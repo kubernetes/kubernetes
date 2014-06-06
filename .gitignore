@@ -1,0 +1,17 @@
+# OSX leaves these everywhere on SMB shares
+._*
+
+# Eclipse files
+.classpath
+.project
+.settings/**
+
+# This is where the result of the go build goes
+/target/**
+/target
+
+# This is where we stage releases
+/release/**
+
+# Emacs save files
+*~

@@ -1,0 +1,18 @@
+  {
+    "id": "frontendController",
+    "desiredState": {
+      "replicas": 3,
+      "replicasInSet": {"name": "frontend"},
+      "taskTemplate": {
+        "desiredState": {
+           "manifest": {
+             "containers": [{
+               "image": "brendanburns/php-redis",
+               "ports": [{"containerPort": 80, "hostPort": 8080}]
+             }]
+           }
+         },
+         "labels": {"name": "frontend"}
+        }},
+    "labels": {"name": "frontend"}
+  }

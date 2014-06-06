@@ -1,0 +1,73 @@
+#server {
+	#listen   80; ## listen for ipv4; this line is default and implied
+	#listen   [::]:80 default_server ipv6only=on; ## listen for ipv6
+
+#	root /usr/share/nginx/www;
+#	index index.html index.htm;
+
+	# Make site accessible from http://localhost/
+#	server_name localhost;
+#       location / {
+#         auth_basic            "Restricted";
+#          auth_basic_user_file  /usr/share/nginx/htpasswd;
+
+          # Proxy settings.
+#          proxy_pass http://localhost:8080/;
+#          proxy_connect_timeout 159s;
+#          proxy_send_timeout   600s;
+#          proxy_read_timeout   600s;
+#          proxy_buffer_size    64k;
+#          proxy_buffers     16 32k;
+#          proxy_busy_buffers_size 64k;
+#          proxy_temp_file_write_size 64k;
+#        }
+#}
+
+# HTTPS server
+#
+server {
+        listen 443;
+        server_name localhost;
+
+        root html;
+        index index.html index.htm;
+
+        ssl on;
+        ssl_certificate /usr/share/nginx/server.cert;
+        ssl_certificate_key /usr/share/nginx/server.key;
+
+        ssl_session_timeout 5m;
+
+        ssl_protocols SSLv3 TLSv1;
+        ssl_ciphers ALL:!ADH:!EXPORT56:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv3:+EXP;
+        ssl_prefer_server_ciphers on;
+
+        location / {
+          auth_basic            "Restricted";
+          auth_basic_user_file  /usr/share/nginx/htpasswd;
+
+          # Proxy settings
+          proxy_pass http://localhost:8080/;
+          proxy_connect_timeout 159s;
+          proxy_send_timeout   600s;
+          proxy_read_timeout   600s;
+          proxy_buffer_size    64k;
+          proxy_buffers     16 32k;
+          proxy_busy_buffers_size 64k;
+          proxy_temp_file_write_size 64k;
+        }
+        location /etcd/ {
+          auth_basic            "Restricted";
+          auth_basic_user_file  /usr/share/nginx/htpasswd;
+
+          # Proxy settings
+          proxy_pass http://localhost:4001/;
+          proxy_connect_timeout 159s;
+          proxy_send_timeout   600s;
+          proxy_read_timeout   600s;
+          proxy_buffer_size    64k;
+          proxy_buffers     16 32k;
+          proxy_busy_buffers_size 64k;
+          proxy_temp_file_write_size 64k;
+        }
+}

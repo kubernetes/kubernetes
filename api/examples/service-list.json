@@ -1,0 +1,19 @@
+{
+    "items": [
+        {
+            "id": "example1",
+            "port": 8000,
+            "labels": {
+                "name": "nginx"
+            }
+        },
+        {
+            "id": "example2",
+            "port": 8080,
+            "labels": {
+                "env": "prod",
+                "name": "jetty"
+            }
+        }
+    ]
+}

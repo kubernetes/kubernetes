@@ -1,0 +1,46 @@
+{
+    "items": [
+        {
+            "id": "my-task-1",
+            "labels": {
+                "name": "testRun",
+                "replicationController": "testRun"
+            },
+            "desiredState": {
+              "manifest": {
+                "containers": [{
+                  "image": "dockerfile/nginx",
+                  "ports": [{
+                    "hostPort": 8080,
+                    "containerPort": 80
+                  }]
+                }
+              }
+            },
+            "currentState": {
+                "host": "host-1"
+            }
+        },
+        {
+            "id": "my-task-2",
+            "labels": {
+                "name": "testRun",
+                "replicationController": "testRun"
+            },
+            "desiredState": {
+              "manifest": {
+                "containers": [{
+                  "image": "dockerfile/nginx",
+                  "ports": [{
+                    "hostPort": 8080,
+                    "containerPort": 80
+                  }]
+                }
+              }
+            },
+            "currentState": {
+                "host": "host-2"
+            }
+        }
+    ]
+}

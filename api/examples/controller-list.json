@@ -1,0 +1,30 @@
+{
+    "items": [
+        {
+            "id": "testRun",
+            "desiredState": {
+                "replicas": 2,
+                "replicasInSet": {
+                    "name": "testRun"
+                },
+                "taskTemplate": {
+                    "desiredState": {
+                        "image": "dockerfile/nginx",
+                        "networkPorts": [
+                            {
+                                "hostPort": 8080,
+                                "containerPort": 80
+                            }
+                        ]
+                    },
+                    "labels": {
+                        "name": "testRun"
+                    }
+                }
+            },
+            "labels": {
+                "name": "testRun"
+            }
+        }
+    ]
+}

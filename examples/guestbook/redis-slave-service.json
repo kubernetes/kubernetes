@@ -1,0 +1,7 @@
+{
+  "id": "redisslave",
+  "port": 10001,
+  "labels": {
+    "name": "redisslave"
+  }
+}

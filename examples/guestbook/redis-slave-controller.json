@@ -1,0 +1,18 @@
+  {
+    "id": "redisSlaveController",
+    "desiredState": {
+      "replicas": 2,
+      "replicasInSet": {"name": "redisslave"},
+      "taskTemplate": {
+        "desiredState": {
+           "manifest": {
+             "containers": [{
+               "image": "brendanburns/redis-slave",
+               "ports": [{"containerPort": 6379, "hostPort": 6380}]
+             }]
+           }
+         },
+         "labels": {"name": "redisslave"}
+        }},
+    "labels": {"name": "redisslave"}
+  }

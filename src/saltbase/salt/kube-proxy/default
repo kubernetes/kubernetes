@@ -1,0 +1,2 @@
+{%- set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() %}
+DAEMON_ARGS="$DAEMON_ARGS --etcd_servers=http://{{ ips[0][0] }}:4001"

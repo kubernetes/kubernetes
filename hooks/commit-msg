@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [[ "$(grep -c "# then delete this line" $1)" == "1" ]]; then
+  echo "Unresolved gofmt errors. Aborting commit."
+  echo "The message of your attempted commit was:"
+  cat $1
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,1 @@
+DOCKER_OPTS="--bridge cbr0 --iptables=false"

@@ -1,0 +1,19 @@
+{
+  "id": "redis-master-2",
+  "desiredState": {
+    "manifest": {
+      "containers": [{
+        "name": "master",
+        "image": "dockerfile/redis",
+        "ports": [{
+          "containerPort": 6379,
+          "hostPort": 6379 
+        }]
+      }]
+    }
+  },
+  "labels": {
+    "name": "redis-master"
+  }
+}
+    
