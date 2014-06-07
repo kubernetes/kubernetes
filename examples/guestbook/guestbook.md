@@ -5,7 +5,7 @@ This example shows how to build a simple multi-tier web application using Kubern
 The example combines a web frontend, a redis master for storage and a replicated set of redis slaves.
 
 ### Step Zero: Prerequisites
-This example assumes that you have forked the repository and turned up a Kubernetes cluster.
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#setup).
 
 
 ### Step One: Turn up the redis master.
