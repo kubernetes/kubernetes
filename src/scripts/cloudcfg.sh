@@ -20,5 +20,5 @@
 
 detect-master
 
-./target/cloudcfg -h https://${KUBE_MASTER_IP} $@
+$(dirname $0)/../../target/cloudcfg -h https://${KUBE_MASTER_IP} $@
 
