@@ -22,23 +22,23 @@ set -e
 
 # Use testing config
 export KUBE_CONFIG_FILE="config-test.sh"
-source $(dirname $0)/util.sh
+source $(dirname $0)/../cluster/util.sh
 
 # Build a release
 $(dirname $0)/../release/release.sh
 
 # Now bring a test cluster up with that release.
-$(dirname $0)/kube-up.sh
+$(dirname $0)/../cluster/kube-up.sh
 
 # Auto shutdown cluster when we exit
 function shutdown-test-cluster () {
   echo "Shutting down test cluster in background."
-  $(dirname $0)/kube-down.sh > /dev/null &
+  $(dirname $0)/../cluster/kube-down.sh > /dev/null &
 }
 trap shutdown-test-cluster EXIT
 
 # Launch a container
-$(dirname $0)/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+$(dirname $0)/../cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
 
 # Get minion IP addresses
 detect-minions

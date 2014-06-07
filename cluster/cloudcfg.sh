@@ -14,21 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ "$(which etcd)" == "" ]; then
-	echo "etcd must be in your PATH"
-	exit 1
+#!/bin/bash
+
+source $(dirname $0)/util.sh
+
+CLOUDCFG=$(dirname $0)/../output/go/cloudcfg
+if [ ! -x $CLOUDCFG ]; then
+  echo "Could not find cloudcfg binary. Run hack/build-go.sh to build it."
+  exit 1
 fi
 
-# Stop right away if the build fails
-set -e
+detect-master
 
-./src/scripts/build-go.sh
-
-etcd -name test -data-dir /tmp/foo > /tmp/etcd.log &
-
-sleep 5
-
-./target/integration
-
-killall etcd
-rm -rf /tmp/foo
+$CLOUDCFG -h https://${KUBE_MASTER_IP} $@
