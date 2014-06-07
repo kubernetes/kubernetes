@@ -50,7 +50,7 @@ You should see a single redis master task.  It will also display the machine tha
 sudo docker ps
 ```
 
-And see the actual task.  (note that initial ```docker pull``` may take a few minutes, depending on network conditions.
+And see the actual task.  (Note that initial ```docker pull``` may take a few minutes, depending on network conditions.)
 
 ### Step Two: Turn up the master service.
 A Kubernetes 'service' is named load balancer that proxies traffic to one or more containers.  The services in a Kubernetes cluster are discoverable inside other containers via environment variables.  Services find the containers to load balance based on task labels.  The task that you created in Step One has the label "name=redis-master", so the corresponding service is defined by that label.  Create a file named redis-master-service.json that contains:
@@ -68,7 +68,7 @@ A Kubernetes 'service' is named load balancer that proxies traffic to one or mor
 Once you have that service description, you can create the service with the cloudcfg cli:
 
 ```shell
-./src/scripts/cloudcfg.sh -c redis-master-service create /services
+./src/scripts/cloudcfg.sh -c redis-master-service.json create /services
 ```
 
 Once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 10000).
@@ -131,7 +131,7 @@ Just like the master, we want to have a service to proxy connections to the read
 }
 ```
 
-This time the label query for the service is 'name=redis-slave'
+This time the label query for the service is 'name=redis-slave'.
 
 Now that you have created the service specification, create it in your cluster with the cloudcfg cli:
 
@@ -219,4 +219,4 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the Google Cloud Console, and visit http://&lt;host-ip&gt;:8080, note you may need to open the firewall for port 8080 using the console or the gcloud tool.
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the Google Cloud Console, and visit http://&lt;host-ip&gt;:8080. Note, you may need to open the firewall for port 8080 using the console or the gcloud tool.
