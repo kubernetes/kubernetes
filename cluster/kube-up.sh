@@ -62,8 +62,8 @@ HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
   echo "MASTER_NAME=${MASTER_NAME}"
   echo "MASTER_RELEASE_TAR=${RELEASE_NORMALIZED}/master-release.tgz"
   echo "MASTER_HTPASSWD='${HTPASSWD}'"
-  cat $(dirname $0)/templates/download-release.sh
-  cat $(dirname $0)/templates/salt-master.sh
+  grep -v "^#" $(dirname $0)/templates/download-release.sh
+  grep -v "^#" $(dirname $0)/templates/salt-master.sh
 ) > ${KUBE_TEMP}/master-start.sh
 
 echo "Starting VMs and configuring firewalls"
@@ -86,7 +86,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "#! /bin/bash"
     echo "MASTER_NAME=${MASTER_NAME}"
     echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
-    cat $(dirname $0)/templates/salt-minion.sh
+    grep -v "^#" $(dirname $0)/templates/salt-minion.sh
   ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
   gcloud compute instances create ${MINION_NAMES[$i]} \
