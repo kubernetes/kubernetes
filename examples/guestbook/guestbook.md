@@ -73,7 +73,7 @@ cluster/cloudcfg.sh -c redis-master-service.json create /services
 
 Once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 10000).
 
-### Step Three: Turn up the replicated slave service.
+### Step Three: Turn up the replicated slave tasks.
 Although the redis master is a single task, the redis read slaves are a 'replicated' task, in Kubernetes, a replication controller is responsible for managing multiple instances of a replicated task.  Create a file named `redis-slave-controller.json` that contains:
 
 ```javascript
@@ -139,7 +139,7 @@ Now that you have created the service specification, create it in your cluster w
 cluster/cloudcfg.sh -c redis-slave-service.json create /services
 ```
 
-### Step Five: Create the frontend service.
+### Step Five: Create the frontend task.
 
 This is a simple PHP server that is configured to talk to both the slave and master services depdending on if the request is a read or a write.  It exposes a simple AJAX interface, and serves an angular based U/X.  Like the redis read slaves it is a replicated service instantiated by a replication controller.  Create a file named `frontend-controller.json`:
 
