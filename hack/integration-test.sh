@@ -14,10 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script will build a dev release and push it to an existing cluster.
+if [ "$(which etcd)" == "" ]; then
+	echo "etcd must be in your PATH"
+	exit 1
+fi
 
-# First build a release
-$(dirname $0)/../release/release.sh
+# Stop right away if the build fails
+set -e
 
-# Now push this out to the cluster
-$(dirname $0)/kube-push.sh
+$(dirname $0)/build-go.sh
+
+ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
+trap "rm -rf ${ETCD_DIR}" EXIT
+
+etcd -name test -data-dir ${ETCD_DIR} > /tmp/etcd.log &
+ETCD_PID=$!
+
+sleep 5
+
+$(dirname $0)/../output/go/integration
+
+kill $ETCD_PID

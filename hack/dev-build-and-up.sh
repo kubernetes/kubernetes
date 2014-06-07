@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
+# This script will build a dev release and bring up a new cluster with that
+# release.
 
-. $(dirname $0)/util.sh
+# First build a release
+$(dirname $0)/../release/release.sh
 
-detect-master
-
-$(dirname $0)/../../target/cloudcfg -h https://${KUBE_MASTER_IP} $@
-
+# Now bring a new cluster up with that release.
+$(dirname $0)/../cluster/kube-up.sh

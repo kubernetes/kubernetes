@@ -7,11 +7,8 @@
 .settings/**
 
 # This is where the result of the go build goes
-/target/**
-/target
-
-# This is where we stage releases
-/release/**
+/output/**
+/output
 
 # Emacs save files
 *~

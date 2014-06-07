@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,17 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(jbeda): Provide a way to override project
-ZONE=us-central1-b
-MASTER_SIZE=f1-micro
-MINION_SIZE=f1-micro
-NUM_MINIONS=2
-# gcloud will expand this to the latest supported image.
-IMAGE=debian-7-backports
-INSTANCE_PREFIX="e2e-test-${USER}"
-MASTER_NAME="${INSTANCE_PREFIX}-master"
-MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
-MINION_IP_RANGES=($(eval echo "10.245.{1..${NUM_MINIONS}}.0/24"))
+# This script will build a dev release and push it to an existing cluster.
 
+# First build a release
+$(dirname $0)/../release/release.sh
+
+# Now push this out to the cluster
+$(dirname $0)/../cluster/kube-push.sh

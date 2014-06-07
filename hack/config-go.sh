@@ -15,9 +15,9 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-pushd $(dirname "${BASH_SOURCE}")/../.. >/dev/null
+pushd $(dirname "${BASH_SOURCE}")/.. >/dev/null
 KUBE_REPO_ROOT="${PWD}"
-KUBE_TARGET="${KUBE_REPO_ROOT}/target"
+KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
 popd >/dev/null
 
 mkdir -p "${KUBE_TARGET}"

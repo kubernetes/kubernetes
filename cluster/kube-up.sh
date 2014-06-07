@@ -47,7 +47,7 @@ trap "rm -rf ${KUBE_TEMP}" EXIT
 
 get-password
 echo "Generating password: $user:$passwd"
-htpasswd -b -c /tmp/htpasswd $user $passwd
+htpasswd -b -c ${KUBE_TEMP}/htpasswd $user $passwd
 cat << EOF > ~/.kubernetes_auth
 {
   "User": "$user",
@@ -55,15 +55,15 @@ cat << EOF > ~/.kubernetes_auth
 }
 EOF
 chmod 0600 ~/.kubernetes_auth
-HTPASSWD=$(cat /tmp/htpasswd)
+HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
 (
   echo "#! /bin/bash"
   echo "MASTER_NAME=${MASTER_NAME}"
   echo "MASTER_RELEASE_TAR=${RELEASE_NORMALIZED}/master-release.tgz"
   echo "MASTER_HTPASSWD='${HTPASSWD}'"
-  cat $(dirname $0)/../templates/download-release.sh
-  cat $(dirname $0)/../templates/salt-master.sh
+  cat $(dirname $0)/templates/download-release.sh
+  cat $(dirname $0)/templates/salt-master.sh
 ) > ${KUBE_TEMP}/master-start.sh
 
 echo "Starting VMs and configuring firewalls"
@@ -86,7 +86,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "#! /bin/bash"
     echo "MASTER_NAME=${MASTER_NAME}"
     echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
-    cat $(dirname $0)/../templates/salt-minion.sh
+    cat $(dirname $0)/templates/salt-minion.sh
   ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
   gcloud compute instances create ${MINION_NAMES[$i]} \
@@ -132,7 +132,6 @@ done
 
 echo
 echo "Kubernetes cluster is running.  Access the master at:"
-
 echo
 echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
 echo

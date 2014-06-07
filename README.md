@@ -14,32 +14,32 @@ Kubernetes is an open source reference implementation of container cluster manag
 ### Setup
 ```
 cd kubernetes
-./src/scripts/dev-build-and-up.sh
+hack/dev-build-and-up.sh
 ```
 
 ### Running a container (simple version)
 ```
 cd kubernetes
-./src/scripts/build-go.sh
-./src/scripts/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+hack/build-go.sh
+cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
 ```
 
 This will spin up two containers running Nginx mapping port 80 to 8080.
 
 To stop the container:
 ```
-./src/scripts/cloudcfg.sh stop myNginx
+cluster/cloudcfg.sh stop myNginx
 ```
 
 To delete the container:
 ```
-./src/scripts/cloudcfg.sh rm myNginx
+cluster/cloudcfg.sh rm myNginx
 ```
 
 ### Running a container (more complete version)
 ```
 cd kubernetes
-./src/scripts/cloudcfg.sh -c examples/task.json create /tasks
+cluster/cloudcfg.sh -c examples/task.json create /tasks
 ```
 
 Where task.json contains something like:
@@ -59,12 +59,12 @@ Where task.json contains something like:
 }
 ```
 
-Look in the ```examples/``` for more examples
+Look in the `examples/` for more examples
 
 ### Tearing down the cluster
 ```
 cd kubernetes
-./src/scripts/kube-down.sh
+cluster/kube-down.sh
 ```
 
 ## Development
@@ -82,7 +82,7 @@ ln -s "../../hooks/commit-msg" .git/hooks/commit-msg
 ### Unit tests
 ```
 cd kubernetes
-./src/scripts/test-go.sh
+hack/test-go.sh
 ```
 
 ### Coverage
@@ -104,7 +104,7 @@ sudo ln -s "$REPO_ROOT/target/bin/etcd" /usr/bin/etcd
 
 ```
 cd kubernetes
-./src/scripts/integration-test.sh
+hack/integration-test.sh
 ```
 
 ### Keeping your development fork in sync
