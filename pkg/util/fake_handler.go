@@ -54,10 +54,10 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 
 func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
 	if f.RequestReceived.URL.Path != expectedPath {
-		t.Errorf("Unexpected request path: %s", f.RequestReceived.URL.Path)
+		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectedPath)
 	}
 	if f.RequestReceived.Method != expectedMethod {
-		t.Errorf("Unexpected method: %s", f.RequestReceived.Method)
+		t.Errorf("Unexpected method: %q, expected: %q", f.RequestReceived.Method, expectedMethod)
 	}
 	if body != nil {
 		if *body != f.RequestBody {
