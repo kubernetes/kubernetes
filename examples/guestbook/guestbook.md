@@ -219,4 +219,6 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the Google Cloud Console, and visit http://&lt;host-ip&gt;:8080. Note, you may need to open the firewall for port 8080 using the console or the gcloud tool.
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console], and visit `http://<host-ip>:8080`. Note, you may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcloud` tool.
+
+[cloud-console]: https://console.developer.google.com
