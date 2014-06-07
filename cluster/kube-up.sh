@@ -78,7 +78,7 @@ gcloud compute instances create ${MASTER_NAME}\
   --machine-type ${MASTER_SIZE} \
   --image ${IMAGE} \
   --tags ${MASTER_TAG} \
-  --scopes compute-rw storage-full \
+  --no-scopes \
   --metadata-from-file startup-script=${KUBE_TEMP}/master-start.sh &
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -95,6 +95,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     --machine-type ${MINION_SIZE} \
     --image ${IMAGE} \
     --tags ${MINION_TAG} \
+    --no-scopes \
     --can-ip-forward \
     --metadata-from-file startup-script=${KUBE_TEMP}/minion-start-${i}.sh &
 
