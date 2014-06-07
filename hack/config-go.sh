@@ -15,6 +15,12 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
+if [ "$(which go)" == "" ]; then
+	echo "Can't find 'go' in PATH, please fix and retry."
+	echo "See http://golang.org/doc/install for installation instructions."
+	exit 1
+fi
+
 pushd $(dirname "${BASH_SOURCE}")/.. >/dev/null
 KUBE_REPO_ROOT="${PWD}"
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
