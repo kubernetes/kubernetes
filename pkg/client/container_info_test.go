@@ -27,6 +27,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
+func expectNoError(t *testing.T, err error) {
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+}
+
 func TestHTTPContainerInfo(t *testing.T) {
 	body := `{"items":[]}`
 	fakeHandler := util.FakeHandler{
