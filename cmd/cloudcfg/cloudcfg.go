@@ -31,14 +31,16 @@ import (
 const APP_VERSION = "0.1"
 
 // The flag package provides a default help printer via -h switch
-var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
-var httpServer *string = flag.String("h", "", "The host to connect to.")
-var config *string = flag.String("c", "", "Path to the config file.")
-var labelQuery *string = flag.String("l", "", "Label query to use for listing")
-var updatePeriod *time.Duration = flag.Duration("u", 60*time.Second, "Update interarrival in seconds")
-var portSpec *string = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
-var servicePort *int = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
-var authConfig *string = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user")
+var (
+	versionFlag  = flag.Bool("v", false, "Print the version number.")
+	httpServer   = flag.String("h", "", "The host to connect to.")
+	config       = flag.String("c", "", "Path to the config file.")
+	labelQuery   = flag.String("l", "", "Label query to use for listing")
+	updatePeriod = flag.Duration("u", 60*time.Second, "Update interarrival in seconds")
+	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
+	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
+	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user")
+)
 
 func usage() {
 	log.Fatal("Usage: cloudcfg -h <host> [-c config/file.json] [-p <hostPort>:<containerPort>,..., <hostPort-n>:<containerPort-n> <method> <path>")
