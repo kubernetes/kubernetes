@@ -82,6 +82,8 @@ gcloud compute instances create ${MASTER_NAME}\
   --restart-on-failure \
   --metadata-from-file startup-script=${KUBE_TEMP}/master-start.sh &
 
+GCLOUD_VERSION=$(gcloud version | grep compute | cut -f 2 -d ' ')
+
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   (
     echo "#! /bin/bash"
@@ -101,10 +103,20 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     --can-ip-forward \
     --metadata-from-file startup-script=${KUBE_TEMP}/minion-start-${i}.sh &
 
-  gcloud compute routes create ${MINION_NAMES[$i]} \
-    --project ${PROJECT} \
-    --destination-range ${MINION_IP_RANGES[$i]} \
-    --next-hop-instance ${ZONE}/instances/${MINION_NAMES[$i]} &
+  # 'gcloud compute' past 2014.06.08 breaks the way we are specifying
+  # --next-hop-instance and there is no way to be compatible with both versions.
+  if [[ $GCLOUD_VERSION < "2014.06.08" ]]; then
+    gcloud compute routes create ${MINION_NAMES[$i]} \
+      --project ${PROJECT} \
+      --destination-range ${MINION_IP_RANGES[$i]} \
+      --next-hop-instance ${ZONE}/instances/${MINION_NAMES[$i]} &
+  else
+    gcloud compute routes create ${MINION_NAMES[$i]} \
+      --project ${PROJECT} \
+      --destination-range ${MINION_IP_RANGES[$i]} \
+      --next-hop-instance ${MINION_NAMES[$i]} \
+      --next-hop-instance-zone ${ZONE} &
+  fi
 done
 
 FAIL=0
