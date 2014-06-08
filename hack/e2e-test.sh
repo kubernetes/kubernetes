@@ -40,6 +40,11 @@ trap shutdown-test-cluster EXIT
 # Launch a container
 $(dirname $0)/../cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
 
+# Container turn up on a clean cluster can take a while for the docker image pull.
+# Sleep for 2 minutes just to be sure.
+echo "Waiting for containers to come up."
+sleep 120
+
 # Get minion IP addresses
 detect-minions
 
