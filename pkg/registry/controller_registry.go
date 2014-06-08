@@ -39,7 +39,8 @@ func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
 		result = ReplicationControllerList{
-			Items: controllers,
+			JSONBase: JSONBase{Kind: "cluster#replicationControllerList"},
+			Items:    controllers,
 		}
 	}
 	return result, err
