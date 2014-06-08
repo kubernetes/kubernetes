@@ -42,7 +42,7 @@ detect-master
 
 (
   echo MASTER_RELEASE_TAR=$RELEASE_NORMALIZED/master-release.tgz
-  cat $(dirname $0)/templates/download-release.sh
+  grep -v "^#" $(dirname $0)/templates/download-release.sh
   echo "echo Executing configuration"
   echo "sudo salt '*' mine.update"
   echo "sudo salt --force-color '*' state.highstate"
