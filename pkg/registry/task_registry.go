@@ -76,6 +76,7 @@ func (storage *TaskRegistryStorage) List(url *url.URL) (interface{}, error) {
 			Items: tasks,
 		}
 	}
+	result.Kind = "cluster#taskList"
 	return result, err
 }
 
@@ -89,6 +90,7 @@ func (storage *TaskRegistryStorage) Get(id string) (interface{}, error) {
 		return task, err
 	}
 	task.CurrentState.Info = info
+	task.Kind = "cluster#task"
 	return task, err
 }
 

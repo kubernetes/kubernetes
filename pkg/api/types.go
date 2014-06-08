@@ -130,6 +130,7 @@ type TaskTemplate struct {
 
 // ServiceList holds a list of services
 type ServiceList struct {
+	JSONBase
 	Items []Service `json:"items" yaml:"items"`
 }
 
