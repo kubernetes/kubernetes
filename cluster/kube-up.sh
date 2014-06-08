@@ -79,6 +79,7 @@ gcloud compute instances create ${MASTER_NAME}\
   --image ${IMAGE} \
   --tags ${MASTER_TAG} \
   --no-scopes \
+  --restart-on-failure \
   --metadata-from-file startup-script=${KUBE_TEMP}/master-start.sh &
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -96,6 +97,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     --image ${IMAGE} \
     --tags ${MINION_TAG} \
     --no-scopes \
+    --restart-on-failure \
     --can-ip-forward \
     --metadata-from-file startup-script=${KUBE_TEMP}/minion-start-${i}.sh &
 
