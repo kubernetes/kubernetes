@@ -60,11 +60,15 @@ func GetServiceEnvironmentVariables(registry ServiceRegistry, machine string) ([
 }
 
 func (sr *ServiceRegistryStorage) List(*url.URL) (interface{}, error) {
-	return sr.registry.ListServices()
+	list, err := sr.registry.ListServices()
+	list.Kind = "cluster#serviceList"
+	return list, err
 }
 
 func (sr *ServiceRegistryStorage) Get(id string) (interface{}, error) {
-	return sr.registry.GetService(id)
+	service, err := sr.registry.GetService(id)
+	service.Kind = "cluster#service"
+	return service, err
 }
 
 func (sr *ServiceRegistryStorage) Delete(id string) error {

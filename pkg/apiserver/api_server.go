@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package apiserver is ...
+// Package apiserver contains the code that provides a RESTful api service
 package apiserver
 
 import (
@@ -50,13 +50,14 @@ type Status struct {
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type ApiServer struct {
 	prefix  string
+	apiName string
 	storage map[string]RESTStorage
 }
 
 // New creates a new ApiServer object.
 // 'storage' contains a map of handlers.
 // 'prefix' is the hosting path prefix.
-func New(storage map[string]RESTStorage, prefix string) *ApiServer {
+func New(storage map[string]RESTStorage, prefix, apiName string) *ApiServer {
 	return &ApiServer{
 		storage: storage,
 		prefix:  prefix,

@@ -35,7 +35,7 @@ func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTSt
 }
 
 func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
-	var result ReplicationControllerList
+	result := ReplicationControllerList{JSONBase: JSONBase{Kind: "cluster#replicationControllerList"}}
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
 		result = ReplicationControllerList{
@@ -46,7 +46,9 @@ func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
 }
 
 func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
-	return storage.registry.GetController(id)
+	controller, err := storage.registry.GetController(id)
+	controller.Kind = "cluster#replicationController"
+	return controller, err
 }
 
 func (storage *ControllerRegistryStorage) Delete(id string) error {
