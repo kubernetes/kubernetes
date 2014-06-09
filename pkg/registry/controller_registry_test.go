@@ -124,9 +124,9 @@ func TestExtractControllerJson(t *testing.T) {
 	expectNoError(t, err)
 	controllerOut, err := storage.Extract(string(body))
 	expectNoError(t, err)
-	jsonOut, err := json.Marshal(controllerOut)
-	expectNoError(t, err)
-	if string(body) != string(jsonOut) {
+	// Extract adds a Kind
+	controller.Kind = "cluster#replicationController"
+	if !reflect.DeepEqual(controller, controllerOut) {
 		t.Errorf("Expected %#v, found %#v", controller, controllerOut)
 	}
 }

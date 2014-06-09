@@ -59,6 +59,7 @@ func (storage *ControllerRegistryStorage) Delete(id string) error {
 func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, error) {
 	result := ReplicationController{}
 	err := json.Unmarshal([]byte(body), &result)
+	result.Kind = "cluster#replicationController"
 	return result, err
 }
 

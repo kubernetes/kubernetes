@@ -78,6 +78,7 @@ func (sr *ServiceRegistryStorage) Delete(id string) error {
 func (sr *ServiceRegistryStorage) Extract(body string) (interface{}, error) {
 	var svc Service
 	err := json.Unmarshal([]byte(body), &svc)
+	svc.Kind = "cluster#service"
 	return svc, err
 }
 
