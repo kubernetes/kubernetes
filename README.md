@@ -6,43 +6,58 @@ Kubernetes is an open source reference implementation of container cluster manag
 
 ### Prerequisites
 
-1. You need a Google Cloud Platform account with billing enabled.  Visit http://cloud.google.com/console for more details
-2. You must have Go installed: [www.golang.org](http://www.golang.org)
+1. You need a Google Cloud Platform account with billing enabled. Visit [http://cloud.google.com/console]() for more details
+2. You must have Go installed: [www.golang.org](http://www.golang.org).
 3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
-4. Get the Kubernetes source:  `git clone https://github.com/GoogleCloudPlatform/kubernetes.git`
+4. Get the Kubernetes source:
+
+        git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 
 ### Setup
+
+The setup script builds Kubernetes, then creates Google Compute Engine instances, firewall rules, and routes:
+
 ```
 cd kubernetes
 hack/dev-build-and-up.sh
 ```
 
 ### Running a container (simple version)
+
+Once you have your instances up and running, the `build-go.sh` script sets up
+your Go workspace and builds the Go components.
+
+The `cloudcfg.sh` script spins up two containers, running [Nginx](http://nginx.org/en/) and with port 80 mapped to 8080:
+
 ```
 cd kubernetes
 hack/build-go.sh
 cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
 ```
 
-This will spin up two containers running Nginx mapping port 80 to 8080.
-
-To stop the container:
+To stop the containers:
 ```
 cluster/cloudcfg.sh stop myNginx
 ```
 
-To delete the container:
+To delete the containers:
 ```
 cluster/cloudcfg.sh rm myNginx
 ```
 
 ### Running a container (more complete version)
+
+
+Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`:
+
+
 ```
 cd kubernetes
-cluster/cloudcfg.sh -c examples/task.json create /tasks
+cluster/cloudcfg.sh -c api/examples/task.json create /tasks
 ```
 
 Where task.json contains something like:
+
 ```
 {
   "ID": "nginx",
@@ -59,7 +74,7 @@ Where task.json contains something like:
 }
 ```
 
-Look in the `examples/` for more examples
+Look in `api/examples/` for more examples
 
 ### Tearing down the cluster
 ```
