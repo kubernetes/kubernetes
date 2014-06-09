@@ -40,6 +40,8 @@ var (
 	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
 	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user")
+	json         = flag.Bool("json", false, "If true, print raw JSON for responses")
+	yaml         = flag.Bool("yaml", false, "If true, print raw YAML for responses")
 )
 
 func usage() {
@@ -62,6 +64,15 @@ func main() {
 	url := *httpServer + "/api/v1beta1" + flag.Arg(1)
 	var request *http.Request
 	var err error
+
+	var printer cloudcfg.ResourcePrinter
+	if *json {
+		printer = &cloudcfg.IdentityPrinter{}
+	} else if *yaml {
+		printer = &cloudcfg.YAMLPrinter{}
+	} else {
+		printer = &cloudcfg.HumanReadablePrinter{}
+	}
 
 	auth, err := cloudcfg.LoadAuthInfo(*authConfig)
 	if err != nil {
@@ -124,5 +135,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: %#v", err)
 	}
-	fmt.Println(body)
+	err = printer.Print(body, os.Stdout)
+	if err != nil {
+		log.Fatalf("Failed to print: %#v", err)
+	}
+	fmt.Print("\n")
 }
