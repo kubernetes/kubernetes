@@ -101,6 +101,7 @@ func (storage *PodRegistryStorage) Delete(id string) error {
 func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
 	pod := Pod{}
 	err := json.Unmarshal([]byte(body), &pod)
+	pod.Kind = "cluster#pod"
 	return pod, err
 }
 

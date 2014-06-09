@@ -18,6 +18,7 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -127,9 +128,9 @@ func TestExtractJson(t *testing.T) {
 	expectNoError(t, err)
 	podOut, err := storage.Extract(string(body))
 	expectNoError(t, err)
-	jsonOut, err := json.Marshal(podOut)
-	expectNoError(t, err)
-	if string(body) != string(jsonOut) {
+	// Extract adds in a kind
+	pod.Kind = "cluster#pod"
+	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)
 	}
 }
