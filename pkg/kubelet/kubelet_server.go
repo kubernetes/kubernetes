@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package kubelet
 
 import (
@@ -26,8 +27,15 @@ import (
 )
 
 type KubeletServer struct {
-	Kubelet       *Kubelet
+	Kubelet       kubeletInterface
 	UpdateChannel chan api.ContainerManifest
+}
+
+// kubeletInterface contains all the kubelet methods required by the server.
+// For testablitiy.
+type kubeletInterface interface {
+	GetContainerID(name string) (string, error)
+	GetContainerInfo(name string) (string, error)
 }
 
 func (s *KubeletServer) error(w http.ResponseWriter, err error) {
