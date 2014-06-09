@@ -44,7 +44,7 @@ func (y *YAMLPrinter) Print(data string, w io.Writer) error {
 // HumanReadablePrinter attempts to provide more elegant output
 type HumanReadablePrinter struct{}
 
-var taskColumns = []string{"Name", "Image(s)", "Host", "Labels"}
+var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
 var replicationControllerColumns = []string{"Name", "Image(s)", "Label Query", "Replicas"}
 var serviceColumns = []string{"Name", "Label Query", "Port"}
 
@@ -81,15 +81,15 @@ func (h *HumanReadablePrinter) makeLabelsList(labels map[string]string) string {
 	return strings.Join(vals, ",")
 }
 
-func (h *HumanReadablePrinter) printTask(task api.Task, w io.Writer) error {
+func (h *HumanReadablePrinter) printPod(pod api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		task.ID, h.makeImageList(task.DesiredState.Manifest), task.CurrentState.Host, h.makeLabelsList(task.Labels))
+		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host, h.makeLabelsList(pod.Labels))
 	return err
 }
 
-func (h *HumanReadablePrinter) printTaskList(taskList api.TaskList, w io.Writer) error {
-	for _, task := range taskList.Items {
-		if err := h.printTask(task, w); err != nil {
+func (h *HumanReadablePrinter) printPodList(podList api.PodList, w io.Writer) error {
+	for _, pod := range podList.Items {
+		if err := h.printPod(pod, w); err != nil {
 			return err
 		}
 	}
@@ -98,7 +98,7 @@ func (h *HumanReadablePrinter) printTaskList(taskList api.TaskList, w io.Writer)
 
 func (h *HumanReadablePrinter) printReplicationController(ctrl api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		ctrl.ID, h.makeImageList(ctrl.DesiredState.TaskTemplate.DesiredState.Manifest), h.makeLabelsList(ctrl.DesiredState.ReplicasInSet), ctrl.DesiredState.Replicas)
+		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), h.makeLabelsList(ctrl.DesiredState.ReplicasInSet), ctrl.DesiredState.Replicas)
 	return err
 }
 
@@ -125,17 +125,19 @@ func (h *HumanReadablePrinter) printServiceList(list api.ServiceList, w io.Write
 	return nil
 }
 
+// TODO replace this with something that returns a concrete printer object, rather than
+//  having the secondary switch below.
 func (h *HumanReadablePrinter) extractObject(data, kind string) (interface{}, error) {
 	// TODO: I think this can be replaced with some reflection and a map[string]type
 	switch kind {
-	case "cluster#task":
-		var obj api.Task
+	case "cluster#pod":
+		var obj api.Pod
 		if err := json.Unmarshal([]byte(data), &obj); err != nil {
 			return nil, err
 		}
 		return obj, nil
-	case "cluster#taskList":
-		var list api.TaskList
+	case "cluster#podList":
+		var list api.PodList
 		if err := json.Unmarshal([]byte(data), &list); err != nil {
 			return nil, err
 		}
@@ -186,12 +188,12 @@ func (h *HumanReadablePrinter) Print(data string, output io.Writer) error {
 		return err
 	}
 	switch obj.(type) {
-	case api.Task:
-		h.printHeader(taskColumns, w)
-		return h.printTask(obj.(api.Task), w)
-	case api.TaskList:
-		h.printHeader(taskColumns, w)
-		return h.printTaskList(obj.(api.TaskList), w)
+	case api.Pod:
+		h.printHeader(podColumns, w)
+		return h.printPod(obj.(api.Pod), w)
+	case api.PodList:
+		h.printHeader(podColumns, w)
+		return h.printPodList(obj.(api.PodList), w)
 	case api.ReplicationController:
 		h.printHeader(replicationControllerColumns, w)
 		return h.printReplicationController(obj.(api.ReplicationController), w)
