@@ -15,7 +15,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
 Create a file named `redis-master.json` describing a single pod, which runs a redis key-value server in a container.
 
-```
+```javascript
 {
   "id": "redis-master-2",
   "desiredState": {
@@ -38,7 +38,7 @@ Create a file named `redis-master.json` describing a single pod, which runs a re
 
 Once you have that pod file, you can create the redis pod in your Kubernetes cluster using the `cloudcfg` CLI:
 
-```
+```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-master.json create /pods
 ```
 
@@ -50,7 +50,7 @@ cluster/cloudcfg.sh list /pods
 
 You'll see a single redis master pod. It will also display the machine that the pod is running on.
 
-```
+```javascript
 Using master: kubernetes-master (external IP: 1.2.3.4)
 {
     "kind": "cluster#podList",
@@ -93,7 +93,7 @@ Using master: kubernetes-master (external IP: 1.2.3.4)
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
-```
+```shell
 $ gcloud compute ssh kubernetes-minion-3 --zone us-central1-b
 $ sudo docker ps
 
@@ -109,7 +109,7 @@ A Kubernetes 'service' is a named load balancer that proxies traffic to one or m
 
 The pod that you created in Step One has the label `name=redis-master`, so the corresponding service is defined by that label.  Create a file named `redis-master-service.json` that contains:
 
-```
+```js
 {
   "id": "redismaster",
   "port": 10000,
@@ -121,7 +121,7 @@ The pod that you created in Step One has the label `name=redis-master`, so the c
 
 Once you have that service description, you can create the service with the `cloudcfg` cli:
 
-```
+```js
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-master-service.json create /services
 
 Using master: kubernetes-master (external IP: 1.2.3.4)
@@ -142,7 +142,7 @@ Although the redis master is a single pod, the redis read slaves are a 'replicat
 
 Create a file named `redis-slave-controller.json` that contains:
 
-```
+```js
   {
     "id": "redisSlaveController",
     "desiredState": {
@@ -165,7 +165,7 @@ Create a file named `redis-slave-controller.json` that contains:
 
 Then you can create the service by running:
 
-```
+```js
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-controller.json create /replicationControllers
 
 Using master: kubernetes-master (external IP: 1.2.3.4)
@@ -208,13 +208,13 @@ Using master: kubernetes-master (external IP: 1.2.3.4)
 
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment.  In particular, the redis slave is started with the following command:
 
-```
+```shell
 redis-server --slaveof $SERVICE_HOST $REDISMASTER_SERVICE_PORT
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
-```
+```js
 $ cluster/cloudcfg.sh list /pods
 
 Using master: kubernetes-master (external IP: 23.236.49.160)
@@ -327,7 +327,7 @@ You will see a single redis master pod and two redis slave pods.
 
 Just like the master, we want to have a service to proxy connections to the read slaves.  In this case, in addition to discovery, the slave service provides transparent load balancing to clients.  As before, create a service specification:
 
-```
+```js
 {
   "id": "redisslave",
   "port": 10001,
@@ -341,7 +341,7 @@ This time the label query for the service is `name=redis-slave`.
 
 Now that you have created the service specification, create it in your cluster with the `cloudcfg` CLI:
 
-```
+```js
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-service.json create /services
 
 Using master: kubernetes-master (external IP: 1.2.3.4)
@@ -361,7 +361,7 @@ This is a simple PHP server that is configured to talk to either the slave or ma
 
 Create a file named `frontend-controller.json`:
 
-```
+```js
 {
   "id": "frontendController",
   "desiredState": {
@@ -384,7 +384,7 @@ Create a file named `frontend-controller.json`:
 
 With this file, you can turn up your frontend with:
 
-```
+```js
 $ cluster/cloudcfg.sh -c examples/guestbook/frontend-controller.json create /replicationControllers
 
 Using master: kubernetes-master (external IP: 1.2.3.4)
@@ -427,7 +427,7 @@ Using master: kubernetes-master (external IP: 1.2.3.4)
 
 Once that's up you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
-```
+```js
 $ cluster/cloudcfg.sh list /pods
 
 Using master: kubernetes-master (external IP: 1.2.3.4)
@@ -635,7 +635,7 @@ You will see a single redis master pod, two redis slaves, and three frontend pod
 
 The code for the PHP service looks like this:
 
-```
+```php
 <?
 
 set_include_path('.:/usr/share/php:/usr/share/pear:/vendor/predis');
