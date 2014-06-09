@@ -40,11 +40,11 @@ type Action struct {
 
 type FakeKubeClient struct {
 	actions []Action
-	tasks   TaskList
+	tasks   PodList
 	ctrl    ReplicationController
 }
 
-func (client *FakeKubeClient) ListTasks(labelQuery map[string]string) (TaskList, error) {
+func (client *FakeKubeClient) ListTasks(labelQuery map[string]string) (PodList, error) {
 	client.actions = append(client.actions, Action{action: "list-tasks"})
 	return client.tasks, nil
 }
@@ -117,7 +117,7 @@ func validateAction(expectedAction, actualAction Action, t *testing.T) {
 
 func TestUpdateWithTasks(t *testing.T) {
 	client := FakeKubeClient{
-		tasks: TaskList{
+		tasks: PodList{
 			Items: []Pod{
 				Pod{JSONBase: JSONBase{ID: "task-1"}},
 				Pod{JSONBase: JSONBase{ID: "task-2"}},
@@ -177,7 +177,7 @@ func TestRunController(t *testing.T) {
 	controller := fakeClient.actions[0].value.(ReplicationController)
 	if controller.ID != name ||
 		controller.DesiredState.Replicas != replicas ||
-		controller.DesiredState.TaskTemplate.DesiredState.Manifest.Containers[0].Image != image {
+		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
 	}
 }
@@ -196,7 +196,7 @@ func TestRunControllerWithService(t *testing.T) {
 	controller := fakeClient.actions[0].value.(ReplicationController)
 	if controller.ID != name ||
 		controller.DesiredState.Replicas != replicas ||
-		controller.DesiredState.TaskTemplate.DesiredState.Manifest.Containers[0].Image != image {
+		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
 	}
 }

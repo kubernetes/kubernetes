@@ -24,7 +24,7 @@ import (
 
 func TestSyncEndpointsEmpty(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{}
-	taskRegistry := MockTaskRegistry{}
+	taskRegistry := MockPodRegistry{}
 
 	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
 	err := endpoints.SyncServiceEndpoints()
@@ -35,7 +35,7 @@ func TestSyncEndpointsError(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
 		err: fmt.Errorf("Test Error"),
 	}
-	taskRegistry := MockTaskRegistry{}
+	taskRegistry := MockPodRegistry{}
 
 	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
 	err := endpoints.SyncServiceEndpoints()
@@ -56,10 +56,10 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	}
-	taskRegistry := MockTaskRegistry{
-		tasks: []Pod{
+	taskRegistry := MockPodRegistry{
+		pods: []Pod{
 			Pod{
-				DesiredState: TaskState{
+				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
 							Container{
@@ -96,7 +96,7 @@ func TestSyncEndpointsTaskError(t *testing.T) {
 			},
 		},
 	}
-	taskRegistry := MockTaskRegistry{
+	taskRegistry := MockPodRegistry{
 		err: fmt.Errorf("test error."),
 	}
 

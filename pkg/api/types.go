@@ -81,8 +81,8 @@ type JSONBase struct {
 	SelfLink          string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 }
 
-// TaskState is the state of a task, used as either input (desired state) or output (current state)
-type TaskState struct {
+// PodState is the state of a pod, used as either input (desired state) or output (current state)
+type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
 	Status   string            `json:"status,omitempty" yaml:"status,omitempty"`
 	Host     string            `json:"host,omitempty" yaml:"host,omitempty"`
@@ -90,24 +90,24 @@ type TaskState struct {
 	Info     interface{}       `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
-type TaskList struct {
+type PodList struct {
 	JSONBase
 	Items []Pod `json:"items" yaml:"items,omitempty"`
 }
 
-// Task is a single task, used as either input (create, update) or as output (list, get)
+// Pod is a collection of containers, used as either input (create, update) or as output (list, get)
 type Pod struct {
 	JSONBase
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	DesiredState TaskState         `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	CurrentState TaskState         `json:"currentState,omitempty" yaml:"currentState,omitempty"`
+	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
+	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
 }
 
 // ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get)
 type ReplicationControllerState struct {
 	Replicas      int               `json:"replicas" yaml:"replicas"`
 	ReplicasInSet map[string]string `json:"replicasInSet,omitempty" yaml:"replicasInSet,omitempty"`
-	TaskTemplate  TaskTemplate      `json:"taskTemplate,omitempty" yaml:"taskTemplate,omitempty"`
+	PodTemplate   PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty"`
 }
 
 type ReplicationControllerList struct {
@@ -122,9 +122,9 @@ type ReplicationController struct {
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
-// TaskTemplate holds the information used for creating tasks
-type TaskTemplate struct {
-	DesiredState TaskState         `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
+// PodTemplate holds the information used for creating pods
+type PodTemplate struct {
+	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 

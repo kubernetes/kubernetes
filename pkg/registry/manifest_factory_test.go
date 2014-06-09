@@ -29,7 +29,7 @@ func TestMakeManifestNoServices(t *testing.T) {
 
 	manifest, err := factory.MakeManifest("machine", Pod{
 		JSONBase: JSONBase{ID: "foobar"},
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
 					Container{
@@ -67,7 +67,7 @@ func TestMakeManifestServices(t *testing.T) {
 	}
 
 	manifest, err := factory.MakeManifest("machine", Pod{
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
 					Container{
@@ -104,7 +104,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 	}
 
 	manifest, err := factory.MakeManifest("machine", Pod{
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
 					Container{

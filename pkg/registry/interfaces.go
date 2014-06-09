@@ -20,7 +20,7 @@ import (
 )
 
 // TaskRegistry is an interface implemented by things that know how to store Task objects
-type TaskRegistry interface {
+type PodRegistry interface {
 	// ListTasks obtains a list of tasks that match query.
 	// Query may be nil in which case all tasks are returned.
 	ListTasks(query *map[string]string) ([]api.Pod, error)

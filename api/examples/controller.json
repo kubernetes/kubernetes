@@ -3,7 +3,7 @@
     "desiredState": {
       "replicas": 2,
       "replicasInSet": {"name": "nginx"},
-      "taskTemplate": {
+      "podTemplate": {
         "desiredState": {
            "manifest": {
              "containers": [{

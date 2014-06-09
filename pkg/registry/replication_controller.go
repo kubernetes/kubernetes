@@ -52,7 +52,7 @@ type RealTaskControl struct {
 }
 
 func (r RealTaskControl) createReplica(controllerSpec ReplicationController) {
-	labels := controllerSpec.DesiredState.TaskTemplate.Labels
+	labels := controllerSpec.DesiredState.PodTemplate.Labels
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
@@ -60,8 +60,8 @@ func (r RealTaskControl) createReplica(controllerSpec ReplicationController) {
 		JSONBase: JSONBase{
 			ID: fmt.Sprintf("%x", rand.Int()),
 		},
-		DesiredState: controllerSpec.DesiredState.TaskTemplate.DesiredState,
-		Labels:       controllerSpec.DesiredState.TaskTemplate.Labels,
+		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
+		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	}
 	_, err := r.kubeClient.CreateTask(task)
 	if err != nil {

@@ -46,7 +46,7 @@ func TestRandomScheduler(t *testing.T) {
 }
 
 func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
-	mockRegistry := MockTaskRegistry{}
+	mockRegistry := MockPodRegistry{}
 	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
 	expectSchedule(scheduler, Pod{}, "m1", t)
 }
@@ -57,10 +57,10 @@ func makeTask(host string, hostPorts ...int) Pod {
 		networkPorts = append(networkPorts, Port{HostPort: port})
 	}
 	return Pod{
-		CurrentState: TaskState{
+		CurrentState: PodState{
 			Host: host,
 		},
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
 					Container{
@@ -73,8 +73,8 @@ func makeTask(host string, hostPorts ...int) Pod {
 }
 
 func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
-	mockRegistry := MockTaskRegistry{
-		tasks: []Pod{
+	mockRegistry := MockPodRegistry{
+		pods: []Pod{
 			makeTask("m1", 8080),
 		},
 	}
@@ -83,8 +83,8 @@ func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 }
 
 func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
-	mockRegistry := MockTaskRegistry{
-		tasks: []Pod{
+	mockRegistry := MockPodRegistry{
+		pods: []Pod{
 			makeTask("m1", 80, 8080),
 			makeTask("m2", 8081, 8082, 8083),
 			makeTask("m3", 80, 443, 8085),
@@ -95,8 +95,8 @@ func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 }
 
 func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
-	mockRegistry := MockTaskRegistry{
-		tasks: []Pod{
+	mockRegistry := MockPodRegistry{
+		pods: []Pod{
 			makeTask("m1", 8080),
 			makeTask("m2", 8081),
 			makeTask("m3", 8080),

@@ -58,7 +58,7 @@ func TestMemorySetUpdateGetTasks(t *testing.T) {
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Host: "foo.com",
 		},
 	}

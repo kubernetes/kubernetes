@@ -52,7 +52,7 @@ func main() {
 	}
 
 	var (
-		taskRegistry       registry.TaskRegistry
+		podRegistry       registry.PodRegistry
 		controllerRegistry registry.ControllerRegistry
 		serviceRegistry    registry.ServiceRegistry
 	)
@@ -60,11 +60,11 @@ func main() {
 	if len(etcdServerList) > 0 {
 		log.Printf("Creating etcd client pointing to %v", etcdServerList)
 		etcdClient := etcd.NewClient(etcdServerList)
-		taskRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
+		podRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
 		controllerRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
 		serviceRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
 	} else {
-		taskRegistry = registry.MakeMemoryRegistry()
+		podRegistry = registry.MakeMemoryRegistry()
 		controllerRegistry = registry.MakeMemoryRegistry()
 		serviceRegistry = registry.MakeMemoryRegistry()
 	}
@@ -75,12 +75,12 @@ func main() {
 	}
 
 	storage := map[string]apiserver.RESTStorage{
-		"tasks":                  registry.MakeTaskRegistryStorage(taskRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, taskRegistry)),
+		"tasks":                  registry.MakeTaskRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),
 		"services":               registry.MakeServiceRegistryStorage(serviceRegistry),
 	}
 
-	endpoints := registry.MakeEndpointController(serviceRegistry, taskRegistry)
+	endpoints := registry.MakeEndpointController(serviceRegistry, podRegistry)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	s := &http.Server{

@@ -65,10 +65,10 @@ func (s *RoundRobinScheduler) Schedule(task Pod) (string, error) {
 
 type FirstFitScheduler struct {
 	machines []string
-	registry TaskRegistry
+	registry PodRegistry
 }
 
-func MakeFirstFitScheduler(machines []string, registry TaskRegistry) Scheduler {
+func MakeFirstFitScheduler(machines []string, registry PodRegistry) Scheduler {
 	return &FirstFitScheduler{
 		machines: machines,
 		registry: registry,
