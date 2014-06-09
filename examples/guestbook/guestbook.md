@@ -82,7 +82,7 @@ Although the redis master is a single task, the redis read slaves are a 'replica
     "desiredState": {
       "replicas": 2,
       "replicasInSet": {"name": "redis-slave"},
-      "taskTemplate": {
+      "podTemplate": {
         "desiredState": {
            "manifest": {
              "containers": [{
@@ -149,7 +149,7 @@ This is a simple PHP server that is configured to talk to both the slave and mas
     "desiredState": {
       "replicas": 3,
       "replicasInSet": {"name": "frontend"},
-      "taskTemplate": {
+      "podTemplate": {
         "desiredState": {
            "manifest": {
              "containers": [{

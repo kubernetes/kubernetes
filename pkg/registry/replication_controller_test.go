@@ -53,8 +53,8 @@ func makeReplicationController(replicas int) ReplicationController {
 	return ReplicationController{
 		DesiredState: ReplicationControllerState{
 			Replicas: replicas,
-			TaskTemplate: TaskTemplate{
-				DesiredState: TaskState{
+			PodTemplate: PodTemplate{
+				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
 							Container{
@@ -72,7 +72,7 @@ func makeReplicationController(replicas int) ReplicationController {
 	}
 }
 
-func makeTaskList(count int) TaskList {
+func makeTaskList(count int) PodList {
 	tasks := []Pod{}
 	for i := 0; i < count; i++ {
 		tasks = append(tasks, Pod{
@@ -81,7 +81,7 @@ func makeTaskList(count int) TaskList {
 			},
 		})
 	}
-	return TaskList{
+	return PodList{
 		Items: tasks,
 	}
 }
@@ -178,8 +178,8 @@ func TestCreateReplica(t *testing.T) {
 
 	controllerSpec := ReplicationController{
 		DesiredState: ReplicationControllerState{
-			TaskTemplate: TaskTemplate{
-				DesiredState: TaskState{
+			PodTemplate: PodTemplate{
+				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
 							Container{
@@ -199,8 +199,8 @@ func TestCreateReplica(t *testing.T) {
 	taskControl.createReplica(controllerSpec)
 
 	//expectedTask := Task{
-	//	Labels:       controllerSpec.DesiredState.TaskTemplate.Labels,
-	//	DesiredState: controllerSpec.DesiredState.TaskTemplate.DesiredState,
+	//	Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
+	//	DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 	//}
 	// TODO: fix this so that it validates the body.
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "POST", nil)

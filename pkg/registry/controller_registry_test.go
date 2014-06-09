@@ -141,8 +141,8 @@ func TestControllerParsing(t *testing.T) {
 			ReplicasInSet: map[string]string{
 				"name": "nginx",
 			},
-			TaskTemplate: TaskTemplate{
-				DesiredState: TaskState{
+			PodTemplate: PodTemplate{
+				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
 							Container{

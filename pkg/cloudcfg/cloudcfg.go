@@ -183,8 +183,8 @@ func RunController(image, name string, replicas int, client client.ClientInterfa
 			ReplicasInSet: map[string]string{
 				"name": name,
 			},
-			TaskTemplate: api.TaskTemplate{
-				DesiredState: api.TaskState{
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							api.Container{

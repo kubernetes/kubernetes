@@ -67,7 +67,7 @@ func TestEtcdCreateTask(t *testing.T) {
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
 					Container{
@@ -167,7 +167,7 @@ func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Id: "foo",
 				Containers: []Container{
@@ -214,7 +214,7 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
-		DesiredState: TaskState{
+		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Id: "foo",
 				Containers: []Container{

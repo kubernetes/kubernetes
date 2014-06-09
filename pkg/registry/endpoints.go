@@ -22,7 +22,7 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func MakeEndpointController(serviceRegistry ServiceRegistry, taskRegistry TaskRegistry) *EndpointController {
+func MakeEndpointController(serviceRegistry ServiceRegistry, taskRegistry PodRegistry) *EndpointController {
 	return &EndpointController{
 		serviceRegistry: serviceRegistry,
 		taskRegistry:    taskRegistry,
@@ -31,7 +31,7 @@ func MakeEndpointController(serviceRegistry ServiceRegistry, taskRegistry TaskRe
 
 type EndpointController struct {
 	serviceRegistry ServiceRegistry
-	taskRegistry    TaskRegistry
+	taskRegistry    PodRegistry
 }
 
 func (e *EndpointController) SyncServiceEndpoints() error {

@@ -7,7 +7,7 @@
                 "replicasInSet": {
                     "name": "testRun"
                 },
-                "taskTemplate": {
+                "podTemplate": {
                     "desiredState": {
                         "image": "dockerfile/nginx",
                         "networkPorts": [

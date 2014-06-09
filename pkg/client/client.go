@@ -38,7 +38,7 @@ import (
 
 // ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
 type ClientInterface interface {
-	ListTasks(labelQuery map[string]string) (api.TaskList, error)
+	ListTasks(labelQuery map[string]string) (api.PodList, error)
 	GetTask(name string) (api.Pod, error)
 	DeleteTask(name string) error
 	CreateTask(api.Pod) (api.Pod, error)
@@ -143,12 +143,12 @@ func DecodeLabelQuery(labelQuery string) map[string]string {
 }
 
 // ListTasks takes a label query, and returns the list of tasks that match that query
-func (client Client) ListTasks(labelQuery map[string]string) (api.TaskList, error) {
+func (client Client) ListTasks(labelQuery map[string]string) (api.PodList, error) {
 	path := "tasks"
 	if labelQuery != nil && len(labelQuery) > 0 {
 		path += "?labels=" + EncodeLabelQuery(labelQuery)
 	}
-	var result api.TaskList
+	var result api.PodList
 	_, err := client.rawRequest("GET", path, nil, &result)
 	return result, err
 }

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-03/schema",
   "type": "object",
   "required": false,
-  "description": "A replicationController resource. A replicationController helps to create and manage a set of tasks. It acts as a factory to create new tasks based on a template. It ensures that there are a specific number of tasks running. If fewer tasks are running than `replicas` then the needed tasks are generated using `taskTemplate`. If more tasks are running than `replicas`, then excess tasks are deleted.",
+  "description": "A replicationController resource. A replicationController helps to create and manage a set of tasks. It acts as a factory to create new tasks based on a template. It ensures that there are a specific number of tasks running. If fewer tasks are running than `replicas` then the needed tasks are generated using `podTemplate`. If more tasks are running than `replicas`, then excess tasks are deleted.",
   "properties": {
     "kind": {
       "type": "string",
@@ -35,7 +35,7 @@
           "required": false,
           "description": "Required labels used to identify tasks in the set"
         },
-        "taskTemplate": {
+        "podTemplate": {
           "type": "object",
           "required": false,
           "description": "Template from which to create new tasks, as necessary. Identical to task schema."

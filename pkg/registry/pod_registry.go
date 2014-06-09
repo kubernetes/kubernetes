@@ -27,12 +27,12 @@ import (
 
 // TaskRegistryStorage implements the RESTStorage interface in terms of a TaskRegistry
 type TaskRegistryStorage struct {
-	registry      TaskRegistry
+	registry      PodRegistry
 	containerInfo client.ContainerInfo
 	scheduler     Scheduler
 }
 
-func MakeTaskRegistryStorage(registry TaskRegistry, containerInfo client.ContainerInfo, scheduler Scheduler) apiserver.RESTStorage {
+func MakeTaskRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler) apiserver.RESTStorage {
 	return &TaskRegistryStorage{
 		registry:      registry,
 		containerInfo: containerInfo,
@@ -64,7 +64,7 @@ func LabelsMatch(task Pod, labelQuery *map[string]string) bool {
 }
 
 func (storage *TaskRegistryStorage) List(url *url.URL) (interface{}, error) {
-	var result TaskList
+	var result PodList
 	var query *map[string]string
 	if url != nil {
 		queryMap := client.DecodeLabelQuery(url.Query().Get("labels"))
@@ -72,7 +72,7 @@ func (storage *TaskRegistryStorage) List(url *url.URL) (interface{}, error) {
 	}
 	tasks, err := storage.registry.ListTasks(query)
 	if err == nil {
-		result = TaskList{
+		result = PodList{
 			Items: tasks,
 		}
 	}

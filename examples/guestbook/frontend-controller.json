@@ -3,7 +3,7 @@
     "desiredState": {
       "replicas": 3,
       "replicasInSet": {"name": "frontend"},
-      "taskTemplate": {
+      "podTemplate": {
         "desiredState": {
            "manifest": {
              "containers": [{
