@@ -9,7 +9,7 @@
 # Short-Description: The Kubernetes controller manager
 # Description:
 #   The Kubernetes controller manager is responsible for monitoring replication
-#   controllers, and creating corresponding tasks to achieve the desired state.
+#   controllers, and creating corresponding pods to achieve the desired state.
 ### END INIT INFO
 
 

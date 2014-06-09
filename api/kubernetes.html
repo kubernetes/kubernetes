@@ -111,16 +111,16 @@
 
                     
                         <h3 id="Overview"><a href="#Overview">Overview</a></h3>
-                        <p>The Kubernetes API currently manages 3 main resources: <code>tasks</code>,
-<code>replicationControllers</code>, and <code>services</code>. Tasks correspond to
+                        <p>The Kubernetes API currently manages 3 main resources: <code>pods</code>,
+<code>replicationControllers</code>, and <code>services</code>. Pods correspond to
 colocated groups of <a href="http://docker.io">Docker containers</a> with
 shared volumes, as supported by <a href="https://developers.google.com/compute/docs/containers">Google Cloud Platform&#39;s
 container-vm
 images</a>.
-Singleton tasks can be created directly via the <code>/tasks</code>
-endpoint. Sets of tasks may created, maintained, and scaled using
+Singleton pods can be created directly via the <code>/pods</code>
+endpoint. Sets of pods may created, maintained, and scaled using
 replicationControllers.  Services create load-balanced targets
-for sets of tasks.</p>
+for sets of pods.</p>
 
                     
                         <h3 id="Resource-identifiers"><a href="#Resource-identifiers">Resource identifiers</a></h3>
@@ -131,7 +131,7 @@ is a map of string (key) to string (value). Each resource may
 have at most one label with a particular key. Individual labels
 are used to specify identifying metadata that can be used to
 define sets of resources by specifying required labels. Examples
-of typical task label keys include <code>stage</code>, <code>service</code>, <code>name</code>,
+of typical pod label keys include <code>stage</code>, <code>service</code>, <code>name</code>,
 <code>tier</code>, <code>partition</code>, and <code>track</code>, but you are free to develop
 your own conventions.</p>
 
@@ -176,7 +176,7 @@ resource during a read/modify/write cycle. The correct client
 action at this point is to GET the resource again, apply the
 changes afresh and try submitting again.</p>
 <p>Note that updates currently only work for replicationControllers
-and services, but not for tasks. Label updates have not yet been
+and services, but not for pods. Label updates have not yet been
 implemented, either.</p>
 
                     
@@ -185,7 +185,7 @@ implemented, either.</p>
                 
                     <div class="panel panel-default">
                         <div class="panel-heading">
-                            <h3 id="_tasks" class="panel-title">/tasks</h3>
+                            <h3 id="_pods" class="panel-title">/pods</h3>
                         </div>
 
                         <div class="panel-body">
@@ -195,28 +195,28 @@ implemented, either.</p>
                                 <div class="panel panel-white">
     <div class="panel-heading">
         <h4 class="panel-title">
-            <a class="block collapsed" data-toggle="collapse" href="#panel__tasks">
+            <a class="block collapsed" data-toggle="collapse" href="#panel__pods">
                 
                     <span class="badge badge_get">get</span>
                 
                     <span class="badge badge_post">post</span>
                 
-                <span class="parent"></span>/tasks
+                <span class="parent"></span>/pods
             </a>
         </h4>
     </div>
-    <div id="panel__tasks" class="panel-collapse collapse">
+    <div id="panel__pods" class="panel-collapse collapse">
         <div class="panel-body">
             <div class="list-group">
                 
-                    <a href="#" data-toggle="modal" data-target="#_tasks_get" class="list-group-item">
+                    <a href="#" data-toggle="modal" data-target="#_pods_get" class="list-group-item">
                         <span class="badge badge_get">get</span>
-                        List all tasks on this cluster
+                        List all pods on this cluster
                     </a>
                 
-                    <a href="#" data-toggle="modal" data-target="#_tasks_post" class="list-group-item">
+                    <a href="#" data-toggle="modal" data-target="#_pods_post" class="list-group-item">
                         <span class="badge badge_post">post</span>
-                        Create a new task. currentState is ignored if present.
+                        Create a new pod. currentState is ignored if present.
                     </a>
                 
             </div>
@@ -224,35 +224,35 @@ implemented, either.</p>
     </div>
 
     
-        <div class="modal fade" id="_tasks_get">
+        <div class="modal fade" id="_pods_get">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
                         <h4 class="modal-title" id="myModalLabel">
                             <span class="badge badge_get">get</span>
-                            <span class="parent"></span>/tasks
+                            <span class="parent"></span>/pods
                         </h4>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info"><p>List all tasks on this cluster</p>
+                        <div class="alert alert-info"><p>List all pods on this cluster</p>
 </div>
 
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs">
                             <li class="active">
-                                <a href="#_tasks_get_request" data-toggle="tab">Request</a>
+                                <a href="#_pods_get_request" data-toggle="tab">Request</a>
                             </li>
                             
                                 <li>
-                                    <a href="#_tasks_get_response" data-toggle="tab">Response</a>
+                                    <a href="#_pods_get_response" data-toggle="tab">Response</a>
                                 </li>
                             
                         </ul>
 
                         <!-- Tab panes -->
                         <div class="tab-content">
-                            <div class="tab-pane active" id="_tasks_get_request">
+                            <div class="tab-pane active" id="_pods_get_request">
                                 
 
                                 
@@ -261,7 +261,7 @@ implemented, either.</p>
                             </div>
 
                             
-                                <div class="tab-pane" id="_tasks_get_response">
+                                <div class="tab-pane" id="_pods_get_response">
                                     
                                         <h2>HTTP status code <a href="http://httpstatus.es/200" target="_blank">200</a></h2>
                                         
@@ -278,7 +278,7 @@ implemented, either.</p>
                                                     <pre>{
     "<span class="hljs-attribute">items</span>": <span class="hljs-value">[
         {
-            "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"my-task-1"</span></span>,
+            "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"my-pod-1"</span></span>,
             "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
                 "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span></span>,
                 "<span class="hljs-attribute">replicationController</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span>
@@ -299,7 +299,7 @@ implemented, either.</p>
             </span>}
         },
         {
-            "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"my-task-2"</span></span>,
+            "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"my-pod-2"</span></span>,
             "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
                 "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span></span>,
                 "<span class="hljs-attribute">replicationController</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span>
@@ -333,31 +333,31 @@ implemented, either.</p>
             </div>
         </div>
     
-        <div class="modal fade" id="_tasks_post">
+        <div class="modal fade" id="_pods_post">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
                         <h4 class="modal-title" id="myModalLabel">
                             <span class="badge badge_post">post</span>
-                            <span class="parent"></span>/tasks
+                            <span class="parent"></span>/pods
                         </h4>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info"><p>Create a new task. currentState is ignored if present.</p>
+                        <div class="alert alert-info"><p>Create a new pod. currentState is ignored if present.</p>
 </div>
 
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs">
                             <li class="active">
-                                <a href="#_tasks_post_request" data-toggle="tab">Request</a>
+                                <a href="#_pods_post_request" data-toggle="tab">Request</a>
                             </li>
                             
                         </ul>
 
                         <!-- Tab panes -->
                         <div class="tab-content">
-                            <div class="tab-pane active" id="_tasks_post_request">
+                            <div class="tab-pane active" id="_pods_post_request">
                                 
 
                                 
@@ -373,7 +373,7 @@ implemented, either.</p>
   "<span class="hljs-attribute">$schema</span>": <span class="hljs-value"><span class="hljs-string">"http://json-schema.org/draft-03/schema"</span></span>,
   "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
   "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Task resource. A task corresponds to a colocated group of [Docker containers](http://docker.io)."</span></span>,
+  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Pod resource. A pod corresponds to a colocated group of [Docker containers](http://docker.io)."</span></span>,
   "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">kind</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"string"</span></span>,
@@ -394,7 +394,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
       "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The desired configuration of the task"</span></span>,
+      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The desired configuration of the pod"</span></span>,
       "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
@@ -426,7 +426,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">currentState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
       "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The current configuration and status of the task. Fields in common with desiredState have the same meaning."</span></span>,
+      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The current configuration and status of the pod. Fields in common with desiredState have the same meaning."</span></span>,
       "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
@@ -497,7 +497,7 @@ implemented, either.</p>
     <div class="panel panel-white">
     <div class="panel-heading">
         <h4 class="panel-title">
-            <a class="block collapsed" data-toggle="collapse" href="#panel__tasks__taskId_">
+            <a class="block collapsed" data-toggle="collapse" href="#panel__pods__podId_">
                 
                     <span class="badge badge_get">get</span>
                 
@@ -505,27 +505,27 @@ implemented, either.</p>
                 
                     <span class="badge badge_delete">delete</span>
                 
-                <span class="parent">/tasks</span>/{taskId}
+                <span class="parent">/pods</span>/{podId}
             </a>
         </h4>
     </div>
-    <div id="panel__tasks__taskId_" class="panel-collapse collapse">
+    <div id="panel__pods__podId_" class="panel-collapse collapse">
         <div class="panel-body">
             <div class="list-group">
                 
-                    <a href="#" data-toggle="modal" data-target="#_tasks__taskId__get" class="list-group-item">
+                    <a href="#" data-toggle="modal" data-target="#_pods__podId__get" class="list-group-item">
                         <span class="badge badge_get">get</span>
-                        Get a specific task
+                        Get a specific pod
                     </a>
                 
-                    <a href="#" data-toggle="modal" data-target="#_tasks__taskId__put" class="list-group-item">
+                    <a href="#" data-toggle="modal" data-target="#_pods__podId__put" class="list-group-item">
                         <span class="badge badge_put">put</span>
-                        Update a task
+                        Update a pod
                     </a>
                 
-                    <a href="#" data-toggle="modal" data-target="#_tasks__taskId__delete" class="list-group-item">
+                    <a href="#" data-toggle="modal" data-target="#_pods__podId__delete" class="list-group-item">
                         <span class="badge badge_delete">delete</span>
-                        Delete a specific task
+                        Delete a specific pod
                     </a>
                 
             </div>
@@ -533,40 +533,40 @@ implemented, either.</p>
     </div>
 
     
-        <div class="modal fade" id="_tasks__taskId__get">
+        <div class="modal fade" id="_pods__podId__get">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
                         <h4 class="modal-title" id="myModalLabel">
                             <span class="badge badge_get">get</span>
-                            <span class="parent">/tasks</span>/{taskId}
+                            <span class="parent">/pods</span>/{podId}
                         </h4>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info"><p>Get a specific task</p>
+                        <div class="alert alert-info"><p>Get a specific pod</p>
 </div>
 
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs">
                             <li class="active">
-                                <a href="#_tasks__taskId__get_request" data-toggle="tab">Request</a>
+                                <a href="#_pods__podId__get_request" data-toggle="tab">Request</a>
                             </li>
                             
                                 <li>
-                                    <a href="#_tasks__taskId__get_response" data-toggle="tab">Response</a>
+                                    <a href="#_pods__podId__get_response" data-toggle="tab">Response</a>
                                 </li>
                             
                         </ul>
 
                         <!-- Tab panes -->
                         <div class="tab-content">
-                            <div class="tab-pane active" id="_tasks__taskId__get_request">
+                            <div class="tab-pane active" id="_pods__podId__get_request">
                                 
                                     <h3>URI Parameters</h3>
                                     <ul>
                                         
-                                            <li><strong>taskId</strong>: string</li>
+                                            <li><strong>podId</strong>: string</li>
                                         
                                     </ul>
                                 
@@ -577,7 +577,7 @@ implemented, either.</p>
                             </div>
 
                             
-                                <div class="tab-pane" id="_tasks__taskId__get_response">
+                                <div class="tab-pane" id="_pods__podId__get_response">
                                     
                                         <h2>HTTP status code <a href="http://httpstatus.es/200" target="_blank">200</a></h2>
                                         
@@ -622,36 +622,36 @@ implemented, either.</p>
             </div>
         </div>
     
-        <div class="modal fade" id="_tasks__taskId__put">
+        <div class="modal fade" id="_pods__podId__put">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
                         <h4 class="modal-title" id="myModalLabel">
                             <span class="badge badge_put">put</span>
-                            <span class="parent">/tasks</span>/{taskId}
+                            <span class="parent">/pods</span>/{podId}
                         </h4>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info"><p>Update a task</p>
+                        <div class="alert alert-info"><p>Update a pod</p>
 </div>
 
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs">
                             <li class="active">
-                                <a href="#_tasks__taskId__put_request" data-toggle="tab">Request</a>
+                                <a href="#_pods__podId__put_request" data-toggle="tab">Request</a>
                             </li>
                             
                         </ul>
 
                         <!-- Tab panes -->
                         <div class="tab-content">
-                            <div class="tab-pane active" id="_tasks__taskId__put_request">
+                            <div class="tab-pane active" id="_pods__podId__put_request">
                                 
                                     <h3>URI Parameters</h3>
                                     <ul>
                                         
-                                            <li><strong>taskId</strong>: string</li>
+                                            <li><strong>podId</strong>: string</li>
                                         
                                     </ul>
                                 
@@ -669,7 +669,7 @@ implemented, either.</p>
   "<span class="hljs-attribute">$schema</span>": <span class="hljs-value"><span class="hljs-string">"http://json-schema.org/draft-03/schema"</span></span>,
   "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
   "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Task resource. A task corresponds to a colocated group of [Docker containers](http://docker.io)."</span></span>,
+  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Pod resource. A pod corresponds to a colocated group of [Docker containers](http://docker.io)."</span></span>,
   "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">kind</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"string"</span></span>,
@@ -690,7 +690,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
       "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The desired configuration of the task"</span></span>,
+      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The desired configuration of the pod"</span></span>,
       "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
@@ -722,7 +722,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">currentState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
       "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The current configuration and status of the task. Fields in common with desiredState have the same meaning."</span></span>,
+      "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"The current configuration and status of the pod. Fields in common with desiredState have the same meaning."</span></span>,
       "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
@@ -787,40 +787,40 @@ implemented, either.</p>
             </div>
         </div>
     
-        <div class="modal fade" id="_tasks__taskId__delete">
+        <div class="modal fade" id="_pods__podId__delete">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
                         <h4 class="modal-title" id="myModalLabel">
                             <span class="badge badge_delete">delete</span>
-                            <span class="parent">/tasks</span>/{taskId}
+                            <span class="parent">/pods</span>/{podId}
                         </h4>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info"><p>Delete a specific task</p>
+                        <div class="alert alert-info"><p>Delete a specific pod</p>
 </div>
 
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs">
                             <li class="active">
-                                <a href="#_tasks__taskId__delete_request" data-toggle="tab">Request</a>
+                                <a href="#_pods__podId__delete_request" data-toggle="tab">Request</a>
                             </li>
                             
                                 <li>
-                                    <a href="#_tasks__taskId__delete_response" data-toggle="tab">Response</a>
+                                    <a href="#_pods__podId__delete_response" data-toggle="tab">Response</a>
                                 </li>
                             
                         </ul>
 
                         <!-- Tab panes -->
                         <div class="tab-content">
-                            <div class="tab-pane active" id="_tasks__taskId__delete_request">
+                            <div class="tab-pane active" id="_pods__podId__delete_request">
                                 
                                     <h3>URI Parameters</h3>
                                     <ul>
                                         
-                                            <li><strong>taskId</strong>: string</li>
+                                            <li><strong>podId</strong>: string</li>
                                         
                                     </ul>
                                 
@@ -831,7 +831,7 @@ implemented, either.</p>
                             </div>
 
                             
-                                <div class="tab-pane" id="_tasks__taskId__delete_response">
+                                <div class="tab-pane" id="_pods__podId__delete_response">
                                     
                                         <h2>HTTP status code <a href="http://httpstatus.es/200" target="_blank">200</a></h2>
                                         
@@ -972,7 +972,7 @@ implemented, either.</p>
                 "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{
                     "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span>
                 </span>}</span>,
-                "<span class="hljs-attribute">taskTemplate</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
                     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
                         "<span class="hljs-attribute">image</span>": <span class="hljs-value"><span class="hljs-string">"dockerfile/nginx"</span></span>,
                         "<span class="hljs-attribute">networkPorts</span>": <span class="hljs-value">[
@@ -1045,7 +1045,7 @@ implemented, either.</p>
   "<span class="hljs-attribute">$schema</span>": <span class="hljs-value"><span class="hljs-string">"http://json-schema.org/draft-03/schema"</span></span>,
   "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
   "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"A replicationController resource. A replicationController helps to create and manage a set of tasks. It acts as a factory to create new tasks based on a template. It ensures that there are a specific number of tasks running. If fewer tasks are running than `replicas` then the needed tasks are generated using `taskTemplate`. If more tasks are running than `replicas`, then excess tasks are deleted."</span></span>,
+  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"A replicationController resource. A replicationController helps to create and manage a set of pods. It acts as a factory to create new pods based on a template. It ensures that there are a specific number of pods running. If fewer pods are running than `replicas` then the needed pods are generated using `podTemplate`. If more pods are running than `replicas`, then excess pods are deleted."</span></span>,
   "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">kind</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"string"</span></span>,
@@ -1071,17 +1071,17 @@ implemented, either.</p>
         "<span class="hljs-attribute">replicas</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"number"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Number of tasks desired in the set"</span>
+          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Number of pods desired in the set"</span>
         </span>}</span>,
         "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Required labels used to identify tasks in the set"</span>
+          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Required labels used to identify pods in the set"</span>
         </span>}</span>,
-        "<span class="hljs-attribute">taskTemplate</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Template from which to create new tasks, as necessary. Identical to task schema."</span>
+          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Template from which to create new pods, as necessary. Identical to pod schema."</span>
         </span>}
       </span>}
     </span>}</span>,
@@ -1100,7 +1100,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
       "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
-      "<span class="hljs-attribute">taskTemplate</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
            "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
              "<span class="hljs-attribute">containers</span>": <span class="hljs-value">[{
@@ -1231,7 +1231,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
       "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
-      "<span class="hljs-attribute">taskTemplate</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
            "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
              "<span class="hljs-attribute">containers</span>": <span class="hljs-value">[{
@@ -1304,7 +1304,7 @@ implemented, either.</p>
   "<span class="hljs-attribute">$schema</span>": <span class="hljs-value"><span class="hljs-string">"http://json-schema.org/draft-03/schema"</span></span>,
   "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
   "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"A replicationController resource. A replicationController helps to create and manage a set of tasks. It acts as a factory to create new tasks based on a template. It ensures that there are a specific number of tasks running. If fewer tasks are running than `replicas` then the needed tasks are generated using `taskTemplate`. If more tasks are running than `replicas`, then excess tasks are deleted."</span></span>,
+  "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"A replicationController resource. A replicationController helps to create and manage a set of pods. It acts as a factory to create new pods based on a template. It ensures that there are a specific number of pods running. If fewer pods are running than `replicas` then the needed pods are generated using `podTemplate`. If more pods are running than `replicas`, then excess pods are deleted."</span></span>,
   "<span class="hljs-attribute">properties</span>": <span class="hljs-value">{
     "<span class="hljs-attribute">kind</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"string"</span></span>,
@@ -1330,17 +1330,17 @@ implemented, either.</p>
         "<span class="hljs-attribute">replicas</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"number"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Number of tasks desired in the set"</span>
+          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Number of pods desired in the set"</span>
         </span>}</span>,
         "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Required labels used to identify tasks in the set"</span>
+          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Required labels used to identify pods in the set"</span>
         </span>}</span>,
-        "<span class="hljs-attribute">taskTemplate</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
-          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Template from which to create new tasks, as necessary. Identical to task schema."</span>
+          "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Template from which to create new pods, as necessary. Identical to pod schema."</span>
         </span>}
       </span>}
     </span>}</span>,
@@ -1359,7 +1359,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
       "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
-      "<span class="hljs-attribute">taskTemplate</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
            "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
              "<span class="hljs-attribute">containers</span>": <span class="hljs-value">[{
@@ -2002,7 +2002,7 @@ implemented, either.</p>
                 <div id="sidebar" class="hidden-print affix" role="complementary">
                     <ul class="nav nav-pills nav-stacked">
                         
-                            <li><a href="#_tasks">/tasks</a></li>
+                            <li><a href="#_pods">/pods</a></li>
                         
                             <li><a href="#_replicationControllers">/replicationControllers</a></li>
                         
