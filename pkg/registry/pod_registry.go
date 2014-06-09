@@ -25,24 +25,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-// TaskRegistryStorage implements the RESTStorage interface in terms of a TaskRegistry
-type TaskRegistryStorage struct {
+// PodRegistryStorage implements the RESTStorage interface in terms of a PodRegistry
+type PodRegistryStorage struct {
 	registry      PodRegistry
 	containerInfo client.ContainerInfo
 	scheduler     Scheduler
 }
 
-func MakeTaskRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler) apiserver.RESTStorage {
-	return &TaskRegistryStorage{
+func MakePodRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler) apiserver.RESTStorage {
+	return &PodRegistryStorage{
 		registry:      registry,
 		containerInfo: containerInfo,
 		scheduler:     scheduler,
 	}
 }
 
-// LabelMatch tests to see if a Task's labels map contains 'key' mapping to 'value'
-func LabelMatch(task Pod, queryKey, queryValue string) bool {
-	for key, value := range task.Labels {
+// LabelMatch tests to see if a Pod's labels map contains 'key' mapping to 'value'
+func LabelMatch(pod Pod, queryKey, queryValue string) bool {
+	for key, value := range pod.Labels {
 		if queryKey == key && queryValue == value {
 			return true
 		}
@@ -50,72 +50,72 @@ func LabelMatch(task Pod, queryKey, queryValue string) bool {
 	return false
 }
 
-// LabelMatch tests to see if a Task's labels map contains all key/value pairs in 'labelQuery'
-func LabelsMatch(task Pod, labelQuery *map[string]string) bool {
+// LabelMatch tests to see if a Pod's labels map contains all key/value pairs in 'labelQuery'
+func LabelsMatch(pod Pod, labelQuery *map[string]string) bool {
 	if labelQuery == nil {
 		return true
 	}
 	for key, value := range *labelQuery {
-		if !LabelMatch(task, key, value) {
+		if !LabelMatch(pod, key, value) {
 			return false
 		}
 	}
 	return true
 }
 
-func (storage *TaskRegistryStorage) List(url *url.URL) (interface{}, error) {
+func (storage *PodRegistryStorage) List(url *url.URL) (interface{}, error) {
 	var result PodList
 	var query *map[string]string
 	if url != nil {
 		queryMap := client.DecodeLabelQuery(url.Query().Get("labels"))
 		query = &queryMap
 	}
-	tasks, err := storage.registry.ListTasks(query)
+	pods, err := storage.registry.ListPods(query)
 	if err == nil {
 		result = PodList{
-			Items: tasks,
+			Items: pods,
 		}
 	}
-	result.Kind = "cluster#taskList"
+	result.Kind = "cluster#podList"
 	return result, err
 }
 
-func (storage *TaskRegistryStorage) Get(id string) (interface{}, error) {
-	task, err := storage.registry.GetTask(id)
+func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
+	pod, err := storage.registry.GetPod(id)
 	if err != nil {
-		return task, err
+		return pod, err
 	}
-	info, err := storage.containerInfo.GetContainerInfo(task.CurrentState.Host, id)
+	info, err := storage.containerInfo.GetContainerInfo(pod.CurrentState.Host, id)
 	if err != nil {
-		return task, err
+		return pod, err
 	}
-	task.CurrentState.Info = info
-	task.Kind = "cluster#task"
-	return task, err
+	pod.CurrentState.Info = info
+	pod.Kind = "cluster#pod"
+	return pod, err
 }
 
-func (storage *TaskRegistryStorage) Delete(id string) error {
-	return storage.registry.DeleteTask(id)
+func (storage *PodRegistryStorage) Delete(id string) error {
+	return storage.registry.DeletePod(id)
 }
 
-func (storage *TaskRegistryStorage) Extract(body string) (interface{}, error) {
-	task := Pod{}
-	err := json.Unmarshal([]byte(body), &task)
-	return task, err
+func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
+	pod := Pod{}
+	err := json.Unmarshal([]byte(body), &pod)
+	return pod, err
 }
 
-func (storage *TaskRegistryStorage) Create(task interface{}) error {
-	taskObj := task.(Pod)
-	if len(taskObj.ID) == 0 {
-		return fmt.Errorf("ID is unspecified: %#v", task)
+func (storage *PodRegistryStorage) Create(pod interface{}) error {
+	podObj := pod.(Pod)
+	if len(podObj.ID) == 0 {
+		return fmt.Errorf("ID is unspecified: %#v", pod)
 	}
-	machine, err := storage.scheduler.Schedule(taskObj)
+	machine, err := storage.scheduler.Schedule(podObj)
 	if err != nil {
 		return err
 	}
-	return storage.registry.CreateTask(machine, taskObj)
+	return storage.registry.CreatePod(machine, podObj)
 }
 
-func (storage *TaskRegistryStorage) Update(task interface{}) error {
-	return storage.registry.UpdateTask(task.(Pod))
+func (storage *PodRegistryStorage) Update(pod interface{}) error {
+	return storage.registry.UpdatePod(pod.(Pod))
 }

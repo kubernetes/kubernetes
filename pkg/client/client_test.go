@@ -40,7 +40,7 @@ func makeUrl(suffix string) string {
 	return apiPath + suffix
 }
 
-func TestListEmptyTasks(t *testing.T) {
+func TestListEmptyPods(t *testing.T) {
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: `{ "items": []}`,
@@ -49,19 +49,19 @@ func TestListEmptyTasks(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	taskList, err := client.ListTasks(nil)
+	podList, err := client.ListPods(nil)
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "GET", nil)
 	if err != nil {
-		t.Errorf("Unexpected error in listing tasks: %#v", err)
+		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}
-	if len(taskList.Items) != 0 {
-		t.Errorf("Unexpected items in task list: %#v", taskList)
+	if len(podList.Items) != 0 {
+		t.Errorf("Unexpected items in pod list: %#v", podList)
 	}
 	testServer.Close()
 }
 
-func TestListTasks(t *testing.T) {
-	expectedTaskList := api.PodList{
+func TestListPods(t *testing.T) {
+	expectedPodList := api.PodList{
 		Items: []api.Pod{
 			api.Pod{
 				CurrentState: api.PodState{
@@ -74,7 +74,7 @@ func TestListTasks(t *testing.T) {
 			},
 		},
 	}
-	body, _ := json.Marshal(expectedTaskList)
+	body, _ := json.Marshal(expectedPodList)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -83,19 +83,19 @@ func TestListTasks(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	receivedTaskList, err := client.ListTasks(nil)
+	receivedPodList, err := client.ListPods(nil)
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "GET", nil)
 	if err != nil {
-		t.Errorf("Unexpected error in listing tasks: %#v", err)
+		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}
-	if !reflect.DeepEqual(expectedTaskList, receivedTaskList) {
-		t.Errorf("Unexpected task list: %#v\nvs.\n%#v", receivedTaskList, expectedTaskList)
+	if !reflect.DeepEqual(expectedPodList, receivedPodList) {
+		t.Errorf("Unexpected pod list: %#v\nvs.\n%#v", receivedPodList, expectedPodList)
 	}
 	testServer.Close()
 }
 
-func TestListTasksLabels(t *testing.T) {
-	expectedTaskList := api.PodList{
+func TestListPodsLabels(t *testing.T) {
+	expectedPodList := api.PodList{
 		Items: []api.Pod{
 			api.Pod{
 				CurrentState: api.PodState{
@@ -108,7 +108,7 @@ func TestListTasksLabels(t *testing.T) {
 			},
 		},
 	}
-	body, _ := json.Marshal(expectedTaskList)
+	body, _ := json.Marshal(expectedPodList)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -118,7 +118,7 @@ func TestListTasksLabels(t *testing.T) {
 		Host: testServer.URL,
 	}
 	query := map[string]string{"foo": "bar", "name": "baz"}
-	receivedTaskList, err := client.ListTasks(query)
+	receivedPodList, err := client.ListPods(query)
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "GET", nil)
 	queryString := fakeHandler.RequestReceived.URL.Query().Get("labels")
 	queryString, _ = url.QueryUnescape(queryString)
@@ -128,16 +128,16 @@ func TestListTasksLabels(t *testing.T) {
 		t.Errorf("Unexpected label query: %s", queryString)
 	}
 	if err != nil {
-		t.Errorf("Unexpected error in listing tasks: %#v", err)
+		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}
-	if !reflect.DeepEqual(expectedTaskList, receivedTaskList) {
-		t.Errorf("Unexpected task list: %#v\nvs.\n%#v", receivedTaskList, expectedTaskList)
+	if !reflect.DeepEqual(expectedPodList, receivedPodList) {
+		t.Errorf("Unexpected pod list: %#v\nvs.\n%#v", receivedPodList, expectedPodList)
 	}
 	testServer.Close()
 }
 
-func TestGetTask(t *testing.T) {
-	expectedTask := api.Pod{
+func TestGetPod(t *testing.T) {
+	expectedPod := api.Pod{
 		CurrentState: api.PodState{
 			Status: "Foobar",
 		},
@@ -146,7 +146,7 @@ func TestGetTask(t *testing.T) {
 			"name": "baz",
 		},
 	}
-	body, _ := json.Marshal(expectedTask)
+	body, _ := json.Marshal(expectedPod)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -155,18 +155,18 @@ func TestGetTask(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	receivedTask, err := client.GetTask("foo")
+	receivedPod, err := client.GetPod("foo")
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks/foo"), "GET", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(expectedTask, receivedTask) {
-		t.Errorf("Received task: %#v\n doesn't match expected task: %#v", receivedTask, expectedTask)
+	if !reflect.DeepEqual(expectedPod, receivedPod) {
+		t.Errorf("Received pod: %#v\n doesn't match expected pod: %#v", receivedPod, expectedPod)
 	}
 	testServer.Close()
 }
 
-func TestDeleteTask(t *testing.T) {
+func TestDeletePod(t *testing.T) {
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: `{"success": true}`,
@@ -175,7 +175,7 @@ func TestDeleteTask(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	err := client.DeleteTask("foo")
+	err := client.DeletePod("foo")
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks/foo"), "DELETE", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
@@ -183,8 +183,8 @@ func TestDeleteTask(t *testing.T) {
 	testServer.Close()
 }
 
-func TestCreateTask(t *testing.T) {
-	requestTask := api.Pod{
+func TestCreatePod(t *testing.T) {
+	requestPod := api.Pod{
 		CurrentState: api.PodState{
 			Status: "Foobar",
 		},
@@ -193,7 +193,7 @@ func TestCreateTask(t *testing.T) {
 			"name": "baz",
 		},
 	}
-	body, _ := json.Marshal(requestTask)
+	body, _ := json.Marshal(requestPod)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -202,19 +202,19 @@ func TestCreateTask(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	receivedTask, err := client.CreateTask(requestTask)
+	receivedPod, err := client.CreatePod(requestPod)
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "POST", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(requestTask, receivedTask) {
-		t.Errorf("Received task: %#v\n doesn't match expected task: %#v", receivedTask, requestTask)
+	if !reflect.DeepEqual(requestPod, receivedPod) {
+		t.Errorf("Received pod: %#v\n doesn't match expected pod: %#v", receivedPod, requestPod)
 	}
 	testServer.Close()
 }
 
-func TestUpdateTask(t *testing.T) {
-	requestTask := api.Pod{
+func TestUpdatePod(t *testing.T) {
+	requestPod := api.Pod{
 		JSONBase: api.JSONBase{ID: "foo"},
 		CurrentState: api.PodState{
 			Status: "Foobar",
@@ -224,7 +224,7 @@ func TestUpdateTask(t *testing.T) {
 			"name": "baz",
 		},
 	}
-	body, _ := json.Marshal(requestTask)
+	body, _ := json.Marshal(requestPod)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -233,12 +233,12 @@ func TestUpdateTask(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	receivedTask, err := client.UpdateTask(requestTask)
+	receivedPod, err := client.UpdatePod(requestPod)
 	fakeHandler.ValidateRequest(t, makeUrl("/tasks/foo"), "PUT", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	expectEqual(t, requestTask, receivedTask)
+	expectEqual(t, requestPod, receivedPod)
 	testServer.Close()
 }
 

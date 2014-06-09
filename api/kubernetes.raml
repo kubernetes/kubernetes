@@ -6,16 +6,16 @@ mediaType: application/json
 documentation:
  - title: Overview
    content: |
-     The Kubernetes API currently manages 3 main resources: `tasks`,
-     `replicationControllers`, and `services`. Tasks correspond to
+     The Kubernetes API currently manages 3 main resources: `pods`,
+     `replicationControllers`, and `services`. Pods correspond to
      colocated groups of [Docker containers](http://docker.io) with
      shared volumes, as supported by [Google Cloud Platform's
      container-vm
      images](https://developers.google.com/compute/docs/containers).
-     Singleton tasks can be created directly via the `/tasks`
-     endpoint. Sets of tasks may created, maintained, and scaled using
+     Singleton pods can be created directly via the `/pods`
+     endpoint. Sets of pods may created, maintained, and scaled using
      replicationControllers.  Services create load-balanced targets
-     for sets of tasks.
+     for sets of pods.
 
  - title: Resource identifiers
    content: |
@@ -26,7 +26,7 @@ documentation:
      have at most one label with a particular key. Individual labels
      are used to specify identifying metadata that can be used to
      define sets of resources by specifying required labels. Examples
-     of typical task label keys include `stage`, `service`, `name`,
+     of typical pod label keys include `stage`, `service`, `name`,
      `tier`, `partition`, and `track`, but you are free to develop
      your own conventions.
 
@@ -75,40 +75,40 @@ documentation:
      changes afresh and try submitting again.
 
      Note that updates currently only work for replicationControllers
-     and services, but not for tasks. Label updates have not yet been
+     and services, but not for pods. Label updates have not yet been
      implemented, either.
 
-/tasks:
+/pods:
   get:
-    description: List all tasks on this cluster
+    description: List all pods on this cluster
     responses:
       200:
         body:
           application/json:
-            example: !include examples/task-list.json
+            example: !include examples/pod-list.json
   post:
-    description: Create a new task. currentState is ignored if present.
+    description: Create a new pod. currentState is ignored if present.
     body:
       json/application:
-        schema: !include doc/task-schema.json
-        example: !include examples/task.json
+        schema: !include doc/pod-schema.json
+        example: !include examples/pod.json
   
-  /{taskId}:
+  /{podId}:
     get:
-      description: Get a specific task
+      description: Get a specific pod
       responses:
         200:
           body:
             application/json:
-              example: !include examples/task.json
+              example: !include examples/pod.json
     put:
-      description: Update a task
+      description: Update a pod
       body:
         json/application:
-          schema: !include doc/task-schema.json
-          example: !include examples/task.json
+          schema: !include doc/pod-schema.json
+          example: !include examples/pod.json
     delete:
-      description: Delete a specific task
+      description: Delete a specific pod
       responses:
         200:
           body:

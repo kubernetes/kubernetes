@@ -22,16 +22,16 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func MakeEndpointController(serviceRegistry ServiceRegistry, taskRegistry PodRegistry) *EndpointController {
+func MakeEndpointController(serviceRegistry ServiceRegistry, podRegistry PodRegistry) *EndpointController {
 	return &EndpointController{
 		serviceRegistry: serviceRegistry,
-		taskRegistry:    taskRegistry,
+		podRegistry:     podRegistry,
 	}
 }
 
 type EndpointController struct {
 	serviceRegistry ServiceRegistry
-	taskRegistry    PodRegistry
+	podRegistry     PodRegistry
 }
 
 func (e *EndpointController) SyncServiceEndpoints() error {
@@ -41,16 +41,16 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	}
 	var resultErr error
 	for _, service := range services.Items {
-		tasks, err := e.taskRegistry.ListTasks(&service.Labels)
+		pods, err := e.podRegistry.ListPods(&service.Labels)
 		if err != nil {
 			log.Printf("Error syncing service: %#v, skipping.", service)
 			resultErr = err
 			continue
 		}
-		endpoints := make([]string, len(tasks))
-		for ix, task := range tasks {
+		endpoints := make([]string, len(pods))
+		for ix, pod := range pods {
 			// TODO: Use port names in the service object, don't just use port #0
-			endpoints[ix] = fmt.Sprintf("%s:%d", task.CurrentState.Host, task.DesiredState.Manifest.Containers[0].Ports[0].HostPort)
+			endpoints[ix] = fmt.Sprintf("%s:%d", pod.CurrentState.Host, pod.DesiredState.Manifest.Containers[0].Ports[0].HostPort)
 		}
 		err = e.serviceRegistry.UpdateEndpoints(Endpoints{
 			Name:      service.ID,

@@ -19,19 +19,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// TaskRegistry is an interface implemented by things that know how to store Task objects
+// PodRegistry is an interface implemented by things that know how to store Pod objects
 type PodRegistry interface {
-	// ListTasks obtains a list of tasks that match query.
-	// Query may be nil in which case all tasks are returned.
-	ListTasks(query *map[string]string) ([]api.Pod, error)
-	// Get a specific task
-	GetTask(taskId string) (*api.Pod, error)
-	// Create a task based on a specification, schedule it onto a specific machine.
-	CreateTask(machine string, task api.Pod) error
-	// Update an existing task
-	UpdateTask(task api.Pod) error
-	// Delete an existing task
-	DeleteTask(taskId string) error
+	// ListPods obtains a list of pods that match query.
+	// Query may be nil in which case all pods are returned.
+	ListPods(query *map[string]string) ([]api.Pod, error)
+	// Get a specific pod
+	GetPod(podID string) (*api.Pod, error)
+	// Create a pod based on a specification, schedule it onto a specific machine.
+	CreatePod(machine string, pod api.Pod) error
+	// Update an existing pod
+	UpdatePod(pod api.Pod) error
+	// Delete an existing pod
+	DeletePod(podID string) error
 }
 
 // ControllerRegistry is an interface for things that know how to store Controllers

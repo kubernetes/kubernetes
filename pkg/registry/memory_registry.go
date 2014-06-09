@@ -19,25 +19,25 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// An implementation of TaskRegistry and ControllerRegistry that is backed by memory
+// An implementation of PodRegistry and ControllerRegistry that is backed by memory
 // Mainly used for testing.
 type MemoryRegistry struct {
-	taskData       map[string]Pod
+	podData       map[string]Pod
 	controllerData map[string]ReplicationController
 	serviceData    map[string]Service
 }
 
 func MakeMemoryRegistry() *MemoryRegistry {
 	return &MemoryRegistry{
-		taskData:       map[string]Pod{},
+		podData:       map[string]Pod{},
 		controllerData: map[string]ReplicationController{},
 		serviceData:    map[string]Service{},
 	}
 }
 
-func (registry *MemoryRegistry) ListTasks(labelQuery *map[string]string) ([]Pod, error) {
+func (registry *MemoryRegistry) ListPods(labelQuery *map[string]string) ([]Pod, error) {
 	result := []Pod{}
-	for _, value := range registry.taskData {
+	for _, value := range registry.podData {
 		if LabelsMatch(value, labelQuery) {
 			result = append(result, value)
 		}
@@ -45,27 +45,27 @@ func (registry *MemoryRegistry) ListTasks(labelQuery *map[string]string) ([]Pod,
 	return result, nil
 }
 
-func (registry *MemoryRegistry) GetTask(taskID string) (*Pod, error) {
-	task, found := registry.taskData[taskID]
+func (registry *MemoryRegistry) GetPod(podID string) (*Pod, error) {
+	pod, found := registry.podData[podID]
 	if found {
-		return &task, nil
+		return &pod, nil
 	} else {
 		return nil, nil
 	}
 }
 
-func (registry *MemoryRegistry) CreateTask(machine string, task Pod) error {
-	registry.taskData[task.ID] = task
+func (registry *MemoryRegistry) CreatePod(machine string, pod Pod) error {
+	registry.podData[pod.ID] = pod
 	return nil
 }
 
-func (registry *MemoryRegistry) DeleteTask(taskID string) error {
-	delete(registry.taskData, taskID)
+func (registry *MemoryRegistry) DeletePod(podID string) error {
+	delete(registry.podData, podID)
 	return nil
 }
 
-func (registry *MemoryRegistry) UpdateTask(task Pod) error {
-	registry.taskData[task.ID] = task
+func (registry *MemoryRegistry) UpdatePod(pod Pod) error {
+	registry.podData[pod.ID] = pod
 	return nil
 }
 

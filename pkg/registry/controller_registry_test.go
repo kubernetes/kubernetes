@@ -62,7 +62,7 @@ func TestListControllersError(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.err, err)
 	}
 	if len(controllers.Items) != 0 {
-		t.Errorf("Unexpected non-zero task list: %#v", controllers)
+		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
 	}
 }
 
@@ -74,7 +74,7 @@ func TestListEmptyControllerList(t *testing.T) {
 	controllers, err := storage.List(nil)
 	expectNoError(t, err)
 	if len(controllers.(ReplicationControllerList).Items) != 0 {
-		t.Errorf("Unexpected non-zero task list: %#v", controllers)
+		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
 	}
 }
 

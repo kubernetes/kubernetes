@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-03/schema",
   "type": "object",
   "required": false,
-  "description": "Task resource. A task corresponds to a colocated group of [Docker containers](http://docker.io).",
+  "description": "Pod resource. A pod corresponds to a co-located group of [Docker containers](http://docker.io).",
   "properties": {
     "kind": {
       "type": "string",
@@ -23,7 +23,7 @@
     "desiredState": {
       "type": "object",
       "required": false,
-      "description": "The desired configuration of the task",
+      "description": "The desired configuration of the pod",
       "properties": {
         "manifest": {
           "type": "object",
@@ -55,7 +55,7 @@
     "currentState": {
       "type": "object",
       "required": false,
-      "description": "The current configuration and status of the task. Fields in common with desiredState have the same meaning.",
+      "description": "The current configuration and status of the pod. Fields in common with desiredState have the same meaning.",
       "properties": {
         "manifest": {
           "type": "object",

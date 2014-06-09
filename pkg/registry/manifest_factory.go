@@ -20,22 +20,22 @@ import (
 )
 
 type ManifestFactory interface {
-	// Make a container object for a given task, given the machine that the task is running on.
-	MakeManifest(machine string, task Pod) (ContainerManifest, error)
+	// Make a container object for a given pod, given the machine that the pod is running on.
+	MakeManifest(machine string, pod Pod) (ContainerManifest, error)
 }
 
 type BasicManifestFactory struct {
 	serviceRegistry ServiceRegistry
 }
 
-func (b *BasicManifestFactory) MakeManifest(machine string, task Pod) (ContainerManifest, error) {
+func (b *BasicManifestFactory) MakeManifest(machine string, pod Pod) (ContainerManifest, error) {
 	envVars, err := GetServiceEnvironmentVariables(b.serviceRegistry, machine)
 	if err != nil {
 		return ContainerManifest{}, err
 	}
-	for ix, container := range task.DesiredState.Manifest.Containers {
-		task.DesiredState.Manifest.Id = task.ID
-		task.DesiredState.Manifest.Containers[ix].Env = append(container.Env, envVars...)
+	for ix, container := range pod.DesiredState.Manifest.Containers {
+		pod.DesiredState.Manifest.Id = pod.ID
+		pod.DesiredState.Manifest.Containers[ix].Env = append(container.Env, envVars...)
 	}
-	return task.DesiredState.Manifest, nil
+	return pod.DesiredState.Manifest, nil
 }

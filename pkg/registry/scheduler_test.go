@@ -22,8 +22,8 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func expectSchedule(scheduler Scheduler, task Pod, expected string, t *testing.T) {
-	actual, err := scheduler.Schedule(task)
+func expectSchedule(scheduler Scheduler, pod Pod, expected string, t *testing.T) {
+	actual, err := scheduler.Schedule(pod)
 	expectNoError(t, err)
 	if actual != expected {
 		t.Errorf("Unexpected scheduling value: %d, expected %d", actual, expected)
@@ -51,7 +51,7 @@ func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
 	expectSchedule(scheduler, Pod{}, "m1", t)
 }
 
-func makeTask(host string, hostPorts ...int) Pod {
+func makePod(host string, hostPorts ...int) Pod {
 	networkPorts := []Port{}
 	for _, port := range hostPorts {
 		networkPorts = append(networkPorts, Port{HostPort: port})
@@ -75,35 +75,35 @@ func makeTask(host string, hostPorts ...int) Pod {
 func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		pods: []Pod{
-			makeTask("m1", 8080),
+			makePod("m1", 8080),
 		},
 	}
 	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
-	expectSchedule(scheduler, makeTask("", 8080), "m2", t)
+	expectSchedule(scheduler, makePod("", 8080), "m2", t)
 }
 
 func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		pods: []Pod{
-			makeTask("m1", 80, 8080),
-			makeTask("m2", 8081, 8082, 8083),
-			makeTask("m3", 80, 443, 8085),
+			makePod("m1", 80, 8080),
+			makePod("m2", 8081, 8082, 8083),
+			makePod("m3", 80, 443, 8085),
 		},
 	}
 	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
-	expectSchedule(scheduler, makeTask("", 8080, 8081), "m3", t)
+	expectSchedule(scheduler, makePod("", 8080, 8081), "m3", t)
 }
 
 func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		pods: []Pod{
-			makeTask("m1", 8080),
-			makeTask("m2", 8081),
-			makeTask("m3", 8080),
+			makePod("m1", 8080),
+			makePod("m2", 8081),
+			makePod("m3", 8080),
 		},
 	}
 	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
-	_, err := scheduler.Schedule(makeTask("", 8080, 8081))
+	_, err := scheduler.Schedule(makePod("", 8080, 8081))
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}

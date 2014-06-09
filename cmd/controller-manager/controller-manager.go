@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 // The controller manager is responsible for monitoring replication controllers, and creating corresponding
-// tasks to achieve the desired state.  It listens for new controllers in etcd, and it sends requests to the
-// master to create/delete tasks.
+// pods to achieve the desired state.  It listens for new controllers in etcd, and it sends requests to the
+// master to create/delete pods.
 //
 // TODO: Refactor the etcd watch code so that it is a pluggable interface.
 package main

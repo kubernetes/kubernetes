@@ -22,7 +22,7 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// Scheduler is an interface implemented by things that know how to schedule tasks onto machines.
+// Scheduler is an interface implemented by things that know how to schedule pods onto machines.
 type Scheduler interface {
 	Schedule(Pod) (string, error)
 }
@@ -40,7 +40,7 @@ func MakeRandomScheduler(machines []string, random rand.Rand) Scheduler {
 	}
 }
 
-func (s *RandomScheduler) Schedule(task Pod) (string, error) {
+func (s *RandomScheduler) Schedule(pod Pod) (string, error) {
 	return s.machines[s.random.Int()%len(s.machines)], nil
 }
 
@@ -57,7 +57,7 @@ func MakeRoundRobinScheduler(machines []string) Scheduler {
 	}
 }
 
-func (s *RoundRobinScheduler) Schedule(task Pod) (string, error) {
+func (s *RoundRobinScheduler) Schedule(pod Pod) (string, error) {
 	result := s.machines[s.currentIndex]
 	s.currentIndex = (s.currentIndex + 1) % len(s.machines)
 	return result, nil
@@ -75,10 +75,10 @@ func MakeFirstFitScheduler(machines []string, registry PodRegistry) Scheduler {
 	}
 }
 
-func (s *FirstFitScheduler) containsPort(task Pod, port Port) bool {
-	for _, container := range task.DesiredState.Manifest.Containers {
-		for _, taskPort := range container.Ports {
-			if taskPort.HostPort == port.HostPort {
+func (s *FirstFitScheduler) containsPort(pod Pod, port Port) bool {
+	for _, container := range pod.DesiredState.Manifest.Containers {
+		for _, podPort := range container.Ports {
+			if podPort.HostPort == port.HostPort {
 				return true
 			}
 		}
@@ -86,30 +86,30 @@ func (s *FirstFitScheduler) containsPort(task Pod, port Port) bool {
 	return false
 }
 
-func (s *FirstFitScheduler) Schedule(task Pod) (string, error) {
-	machineToTasks := map[string][]Pod{}
-	tasks, err := s.registry.ListTasks(nil)
+func (s *FirstFitScheduler) Schedule(pod Pod) (string, error) {
+	machineToPods := map[string][]Pod{}
+	pods, err := s.registry.ListPods(nil)
 	if err != nil {
 		return "", err
 	}
-	for _, scheduledTask := range tasks {
-		host := scheduledTask.CurrentState.Host
-		machineToTasks[host] = append(machineToTasks[host], scheduledTask)
+	for _, scheduledPod := range pods {
+		host := scheduledPod.CurrentState.Host
+		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	for _, machine := range s.machines {
-		taskFits := true
-		for _, scheduledTask := range machineToTasks[machine] {
-			for _, container := range task.DesiredState.Manifest.Containers {
+		podFits := true
+		for _, scheduledPod := range machineToPods[machine] {
+			for _, container := range pod.DesiredState.Manifest.Containers {
 				for _, port := range container.Ports {
-					if s.containsPort(scheduledTask, port) {
-						taskFits = false
+					if s.containsPort(scheduledPod, port) {
+						podFits = false
 					}
 				}
 			}
 		}
-		if taskFits {
+		if podFits {
 			return machine, nil
 		}
 	}
-	return "", fmt.Errorf("Failed to find fit for %#v", task)
+	return "", fmt.Errorf("Failed to find fit for %#v", pod)
 }

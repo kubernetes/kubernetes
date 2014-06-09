@@ -319,7 +319,7 @@ func (kl *Kubelet) KillContainer(name string) error {
 	return err
 }
 
-// Watch a file for changes to the set of tasks that should run on this Kubelet
+// Watch a file for changes to the set of pods that should run on this Kubelet
 // This function loops forever and is intended to be run as a goroutine
 func (kl *Kubelet) WatchFile(file string, changeChannel chan<- api.ContainerManifest) {
 	var lastData []byte
@@ -344,7 +344,7 @@ func (kl *Kubelet) WatchFile(file string, changeChannel chan<- api.ContainerMani
 	}
 }
 
-// Watch an HTTP endpoint for changes to the set of tasks that should run on this Kubelet
+// Watch an HTTP endpoint for changes to the set of pods that should run on this Kubelet
 // This function runs forever and is intended to be run as a goroutine
 func (kl *Kubelet) WatchHTTP(url string, changeChannel chan<- api.ContainerManifest) {
 	var lastData []byte

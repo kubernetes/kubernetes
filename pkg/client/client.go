@@ -16,9 +16,9 @@ limitations under the License.
 
 // A client for the Kubernetes cluster management API
 // There are three fundamental objects
-//   Task - A single running container
-//   TaskForce - A set of co-scheduled Task(s)
-//   ReplicationController - A manager for replicating TaskForces
+//   Pod - A co-scheduled set of running containers
+//   ReplicationController - A manager for replicating Pods
+//   Service - A discoverable load balancer
 package client
 
 import (
@@ -38,11 +38,11 @@ import (
 
 // ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
 type ClientInterface interface {
-	ListTasks(labelQuery map[string]string) (api.PodList, error)
-	GetTask(name string) (api.Pod, error)
-	DeleteTask(name string) error
-	CreateTask(api.Pod) (api.Pod, error)
-	UpdateTask(api.Pod) (api.Pod, error)
+	ListPods(labelQuery map[string]string) (api.PodList, error)
+	GetPod(name string) (api.Pod, error)
+	DeletePod(name string) error
+	CreatePod(api.Pod) (api.Pod, error)
+	UpdatePod(api.Pod) (api.Pod, error)
 
 	GetReplicationController(name string) (api.ReplicationController, error)
 	CreateReplicationController(api.ReplicationController) (api.ReplicationController, error)
@@ -142,8 +142,8 @@ func DecodeLabelQuery(labelQuery string) map[string]string {
 	return result
 }
 
-// ListTasks takes a label query, and returns the list of tasks that match that query
-func (client Client) ListTasks(labelQuery map[string]string) (api.PodList, error) {
+// ListPods takes a label query, and returns the list of pods that match that query
+func (client Client) ListPods(labelQuery map[string]string) (api.PodList, error) {
 	path := "tasks"
 	if labelQuery != nil && len(labelQuery) > 0 {
 		path += "?labels=" + EncodeLabelQuery(labelQuery)
@@ -153,35 +153,35 @@ func (client Client) ListTasks(labelQuery map[string]string) (api.PodList, error
 	return result, err
 }
 
-// GetTask takes the name of the task, and returns the corresponding Task object, and an error if it occurs
-func (client Client) GetTask(name string) (api.Pod, error) {
+// GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
+func (client Client) GetPod(name string) (api.Pod, error) {
 	var result api.Pod
 	_, err := client.rawRequest("GET", "tasks/"+name, nil, &result)
 	return result, err
 }
 
-// DeleteTask takes the name of the task, and returns an error if one occurs
-func (client Client) DeleteTask(name string) error {
+// DeletePod takes the name of the pod, and returns an error if one occurs
+func (client Client) DeletePod(name string) error {
 	_, err := client.rawRequest("DELETE", "tasks/"+name, nil, nil)
 	return err
 }
 
-// CreateTask takes the representation of a task.  Returns the server's representation of the task, and an error, if it occurs
-func (client Client) CreateTask(task api.Pod) (api.Pod, error) {
+// CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs
+func (client Client) CreatePod(pod api.Pod) (api.Pod, error) {
 	var result api.Pod
-	body, err := json.Marshal(task)
+	body, err := json.Marshal(pod)
 	if err == nil {
 		_, err = client.rawRequest("POST", "tasks", bytes.NewBuffer(body), &result)
 	}
 	return result, err
 }
 
-// UpdateTask takes the representation of a task to update.  Returns the server's representation of the task, and an error, if it occurs
-func (client Client) UpdateTask(task api.Pod) (api.Pod, error) {
+// UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs
+func (client Client) UpdatePod(pod api.Pod) (api.Pod, error) {
 	var result api.Pod
-	body, err := json.Marshal(task)
+	body, err := json.Marshal(pod)
 	if err == nil {
-		_, err = client.rawRequest("PUT", "tasks/"+task.ID, bytes.NewBuffer(body), &result)
+		_, err = client.rawRequest("PUT", "tasks/"+pod.ID, bytes.NewBuffer(body), &result)
 	}
 	return result, err
 }
