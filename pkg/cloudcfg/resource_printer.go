@@ -1,7 +1,6 @@
 package cloudcfg
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,17 +11,21 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
+// ResourcePrinter is an interface that knows how to print API resources
 type ResourcePrinter interface {
+	// Print receives an arbitrary JSON body, formats it and prints it to a writer
 	Print(string, io.Writer) error
 }
 
+// Identity printer simply copies the body out to the output stream
 type IdentityPrinter struct{}
 
 func (i *IdentityPrinter) Print(data string, w io.Writer) error {
-	_, err := io.Copy(w, bytes.NewBufferString(data))
+	_, err := fmt.Fprint(w, data)
 	return err
 }
 
+// YAMLPrinter parses JSON, and re-formats as YAML
 type YAMLPrinter struct{}
 
 func (y *YAMLPrinter) Print(data string, w io.Writer) error {
@@ -38,6 +41,7 @@ func (y *YAMLPrinter) Print(data string, w io.Writer) error {
 	return err
 }
 
+// HumanReadablePrinter attempts to provide more elegant output
 type HumanReadablePrinter struct{}
 
 var taskColumns = []string{"Name", "Image(s)", "Host", "Labels"}
