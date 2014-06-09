@@ -35,17 +35,17 @@ func makeUrl(suffix string) string {
 	return apiPath + suffix
 }
 
-type FakeTaskControl struct {
+type FakePodControl struct {
 	controllerSpec []ReplicationController
-	deleteTaskID   []string
+	deletePodID   []string
 }
 
-func (f *FakeTaskControl) createReplica(spec ReplicationController) {
+func (f *FakePodControl) createReplica(spec ReplicationController) {
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
-func (f *FakeTaskControl) deleteTask(taskID string) error {
-	f.deleteTaskID = append(f.deleteTaskID, taskID)
+func (f *FakePodControl) deletePod(podID string) error {
+	f.deletePodID = append(f.deletePodID, podID)
 	return nil
 }
 
@@ -72,31 +72,31 @@ func makeReplicationController(replicas int) ReplicationController {
 	}
 }
 
-func makeTaskList(count int) PodList {
-	tasks := []Pod{}
+func makePodList(count int) PodList {
+	pods := []Pod{}
 	for i := 0; i < count; i++ {
-		tasks = append(tasks, Pod{
+		pods = append(pods, Pod{
 			JSONBase: JSONBase{
-				ID: fmt.Sprintf("task%d", i),
+				ID: fmt.Sprintf("pod%d", i),
 			},
 		})
 	}
 	return PodList{
-		Items: tasks,
+		Items: pods,
 	}
 }
 
-func validateSyncReplication(t *testing.T, fakeTaskControl *FakeTaskControl, expectedCreates, expectedDeletes int) {
-	if len(fakeTaskControl.controllerSpec) != expectedCreates {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakeTaskControl.controllerSpec))
+func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expectedCreates, expectedDeletes int) {
+	if len(fakePodControl.controllerSpec) != expectedCreates {
+		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.controllerSpec))
 	}
-	if len(fakeTaskControl.deleteTaskID) != expectedDeletes {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakeTaskControl.deleteTaskID))
+	if len(fakePodControl.deletePodID) != expectedDeletes {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodID))
 	}
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := json.Marshal(makeTaskList(2))
+	body, _ := json.Marshal(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -106,19 +106,19 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(2)
 
 	manager.syncReplicationController(controllerSpec)
-	validateSyncReplication(t, &fakeTaskControl, 0, 0)
+	validateSyncReplication(t, &fakePodControl, 0, 0)
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := json.Marshal(makeTaskList(2))
+	body, _ := json.Marshal(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -128,15 +128,15 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(1)
 
 	manager.syncReplicationController(controllerSpec)
-	validateSyncReplication(t, &fakeTaskControl, 0, 1)
+	validateSyncReplication(t, &fakePodControl, 0, 1)
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
@@ -150,15 +150,15 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(2)
 
 	manager.syncReplicationController(controllerSpec)
-	validateSyncReplication(t, &fakeTaskControl, 2, 0)
+	validateSyncReplication(t, &fakePodControl, 2, 0)
 }
 
 func TestCreateReplica(t *testing.T) {
@@ -172,7 +172,7 @@ func TestCreateReplica(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	taskControl := RealTaskControl{
+	podControl := RealPodControl{
 		kubeClient: client,
 	}
 
@@ -196,9 +196,9 @@ func TestCreateReplica(t *testing.T) {
 		},
 	}
 
-	taskControl.createReplica(controllerSpec)
+	podControl.createReplica(controllerSpec)
 
-	//expectedTask := Task{
+	//expectedPod := Pod{
 	//	Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	//	DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 	//}
@@ -207,7 +207,7 @@ func TestCreateReplica(t *testing.T) {
 }
 
 func TestHandleWatchResponseNotSet(t *testing.T) {
-	body, _ := json.Marshal(makeTaskList(2))
+	body, _ := json.Marshal(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -217,10 +217,10 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "delete",
 	})
@@ -228,7 +228,7 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 }
 
 func TestHandleWatchResponseNoNode(t *testing.T) {
-	body, _ := json.Marshal(makeTaskList(2))
+	body, _ := json.Marshal(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -238,10 +238,10 @@ func TestHandleWatchResponseNoNode(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
 	})
@@ -251,7 +251,7 @@ func TestHandleWatchResponseNoNode(t *testing.T) {
 }
 
 func TestHandleWatchResponseBadData(t *testing.T) {
-	body, _ := json.Marshal(makeTaskList(2))
+	body, _ := json.Marshal(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -261,10 +261,10 @@ func TestHandleWatchResponseBadData(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
 		Node: &etcd.Node{
@@ -277,7 +277,7 @@ func TestHandleWatchResponseBadData(t *testing.T) {
 }
 
 func TestHandleWatchResponse(t *testing.T) {
-	body, _ := json.Marshal(makeTaskList(2))
+	body, _ := json.Marshal(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -287,10 +287,10 @@ func TestHandleWatchResponse(t *testing.T) {
 		Host: testServer.URL,
 	}
 
-	fakeTaskControl := FakeTaskControl{}
+	fakePodControl := FakePodControl{}
 
 	manager := MakeReplicationManager(nil, &client)
-	manager.taskControl = &fakeTaskControl
+	manager.podControl = &fakePodControl
 
 	controller := makeReplicationController(2)
 

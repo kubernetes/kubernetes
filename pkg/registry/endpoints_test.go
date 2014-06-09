@@ -24,9 +24,9 @@ import (
 
 func TestSyncEndpointsEmpty(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{}
-	taskRegistry := MockPodRegistry{}
+	podRegistry := MockPodRegistry{}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
 	err := endpoints.SyncServiceEndpoints()
 	expectNoError(t, err)
 }
@@ -35,9 +35,9 @@ func TestSyncEndpointsError(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
 		err: fmt.Errorf("Test Error"),
 	}
-	taskRegistry := MockPodRegistry{}
+	podRegistry := MockPodRegistry{}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
 	err := endpoints.SyncServiceEndpoints()
 	if err != serviceRegistry.err {
 		t.Errorf("Errors don't match: %#v %#v", err, serviceRegistry.err)
@@ -56,7 +56,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	}
-	taskRegistry := MockPodRegistry{
+	podRegistry := MockPodRegistry{
 		pods: []Pod{
 			Pod{
 				DesiredState: PodState{
@@ -76,7 +76,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 	}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
 	err := endpoints.SyncServiceEndpoints()
 	expectNoError(t, err)
 	if len(serviceRegistry.endpoints.Endpoints) != 1 {
@@ -84,7 +84,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	}
 }
 
-func TestSyncEndpointsTaskError(t *testing.T) {
+func TestSyncEndpointsPodError(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
 		list: ServiceList{
 			Items: []Service{
@@ -96,11 +96,11 @@ func TestSyncEndpointsTaskError(t *testing.T) {
 			},
 		},
 	}
-	taskRegistry := MockPodRegistry{
+	podRegistry := MockPodRegistry{
 		err: fmt.Errorf("test error."),
 	}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
 	err := endpoints.SyncServiceEndpoints()
 	if err == nil {
 		t.Error("Unexpected non-error")

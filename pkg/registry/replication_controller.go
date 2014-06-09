@@ -31,53 +31,53 @@ import (
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored in etcd
-// with actual running tasks.
+// with actual running pods.
 // TODO: Remove the etcd dependency and re-factor in terms of a generic watch interface
 type ReplicationManager struct {
-	etcdClient  *etcd.Client
-	kubeClient  client.ClientInterface
-	taskControl TaskControlInterface
-	updateLock  sync.Mutex
+	etcdClient *etcd.Client
+	kubeClient client.ClientInterface
+	podControl PodControlInterface
+	updateLock sync.Mutex
 }
 
-// An interface that knows how to add or delete tasks
+// An interface that knows how to add or delete pods
 // created as an interface to allow testing.
-type TaskControlInterface interface {
+type PodControlInterface interface {
 	createReplica(controllerSpec ReplicationController)
-	deleteTask(taskID string) error
+	deletePod(podID string) error
 }
 
-type RealTaskControl struct {
+type RealPodControl struct {
 	kubeClient client.ClientInterface
 }
 
-func (r RealTaskControl) createReplica(controllerSpec ReplicationController) {
+func (r RealPodControl) createReplica(controllerSpec ReplicationController) {
 	labels := controllerSpec.DesiredState.PodTemplate.Labels
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
-	task := Pod{
+	pod := Pod{
 		JSONBase: JSONBase{
 			ID: fmt.Sprintf("%x", rand.Int()),
 		},
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	}
-	_, err := r.kubeClient.CreateTask(task)
+	_, err := r.kubeClient.CreatePod(pod)
 	if err != nil {
 		log.Printf("%#v\n", err)
 	}
 }
 
-func (r RealTaskControl) deleteTask(taskID string) error {
-	return r.kubeClient.DeleteTask(taskID)
+func (r RealPodControl) deletePod(podID string) error {
+	return r.kubeClient.DeletePod(podID)
 }
 
 func MakeReplicationManager(etcdClient *etcd.Client, kubeClient client.ClientInterface) *ReplicationManager {
 	return &ReplicationManager{
 		kubeClient: kubeClient,
 		etcdClient: etcdClient,
-		taskControl: RealTaskControl{
+		podControl: RealPodControl{
 			kubeClient: kubeClient,
 		},
 	}
@@ -118,9 +118,9 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*Rep
 	return nil, nil
 }
 
-func (rm *ReplicationManager) filterActiveTasks(tasks []Pod) []Pod {
+func (rm *ReplicationManager) filterActivePods(pods []Pod) []Pod {
 	var result []Pod
-	for _, value := range tasks {
+	for _, value := range pods {
 		if strings.Index(value.CurrentState.Status, "Exit") == -1 {
 			result = append(result, value)
 		}
@@ -130,23 +130,23 @@ func (rm *ReplicationManager) filterActiveTasks(tasks []Pod) []Pod {
 
 func (rm *ReplicationManager) syncReplicationController(controllerSpec ReplicationController) error {
 	rm.updateLock.Lock()
-	taskList, err := rm.kubeClient.ListTasks(controllerSpec.DesiredState.ReplicasInSet)
+	podList, err := rm.kubeClient.ListPods(controllerSpec.DesiredState.ReplicasInSet)
 	if err != nil {
 		return err
 	}
-	filteredList := rm.filterActiveTasks(taskList.Items)
+	filteredList := rm.filterActivePods(podList.Items)
 	diff := len(filteredList) - controllerSpec.DesiredState.Replicas
 	log.Printf("%#v", filteredList)
 	if diff < 0 {
 		diff *= -1
 		log.Printf("Too few replicas, creating %d\n", diff)
 		for i := 0; i < diff; i++ {
-			rm.taskControl.createReplica(controllerSpec)
+			rm.podControl.createReplica(controllerSpec)
 		}
 	} else if diff > 0 {
 		log.Print("Too many replicas, deleting")
 		for i := 0; i < diff; i++ {
-			rm.taskControl.deleteTask(filteredList[i].ID)
+			rm.podControl.deletePod(filteredList[i].ID)
 		}
 	}
 	rm.updateLock.Unlock()

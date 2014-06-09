@@ -24,7 +24,7 @@ import (
 )
 
 type MockPodRegistry struct {
-	err   error
+	err  error
 	pods []Pod
 }
 
@@ -34,30 +34,30 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
-func (registry *MockPodRegistry) ListTasks(*map[string]string) ([]Pod, error) {
+func (registry *MockPodRegistry) ListPods(*map[string]string) ([]Pod, error) {
 	return registry.pods, registry.err
 }
 
-func (registry *MockPodRegistry) GetTask(podId string) (*Pod, error) {
+func (registry *MockPodRegistry) GetPod(podId string) (*Pod, error) {
 	return &Pod{}, registry.err
 }
 
-func (registry *MockPodRegistry) CreateTask(machine string, pod Pod) error {
+func (registry *MockPodRegistry) CreatePod(machine string, pod Pod) error {
 	return registry.err
 }
 
-func (registry *MockPodRegistry) UpdateTask(pod Pod) error {
+func (registry *MockPodRegistry) UpdatePod(pod Pod) error {
 	return registry.err
 }
-func (registry *MockPodRegistry) DeleteTask(podId string) error {
+func (registry *MockPodRegistry) DeletePod(podId string) error {
 	return registry.err
 }
 
-func TestListTasksError(t *testing.T) {
+func TestListPodsError(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		err: fmt.Errorf("Test Error"),
 	}
-	storage := TaskRegistryStorage{
+	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
 	pods, err := storage.List(nil)
@@ -69,9 +69,9 @@ func TestListTasksError(t *testing.T) {
 	}
 }
 
-func TestListEmptyTaskList(t *testing.T) {
+func TestListEmptyPodList(t *testing.T) {
 	mockRegistry := MockPodRegistry{}
-	storage := TaskRegistryStorage{
+	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
 	pods, err := storage.List(nil)
@@ -81,7 +81,7 @@ func TestListEmptyTaskList(t *testing.T) {
 	}
 }
 
-func TestListTaskList(t *testing.T) {
+func TestListPodList(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		pods: []Pod{
 			Pod{
@@ -96,7 +96,7 @@ func TestListTaskList(t *testing.T) {
 			},
 		},
 	}
-	storage := TaskRegistryStorage{
+	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
 	podsObj, err := storage.List(nil)
@@ -115,7 +115,7 @@ func TestListTaskList(t *testing.T) {
 
 func TestExtractJson(t *testing.T) {
 	mockRegistry := MockPodRegistry{}
-	storage := TaskRegistryStorage{
+	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
 	pod := Pod{

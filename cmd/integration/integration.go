@@ -42,7 +42,7 @@ func main() {
 	reg := registry.MakeEtcdRegistry(etcdClient, machineList)
 
 	apiserver := apiserver.New(map[string]apiserver.RESTStorage{
-		"tasks":                  registry.MakeTaskRegistryStorage(reg, &kube_client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList)),
+		"tasks":                  registry.MakePodRegistryStorage(reg, &kube_client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(reg),
 	}, "/api/v1beta1")
 	server := httptest.NewServer(apiserver)
@@ -75,12 +75,12 @@ func main() {
 	if _, err = kubeClient.CreateReplicationController(controllerRequest); err != nil {
 		log.Fatalf("Unexpected error: %#v", err)
 	}
-	// Give the controllers some time to actually create the tasks
+	// Give the controllers some time to actually create the pods
 	time.Sleep(time.Second * 10)
 
 	// Validate that they're truly up.
-	tasks, err := kubeClient.ListTasks(nil)
-	if err != nil || len(tasks.Items) != 2 {
+	pods, err := kubeClient.ListPods(nil)
+	if err != nil || len(pods.Items) != 2 {
 		log.Fatal("FAILED")
 	}
 	log.Printf("OK")

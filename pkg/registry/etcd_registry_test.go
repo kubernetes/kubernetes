@@ -25,20 +25,20 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func TestEtcdGetTask(t *testing.T) {
+func TestEtcdGetPod(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/hosts/machine/tasks/foo", util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/hosts/machine/pods/foo", util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	task, err := registry.GetTask("foo")
+	pod, err := registry.GetPod("foo")
 	expectNoError(t, err)
-	if task.ID != "foo" {
-		t.Errorf("Unexpected task: %#v", task)
+	if pod.ID != "foo" {
+		t.Errorf("Unexpected pod: %#v", pod)
 	}
 }
 
-func TestEtcdGetTaskNotFound(t *testing.T) {
+func TestEtcdGetPodNotFound(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -47,15 +47,15 @@ func TestEtcdGetTaskNotFound(t *testing.T) {
 		},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	_, err := registry.GetTask("foo")
+	_, err := registry.GetPod("foo")
 	if err == nil {
 		t.Errorf("Unexpected non-error.")
 	}
 }
 
-func TestEtcdCreateTask(t *testing.T) {
+func TestEtcdCreatePod(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -63,7 +63,7 @@ func TestEtcdCreateTask(t *testing.T) {
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Pod{
+	err := registry.CreatePod("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -78,13 +78,13 @@ func TestEtcdCreateTask(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	resp, err := fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
+	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	expectNoError(t, err)
-	var task Pod
-	err = json.Unmarshal([]byte(resp.Node.Value), &task)
+	var pod Pod
+	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
-	if task.ID != "foo" {
-		t.Errorf("Unexpected task: %#v %s", task, resp.Node.Value)
+	if pod.ID != "foo" {
+		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests []ContainerManifest
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
@@ -95,9 +95,9 @@ func TestEtcdCreateTask(t *testing.T) {
 	}
 }
 
-func TestEtcdCreateTaskAlreadyExisting(t *testing.T) {
+func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}),
@@ -106,7 +106,7 @@ func TestEtcdCreateTaskAlreadyExisting(t *testing.T) {
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Pod{
+	err := registry.CreatePod("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -116,9 +116,9 @@ func TestEtcdCreateTaskAlreadyExisting(t *testing.T) {
 	}
 }
 
-func TestEtcdCreateTaskWithContainersError(t *testing.T) {
+func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -131,7 +131,7 @@ func TestEtcdCreateTaskWithContainersError(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 200},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Pod{
+	err := registry.CreatePod("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -139,7 +139,7 @@ func TestEtcdCreateTaskWithContainersError(t *testing.T) {
 	if err == nil {
 		t.Error("Unexpected non-error")
 	}
-	_, err = fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
+	_, err = fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	if err == nil {
 		t.Error("Unexpected non-error")
 	}
@@ -148,9 +148,9 @@ func TestEtcdCreateTaskWithContainersError(t *testing.T) {
 	}
 }
 
-func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
+func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -163,7 +163,7 @@ func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Pod{
+	err := registry.CreatePod("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -179,13 +179,13 @@ func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	resp, err := fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
+	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	expectNoError(t, err)
-	var task Pod
-	err = json.Unmarshal([]byte(resp.Node.Value), &task)
+	var pod Pod
+	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
-	if task.ID != "foo" {
-		t.Errorf("Unexpected task: %#v %s", task, resp.Node.Value)
+	if pod.ID != "foo" {
+		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests []ContainerManifest
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
@@ -196,9 +196,9 @@ func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
 	}
 }
 
-func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
+func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -210,7 +210,7 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Pod{
+	err := registry.CreatePod("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -226,13 +226,13 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	resp, err := fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
+	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	expectNoError(t, err)
-	var task Pod
-	err = json.Unmarshal([]byte(resp.Node.Value), &task)
+	var pod Pod
+	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
-	if task.ID != "foo" {
-		t.Errorf("Unexpected task: %#v %s", task, resp.Node.Value)
+	if pod.ID != "foo" {
+		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests []ContainerManifest
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
@@ -243,9 +243,9 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 	}
 }
 
-func TestEtcdDeleteTask(t *testing.T) {
+func TestEtcdDeletePod(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	key := "/registry/hosts/machine/tasks/foo"
+	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
 		ContainerManifest{
@@ -253,7 +253,7 @@ func TestEtcdDeleteTask(t *testing.T) {
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.DeleteTask("foo")
+	err := registry.DeletePod("foo")
 	expectNoError(t, err)
 	if len(fakeClient.deletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.deletedKeys)
@@ -267,16 +267,16 @@ func TestEtcdDeleteTask(t *testing.T) {
 	}
 }
 
-func TestEtcdDeleteTaskMultipleContainers(t *testing.T) {
+func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	key := "/registry/hosts/machine/tasks/foo"
+	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
 		ContainerManifest{Id: "foo"},
 		ContainerManifest{Id: "bar"},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.DeleteTask("foo")
+	err := registry.DeletePod("foo")
 	expectNoError(t, err)
 	if len(fakeClient.deletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.deletedKeys)
@@ -295,9 +295,9 @@ func TestEtcdDeleteTaskMultipleContainers(t *testing.T) {
 	}
 }
 
-func TestEtcdEmptyListTasks(t *testing.T) {
+func TestEtcdEmptyListPods(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	key := "/registry/hosts/machine/tasks"
+	key := "/registry/hosts/machine/pods"
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -307,31 +307,31 @@ func TestEtcdEmptyListTasks(t *testing.T) {
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	tasks, err := registry.ListTasks(nil)
+	pods, err := registry.ListPods(nil)
 	expectNoError(t, err)
-	if len(tasks) != 0 {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 0 {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
-func TestEtcdListTasksNotFound(t *testing.T) {
+func TestEtcdListPodsNotFound(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	key := "/registry/hosts/machine/tasks"
+	key := "/registry/hosts/machine/pods"
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	tasks, err := registry.ListTasks(nil)
+	pods, err := registry.ListPods(nil)
 	expectNoError(t, err)
-	if len(tasks) != 0 {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 0 {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
-func TestEtcdListTasks(t *testing.T) {
+func TestEtcdListPods(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	key := "/registry/hosts/machine/tasks"
+	key := "/registry/hosts/machine/pods"
 	fakeClient.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -348,10 +348,10 @@ func TestEtcdListTasks(t *testing.T) {
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	tasks, err := registry.ListTasks(nil)
+	pods, err := registry.ListPods(nil)
 	expectNoError(t, err)
-	if len(tasks) != 2 || tasks[0].ID != "foo" || tasks[1].ID != "bar" {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 2 || pods[0].ID != "foo" || pods[1].ID != "bar" {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
@@ -471,7 +471,7 @@ func TestEtcdCreateController(t *testing.T) {
 	err = json.Unmarshal([]byte(resp.Node.Value), &ctrl)
 	expectNoError(t, err)
 	if ctrl.ID != "foo" {
-		t.Errorf("Unexpected task: %#v %s", ctrl, resp.Node.Value)
+		t.Errorf("Unexpected pod: %#v %s", ctrl, resp.Node.Value)
 	}
 }
 
@@ -514,7 +514,7 @@ func TestEtcdListServices(t *testing.T) {
 	services, err := registry.ListServices()
 	expectNoError(t, err)
 	if len(services.Items) != 2 || services.Items[0].ID != "foo" || services.Items[1].ID != "bar" {
-		t.Errorf("Unexpected task list: %#v", services)
+		t.Errorf("Unexpected pod list: %#v", services)
 	}
 }
 
@@ -548,7 +548,7 @@ func TestEtcdGetService(t *testing.T) {
 	service, err := registry.GetService("foo")
 	expectNoError(t, err)
 	if service.ID != "foo" {
-		t.Errorf("Unexpected task: %#v", service)
+		t.Errorf("Unexpected pod: %#v", service)
 	}
 }
 

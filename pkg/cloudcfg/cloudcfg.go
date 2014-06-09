@@ -63,10 +63,10 @@ func LoadAuthInfo(path string) (client.AuthInfo, error) {
 	return auth, err
 }
 
-// Perform a rolling update of a collection of tasks.
+// Perform a rolling update of a collection of pods.
 // 'name' points to a replication controller.
-// 'client' is used for updating tasks.
-// 'updatePeriod' is the time between task updates.
+// 'client' is used for updating pods.
+// 'updatePeriod' is the time between pod updates.
 func Update(name string, client client.ClientInterface, updatePeriod time.Duration) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
@@ -74,12 +74,12 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 	}
 	labels := controller.DesiredState.ReplicasInSet
 
-	taskList, err := client.ListTasks(labels)
+	podList, err := client.ListPods(labels)
 	if err != nil {
 		return err
 	}
-	for _, task := range taskList.Items {
-		_, err = client.UpdateTask(task)
+	for _, pod := range podList.Items {
+		_, err = client.UpdatePod(pod)
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func makePorts(spec string) []api.Port {
 	return result
 }
 
-// RunController creates a new replication controller named 'name' which creates 'replicas' tasks running 'image'
+// RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'
 func RunController(image, name string, replicas int, client client.ClientInterface, portSpec string, servicePort int) error {
 	controller := api.ReplicationController{
 		JSONBase: api.JSONBase{

@@ -138,16 +138,16 @@ func (server *ApiServer) handleREST(parts []string, url *url.URL, req *http.Requ
 			}
 			server.write(200, controllers, w)
 		case 2:
-			task, err := storage.Get(parts[1])
+			pod, err := storage.Get(parts[1])
 			if err != nil {
 				server.error(err, w)
 				return
 			}
-			if task == nil {
+			if pod == nil {
 				server.notFound(req, w)
 				return
 			}
-			server.write(200, task, w)
+			server.write(200, pod, w)
 		default:
 			server.notFound(req, w)
 		}

@@ -21,40 +21,40 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestListTasksEmpty(t *testing.T) {
+func TestListPodsEmpty(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	tasks, err := registry.ListTasks(nil)
+	pods, err := registry.ListPods(nil)
 	expectNoError(t, err)
-	if len(tasks) != 0 {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 0 {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
-func TestMemoryListTasks(t *testing.T) {
+func TestMemoryListPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	registry.CreateTask("machine", Pod{JSONBase: JSONBase{ID: "foo"}})
-	tasks, err := registry.ListTasks(nil)
+	registry.CreatePod("machine", Pod{JSONBase: JSONBase{ID: "foo"}})
+	pods, err := registry.ListPods(nil)
 	expectNoError(t, err)
-	if len(tasks) != 1 || tasks[0].ID != "foo" {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 1 || pods[0].ID != "foo" {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
-func TestMemorySetGetTasks(t *testing.T) {
+func TestMemorySetGetPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedTask := Pod{JSONBase: JSONBase{ID: "foo"}}
-	registry.CreateTask("machine", expectedTask)
-	task, err := registry.GetTask("foo")
+	expectedPod := Pod{JSONBase: JSONBase{ID: "foo"}}
+	registry.CreatePod("machine", expectedPod)
+	pod, err := registry.GetPod("foo")
 	expectNoError(t, err)
-	if expectedTask.ID != task.ID {
-		t.Errorf("Unexpected task, expected %#v, actual %#v", expectedTask, task)
+	if expectedPod.ID != pod.ID {
+		t.Errorf("Unexpected pod, expected %#v, actual %#v", expectedPod, pod)
 	}
 }
 
-func TestMemorySetUpdateGetTasks(t *testing.T) {
+func TestMemorySetUpdateGetPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	oldTask := Pod{JSONBase: JSONBase{ID: "foo"}}
-	expectedTask := Pod{
+	oldPod := Pod{JSONBase: JSONBase{ID: "foo"}}
+	expectedPod := Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -62,43 +62,43 @@ func TestMemorySetUpdateGetTasks(t *testing.T) {
 			Host: "foo.com",
 		},
 	}
-	registry.CreateTask("machine", oldTask)
-	registry.UpdateTask(expectedTask)
-	task, err := registry.GetTask("foo")
+	registry.CreatePod("machine", oldPod)
+	registry.UpdatePod(expectedPod)
+	pod, err := registry.GetPod("foo")
 	expectNoError(t, err)
-	if expectedTask.ID != task.ID || task.DesiredState.Host != expectedTask.DesiredState.Host {
-		t.Errorf("Unexpected task, expected %#v, actual %#v", expectedTask, task)
+	if expectedPod.ID != pod.ID || pod.DesiredState.Host != expectedPod.DesiredState.Host {
+		t.Errorf("Unexpected pod, expected %#v, actual %#v", expectedPod, pod)
 	}
 }
 
-func TestMemorySetDeleteGetTasks(t *testing.T) {
+func TestMemorySetDeleteGetPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedTask := Pod{JSONBase: JSONBase{ID: "foo"}}
-	registry.CreateTask("machine", expectedTask)
-	registry.DeleteTask("foo")
-	task, err := registry.GetTask("foo")
+	expectedPod := Pod{JSONBase: JSONBase{ID: "foo"}}
+	registry.CreatePod("machine", expectedPod)
+	registry.DeletePod("foo")
+	pod, err := registry.GetPod("foo")
 	expectNoError(t, err)
-	if task != nil {
-		t.Errorf("Unexpected task: %#v", task)
+	if pod != nil {
+		t.Errorf("Unexpected pod: %#v", pod)
 	}
 }
 
 func TestListControllersEmpty(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	tasks, err := registry.ListControllers()
+	pods, err := registry.ListControllers()
 	expectNoError(t, err)
-	if len(tasks) != 0 {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 0 {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
 func TestMemoryListControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	registry.CreateController(ReplicationController{JSONBase: JSONBase{ID: "foo"}})
-	tasks, err := registry.ListControllers()
+	pods, err := registry.ListControllers()
 	expectNoError(t, err)
-	if len(tasks) != 1 || tasks[0].ID != "foo" {
-		t.Errorf("Unexpected task list: %#v", tasks)
+	if len(pods) != 1 || pods[0].ID != "foo" {
+		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
 
@@ -106,10 +106,10 @@ func TestMemorySetGetControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	expectedController := ReplicationController{JSONBase: JSONBase{ID: "foo"}}
 	registry.CreateController(expectedController)
-	task, err := registry.GetController("foo")
+	pod, err := registry.GetController("foo")
 	expectNoError(t, err)
-	if expectedController.ID != task.ID {
-		t.Errorf("Unexpected task, expected %#v, actual %#v", expectedController, task)
+	if expectedController.ID != pod.ID {
+		t.Errorf("Unexpected pod, expected %#v, actual %#v", expectedController, pod)
 	}
 }
 
@@ -126,10 +126,10 @@ func TestMemorySetUpdateGetControllers(t *testing.T) {
 	}
 	registry.CreateController(oldController)
 	registry.UpdateController(expectedController)
-	task, err := registry.GetController("foo")
+	pod, err := registry.GetController("foo")
 	expectNoError(t, err)
-	if expectedController.ID != task.ID || task.DesiredState.Replicas != expectedController.DesiredState.Replicas {
-		t.Errorf("Unexpected task, expected %#v, actual %#v", expectedController, task)
+	if expectedController.ID != pod.ID || pod.DesiredState.Replicas != expectedController.DesiredState.Replicas {
+		t.Errorf("Unexpected pod, expected %#v, actual %#v", expectedController, pod)
 	}
 }
 
@@ -138,9 +138,9 @@ func TestMemorySetDeleteGetControllers(t *testing.T) {
 	expectedController := ReplicationController{JSONBase: JSONBase{ID: "foo"}}
 	registry.CreateController(expectedController)
 	registry.DeleteController("foo")
-	task, err := registry.GetController("foo")
+	pod, err := registry.GetController("foo")
 	expectNoError(t, err)
-	if task != nil {
-		t.Errorf("Unexpected task: %#v", task)
+	if pod != nil {
+		t.Errorf("Unexpected pod: %#v", pod)
 	}
 }

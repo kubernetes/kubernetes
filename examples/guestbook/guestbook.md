@@ -10,7 +10,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
 ### Step One: Turn up the redis master.
 
-Create a file named `redis-master.json`, this file is describes a single task, which runs a redis key-value server in a container.
+Create a file named `redis-master.json`, this file is describes a single pod, which runs a redis key-value server in a container.
 
 ```javascript
 {
@@ -33,27 +33,27 @@ Create a file named `redis-master.json`, this file is describes a single task, w
 }
 ```
 
-Once you have that task file, you can create the redis task in your Kubernetes cluster using the `cloudcfg` cli:
+Once you have that pod file, you can create the redis pod in your Kubernetes cluster using the `cloudcfg` cli:
 
 ```shell
-cluster/cloudcfg.sh -c redis-master.json create /tasks
+cluster/cloudcfg.sh -c redis-master.json create /pods
 ```
 
-Once that's up you can list the tasks in the cluster, to verify that the master is running:
+Once that's up you can list the pods in the cluster, to verify that the master is running:
 
 ```shell
-cluster/cloudcfg.sh list /tasks
+cluster/cloudcfg.sh list /pods
 ```
 
-You should see a single redis master task.  It will also display the machine that the task is running on.  If you ssh to that machine, you can run
+You should see a single redis master pod.  It will also display the machine that the pod is running on.  If you ssh to that machine, you can run
 ```shell
 sudo docker ps
 ```
 
-And see the actual task.  (Note that initial `docker pull` may take a few minutes, depending on network conditions.)
+And see the actual pod.  (Note that initial `docker pull` may take a few minutes, depending on network conditions.)
 
 ### Step Two: Turn up the master service.
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers.  The services in a Kubernetes cluster are discoverable inside other containers via environment variables.  Services find the containers to load balance based on task labels.  The task that you created in Step One has the label `name=redis-master`, so the corresponding service is defined by that label.  Create a file named `redis-master-service.json` that contains:
+A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers.  The services in a Kubernetes cluster are discoverable inside other containers via environment variables.  Services find the containers to load balance based on pod labels.  The pod that you created in Step One has the label `name=redis-master`, so the corresponding service is defined by that label.  Create a file named `redis-master-service.json` that contains:
 
 ```javascript
 {
@@ -73,8 +73,8 @@ cluster/cloudcfg.sh -c redis-master-service.json create /services
 
 Once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 10000).
 
-### Step Three: Turn up the replicated slave tasks.
-Although the redis master is a single task, the redis read slaves are a 'replicated' task, in Kubernetes, a replication controller is responsible for managing multiple instances of a replicated task.  Create a file named `redis-slave-controller.json` that contains:
+### Step Three: Turn up the replicated slave pods.
+Although the redis master is a single pod, the redis read slaves are a 'replicated' pod, in Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  Create a file named `redis-slave-controller.json` that contains:
 
 ```javascript
   {
@@ -109,13 +109,13 @@ The redis slave configures itself by looking for the Kubernetes service environm
 redis-server --slaveof $SERVICE_HOST $REDISMASTER_SERVICE_PORT
 ```
 
-Once that's up you can list the tasks in the cluster, to verify that the master and slaves are running:
+Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
 ```shell
-cluster/cloudcfg.sh list /tasks
+cluster/cloudcfg.sh list /pods
 ```
 
-You should see a single redis master task, and two redis slave tasks.
+You should see a single redis master pod, and two redis slave pods.
 
 ### Step Four: Create the redis slave service.
 
@@ -139,7 +139,7 @@ Now that you have created the service specification, create it in your cluster w
 cluster/cloudcfg.sh -c redis-slave-service.json create /services
 ```
 
-### Step Five: Create the frontend task.
+### Step Five: Create the frontend pod.
 
 This is a simple PHP server that is configured to talk to both the slave and master services depdending on if the request is a read or a write.  It exposes a simple AJAX interface, and serves an angular based U/X.  Like the redis read slaves it is a replicated service instantiated by a replication controller.  Create a file named `frontend-controller.json`:
 
@@ -170,13 +170,13 @@ With this file, you can turn up your frontend with:
 cluster/cloudcfg.sh -c frontend-controller.json create /replicationControllers
 ```
 
-Once that's up you can list the tasks in the cluster, to verify that the master, slaves and frontends are running:
+Once that's up you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
 ```shell
-cluster/cloudcfg.sh list /tasks
+cluster/cloudcfg.sh list /pods
 ```
 
-You should see a single redis master task, two redis slave and three frontend tasks.
+You should see a single redis master pod, two redis slave and three frontend pods.
 
 The code for the PHP service looks like this:
 ```php

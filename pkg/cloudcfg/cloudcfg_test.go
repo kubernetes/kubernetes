@@ -40,32 +40,32 @@ type Action struct {
 
 type FakeKubeClient struct {
 	actions []Action
-	tasks   PodList
+	pods    PodList
 	ctrl    ReplicationController
 }
 
-func (client *FakeKubeClient) ListTasks(labelQuery map[string]string) (PodList, error) {
-	client.actions = append(client.actions, Action{action: "list-tasks"})
-	return client.tasks, nil
+func (client *FakeKubeClient) ListPods(labelQuery map[string]string) (PodList, error) {
+	client.actions = append(client.actions, Action{action: "list-pods"})
+	return client.pods, nil
 }
 
-func (client *FakeKubeClient) GetTask(name string) (Pod, error) {
-	client.actions = append(client.actions, Action{action: "get-task", value: name})
+func (client *FakeKubeClient) GetPod(name string) (Pod, error) {
+	client.actions = append(client.actions, Action{action: "get-pod", value: name})
 	return Pod{}, nil
 }
 
-func (client *FakeKubeClient) DeleteTask(name string) error {
-	client.actions = append(client.actions, Action{action: "delete-task", value: name})
+func (client *FakeKubeClient) DeletePod(name string) error {
+	client.actions = append(client.actions, Action{action: "delete-pod", value: name})
 	return nil
 }
 
-func (client *FakeKubeClient) CreateTask(task Pod) (Pod, error) {
-	client.actions = append(client.actions, Action{action: "create-task"})
+func (client *FakeKubeClient) CreatePod(pod Pod) (Pod, error) {
+	client.actions = append(client.actions, Action{action: "create-pod"})
 	return Pod{}, nil
 }
 
-func (client *FakeKubeClient) UpdateTask(task Pod) (Pod, error) {
-	client.actions = append(client.actions, Action{action: "update-task", value: task.ID})
+func (client *FakeKubeClient) UpdatePod(pod Pod) (Pod, error) {
+	client.actions = append(client.actions, Action{action: "update-pod", value: pod.ID})
 	return Pod{}, nil
 }
 
@@ -115,12 +115,12 @@ func validateAction(expectedAction, actualAction Action, t *testing.T) {
 	}
 }
 
-func TestUpdateWithTasks(t *testing.T) {
+func TestUpdateWithPods(t *testing.T) {
 	client := FakeKubeClient{
-		tasks: PodList{
+		pods: PodList{
 			Items: []Pod{
-				Pod{JSONBase: JSONBase{ID: "task-1"}},
-				Pod{JSONBase: JSONBase{ID: "task-2"}},
+				Pod{JSONBase: JSONBase{ID: "pod-1"}},
+				Pod{JSONBase: JSONBase{ID: "pod-2"}},
 			},
 		},
 	}
@@ -129,19 +129,19 @@ func TestUpdateWithTasks(t *testing.T) {
 		t.Errorf("Unexpected action list %#v", client.actions)
 	}
 	validateAction(Action{action: "get-controller", value: "foo"}, client.actions[0], t)
-	validateAction(Action{action: "list-tasks"}, client.actions[1], t)
-	validateAction(Action{action: "update-task", value: "task-1"}, client.actions[2], t)
-	validateAction(Action{action: "update-task", value: "task-2"}, client.actions[3], t)
+	validateAction(Action{action: "list-pods"}, client.actions[1], t)
+	validateAction(Action{action: "update-pod", value: "pod-1"}, client.actions[2], t)
+	validateAction(Action{action: "update-pod", value: "pod-2"}, client.actions[3], t)
 }
 
-func TestUpdateNoTasks(t *testing.T) {
+func TestUpdateNoPods(t *testing.T) {
 	client := FakeKubeClient{}
 	Update("foo", &client, 0)
 	if len(client.actions) != 2 {
 		t.Errorf("Unexpected action list %#v", client.actions)
 	}
 	validateAction(Action{action: "get-controller", value: "foo"}, client.actions[0], t)
-	validateAction(Action{action: "list-tasks"}, client.actions[1], t)
+	validateAction(Action{action: "list-pods"}, client.actions[1], t)
 }
 
 func TestDoRequest(t *testing.T) {
