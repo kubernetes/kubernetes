@@ -2,7 +2,7 @@
 
 Kubernetes is an open source reference implementation of container cluster management.
 
-[Kubernetes Design Document](https://github.com/GoogleCloudPlatform/kubernetes/edit/master/DESIGN.md)
+[Kubernetes Design Document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md)
 
 ## Getting started on Google Compute Engine
 
