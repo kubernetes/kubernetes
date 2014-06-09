@@ -75,7 +75,7 @@ func main() {
 	}
 
 	storage := map[string]apiserver.RESTStorage{
-		"tasks":                  registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry)),
+		"pods":                  registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),
 		"services":               registry.MakeServiceRegistryStorage(serviceRegistry),
 	}

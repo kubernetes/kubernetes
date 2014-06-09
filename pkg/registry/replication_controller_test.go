@@ -203,7 +203,7 @@ func TestCreateReplica(t *testing.T) {
 	//	DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 	//}
 	// TODO: fix this so that it validates the body.
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "POST", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "POST", nil)
 }
 
 func TestHandleWatchResponseNotSet(t *testing.T) {

@@ -140,7 +140,7 @@ echo "  up."
 echo
 
 until $(curl --insecure --user ${user}:${passwd} --max-time 1 \
-        --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/tasks); do
+        --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
     printf "."
     sleep 2
 done

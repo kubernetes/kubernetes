@@ -144,7 +144,7 @@ func DecodeLabelQuery(labelQuery string) map[string]string {
 
 // ListPods takes a label query, and returns the list of pods that match that query
 func (client Client) ListPods(labelQuery map[string]string) (api.PodList, error) {
-	path := "tasks"
+	path := "pods"
 	if labelQuery != nil && len(labelQuery) > 0 {
 		path += "?labels=" + EncodeLabelQuery(labelQuery)
 	}
@@ -156,13 +156,13 @@ func (client Client) ListPods(labelQuery map[string]string) (api.PodList, error)
 // GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
 func (client Client) GetPod(name string) (api.Pod, error) {
 	var result api.Pod
-	_, err := client.rawRequest("GET", "tasks/"+name, nil, &result)
+	_, err := client.rawRequest("GET", "pods/"+name, nil, &result)
 	return result, err
 }
 
 // DeletePod takes the name of the pod, and returns an error if one occurs
 func (client Client) DeletePod(name string) error {
-	_, err := client.rawRequest("DELETE", "tasks/"+name, nil, nil)
+	_, err := client.rawRequest("DELETE", "pods/"+name, nil, nil)
 	return err
 }
 
@@ -171,7 +171,7 @@ func (client Client) CreatePod(pod api.Pod) (api.Pod, error) {
 	var result api.Pod
 	body, err := json.Marshal(pod)
 	if err == nil {
-		_, err = client.rawRequest("POST", "tasks", bytes.NewBuffer(body), &result)
+		_, err = client.rawRequest("POST", "pods", bytes.NewBuffer(body), &result)
 	}
 	return result, err
 }
@@ -181,7 +181,7 @@ func (client Client) UpdatePod(pod api.Pod) (api.Pod, error) {
 	var result api.Pod
 	body, err := json.Marshal(pod)
 	if err == nil {
-		_, err = client.rawRequest("PUT", "tasks/"+pod.ID, bytes.NewBuffer(body), &result)
+		_, err = client.rawRequest("PUT", "pods/"+pod.ID, bytes.NewBuffer(body), &result)
 	}
 	return result, err
 }

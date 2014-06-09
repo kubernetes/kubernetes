@@ -50,7 +50,7 @@ func TestListEmptyPods(t *testing.T) {
 		Host: testServer.URL,
 	}
 	podList, err := client.ListPods(nil)
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "GET", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "GET", nil)
 	if err != nil {
 		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}
@@ -84,7 +84,7 @@ func TestListPods(t *testing.T) {
 		Host: testServer.URL,
 	}
 	receivedPodList, err := client.ListPods(nil)
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "GET", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "GET", nil)
 	if err != nil {
 		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}
@@ -119,7 +119,7 @@ func TestListPodsLabels(t *testing.T) {
 	}
 	query := map[string]string{"foo": "bar", "name": "baz"}
 	receivedPodList, err := client.ListPods(query)
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "GET", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "GET", nil)
 	queryString := fakeHandler.RequestReceived.URL.Query().Get("labels")
 	queryString, _ = url.QueryUnescape(queryString)
 	// TODO(bburns) : This assumes some ordering in serialization that might not always
@@ -156,7 +156,7 @@ func TestGetPod(t *testing.T) {
 		Host: testServer.URL,
 	}
 	receivedPod, err := client.GetPod("foo")
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks/foo"), "GET", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods/foo"), "GET", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
@@ -176,7 +176,7 @@ func TestDeletePod(t *testing.T) {
 		Host: testServer.URL,
 	}
 	err := client.DeletePod("foo")
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks/foo"), "DELETE", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods/foo"), "DELETE", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
@@ -203,7 +203,7 @@ func TestCreatePod(t *testing.T) {
 		Host: testServer.URL,
 	}
 	receivedPod, err := client.CreatePod(requestPod)
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks"), "POST", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "POST", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
@@ -234,7 +234,7 @@ func TestUpdatePod(t *testing.T) {
 		Host: testServer.URL,
 	}
 	receivedPod, err := client.UpdatePod(requestPod)
-	fakeHandler.ValidateRequest(t, makeUrl("/tasks/foo"), "PUT", nil)
+	fakeHandler.ValidateRequest(t, makeUrl("/pods/foo"), "PUT", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}

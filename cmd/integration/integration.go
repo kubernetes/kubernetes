@@ -42,7 +42,7 @@ func main() {
 	reg := registry.MakeEtcdRegistry(etcdClient, machineList)
 
 	apiserver := apiserver.New(map[string]apiserver.RESTStorage{
-		"tasks":                  registry.MakePodRegistryStorage(reg, &kube_client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList)),
+		"pods":                  registry.MakePodRegistryStorage(reg, &kube_client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(reg),
 	}, "/api/v1beta1")
 	server := httptest.NewServer(apiserver)
