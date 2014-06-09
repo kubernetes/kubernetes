@@ -1,30 +1,19 @@
 # Kubernetes Design Overview
 
-<ul class="toc">
-  <li><a href="#overview">Overview</a></li>
-  <li><a href="#key_concept_container_pod">Key Concept: Container Pod</a></li>
-  <li><a href="#the_kubernetes_node">The Kubernetes Node</a>
-    <ul class="toc">
-      <li><a href="#kubelet">Kubelet</a></li>
-      <li><a href="#kubernetes_proxy">Kubernetes Proxy</a></li>
-    </ul>
-  </li>
-  <li><a href="#the_kubernetes_master">The Kubernetes Master</a>
-    <ul class="toc">
-      <li><a href="#etcd">etcd</a></li>
-      <li><a href="#kubernetes_api_server">Kubernetes API Server</a></li>
-      <li><a href="#kubernetes_controller_manager_server">Kubernetes Controller Manager Server</a></li>
-      <li><a href="#key_concept_labels">Key Concept: Labels</a></li>
-    </ul>
-  </li>
-  <li><a href="#network_model">Network Model</a></li>
-  <li><a href="#release_process">Release Process</a></li>
-  <li><a href="#gce_cluster_configuration">GCE Cluster Configuration</a>
-    <ul class="toc">
-      <li><a href="#cluster_security">Cluster Security</a></li>
-    </ul>
-  </li>
-</ul>
+- [Overview](#overview)
+- [Key Concept: Container Pod](#key-concept-container-pod)
+- [The Kubernetes Node](#the-kubernetes-node)
+  - [Kubelet](#kubelet)
+  - [Kubernetes Proxy](#kubernetes-proxy)
+- [The Kubernetes Master](#the-kubernetes-master)
+  - [etcd](#etcd)
+  - [Kubernetes API Server](#kubernetes-api-server)
+  - [Kubernetes Controller Manager Server](#kubernetes-controller-manager-server)
+  - [Key Concept: Labels](#key-concept-labels)
+- [Network Model](#network-model)
+- [Release Process](#release-process)
+- [GCE Cluster Configuration](#gce-cluster-configuration)
+  - [Cluster Security](#cluster-security)
 
 ## Overview
 
