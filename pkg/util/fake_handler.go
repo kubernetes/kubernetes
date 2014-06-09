@@ -19,8 +19,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"testing"
 )
+
+// TestInterface is a simple interface providing Errorf, to make injection for
+// testing easier (insert 'yo dawg' meme here)
+type TestInterface interface {
+	Errorf(format string, args ...interface{})
+}
 
 // FakeHandler is to assist in testing HTTP requests.
 type FakeHandler struct {
@@ -41,7 +46,7 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	f.ResponseBody = string(bodyReceived)
 }
 
-func (f FakeHandler) ValidateRequest(t *testing.T, expectedPath, expectedMethod string, body *string) {
+func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
 	if f.RequestReceived.URL.Path != expectedPath {
 		t.Errorf("Unexpected request path: %s", f.RequestReceived.URL.Path)
 	}
