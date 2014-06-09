@@ -93,12 +93,12 @@ func TestContainer(t *testing.T) {
 	}
 	resp.Body.Close()
 	close(fw.updateChan)
-	recieved := fw.updateReader.GetList()
-	if len(recieved) != 1 {
-		t.Errorf("Expected 1 manifest, but got %v", len(recieved))
+	received := fw.updateReader.GetList()
+	if len(received) != 1 {
+		t.Errorf("Expected 1 manifest, but got %v", len(received))
 	}
-	if !reflect.DeepEqual(expected, recieved[0]) {
-		t.Errorf("Expected %#v, but got %#v", expected, recieved[0])
+	if !reflect.DeepEqual(expected, received[0]) {
+		t.Errorf("Expected %#v, but got %#v", expected, received[0])
 	}
 }
 
