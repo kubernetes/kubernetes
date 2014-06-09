@@ -23,13 +23,13 @@ import (
 type TaskRegistry interface {
 	// ListTasks obtains a list of tasks that match query.
 	// Query may be nil in which case all tasks are returned.
-	ListTasks(query *map[string]string) ([]api.Task, error)
+	ListTasks(query *map[string]string) ([]api.Pod, error)
 	// Get a specific task
-	GetTask(taskId string) (*api.Task, error)
+	GetTask(taskId string) (*api.Pod, error)
 	// Create a task based on a specification, schedule it onto a specific machine.
-	CreateTask(machine string, task api.Task) error
+	CreateTask(machine string, task api.Pod) error
 	// Update an existing task
-	UpdateTask(task api.Task) error
+	UpdateTask(task api.Pod) error
 	// Delete an existing task
 	DeleteTask(taskId string) error
 }

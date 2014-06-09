@@ -92,11 +92,11 @@ type TaskState struct {
 
 type TaskList struct {
 	JSONBase
-	Items []Task `json:"items" yaml:"items,omitempty"`
+	Items []Pod `json:"items" yaml:"items,omitempty"`
 }
 
 // Task is a single task, used as either input (create, update) or as output (list, get)
-type Task struct {
+type Pod struct {
 	JSONBase
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	DesiredState TaskState         `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`

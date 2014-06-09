@@ -41,7 +41,7 @@ func MakeTaskRegistryStorage(registry TaskRegistry, containerInfo client.Contain
 }
 
 // LabelMatch tests to see if a Task's labels map contains 'key' mapping to 'value'
-func LabelMatch(task Task, queryKey, queryValue string) bool {
+func LabelMatch(task Pod, queryKey, queryValue string) bool {
 	for key, value := range task.Labels {
 		if queryKey == key && queryValue == value {
 			return true
@@ -51,7 +51,7 @@ func LabelMatch(task Task, queryKey, queryValue string) bool {
 }
 
 // LabelMatch tests to see if a Task's labels map contains all key/value pairs in 'labelQuery'
-func LabelsMatch(task Task, labelQuery *map[string]string) bool {
+func LabelsMatch(task Pod, labelQuery *map[string]string) bool {
 	if labelQuery == nil {
 		return true
 	}
@@ -99,13 +99,13 @@ func (storage *TaskRegistryStorage) Delete(id string) error {
 }
 
 func (storage *TaskRegistryStorage) Extract(body string) (interface{}, error) {
-	task := Task{}
+	task := Pod{}
 	err := json.Unmarshal([]byte(body), &task)
 	return task, err
 }
 
 func (storage *TaskRegistryStorage) Create(task interface{}) error {
-	taskObj := task.(Task)
+	taskObj := task.(Pod)
 	if len(taskObj.ID) == 0 {
 		return fmt.Errorf("ID is unspecified: %#v", task)
 	}
@@ -117,5 +117,5 @@ func (storage *TaskRegistryStorage) Create(task interface{}) error {
 }
 
 func (storage *TaskRegistryStorage) Update(task interface{}) error {
-	return storage.registry.UpdateTask(task.(Task))
+	return storage.registry.UpdateTask(task.(Pod))
 }

@@ -56,7 +56,7 @@ func (r RealTaskControl) createReplica(controllerSpec ReplicationController) {
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
-	task := Task{
+	task := Pod{
 		JSONBase: JSONBase{
 			ID: fmt.Sprintf("%x", rand.Int()),
 		},
@@ -118,8 +118,8 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*Rep
 	return nil, nil
 }
 
-func (rm *ReplicationManager) filterActiveTasks(tasks []Task) []Task {
-	var result []Task
+func (rm *ReplicationManager) filterActiveTasks(tasks []Pod) []Pod {
+	var result []Pod
 	for _, value := range tasks {
 		if strings.Index(value.CurrentState.Status, "Exit") == -1 {
 			result = append(result, value)

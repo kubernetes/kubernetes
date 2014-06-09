@@ -24,7 +24,7 @@ import (
 
 // Scheduler is an interface implemented by things that know how to schedule tasks onto machines.
 type Scheduler interface {
-	Schedule(Task) (string, error)
+	Schedule(Pod) (string, error)
 }
 
 // RandomScheduler choses machines uniformly at random.
@@ -40,7 +40,7 @@ func MakeRandomScheduler(machines []string, random rand.Rand) Scheduler {
 	}
 }
 
-func (s *RandomScheduler) Schedule(task Task) (string, error) {
+func (s *RandomScheduler) Schedule(task Pod) (string, error) {
 	return s.machines[s.random.Int()%len(s.machines)], nil
 }
 
@@ -57,7 +57,7 @@ func MakeRoundRobinScheduler(machines []string) Scheduler {
 	}
 }
 
-func (s *RoundRobinScheduler) Schedule(task Task) (string, error) {
+func (s *RoundRobinScheduler) Schedule(task Pod) (string, error) {
 	result := s.machines[s.currentIndex]
 	s.currentIndex = (s.currentIndex + 1) % len(s.machines)
 	return result, nil
@@ -75,7 +75,7 @@ func MakeFirstFitScheduler(machines []string, registry TaskRegistry) Scheduler {
 	}
 }
 
-func (s *FirstFitScheduler) containsPort(task Task, port Port) bool {
+func (s *FirstFitScheduler) containsPort(task Pod, port Port) bool {
 	for _, container := range task.DesiredState.Manifest.Containers {
 		for _, taskPort := range container.Ports {
 			if taskPort.HostPort == port.HostPort {
@@ -86,8 +86,8 @@ func (s *FirstFitScheduler) containsPort(task Task, port Port) bool {
 	return false
 }
 
-func (s *FirstFitScheduler) Schedule(task Task) (string, error) {
-	machineToTasks := map[string][]Task{}
+func (s *FirstFitScheduler) Schedule(task Pod) (string, error) {
+	machineToTasks := map[string][]Pod{}
 	tasks, err := s.registry.ListTasks(nil)
 	if err != nil {
 		return "", err
