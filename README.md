@@ -84,6 +84,11 @@ cd kubernetes
 cluster/kube-down.sh
 ```
 
+## Where to go next?
+[Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)
+
+Or fork and start hacking!
+
 ## Development
 
 ### Hooks
