@@ -27,7 +27,7 @@ import (
 
 func TestEtcdGetTask(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/hosts/machine/tasks/foo", util.MakeJSONString(Task{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/hosts/machine/tasks/foo", util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	task, err := registry.GetTask("foo")
 	expectNoError(t, err)
@@ -63,7 +63,7 @@ func TestEtcdCreateTask(t *testing.T) {
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Task{
+	err := registry.CreateTask("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -80,7 +80,7 @@ func TestEtcdCreateTask(t *testing.T) {
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
 	expectNoError(t, err)
-	var task Task
+	var task Pod
 	err = json.Unmarshal([]byte(resp.Node.Value), &task)
 	expectNoError(t, err)
 	if task.ID != "foo" {
@@ -100,13 +100,13 @@ func TestEtcdCreateTaskAlreadyExisting(t *testing.T) {
 	fakeClient.Data["/registry/hosts/machine/tasks/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: util.MakeJSONString(Task{JSONBase: JSONBase{ID: "foo"}}),
+				Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}),
 			},
 		},
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Task{
+	err := registry.CreateTask("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -131,7 +131,7 @@ func TestEtcdCreateTaskWithContainersError(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 200},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Task{
+	err := registry.CreateTask("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -163,7 +163,7 @@ func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Task{
+	err := registry.CreateTask("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -181,7 +181,7 @@ func TestEtcdCreateTaskWithContainersNotFound(t *testing.T) {
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
 	expectNoError(t, err)
-	var task Task
+	var task Pod
 	err = json.Unmarshal([]byte(resp.Node.Value), &task)
 	expectNoError(t, err)
 	if task.ID != "foo" {
@@ -210,7 +210,7 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateTask("machine", Task{
+	err := registry.CreateTask("machine", Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -228,7 +228,7 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/tasks/foo", false, false)
 	expectNoError(t, err)
-	var task Task
+	var task Pod
 	err = json.Unmarshal([]byte(resp.Node.Value), &task)
 	expectNoError(t, err)
 	if task.ID != "foo" {
@@ -246,7 +246,7 @@ func TestEtcdCreateTaskWithExistingContainers(t *testing.T) {
 func TestEtcdDeleteTask(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/tasks/foo"
-	fakeClient.Set(key, util.MakeJSONString(Task{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
 		ContainerManifest{
 			Id: "foo",
@@ -270,7 +270,7 @@ func TestEtcdDeleteTask(t *testing.T) {
 func TestEtcdDeleteTaskMultipleContainers(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/tasks/foo"
-	fakeClient.Set(key, util.MakeJSONString(Task{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
 		ContainerManifest{Id: "foo"},
 		ContainerManifest{Id: "bar"},
@@ -337,10 +337,10 @@ func TestEtcdListTasks(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					&etcd.Node{
-						Value: util.MakeJSONString(Task{JSONBase: JSONBase{ID: "foo"}}),
+						Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}),
 					},
 					&etcd.Node{
-						Value: util.MakeJSONString(Task{JSONBase: JSONBase{ID: "bar"}}),
+						Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "bar"}}),
 					},
 				},
 			},

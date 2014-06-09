@@ -22,21 +22,21 @@ import (
 // An implementation of TaskRegistry and ControllerRegistry that is backed by memory
 // Mainly used for testing.
 type MemoryRegistry struct {
-	taskData       map[string]Task
+	taskData       map[string]Pod
 	controllerData map[string]ReplicationController
 	serviceData    map[string]Service
 }
 
 func MakeMemoryRegistry() *MemoryRegistry {
 	return &MemoryRegistry{
-		taskData:       map[string]Task{},
+		taskData:       map[string]Pod{},
 		controllerData: map[string]ReplicationController{},
 		serviceData:    map[string]Service{},
 	}
 }
 
-func (registry *MemoryRegistry) ListTasks(labelQuery *map[string]string) ([]Task, error) {
-	result := []Task{}
+func (registry *MemoryRegistry) ListTasks(labelQuery *map[string]string) ([]Pod, error) {
+	result := []Pod{}
 	for _, value := range registry.taskData {
 		if LabelsMatch(value, labelQuery) {
 			result = append(result, value)
@@ -45,7 +45,7 @@ func (registry *MemoryRegistry) ListTasks(labelQuery *map[string]string) ([]Task
 	return result, nil
 }
 
-func (registry *MemoryRegistry) GetTask(taskID string) (*Task, error) {
+func (registry *MemoryRegistry) GetTask(taskID string) (*Pod, error) {
 	task, found := registry.taskData[taskID]
 	if found {
 		return &task, nil
@@ -54,7 +54,7 @@ func (registry *MemoryRegistry) GetTask(taskID string) (*Task, error) {
 	}
 }
 
-func (registry *MemoryRegistry) CreateTask(machine string, task Task) error {
+func (registry *MemoryRegistry) CreateTask(machine string, task Pod) error {
 	registry.taskData[task.ID] = task
 	return nil
 }
@@ -64,7 +64,7 @@ func (registry *MemoryRegistry) DeleteTask(taskID string) error {
 	return nil
 }
 
-func (registry *MemoryRegistry) UpdateTask(task Task) error {
+func (registry *MemoryRegistry) UpdateTask(task Pod) error {
 	registry.taskData[task.ID] = task
 	return nil
 }

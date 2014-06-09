@@ -22,7 +22,7 @@ import (
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func expectSchedule(scheduler Scheduler, task Task, expected string, t *testing.T) {
+func expectSchedule(scheduler Scheduler, task Pod, expected string, t *testing.T) {
 	actual, err := scheduler.Schedule(task)
 	expectNoError(t, err)
 	if actual != expected {
@@ -32,31 +32,31 @@ func expectSchedule(scheduler Scheduler, task Task, expected string, t *testing.
 
 func TestRoundRobinScheduler(t *testing.T) {
 	scheduler := MakeRoundRobinScheduler([]string{"m1", "m2", "m3", "m4"})
-	expectSchedule(scheduler, Task{}, "m1", t)
-	expectSchedule(scheduler, Task{}, "m2", t)
-	expectSchedule(scheduler, Task{}, "m3", t)
-	expectSchedule(scheduler, Task{}, "m4", t)
+	expectSchedule(scheduler, Pod{}, "m1", t)
+	expectSchedule(scheduler, Pod{}, "m2", t)
+	expectSchedule(scheduler, Pod{}, "m3", t)
+	expectSchedule(scheduler, Pod{}, "m4", t)
 }
 
 func TestRandomScheduler(t *testing.T) {
 	random := rand.New(rand.NewSource(0))
 	scheduler := MakeRandomScheduler([]string{"m1", "m2", "m3", "m4"}, *random)
-	_, err := scheduler.Schedule(Task{})
+	_, err := scheduler.Schedule(Pod{})
 	expectNoError(t, err)
 }
 
 func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
 	mockRegistry := MockTaskRegistry{}
 	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
-	expectSchedule(scheduler, Task{}, "m1", t)
+	expectSchedule(scheduler, Pod{}, "m1", t)
 }
 
-func makeTask(host string, hostPorts ...int) Task {
+func makeTask(host string, hostPorts ...int) Pod {
 	networkPorts := []Port{}
 	for _, port := range hostPorts {
 		networkPorts = append(networkPorts, Port{HostPort: port})
 	}
-	return Task{
+	return Pod{
 		CurrentState: TaskState{
 			Host: host,
 		},
@@ -74,7 +74,7 @@ func makeTask(host string, hostPorts ...int) Task {
 
 func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 	mockRegistry := MockTaskRegistry{
-		tasks: []Task{
+		tasks: []Pod{
 			makeTask("m1", 8080),
 		},
 	}
@@ -84,7 +84,7 @@ func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 
 func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 	mockRegistry := MockTaskRegistry{
-		tasks: []Task{
+		tasks: []Pod{
 			makeTask("m1", 80, 8080),
 			makeTask("m2", 8081, 8082, 8083),
 			makeTask("m3", 80, 443, 8085),
@@ -96,7 +96,7 @@ func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 
 func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	mockRegistry := MockTaskRegistry{
-		tasks: []Task{
+		tasks: []Pod{
 			makeTask("m1", 8080),
 			makeTask("m2", 8081),
 			makeTask("m3", 8080),

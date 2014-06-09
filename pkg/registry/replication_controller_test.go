@@ -73,9 +73,9 @@ func makeReplicationController(replicas int) ReplicationController {
 }
 
 func makeTaskList(count int) TaskList {
-	tasks := []Task{}
+	tasks := []Pod{}
 	for i := 0; i < count; i++ {
-		tasks = append(tasks, Task{
+		tasks = append(tasks, Pod{
 			JSONBase: JSONBase{
 				ID: fmt.Sprintf("task%d", i),
 			},

@@ -57,8 +57,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 	}
 	taskRegistry := MockTaskRegistry{
-		tasks: []Task{
-			Task{
+		tasks: []Pod{
+			Pod{
 				DesiredState: TaskState{
 					Manifest: ContainerManifest{
 						Containers: []Container{

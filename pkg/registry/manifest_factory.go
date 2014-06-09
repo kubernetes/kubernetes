@@ -21,14 +21,14 @@ import (
 
 type ManifestFactory interface {
 	// Make a container object for a given task, given the machine that the task is running on.
-	MakeManifest(machine string, task Task) (ContainerManifest, error)
+	MakeManifest(machine string, task Pod) (ContainerManifest, error)
 }
 
 type BasicManifestFactory struct {
 	serviceRegistry ServiceRegistry
 }
 
-func (b *BasicManifestFactory) MakeManifest(machine string, task Task) (ContainerManifest, error) {
+func (b *BasicManifestFactory) MakeManifest(machine string, task Pod) (ContainerManifest, error) {
 	envVars, err := GetServiceEnvironmentVariables(b.serviceRegistry, machine)
 	if err != nil {
 		return ContainerManifest{}, err

@@ -62,8 +62,8 @@ func TestListEmptyTasks(t *testing.T) {
 
 func TestListTasks(t *testing.T) {
 	expectedTaskList := api.TaskList{
-		Items: []api.Task{
-			api.Task{
+		Items: []api.Pod{
+			api.Pod{
 				CurrentState: api.TaskState{
 					Status: "Foobar",
 				},
@@ -96,8 +96,8 @@ func TestListTasks(t *testing.T) {
 
 func TestListTasksLabels(t *testing.T) {
 	expectedTaskList := api.TaskList{
-		Items: []api.Task{
-			api.Task{
+		Items: []api.Pod{
+			api.Pod{
 				CurrentState: api.TaskState{
 					Status: "Foobar",
 				},
@@ -137,7 +137,7 @@ func TestListTasksLabels(t *testing.T) {
 }
 
 func TestGetTask(t *testing.T) {
-	expectedTask := api.Task{
+	expectedTask := api.Pod{
 		CurrentState: api.TaskState{
 			Status: "Foobar",
 		},
@@ -184,7 +184,7 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestCreateTask(t *testing.T) {
-	requestTask := api.Task{
+	requestTask := api.Pod{
 		CurrentState: api.TaskState{
 			Status: "Foobar",
 		},
@@ -214,7 +214,7 @@ func TestCreateTask(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	requestTask := api.Task{
+	requestTask := api.Pod{
 		JSONBase: api.JSONBase{ID: "foo"},
 		CurrentState: api.TaskState{
 			Status: "Foobar",

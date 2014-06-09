@@ -39,10 +39,10 @@ import (
 // ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
 type ClientInterface interface {
 	ListTasks(labelQuery map[string]string) (api.TaskList, error)
-	GetTask(name string) (api.Task, error)
+	GetTask(name string) (api.Pod, error)
 	DeleteTask(name string) error
-	CreateTask(api.Task) (api.Task, error)
-	UpdateTask(api.Task) (api.Task, error)
+	CreateTask(api.Pod) (api.Pod, error)
+	UpdateTask(api.Pod) (api.Pod, error)
 
 	GetReplicationController(name string) (api.ReplicationController, error)
 	CreateReplicationController(api.ReplicationController) (api.ReplicationController, error)
@@ -154,8 +154,8 @@ func (client Client) ListTasks(labelQuery map[string]string) (api.TaskList, erro
 }
 
 // GetTask takes the name of the task, and returns the corresponding Task object, and an error if it occurs
-func (client Client) GetTask(name string) (api.Task, error) {
-	var result api.Task
+func (client Client) GetTask(name string) (api.Pod, error) {
+	var result api.Pod
 	_, err := client.rawRequest("GET", "tasks/"+name, nil, &result)
 	return result, err
 }
@@ -167,8 +167,8 @@ func (client Client) DeleteTask(name string) error {
 }
 
 // CreateTask takes the representation of a task.  Returns the server's representation of the task, and an error, if it occurs
-func (client Client) CreateTask(task api.Task) (api.Task, error) {
-	var result api.Task
+func (client Client) CreateTask(task api.Pod) (api.Pod, error) {
+	var result api.Pod
 	body, err := json.Marshal(task)
 	if err == nil {
 		_, err = client.rawRequest("POST", "tasks", bytes.NewBuffer(body), &result)
@@ -177,8 +177,8 @@ func (client Client) CreateTask(task api.Task) (api.Task, error) {
 }
 
 // UpdateTask takes the representation of a task to update.  Returns the server's representation of the task, and an error, if it occurs
-func (client Client) UpdateTask(task api.Task) (api.Task, error) {
-	var result api.Task
+func (client Client) UpdateTask(task api.Pod) (api.Pod, error) {
+	var result api.Pod
 	body, err := json.Marshal(task)
 	if err == nil {
 		_, err = client.rawRequest("PUT", "tasks/"+task.ID, bytes.NewBuffer(body), &result)

@@ -66,8 +66,8 @@ func makeTaskKey(machine, taskID string) string {
 	return "/registry/hosts/" + machine + "/tasks/" + taskID
 }
 
-func (registry *EtcdRegistry) ListTasks(query *map[string]string) ([]Task, error) {
-	tasks := []Task{}
+func (registry *EtcdRegistry) ListTasks(query *map[string]string) ([]Pod, error) {
+	tasks := []Pod{}
 	for _, machine := range registry.machines {
 		machineTasks, err := registry.listTasksForMachine(machine)
 		if err != nil {
@@ -95,12 +95,12 @@ func (registry *EtcdRegistry) listEtcdNode(key string) ([]*etcd.Node, error) {
 	return result.Node.Nodes, nil
 }
 
-func (registry *EtcdRegistry) listTasksForMachine(machine string) ([]Task, error) {
-	tasks := []Task{}
+func (registry *EtcdRegistry) listTasksForMachine(machine string) ([]Pod, error) {
+	tasks := []Pod{}
 	key := "/registry/hosts/" + machine + "/tasks"
 	nodes, err := registry.listEtcdNode(key)
 	for _, node := range nodes {
-		task := Task{}
+		task := Pod{}
 		err = json.Unmarshal([]byte(node.Value), &task)
 		if err != nil {
 			return tasks, err
@@ -111,7 +111,7 @@ func (registry *EtcdRegistry) listTasksForMachine(machine string) ([]Task, error
 	return tasks, err
 }
 
-func (registry *EtcdRegistry) GetTask(taskID string) (*Task, error) {
+func (registry *EtcdRegistry) GetTask(taskID string) (*Pod, error) {
 	task, _, err := registry.findTask(taskID)
 	return &task, err
 }
@@ -144,7 +144,7 @@ func (registry *EtcdRegistry) updateManifests(machine string, manifests []Contai
 	return err
 }
 
-func (registry *EtcdRegistry) CreateTask(machineIn string, task Task) error {
+func (registry *EtcdRegistry) CreateTask(machineIn string, task Pod) error {
 	taskOut, machine, err := registry.findTask(task.ID)
 	if err == nil {
 		return fmt.Errorf("A task named %s already exists on %s (%#v)", task.ID, machine, taskOut)
@@ -152,7 +152,7 @@ func (registry *EtcdRegistry) CreateTask(machineIn string, task Task) error {
 	return registry.runTask(task, machineIn)
 }
 
-func (registry *EtcdRegistry) runTask(task Task, machine string) error {
+func (registry *EtcdRegistry) runTask(task Pod, machine string) error {
 	manifests, err := registry.loadManifests(machine)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (registry *EtcdRegistry) runTask(task Task, machine string) error {
 	return registry.updateManifests(machine, manifests)
 }
 
-func (registry *EtcdRegistry) UpdateTask(task Task) error {
+func (registry *EtcdRegistry) UpdateTask(task Pod) error {
 	return fmt.Errorf("Unimplemented!")
 }
 
@@ -213,33 +213,33 @@ func (registry *EtcdRegistry) deleteTaskFromMachine(machine, taskID string) erro
 	return err
 }
 
-func (registry *EtcdRegistry) getTaskForMachine(machine, taskID string) (Task, error) {
+func (registry *EtcdRegistry) getTaskForMachine(machine, taskID string) (Pod, error) {
 	key := makeTaskKey(machine, taskID)
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
 		if isEtcdNotFound(err) {
-			return Task{}, fmt.Errorf("Not found (%#v).", err)
+			return Pod{}, fmt.Errorf("Not found (%#v).", err)
 		} else {
-			return Task{}, err
+			return Pod{}, err
 		}
 	}
 	if result.Node == nil || len(result.Node.Value) == 0 {
-		return Task{}, fmt.Errorf("no nodes field: %#v", result)
+		return Pod{}, fmt.Errorf("no nodes field: %#v", result)
 	}
-	task := Task{}
+	task := Pod{}
 	err = json.Unmarshal([]byte(result.Node.Value), &task)
 	task.CurrentState.Host = machine
 	return task, err
 }
 
-func (registry *EtcdRegistry) findTask(taskID string) (Task, string, error) {
+func (registry *EtcdRegistry) findTask(taskID string) (Pod, string, error) {
 	for _, machine := range registry.machines {
 		task, err := registry.getTaskForMachine(machine, taskID)
 		if err == nil {
 			return task, machine, nil
 		}
 	}
-	return Task{}, "", fmt.Errorf("Task not found %s", taskID)
+	return Pod{}, "", fmt.Errorf("Task not found %s", taskID)
 }
 
 func isEtcdNotFound(err error) bool {

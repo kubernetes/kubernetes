@@ -32,7 +32,7 @@ func TestListTasksEmpty(t *testing.T) {
 
 func TestMemoryListTasks(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	registry.CreateTask("machine", Task{JSONBase: JSONBase{ID: "foo"}})
+	registry.CreateTask("machine", Pod{JSONBase: JSONBase{ID: "foo"}})
 	tasks, err := registry.ListTasks(nil)
 	expectNoError(t, err)
 	if len(tasks) != 1 || tasks[0].ID != "foo" {
@@ -42,7 +42,7 @@ func TestMemoryListTasks(t *testing.T) {
 
 func TestMemorySetGetTasks(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedTask := Task{JSONBase: JSONBase{ID: "foo"}}
+	expectedTask := Pod{JSONBase: JSONBase{ID: "foo"}}
 	registry.CreateTask("machine", expectedTask)
 	task, err := registry.GetTask("foo")
 	expectNoError(t, err)
@@ -53,8 +53,8 @@ func TestMemorySetGetTasks(t *testing.T) {
 
 func TestMemorySetUpdateGetTasks(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	oldTask := Task{JSONBase: JSONBase{ID: "foo"}}
-	expectedTask := Task{
+	oldTask := Pod{JSONBase: JSONBase{ID: "foo"}}
+	expectedTask := Pod{
 		JSONBase: JSONBase{
 			ID: "foo",
 		},
@@ -73,7 +73,7 @@ func TestMemorySetUpdateGetTasks(t *testing.T) {
 
 func TestMemorySetDeleteGetTasks(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedTask := Task{JSONBase: JSONBase{ID: "foo"}}
+	expectedTask := Pod{JSONBase: JSONBase{ID: "foo"}}
 	registry.CreateTask("machine", expectedTask)
 	registry.DeleteTask("foo")
 	task, err := registry.GetTask("foo")

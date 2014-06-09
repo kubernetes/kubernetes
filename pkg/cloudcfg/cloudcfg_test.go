@@ -49,9 +49,9 @@ func (client *FakeKubeClient) ListTasks(labelQuery map[string]string) (TaskList,
 	return client.tasks, nil
 }
 
-func (client *FakeKubeClient) GetTask(name string) (Task, error) {
+func (client *FakeKubeClient) GetTask(name string) (Pod, error) {
 	client.actions = append(client.actions, Action{action: "get-task", value: name})
-	return Task{}, nil
+	return Pod{}, nil
 }
 
 func (client *FakeKubeClient) DeleteTask(name string) error {
@@ -59,14 +59,14 @@ func (client *FakeKubeClient) DeleteTask(name string) error {
 	return nil
 }
 
-func (client *FakeKubeClient) CreateTask(task Task) (Task, error) {
+func (client *FakeKubeClient) CreateTask(task Pod) (Pod, error) {
 	client.actions = append(client.actions, Action{action: "create-task"})
-	return Task{}, nil
+	return Pod{}, nil
 }
 
-func (client *FakeKubeClient) UpdateTask(task Task) (Task, error) {
+func (client *FakeKubeClient) UpdateTask(task Pod) (Pod, error) {
 	client.actions = append(client.actions, Action{action: "update-task", value: task.ID})
-	return Task{}, nil
+	return Pod{}, nil
 }
 
 func (client *FakeKubeClient) GetReplicationController(name string) (ReplicationController, error) {
@@ -118,9 +118,9 @@ func validateAction(expectedAction, actualAction Action, t *testing.T) {
 func TestUpdateWithTasks(t *testing.T) {
 	client := FakeKubeClient{
 		tasks: TaskList{
-			Items: []Task{
-				Task{JSONBase: JSONBase{ID: "task-1"}},
-				Task{JSONBase: JSONBase{ID: "task-2"}},
+			Items: []Pod{
+				Pod{JSONBase: JSONBase{ID: "task-1"}},
+				Pod{JSONBase: JSONBase{ID: "task-2"}},
 			},
 		},
 	}
@@ -272,7 +272,7 @@ func TestRequestWithBodyNoSuchFile(t *testing.T) {
 func TestRequestWithBody(t *testing.T) {
 	file, err := ioutil.TempFile("", "foo")
 	expectNoError(t, err)
-	data, err := json.Marshal(Task{JSONBase: JSONBase{ID: "foo"}})
+	data, err := json.Marshal(Pod{JSONBase: JSONBase{ID: "foo"}})
 	expectNoError(t, err)
 	_, err = file.Write(data)
 	expectNoError(t, err)
