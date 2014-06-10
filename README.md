@@ -8,7 +8,8 @@ Kubernetes is an open source implementation of container cluster management.
 
 ### Prerequisites
 
-1. You need a Google Cloud Platform account with billing enabled. Visit [http://cloud.google.com/console]() for more details
+1. You need a Google Cloud Platform account with billing enabled. Visit 
+   [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
 2. You must have Go installed: [www.golang.org](http://www.golang.org).
 3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
 4. Get the Kubernetes source:
