@@ -79,24 +79,25 @@ func main() {
 		log.Fatalf("Error loading auth: %#v", err)
 	}
 
-	if method == "get" || method == "list" {
+	switch method {
+	case "get", "list":
 		if len(*labelQuery) > 0 && method == "list" {
 			url = url + "?labels=" + *labelQuery
 		}
 		request, err = http.NewRequest("GET", url, nil)
-	} else if method == "delete" {
+	case "delete":
 		request, err = http.NewRequest("DELETE", url, nil)
-	} else if method == "create" {
+	case "create":
 		request, err = cloudcfg.RequestWithBody(*config, url, "POST")
-	} else if method == "update" {
+	case "update":
 		request, err = cloudcfg.RequestWithBody(*config, url, "PUT")
-	} else if method == "rollingupdate" {
+	case "rollingupdate":
 		client := &kube_client.Client{
 			Host: *httpServer,
 			Auth: &auth,
 		}
 		cloudcfg.Update(flag.Arg(1), client, *updatePeriod)
-	} else if method == "run" {
+	case "run":
 		args := flag.Args()
 		if len(args) < 4 {
 			log.Fatal("usage: cloudcfg -h <host> run <image> <replicas> <name>")
@@ -112,19 +113,19 @@ func main() {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
-	} else if method == "stop" {
+	case "stop":
 		err = cloudcfg.StopController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: &auth})
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
-	} else if method == "rm" {
+	case "rm":
 		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: &auth})
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
-	} else {
+	default:
 		log.Fatalf("Unknown command: %s", method)
 	}
 	if err != nil {
