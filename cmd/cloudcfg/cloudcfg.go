@@ -133,7 +133,7 @@ func main() {
 	var body string
 	body, err = cloudcfg.DoRequest(request, auth.User, auth.Password)
 	if err != nil {
-		log.Fatalf("Error: %#v", err)
+		log.Fatalf("Error: %#v %s", err, body)
 	}
 	err = printer.Print(body, os.Stdout)
 	if err != nil {
