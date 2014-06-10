@@ -88,6 +88,6 @@ function get-password {
     return
   fi
   user=admin
-  passwd=$(python -c 'import string,random; print "".join(random.choice(string.ascii_letters + string.digits) for _ in range(16))')
+  passwd=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
 }
 
