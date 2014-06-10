@@ -31,7 +31,7 @@ While Docker itself works with individual containers, Kubernetes works with a `p
 
 The Kubernetes node has the services necessary to run Docker containers and be managed from the master systems.
 
-The Kubernetes node design is an extension of the [Container-optimized Google Compute Engine image](https://developers.google.com/compute/docs/containers).  Over time the plan is for these images/nodes to merge and be the same thing used in different ways. It has the services necessary to run Docker containers and be managed from the master systems.
+The Kubernetes node design is an extension of the [Container-optimized Google Compute Engine image](https://developers.google.com/compute/docs/containers/container_vms).  Over time the plan is for these images/nodes to merge and be the same thing used in different ways. It has the services necessary to run Docker containers and be managed from the master systems.
 
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
