@@ -4,6 +4,9 @@ Kubernetes is an open source implementation of container cluster management.
 
 [Kubernetes Design Document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md)
 
+## Kubernetes can run anywhere!
+However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
+
 ## Getting started on Google Compute Engine
 
 ### Prerequisites
