@@ -11,13 +11,18 @@ However, initial development was done on GCE and so our instructions and scripts
 
 ### Prerequisites
 
-1. You need a Google Cloud Platform account with billing enabled. Visit 
+1. You need a Google Cloud Platform account with billing enabled. Visit
    [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
 2. You must have Go installed: [www.golang.org](http://www.golang.org).
 3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
 4. Get the Kubernetes source:
 
         git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+
+5. Setting up a cluster requires the `htpasswd` tool in order to hash a randomly generated password for accessing the API server.  This is already installed on recent version of Mac OS X but on linux you need to install it yourself.  On Debian/Ubuntu you can do this with:
+
+        sudo apt-get udpate
+        sudo apt-get install apache2-utils
 
 ### Setup
 
@@ -59,10 +64,10 @@ Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`:
 
 ```
 cd kubernetes
-cluster/cloudcfg.sh -c api/examples/task.json create /tasks
+cluster/cloudcfg.sh -c api/examples/pod.json create /pods
 ```
 
-Where task.json contains something like:
+Where pod.json contains something like:
 
 ```
 {
