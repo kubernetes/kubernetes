@@ -11,7 +11,7 @@ However, initial development was done on GCE and so our instructions and scripts
 
 ### Prerequisites
 
-1. You need a Google Cloud Platform account with billing enabled. Visit 
+1. You need a Google Cloud Platform account with billing enabled. Visit
    [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
 2. You must have Go installed: [www.golang.org](http://www.golang.org).
 3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
@@ -59,10 +59,10 @@ Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`:
 
 ```
 cd kubernetes
-cluster/cloudcfg.sh -c api/examples/task.json create /tasks
+cluster/cloudcfg.sh -c api/examples/pod.json create /pods
 ```
 
-Where task.json contains something like:
+Where pod.json contains something like:
 
 ```
 {
