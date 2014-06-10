@@ -150,5 +150,7 @@ echo "Kubernetes cluster is running.  Access the master at:"
 echo
 echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
 echo
+echo "Security note: The server above uses a self signed certificate.  This is"
+echo "    subject to \"Man in the middle\" type attacks."
 
 

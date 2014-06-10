@@ -1,6 +1,6 @@
 # Kubernetes
 
-Kubernetes is an open source reference implementation of container cluster management.
+Kubernetes is an open source implementation of container cluster management.
 
 [Kubernetes Design Document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md)
 
@@ -89,6 +89,14 @@ cluster/kube-down.sh
 
 Or fork and start hacking!
 
+## Community, discussion and support
+
+If you have questions or want to start contributing please reach out.  We don't bite!
+
+The Kubernetes team is hanging out on IRC on the [#google-containers room on freenode.net](http://webchat.freenode.net/?channels=google-containers).  We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers).
+
+If you are a company and are looking for a more formal engagement with Google around Kubernetes and containers at Google as a whole, please fill out [this form](https://docs.google.com/a/google.com/forms/d/1_RfwC8LZU4CKe4vKq32x5xpEJI5QZ-j0ShGmZVv9cm4/viewform). and we'll be in touch.
+
 ## Development
 
 ### Hooks
@@ -148,3 +156,4 @@ Install [nodejs](http://nodejs.org/download/), [npm](https://www.npmjs.org/), an
 cd kubernetes/api
 raml2html kubernetes.raml > kubernetes.html
 ```
+

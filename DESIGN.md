@@ -123,6 +123,8 @@ The bootstrapping works like this:
 
 ### Cluster Security
 
-As there is no security currently built into the `apiserver`, the salt configuration will install `nginx`.  `nginx` is configured to serve HTTPS with a self signed certificate.  HTTP basic auth is used from the client to `nginx`.  `nginx` then forwards the request on to the `apiserver` over plain old HTTP.
+As there is no security currently built into the `apiserver`, the salt configuration will install `nginx`.  `nginx` is configured to serve HTTPS with a self signed certificate.  HTTP basic auth is used from the client to `nginx`.  `nginx` then forwards the request on to the `apiserver` over plain old HTTP.  Because a self signed certificate is used access to server should be safe from eavesdropping but is subject to "man in the middle" attacks.  Access via the browser will result in warnings and tools like curl will require an "--insecure" flag.
+
+All communication within the cluster (worker nodes to the master, for instance) occurs on the internal virtual network and should be safe from eavesdropping.
 
 The password is generated randomly as part of the `kube-up.sh` script and stored in `~/.kubernetes_auth`.
