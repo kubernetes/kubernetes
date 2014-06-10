@@ -31,7 +31,7 @@ While Docker itself works with individual containers, Kubernetes works with a `p
 
 The Kubernetes node has the services necessary to run Docker containers and be managed from the master systems.
 
-The Kubernetes node design is an extension of the [Container-optimized Google Compute Engine image](https://developers.google.com/compute/docs/containers#container-optimized_google_compute_engine_images).  Over time these plan is for these images/nodes to merge and be the same thing used in different ways. It has the services necessary to run Docker containers and be managed from the master systems.
+The Kubernetes node design is an extension of the [Container-optimized Google Compute Engine image](https://developers.google.com/compute/docs/containers/container_vms).  Over time the plan is for these images/nodes to merge and be the same thing used in different ways. It has the services necessary to run Docker containers and be managed from the master systems.
 
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
@@ -123,7 +123,7 @@ The bootstrapping works like this:
 
 ### Cluster Security
 
-As there is no security currently built into the `apiserver`, the salt configuration will install `nginx`.  `nginx` is configured to serve HTTPS with a self signed certificate.  HTTP basic auth is used from the client to `nginx`.  `nginx` then forwards the request on to the `apiserver` over plain old HTTP.  Because a self signed certificate is used access to server should be safe from eavesdropping but is subject to "man in the middle" attacks.  Access via the browser will result in warnings and tools like curl will require an "--insecure" flag.
+As there is no security currently built into the `apiserver`, the salt configuration will install `nginx`.  `nginx` is configured to serve HTTPS with a self signed certificate.  HTTP basic auth is used from the client to `nginx`.  `nginx` then forwards the request on to the `apiserver` over plain old HTTP.  Because a self signed certificate is used, access to the server should be safe from eavesdropping but is subject to "man in the middle" attacks.  Access via the browser will result in warnings and tools like curl will require an "--insecure" flag.
 
 All communication within the cluster (worker nodes to the master, for instance) occurs on the internal virtual network and should be safe from eavesdropping.
 
