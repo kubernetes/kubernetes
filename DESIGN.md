@@ -1,6 +1,23 @@
 # Kubernetes Design Overview
 
-Kubernetes build on top of [Docker](http://www.docker.io) to construct a clustered container scheduling service.  The goals of the project are to enable users to ask a Kubernetes cluster to run a set of containers.  The system will automatically pick a worker node to run those containers on.
+- [Overview](#overview)
+- [Key Concept: Container Pod](#key-concept-container-pod)
+- [The Kubernetes Node](#the-kubernetes-node)
+  - [Kubelet](#kubelet)
+  - [Kubernetes Proxy](#kubernetes-proxy)
+- [The Kubernetes Master](#the-kubernetes-master)
+  - [etcd](#etcd)
+  - [Kubernetes API Server](#kubernetes-api-server)
+  - [Kubernetes Controller Manager Server](#kubernetes-controller-manager-server)
+  - [Key Concept: Labels](#key-concept-labels)
+- [Network Model](#network-model)
+- [Release Process](#release-process)
+- [GCE Cluster Configuration](#gce-cluster-configuration)
+  - [Cluster Security](#cluster-security)
+
+## Overview
+
+Kubernetes builds on top of [Docker](http://www.docker.io) to construct a clustered container scheduling service.  The goals of the project are to enable users to ask a Kubernetes cluster to run a set of containers.  The system will automatically pick a worker node to run those containers on.
 
 As container based applications and systems get larger, some tools are provided to facilitate sanity. This includes ways for containers to find and communicate with each other and ways to work with and manage sets of containers that do similar work.
 
@@ -19,9 +36,9 @@ The Kubernetes node design is an extension of the [Container-optimized Google Co
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
 ### Kubelet
-The second component on the node called the `kubelet`.  The Kubelet is the logical successor (and rewrite in go) of the [Container Agent](https://github.com/GoogleCloudPlatform/container-agent) that is part of the Compute Engine image.
+The second component on the node is called the `kubelet`.  The Kubelet is the logical successor (and rewrite in go) of the [Container Agent](https://github.com/GoogleCloudPlatform/container-agent) that is part of the Compute Engine image.
 
-The Kubelet works in terms of a container manifest.  A container manifest (defined [here](https://developers.google.com/compute/docs/containers#container_manifest)) is a YAML file that describes a `pod`.  The Kubelet takes a set of manifests that are provided in various mechanisms and ensures that the containers described in those manifests are started and continue running.
+The Kubelet works in terms of a container manifest.  A container manifest (defined [here](https://developers.google.com/compute/docs/containers/container_vms#container_manifest)) is a YAML file that describes a `pod`.  The Kubelet takes a set of manifests that are provided in various mechanisms and ensures that the containers described in those manifests are started and continue running.
 
 There are 4 ways that a container manifest can be provided to the Kubelet:
 
@@ -81,7 +98,7 @@ Ports mapped in from the 'main IP' (and hence the internet if the right firewall
 
 ## Release Process
 
-Right now "building" or "releasing" Kubernetes consists of some scripts (in `release/` to create a `tar` of the necessary data and then uploading it to Google Cloud Storage.  In the future we will generate Docker images for the bulk of the above described components: [Issue #19](https://github.com/GoogleCloudPlatform/kubernetes/issues/19).
+Right now "building" or "releasing" Kubernetes consists of some scripts (in `release/`) to create a `tar` of the necessary data and then uploading it to Google Cloud Storage.  In the future we will generate Docker images for the bulk of the above described components: [Issue #19](https://github.com/GoogleCloudPlatform/kubernetes/issues/19).
 
 ## GCE Cluster Configuration
 
