@@ -66,12 +66,14 @@ func (s *RoundRobinScheduler) Schedule(pod Pod) (string, error) {
 type FirstFitScheduler struct {
 	machines []string
 	registry PodRegistry
+	random   *rand.Rand
 }
 
-func MakeFirstFitScheduler(machines []string, registry PodRegistry) Scheduler {
+func MakeFirstFitScheduler(machines []string, registry PodRegistry, random *rand.Rand) Scheduler {
 	return &FirstFitScheduler{
 		machines: machines,
 		registry: registry,
+		random: random,
 	}
 }
 
@@ -96,6 +98,7 @@ func (s *FirstFitScheduler) Schedule(pod Pod) (string, error) {
 		host := scheduledPod.CurrentState.Host
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
+	var machineOptions []string
 	for _, machine := range s.machines {
 		podFits := true
 		for _, scheduledPod := range machineToPods[machine] {
@@ -108,8 +111,12 @@ func (s *FirstFitScheduler) Schedule(pod Pod) (string, error) {
 			}
 		}
 		if podFits {
-			return machine, nil
+			machineOptions = append(machineOptions, machine)
 		}
 	}
-	return "", fmt.Errorf("Failed to find fit for %#v", pod)
+	if len(machineOptions) == 0 {
+		return "", fmt.Errorf("Failed to find fit for %#v", pod)
+	} else {
+		return machineOptions[s.random.Int()%len(machineOptions)], nil
+	}
 }
