@@ -67,7 +67,7 @@ It validates and configures data for 3 types of objects:
 
 * `pod`: Each `pod` has a representation at the Kubernetes API level.
 * `service`: A service is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more Pods.
-* `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll start more.  If there are too few, it'll kill some.
+* `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
 
 Beyond just servicing REST operations, validating them and storing them in `etcd`, the API Server does two other things:
 
