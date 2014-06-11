@@ -49,7 +49,19 @@ var (
 )
 
 func usage() {
-	log.Fatal("Usage: cloudcfg -h <host> [-c config/file.json] [-p <hostPort>:<containerPort>,..., <hostPort-n>:<containerPort-n> <method> <path>")
+	fmt.Fprint(os.Stderr, `usage: cloudcfg -h [-c config/file.json] [-p :,..., :] <method>
+
+  Kubernetes REST API:
+  cloudcfg [OPTIONS] get|list|create|delete|update <url>
+
+  Manage replication controllers:
+  cloudcfg [OPTIONS] stop|rm|rollingupdate <controller>
+  cloudcfg [OPTIONS] run <image> <replicas> <controller>
+  cloudcfg [OPTIONS] resize <controller> <replicas>
+
+  Options:
+`)
+	flag.PrintDefaults()
 }
 
 // Reads & parses config file. On error, calls log.Fatal().
@@ -71,6 +83,10 @@ func readConfig(storage string) []byte {
 
 // CloudCfg command line tool.
 func main() {
+	flag.Usage = func() {
+		usage()
+	}
+
 	flag.Parse() // Scan the arguments list
 
 	if *versionFlag {
@@ -78,8 +94,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(flag.Args()) < 2 {
+	if len(flag.Args()) < 1 {
 		usage()
+		os.Exit(1)
 	}
 	method := flag.Arg(0)
 	secure := true
@@ -90,9 +107,54 @@ func main() {
 	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
 		secure = false
 	}
-	storage := strings.Trim(flag.Arg(1), "/")
-	url := *httpServer + path.Join("/api/v1beta1", storage)
+
+	var auth *kube_client.AuthInfo
+	if secure {
+		auth, err = cloudcfg.LoadAuthInfo(*authConfig)
+		if err != nil {
+			log.Fatalf("Error loading auth: %#v", err)
+		}
+	}
+
+	matchFound := executeAPIRequest(method, auth) || executeControllerRequest(method, auth)
+	if matchFound == false {
+		log.Fatalf("Unknown command %s", method)
+	}
+}
+
+// Attempts to execute an API request
+func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
+	parseStorage := func() string {
+		if len(flag.Args()) != 2 {
+			log.Fatal("usage: cloudcfg [OPTIONS] get|list|create|update|delete <url>")
+		}
+		return strings.Trim(flag.Arg(1), "/")
+	}
+
+	readUrl := func(storage string) string {
+		return *httpServer + path.Join("/api/v1beta1", storage)
+	}
+
 	var request *http.Request
+	var err error
+	switch method {
+	case "get", "list":
+		url := readUrl(parseStorage())
+		if len(*labelQuery) > 0 && method == "list" {
+			url = url + "?labels=" + *labelQuery
+		}
+		request, err = http.NewRequest("GET", url, nil)
+	case "delete":
+		request, err = http.NewRequest("DELETE", readUrl(parseStorage()), nil)
+	case "create":
+		storage := parseStorage()
+		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), readUrl(storage), "POST")
+	case "update":
+		storage := parseStorage()
+		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), readUrl(storage), "PUT")
+	default:
+		return false
+	}
 
 	var printer cloudcfg.ResourcePrinter
 	if *json {
@@ -103,58 +165,55 @@ func main() {
 		printer = &cloudcfg.HumanReadablePrinter{}
 	}
 
-	var auth *kube_client.AuthInfo
-	if secure {
-		auth, err = cloudcfg.LoadAuthInfo(*authConfig)
-		if err != nil {
-			log.Fatalf("Error loading auth: %#v", err)
+	var body string
+	if body, err = cloudcfg.DoRequest(request, auth); err == nil {
+		if err = printer.Print(body, os.Stdout); err != nil {
+			log.Fatalf("Failed to print: %#v\nRaw received text:\n%v\n", err, string(body))
 		}
+		fmt.Print("\n")
+	} else {
+		log.Fatalf("Error: %#v %s", err, body)
 	}
 
-	switch method {
-	case "get", "list":
-		if len(*labelQuery) > 0 && method == "list" {
-			url = url + "?labels=" + *labelQuery
+	return true
+}
+
+// Attempts to execute a replicationController request
+func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
+	parseController := func() string {
+		if len(flag.Args()) != 2 {
+			log.Fatal("usage: cloudcfg [OPTIONS] stop|rm|rollingupdate <controller>")
 		}
-		request, err = http.NewRequest("GET", url, nil)
-	case "delete":
-		request, err = http.NewRequest("DELETE", url, nil)
-	case "create":
-		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), url, "POST")
-	case "update":
-		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), url, "PUT")
+		return flag.Arg(1)
+	}
+
+	var err error
+	switch method {
+	case "stop":
+		err = cloudcfg.StopController(parseController(), kube_client.Client{Host: *httpServer, Auth: auth})
+	case "rm":
+		err = cloudcfg.DeleteController(parseController(), kube_client.Client{Host: *httpServer, Auth: auth})
 	case "rollingupdate":
 		client := &kube_client.Client{
 			Host: *httpServer,
 			Auth: auth,
 		}
-		cloudcfg.Update(flag.Arg(1), client, *updatePeriod)
+		err = cloudcfg.Update(parseController(), client, *updatePeriod)
 	case "run":
-		args := flag.Args()
-		if len(args) < 4 {
-			log.Fatal("usage: cloudcfg -h <host> run <image> <replicas> <name>")
+		if len(flag.Args()) != 4 {
+			log.Fatal("usage: cloudcfg [OPTIONS] run <image> <replicas> <controller>")
 		}
-		image := args[1]
-		replicas, err := strconv.Atoi(args[2])
-		name := args[3]
+		image := flag.Arg(1)
+		replicas, err := strconv.Atoi(flag.Arg(2))
+		name := flag.Arg(3)
 		if err != nil {
 			log.Fatalf("Error parsing replicas: %#v", err)
 		}
 		err = cloudcfg.RunController(image, name, replicas, kube_client.Client{Host: *httpServer, Auth: auth}, *portSpec, *servicePort)
-		if err != nil {
-			log.Fatalf("Error: %#v", err)
-		}
-		return
-	case "stop":
-		err = cloudcfg.StopController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
-		if err != nil {
-			log.Fatalf("Error: %#v", err)
-		}
-		return
 	case "resize":
 		args := flag.Args()
 		if len(args) < 3 {
-			log.Fatal("usage: cloudcfg resize <name> <replicas>")
+			log.Fatal("usage: cloudcfg resize <controller> <replicas>")
 		}
 		name := args[1]
 		replicas, err := strconv.Atoi(args[2])
@@ -162,29 +221,11 @@ func main() {
 			log.Fatalf("Error parsing replicas: %#v", err)
 		}
 		err = cloudcfg.ResizeController(name, replicas, kube_client.Client{Host: *httpServer, Auth: auth})
-		if err != nil {
-			log.Fatalf("Error: %#v", err)
-		}
-		return
-	case "rm":
-		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
-		if err != nil {
-			log.Fatalf("Error: %#v", err)
-		}
-		return
 	default:
-		log.Fatalf("Unknown command: %s", method)
+		return false
 	}
 	if err != nil {
 		log.Fatalf("Error: %#v", err)
 	}
-	body, err := cloudcfg.DoRequest(request, auth)
-	if err != nil {
-		log.Fatalf("Error: %#v %s", err, body)
-	}
-	err = printer.Print(body, os.Stdout)
-	if err != nil {
-		log.Fatalf("Failed to print: %#v\nRaw received text:\n%v\n", err, string(body))
-	}
-	fmt.Print("\n")
+	return true
 }
