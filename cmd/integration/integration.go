@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 // A basic integration test for the service.
 // Assumes that there is a pre-existing etcd server running on localhost.
 package main
@@ -26,7 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -42,13 +43,13 @@ func main() {
 	reg := registry.MakeEtcdRegistry(etcdClient, machineList)
 
 	apiserver := apiserver.New(map[string]apiserver.RESTStorage{
-		"pods":                  registry.MakePodRegistryStorage(reg, &kube_client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList)),
+		"pods": registry.MakePodRegistryStorage(reg, &client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(reg),
 	}, "/api/v1beta1")
 	server := httptest.NewServer(apiserver)
 
 	controllerManager := registry.MakeReplicationManager(etcd.NewClient(servers),
-		kube_client.Client{
+		client.Client{
 			Host: server.URL,
 		})
 
@@ -60,7 +61,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := kube_client.Client{
+	kubeClient := client.Client{
 		Host: server.URL,
 	}
 	data, err := ioutil.ReadFile("api/examples/controller.json")
