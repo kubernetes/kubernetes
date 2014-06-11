@@ -21,7 +21,7 @@ Kubernetes builds on top of [Docker](http://www.docker.io) to construct a cluste
 
 As container based applications and systems get larger, some tools are provided to facilitate sanity. This includes ways for containers to find and communicate with each other and ways to work with and manage sets of containers that do similar work.
 
-When looking at the arechitecture of the system, we'll break it down to services that run on the worker node and services that play a "master" role.
+When looking at the architecture of the system, we'll break it down to services that run on the worker node and services that play a "master" role.
 
 ## Key Concept: Container Pod
 
