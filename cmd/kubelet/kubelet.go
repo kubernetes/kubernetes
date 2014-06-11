@@ -34,9 +34,9 @@ import (
 var (
 	file               = flag.String("config", "", "Path to the config file")
 	etcd_servers       = flag.String("etcd_servers", "", "Url of etcd servers in the cluster")
-	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max seconds between synchronizing running containers and config")
-	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Seconds between checking file for new data")
-	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Seconds between checking http for new data")
+	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
+	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking file for new data")
+	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
 	manifest_url       = flag.String("manifest_url", "", "URL for accessing the container manifest")
 	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on")
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
