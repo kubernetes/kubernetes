@@ -36,7 +36,7 @@ var (
 	httpServer   = flag.String("h", "", "The host to connect to.")
 	config       = flag.String("c", "", "Path to the config file.")
 	labelQuery   = flag.String("l", "", "Label query to use for listing")
-	updatePeriod = flag.Duration("u", 60*time.Second, "Update interarrival in seconds")
+	updatePeriod = flag.Duration("u", 60*time.Second, "Update interarrival period")
 	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
 	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user")
