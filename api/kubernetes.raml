@@ -84,14 +84,12 @@ documentation:
     responses:
       200:
         body:
-          application/json:
-            example: !include examples/pod-list.json
+          example: !include examples/pod-list.json
   post:
     description: Create a new pod. currentState is ignored if present.
     body:
-      json/application:
-        schema: !include doc/pod-schema.json
-        example: !include examples/pod.json
+      schema: !include doc/pod-schema.json
+      example: !include examples/pod.json
   
   /{podId}:
     get:
@@ -99,24 +97,21 @@ documentation:
       responses:
         200:
           body:
-            application/json:
-              example: !include examples/pod.json
+            example: !include examples/pod.json
     put:
       description: Update a pod
       body:
-        json/application:
-          schema: !include doc/pod-schema.json
-          example: !include examples/pod.json
+        schema: !include doc/pod-schema.json
+        example: !include examples/pod.json
     delete:
       description: Delete a specific pod
       responses:
         200:
           body:
-            application/json:
-              example: |
-                { 
-                  "success": true
-                }
+            example: |
+              { 
+                "success": true
+              }
 
 /replicationControllers:
   get:
@@ -124,14 +119,12 @@ documentation:
     responses:
       200:
         body:
-          application/json:
-            example: !include examples/controller-list.json
+          example: !include examples/controller-list.json
   post:
     description: Create a new controller. currentState is ignored if present.
     body:
-      json/application:
-        schema: !include doc/controller-schema.json
-        example: !include examples/controller.json
+      schema: !include doc/controller-schema.json
+      example: !include examples/controller.json
   
   /{controllerId}:
     get:
@@ -139,24 +132,21 @@ documentation:
       responses:
         200:
           body:
-            application/json:
-              example: !include examples/controller.json
+            example: !include examples/controller.json
     put:
       description: Update a controller
       body:
-        json/application:
-          schema: !include doc/controller-schema.json
-          example: !include examples/controller.json
+        schema: !include doc/controller-schema.json
+        example: !include examples/controller.json
     delete:
       description: Delete a specific controller
       responses:
         200:
           body:
-            application/json:
-              example: |
-                { 
-                  "success": true
-                }
+            example: |
+              { 
+                "success": true
+              }
 
 /services:
   get:
@@ -164,14 +154,12 @@ documentation:
     responses:
       200:
         body:
-          application/json:
-            example: !include examples/service-list.json
+          example: !include examples/service-list.json
   post:
     description: Create a new service
     body:
-      json/application:
-        schema: !include doc/service-schema.json
-        example: !include examples/service.json
+      schema: !include doc/service-schema.json
+      example: !include examples/service.json
   
   /{serviceId}:
     get:
@@ -179,22 +167,19 @@ documentation:
       responses:
         200:
           body:
-            application/json:
-              example: !include examples/service.json
+            example: !include examples/service.json
     put:
       description: Update a service
       body:
-        json/application:
-          schema: !include doc/service-schema.json
-          example: !include examples/service.json
+        schema: !include doc/service-schema.json
+        example: !include examples/service.json
     delete:
       description: Delete a specific service
       responses:
         200:
           body:
-            application/json:
-              example: |
-                { 
-                  "success": true
-                }
+            example: |
+              { 
+                "success": true
+              }
 
