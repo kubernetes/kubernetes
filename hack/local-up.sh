@@ -35,6 +35,9 @@ set -e
   done
 )
 
+source "$(dirname 0)/../cluster/util.sh"
+get-password
+
 echo "Starting etcd"
 
 ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
