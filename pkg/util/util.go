@@ -26,7 +26,7 @@ import (
 func HandleCrash() {
 	r := recover()
 	if r != nil {
-		log.Printf("Recovered from panic: %#v", r)
+		log.Printf("Recovered from panic: %v", r)
 	}
 }
 
