@@ -24,4 +24,4 @@ if [ ! -x $CLOUDCFG ]; then
 fi
 
 # 8080 is the default port for the master
-$CLOUDCFG -h https://localhost:8080 $@
+$CLOUDCFG -h http://localhost:8080 $@

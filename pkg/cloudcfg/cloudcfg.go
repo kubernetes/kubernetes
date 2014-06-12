@@ -99,13 +99,13 @@ func RequestWithBody(configFile, url, method string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return RequestWithBodyData(data, url, method)
+	return requestWithBodyData(data, url, method)
 }
 
 // RequestWithBodyData is a helper method that creates an HTTP request with the specified url, method
 // and body data
 // FIXME: need to be public API?
-func RequestWithBodyData(data []byte, url, method string) (*http.Request, error) {
+func requestWithBodyData(data []byte, url, method string) (*http.Request, error) {
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	request.ContentLength = int64(len(data))
 	return request, err
@@ -113,14 +113,24 @@ func RequestWithBodyData(data []byte, url, method string) (*http.Request, error)
 
 // Execute a request, adds authentication, and HTTPS cert ignoring.
 // TODO: Make this stuff optional
-// FIXME: need to be public API?
-func DoRequest(request *http.Request, user, password string) (string, error) {
+func DoSecureRequest(request *http.Request, user, password string) (string, error) {
 	request.SetBasicAuth(user, password)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
 	response, err := client.Do(request)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	return string(body), err
+}
+
+// Execute a request.
+func DoInsecureRequest(request *http.Request) (string, error) {
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return "", err
 	}
