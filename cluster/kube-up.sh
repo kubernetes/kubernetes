@@ -98,7 +98,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 
   # 'gcloud compute' past 2014.06.08 breaks the way we are specifying
   # --next-hop-instance and there is no way to be compatible with both versions.
-  if [[ $GCLOUD_VERSION < "2014.06.08" ]]; then
+  if [[ $GCLOUD_VERSION > "2014.06.08" ]]; then
     gcloud compute routes create ${MINION_NAMES[$i]} \
       --project ${PROJECT} \
       --destination-range ${MINION_IP_RANGES[$i]} \
