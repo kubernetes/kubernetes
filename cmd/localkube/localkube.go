@@ -49,14 +49,14 @@ var (
 
 // master flags
 var (
-	master_port    = flag.Uint("master_port", 8080, "The port to listen on.  Default 8080.")
-	master_address = flag.String("master_address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
+	master_port    = flag.Uint("master_port", 8080, "The port for the master to listen on.  Default 8080.")
+	master_address = flag.String("master_address", "127.0.0.1", "The address for the master to listen to. Default 127.0.0.1")
 	apiPrefix      = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
 )
 
 // flags that affect both
 var (
-	etcd_server = flag.String("etcd_servers", "http://localhost:4001", "Url of local etcd server")
+	etcd_server = flag.String("etcd_server", "http://localhost:4001", "Url of local etcd server")
 )
 
 // Starts kubelet services. Never returns.
@@ -68,6 +68,7 @@ func fake_kubelet() {
 	}
 
 	my_kubelet := kubelet.Kubelet{
+		Hostname:           *kubelet_address,
 		DockerClient:       dockerClient,
 		FileCheckFrequency: *fileCheckFrequency,
 		SyncFrequency:      *syncFrequency,

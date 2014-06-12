@@ -57,7 +57,13 @@ func main() {
 		log.Fatal("Couldn't connnect to docker.")
 	}
 
+	hostname, err := exec.Command("hostname", "-f").Output()
+	if err != nil {
+		log.Fatalf("Couldn't determine hostname: %v", err)
+	}
+
 	my_kubelet := kubelet.Kubelet{
+		Hostname:           hostname,
 		DockerClient:       dockerClient,
 		FileCheckFrequency: *fileCheckFrequency,
 		SyncFrequency:      *syncFrequency,
