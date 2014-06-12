@@ -428,7 +428,7 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, changeChannel chan<- []ap
 // The channel to send new configurations across
 // This function loops forever and is intended to be run in a go routine.
 func (kl *Kubelet) SyncAndSetupEtcdWatch(changeChannel chan<- []api.ContainerManifest) {
-	key := "/registry/hosts/" + strings.TrimSpace(string(kl.Hostname))
+	key := "/registry/hosts/" + strings.TrimSpace(kl.Hostname)
 	// First fetch the initial configuration (watch only gives changes...)
 	for {
 		err := kl.getKubeletStateFromEtcd(key, changeChannel)

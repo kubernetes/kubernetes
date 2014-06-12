@@ -24,6 +24,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -63,7 +64,7 @@ func main() {
 	}
 
 	my_kubelet := kubelet.Kubelet{
-		Hostname:           hostname,
+		Hostname:           string(hostname),
 		DockerClient:       dockerClient,
 		FileCheckFrequency: *fileCheckFrequency,
 		SyncFrequency:      *syncFrequency,
