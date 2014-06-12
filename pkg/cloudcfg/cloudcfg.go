@@ -150,6 +150,25 @@ func StopController(name string, client client.ClientInterface) error {
 	return nil
 }
 
+// ResizeController resizes a controller named 'name' by setting replicas to 'replicas'
+func ResizeController(name string, replicas int, client client.ClientInterface) error {
+	controller, err := client.GetReplicationController(name)
+	if err != nil {
+		return err
+	}
+	controller.DesiredState.Replicas = replicas
+	controllerOut, err := client.UpdateReplicationController(controller)
+	if err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(controllerOut)
+	if err != nil {
+		return err
+	}
+	fmt.Print(string(data))
+	return nil
+}
+
 func makePorts(spec string) []api.Port {
 	parts := strings.Split(spec, ",")
 	var result []api.Port
