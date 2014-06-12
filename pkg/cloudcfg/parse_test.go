@@ -18,6 +18,7 @@ func TestParseBadStorage(t *testing.T) {
 func DoParseTest(t *testing.T, storage string, obj interface{}) {
 	json_data, _ := json.Marshal(obj)
 	yaml_data, _ := yaml.Marshal(obj)
+	t.Logf("Intermediate yaml:\n%v\n", string(yaml_data))
 
 	json_got, json_err := ToWireFormat(json_data, storage)
 	yaml_got, yaml_err := ToWireFormat(yaml_data, storage)
@@ -28,7 +29,6 @@ func DoParseTest(t *testing.T, storage string, obj interface{}) {
 	if yaml_err != nil {
 		t.Errorf("yaml err: %#v", yaml_err)
 	}
-	t.Logf("Intermediate yaml:\n%v\n", string(yaml_data))
 	if string(json_got) != string(json_data) {
 		t.Errorf("json output didn't match:\nGot:\n%v\n\nWanted:\n%v\n",
 			string(json_got), string(json_data))
