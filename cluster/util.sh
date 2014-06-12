@@ -56,9 +56,9 @@ function detect-project () {
 function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    local minion_ip=$(gcloud compute instances get ${MINION_NAMES[$i]} \
-      --fields networkInterfaces[].accessConfigs[].natIP --format=text \
-      | tail -n 1 | cut -f 2 -d ' ')
+    local minion_ip=$(gcutil listinstances --format=csv --sort=external-ip \
+      --columns=external-ip --filter="name eq ${MINION_NAMES[$i]}" \
+      | tail -n 1)
     echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
   done
@@ -71,9 +71,9 @@ function detect-minions () {
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [ -z "$KUBE_MASTER_IP" ]; then
-    KUBE_MASTER_IP=$(gcloud compute instances get ${MASTER_NAME} \
-      --fields networkInterfaces[].accessConfigs[].natIP --format=text \
-      | tail -n 1 | cut -f 2 -d ' ')
+    KUBE_MASTER_IP=$(gcutil listinstances --format=csv --sort=external-ip \
+      --columns=external-ip --filter="name eq ${MASTER_NAME}" \
+      | tail -n 1)
   fi
   if [ -z "$KUBE_MASTER_IP" ]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
@@ -84,7 +84,7 @@ function detect-master () {
 
 function get-password {
   file=${HOME}/.kubernetes_auth
-  if [ -e ${file} ]; then 
+  if [ -e ${file} ]; then
     user=$(cat $file | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
     passwd=$(cat $file | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
     return
@@ -101,4 +101,3 @@ function get-password {
 EOF
   chmod 0600 ~/.kubernetes_auth
 }
-

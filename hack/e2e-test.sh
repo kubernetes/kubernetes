@@ -33,8 +33,11 @@ $(dirname $0)/../cluster/kube-up.sh
 # Auto shutdown cluster when we exit
 function shutdown-test-cluster () {
   echo "Shutting down test cluster in background."
-  gcloud compute firewalls delete --quiet ${MINION_TAG}-http-alt \
-    --project ${PROJECT} &
+  gcutil deletefirewall  \
+    --project ${PROJECT} \
+    --norespect_terminal_width \
+    --force \
+    ${MINION_TAG}-http-alt &
   $(dirname $0)/../cluster/kube-down.sh > /dev/null &
 }
 trap shutdown-test-cluster EXIT
@@ -43,10 +46,13 @@ trap shutdown-test-cluster EXIT
 detect-project
 
 # Open up port 8080 so nginx containers on minions can be reached
-gcloud compute firewalls create --quiet ${MINION_TAG}-http-alt \
+gcutil addfirewall \
+  --norespect_terminal_width \
   --project ${PROJECT} \
-  --target-tags ${MINION_TAG} \
-  --allow tcp:8080 &
+  --target_tags ${MINION_TAG} \
+  --allowed tcp:8080 \
+  --network ${NETWORK} \
+  ${MINION_TAG}-http-alt &
 
 # Launch a container
 $(dirname $0)/../cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx

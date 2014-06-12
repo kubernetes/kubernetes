@@ -25,7 +25,7 @@ set -e
 source $(dirname $0)/util.sh
 
 # Make sure that prerequisites are installed.
-for x in gcloud gsutil; do
+for x in gcloud gcutil gsutil; do
   if [ "$(which $x)" == "" ]; then
     echo "Can't find $x in PATH, please fix and retry."
     exit 1
@@ -46,12 +46,11 @@ detect-master
   echo "echo Executing configuration"
   echo "sudo salt '*' mine.update"
   echo "sudo salt --force-color '*' state.highstate"
-) | gcloud compute ssh $KUBE_MASTER \
-  --project ${PROJECT} --zone ${ZONE} --command="bash"
+) | gcutil ssh --project ${PROJECT} --zone ${ZONE} $KUBE_MASTER bash
 
 get-password
 
-echo "Kubernetes cluster is running.  Access the master at:"
+echo "Kubernetes cluster is updated.  Access the master at:"
 echo
 echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
 echo

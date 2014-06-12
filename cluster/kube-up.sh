@@ -26,7 +26,7 @@ set -e
 source $(dirname $0)/util.sh
 
 # Make sure that prerequisites are installed.
-for x in gcloud gsutil; do
+for x in gcloud gcutil gsutil; do
   if [ "$(which $x)" == "" ]; then
     echo "Can't find $x in PATH, please fix and retry."
     exit 1
@@ -60,24 +60,24 @@ HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 ) > ${KUBE_TEMP}/master-start.sh
 
 echo "Starting VMs and configuring firewalls"
-gcloud compute firewalls create --quiet ${MASTER_NAME}-https \
+gcutil addfirewall ${MASTER_NAME}-https \
+  --norespect_terminal_width \
   --project ${PROJECT} \
-  --target-tags ${MASTER_TAG} \
-  --allow tcp:443 \
-  --network ${NETWORK} &
+  --network ${NETWORK} \
+  --target_tags ${MASTER_TAG} \
+  --allowed tcp:443 &
 
-gcloud compute instances create ${MASTER_NAME}\
+gcutil addinstance ${MASTER_NAME}\
+  --norespect_terminal_width \
   --project ${PROJECT} \
   --zone ${ZONE} \
-  --machine-type ${MASTER_SIZE} \
+  --machine_type ${MASTER_SIZE} \
   --image ${IMAGE} \
   --tags ${MASTER_TAG} \
-  --no-scopes \
-  --restart-on-failure \
-  --metadata-from-file startup-script=${KUBE_TEMP}/master-start.sh \
-  --network ${NETWORK} &
-
-GCLOUD_VERSION=$(gcloud version | grep compute | cut -f 2 -d ' ')
+  --network ${NETWORK} \
+  --service_account_scopes="storage-ro" \
+  --automatic_restart \
+  --metadata_from_file startup-script:${KUBE_TEMP}/master-start.sh &
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   (
@@ -87,34 +87,24 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     grep -v "^#" $(dirname $0)/templates/salt-minion.sh
   ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
-  gcloud compute instances create ${MINION_NAMES[$i]} \
+  gcutil addinstance ${MINION_NAMES[$i]} \
+  --norespect_terminal_width \
     --project ${PROJECT} \
     --zone ${ZONE} \
-    --machine-type ${MINION_SIZE} \
+    --machine_type ${MINION_SIZE} \
     --image ${IMAGE} \
     --tags ${MINION_TAG} \
-    --no-scopes \
-    --restart-on-failure \
-    --can-ip-forward \
-    --metadata-from-file startup-script=${KUBE_TEMP}/minion-start-${i}.sh \
-    --network ${NETWORK} &
+    --network ${NETWORK} \
+    --service_account_scopes="" \
+    --automatic_restart \
+    --can_ip_forward \
+    --metadata_from_file startup-script:${KUBE_TEMP}/minion-start-${i}.sh &
 
-  # 'gcloud compute' past 2014.06.11 breaks the way we are specifying
-  # --next-hop-instance and there is no way to be compatible with both versions.
-  if [[ $GCLOUD_VERSION < "2014.06.11" ]]; then
-    gcloud compute routes create ${MINION_NAMES[$i]} \
-      --project ${PROJECT} \
-      --destination-range ${MINION_IP_RANGES[$i]} \
-      --next-hop-instance ${ZONE}/instances/${MINION_NAMES[$i]} \
-      --network ${NETWORK} &
-  else
-    gcloud compute routes create ${MINION_NAMES[$i]} \
-      --project ${PROJECT} \
-      --destination-range ${MINION_IP_RANGES[$i]} \
-      --next-hop-instance ${MINION_NAMES[$i]} \
-      --next-hop-instance-zone ${ZONE} \
-      --network ${NETWORK} &
-  fi
+  gcutil addroute ${MINION_NAMES[$i]} ${MINION_IP_RANGES[$i]} \
+  --norespect_terminal_width \
+    --project ${PROJECT} \
+    --network ${NETWORK} \
+    --next_hop_instance ${ZONE}/instances/${MINION_NAMES[$i]} &
 done
 
 FAIL=0
@@ -150,5 +140,3 @@ echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
 echo
 echo "Security note: The server above uses a self signed certificate.  This is"
 echo "    subject to \"Man in the middle\" type attacks."
-
-
