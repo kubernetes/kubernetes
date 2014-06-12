@@ -72,7 +72,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		id, found, err := s.Kubelet.GetContainerID(container)
-		if (!found) {
+		if !found {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprint(w, "{}")
 			return

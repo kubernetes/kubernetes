@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package api includes all types used to communicate between the various
-// parts of the Kubernetes system.
 package api
 
 // ContainerManifest corresponds to the Container Manifest format, documented at:
