@@ -270,7 +270,7 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 		dockerPort := docker.Port(strconv.Itoa(interiorPort) + "/tcp")
 		exposedPorts[dockerPort] = struct{}{}
 		portBindings[dockerPort] = []docker.PortBinding{
-			docker.PortBinding{
+			{
 				HostPort: strconv.Itoa(exteriorPort),
 			},
 		}

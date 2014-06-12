@@ -22,14 +22,14 @@ import (
 // An implementation of PodRegistry and ControllerRegistry that is backed by memory
 // Mainly used for testing.
 type MemoryRegistry struct {
-	podData       map[string]Pod
+	podData        map[string]Pod
 	controllerData map[string]ReplicationController
 	serviceData    map[string]Service
 }
 
 func MakeMemoryRegistry() *MemoryRegistry {
 	return &MemoryRegistry{
-		podData:       map[string]Pod{},
+		podData:        map[string]Pod{},
 		controllerData: map[string]ReplicationController{},
 		serviceData:    map[string]Service{},
 	}

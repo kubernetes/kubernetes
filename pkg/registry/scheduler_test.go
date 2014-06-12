@@ -64,7 +64,7 @@ func makePod(host string, hostPorts ...int) Pod {
 		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
-					Container{
+					{
 						Ports: networkPorts,
 					},
 				},

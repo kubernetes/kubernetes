@@ -81,12 +81,12 @@ func TestListEmptyControllerList(t *testing.T) {
 func TestListControllerList(t *testing.T) {
 	mockRegistry := MockControllerRegistry{
 		controllers: []ReplicationController{
-			ReplicationController{
+			{
 				JSONBase: JSONBase{
 					ID: "foo",
 				},
 			},
-			ReplicationController{
+			{
 				JSONBase: JSONBase{
 					ID: "bar",
 				},
@@ -145,10 +145,10 @@ func TestControllerParsing(t *testing.T) {
 				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
-							Container{
+							{
 								Image: "dockerfile/nginx",
 								Ports: []Port{
-									Port{
+									{
 										ContainerPort: 80,
 										HostPort:      8080,
 									},

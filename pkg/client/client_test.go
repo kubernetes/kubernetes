@@ -63,7 +63,7 @@ func TestListEmptyPods(t *testing.T) {
 func TestListPods(t *testing.T) {
 	expectedPodList := api.PodList{
 		Items: []api.Pod{
-			api.Pod{
+			{
 				CurrentState: api.PodState{
 					Status: "Foobar",
 				},
@@ -97,7 +97,7 @@ func TestListPods(t *testing.T) {
 func TestListPodsLabels(t *testing.T) {
 	expectedPodList := api.PodList{
 		Items: []api.Pod{
-			api.Pod{
+			{
 				CurrentState: api.PodState{
 					Status: "Foobar",
 				},
