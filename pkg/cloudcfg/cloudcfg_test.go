@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -152,7 +153,7 @@ func TestDoRequest(t *testing.T) {
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
-	body, err := DoRequest(request, "user", "pass")
+	body, err := DoRequest(request, &client.AuthInfo{"user", "pass"})
 	if request.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *request)
 	}
