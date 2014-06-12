@@ -17,7 +17,6 @@ package util
 
 import (
 	"io/ioutil"
-	"log"
 	"net/http"
 )
 
@@ -26,12 +25,18 @@ import (
 type TestInterface interface {
 	Errorf(format string, args ...interface{})
 }
+type LogInterface interface {
+	Logf(format string, args ...interface{})
+}
 
 // FakeHandler is to assist in testing HTTP requests.
 type FakeHandler struct {
 	RequestReceived *http.Request
 	StatusCode      int
 	ResponseBody    string
+	// For logging - you can use a *testing.T
+	// This will keep log messages associated with the test.
+	T LogInterface
 }
 
 func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -40,8 +45,8 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	response.Write([]byte(f.ResponseBody))
 
 	bodyReceived, err := ioutil.ReadAll(request.Body)
-	if err != nil {
-		log.Printf("Received read error: %#v", err)
+	if err != nil && f.T != nil {
+		f.T.Logf("Received read error: %#v", err)
 	}
 	f.ResponseBody = string(bodyReceived)
 }

@@ -250,7 +250,7 @@ func DeleteController(name string, client client.ClientInterface) error {
 		return err
 	}
 	if controller.DesiredState.Replicas != 0 {
-		return fmt.Errorf("controller has non-zero replicas (%d)", controller.DesiredState.Replicas)
+		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.DesiredState.Replicas)
 	}
 	return client.DeleteReplicationController(name)
 }
