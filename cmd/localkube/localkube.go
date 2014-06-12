@@ -79,7 +79,6 @@ func fake_kubelet() {
 
 // Starts api services (the master). Never returns.
 func api_server() {
-	//machineList := util.StringList{fmt.Sprintf("%s:%v", *kubelet_address, *kubelet_port)}
 	machineList := util.StringList{*kubelet_address}
 
 	etcdClient := etcd.NewClient([]string{*etcd_server})

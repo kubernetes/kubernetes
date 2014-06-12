@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -70,7 +71,7 @@ func main() {
 	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
 		secure = false
 	}
-	url := *httpServer + "/api/v1beta1" + flag.Arg(1)
+	url := *httpServer + path.Join("/api/v1beta1", flag.Arg(1))
 	var request *http.Request
 
 	var printer cloudcfg.ResourcePrinter
@@ -82,7 +83,7 @@ func main() {
 		printer = &cloudcfg.HumanReadablePrinter{}
 	}
 
-	var auth kube_client.AuthInfo
+	var auth *kube_client.AuthInfo
 	if secure {
 		auth, err = cloudcfg.LoadAuthInfo(*authConfig)
 		if err != nil {
@@ -105,7 +106,7 @@ func main() {
 	case "rollingupdate":
 		client := &kube_client.Client{
 			Host: *httpServer,
-			Auth: &auth,
+			Auth: auth,
 		}
 		cloudcfg.Update(flag.Arg(1), client, *updatePeriod)
 	case "run":
@@ -119,19 +120,19 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error parsing replicas: %#v", err)
 		}
-		err = cloudcfg.RunController(image, name, replicas, kube_client.Client{Host: *httpServer, Auth: &auth}, *portSpec, *servicePort)
+		err = cloudcfg.RunController(image, name, replicas, kube_client.Client{Host: *httpServer, Auth: auth}, *portSpec, *servicePort)
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
 	case "stop":
-		err = cloudcfg.StopController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: &auth})
+		err = cloudcfg.StopController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
 	case "rm":
-		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: &auth})
+		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
@@ -142,12 +143,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: %#v", err)
 	}
-	var body string
-	if secure {
-		body, err = cloudcfg.DoSecureRequest(request, auth.User, auth.Password)
-	} else {
-		body, err = cloudcfg.DoInsecureRequest(request)
-	}
+	body, err := cloudcfg.DoRequest(request, auth)
 	if err != nil {
 		log.Fatalf("Error: %#v", err)
 	}
