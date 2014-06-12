@@ -63,7 +63,8 @@ echo "Starting VMs and configuring firewalls"
 gcloud compute firewalls create --quiet ${MASTER_NAME}-https \
   --project ${PROJECT} \
   --target-tags ${MASTER_TAG} \
-  --allow tcp:443 &
+  --allow tcp:443 \
+  --network ${NETWORK} &
 
 gcloud compute instances create ${MASTER_NAME}\
   --project ${PROJECT} \
@@ -73,7 +74,8 @@ gcloud compute instances create ${MASTER_NAME}\
   --tags ${MASTER_TAG} \
   --no-scopes \
   --restart-on-failure \
-  --metadata-from-file startup-script=${KUBE_TEMP}/master-start.sh &
+  --metadata-from-file startup-script=${KUBE_TEMP}/master-start.sh \
+  --network ${NETWORK} &
 
 GCLOUD_VERSION=$(gcloud version | grep compute | cut -f 2 -d ' ')
 
@@ -94,7 +96,8 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     --no-scopes \
     --restart-on-failure \
     --can-ip-forward \
-    --metadata-from-file startup-script=${KUBE_TEMP}/minion-start-${i}.sh &
+    --metadata-from-file startup-script=${KUBE_TEMP}/minion-start-${i}.sh \
+    --network ${NETWORK} &
 
   # 'gcloud compute' past 2014.06.11 breaks the way we are specifying
   # --next-hop-instance and there is no way to be compatible with both versions.
@@ -102,13 +105,15 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     gcloud compute routes create ${MINION_NAMES[$i]} \
       --project ${PROJECT} \
       --destination-range ${MINION_IP_RANGES[$i]} \
-      --next-hop-instance ${ZONE}/instances/${MINION_NAMES[$i]} &
+      --next-hop-instance ${ZONE}/instances/${MINION_NAMES[$i]} \
+      --network ${NETWORK} &
   else
     gcloud compute routes create ${MINION_NAMES[$i]} \
       --project ${PROJECT} \
       --destination-range ${MINION_IP_RANGES[$i]} \
       --next-hop-instance ${MINION_NAMES[$i]} \
-      --next-hop-instance-zone ${ZONE} &
+      --next-hop-instance-zone ${ZONE} \
+      --network ${NETWORK} &
   fi
 done
 

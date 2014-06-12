@@ -19,6 +19,7 @@ MINION_SIZE=g1-small
 NUM_MINIONS=2
 # gcloud will expand this to the latest supported image.
 IMAGE=debian-7-backports
+NETWORK=default
 INSTANCE_PREFIX="e2e-test-${USER}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
