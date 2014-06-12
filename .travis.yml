@@ -12,4 +12,4 @@ install:
 
 script:
   - ./hack/test-go.sh
-  - PATH=$GOPATH/bin ./hack/integration-test.sh
+  - PATH=$GOPATH/bin:$PATH ./hack/integration-test.sh
