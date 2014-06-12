@@ -85,12 +85,12 @@ func TestListEmptyPodList(t *testing.T) {
 func TestListPodList(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		pods: []Pod{
-			Pod{
+			{
 				JSONBase: JSONBase{
 					ID: "foo",
 				},
 			},
-			Pod{
+			{
 				JSONBase: JSONBase{
 					ID: "bar",
 				},

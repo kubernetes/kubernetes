@@ -48,7 +48,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
 		list: ServiceList{
 			Items: []Service{
-				Service{
+				{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -58,13 +58,13 @@ func TestSyncEndpointsItems(t *testing.T) {
 	}
 	podRegistry := MockPodRegistry{
 		pods: []Pod{
-			Pod{
+			{
 				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
-							Container{
+							{
 								Ports: []Port{
-									Port{
+									{
 										HostPort: 8080,
 									},
 								},
@@ -88,7 +88,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
 		list: ServiceList{
 			Items: []Service{
-				Service{
+				{
 					Labels: map[string]string{
 						"foo": "bar",
 					},

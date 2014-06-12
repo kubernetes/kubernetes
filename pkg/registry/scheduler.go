@@ -73,7 +73,7 @@ func MakeFirstFitScheduler(machines []string, registry PodRegistry, random *rand
 	return &FirstFitScheduler{
 		machines: machines,
 		registry: registry,
-		random: random,
+		random:   random,
 	}
 }
 

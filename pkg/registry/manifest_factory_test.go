@@ -32,7 +32,7 @@ func TestMakeManifestNoServices(t *testing.T) {
 		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
-					Container{
+					{
 						Name: "foo",
 					},
 				},
@@ -55,7 +55,7 @@ func TestMakeManifestServices(t *testing.T) {
 	registry := MockServiceRegistry{
 		list: ServiceList{
 			Items: []Service{
-				Service{
+				{
 					JSONBase: JSONBase{ID: "test"},
 					Port:     8080,
 				},
@@ -70,7 +70,7 @@ func TestMakeManifestServices(t *testing.T) {
 		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
-					Container{
+					{
 						Name: "foo",
 					},
 				},
@@ -92,7 +92,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 	registry := MockServiceRegistry{
 		list: ServiceList{
 			Items: []Service{
-				Service{
+				{
 					JSONBase: JSONBase{ID: "test"},
 					Port:     8080,
 				},
@@ -107,9 +107,9 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
-					Container{
+					{
 						Env: []EnvVar{
-							EnvVar{
+							{
 								Name:  "foo",
 								Value: "bar",
 							},

@@ -37,7 +37,7 @@ func makeUrl(suffix string) string {
 
 type FakePodControl struct {
 	controllerSpec []ReplicationController
-	deletePodID   []string
+	deletePodID    []string
 }
 
 func (f *FakePodControl) createReplica(spec ReplicationController) {
@@ -57,7 +57,7 @@ func makeReplicationController(replicas int) ReplicationController {
 				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
-							Container{
+							{
 								Image: "foo/bar",
 							},
 						},
@@ -182,7 +182,7 @@ func TestCreateReplica(t *testing.T) {
 				DesiredState: PodState{
 					Manifest: ContainerManifest{
 						Containers: []Container{
-							Container{
+							{
 								Image: "foo/bar",
 							},
 						},

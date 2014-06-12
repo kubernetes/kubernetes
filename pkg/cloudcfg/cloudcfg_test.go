@@ -120,8 +120,8 @@ func TestUpdateWithPods(t *testing.T) {
 	client := FakeKubeClient{
 		pods: PodList{
 			Items: []Pod{
-				Pod{JSONBase: JSONBase{ID: "pod-1"}},
-				Pod{JSONBase: JSONBase{ID: "pod-2"}},
+				{JSONBase: JSONBase{ID: "pod-1"}},
+				{JSONBase: JSONBase{ID: "pod-2"}},
 			},
 		},
 	}

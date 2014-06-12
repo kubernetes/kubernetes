@@ -172,10 +172,10 @@ func TestContainerExists(t *testing.T) {
 		Name: "foo",
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			Names: []string{"foo--qux--1234"},
 		},
-		docker.APIContainers{
+		{
 			Names: []string{"bar--qux--1234"},
 		},
 	}
@@ -201,11 +201,11 @@ func TestGetContainerID(t *testing.T) {
 		DockerClient: &fakeDocker,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			Names: []string{"foo"},
 			ID:    "1234",
 		},
-		docker.APIContainers{
+		{
 			Names: []string{"bar"},
 			ID:    "4567",
 		},
@@ -236,10 +236,10 @@ func TestGetContainerByName(t *testing.T) {
 		DockerClient: &fakeDocker,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			Names: []string{"foo"},
 		},
-		docker.APIContainers{
+		{
 			Names: []string{"bar"},
 		},
 	}
@@ -264,10 +264,10 @@ func TestListContainers(t *testing.T) {
 		DockerClient: &fakeDocker,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			Names: []string{"foo"},
 		},
-		docker.APIContainers{
+		{
 			Names: []string{"bar"},
 		},
 	}
@@ -282,10 +282,10 @@ func TestKillContainerWithError(t *testing.T) {
 	fakeDocker := FakeDockerClient{
 		err: fmt.Errorf("Sample Error"),
 		containerList: []docker.APIContainers{
-			docker.APIContainers{
+			{
 				Names: []string{"foo"},
 			},
-			docker.APIContainers{
+			{
 				Names: []string{"bar"},
 			},
 		},
@@ -306,10 +306,10 @@ func TestKillContainer(t *testing.T) {
 		DockerClient: &fakeDocker,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			Names: []string{"foo"},
 		},
-		docker.APIContainers{
+		{
 			Names: []string{"bar"},
 		},
 	}
@@ -325,11 +325,11 @@ func TestKillContainer(t *testing.T) {
 func TestSyncHTTP(t *testing.T) {
 	containers := api.ContainerManifest{
 		Containers: []api.Container{
-			api.Container{
+			{
 				Name:  "foo",
 				Image: "dockerfile/foo",
 			},
-			api.Container{
+			{
 				Name:  "bar",
 				Image: "dockerfile/bar",
 			},
@@ -374,8 +374,8 @@ func TestResponseToManifests(t *testing.T) {
 	list, err := kubelet.ResponseToManifests(&etcd.Response{
 		Node: &etcd.Node{
 			Value: util.MakeJSONString([]api.ContainerManifest{
-				api.ContainerManifest{Id: "foo"},
-				api.ContainerManifest{Id: "bar"},
+				{Id: "foo"},
+				{Id: "bar"},
 			}),
 		},
 	})
@@ -508,7 +508,7 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 		err: nil,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			// format is <container-id>--<manifest-id>
 			Names: []string{"bar--foo"},
 			ID:    "1234",
@@ -521,10 +521,10 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 		DockerClient: &fakeDocker,
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{
-		api.ContainerManifest{
+		{
 			Id: "foo",
 			Containers: []api.Container{
-				api.Container{Name: "bar"},
+				{Name: "bar"},
 			},
 		},
 	})
@@ -543,7 +543,7 @@ func TestSyncManifestsDeletes(t *testing.T) {
 		err: nil,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
-		docker.APIContainers{
+		{
 			Names: []string{"foo"},
 			ID:    "1234",
 		},

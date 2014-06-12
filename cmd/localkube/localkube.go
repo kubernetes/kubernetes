@@ -23,7 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-        "math/rand"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -91,8 +91,8 @@ func api_server() {
 		Client: http.DefaultClient,
 		Port:   *kubelet_port,
 	}
-        random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
-	
+	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
+
 	storage := map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry, random)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),

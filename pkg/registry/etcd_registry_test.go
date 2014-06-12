@@ -70,7 +70,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		DesiredState: PodState{
 			Manifest: ContainerManifest{
 				Containers: []Container{
-					Container{
+					{
 						Name: "foo",
 					},
 				},
@@ -171,7 +171,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 			Manifest: ContainerManifest{
 				Id: "foo",
 				Containers: []Container{
-					Container{
+					{
 						Name: "foo",
 					},
 				},
@@ -205,7 +205,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
-		ContainerManifest{
+		{
 			Id: "bar",
 		},
 	}), 0)
@@ -218,7 +218,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 			Manifest: ContainerManifest{
 				Id: "foo",
 				Containers: []Container{
-					Container{
+					{
 						Name: "foo",
 					},
 				},
@@ -248,7 +248,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
-		ContainerManifest{
+		{
 			Id: "foo",
 		},
 	}), 0)
@@ -272,8 +272,8 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
-		ContainerManifest{Id: "foo"},
-		ContainerManifest{Id: "bar"},
+		{Id: "foo"},
+		{Id: "bar"},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
@@ -336,10 +336,10 @@ func TestEtcdListPods(t *testing.T) {
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
-					&etcd.Node{
+					{
 						Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}),
 					},
-					&etcd.Node{
+					{
 						Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "bar"}}),
 					},
 				},
@@ -392,10 +392,10 @@ func TestEtcdListControllers(t *testing.T) {
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
-					&etcd.Node{
+					{
 						Value: util.MakeJSONString(ReplicationController{JSONBase: JSONBase{ID: "foo"}}),
 					},
-					&etcd.Node{
+					{
 						Value: util.MakeJSONString(ReplicationController{JSONBase: JSONBase{ID: "bar"}}),
 					},
 				},
@@ -499,10 +499,10 @@ func TestEtcdListServices(t *testing.T) {
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
-					&etcd.Node{
+					{
 						Value: util.MakeJSONString(Service{JSONBase: JSONBase{ID: "foo"}}),
 					},
-					&etcd.Node{
+					{
 						Value: util.MakeJSONString(Service{JSONBase: JSONBase{ID: "bar"}}),
 					},
 				},

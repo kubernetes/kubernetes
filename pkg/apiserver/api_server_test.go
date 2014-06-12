@@ -127,7 +127,7 @@ func TestNonEmptyList(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{
 		list: []Simple{
-			Simple{
+			{
 				Name: "foo",
 			},
 		},
