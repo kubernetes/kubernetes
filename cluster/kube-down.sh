@@ -25,17 +25,31 @@ source $(dirname $0)/util.sh
 detect-project
 
 echo "Bringing down cluster"
-gcloud compute firewalls delete --quiet ${MASTER_NAME}-https \
-  --project ${PROJECT} &
-
-gcloud compute instances delete --quiet ${MASTER_NAME} \
+gcutil deletefirewall  \
   --project ${PROJECT} \
-  --zone ${ZONE} &
+  --norespect_terminal_width \
+  --force \
+  ${MASTER_NAME}-https &
 
-gcloud compute instances delete --quiet ${MINION_NAMES[*]} \
+gcutil deleteinstance \
   --project ${PROJECT} \
-  --zone ${ZONE} &
+  --norespect_terminal_width \
+  --force \
+  --delete_boot_pd \
+  --zone ${ZONE} \
+  ${MASTER_NAME} &
 
-gcloud compute routes delete --quiet ${MINION_NAMES[*]} \
-  --project ${PROJECT} &
+gcutil deleteinstance \
+  --project ${PROJECT} \
+  --norespect_terminal_width \
+  --force \
+  --delete_boot_pd \
+  --zone ${ZONE} \
+  ${MINION_NAMES[*]} &
+
+gcutil deleteroute  \
+  --project ${PROJECT} \
+  --force \
+  ${MINION_NAMES[*]} &
+
 wait

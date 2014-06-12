@@ -94,12 +94,12 @@ Using master: kubernetes-master (external IP: 1.2.3.4)
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-$ gcloud compute ssh kubernetes-minion-3 --zone us-central1-b
+$ gcutil ssh kubernetes-minion-3 --zone us-central1-b
 $ sudo docker ps
 
 me@kubernetes-minion-3:~$ sudo docker ps
 CONTAINER ID  IMAGE  COMMAND  CREATED  STATUS  PORTS  NAMES
-417ab993cdf8  dockerfile/redis:latest  redis-server /etc/re  8 minutes ago Up 8 minutes  0.0.0.0:6379->6379/tcp  master--redis_-_master_-_2--6b944b49   
+417ab993cdf8  dockerfile/redis:latest  redis-server /etc/re  8 minutes ago Up 8 minutes  0.0.0.0:6379->6379/tcp  master--redis_-_master_-_2--6b944b49
 ```
 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.)
@@ -357,7 +357,7 @@ Using master: kubernetes-master (external IP: 1.2.3.4)
 
 ### Step Five: Create the frontend pod.
 
-This is a simple PHP server that is configured to talk to either the slave or master services depending on whether the request is a read or a write. It exposes a simple AJAX interface, and serves an angular-based UX. Like the redis read slaves it is a replicated service instantiated by a replication controller.  
+This is a simple PHP server that is configured to talk to either the slave or master services depending on whether the request is a read or a write. It exposes a simple AJAX interface, and serves an angular-based UX. Like the redis read slaves it is a replicated service instantiated by a replication controller.
 
 Create a file named `frontend-controller.json`:
 
@@ -675,6 +675,6 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console], and visit `http://<host-ip>:8080`. You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcloud` tool.
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console], and visit `http://<host-ip>:8080`. You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool.
 
 [cloud-console]: https://console.developer.google.com

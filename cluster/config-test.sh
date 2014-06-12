@@ -17,8 +17,8 @@ ZONE=us-central1-b
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
 NUM_MINIONS=2
-# gcloud will expand this to the latest supported image.
-IMAGE=debian-7-backports
+# gcloud/gcutil will expand this to the latest supported image.
+IMAGE=backports-debian-7-wheezy
 NETWORK=default
 INSTANCE_PREFIX="e2e-test-${USER}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"

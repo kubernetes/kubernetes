@@ -22,7 +22,7 @@ echo "Auto installer for launching Kubernetes"
 echo "Release: $RELEASE_PREFIX$RELEASE_NAME"
 
 # Make sure that prerequisites are installed.
-for x in gcloud gsutil; do
+for x in gcloud gcutil gsutil; do
   if [ "$(which $x)" == "" ]; then
     echo "Can't find $x in PATH, please fix and retry."
     exit 1
