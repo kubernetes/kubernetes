@@ -18,6 +18,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -50,6 +51,22 @@ func usage() {
 	log.Fatal("Usage: cloudcfg -h <host> [-c config/file.json] [-p <hostPort>:<containerPort>,..., <hostPort-n>:<containerPort-n> <method> <path>")
 }
 
+// Reads & parses config file. On error, calls log.Fatal().
+func readConfig(storage string) []byte {
+	if len(*config) == 0 {
+		log.Fatal("Need config file (-c)")
+	}
+	data, err := ioutil.ReadFile(*config)
+	if err != nil {
+		log.Fatalf("Unable to read %v: %#v\n", *config, err)
+	}
+	data, err = cloudcfg.ToWireFormat(data, storage)
+	if err != nil {
+		log.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
+	}
+	return data
+}
+
 // CloudCfg command line tool.
 func main() {
 	flag.Parse() // Scan the arguments list
@@ -71,7 +88,8 @@ func main() {
 	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
 		secure = false
 	}
-	url := *httpServer + path.Join("/api/v1beta1", flag.Arg(1))
+	storage := flag.Arg(1)
+	url := *httpServer + path.Join("/api/v1beta1", storage)
 	var request *http.Request
 
 	var printer cloudcfg.ResourcePrinter
@@ -100,9 +118,9 @@ func main() {
 	case "delete":
 		request, err = http.NewRequest("DELETE", url, nil)
 	case "create":
-		request, err = cloudcfg.RequestWithBody(*config, url, "POST")
+		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), url, "POST")
 	case "update":
-		request, err = cloudcfg.RequestWithBody(*config, url, "PUT")
+		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), url, "PUT")
 	case "rollingupdate":
 		client := &kube_client.Client{
 			Host: *httpServer,
