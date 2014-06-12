@@ -6,11 +6,13 @@ go:
 
 install: 
   - go get code.google.com/p/go.tools/cmd/cover
+  - go get github.com/coreos/etcd
   - curl https://sdk.cloud.google.com | CLOUDSDK_CORE_DISABLE_PROMPTS=1 bash
   - bad=$(gofmt -s -l pkg/ cmd/) bash -x -c '[[ -z "$bad" ]]'
   - ./hack/build-go.sh
 
 script:
+  - . /home/travis/google-cloud-sdk/path.bash.inc
   - ./hack/test-go.sh
   - ./hack/integration-test.sh
   - ./hack/e2e-test.sh
