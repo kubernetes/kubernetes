@@ -12,3 +12,6 @@
 
 # Emacs save files
 *~
+
+# Go test binaries
+*.test

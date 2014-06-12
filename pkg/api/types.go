@@ -19,7 +19,7 @@ limitations under the License.
 package api
 
 // ContainerManifest corresponds to the Container Manifest format, documented at:
-// https://developers.google.com/compute/docs/containers#container_manifest
+// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
 // This is used as the representation of Kubernete's workloads.
 type ContainerManifest struct {
 	Version    string      `yaml:"version" json:"version"`

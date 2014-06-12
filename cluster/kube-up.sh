@@ -46,15 +46,8 @@ KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
 trap "rm -rf ${KUBE_TEMP}" EXIT
 
 get-password
-echo "Generating password: $user:$passwd"
+echo "Using password: $user:$passwd"
 htpasswd -b -c ${KUBE_TEMP}/htpasswd $user $passwd
-cat << EOF > ~/.kubernetes_auth
-{
-  "User": "$user",
-  "Password": "$passwd"
-}
-EOF
-chmod 0600 ~/.kubernetes_auth
 HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
 (
