@@ -152,6 +152,9 @@ func (kl *Kubelet) ContainerExists(manifest *api.ContainerManifest, container *a
 	return false, "", nil
 }
 
+// GetContainerID looks at the list of containers on the machine and returns the ID of the container whose name
+// matches 'name'.  It returns the name of the container, or empty string, if the container isn't found.
+// it returns true if the container is found, false otherwise, and any error that occurs.
 func (kl *Kubelet) GetContainerID(name string) (string, bool, error) {
 	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
