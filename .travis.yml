@@ -12,7 +12,6 @@ install:
   - ./hack/build-go.sh
 
 script:
-  - . /home/travis/google-cloud-sdk/path.bash.inc
   - ./hack/test-go.sh
-  - ./hack/integration-test.sh
-  - ./hack/e2e-test.sh
+  - bash --init-file /home/travis/google-cloud-sdk/path.bash.inc ./hack/integration-test.sh
+  - bash --init-file /home/travis/google-cloud-sdk/path.bash.inc ./hack/e2e-test.sh
