@@ -93,6 +93,16 @@ cd kubernetes
 cluster/kube-down.sh
 ```
 
+## Running locally
+In a separate tab of your terminal, run:
+
+```
+cd kubernetes
+hack/local-up.sh
+```
+
+This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down. While it's running, you can use `hack/localcfg.sh` in place of `cluster/cloudcfg.sh` to talk to it.
+
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)
 

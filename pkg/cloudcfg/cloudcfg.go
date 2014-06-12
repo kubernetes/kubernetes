@@ -42,25 +42,28 @@ func promptForString(field string) string {
 	return result
 }
 
-// Parse an AuthInfo object from a file path
-func LoadAuthInfo(path string) (client.AuthInfo, error) {
+// Parse an AuthInfo object from a file path. Prompt user and create file if it doesn't exist.
+func LoadAuthInfo(path string) (*client.AuthInfo, error) {
 	var auth client.AuthInfo
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		auth.User = promptForString("Username")
 		auth.Password = promptForString("Password")
 		data, err := json.Marshal(auth)
 		if err != nil {
-			return auth, err
+			return &auth, err
 		}
 		err = ioutil.WriteFile(path, data, 0600)
-		return auth, err
+		return &auth, err
 	}
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return auth, err
+		return nil, err
 	}
 	err = json.Unmarshal(data, &auth)
-	return auth, err
+	if err != nil {
+		return nil, err
+	}
+	return &auth, err
 }
 
 // Perform a rolling update of a collection of pods.
@@ -99,23 +102,22 @@ func RequestWithBody(configFile, url, method string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return RequestWithBodyData(data, url, method)
+	return requestWithBodyData(data, url, method)
 }
 
-// RequestWithBodyData is a helper method that creates an HTTP request with the specified url, method
+// requestWithBodyData is a helper method that creates an HTTP request with the specified url, method
 // and body data
-// FIXME: need to be public API?
-func RequestWithBodyData(data []byte, url, method string) (*http.Request, error) {
+func requestWithBodyData(data []byte, url, method string) (*http.Request, error) {
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	request.ContentLength = int64(len(data))
 	return request, err
 }
 
-// Execute a request, adds authentication, and HTTPS cert ignoring.
-// TODO: Make this stuff optional
-// FIXME: need to be public API?
-func DoRequest(request *http.Request, user, password string) (string, error) {
-	request.SetBasicAuth(user, password)
+// Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
+func DoRequest(request *http.Request, auth *client.AuthInfo) (string, error) {
+	if auth != nil {
+		request.SetBasicAuth(auth.User, auth.Password)
+	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}

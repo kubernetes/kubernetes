@@ -14,17 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script sets up a go workspace locally and builds all go components.
+# This file is exactly like cloudcfg.sh, but it talks to a local master
+# (which you're assumed to be running with localkube.sh).
 
-set -e
+CLOUDCFG=$(dirname $0)/../output/go/cloudcfg
+if [ ! -x $CLOUDCFG ]; then
+  echo "Could not find cloudcfg binary. Run hack/build-go.sh to build it."
+  exit 1
+fi
 
-source $(dirname $0)/config-go.sh
-
-cd "${KUBE_TARGET}"
-
-BINARIES="proxy integration apiserver controller-manager kubelet cloudcfg localkube"
-
-for b in $BINARIES; do
-  echo "+++ Building ${b}"
-  go build "${KUBE_GO_PACKAGE}"/cmd/${b}
-done
+# 8080 is the default port for the master
+$CLOUDCFG -h http://localhost:8080 $@

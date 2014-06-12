@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -39,7 +41,7 @@ var (
 	updatePeriod = flag.Duration("u", 60*time.Second, "Update interarrival period")
 	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
-	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user")
+	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
 	json         = flag.Bool("json", false, "If true, print raw JSON for responses")
 	yaml         = flag.Bool("yaml", false, "If true, print raw YAML for responses")
 )
@@ -61,9 +63,16 @@ func main() {
 		usage()
 	}
 	method := flag.Arg(0)
-	url := *httpServer + "/api/v1beta1" + flag.Arg(1)
+	secure := true
+	parsedUrl, err := url.Parse(*httpServer)
+	if err != nil {
+		log.Fatalf("Unable to parse %v as a URL\n", err)
+	}
+	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
+		secure = false
+	}
+	url := *httpServer + path.Join("/api/v1beta1", flag.Arg(1))
 	var request *http.Request
-	var err error
 
 	var printer cloudcfg.ResourcePrinter
 	if *json {
@@ -74,9 +83,12 @@ func main() {
 		printer = &cloudcfg.HumanReadablePrinter{}
 	}
 
-	auth, err := cloudcfg.LoadAuthInfo(*authConfig)
-	if err != nil {
-		log.Fatalf("Error loading auth: %#v", err)
+	var auth *kube_client.AuthInfo
+	if secure {
+		auth, err = cloudcfg.LoadAuthInfo(*authConfig)
+		if err != nil {
+			log.Fatalf("Error loading auth: %#v", err)
+		}
 	}
 
 	switch method {
@@ -94,7 +106,7 @@ func main() {
 	case "rollingupdate":
 		client := &kube_client.Client{
 			Host: *httpServer,
-			Auth: &auth,
+			Auth: auth,
 		}
 		cloudcfg.Update(flag.Arg(1), client, *updatePeriod)
 	case "run":
@@ -108,19 +120,19 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error parsing replicas: %#v", err)
 		}
-		err = cloudcfg.RunController(image, name, replicas, kube_client.Client{Host: *httpServer, Auth: &auth}, *portSpec, *servicePort)
+		err = cloudcfg.RunController(image, name, replicas, kube_client.Client{Host: *httpServer, Auth: auth}, *portSpec, *servicePort)
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
 	case "stop":
-		err = cloudcfg.StopController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: &auth})
+		err = cloudcfg.StopController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
 	case "rm":
-		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: &auth})
+		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
 		if err != nil {
 			log.Fatalf("Error: %#v", err)
 		}
@@ -131,8 +143,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: %#v", err)
 	}
-	var body string
-	body, err = cloudcfg.DoRequest(request, auth.User, auth.Password)
+	body, err := cloudcfg.DoRequest(request, auth)
 	if err != nil {
 		log.Fatalf("Error: %#v", err)
 	}

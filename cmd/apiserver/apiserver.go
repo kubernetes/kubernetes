@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 // apiserver is the main api server and master for the cluster.
 // it is responsible for serving the cluster management API.
 package main
@@ -53,7 +54,7 @@ func main() {
 	}
 
 	var (
-		podRegistry       registry.PodRegistry
+		podRegistry        registry.PodRegistry
 		controllerRegistry registry.ControllerRegistry
 		serviceRegistry    registry.ServiceRegistry
 	)
@@ -77,7 +78,7 @@ func main() {
 
 	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	storage := map[string]apiserver.RESTStorage{
-		"pods":                  registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry, random)),
+		"pods": registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry, random)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),
 		"services":               registry.MakeServiceRegistryStorage(serviceRegistry),
 	}

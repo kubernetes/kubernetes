@@ -60,6 +60,7 @@ type DockerInterface interface {
 
 // The main kubelet implementation
 type Kubelet struct {
+	Hostname           string
 	Client             registry.EtcdClient
 	DockerClient       DockerInterface
 	FileCheckFrequency time.Duration
@@ -427,15 +428,10 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, changeChannel chan<- []ap
 // The channel to send new configurations across
 // This function loops forever and is intended to be run in a go routine.
 func (kl *Kubelet) SyncAndSetupEtcdWatch(changeChannel chan<- []api.ContainerManifest) {
-	hostname, err := exec.Command("hostname", "-f").Output()
-	if err != nil {
-		log.Printf("Couldn't determine hostname : %v", err)
-		return
-	}
-	key := "/registry/hosts/" + strings.TrimSpace(string(hostname))
+	key := "/registry/hosts/" + strings.TrimSpace(kl.Hostname)
 	// First fetch the initial configuration (watch only gives changes...)
 	for {
-		err = kl.getKubeletStateFromEtcd(key, changeChannel)
+		err := kl.getKubeletStateFromEtcd(key, changeChannel)
 		if err == nil {
 			// We got a successful response, etcd is up, set up the watch.
 			break
