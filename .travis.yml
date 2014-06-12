@@ -1,0 +1,14 @@
+language: go
+
+go:
+  - 1.2
+  - tip
+
+install: 
+  - bad=$(gofmt -s -l pkg/ cmd/) bash -x -c '[[ -z "$bad" ]]'
+  - ./hack/build-go.sh
+
+script:
+  - ./hack/test-go.sh
+  - ./hack/integration-test.sh
+  - ./hack/e2e-test.sh
