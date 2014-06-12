@@ -47,8 +47,9 @@ func TestRandomScheduler(t *testing.T) {
 
 func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
 	mockRegistry := MockPodRegistry{}
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
-	expectSchedule(scheduler, Pod{}, "m1", t)
+	r := rand.New(rand.NewSource(0))
+	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
+	expectSchedule(scheduler, Pod{}, "m3", t)
 }
 
 func makePod(host string, hostPorts ...int) Pod {
@@ -78,8 +79,9 @@ func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 			makePod("m1", 8080),
 		},
 	}
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
-	expectSchedule(scheduler, makePod("", 8080), "m2", t)
+	r := rand.New(rand.NewSource(0))
+	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
+	expectSchedule(scheduler, makePod("", 8080), "m3", t)
 }
 
 func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
@@ -90,7 +92,8 @@ func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 			makePod("m3", 80, 443, 8085),
 		},
 	}
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
+	r := rand.New(rand.NewSource(0))
+	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
 	expectSchedule(scheduler, makePod("", 8080, 8081), "m3", t)
 }
 
@@ -102,7 +105,8 @@ func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
 			makePod("m3", 8080),
 		},
 	}
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry)
+	r := rand.New(rand.NewSource(0))
+	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
 	_, err := scheduler.Schedule(makePod("", 8080, 8081))
 	if err == nil {
 		t.Error("Unexpected non-error.")

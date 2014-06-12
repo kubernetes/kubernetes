@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -74,8 +75,9 @@ func main() {
 		Port:   10250,
 	}
 
+	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	storage := map[string]apiserver.RESTStorage{
-		"pods":                  registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry)),
+		"pods":                  registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry, random)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),
 		"services":               registry.MakeServiceRegistryStorage(serviceRegistry),
 	}
