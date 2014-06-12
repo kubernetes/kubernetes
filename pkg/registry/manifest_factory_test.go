@@ -18,7 +18,7 @@ package registry
 import (
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func TestMakeManifestNoServices(t *testing.T) {
@@ -27,11 +27,11 @@ func TestMakeManifestNoServices(t *testing.T) {
 		serviceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", Pod{
-		JSONBase: JSONBase{ID: "foobar"},
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
+	manifest, err := factory.MakeManifest("machine", api.Pod{
+		JSONBase: api.JSONBase{ID: "foobar"},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
 					{
 						Name: "foo",
 					},
@@ -53,10 +53,10 @@ func TestMakeManifestNoServices(t *testing.T) {
 
 func TestMakeManifestServices(t *testing.T) {
 	registry := MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
+		list: api.ServiceList{
+			Items: []api.Service{
 				{
-					JSONBase: JSONBase{ID: "test"},
+					JSONBase: api.JSONBase{ID: "test"},
 					Port:     8080,
 				},
 			},
@@ -66,10 +66,10 @@ func TestMakeManifestServices(t *testing.T) {
 		serviceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", Pod{
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
+	manifest, err := factory.MakeManifest("machine", api.Pod{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
 					{
 						Name: "foo",
 					},
@@ -90,10 +90,10 @@ func TestMakeManifestServices(t *testing.T) {
 
 func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 	registry := MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
+		list: api.ServiceList{
+			Items: []api.Service{
 				{
-					JSONBase: JSONBase{ID: "test"},
+					JSONBase: api.JSONBase{ID: "test"},
 					Port:     8080,
 				},
 			},
@@ -103,12 +103,12 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		serviceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", Pod{
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
+	manifest, err := factory.MakeManifest("machine", api.Pod{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
 					{
-						Env: []EnvVar{
+						Env: []api.EnvVar{
 							{
 								Name:  "foo",
 								Value: "bar",

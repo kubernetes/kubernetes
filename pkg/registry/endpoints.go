@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func MakeEndpointController(serviceRegistry ServiceRegistry, podRegistry PodRegistry) *EndpointController {
@@ -52,7 +52,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			// TODO: Use port names in the service object, don't just use port #0
 			endpoints[ix] = fmt.Sprintf("%s:%d", pod.CurrentState.Host, pod.DesiredState.Manifest.Containers[0].Ports[0].HostPort)
 		}
-		err = e.serviceRegistry.UpdateEndpoints(Endpoints{
+		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
 			Name:      service.ID,
 			Endpoints: endpoints,
 		})

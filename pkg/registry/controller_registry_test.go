@@ -22,27 +22,27 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 type MockControllerRegistry struct {
 	err         error
-	controllers []ReplicationController
+	controllers []api.ReplicationController
 }
 
-func (registry *MockControllerRegistry) ListControllers() ([]ReplicationController, error) {
+func (registry *MockControllerRegistry) ListControllers() ([]api.ReplicationController, error) {
 	return registry.controllers, registry.err
 }
 
-func (registry *MockControllerRegistry) GetController(ID string) (*ReplicationController, error) {
-	return &ReplicationController{}, registry.err
+func (registry *MockControllerRegistry) GetController(ID string) (*api.ReplicationController, error) {
+	return &api.ReplicationController{}, registry.err
 }
 
-func (registry *MockControllerRegistry) CreateController(controller ReplicationController) error {
+func (registry *MockControllerRegistry) CreateController(controller api.ReplicationController) error {
 	return registry.err
 }
 
-func (registry *MockControllerRegistry) UpdateController(controller ReplicationController) error {
+func (registry *MockControllerRegistry) UpdateController(controller api.ReplicationController) error {
 	return registry.err
 }
 func (registry *MockControllerRegistry) DeleteController(ID string) error {
@@ -57,7 +57,7 @@ func TestListControllersError(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	controllersObj, err := storage.List(nil)
-	controllers := controllersObj.(ReplicationControllerList)
+	controllers := controllersObj.(api.ReplicationControllerList)
 	if err != mockRegistry.err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.err, err)
 	}
@@ -73,21 +73,21 @@ func TestListEmptyControllerList(t *testing.T) {
 	}
 	controllers, err := storage.List(nil)
 	expectNoError(t, err)
-	if len(controllers.(ReplicationControllerList).Items) != 0 {
+	if len(controllers.(api.ReplicationControllerList).Items) != 0 {
 		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
 	}
 }
 
 func TestListControllerList(t *testing.T) {
 	mockRegistry := MockControllerRegistry{
-		controllers: []ReplicationController{
+		controllers: []api.ReplicationController{
 			{
-				JSONBase: JSONBase{
+				JSONBase: api.JSONBase{
 					ID: "foo",
 				},
 			},
 			{
-				JSONBase: JSONBase{
+				JSONBase: api.JSONBase{
 					ID: "bar",
 				},
 			},
@@ -97,7 +97,7 @@ func TestListControllerList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	controllersObj, err := storage.List(nil)
-	controllers := controllersObj.(ReplicationControllerList)
+	controllers := controllersObj.(api.ReplicationControllerList)
 	expectNoError(t, err)
 	if len(controllers.Items) != 2 {
 		t.Errorf("Unexpected controller list: %#v", controllers)
@@ -115,8 +115,8 @@ func TestExtractControllerJson(t *testing.T) {
 	storage := ControllerRegistryStorage{
 		registry: &mockRegistry,
 	}
-	controller := ReplicationController{
-		JSONBase: JSONBase{
+	controller := api.ReplicationController{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	}
@@ -132,22 +132,22 @@ func TestExtractControllerJson(t *testing.T) {
 }
 
 func TestControllerParsing(t *testing.T) {
-	expectedController := ReplicationController{
-		JSONBase: JSONBase{
+	expectedController := api.ReplicationController{
+		JSONBase: api.JSONBase{
 			ID: "nginxController",
 		},
-		DesiredState: ReplicationControllerState{
+		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 			ReplicasInSet: map[string]string{
 				"name": "nginx",
 			},
-			PodTemplate: PodTemplate{
-				DesiredState: PodState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
 							{
 								Image: "dockerfile/nginx",
-								Ports: []Port{
+								Ports: []api.Port{
 									{
 										ContainerPort: 80,
 										HostPort:      8080,
@@ -177,7 +177,7 @@ func TestControllerParsing(t *testing.T) {
 	expectNoError(t, err)
 	data, err = ioutil.ReadFile(fileName)
 	expectNoError(t, err)
-	var controller ReplicationController
+	var controller api.ReplicationController
 	err = json.Unmarshal(data, &controller)
 	expectNoError(t, err)
 

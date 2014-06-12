@@ -20,14 +20,14 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
 
 func TestEtcdGetPod(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/hosts/machine/pods/foo", util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/hosts/machine/pods/foo", util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pod, err := registry.GetPod("foo")
 	expectNoError(t, err)
@@ -61,15 +61,15 @@ func TestEtcdCreatePod(t *testing.T) {
 		},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{}), 0)
+	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", Pod{
-		JSONBase: JSONBase{
+	err := registry.CreatePod("machine", api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
 					{
 						Name: "foo",
 					},
@@ -80,13 +80,13 @@ func TestEtcdCreatePod(t *testing.T) {
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	expectNoError(t, err)
-	var pod Pod
+	var pod api.Pod
 	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var manifests []ContainerManifest
+	var manifests []api.ContainerManifest
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
 	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
@@ -100,14 +100,14 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}),
+				Value: util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}),
 			},
 		},
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", Pod{
-		JSONBase: JSONBase{
+	err := registry.CreatePod("machine", api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	})
@@ -131,8 +131,8 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 200},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", Pod{
-		JSONBase: JSONBase{
+	err := registry.CreatePod("machine", api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	})
@@ -163,14 +163,14 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", Pod{
-		JSONBase: JSONBase{
+	err := registry.CreatePod("machine", api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
 				Id: "foo",
-				Containers: []Container{
+				Containers: []api.Container{
 					{
 						Name: "foo",
 					},
@@ -181,13 +181,13 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	expectNoError(t, err)
-	var pod Pod
+	var pod api.Pod
 	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var manifests []ContainerManifest
+	var manifests []api.ContainerManifest
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
 	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
@@ -204,20 +204,20 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
+	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
 		{
 			Id: "bar",
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", Pod{
-		JSONBase: JSONBase{
+	err := registry.CreatePod("machine", api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
 				Id: "foo",
-				Containers: []Container{
+				Containers: []api.Container{
 					{
 						Name: "foo",
 					},
@@ -228,13 +228,13 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	expectNoError(t, err)
-	var pod Pod
+	var pod api.Pod
 	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var manifests []ContainerManifest
+	var manifests []api.ContainerManifest
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
 	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
@@ -246,8 +246,8 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 func TestEtcdDeletePod(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods/foo"
-	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
+	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
 		{
 			Id: "foo",
 		},
@@ -270,8 +270,8 @@ func TestEtcdDeletePod(t *testing.T) {
 func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods/foo"
-	fakeClient.Set(key, util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}), 0)
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]ContainerManifest{
+	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
 		{Id: "foo"},
 		{Id: "bar"},
 	}), 0)
@@ -285,7 +285,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.deletedKeys[0], key)
 	}
 	response, _ := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
-	var manifests []ContainerManifest
+	var manifests []api.ContainerManifest
 	json.Unmarshal([]byte(response.Node.Value), &manifests)
 	if len(manifests) != 1 {
 		t.Errorf("Unexpected manifest set: %#v, expected empty", manifests)
@@ -337,10 +337,10 @@ func TestEtcdListPods(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "foo"}}),
+						Value: util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}),
 					},
 					{
-						Value: util.MakeJSONString(Pod{JSONBase: JSONBase{ID: "bar"}}),
+						Value: util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "bar"}}),
 					},
 				},
 			},
@@ -393,10 +393,10 @@ func TestEtcdListControllers(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: util.MakeJSONString(ReplicationController{JSONBase: JSONBase{ID: "foo"}}),
+						Value: util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}),
 					},
 					{
-						Value: util.MakeJSONString(ReplicationController{JSONBase: JSONBase{ID: "bar"}}),
+						Value: util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "bar"}}),
 					},
 				},
 			},
@@ -413,7 +413,7 @@ func TestEtcdListControllers(t *testing.T) {
 
 func TestEtcdGetController(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(ReplicationController{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	ctrl, err := registry.GetController("foo")
 	expectNoError(t, err)
@@ -459,15 +459,15 @@ func TestEtcdDeleteController(t *testing.T) {
 func TestEtcdCreateController(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateController(ReplicationController{
-		JSONBase: JSONBase{
+	err := registry.CreateController(api.ReplicationController{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	})
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/controllers/foo", false, false)
 	expectNoError(t, err)
-	var ctrl ReplicationController
+	var ctrl api.ReplicationController
 	err = json.Unmarshal([]byte(resp.Node.Value), &ctrl)
 	expectNoError(t, err)
 	if ctrl.ID != "foo" {
@@ -477,11 +477,11 @@ func TestEtcdCreateController(t *testing.T) {
 
 func TestEtcdUpdateController(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(ReplicationController{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.UpdateController(ReplicationController{
-		JSONBase: JSONBase{ID: "foo"},
-		DesiredState: ReplicationControllerState{
+	err := registry.UpdateController(api.ReplicationController{
+		JSONBase: api.JSONBase{ID: "foo"},
+		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
 	})
@@ -500,10 +500,10 @@ func TestEtcdListServices(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: util.MakeJSONString(Service{JSONBase: JSONBase{ID: "foo"}}),
+						Value: util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}),
 					},
 					{
-						Value: util.MakeJSONString(Service{JSONBase: JSONBase{ID: "bar"}}),
+						Value: util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "bar"}}),
 					},
 				},
 			},
@@ -527,13 +527,13 @@ func TestEtcdCreateService(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreateService(Service{
-		JSONBase: JSONBase{ID: "foo"},
+	err := registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
 	})
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/services/specs/foo", false, false)
 	expectNoError(t, err)
-	var service Service
+	var service api.Service
 	err = json.Unmarshal([]byte(resp.Node.Value), &service)
 	expectNoError(t, err)
 	if service.ID != "foo" {
@@ -543,7 +543,7 @@ func TestEtcdCreateService(t *testing.T) {
 
 func TestEtcdGetService(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(Service{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	service, err := registry.GetService("foo")
 	expectNoError(t, err)
@@ -589,10 +589,10 @@ func TestEtcdDeleteService(t *testing.T) {
 
 func TestEtcdUpdateService(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(Service{JSONBase: JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.UpdateService(Service{
-		JSONBase: JSONBase{ID: "foo"},
+	err := registry.UpdateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
 		Labels: map[string]string{
 			"baz": "bar",
 		},
@@ -607,7 +607,7 @@ func TestEtcdUpdateService(t *testing.T) {
 func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	endpoints := Endpoints{
+	endpoints := api.Endpoints{
 		Name:      "foo",
 		Endpoints: []string{"baz", "bar"},
 	}
@@ -615,7 +615,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	expectNoError(t, err)
 	response, err := fakeClient.Get("/registry/services/endpoints/foo", false, false)
 	expectNoError(t, err)
-	var endpointsOut Endpoints
+	var endpointsOut api.Endpoints
 	err = json.Unmarshal([]byte(response.Node.Value), &endpointsOut)
 	if !reflect.DeepEqual(endpoints, endpointsOut) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", endpointsOut, endpoints)

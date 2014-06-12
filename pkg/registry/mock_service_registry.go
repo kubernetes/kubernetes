@@ -16,24 +16,24 @@ limitations under the License.
 package registry
 
 import (
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 type MockServiceRegistry struct {
-	list      ServiceList
+	list      api.ServiceList
 	err       error
-	endpoints Endpoints
+	endpoints api.Endpoints
 }
 
-func (m *MockServiceRegistry) ListServices() (ServiceList, error) {
+func (m *MockServiceRegistry) ListServices() (api.ServiceList, error) {
 	return m.list, m.err
 }
 
-func (m *MockServiceRegistry) CreateService(svc Service) error {
+func (m *MockServiceRegistry) CreateService(svc api.Service) error {
 	return m.err
 }
 
-func (m *MockServiceRegistry) GetService(name string) (*Service, error) {
+func (m *MockServiceRegistry) GetService(name string) (*api.Service, error) {
 	return nil, m.err
 }
 
@@ -41,11 +41,11 @@ func (m *MockServiceRegistry) DeleteService(name string) error {
 	return m.err
 }
 
-func (m *MockServiceRegistry) UpdateService(svc Service) error {
+func (m *MockServiceRegistry) UpdateService(svc api.Service) error {
 	return m.err
 }
 
-func (m *MockServiceRegistry) UpdateEndpoints(e Endpoints) error {
+func (m *MockServiceRegistry) UpdateEndpoints(e api.Endpoints) error {
 	m.endpoints = e
 	return m.err
 }

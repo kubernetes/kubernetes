@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -43,7 +43,7 @@ type ReplicationManager struct {
 // An interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
-	createReplica(controllerSpec ReplicationController)
+	createReplica(controllerSpec api.ReplicationController)
 	deletePod(podID string) error
 }
 
@@ -51,13 +51,13 @@ type RealPodControl struct {
 	kubeClient client.ClientInterface
 }
 
-func (r RealPodControl) createReplica(controllerSpec ReplicationController) {
+func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) {
 	labels := controllerSpec.DesiredState.PodTemplate.Labels
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
-	pod := Pod{
-		JSONBase: JSONBase{
+	pod := api.Pod{
+		JSONBase: api.JSONBase{
 			ID: fmt.Sprintf("%x", rand.Int()),
 		},
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
@@ -102,10 +102,10 @@ func (rm *ReplicationManager) WatchControllers() {
 	}
 }
 
-func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*ReplicationController, error) {
+func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api.ReplicationController, error) {
 	if response.Action == "set" {
 		if response.Node != nil {
-			var controllerSpec ReplicationController
+			var controllerSpec api.ReplicationController
 			err := json.Unmarshal([]byte(response.Node.Value), &controllerSpec)
 			if err != nil {
 				return nil, err
@@ -118,8 +118,8 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*Rep
 	return nil, nil
 }
 
-func (rm *ReplicationManager) filterActivePods(pods []Pod) []Pod {
-	var result []Pod
+func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
+	var result []api.Pod
 	for _, value := range pods {
 		if strings.Index(value.CurrentState.Status, "Exit") == -1 {
 			result = append(result, value)
@@ -128,7 +128,7 @@ func (rm *ReplicationManager) filterActivePods(pods []Pod) []Pod {
 	return result
 }
 
-func (rm *ReplicationManager) syncReplicationController(controllerSpec ReplicationController) error {
+func (rm *ReplicationManager) syncReplicationController(controllerSpec api.ReplicationController) error {
 	rm.updateLock.Lock()
 	podList, err := rm.kubeClient.ListPods(controllerSpec.DesiredState.ReplicasInSet)
 	if err != nil {
@@ -168,7 +168,7 @@ func (rm *ReplicationManager) Synchronize() {
 		// sooner rather than later.
 		if response != nil && response.Node != nil && response.Node.Nodes != nil {
 			for _, value := range response.Node.Nodes {
-				var controllerSpec ReplicationController
+				var controllerSpec api.ReplicationController
 				err := json.Unmarshal([]byte(value.Value), &controllerSpec)
 				if err != nil {
 					log.Printf("Unexpected error: %#v", err)

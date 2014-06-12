@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net/url"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
@@ -41,7 +41,7 @@ func MakePodRegistryStorage(registry PodRegistry, containerInfo client.Container
 }
 
 // LabelMatch tests to see if a Pod's labels map contains 'key' mapping to 'value'
-func LabelMatch(pod Pod, queryKey, queryValue string) bool {
+func LabelMatch(pod api.Pod, queryKey, queryValue string) bool {
 	for key, value := range pod.Labels {
 		if queryKey == key && queryValue == value {
 			return true
@@ -51,7 +51,7 @@ func LabelMatch(pod Pod, queryKey, queryValue string) bool {
 }
 
 // LabelMatch tests to see if a Pod's labels map contains all key/value pairs in 'labelQuery'
-func LabelsMatch(pod Pod, labelQuery *map[string]string) bool {
+func LabelsMatch(pod api.Pod, labelQuery *map[string]string) bool {
 	if labelQuery == nil {
 		return true
 	}
@@ -64,7 +64,7 @@ func LabelsMatch(pod Pod, labelQuery *map[string]string) bool {
 }
 
 func (storage *PodRegistryStorage) List(url *url.URL) (interface{}, error) {
-	var result PodList
+	var result api.PodList
 	var query *map[string]string
 	if url != nil {
 		queryMap := client.DecodeLabelQuery(url.Query().Get("labels"))
@@ -72,7 +72,7 @@ func (storage *PodRegistryStorage) List(url *url.URL) (interface{}, error) {
 	}
 	pods, err := storage.registry.ListPods(query)
 	if err == nil {
-		result = PodList{
+		result = api.PodList{
 			Items: pods,
 		}
 	}
@@ -99,14 +99,14 @@ func (storage *PodRegistryStorage) Delete(id string) error {
 }
 
 func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
-	pod := Pod{}
+	pod := api.Pod{}
 	err := json.Unmarshal([]byte(body), &pod)
 	pod.Kind = "cluster#pod"
 	return pod, err
 }
 
 func (storage *PodRegistryStorage) Create(pod interface{}) error {
-	podObj := pod.(Pod)
+	podObj := pod.(api.Pod)
 	if len(podObj.ID) == 0 {
 		return fmt.Errorf("ID is unspecified: %#v", pod)
 	}
@@ -118,5 +118,5 @@ func (storage *PodRegistryStorage) Create(pod interface{}) error {
 }
 
 func (storage *PodRegistryStorage) Update(pod interface{}) error {
-	return storage.registry.UpdatePod(pod.(Pod))
+	return storage.registry.UpdatePod(pod.(api.Pod))
 }

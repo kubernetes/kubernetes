@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"math/rand"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // Scheduler is an interface implemented by things that know how to schedule pods onto machines.
 type Scheduler interface {
-	Schedule(Pod) (string, error)
+	Schedule(api.Pod) (string, error)
 }
 
 // RandomScheduler choses machines uniformly at random.
@@ -40,7 +40,7 @@ func MakeRandomScheduler(machines []string, random rand.Rand) Scheduler {
 	}
 }
 
-func (s *RandomScheduler) Schedule(pod Pod) (string, error) {
+func (s *RandomScheduler) Schedule(pod api.Pod) (string, error) {
 	return s.machines[s.random.Int()%len(s.machines)], nil
 }
 
@@ -57,7 +57,7 @@ func MakeRoundRobinScheduler(machines []string) Scheduler {
 	}
 }
 
-func (s *RoundRobinScheduler) Schedule(pod Pod) (string, error) {
+func (s *RoundRobinScheduler) Schedule(pod api.Pod) (string, error) {
 	result := s.machines[s.currentIndex]
 	s.currentIndex = (s.currentIndex + 1) % len(s.machines)
 	return result, nil
@@ -77,7 +77,7 @@ func MakeFirstFitScheduler(machines []string, registry PodRegistry, random *rand
 	}
 }
 
-func (s *FirstFitScheduler) containsPort(pod Pod, port Port) bool {
+func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 	for _, container := range pod.DesiredState.Manifest.Containers {
 		for _, podPort := range container.Ports {
 			if podPort.HostPort == port.HostPort {
@@ -88,8 +88,8 @@ func (s *FirstFitScheduler) containsPort(pod Pod, port Port) bool {
 	return false
 }
 
-func (s *FirstFitScheduler) Schedule(pod Pod) (string, error) {
-	machineToPods := map[string][]Pod{}
+func (s *FirstFitScheduler) Schedule(pod api.Pod) (string, error) {
+	machineToPods := map[string][]api.Pod{}
 	pods, err := s.registry.ListPods(nil)
 	if err != nil {
 		return "", err

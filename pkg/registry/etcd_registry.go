@@ -22,7 +22,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -66,8 +66,8 @@ func makePodKey(machine, podID string) string {
 	return "/registry/hosts/" + machine + "/pods/" + podID
 }
 
-func (registry *EtcdRegistry) ListPods(query *map[string]string) ([]Pod, error) {
-	pods := []Pod{}
+func (registry *EtcdRegistry) ListPods(query *map[string]string) ([]api.Pod, error) {
+	pods := []api.Pod{}
 	for _, machine := range registry.machines {
 		machinePods, err := registry.listPodsForMachine(machine)
 		if err != nil {
@@ -95,12 +95,12 @@ func (registry *EtcdRegistry) listEtcdNode(key string) ([]*etcd.Node, error) {
 	return result.Node.Nodes, nil
 }
 
-func (registry *EtcdRegistry) listPodsForMachine(machine string) ([]Pod, error) {
-	pods := []Pod{}
+func (registry *EtcdRegistry) listPodsForMachine(machine string) ([]api.Pod, error) {
+	pods := []api.Pod{}
 	key := "/registry/hosts/" + machine + "/pods"
 	nodes, err := registry.listEtcdNode(key)
 	for _, node := range nodes {
-		pod := Pod{}
+		pod := api.Pod{}
 		err = json.Unmarshal([]byte(node.Value), &pod)
 		if err != nil {
 			return pods, err
@@ -111,7 +111,7 @@ func (registry *EtcdRegistry) listPodsForMachine(machine string) ([]Pod, error) 
 	return pods, err
 }
 
-func (registry *EtcdRegistry) GetPod(podID string) (*Pod, error) {
+func (registry *EtcdRegistry) GetPod(podID string) (*api.Pod, error) {
 	pod, _, err := registry.findPod(podID)
 	return &pod, err
 }
@@ -120,14 +120,14 @@ func makeContainerKey(machine string) string {
 	return "/registry/hosts/" + machine + "/kubelet"
 }
 
-func (registry *EtcdRegistry) loadManifests(machine string) ([]ContainerManifest, error) {
-	var manifests []ContainerManifest
+func (registry *EtcdRegistry) loadManifests(machine string) ([]api.ContainerManifest, error) {
+	var manifests []api.ContainerManifest
 	response, err := registry.etcdClient.Get(makeContainerKey(machine), false, false)
 
 	if err != nil {
 		if isEtcdNotFound(err) {
 			err = nil
-			manifests = []ContainerManifest{}
+			manifests = []api.ContainerManifest{}
 		}
 	} else {
 		err = json.Unmarshal([]byte(response.Node.Value), &manifests)
@@ -135,7 +135,7 @@ func (registry *EtcdRegistry) loadManifests(machine string) ([]ContainerManifest
 	return manifests, err
 }
 
-func (registry *EtcdRegistry) updateManifests(machine string, manifests []ContainerManifest) error {
+func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest) error {
 	containerData, err := json.Marshal(manifests)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (registry *EtcdRegistry) updateManifests(machine string, manifests []Contai
 	return err
 }
 
-func (registry *EtcdRegistry) CreatePod(machineIn string, pod Pod) error {
+func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
 	podOut, machine, err := registry.findPod(pod.ID)
 	if err == nil {
 		return fmt.Errorf("A pod named %s already exists on %s (%#v)", pod.ID, machine, podOut)
@@ -152,7 +152,7 @@ func (registry *EtcdRegistry) CreatePod(machineIn string, pod Pod) error {
 	return registry.runPod(pod, machineIn)
 }
 
-func (registry *EtcdRegistry) runPod(pod Pod, machine string) error {
+func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	manifests, err := registry.loadManifests(machine)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (registry *EtcdRegistry) runPod(pod Pod, machine string) error {
 	return registry.updateManifests(machine, manifests)
 }
 
-func (registry *EtcdRegistry) UpdatePod(pod Pod) error {
+func (registry *EtcdRegistry) UpdatePod(pod api.Pod) error {
 	return fmt.Errorf("Unimplemented!")
 }
 
@@ -190,7 +190,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 	if err != nil {
 		return err
 	}
-	newManifests := make([]ContainerManifest, 0)
+	newManifests := make([]api.ContainerManifest, 0)
 	found := false
 	for _, manifest := range manifests {
 		if manifest.Id != podID {
@@ -213,33 +213,33 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 	return err
 }
 
-func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (Pod, error) {
+func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (api.Pod, error) {
 	key := makePodKey(machine, podID)
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
 		if isEtcdNotFound(err) {
-			return Pod{}, fmt.Errorf("Not found (%#v).", err)
+			return api.Pod{}, fmt.Errorf("Not found (%#v).", err)
 		} else {
-			return Pod{}, err
+			return api.Pod{}, err
 		}
 	}
 	if result.Node == nil || len(result.Node.Value) == 0 {
-		return Pod{}, fmt.Errorf("no nodes field: %#v", result)
+		return api.Pod{}, fmt.Errorf("no nodes field: %#v", result)
 	}
-	pod := Pod{}
+	pod := api.Pod{}
 	err = json.Unmarshal([]byte(result.Node.Value), &pod)
 	pod.CurrentState.Host = machine
 	return pod, err
 }
 
-func (registry *EtcdRegistry) findPod(podID string) (Pod, string, error) {
+func (registry *EtcdRegistry) findPod(podID string) (api.Pod, string, error) {
 	for _, machine := range registry.machines {
 		pod, err := registry.getPodForMachine(machine, podID)
 		if err == nil {
 			return pod, machine, nil
 		}
 	}
-	return Pod{}, "", fmt.Errorf("Pod not found %s", podID)
+	return api.Pod{}, "", fmt.Errorf("Pod not found %s", podID)
 }
 
 func isEtcdNotFound(err error) bool {
@@ -259,12 +259,12 @@ func isEtcdNotFound(err error) bool {
 	return false
 }
 
-func (registry *EtcdRegistry) ListControllers() ([]ReplicationController, error) {
-	var controllers []ReplicationController
+func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, error) {
+	var controllers []api.ReplicationController
 	key := "/registry/controllers"
 	nodes, err := registry.listEtcdNode(key)
 	for _, node := range nodes {
-		var controller ReplicationController
+		var controller api.ReplicationController
 		err = json.Unmarshal([]byte(node.Value), &controller)
 		if err != nil {
 			return controllers, err
@@ -278,8 +278,8 @@ func makeControllerKey(id string) string {
 	return "/registry/controllers/" + id
 }
 
-func (registry *EtcdRegistry) GetController(controllerID string) (*ReplicationController, error) {
-	var controller ReplicationController
+func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
+	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
@@ -296,12 +296,12 @@ func (registry *EtcdRegistry) GetController(controllerID string) (*ReplicationCo
 	return &controller, err
 }
 
-func (registry *EtcdRegistry) CreateController(controller ReplicationController) error {
+func (registry *EtcdRegistry) CreateController(controller api.ReplicationController) error {
 	// TODO : check for existence here and error.
 	return registry.UpdateController(controller)
 }
 
-func (registry *EtcdRegistry) UpdateController(controller ReplicationController) error {
+func (registry *EtcdRegistry) UpdateController(controller api.ReplicationController) error {
 	controllerData, err := json.Marshal(controller)
 	if err != nil {
 		return err
@@ -321,25 +321,25 @@ func makeServiceKey(name string) string {
 	return "/registry/services/specs/" + name
 }
 
-func (registry *EtcdRegistry) ListServices() (ServiceList, error) {
+func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
 	nodes, err := registry.listEtcdNode("/registry/services/specs")
 	if err != nil {
-		return ServiceList{}, err
+		return api.ServiceList{}, err
 	}
 
-	var services []Service
+	var services []api.Service
 	for _, node := range nodes {
-		var svc Service
+		var svc api.Service
 		err := json.Unmarshal([]byte(node.Value), &svc)
 		if err != nil {
-			return ServiceList{}, err
+			return api.ServiceList{}, err
 		}
 		services = append(services, svc)
 	}
-	return ServiceList{Items: services}, nil
+	return api.ServiceList{Items: services}, nil
 }
 
-func (registry *EtcdRegistry) CreateService(svc Service) error {
+func (registry *EtcdRegistry) CreateService(svc api.Service) error {
 	key := makeServiceKey(svc.ID)
 	data, err := json.Marshal(svc)
 	if err != nil {
@@ -349,7 +349,7 @@ func (registry *EtcdRegistry) CreateService(svc Service) error {
 	return err
 }
 
-func (registry *EtcdRegistry) GetService(name string) (*Service, error) {
+func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	response, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
@@ -359,7 +359,7 @@ func (registry *EtcdRegistry) GetService(name string) (*Service, error) {
 			return nil, err
 		}
 	}
-	var svc Service
+	var svc api.Service
 	err = json.Unmarshal([]byte(response.Node.Value), &svc)
 	if err != nil {
 		return nil, err
@@ -378,11 +378,11 @@ func (registry *EtcdRegistry) DeleteService(name string) error {
 	return err
 }
 
-func (registry *EtcdRegistry) UpdateService(svc Service) error {
+func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 	return registry.CreateService(svc)
 }
 
-func (registry *EtcdRegistry) UpdateEndpoints(e Endpoints) error {
+func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
 	data, err := json.Marshal(e)
 	if err != nil {
 		return err

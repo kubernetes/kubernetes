@@ -19,10 +19,10 @@ import (
 	"math/rand"
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func expectSchedule(scheduler Scheduler, pod Pod, expected string, t *testing.T) {
+func expectSchedule(scheduler Scheduler, pod api.Pod, expected string, t *testing.T) {
 	actual, err := scheduler.Schedule(pod)
 	expectNoError(t, err)
 	if actual != expected {
@@ -32,16 +32,16 @@ func expectSchedule(scheduler Scheduler, pod Pod, expected string, t *testing.T)
 
 func TestRoundRobinScheduler(t *testing.T) {
 	scheduler := MakeRoundRobinScheduler([]string{"m1", "m2", "m3", "m4"})
-	expectSchedule(scheduler, Pod{}, "m1", t)
-	expectSchedule(scheduler, Pod{}, "m2", t)
-	expectSchedule(scheduler, Pod{}, "m3", t)
-	expectSchedule(scheduler, Pod{}, "m4", t)
+	expectSchedule(scheduler, api.Pod{}, "m1", t)
+	expectSchedule(scheduler, api.Pod{}, "m2", t)
+	expectSchedule(scheduler, api.Pod{}, "m3", t)
+	expectSchedule(scheduler, api.Pod{}, "m4", t)
 }
 
 func TestRandomScheduler(t *testing.T) {
 	random := rand.New(rand.NewSource(0))
 	scheduler := MakeRandomScheduler([]string{"m1", "m2", "m3", "m4"}, *random)
-	_, err := scheduler.Schedule(Pod{})
+	_, err := scheduler.Schedule(api.Pod{})
 	expectNoError(t, err)
 }
 
@@ -49,21 +49,21 @@ func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
 	mockRegistry := MockPodRegistry{}
 	r := rand.New(rand.NewSource(0))
 	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
-	expectSchedule(scheduler, Pod{}, "m3", t)
+	expectSchedule(scheduler, api.Pod{}, "m3", t)
 }
 
-func makePod(host string, hostPorts ...int) Pod {
-	networkPorts := []Port{}
+func makePod(host string, hostPorts ...int) api.Pod {
+	networkPorts := []api.Port{}
 	for _, port := range hostPorts {
-		networkPorts = append(networkPorts, Port{HostPort: port})
+		networkPorts = append(networkPorts, api.Port{HostPort: port})
 	}
-	return Pod{
-		CurrentState: PodState{
+	return api.Pod{
+		CurrentState: api.PodState{
 			Host: host,
 		},
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
 					{
 						Ports: networkPorts,
 					},
@@ -75,7 +75,7 @@ func makePod(host string, hostPorts ...int) Pod {
 
 func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 	mockRegistry := MockPodRegistry{
-		pods: []Pod{
+		pods: []api.Pod{
 			makePod("m1", 8080),
 		},
 	}
@@ -86,7 +86,7 @@ func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 
 func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 	mockRegistry := MockPodRegistry{
-		pods: []Pod{
+		pods: []api.Pod{
 			makePod("m1", 80, 8080),
 			makePod("m2", 8081, 8082, 8083),
 			makePod("m3", 80, 443, 8085),
@@ -99,7 +99,7 @@ func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 
 func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	mockRegistry := MockPodRegistry{
-		pods: []Pod{
+		pods: []api.Pod{
 			makePod("m1", 8080),
 			makePod("m2", 8081),
 			makePod("m3", 8080),

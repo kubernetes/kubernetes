@@ -16,27 +16,27 @@ limitations under the License.
 package registry
 
 import (
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // An implementation of PodRegistry and ControllerRegistry that is backed by memory
 // Mainly used for testing.
 type MemoryRegistry struct {
-	podData        map[string]Pod
-	controllerData map[string]ReplicationController
-	serviceData    map[string]Service
+	podData        map[string]api.Pod
+	controllerData map[string]api.ReplicationController
+	serviceData    map[string]api.Service
 }
 
 func MakeMemoryRegistry() *MemoryRegistry {
 	return &MemoryRegistry{
-		podData:        map[string]Pod{},
-		controllerData: map[string]ReplicationController{},
-		serviceData:    map[string]Service{},
+		podData:        map[string]api.Pod{},
+		controllerData: map[string]api.ReplicationController{},
+		serviceData:    map[string]api.Service{},
 	}
 }
 
-func (registry *MemoryRegistry) ListPods(labelQuery *map[string]string) ([]Pod, error) {
-	result := []Pod{}
+func (registry *MemoryRegistry) ListPods(labelQuery *map[string]string) ([]api.Pod, error) {
+	result := []api.Pod{}
 	for _, value := range registry.podData {
 		if LabelsMatch(value, labelQuery) {
 			result = append(result, value)
@@ -45,7 +45,7 @@ func (registry *MemoryRegistry) ListPods(labelQuery *map[string]string) ([]Pod, 
 	return result, nil
 }
 
-func (registry *MemoryRegistry) GetPod(podID string) (*Pod, error) {
+func (registry *MemoryRegistry) GetPod(podID string) (*api.Pod, error) {
 	pod, found := registry.podData[podID]
 	if found {
 		return &pod, nil
@@ -54,7 +54,7 @@ func (registry *MemoryRegistry) GetPod(podID string) (*Pod, error) {
 	}
 }
 
-func (registry *MemoryRegistry) CreatePod(machine string, pod Pod) error {
+func (registry *MemoryRegistry) CreatePod(machine string, pod api.Pod) error {
 	registry.podData[pod.ID] = pod
 	return nil
 }
@@ -64,20 +64,20 @@ func (registry *MemoryRegistry) DeletePod(podID string) error {
 	return nil
 }
 
-func (registry *MemoryRegistry) UpdatePod(pod Pod) error {
+func (registry *MemoryRegistry) UpdatePod(pod api.Pod) error {
 	registry.podData[pod.ID] = pod
 	return nil
 }
 
-func (registry *MemoryRegistry) ListControllers() ([]ReplicationController, error) {
-	result := []ReplicationController{}
+func (registry *MemoryRegistry) ListControllers() ([]api.ReplicationController, error) {
+	result := []api.ReplicationController{}
 	for _, value := range registry.controllerData {
 		result = append(result, value)
 	}
 	return result, nil
 }
 
-func (registry *MemoryRegistry) GetController(controllerID string) (*ReplicationController, error) {
+func (registry *MemoryRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
 	controller, found := registry.controllerData[controllerID]
 	if found {
 		return &controller, nil
@@ -86,7 +86,7 @@ func (registry *MemoryRegistry) GetController(controllerID string) (*Replication
 	}
 }
 
-func (registry *MemoryRegistry) CreateController(controller ReplicationController) error {
+func (registry *MemoryRegistry) CreateController(controller api.ReplicationController) error {
 	registry.controllerData[controller.ID] = controller
 	return nil
 }
@@ -96,25 +96,25 @@ func (registry *MemoryRegistry) DeleteController(controllerId string) error {
 	return nil
 }
 
-func (registry *MemoryRegistry) UpdateController(controller ReplicationController) error {
+func (registry *MemoryRegistry) UpdateController(controller api.ReplicationController) error {
 	registry.controllerData[controller.ID] = controller
 	return nil
 }
 
-func (registry *MemoryRegistry) ListServices() (ServiceList, error) {
-	var list []Service
+func (registry *MemoryRegistry) ListServices() (api.ServiceList, error) {
+	var list []api.Service
 	for _, value := range registry.serviceData {
 		list = append(list, value)
 	}
-	return ServiceList{Items: list}, nil
+	return api.ServiceList{Items: list}, nil
 }
 
-func (registry *MemoryRegistry) CreateService(svc Service) error {
+func (registry *MemoryRegistry) CreateService(svc api.Service) error {
 	registry.serviceData[svc.ID] = svc
 	return nil
 }
 
-func (registry *MemoryRegistry) GetService(name string) (*Service, error) {
+func (registry *MemoryRegistry) GetService(name string) (*api.Service, error) {
 	svc, found := registry.serviceData[name]
 	if found {
 		return &svc, nil
@@ -128,10 +128,10 @@ func (registry *MemoryRegistry) DeleteService(name string) error {
 	return nil
 }
 
-func (registry *MemoryRegistry) UpdateService(svc Service) error {
+func (registry *MemoryRegistry) UpdateService(svc api.Service) error {
 	return registry.CreateService(svc)
 }
 
-func (registry *MemoryRegistry) UpdateEndpoints(e Endpoints) error {
+func (registry *MemoryRegistry) UpdateEndpoints(e api.Endpoints) error {
 	return nil
 }
