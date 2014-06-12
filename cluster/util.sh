@@ -70,9 +70,11 @@ function detect-minions () {
 
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
-  KUBE_MASTER_IP=$(gcloud compute instances get ${MASTER_NAME} \
-    --fields networkInterfaces[].accessConfigs[].natIP --format=text \
-    | tail -n 1 | cut -f 2 -d ' ')
+  if [ -z "$KUBE_MASTER_IP" ]; then
+    KUBE_MASTER_IP=$(gcloud compute instances get ${MASTER_NAME} \
+      --fields networkInterfaces[].accessConfigs[].natIP --format=text \
+      | tail -n 1 | cut -f 2 -d ' ')
+  fi
   if [ -z "$KUBE_MASTER_IP" ]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
     exit 1
