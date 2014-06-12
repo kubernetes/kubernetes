@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -64,6 +65,7 @@ func readConfig(storage string) []byte {
 	if err != nil {
 		log.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
 	}
+	log.Printf("Parsed config file successfully; sending:\n%v\n", string(data))
 	return data
 }
 
@@ -88,7 +90,7 @@ func main() {
 	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
 		secure = false
 	}
-	storage := flag.Arg(1)
+	storage := strings.Trim(flag.Arg(1), "/")
 	url := *httpServer + path.Join("/api/v1beta1", storage)
 	var request *http.Request
 
@@ -167,7 +169,7 @@ func main() {
 	}
 	err = printer.Print(body, os.Stdout)
 	if err != nil {
-		log.Fatalf("Failed to print: %#v", err)
+		log.Fatalf("Failed to print: %#v\nRaw received text:\n%v\n", err, string(body))
 	}
 	fmt.Print("\n")
 }
