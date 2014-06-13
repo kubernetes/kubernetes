@@ -53,7 +53,7 @@ KUBE_GO_PACKAGE_DIR="${GOPATH}/src/${KUBE_GO_PACKAGE}"
     fi
 
     rm "${PACKAGE_DIR}" >/dev/null 2>&1 || true
-    ln -s "${THIRD_PARTY_BASE}/${p}" "${PACKAGE_DIR}"
+    ln -s "${THIRD_PARTY_BASE}/src/${p}" "${PACKAGE_DIR}"
   done
 
   for p in ${PACKAGES}; do
