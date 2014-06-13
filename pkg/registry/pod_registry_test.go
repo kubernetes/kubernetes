@@ -201,5 +201,31 @@ func TestLabelsMatch(t *testing.T) {
 		"foobar": "bar",
 		"baz":    "blah",
 	})
+}
 
+func TestMakePodStatus(t *testing.T) {
+	status := makePodStatus(map[string]interface{}{})
+	if status != "Pending" {
+		t.Errorf("Expected 'Pending', got '%s'", status)
+	}
+
+	status = makePodStatus(map[string]interface{}{
+		"State": map[string]interface{}{
+			"Running": false,
+		},
+	})
+
+	if status != "Stopped" {
+		t.Errorf("Expected 'Stopped', got '%s'", status)
+	}
+
+	status = makePodStatus(map[string]interface{}{
+		"State": map[string]interface{}{
+			"Running": true,
+		},
+	})
+
+	if status != "Running" {
+		t.Errorf("Expected 'Running', got '%s'", status)
+	}
 }
