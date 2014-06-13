@@ -16,7 +16,7 @@
 ZONE=us-central1-b
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
-NUM_MINIONS=2
+NUM_MINIONS=3
 # gcloud/gcutil will expand this to the latest supported image.
 IMAGE=backports-debian-7-wheezy
 NETWORK=default

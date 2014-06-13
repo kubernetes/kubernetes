@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Starts a Kubernetes cluster, verifies it can do basic things, and shuts it
+# Starts a Kubernetes cluster, runs the e2e test suite, and shuts it
 # down.
 
 # Exit on error
@@ -22,13 +22,31 @@ set -e
 
 # Use testing config
 export KUBE_CONFIG_FILE="config-test.sh"
-source $(dirname $0)/../cluster/util.sh
+export KUBE_REPO_ROOT="$(dirname $0)/.."
+export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/cloudcfg.sh"
+
+source "${KUBE_REPO_ROOT}/cluster/util.sh"
 
 # Build a release
 $(dirname $0)/../release/release.sh
 
 # Now bring a test cluster up with that release.
 $(dirname $0)/../cluster/kube-up.sh
+
+# Detect the project into $PROJECT if it isn't set
+detect-project
+
+set +e
+
+# Open up port 80 & 8080 so common containers on minions can be reached
+gcutil addfirewall \
+  --norespect_terminal_width \
+  --project ${PROJECT} \
+  --target_tags ${MINION_TAG} \
+  --allowed tcp:80 \
+  --allowed tcp:8080 \
+  --network ${NETWORK} \
+  ${MINION_TAG}-http-alt
 
 # Auto shutdown cluster when we exit
 function shutdown-test-cluster () {
@@ -42,33 +60,15 @@ function shutdown-test-cluster () {
 }
 trap shutdown-test-cluster EXIT
 
-# Detect the project into $PROJECT if it isn't set
-detect-project
-
-# Open up port 8080 so nginx containers on minions can be reached
-gcutil addfirewall \
-  --norespect_terminal_width \
-  --project ${PROJECT} \
-  --target_tags ${MINION_TAG} \
-  --allowed tcp:8080 \
-  --network ${NETWORK} \
-  ${MINION_TAG}-http-alt &
-
-# Launch a container
-$(dirname $0)/../cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
-
-# Container turn up on a clean cluster can take a while for the docker image pull.
-# Sleep for 2 minutes just to be sure.
-echo "Waiting for containers to come up."
-sleep 120
-
-# Get minion IP addresses
-detect-minions
-
-# Verify that something is listening (nginx should give us a 404)
-for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
-  IP_ADDRESS=${KUBE_MINION_IP_ADDRESSES[$i]}
-  echo "Trying to reach nginx instance that should be running at ${IP_ADDRESS}:8080..."
-  curl "http://${IP_ADDRESS}:8080"
+any_failed=0
+for test_file in "$(dirname $0)/e2e-suite/*.sh"; do
+  $test_file
+  if [[ -z $? ]]; then
+    echo "${test_file}: passed!"
+  else
+    echo "${test_file}: FAILED!"
+    any_failed=1
+  fi
 done
 
+exit ${any_failed}
