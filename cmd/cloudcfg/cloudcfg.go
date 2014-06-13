@@ -151,6 +151,21 @@ func main() {
 			log.Fatalf("Error: %#v", err)
 		}
 		return
+	case "resize":
+		args := flag.Args()
+		if len(args) < 3 {
+			log.Fatal("usage: cloudcfg resize <name> <replicas>")
+		}
+		name := args[1]
+		replicas, err := strconv.Atoi(args[2])
+		if err != nil {
+			log.Fatalf("Error parsing replicas: %#v", err)
+		}
+		err = cloudcfg.ResizeController(name, replicas, kube_client.Client{Host: *httpServer, Auth: auth})
+		if err != nil {
+			log.Fatalf("Error: %#v", err)
+		}
+		return
 	case "rm":
 		err = cloudcfg.DeleteController(flag.Arg(1), kube_client.Client{Host: *httpServer, Auth: auth})
 		if err != nil {

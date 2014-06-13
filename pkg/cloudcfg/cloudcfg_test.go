@@ -222,6 +222,25 @@ func TestStopController(t *testing.T) {
 	}
 }
 
+func TestResizeController(t *testing.T) {
+	fakeClient := FakeKubeClient{}
+	name := "name"
+	replicas := 17
+	ResizeController(name, replicas, &fakeClient)
+	if len(fakeClient.actions) != 2 {
+		t.Errorf("Unexpected actions: %#v", fakeClient.actions)
+	}
+	if fakeClient.actions[0].action != "get-controller" ||
+		fakeClient.actions[0].value.(string) != name {
+		t.Errorf("Unexpected action: %#v", fakeClient.actions[0])
+	}
+	controller := fakeClient.actions[1].value.(ReplicationController)
+	if fakeClient.actions[1].action != "update-controller" ||
+		controller.DesiredState.Replicas != 17 {
+		t.Errorf("Unexpected action: %#v", fakeClient.actions[1])
+	}
+}
+
 func TestCloudCfgDeleteController(t *testing.T) {
 	fakeClient := FakeKubeClient{}
 	name := "name"
