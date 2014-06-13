@@ -16,22 +16,22 @@ limitations under the License.
 package registry
 
 import (
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 type ManifestFactory interface {
 	// Make a container object for a given pod, given the machine that the pod is running on.
-	MakeManifest(machine string, pod Pod) (ContainerManifest, error)
+	MakeManifest(machine string, pod api.Pod) (api.ContainerManifest, error)
 }
 
 type BasicManifestFactory struct {
 	serviceRegistry ServiceRegistry
 }
 
-func (b *BasicManifestFactory) MakeManifest(machine string, pod Pod) (ContainerManifest, error) {
+func (b *BasicManifestFactory) MakeManifest(machine string, pod api.Pod) (api.ContainerManifest, error) {
 	envVars, err := GetServiceEnvironmentVariables(b.serviceRegistry, machine)
 	if err != nil {
-		return ContainerManifest{}, err
+		return api.ContainerManifest{}, err
 	}
 	for ix, container := range pod.DesiredState.Manifest.Containers {
 		pod.DesiredState.Manifest.Id = pod.ID

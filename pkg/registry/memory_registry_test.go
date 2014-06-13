@@ -18,7 +18,7 @@ package registry
 import (
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func TestListPodsEmpty(t *testing.T) {
@@ -32,7 +32,7 @@ func TestListPodsEmpty(t *testing.T) {
 
 func TestMemoryListPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	registry.CreatePod("machine", Pod{JSONBase: JSONBase{ID: "foo"}})
+	registry.CreatePod("machine", api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
 	pods, err := registry.ListPods(nil)
 	expectNoError(t, err)
 	if len(pods) != 1 || pods[0].ID != "foo" {
@@ -42,7 +42,7 @@ func TestMemoryListPods(t *testing.T) {
 
 func TestMemorySetGetPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedPod := Pod{JSONBase: JSONBase{ID: "foo"}}
+	expectedPod := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreatePod("machine", expectedPod)
 	pod, err := registry.GetPod("foo")
 	expectNoError(t, err)
@@ -53,12 +53,12 @@ func TestMemorySetGetPods(t *testing.T) {
 
 func TestMemorySetUpdateGetPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	oldPod := Pod{JSONBase: JSONBase{ID: "foo"}}
-	expectedPod := Pod{
-		JSONBase: JSONBase{
+	oldPod := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	expectedPod := api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: PodState{
+		DesiredState: api.PodState{
 			Host: "foo.com",
 		},
 	}
@@ -73,7 +73,7 @@ func TestMemorySetUpdateGetPods(t *testing.T) {
 
 func TestMemorySetDeleteGetPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedPod := Pod{JSONBase: JSONBase{ID: "foo"}}
+	expectedPod := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreatePod("machine", expectedPod)
 	registry.DeletePod("foo")
 	pod, err := registry.GetPod("foo")
@@ -94,7 +94,7 @@ func TestListControllersEmpty(t *testing.T) {
 
 func TestMemoryListControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	registry.CreateController(ReplicationController{JSONBase: JSONBase{ID: "foo"}})
+	registry.CreateController(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}})
 	pods, err := registry.ListControllers()
 	expectNoError(t, err)
 	if len(pods) != 1 || pods[0].ID != "foo" {
@@ -104,7 +104,7 @@ func TestMemoryListControllers(t *testing.T) {
 
 func TestMemorySetGetControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedController := ReplicationController{JSONBase: JSONBase{ID: "foo"}}
+	expectedController := api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreateController(expectedController)
 	pod, err := registry.GetController("foo")
 	expectNoError(t, err)
@@ -115,12 +115,12 @@ func TestMemorySetGetControllers(t *testing.T) {
 
 func TestMemorySetUpdateGetControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	oldController := ReplicationController{JSONBase: JSONBase{ID: "foo"}}
-	expectedController := ReplicationController{
-		JSONBase: JSONBase{
+	oldController := api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}
+	expectedController := api.ReplicationController{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: ReplicationControllerState{
+		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
 	}
@@ -135,7 +135,7 @@ func TestMemorySetUpdateGetControllers(t *testing.T) {
 
 func TestMemorySetDeleteGetControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	expectedController := ReplicationController{JSONBase: JSONBase{ID: "foo"}}
+	expectedController := api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreateController(expectedController)
 	registry.DeleteController("foo")
 	pod, err := registry.GetController("foo")

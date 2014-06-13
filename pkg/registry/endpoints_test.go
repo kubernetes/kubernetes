@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func TestSyncEndpointsEmpty(t *testing.T) {
@@ -46,8 +46,8 @@ func TestSyncEndpointsError(t *testing.T) {
 
 func TestSyncEndpointsItems(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
+		list: api.ServiceList{
+			Items: []api.Service{
 				{
 					Labels: map[string]string{
 						"foo": "bar",
@@ -57,13 +57,13 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 	}
 	podRegistry := MockPodRegistry{
-		pods: []Pod{
+		pods: []api.Pod{
 			{
-				DesiredState: PodState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
 							{
-								Ports: []Port{
+								Ports: []api.Port{
 									{
 										HostPort: 8080,
 									},
@@ -86,8 +86,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 
 func TestSyncEndpointsPodError(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
+		list: api.ServiceList{
+			Items: []api.Service{
 				{
 					Labels: map[string]string{
 						"foo": "bar",

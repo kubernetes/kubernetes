@@ -21,12 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 type MockPodRegistry struct {
 	err  error
-	pods []Pod
+	pods []api.Pod
 }
 
 func expectNoError(t *testing.T, err error) {
@@ -35,19 +35,19 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
-func (registry *MockPodRegistry) ListPods(*map[string]string) ([]Pod, error) {
+func (registry *MockPodRegistry) ListPods(*map[string]string) ([]api.Pod, error) {
 	return registry.pods, registry.err
 }
 
-func (registry *MockPodRegistry) GetPod(podId string) (*Pod, error) {
-	return &Pod{}, registry.err
+func (registry *MockPodRegistry) GetPod(podId string) (*api.Pod, error) {
+	return &api.Pod{}, registry.err
 }
 
-func (registry *MockPodRegistry) CreatePod(machine string, pod Pod) error {
+func (registry *MockPodRegistry) CreatePod(machine string, pod api.Pod) error {
 	return registry.err
 }
 
-func (registry *MockPodRegistry) UpdatePod(pod Pod) error {
+func (registry *MockPodRegistry) UpdatePod(pod api.Pod) error {
 	return registry.err
 }
 func (registry *MockPodRegistry) DeletePod(podId string) error {
@@ -65,7 +65,7 @@ func TestListPodsError(t *testing.T) {
 	if err != mockRegistry.err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.err, err)
 	}
-	if len(pods.(PodList).Items) != 0 {
+	if len(pods.(api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
 	}
 }
@@ -77,21 +77,21 @@ func TestListEmptyPodList(t *testing.T) {
 	}
 	pods, err := storage.List(nil)
 	expectNoError(t, err)
-	if len(pods.(PodList).Items) != 0 {
+	if len(pods.(api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
 	}
 }
 
 func TestListPodList(t *testing.T) {
 	mockRegistry := MockPodRegistry{
-		pods: []Pod{
+		pods: []api.Pod{
 			{
-				JSONBase: JSONBase{
+				JSONBase: api.JSONBase{
 					ID: "foo",
 				},
 			},
 			{
-				JSONBase: JSONBase{
+				JSONBase: api.JSONBase{
 					ID: "bar",
 				},
 			},
@@ -101,7 +101,7 @@ func TestListPodList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	podsObj, err := storage.List(nil)
-	pods := podsObj.(PodList)
+	pods := podsObj.(api.PodList)
 	expectNoError(t, err)
 	if len(pods.Items) != 2 {
 		t.Errorf("Unexpected pod list: %#v", pods)
@@ -119,8 +119,8 @@ func TestExtractJson(t *testing.T) {
 	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
-	pod := Pod{
-		JSONBase: JSONBase{
+	pod := api.Pod{
+		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	}
@@ -135,32 +135,32 @@ func TestExtractJson(t *testing.T) {
 	}
 }
 
-func expectLabelMatch(t *testing.T, pod Pod, key, value string) {
+func expectLabelMatch(t *testing.T, pod api.Pod, key, value string) {
 	if !LabelMatch(pod, key, value) {
 		t.Errorf("Unexpected match failure: %#v %s %s", pod, key, value)
 	}
 }
 
-func expectNoLabelMatch(t *testing.T, pod Pod, key, value string) {
+func expectNoLabelMatch(t *testing.T, pod api.Pod, key, value string) {
 	if LabelMatch(pod, key, value) {
 		t.Errorf("Unexpected match success: %#v %s %s", pod, key, value)
 	}
 }
 
-func expectLabelsMatch(t *testing.T, pod Pod, query *map[string]string) {
+func expectLabelsMatch(t *testing.T, pod api.Pod, query *map[string]string) {
 	if !LabelsMatch(pod, query) {
 		t.Errorf("Unexpected match failure: %#v %#v", pod, *query)
 	}
 }
 
-func expectNoLabelsMatch(t *testing.T, pod Pod, query *map[string]string) {
+func expectNoLabelsMatch(t *testing.T, pod api.Pod, query *map[string]string) {
 	if LabelsMatch(pod, query) {
 		t.Errorf("Unexpected match success: %#v %#v", pod, *query)
 	}
 }
 
 func TestLabelMatch(t *testing.T) {
-	pod := Pod{
+	pod := api.Pod{
 		Labels: map[string]string{
 			"foo": "bar",
 			"baz": "blah",
@@ -173,7 +173,7 @@ func TestLabelMatch(t *testing.T) {
 }
 
 func TestLabelsMatch(t *testing.T) {
-	pod := Pod{
+	pod := api.Pod{
 		Labels: map[string]string{
 			"foo": "bar",
 			"baz": "blah",

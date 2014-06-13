@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -36,11 +36,11 @@ func makeUrl(suffix string) string {
 }
 
 type FakePodControl struct {
-	controllerSpec []ReplicationController
+	controllerSpec []api.ReplicationController
 	deletePodID    []string
 }
 
-func (f *FakePodControl) createReplica(spec ReplicationController) {
+func (f *FakePodControl) createReplica(spec api.ReplicationController) {
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
@@ -49,14 +49,14 @@ func (f *FakePodControl) deletePod(podID string) error {
 	return nil
 }
 
-func makeReplicationController(replicas int) ReplicationController {
-	return ReplicationController{
-		DesiredState: ReplicationControllerState{
+func makeReplicationController(replicas int) api.ReplicationController {
+	return api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
-			PodTemplate: PodTemplate{
-				DesiredState: PodState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
 							{
 								Image: "foo/bar",
 							},
@@ -72,16 +72,16 @@ func makeReplicationController(replicas int) ReplicationController {
 	}
 }
 
-func makePodList(count int) PodList {
-	pods := []Pod{}
+func makePodList(count int) api.PodList {
+	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
-		pods = append(pods, Pod{
-			JSONBase: JSONBase{
+		pods = append(pods, api.Pod{
+			JSONBase: api.JSONBase{
 				ID: fmt.Sprintf("pod%d", i),
 			},
 		})
 	}
-	return PodList{
+	return api.PodList{
 		Items: pods,
 	}
 }
@@ -102,7 +102,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -124,7 +124,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -146,7 +146,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -168,7 +168,7 @@ func TestCreateReplica(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -176,12 +176,12 @@ func TestCreateReplica(t *testing.T) {
 		kubeClient: client,
 	}
 
-	controllerSpec := ReplicationController{
-		DesiredState: ReplicationControllerState{
-			PodTemplate: PodTemplate{
-				DesiredState: PodState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
+	controllerSpec := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
 							{
 								Image: "foo/bar",
 							},
@@ -213,7 +213,7 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -234,7 +234,7 @@ func TestHandleWatchResponseNoNode(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -257,7 +257,7 @@ func TestHandleWatchResponseBadData(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
@@ -283,7 +283,7 @@ func TestHandleWatchResponse(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 

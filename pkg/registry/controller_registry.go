@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"net/url"
 
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 )
 
@@ -36,11 +36,11 @@ func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTSt
 }
 
 func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
-	result := ReplicationControllerList{JSONBase: JSONBase{Kind: "cluster#replicationControllerList"}}
+	result := api.ReplicationControllerList{JSONBase: api.JSONBase{Kind: "cluster#replicationControllerList"}}
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
-		result = ReplicationControllerList{
-			JSONBase: JSONBase{Kind: "cluster#replicationControllerList"},
+		result = api.ReplicationControllerList{
+			JSONBase: api.JSONBase{Kind: "cluster#replicationControllerList"},
 			Items:    controllers,
 		}
 	}
@@ -58,16 +58,16 @@ func (storage *ControllerRegistryStorage) Delete(id string) error {
 }
 
 func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, error) {
-	result := ReplicationController{}
+	result := api.ReplicationController{}
 	err := json.Unmarshal([]byte(body), &result)
 	result.Kind = "cluster#replicationController"
 	return result, err
 }
 
 func (storage *ControllerRegistryStorage) Create(controller interface{}) error {
-	return storage.registry.CreateController(controller.(ReplicationController))
+	return storage.registry.CreateController(controller.(api.ReplicationController))
 }
 
 func (storage *ControllerRegistryStorage) Update(controller interface{}) error {
-	return storage.registry.UpdateController(controller.(ReplicationController))
+	return storage.registry.UpdateController(controller.(api.ReplicationController))
 }
