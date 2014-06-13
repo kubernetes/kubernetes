@@ -2,7 +2,7 @@
 
 errors=0
 for file in $(git diff --cached --name-only | grep "\.go"); do
-  diff="$(git show ":${file}" | gofmt -d)"
+  diff="$(git show ":${file}" | gofmt -s -d)"
   if [[ -n "$diff" ]]; then
     echo "# *** ERROR: *** File ${file} has not been gofmt'd." >> $1
     errors=1
