@@ -25,37 +25,42 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// a simple echoServer that only accept one connection
-func echoServer(addr string) error {
+// a simple echoServer that only accepts one connection. Returns port actually
+// being listened on, or an error.
+func echoServer(t *testing.T, addr string) (string, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("failed to start echo service: %v", err)
+		return "", fmt.Errorf("failed to start echo service: %v", err)
 	}
-	defer l.Close()
-	conn, err := l.Accept()
-	if err != nil {
-		return fmt.Errorf("failed to accept new conn to echo service: %v", err)
-	}
-	io.Copy(conn, conn)
-	conn.Close()
-	return nil
+	go func() {
+		defer l.Close()
+		conn, err := l.Accept()
+		if err != nil {
+			t.Errorf("failed to accept new conn to echo service: %v", err)
+		}
+		io.Copy(conn, conn)
+		conn.Close()
+	}()
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	return port, err
 }
 
 func TestProxy(t *testing.T) {
-	go func() {
-		if err := echoServer("127.0.0.1:2222"); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	port, err := echoServer(t, "127.0.0.1:")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{"echo", []string{"127.0.0.1:2222"}}})
+	lb.OnUpdate([]api.Endpoints{{"echo", []string{net.JoinHostPort("127.0.0.1", port)}}})
 
 	p := NewProxier(lb)
-	if err := p.AddService("echo", 2223); err != nil {
-		t.Fatalf("error adding new service: %v", err)
+
+	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
 	}
-	conn, err := net.Dial("tcp", "127.0.0.1:2223")
+	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
 	if err != nil {
 		t.Fatalf("error connecting to proxy: %v", err)
 	}
