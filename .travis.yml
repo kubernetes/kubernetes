@@ -1,0 +1,15 @@
+language: go
+
+go:
+  - 1.2
+  - tip
+
+install: 
+  - go get code.google.com/p/go.tools/cmd/cover
+  - go get github.com/coreos/etcd
+  - bad=$(gofmt -s -l pkg/ cmd/) bash -x -c '[[ -z "$bad" ]]'
+  - ./hack/build-go.sh
+
+script:
+  - ./hack/test-go.sh
+  - PATH=$HOME/gopath/bin:$PATH ./hack/integration-test.sh
