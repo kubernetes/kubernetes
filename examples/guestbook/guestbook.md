@@ -94,7 +94,7 @@ Using master: kubernetes-master (external IP: 1.2.3.4)
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-$ gcutil ssh kubernetes-minion-3 --zone us-central1-b
+$ gcutil ssh --zone us-central1-b kubernetes-minion-3
 $ sudo docker ps
 
 me@kubernetes-minion-3:~$ sudo docker ps
