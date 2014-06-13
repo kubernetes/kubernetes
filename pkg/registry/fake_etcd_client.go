@@ -32,7 +32,7 @@ type FakeEtcdClient struct {
 	deletedKeys []string
 	Err         error
 	t           *testing.T
-	Ix			int
+	Ix          int
 }
 
 func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
