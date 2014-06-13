@@ -572,6 +572,11 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	existingContainers, _ := kl.ListContainers()
 	log.Printf("Existing:\n%#v Desired: %#v", existingContainers, desired)
 	for _, container := range existingContainers {
+		// This is slightly hacky, but we ignore containers that lack '--' in their name
+		// to allow users to manually spin up their own containers if they want.
+		if !strings.Contains(container, "--") {
+			continue
+		}
 		if !desired[container] {
 			log.Printf("Killing: %s", container)
 			err = kl.KillContainer(container)

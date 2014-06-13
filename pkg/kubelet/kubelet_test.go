@@ -91,6 +91,7 @@ type FakeDockerClient struct {
 	container     *docker.Container
 	err           error
 	called        []string
+	stopped       string
 }
 
 func (f *FakeDockerClient) clearCalls() {
@@ -123,6 +124,7 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.appendCall("stop")
+	f.stopped = id
 	return nil
 }
 
@@ -528,8 +530,13 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			Names: []string{"foo"},
+			// the '--' is required for the kubelet to manage the container
+			Names: []string{"foo--bar"},
 			ID:    "1234",
+		},
+		{
+			Names: []string{"foo"},
+			ID:    "4567",
 		},
 	}
 	kubelet := Kubelet{
@@ -540,7 +547,8 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	if len(fakeDocker.called) != 3 ||
 		fakeDocker.called[0] != "list" ||
 		fakeDocker.called[1] != "list" ||
-		fakeDocker.called[2] != "stop" {
+		fakeDocker.called[2] != "stop" ||
+		fakeDocker.stopped != "1234" {
 		t.Errorf("Unexpected call sequence: %#v", fakeDocker.called)
 	}
 }
