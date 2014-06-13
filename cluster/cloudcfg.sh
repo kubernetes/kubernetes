@@ -24,6 +24,6 @@ if [ ! -x $CLOUDCFG ]; then
   exit 1
 fi
 
-detect-master
+detect-master > /dev/null
 
 $CLOUDCFG -h https://${KUBE_MASTER_IP} $@
