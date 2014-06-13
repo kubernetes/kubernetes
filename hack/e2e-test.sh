@@ -50,12 +50,26 @@ gcutil addfirewall \
   --norespect_terminal_width \
   --project ${PROJECT} \
   --target_tags ${MINION_TAG} \
-  --allowed tcp:8080 \
+  --allowed tcp:80 \
   --network ${NETWORK} \
   ${MINION_TAG}-http-alt &
 
-# Launch a container
-$(dirname $0)/../cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+CLOUDCGF="$(dirname $0)/../cluster/cloudcfg.sh"
+GUESTBOOK="$(dirname $0)/../.examples/guestbook"
+
+# Launch the guestbook example
+$CLOUDCFG -c "${GUESTBOOK}/redis-master.json" create /pods
+$CLOUDCFG -c "${GUESTBOOK}/redis-master-service.json" create /services
+$CLOUDCFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
+
+sleep 5
+
+# Count number of pods-- should be 5 plus two lines of header
+PODS_FOUND=$($CLOUDCFG list pods | wc -l)
+
+echo $PODS_FOUND
+
+exit 0
 
 # Container turn up on a clean cluster can take a while for the docker image pull.
 # Sleep for 2 minutes just to be sure.
