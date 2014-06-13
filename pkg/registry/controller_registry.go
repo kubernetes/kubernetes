@@ -49,6 +49,9 @@ func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
 
 func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 	controller, err := storage.registry.GetController(id)
+	if err != nil {
+		return nil, err
+	}
 	controller.Kind = "cluster#replicationController"
 	return controller, err
 }

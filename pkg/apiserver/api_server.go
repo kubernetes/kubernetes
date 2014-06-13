@@ -70,6 +70,13 @@ func (server *ApiServer) handleIndex(w http.ResponseWriter) {
 
 // HTTP Handler interface
 func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if x := recover(); x != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "apiserver panic. Look in log for details.")
+			log.Printf("ApiServer panic'd: %#v\n", x)
+		}
+	}()
 	log.Printf("%s %s", req.Method, req.RequestURI)
 	url, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
