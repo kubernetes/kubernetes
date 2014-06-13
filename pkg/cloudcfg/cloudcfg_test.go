@@ -150,6 +150,7 @@ func TestDoRequest(t *testing.T) {
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: expectedBody,
+		T:            t,
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)

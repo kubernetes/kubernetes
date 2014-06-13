@@ -91,13 +91,13 @@ type PodState struct {
 }
 
 type PodList struct {
-	JSONBase
-	Items []Pod `json:"items" yaml:"items,omitempty"`
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Pod `json:"items" yaml:"items,omitempty"`
 }
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get)
 type Pod struct {
-	JSONBase
+	JSONBase     `json:",inline" yaml:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
@@ -111,13 +111,13 @@ type ReplicationControllerState struct {
 }
 
 type ReplicationControllerList struct {
-	JSONBase
-	Items []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 // ReplicationController represents the configuration of a replication controller
 type ReplicationController struct {
-	JSONBase
+	JSONBase     `json:",inline" yaml:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
@@ -130,16 +130,16 @@ type PodTemplate struct {
 
 // ServiceList holds a list of services
 type ServiceList struct {
-	JSONBase
-	Items []Service `json:"items" yaml:"items"`
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Service `json:"items" yaml:"items"`
 }
 
 // Defines a service abstraction by a name (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the labels that define the service.
 type Service struct {
-	JSONBase
-	Port   int               `json:"port,omitempty" yaml:"port,omitempty"`
-	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	JSONBase `json:",inline" yaml:",inline"`
+	Port     int               `json:"port,omitempty" yaml:"port,omitempty"`
+	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // Defines the endpoints that implement the actual service, for example:

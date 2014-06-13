@@ -102,12 +102,12 @@ func RequestWithBody(configFile, url, method string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return requestWithBodyData(data, url, method)
+	return RequestWithBodyData(data, url, method)
 }
 
-// requestWithBodyData is a helper method that creates an HTTP request with the specified url, method
+// RequestWithBodyData is a helper method that creates an HTTP request with the specified url, method
 // and body data
-func requestWithBodyData(data []byte, url, method string) (*http.Request, error) {
+func RequestWithBodyData(data []byte, url, method string) (*http.Request, error) {
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	request.ContentLength = int64(len(data))
 	return request, err
@@ -250,7 +250,7 @@ func DeleteController(name string, client client.ClientInterface) error {
 		return err
 	}
 	if controller.DesiredState.Replicas != 0 {
-		return fmt.Errorf("controller has non-zero replicas (%d)", controller.DesiredState.Replicas)
+		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.DesiredState.Replicas)
 	}
 	return client.DeleteReplicationController(name)
 }

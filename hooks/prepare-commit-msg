@@ -10,7 +10,7 @@ for file in $(git diff --cached --name-only | grep "\.go"); do
 done
 
 if [[ $errors == "1" ]]; then
-  echo "# To fix these errors, run gofmt -w <file>." >> $1
+  echo "# To fix these errors, run gofmt -s -w <file>." >> $1
   echo "# If you want to commit in spite of these format errors," >> $1
   echo "# then delete this line. Otherwise, your commit will be" >> $1
   echo "# aborted." >> $1
