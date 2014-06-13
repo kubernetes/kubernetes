@@ -115,7 +115,7 @@ func (s *FirstFitScheduler) Schedule(pod api.Pod) (string, error) {
 		}
 	}
 	if len(machineOptions) == 0 {
-		return "", fmt.Errorf("Failed to find fit for %#v", pod)
+		return "", fmt.Errorf("failed to find fit for %#v", pod)
 	} else {
 		return machineOptions[s.random.Int()%len(machineOptions)], nil
 	}

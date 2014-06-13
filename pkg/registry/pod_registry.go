@@ -122,7 +122,7 @@ func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
 func (storage *PodRegistryStorage) Create(pod interface{}) error {
 	podObj := pod.(api.Pod)
 	if len(podObj.ID) == 0 {
-		return fmt.Errorf("ID is unspecified: %#v", pod)
+		return fmt.Errorf("id is unspecified: %#v", pod)
 	}
 	machine, err := storage.scheduler.Schedule(podObj)
 	if err != nil {

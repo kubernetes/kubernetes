@@ -109,7 +109,7 @@ func TestSimpleList(t *testing.T) {
 func TestErrorList(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{
-		err: fmt.Errorf("Test Error"),
+		err: fmt.Errorf("test Error"),
 	}
 	storage["simple"] = &simpleStorage
 	handler := New(storage, "/prefix/version")

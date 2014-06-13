@@ -33,7 +33,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 
 func TestSyncEndpointsError(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{
-		err: fmt.Errorf("Test Error"),
+		err: fmt.Errorf("test error"),
 	}
 	podRegistry := MockPodRegistry{}
 

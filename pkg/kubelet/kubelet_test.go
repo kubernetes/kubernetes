@@ -302,7 +302,7 @@ func TestListContainers(t *testing.T) {
 
 func TestKillContainerWithError(t *testing.T) {
 	fakeDocker := FakeDockerClient{
-		err: fmt.Errorf("Sample Error"),
+		err: fmt.Errorf("sample error"),
 		containerList: []docker.APIContainers{
 			{
 				Names: []string{"foo"},
@@ -585,7 +585,7 @@ func TestEventWritingError(t *testing.T) {
 	kubelet := &Kubelet{
 		Client: fakeEtcd,
 	}
-	fakeEtcd.Err = fmt.Errorf("Test error")
+	fakeEtcd.Err = fmt.Errorf("test error")
 	err := kubelet.LogEvent(&api.Event{
 		Event: "test",
 		Container: &api.Container{

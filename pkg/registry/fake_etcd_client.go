@@ -76,7 +76,7 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
-	return nil, fmt.Errorf("Unimplemented")
+	return nil, fmt.Errorf("unimplemented")
 }
 
 func MakeTestEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
