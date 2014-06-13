@@ -594,11 +594,11 @@ func TestMakeCommandLine(t *testing.T) {
 func TestMakeEnvVariables(t *testing.T) {
 	container := api.Container{
 		Env: []api.EnvVar{
-			api.EnvVar{
+			{
 				Name:  "foo",
 				Value: "bar",
 			},
-			api.EnvVar{
+			{
 				Name:  "baz",
 				Value: "blah",
 			},
@@ -619,12 +619,12 @@ func TestMakeEnvVariables(t *testing.T) {
 func TestMakeVolumesAndBinds(t *testing.T) {
 	container := api.Container{
 		VolumeMounts: []api.VolumeMount{
-			api.VolumeMount{
+			{
 				MountPath: "/mnt/path",
 				Name:      "disk",
 				ReadOnly:  false,
 			},
-			api.VolumeMount{
+			{
 				MountPath: "/mnt/path2",
 				Name:      "disk2",
 				ReadOnly:  true,
@@ -653,11 +653,11 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 func TestMakePortsAndBindings(t *testing.T) {
 	container := api.Container{
 		Ports: []api.Port{
-			api.Port{
+			{
 				ContainerPort: 80,
 				HostPort:      8080,
 			},
-			api.Port{
+			{
 				ContainerPort: 443,
 				HostPort:      443,
 			},
@@ -840,7 +840,7 @@ func TestWatchEtcd(t *testing.T) {
 	reader := startReading(changeChannel)
 
 	manifest := []api.ContainerManifest{
-		api.ContainerManifest{
+		{
 			Id: "foo",
 		},
 	}
