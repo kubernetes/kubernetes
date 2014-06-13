@@ -180,7 +180,7 @@ func main() {
 	}
 	body, err := cloudcfg.DoRequest(request, auth)
 	if err != nil {
-		log.Fatalf("Error: %#v", err)
+		log.Fatalf("Error: %#v %s", err, body)
 	}
 	err = printer.Print(body, os.Stdout)
 	if err != nil {

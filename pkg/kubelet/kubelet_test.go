@@ -153,6 +153,12 @@ func verifyPackUnpack(t *testing.T, manifestId, containerName string) {
 	}
 }
 
+func verifyBoolean(t *testing.T, expected, value bool) {
+	if expected != value {
+		t.Errorf("Unexpected boolean.  Expected %s.  Found %s", expected, value)
+	}
+}
+
 func TestContainerManifestNaming(t *testing.T) {
 	verifyPackUnpack(t, "manifest1234", "container5678")
 	verifyPackUnpack(t, "manifest--", "container__")
@@ -222,20 +228,23 @@ func TestGetContainerID(t *testing.T) {
 		},
 	}
 
-	id, err := kubelet.GetContainerID("foo")
+	id, found, err := kubelet.GetContainerID("foo")
+	verifyBoolean(t, true, found)
 	verifyStringEquals(t, id, "1234")
 	verifyNoError(t, err)
 	verifyCalls(t, fakeDocker, []string{"list"})
 	fakeDocker.clearCalls()
 
-	id, err = kubelet.GetContainerID("bar")
+	id, found, err = kubelet.GetContainerID("bar")
+	verifyBoolean(t, true, found)
 	verifyStringEquals(t, id, "4567")
 	verifyNoError(t, err)
 	verifyCalls(t, fakeDocker, []string{"list"})
 	fakeDocker.clearCalls()
 
-	id, err = kubelet.GetContainerID("NotFound")
-	verifyError(t, err)
+	id, found, err = kubelet.GetContainerID("NotFound")
+	verifyBoolean(t, false, found)
+	verifyNoError(t, err)
 	verifyCalls(t, fakeDocker, []string{"list"})
 }
 

@@ -34,7 +34,7 @@ type KubeletServer struct {
 // kubeletInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type kubeletInterface interface {
-	GetContainerID(name string) (string, error)
+	GetContainerID(name string) (string, bool, error)
 	GetContainerInfo(name string) (string, error)
 }
 
@@ -71,7 +71,12 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Missing container query arg.")
 			return
 		}
-		id, err := s.Kubelet.GetContainerID(container)
+		id, found, err := s.Kubelet.GetContainerID(container)
+		if (!found) {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "{}")
+			return
+		}
 		body, err := s.Kubelet.GetContainerInfo(id)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

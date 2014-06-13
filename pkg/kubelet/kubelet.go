@@ -155,25 +155,31 @@ func (kl *Kubelet) ContainerExists(manifest *api.ContainerManifest, container *a
 	return false, "", nil
 }
 
-func (kl *Kubelet) GetContainerID(name string) (string, error) {
+// GetContainerID looks at the list of containers on the machine and returns the ID of the container whose name
+// matches 'name'.  It returns the name of the container, or empty string, if the container isn't found.
+// it returns true if the container is found, false otherwise, and any error that occurs.
+func (kl *Kubelet) GetContainerID(name string) (string, bool, error) {
 	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	for _, value := range containerList {
 		if strings.Contains(value.Names[0], name) {
-			return value.ID, nil
+			return value.ID, true, nil
 		}
 	}
-	return "", fmt.Errorf("couldn't find name: %s", name)
+	return "", false, nil
 }
 
 // Get a container by name.
 // returns the container data from Docker, or an error if one exists.
 func (kl *Kubelet) GetContainerByName(name string) (*docker.Container, error) {
-	id, err := kl.GetContainerID(name)
+	id, found, err := kl.GetContainerID(name)
 	if err != nil {
 		return nil, err
+	}
+	if !found {
+		return nil, nil
 	}
 	return kl.DockerClient.InspectContainer(id)
 }
@@ -317,9 +323,14 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 }
 
 func (kl *Kubelet) KillContainer(name string) error {
-	id, err := kl.GetContainerID(name)
+	id, found, err := kl.GetContainerID(name)
 	if err != nil {
 		return err
+	}
+	if !found {
+		// This is weird, but not an error, so yell and then return nil
+		log.Printf("Couldn't find container: %s", name)
+		return nil
 	}
 	err = kl.DockerClient.StopContainer(id, 10)
 	manifestId, containerName := dockerNameToManifestAndContainer(name)
