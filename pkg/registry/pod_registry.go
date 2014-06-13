@@ -80,6 +80,19 @@ func (storage *PodRegistryStorage) List(url *url.URL) (interface{}, error) {
 	return result, err
 }
 
+func makePodStatus(info interface{}) string {
+	if state, ok := info.(map[string]interface{})["State"]; ok {
+		if running, ok := state.(map[string]interface{})["Running"]; ok {
+			if running.(bool) {
+				return "Running"
+			} else {
+				return "Stopped"
+			}
+		}
+	}
+	return "Pending"
+}
+
 func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	pod, err := storage.registry.GetPod(id)
 	if err != nil {
@@ -90,6 +103,7 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 		return pod, err
 	}
 	pod.CurrentState.Info = info
+	pod.CurrentState.Status = makePodStatus(info)
 	pod.Kind = "cluster#pod"
 	return pod, err
 }
