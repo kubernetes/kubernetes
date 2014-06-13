@@ -112,7 +112,7 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api
 			}
 			return &controllerSpec, nil
 		} else {
-			return nil, fmt.Errorf("Response node is null %#v", response)
+			return nil, fmt.Errorf("response node is null %#v", response)
 		}
 	}
 	return nil, nil

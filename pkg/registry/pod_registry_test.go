@@ -56,7 +56,7 @@ func (registry *MockPodRegistry) DeletePod(podId string) error {
 
 func TestListPodsError(t *testing.T) {
 	mockRegistry := MockPodRegistry{
-		err: fmt.Errorf("Test Error"),
+		err: fmt.Errorf("test error"),
 	}
 	storage := PodRegistryStorage{
 		registry: &mockRegistry,

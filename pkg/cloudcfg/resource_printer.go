@@ -183,7 +183,7 @@ func (h *HumanReadablePrinter) extractObject(data, kind string) (interface{}, er
 		}
 		return list, nil
 	default:
-		return nil, fmt.Errorf("Unknown kind: %s", kind)
+		return nil, fmt.Errorf("unknown kind: %s", kind)
 	}
 }
 
@@ -196,7 +196,7 @@ func (h *HumanReadablePrinter) Print(data string, output io.Writer) error {
 	}
 
 	if _, contains := obj.(map[string]interface{})["kind"]; !contains {
-		return fmt.Errorf("Unexpected object with no 'kind' field: %s", data)
+		return fmt.Errorf("unexpected object with no 'kind' field: %s", data)
 	}
 	kind := (obj.(map[string]interface{})["kind"]).(string)
 	obj, err := h.extractObject(data, kind)

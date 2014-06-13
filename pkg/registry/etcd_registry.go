@@ -147,7 +147,7 @@ func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.Co
 func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
 	podOut, machine, err := registry.findPod(pod.ID)
 	if err == nil {
-		return fmt.Errorf("A pod named %s already exists on %s (%#v)", pod.ID, machine, podOut)
+		return fmt.Errorf("a pod named %s already exists on %s (%#v)", pod.ID, machine, podOut)
 	}
 	return registry.runPod(pod, machineIn)
 }
@@ -174,7 +174,7 @@ func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 }
 
 func (registry *EtcdRegistry) UpdatePod(pod api.Pod) error {
-	return fmt.Errorf("Unimplemented!")
+	return fmt.Errorf("unimplemented!")
 }
 
 func (registry *EtcdRegistry) DeletePod(podID string) error {
@@ -218,7 +218,7 @@ func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (api.Pod, 
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
 		if isEtcdNotFound(err) {
-			return api.Pod{}, fmt.Errorf("Not found (%#v).", err)
+			return api.Pod{}, fmt.Errorf("not found (%#v).", err)
 		} else {
 			return api.Pod{}, err
 		}
@@ -239,7 +239,7 @@ func (registry *EtcdRegistry) findPod(podID string) (api.Pod, string, error) {
 			return pod, machine, nil
 		}
 	}
-	return api.Pod{}, "", fmt.Errorf("Pod not found %s", podID)
+	return api.Pod{}, "", fmt.Errorf("pod not found %s", podID)
 }
 
 func isEtcdNotFound(err error) bool {
@@ -284,7 +284,7 @@ func (registry *EtcdRegistry) GetController(controllerID string) (*api.Replicati
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
 		if isEtcdNotFound(err) {
-			return nil, fmt.Errorf("Controller %s not found", controllerID)
+			return nil, fmt.Errorf("controller %s not found", controllerID)
 		} else {
 			return nil, err
 		}
@@ -354,7 +354,7 @@ func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	response, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
 		if isEtcdNotFound(err) {
-			return nil, fmt.Errorf("Service %s was not found.", name)
+			return nil, fmt.Errorf("service %s was not found.", name)
 		} else {
 			return nil, err
 		}

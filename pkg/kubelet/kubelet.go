@@ -504,7 +504,7 @@ func (kl *Kubelet) ExtractYAMLData(buf []byte, output interface{}) error {
 func (kl *Kubelet) extractFromEtcd(response *etcd.Response) ([]api.ContainerManifest, error) {
 	var manifests []api.ContainerManifest
 	if response.Node == nil || len(response.Node.Value) == 0 {
-		return manifests, fmt.Errorf("No nodes field: %#v", response)
+		return manifests, fmt.Errorf("no nodes field: %#v", response)
 	}
 	err := kl.ExtractYAMLData([]byte(response.Node.Value), &manifests)
 	return manifests, err

@@ -51,7 +51,7 @@ func (registry *MockControllerRegistry) DeleteController(ID string) error {
 
 func TestListControllersError(t *testing.T) {
 	mockRegistry := MockControllerRegistry{
-		err: fmt.Errorf("Test Error"),
+		err: fmt.Errorf("test error"),
 	}
 	storage := ControllerRegistryStorage{
 		registry: &mockRegistry,
