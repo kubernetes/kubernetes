@@ -16,10 +16,13 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"io/ioutil"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -191,6 +194,14 @@ func TestContainerExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
+
+	fakeDocker.clearCalls()
+	missingManifest := api.ContainerManifest{Id: "foobar"}
+	exists, _, err = kubelet.ContainerExists(&missingManifest, &container)
+	verifyCalls(t, fakeDocker, []string{"list"})
+	if exists {
+		t.Errorf("Failed to not find container %#v, missingManifest")
+	}
 }
 
 func TestGetContainerID(t *testing.T) {
@@ -320,42 +331,6 @@ func TestKillContainer(t *testing.T) {
 	err := kubelet.KillContainer("foo")
 	verifyNoError(t, err)
 	verifyCalls(t, fakeDocker, []string{"list", "stop"})
-}
-
-func TestSyncHTTP(t *testing.T) {
-	containers := api.ContainerManifest{
-		Containers: []api.Container{
-			{
-				Name:  "foo",
-				Image: "dockerfile/foo",
-			},
-			{
-				Name:  "bar",
-				Image: "dockerfile/bar",
-			},
-		},
-	}
-	data, _ := json.Marshal(containers)
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(data),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	kubelet := Kubelet{}
-
-	var containersOut api.ContainerManifest
-	data, err := kubelet.SyncHTTP(&http.Client{}, testServer.URL, &containersOut)
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-	if len(containers.Containers) != len(containersOut.Containers) {
-		t.Errorf("Container sizes don't match.  Expected: %d Received %d, %#v", len(containers.Containers), len(containersOut.Containers), containersOut)
-	}
-	expectedData, _ := json.Marshal(containers)
-	actualData, _ := json.Marshal(containersOut)
-	if string(expectedData) != string(actualData) {
-		t.Errorf("Container data doesn't match.  Expected: %s Received %s", string(expectedData), string(actualData))
-	}
 }
 
 func TestResponseToContainersNil(t *testing.T) {
@@ -558,5 +533,333 @@ func TestSyncManifestsDeletes(t *testing.T) {
 		fakeDocker.called[1] != "list" ||
 		fakeDocker.called[2] != "stop" {
 		t.Errorf("Unexpected call sequence: %#v", fakeDocker.called)
+	}
+}
+
+func TestEventWriting(t *testing.T) {
+	fakeEtcd := registry.MakeFakeEtcdClient(t)
+	kubelet := &Kubelet{
+		Client: fakeEtcd,
+	}
+	expectedEvent := api.Event{
+		Event: "test",
+		Container: &api.Container{
+			Name: "foo",
+		},
+	}
+	err := kubelet.LogEvent(&expectedEvent)
+	expectNoError(t, err)
+	if fakeEtcd.Ix != 1 {
+		t.Errorf("Unexpected number of children added: %d, expected 1", fakeEtcd.Ix)
+	}
+	response, err := fakeEtcd.Get("/events/foo/1", false, false)
+	expectNoError(t, err)
+	var event api.Event
+	err = json.Unmarshal([]byte(response.Node.Value), &event)
+	expectNoError(t, err)
+	if event.Event != expectedEvent.Event ||
+		event.Container.Name != expectedEvent.Container.Name {
+		t.Errorf("Event's don't match.  Expected: %#v Saw: %#v", expectedEvent, event)
+	}
+}
+
+func TestEventWritingError(t *testing.T) {
+	fakeEtcd := registry.MakeFakeEtcdClient(t)
+	kubelet := &Kubelet{
+		Client: fakeEtcd,
+	}
+	fakeEtcd.Err = fmt.Errorf("Test error")
+	err := kubelet.LogEvent(&api.Event{
+		Event: "test",
+		Container: &api.Container{
+			Name: "foo",
+		},
+	})
+	if err == nil {
+		t.Errorf("Unexpected non-error")
+	}
+}
+
+func TestMakeCommandLine(t *testing.T) {
+	expected := []string{"echo", "hello", "world"}
+	container := api.Container{
+		Command: strings.Join(expected, " "),
+	}
+	cmdLine := makeCommandLine(&container)
+	if !reflect.DeepEqual(expected, cmdLine) {
+		t.Error("Unexpected command line.  Expected %#v, got %#v", expected, cmdLine)
+	}
+}
+
+func TestMakeEnvVariables(t *testing.T) {
+	container := api.Container{
+		Env: []api.EnvVar{
+			api.EnvVar{
+				Name:  "foo",
+				Value: "bar",
+			},
+			api.EnvVar{
+				Name:  "baz",
+				Value: "blah",
+			},
+		},
+	}
+	vars := makeEnvironmentVariables(&container)
+	if len(vars) != len(container.Env) {
+		t.Errorf("Vars don't match.  Expected: %#v Found: %#v", container.Env, vars)
+	}
+	for ix, env := range container.Env {
+		value := fmt.Sprintf("%s=%s", env.Name, env.Value)
+		if value != vars[ix] {
+			t.Errorf("Unexpected value: %s.  Expected: %s", vars[ix], value)
+		}
+	}
+}
+
+func TestMakeVolumesAndBinds(t *testing.T) {
+	container := api.Container{
+		VolumeMounts: []api.VolumeMount{
+			api.VolumeMount{
+				MountPath: "/mnt/path",
+				Name:      "disk",
+				ReadOnly:  false,
+			},
+			api.VolumeMount{
+				MountPath: "/mnt/path2",
+				Name:      "disk2",
+				ReadOnly:  true,
+			},
+		},
+	}
+	volumes, binds := makeVolumesAndBinds(&container)
+	if len(volumes) != len(container.VolumeMounts) ||
+		len(binds) != len(container.VolumeMounts) {
+		t.Errorf("Unexpected volumes and binds: %#v %#v.  Container was: %#v", volumes, binds, container)
+	}
+	for ix, volume := range container.VolumeMounts {
+		expectedBind := "/exports/" + volume.Name + ":" + volume.MountPath
+		if volume.ReadOnly {
+			expectedBind = expectedBind + ":ro"
+		}
+		if binds[ix] != expectedBind {
+			t.Errorf("Unexpected bind.  Expected %s.  Found %s", expectedBind, binds[ix])
+		}
+		if _, ok := volumes[volume.MountPath]; !ok {
+			t.Errorf("Map is missing key: %s. %#v", volume.MountPath, volumes)
+		}
+	}
+}
+
+func TestMakePortsAndBindings(t *testing.T) {
+	container := api.Container{
+		Ports: []api.Port{
+			api.Port{
+				ContainerPort: 80,
+				HostPort:      8080,
+			},
+			api.Port{
+				ContainerPort: 443,
+				HostPort:      443,
+			},
+		},
+	}
+	exposedPorts, bindings := makePortsAndBindings(&container)
+	if len(container.Ports) != len(exposedPorts) ||
+		len(container.Ports) != len(bindings) {
+		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
+	}
+}
+
+func TestExtractFromNonExistentFile(t *testing.T) {
+	kubelet := Kubelet{}
+	changeChannel := make(chan api.ContainerManifest)
+	lastData := []byte{1, 2, 3}
+	data, err := kubelet.extractFromFile(lastData, "/some/fake/file", changeChannel)
+	if err == nil {
+		t.Error("Unexpected non-error.")
+	}
+	if !bytes.Equal(data, lastData) {
+		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
+	}
+}
+
+func TestExtractFromBadDataFile(t *testing.T) {
+	kubelet := Kubelet{}
+	changeChannel := make(chan api.ContainerManifest)
+	lastData := []byte{1, 2, 3}
+	file, err := ioutil.TempFile("", "foo")
+	expectNoError(t, err)
+	name := file.Name()
+	file.Close()
+	ioutil.WriteFile(name, lastData, 0755)
+	data, err := kubelet.extractFromFile(lastData, name, changeChannel)
+
+	if err == nil {
+		t.Error("Unexpected non-error.")
+	}
+	if !bytes.Equal(data, lastData) {
+		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
+	}
+}
+
+func TestExtractFromSameDataFile(t *testing.T) {
+	kubelet := Kubelet{}
+	changeChannel := make(chan api.ContainerManifest)
+	manifest := api.ContainerManifest{
+		Id: "foo",
+	}
+	lastData, err := json.Marshal(manifest)
+	expectNoError(t, err)
+	file, err := ioutil.TempFile("", "foo")
+	expectNoError(t, err)
+	name := file.Name()
+	expectNoError(t, file.Close())
+	ioutil.WriteFile(name, lastData, 0755)
+	data, err := kubelet.extractFromFile(lastData, name, changeChannel)
+
+	expectNoError(t, err)
+	if !bytes.Equal(data, lastData) {
+		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
+	}
+}
+
+func TestExtractFromChangedDataFile(t *testing.T) {
+	kubelet := Kubelet{}
+	changeChannel := make(chan api.ContainerManifest)
+	reader := startReadingSingle(changeChannel)
+	oldManifest := api.ContainerManifest{
+		Id: "foo",
+	}
+	newManifest := api.ContainerManifest{
+		Id: "bar",
+	}
+	lastData, err := json.Marshal(oldManifest)
+	expectNoError(t, err)
+	newData, err := json.Marshal(newManifest)
+	expectNoError(t, err)
+	file, err := ioutil.TempFile("", "foo")
+	expectNoError(t, err)
+	name := file.Name()
+	expectNoError(t, file.Close())
+	ioutil.WriteFile(name, newData, 0755)
+	data, err := kubelet.extractFromFile(lastData, name, changeChannel)
+	close(changeChannel)
+
+	expectNoError(t, err)
+	if !bytes.Equal(data, newData) {
+		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
+	}
+	read := reader.GetList()
+	if len(read) != 1 {
+		t.Errorf("Unexpected channel traffic: %#v", read)
+	}
+	if !reflect.DeepEqual(read[0], newManifest) {
+		t.Errorf("Unexpected difference.  Expected %#v, got %#v", newManifest, read[0])
+	}
+}
+
+func TestExtractFromHttpBadness(t *testing.T) {
+	kubelet := Kubelet{}
+	lastData := []byte{1, 2, 3}
+	changeChannel := make(chan api.ContainerManifest)
+	data, err := kubelet.extractFromHTTP(lastData, "http://localhost:12345", changeChannel)
+	if err == nil {
+		t.Error("Unexpected non-error.")
+	}
+	if !bytes.Equal(lastData, data) {
+		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", lastData, data)
+	}
+}
+
+func TestExtractFromHttpNoChange(t *testing.T) {
+	kubelet := Kubelet{}
+	changeChannel := make(chan api.ContainerManifest)
+
+	manifest := api.ContainerManifest{
+		Id: "foo",
+	}
+	lastData, err := json.Marshal(manifest)
+
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(lastData),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+
+	data, err := kubelet.extractFromHTTP(lastData, testServer.URL, changeChannel)
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if !bytes.Equal(lastData, data) {
+		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", lastData, data)
+	}
+}
+
+func TestExtractFromHttpChanges(t *testing.T) {
+	kubelet := Kubelet{}
+	changeChannel := make(chan api.ContainerManifest)
+	reader := startReadingSingle(changeChannel)
+
+	manifest := api.ContainerManifest{
+		Id: "foo",
+	}
+	newManifest := api.ContainerManifest{
+		Id: "bar",
+	}
+	lastData, _ := json.Marshal(manifest)
+	newData, _ := json.Marshal(newManifest)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(newData),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+
+	data, err := kubelet.extractFromHTTP(lastData, testServer.URL, changeChannel)
+	close(changeChannel)
+
+	read := reader.GetList()
+
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if len(read) != 1 {
+		t.Errorf("Unexpected list: %#v", read)
+	}
+	if !bytes.Equal(newData, data) {
+		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", lastData, data)
+	}
+	if !reflect.DeepEqual(newManifest, read[0]) {
+		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", newManifest, read[0])
+	}
+}
+
+func TestWatchEtcd(t *testing.T) {
+	watchChannel := make(chan *etcd.Response)
+	changeChannel := make(chan []api.ContainerManifest)
+	kubelet := Kubelet{}
+	reader := startReading(changeChannel)
+
+	manifest := []api.ContainerManifest{
+		api.ContainerManifest{
+			Id: "foo",
+		},
+	}
+	data, err := json.Marshal(manifest)
+	expectNoError(t, err)
+
+	go kubelet.WatchEtcd(watchChannel, changeChannel)
+
+	watchChannel <- &etcd.Response{
+		Node: &etcd.Node{
+			Value: string(data),
+		},
+	}
+	close(watchChannel)
+	close(changeChannel)
+
+	read := reader.GetList()
+	if len(read) != 1 ||
+		!reflect.DeepEqual(read[0], manifest) {
+		t.Errorf("Unexpected manifest(s) %#v %#v", read[0], manifest)
 	}
 }

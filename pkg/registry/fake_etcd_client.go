@@ -30,8 +30,9 @@ type EtcdResponseWithError struct {
 type FakeEtcdClient struct {
 	Data        map[string]EtcdResponseWithError
 	deletedKeys []string
-	err         error
+	Err         error
 	t           *testing.T
+	Ix			int
 }
 
 func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
@@ -42,7 +43,8 @@ func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
 }
 
 func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
-	return f.Set(key, data, ttl)
+	f.Ix = f.Ix + 1
+	return f.Set(fmt.Sprintf("%s/%d", key, f.Ix), data, ttl)
 }
 
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
@@ -63,14 +65,14 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 		},
 	}
 	f.Data[key] = result
-	return result.R, f.err
+	return result.R, f.Err
 }
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
 	return f.Set(key, value, ttl)
 }
 func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
 	f.deletedKeys = append(f.deletedKeys, key)
-	return &etcd.Response{}, f.err
+	return &etcd.Response{}, f.Err
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {

@@ -21,10 +21,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -237,18 +239,15 @@ func dockerNameToManifestAndContainer(name string) (manifestId, containerName st
 	return
 }
 
-func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.Container) (name string, err error) {
-	err = kl.pullImage(container.Image)
-	if err != nil {
-		return "", err
-	}
-
-	name = manifestAndContainerToDockerName(manifest, container)
-	envVariables := []string{}
+func makeEnvironmentVariables(container *api.Container) []string {
+	var result []string
 	for _, value := range container.Env {
-		envVariables = append(envVariables, fmt.Sprintf("%s=%s", value.Name, value.Value))
+		result = append(result, fmt.Sprintf("%s=%s", value.Name, value.Value))
 	}
+	return result
+}
 
+func makeVolumesAndBinds(container *api.Container) (map[string]struct{}, []string) {
 	volumes := map[string]struct{}{}
 	binds := []string{}
 	for _, volume := range container.VolumeMounts {
@@ -259,7 +258,10 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 		}
 		binds = append(binds, basePath)
 	}
+	return volumes, binds
+}
 
+func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
 	exposedPorts := map[docker.Port]struct{}{}
 	portBindings := map[docker.Port][]docker.PortBinding{}
 	for _, port := range container.Ports {
@@ -275,10 +277,24 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 			},
 		}
 	}
+	return exposedPorts, portBindings
+}
+
+func makeCommandLine(container *api.Container) []string {
 	var cmdList []string
 	if len(container.Command) > 0 {
 		cmdList = strings.Split(container.Command, " ")
 	}
+	return cmdList
+}
+
+func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.Container) (name string, err error) {
+	name = manifestAndContainerToDockerName(manifest, container)
+
+	envVariables := makeEnvironmentVariables(container)
+	volumes, binds := makeVolumesAndBinds(container)
+	exposedPorts, portBindings := makePortsAndBindings(container)
+
 	opts := docker.CreateContainerOptions{
 		Name: name,
 		Config: &docker.Config{
@@ -287,7 +303,7 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 			Env:          envVariables,
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
-			Cmd:          cmdList,
+			Cmd:          makeCommandLine(container),
 		},
 	}
 	dockerContainer, err := kl.DockerClient.CreateContainer(opts)
@@ -320,74 +336,76 @@ func (kl *Kubelet) KillContainer(name string) error {
 	return err
 }
 
+func (kl *Kubelet) extractFromFile(lastData []byte, name string, changeChannel chan<- api.ContainerManifest) ([]byte, error) {
+	var file *os.File
+	var err error
+	if file, err = os.Open(name); err != nil {
+		return lastData, err
+	}
+
+	return kl.extractFromReader(lastData, file, changeChannel)
+}
+
+func (kl *Kubelet) extractFromReader(lastData []byte, reader io.Reader, changeChannel chan<- api.ContainerManifest) ([]byte, error) {
+	var manifest api.ContainerManifest
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		log.Printf("Couldn't read file: %v", err)
+		return lastData, err
+	}
+	if err = kl.ExtractYAMLData(data, &manifest); err != nil {
+		return lastData, err
+	}
+	if !bytes.Equal(lastData, data) {
+		lastData = data
+		// Ok, we have a valid configuration, send to channel for
+		// rejiggering.
+		changeChannel <- manifest
+		return data, nil
+	}
+	return lastData, nil
+}
+
 // Watch a file for changes to the set of pods that should run on this Kubelet
 // This function loops forever and is intended to be run as a goroutine
 func (kl *Kubelet) WatchFile(file string, changeChannel chan<- api.ContainerManifest) {
 	var lastData []byte
 	for {
+		var err error
 		time.Sleep(kl.FileCheckFrequency)
-		var manifest api.ContainerManifest
-		data, err := ioutil.ReadFile(file)
+		lastData, err = kl.extractFromFile(lastData, file, changeChannel)
 		if err != nil {
-			log.Printf("Couldn't read file: %s : %v", file, err)
-			continue
-		}
-		if err = kl.ExtractYAMLData(data, &manifest); err != nil {
-			continue
-		}
-		if !bytes.Equal(lastData, data) {
-			lastData = data
-			// Ok, we have a valid configuration, send to channel for
-			// rejiggering.
-			changeChannel <- manifest
-			continue
+			log.Printf("Error polling file: %#v", err)
 		}
 	}
+}
+
+func (kl *Kubelet) extractFromHTTP(lastData []byte, url string, changeChannel chan<- api.ContainerManifest) ([]byte, error) {
+	client := &http.Client{}
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return lastData, err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return lastData, err
+	}
+	defer response.Body.Close()
+	return kl.extractFromReader(lastData, response.Body, changeChannel)
 }
 
 // Watch an HTTP endpoint for changes to the set of pods that should run on this Kubelet
 // This function runs forever and is intended to be run as a goroutine
 func (kl *Kubelet) WatchHTTP(url string, changeChannel chan<- api.ContainerManifest) {
 	var lastData []byte
-	client := &http.Client{}
 	for {
+		var err error
 		time.Sleep(kl.HTTPCheckFrequency)
-		var config api.ContainerManifest
-		data, err := kl.SyncHTTP(client, url, &config)
-		log.Printf("Containers: %#v", config)
+		lastData, err = kl.extractFromHTTP(lastData, url, changeChannel)
 		if err != nil {
-			log.Printf("Error syncing HTTP: %#v", err)
-			continue
-		}
-		if !bytes.Equal(lastData, data) {
-			lastData = data
-			changeChannel <- config
-			continue
+			log.Printf("Error syncing http: %#v", err)
 		}
 	}
-}
-
-// SyncHTTP reads from url a yaml manifest and populates config. Returns the
-// raw bytes, if something was read. Returns an error if something goes wrong.
-// 'client' is used to execute the request, to allow caching of clients.
-func (kl *Kubelet) SyncHTTP(client *http.Client, url string, config *api.ContainerManifest) ([]byte, error) {
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-	if err = kl.ExtractYAMLData(body, &config); err != nil {
-		return body, err
-	}
-	return body, nil
 }
 
 // Take an etcd Response object, and turn it into a structured list of containers
@@ -473,30 +491,32 @@ func (kl *Kubelet) ExtractYAMLData(buf []byte, output interface{}) error {
 	return nil
 }
 
+func (kl *Kubelet) extractFromEtcd(response *etcd.Response) ([]api.ContainerManifest, error) {
+	var manifests []api.ContainerManifest
+	if response.Node == nil || len(response.Node.Value) == 0 {
+		return manifests, fmt.Errorf("No nodes field: %#v", response)
+	}
+	err := kl.ExtractYAMLData([]byte(response.Node.Value), &manifests)
+	return manifests, err
+}
+
 // Watch etcd for changes, receives config objects from the etcd client watch.
-// This function loops forever and is intended to be run as a goroutine.
+// This function loops until the watchChannel is closed, and is intended to be run as a goroutine.
 func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, changeChannel chan<- []api.ContainerManifest) {
 	defer util.HandleCrash()
 	for {
 		watchResponse := <-watchChannel
 		log.Printf("Got change: %#v", watchResponse)
-
 		// This means the channel has been closed.
 		if watchResponse == nil {
 			return
 		}
-
-		if watchResponse.Node == nil || len(watchResponse.Node.Value) == 0 {
-			log.Printf("No nodes field: %#v", watchResponse)
-			if watchResponse.Node != nil {
-				log.Printf("Node: %#v", watchResponse.Node)
-			}
-		}
-		log.Printf("Got data: %v", watchResponse.Node.Value)
-		var manifests []api.ContainerManifest
-		if err := kl.ExtractYAMLData([]byte(watchResponse.Node.Value), &manifests); err != nil {
+		manifests, err := kl.extractFromEtcd(watchResponse)
+		if err != nil {
+			log.Printf("Error handling response from etcd: %#v", err)
 			continue
 		}
+		log.Printf("manifests: %#v", manifests)
 		// Ok, we have a valid configuration, send to channel for
 		// rejiggering.
 		changeChannel <- manifests
@@ -518,6 +538,11 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			}
 			if !exists {
 				log.Printf("%#v doesn't exist, creating", element)
+				err = kl.pullImage(element.Image)
+				if err != nil {
+					log.Printf("Error pulling container: %#v", err)
+					continue
+				}
 				actualName, err = kl.RunContainer(&manifest, &element)
 				// For some reason, list gives back names that start with '/'
 				actualName = "/" + actualName
