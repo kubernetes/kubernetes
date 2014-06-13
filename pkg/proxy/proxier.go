@@ -90,14 +90,31 @@ func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 // AddService starts listening for a new service on a given port.
 func (proxier Proxier) AddService(service string, port int) error {
 	// Make sure we can start listening on the port before saying all's well.
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
 	}
-	log.Printf("Listening for %s on %d", service, port)
-	// If that succeeds, start the accepting loop.
-	go proxier.AcceptHandler(service, ln)
+	proxier.addServiceCommon(service, l)
 	return nil
+}
+
+// addService starts listening for a new service, returning the port it's using.
+// For testing on a system with unknown ports used.
+func (proxier Proxier) addServiceOnUnusedPort(service string) (string, error) {
+	// Make sure we can start listening on the port before saying all's well.
+	l, err := net.Listen("tcp", ":")
+	if err != nil {
+		return "", err
+	}
+	proxier.addServiceCommon(service, l)
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	return port, nil
+}
+
+func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
+	log.Printf("Listening for %s on %s", service, l.Addr().String())
+	// If that succeeds, start the accepting loop.
+	go proxier.AcceptHandler(service, l)
 }
 
 func (proxier Proxier) OnUpdate(services []api.Service) {
