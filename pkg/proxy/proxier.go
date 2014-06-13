@@ -102,7 +102,7 @@ func (proxier Proxier) AddService(service string, port int) error {
 // For testing on a system with unknown ports used.
 func (proxier Proxier) addServiceOnUnusedPort(service string) (string, error) {
 	// Make sure we can start listening on the port before saying all's well.
-	l, err := net.Listen("tcp", ":")
+	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return "", err
 	}

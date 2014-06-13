@@ -46,7 +46,7 @@ func echoServer(t *testing.T, addr string) (string, error) {
 }
 
 func TestProxy(t *testing.T) {
-	port, err := echoServer(t, "127.0.0.1:")
+	port, err := echoServer(t, "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
