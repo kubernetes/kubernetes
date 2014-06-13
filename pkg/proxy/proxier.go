@@ -13,8 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// Simple proxy for tcp connections between a localhost:lport and services that provide
-// the actual implementations.
 
 package proxy
 
@@ -28,6 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
+// Proxier is a simple proxy for tcp connections between a localhost:lport and services that provide
+// the actual implementations.
 type Proxier struct {
 	loadBalancer LoadBalancer
 	serviceMap   map[string]int

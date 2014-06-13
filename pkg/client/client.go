@@ -14,11 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A client for the Kubernetes cluster management API
-// There are three fundamental objects
-//   Pod - A co-scheduled set of running containers
-//   ReplicationController - A manager for replicating Pods
-//   Service - A discoverable load balancer
 package client
 
 import (
