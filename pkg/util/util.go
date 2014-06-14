@@ -18,7 +18,9 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"runtime"
 	"time"
 )
 
@@ -26,7 +28,15 @@ import (
 func HandleCrash() {
 	r := recover()
 	if r != nil {
-		log.Printf("Recovered from panic: %#v", r)
+		callers := ""
+		for i := 0; true; i++ {
+			_, file, line, ok := runtime.Caller(i)
+			if !ok {
+				break
+			}
+			callers = callers + fmt.Sprintf("%v:%v\n", file, line)
+		}
+		log.Printf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
 	}
 }
 
