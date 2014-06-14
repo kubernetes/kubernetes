@@ -14,6 +14,11 @@
 
 # A set of defaults for Kubernetes releases
 
+if [ "$(which gcloud)" == "" ]; then
+  echo "Couldn't find gcloud in PATH"
+  exit 1
+fi
+
 PROJECT=$(gcloud config list project | tail -n 1 | cut -f 3 -d ' ')
 
 if which md5 > /dev/null; then
