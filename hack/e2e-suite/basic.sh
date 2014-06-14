@@ -24,7 +24,7 @@ source "${KUBE_REPO_ROOT}/cluster/util.sh"
 detect-project
 
 # Launch a container
-$CLOUDCFG -p 8080:80 run dockerfile/nginx 3 myNginx
+$CLOUDCFG -p 8080:80 run dockerfile/nginx 2 myNginx
 
 # Container turn up on a clean cluster can take a while for the docker image pull.
 # Sleep for 2 minutes just to be sure.
