@@ -190,15 +190,22 @@ func (h *HumanReadablePrinter) extractObject(data, kind string) (interface{}, er
 func (h *HumanReadablePrinter) Print(data string, output io.Writer) error {
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()
-	var obj interface{}
-	if err := json.Unmarshal([]byte(data), &obj); err != nil {
+	var mapObj map[string]interface{}
+	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {
 		return err
 	}
 
-	if _, contains := obj.(map[string]interface{})["kind"]; !contains {
+	// Don't complain about empty objects returned by DELETE commands.
+	if len(mapObj) == 0 {
+		fmt.Fprint(w, "<empty>")
+		return nil
+	}
+
+	if _, contains := mapObj["kind"]; !contains {
 		return fmt.Errorf("unexpected object with no 'kind' field: %s", data)
 	}
-	kind := (obj.(map[string]interface{})["kind"]).(string)
+
+	kind := (mapObj["kind"]).(string)
 	obj, err := h.extractObject(data, kind)
 	if err != nil {
 		return err

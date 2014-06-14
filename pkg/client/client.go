@@ -90,13 +90,13 @@ func (client Client) rawRequest(method, path string, requestBody io.Reader, targ
 	if err != nil {
 		return nil, err
 	}
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("request [%s %s] failed (%d) %s", method, client.makeURL(path), response.StatusCode, response.Status)
-	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return body, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("request [%s %s] failed (%d) %s: %s", method, client.makeURL(path), response.StatusCode, response.Status, string(body))
 	}
 	if target != nil {
 		err = json.Unmarshal(body, target)

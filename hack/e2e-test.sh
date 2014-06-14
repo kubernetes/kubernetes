@@ -17,6 +17,11 @@
 # Starts a Kubernetes cluster, runs the e2e test suite, and shuts it
 # down.
 
+# For debugging of this test's components, it's helpful to leave the test
+# cluster running.
+ALREADY_UP=${1:-0}
+LEAVE_UP=${2:-0}
+
 # Exit on error
 set -e
 
@@ -27,26 +32,29 @@ export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/cloudcfg.sh"
 
 source "${KUBE_REPO_ROOT}/cluster/util.sh"
 
-# Build a release
-$(dirname $0)/../release/release.sh
+if [[ ${ALREADY_UP} -ne 1 ]]; then
+  # Build a release
+  $(dirname $0)/../release/release.sh
 
-# Now bring a test cluster up with that release.
-$(dirname $0)/../cluster/kube-up.sh
+  # Now bring a test cluster up with that release.
+  $(dirname $0)/../cluster/kube-up.sh
+fi
 
 # Detect the project into $PROJECT if it isn't set
 detect-project
 
 set +e
 
-# Open up port 80 & 8080 so common containers on minions can be reached
-gcutil addfirewall \
-  --norespect_terminal_width \
-  --project ${PROJECT} \
-  --target_tags ${MINION_TAG} \
-  --allowed tcp:80 \
-  --allowed tcp:8080 \
-  --network ${NETWORK} \
-  ${MINION_TAG}-http-alt
+if [[ ${ALREADY_UP} -ne 1 ]]; then
+  # Open up port 80 & 8080 so common containers on minions can be reached
+  gcutil addfirewall \
+    --norespect_terminal_width \
+    --project ${PROJECT} \
+    --target_tags ${MINION_TAG} \
+    --allowed tcp:80,tcp:8080 \
+    --network ${NETWORK} \
+    ${MINION_TAG}-http-alt
+fi
 
 # Auto shutdown cluster when we exit
 function shutdown-test-cluster () {
@@ -58,17 +66,25 @@ function shutdown-test-cluster () {
     ${MINION_TAG}-http-alt &
   $(dirname $0)/../cluster/kube-down.sh > /dev/null &
 }
-trap shutdown-test-cluster EXIT
+
+if [[ ${LEAVE_UP} -ne 1 ]]; then
+  trap shutdown-test-cluster EXIT
+fi
 
 any_failed=0
-for test_file in "$(dirname $0)/e2e-suite/*.sh"; do
-  $test_file
-  if [[ -z $? ]]; then
-    echo "${test_file}: passed!"
+for test_file in $(ls $(dirname $0)/e2e-suite/); do
+  "$(dirname $0)/e2e-suite/${test_file}"
+  result="$?"
+  if [[ "${result}" -eq "0" ]]; then
+    echo "${test_file} returned ${result}; passed!"
   else
-    echo "${test_file}: FAILED!"
+    echo "${test_file} returned ${result}; FAIL!"
     any_failed=1
   fi
 done
+
+if [[ ${any_failed} -ne 0 ]]; then
+  echo "At least one test failed."
+fi
 
 exit ${any_failed}
