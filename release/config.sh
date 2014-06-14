@@ -19,7 +19,17 @@ if [ "$(which gcloud)" == "" ]; then
   exit 1
 fi
 
+if [ -n "$(gcloud auth list 2>&1 | grep 'No credentialed accounts')" ]; then
+    gcloud auth login
+fi
+
 PROJECT=$(gcloud config list project | tail -n 1 | cut -f 3 -d ' ')
+
+if [ ! -n "$PROJECT" ]; then
+    echo "Default project is not set."
+    echo "Please run gcloud config set project <project>"
+    exit 1
+fi
 
 if which md5 > /dev/null; then
   HASH=$(md5 -q -s $PROJECT)
