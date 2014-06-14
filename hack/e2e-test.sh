@@ -51,8 +51,7 @@ if [[ ${ALREADY_UP} -ne 1 ]]; then
     --norespect_terminal_width \
     --project ${PROJECT} \
     --target_tags ${MINION_TAG} \
-    --allowed tcp:80 \
-    --allowed tcp:8080 \
+    --allowed tcp:80,tcp:8080 \
     --network ${NETWORK} \
     ${MINION_TAG}-http-alt
 fi
