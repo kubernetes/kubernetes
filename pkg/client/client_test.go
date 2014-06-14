@@ -122,11 +122,8 @@ func TestListPodsLabels(t *testing.T) {
 	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "GET", nil)
 	queryString := fakeHandler.RequestReceived.URL.Query().Get("labels")
 	queryString, _ = url.QueryUnescape(queryString)
-	// TODO(bburns) : This assumes some ordering in serialization that might not always
-	// be true, parse it into a map.
-	if queryString != "foo=bar,name=baz" {
-		t.Errorf("Unexpected label query: %s", queryString)
-	}
+	parsedQueryString := DecodeLabelQuery(queryString)
+	expectEqual(t, query, parsedQueryString)
 	if err != nil {
 		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}
