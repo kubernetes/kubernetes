@@ -14,8 +14,8 @@ cd $THIRD_PARTY_DIR
 . ./deps.sh
 
 # Create a temp GOPATH root.  It must be an absolute path
-mkdir -p ../target/go_dep_update
-cd ../target/go_dep_update
+mkdir -p ../output/go_dep_update
+cd ../output/go_dep_update
 TMP_GO_ROOT=$PWD
 cd -
 export GOPATH=${TMP_GO_ROOT}
@@ -50,10 +50,10 @@ for p in $PACKAGES; do
   cd -
 
   # Copy the code into the final directory
-  rsync -a -z -r --exclude '.git/' --exclude '.hg/' $TMP_GO_ROOT/src/$p/ $p
+  rsync -a -z -r --exclude '.git/' --exclude '.hg/' $TMP_GO_ROOT/src/$p/ src/$p
 
   # Make a nice commit about what everything bumped to
-  git add $p
+  git add src/$p
   if ! git diff --cached --exit-code > /dev/null 2>&1; then
     git commit -m "bump($p): $HEAD"
   fi

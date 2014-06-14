@@ -40,7 +40,7 @@ mkdir -p $MASTER_RELEASE_DIR/third_party/go
 echo "Building release tree"
 cp release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
 cp -r cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
-cp -r third_party $MASTER_RELEASE_DIR/third_party/go/src
+cp -r third_party/src $MASTER_RELEASE_DIR/third_party/go/src
 
 function find_go_files() {
   find * -not \( \
