@@ -85,9 +85,21 @@ func MakeReplicationManager(etcdClient *etcd.Client, kubeClient client.ClientInt
 
 func (rm *ReplicationManager) WatchControllers() {
 	watchChannel := make(chan *etcd.Response)
-	go util.Forever(func() { rm.etcdClient.Watch("/registry/controllers", 0, true, watchChannel, nil) }, 0)
+	go func() {
+		defer util.HandleCrash()
+		defer func() {
+			close(watchChannel)
+		}()
+		rm.etcdClient.Watch("/registry/controllers", 0, true, watchChannel, nil)
+	}()
+
 	for {
-		watchResponse := <-watchChannel
+		watchResponse, ok := <-watchChannel
+		if !ok {
+			// watchChannel has been closed. Let the util.Forever() that
+			// called us call us again.
+			return
+		}
 		if watchResponse == nil {
 			time.Sleep(time.Second * 10)
 			continue
