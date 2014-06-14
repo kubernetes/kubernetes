@@ -22,7 +22,8 @@ set -e
 
 HAVE_JQ=$(which jq)
 if [[ -z ${HAVE_JQ} ]]; then
-  echo "Please install jq, e.g.: sudo apt-get install jq"
+  echo "Please install jq, e.g.: 'sudo apt-get install jq' or, "
+  echo "if you're on a mac with homebrew, 'brew install jq'."
   exit 1
 fi
 
