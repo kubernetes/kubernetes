@@ -280,6 +280,7 @@ You may need to open the firewall for port 8080 using the [console][cloud-consol
 ```shell
 $ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
 ```
-For details about limiting traffic to specific sources, see the [gcutil documentation][https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall]
+For details about limiting traffic to specific sources, see the [gcutil documentation][gcutil-docs]
 
 [cloud-console]: https://console.developer.google.com
+[gcutil-docs]: https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall
