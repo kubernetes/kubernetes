@@ -10,6 +10,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
     $ cd kubernetes
     $ hack/dev-build-and-up.sh
+    $ hack/build-go.sh
 
 ### Step One: Turn up the redis master.
 
