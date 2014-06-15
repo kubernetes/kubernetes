@@ -34,13 +34,14 @@ import (
 
 var (
 	file               = flag.String("config", "", "Path to the config file")
-	etcd_servers       = flag.String("etcd_servers", "", "Url of etcd servers in the cluster")
+	etcdServers        = flag.String("etcd_servers", "", "Url of etcd servers in the cluster")
 	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
 	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking file for new data")
 	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
-	manifest_url       = flag.String("manifest_url", "", "URL for accessing the container manifest")
+	manifestUrl        = flag.String("manifest_url", "", "URL for accessing the container manifest")
 	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on")
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
+	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 )
 
 const dockerBinary = "/usr/bin/docker"
@@ -58,9 +59,12 @@ func main() {
 		log.Fatal("Couldn't connnect to docker.")
 	}
 
-	hostname, err := exec.Command("hostname", "-f").Output()
-	if err != nil {
-		log.Fatalf("Couldn't determine hostname: %v", err)
+	hostname := []byte(*hostnameOverride)
+	if string(hostname) == "" {
+		hostname, err = exec.Command("hostname", "-f").Output()
+		if err != nil {
+			log.Fatalf("Couldn't determine hostname: %v", err)
+		}
 	}
 
 	my_kubelet := kubelet.Kubelet{
@@ -70,5 +74,5 @@ func main() {
 		SyncFrequency:      *syncFrequency,
 		HTTPCheckFrequency: *httpCheckFrequency,
 	}
-	my_kubelet.RunKubelet(*file, *manifest_url, *etcd_servers, *address, *port)
+	my_kubelet.RunKubelet(*file, *manifestUrl, *etcdServers, *address, *port)
 }

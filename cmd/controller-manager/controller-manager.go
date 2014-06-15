@@ -27,7 +27,7 @@ import (
 	"os"
 	"time"
 
-	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -49,7 +49,7 @@ func main() {
 	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
 
 	controllerManager := registry.MakeReplicationManager(etcd.NewClient([]string{*etcd_servers}),
-		kube_client.Client{
+		client.Client{
 			Host: "http://" + *master,
 		})
 
