@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package apiserver
 
 import (
@@ -131,6 +132,15 @@ func (server *ApiServer) readBody(req *http.Request) (string, error) {
 	return string(body), err
 }
 
+// handleREST is the main dispatcher for the server.  It switches on the HTTP method, and then
+// on path length, according to the following table:
+//   Method     Path          Action
+//   GET        /foo          list
+//   GET        /foo/bar      get 'bar'
+//   POST       /foo          create
+//   PUT        /foo/bar      update 'bar'
+//   DELETE     /foo/bar      delete 'bar'
+// Returns 404 if the method/pattern doesn't match one of these entries
 func (server *ApiServer) handleREST(parts []string, url *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
 	switch req.Method {
 	case "GET":

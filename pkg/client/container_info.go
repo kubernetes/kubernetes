@@ -23,10 +23,15 @@ import (
 	"net/http"
 )
 
+// ContainerInfo is an interface for things that can get information about a container.
+// Injectable for easy testing.
 type ContainerInfo interface {
+	// GetContainerInfo returns information about container 'name' on 'host'
+	// Returns an untyped interface, and an error, if one occurs
 	GetContainerInfo(host, name string) (interface{}, error)
 }
 
+// The default implementation, accesses the kubelet over HTTP
 type HTTPContainerInfo struct {
 	Client *http.Client
 	Port   uint
