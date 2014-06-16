@@ -7,6 +7,12 @@ Kubernetes is an open source implementation of container cluster management.
 ## Kubernetes can run anywhere!
 However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
 
+### Contents
+* [Getting started on Google Compute Engine](#getting-started-on-google-compute-engine)
+* [Running a local cluster](#running-locally)
+* [Discussion and Community Support](#community-discussion-and-support)
+* [Hacking on Kubernetes](#development)
+
 ## Getting started on Google Compute Engine
 
 ### Prerequisites
