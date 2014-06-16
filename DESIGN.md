@@ -36,7 +36,7 @@ The Kubernetes node design is an extension of the [Container-optimized Google Co
 Each node runs Docker, of course.  Docker takes care of the details of downloading images and running containers.
 
 ### Kubelet
-The second component on the node is called the `kubelet`.  The Kubelet is the logical successor (and rewrite in go) of the [Container Agent](https://github.com/GoogleCloudPlatform/container-agent) that is part of the Compute Engine image.
+The second component on the node is called the `kubelet`.  The Kubelet is the logical successor (and rewritten in go) of the [Container Agent](https://github.com/GoogleCloudPlatform/container-agent) that is part of the Compute Engine image.
 
 The Kubelet works in terms of a container manifest.  A container manifest (defined [here](https://developers.google.com/compute/docs/containers/container_vms#container_manifest)) is a YAML file that describes a `pod`.  The Kubelet takes a set of manifests that are provided in various mechanisms and ensures that the containers described in those manifests are started and continue running.
 
