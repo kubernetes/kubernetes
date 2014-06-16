@@ -38,7 +38,7 @@ type RESTStorage interface {
 
 // Status is a return value for calls that don't return other objects
 type Status struct {
-	success bool
+	Success bool
 }
 
 // ApiServer is an HTTPHandler that delegates to RESTStorage objects.
@@ -195,7 +195,7 @@ func (server *ApiServer) handleREST(parts []string, url *url.URL, req *http.Requ
 			server.error(err, w)
 			return
 		}
-		server.write(200, Status{success: true}, w)
+		server.write(200, Status{Success: true}, w)
 		return
 	case "PUT":
 		if len(parts) != 2 {
