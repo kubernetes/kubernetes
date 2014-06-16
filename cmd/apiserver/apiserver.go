@@ -20,16 +20,17 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -71,7 +72,7 @@ func main() {
 		serviceRegistry = registry.MakeMemoryRegistry()
 	}
 
-	containerInfo := &kube_client.HTTPContainerInfo{
+	containerInfo := &client.HTTPContainerInfo{
 		Client: http.DefaultClient,
 		Port:   10250,
 	}
@@ -87,7 +88,7 @@ func main() {
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	s := &http.Server{
-		Addr:           fmt.Sprintf("%s:%d", *address, *port),
+		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
 		Handler:        apiserver.New(storage, *apiPrefix),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
