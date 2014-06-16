@@ -20,17 +20,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
-	"math/rand"
-	"net/http"
-	"time"
+	"net"
+	"strconv"
 
-	"github.com/coreos/go-etcd/etcd"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -53,45 +47,13 @@ func main() {
 		log.Fatal("No machines specified!")
 	}
 
-	var (
-		podRegistry        registry.PodRegistry
-		controllerRegistry registry.ControllerRegistry
-		serviceRegistry    registry.ServiceRegistry
-	)
+	var m *master.Master
 
 	if len(etcdServerList) > 0 {
-		log.Printf("Creating etcd client pointing to %v", etcdServerList)
-		etcdClient := etcd.NewClient(etcdServerList)
-		podRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
-		controllerRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
-		serviceRegistry = registry.MakeEtcdRegistry(etcdClient, machineList)
+		m = master.New(etcdServerList, machineList)
 	} else {
-		podRegistry = registry.MakeMemoryRegistry()
-		controllerRegistry = registry.MakeMemoryRegistry()
-		serviceRegistry = registry.MakeMemoryRegistry()
+		m = master.NewMemoryServer(machineList)
 	}
 
-	containerInfo := &kube_client.HTTPContainerInfo{
-		Client: http.DefaultClient,
-		Port:   10250,
-	}
-
-	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
-	storage := map[string]apiserver.RESTStorage{
-		"pods": registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry, random)),
-		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),
-		"services":               registry.MakeServiceRegistryStorage(serviceRegistry),
-	}
-
-	endpoints := registry.MakeEndpointController(serviceRegistry, podRegistry)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
-
-	s := &http.Server{
-		Addr:           fmt.Sprintf("%s:%d", *address, *port),
-		Handler:        apiserver.New(storage, *apiPrefix),
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-	log.Fatal(s.ListenAndServe())
+	log.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))
 }
