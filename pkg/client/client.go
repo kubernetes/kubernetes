@@ -112,6 +112,8 @@ func (client Client) makeURL(path string) string {
 	return client.Host + "/api/v1beta1/" + path
 }
 
+// EncodeLabelQuery transforms a label query expressed as a key/value map, into a
+// comma separated, key=value encoding.
 func EncodeLabelQuery(labelQuery map[string]string) string {
 	query := make([]string, 0, len(labelQuery))
 	for key, value := range labelQuery {
@@ -120,6 +122,8 @@ func EncodeLabelQuery(labelQuery map[string]string) string {
 	return url.QueryEscape(strings.Join(query, ","))
 }
 
+// DecodeLabelQuery transforms a label query from a comma separated, key=value format into
+// a key/value map.
 func DecodeLabelQuery(labelQuery string) map[string]string {
 	result := map[string]string{}
 	if len(labelQuery) == 0 {

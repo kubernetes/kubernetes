@@ -26,10 +26,12 @@ type ContainerManifest struct {
 	Id         string      `yaml:"id,omitempty" json:"id,omitempty"`
 }
 
+// Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	Name string `yaml:"name" json:"name"`
 }
 
+// Port represents a network port in a single container
 type Port struct {
 	Name          string `yaml:"name,omitempty" json:"name,omitempty"`
 	HostPort      int    `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
@@ -37,12 +39,15 @@ type Port struct {
 	Protocol      string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 }
 
+// VolumeMount describes a mounting of a Volume within a container
 type VolumeMount struct {
+	// Name must match the Name of a volume [above]
 	Name      string `yaml:"name,omitempty" json:"name,omitempty"`
 	ReadOnly  bool   `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
 }
 
+// EnvVar represents an environment variable present in a Container
 type EnvVar struct {
 	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
