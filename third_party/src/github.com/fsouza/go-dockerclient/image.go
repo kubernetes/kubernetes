@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
 
 // APIImages represent an image returned in the ListImages call.
@@ -27,6 +28,34 @@ type APIImages struct {
 	ParentId    string `json:",omitempty"`
 	Repository  string `json:",omitempty"`
 	Tag         string `json:",omitempty"`
+}
+
+type Image struct {
+	ID              string    `json:"id"`
+	Parent          string    `json:"parent,omitempty"`
+	Comment         string    `json:"comment,omitempty"`
+	Created         time.Time `json:"created"`
+	Container       string    `json:"container,omitempty"`
+	ContainerConfig Config    `json:"containerconfig,omitempty"`
+	DockerVersion   string    `json:"dockerversion,omitempty"`
+	Author          string    `json:"author,omitempty"`
+	Config          *Config   `json:"config,omitempty"`
+	Architecture    string    `json:"architecture,omitempty"`
+	Size            int64
+}
+
+type ImagePre012 struct {
+	ID              string    `json:"id"`
+	Parent          string    `json:"parent,omitempty"`
+	Comment         string    `json:"comment,omitempty"`
+	Created         time.Time `json:"created"`
+	Container       string    `json:"container,omitempty"`
+	ContainerConfig Config    `json:"container_config,omitempty"`
+	DockerVersion   string    `json:"docker_version,omitempty"`
+	Author          string    `json:"author,omitempty"`
+	Config          *Config   `json:"config,omitempty"`
+	Architecture    string    `json:"architecture,omitempty"`
+	Size            int64
 }
 
 var (
@@ -86,11 +115,35 @@ func (c *Client) InspectImage(name string) (*Image, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var image Image
-	err = json.Unmarshal(body, &image)
-	if err != nil {
-		return nil, err
+
+	// if the caller elected to skip checking the server's version, assume it's the latest
+	if c.SkipServerVersionCheck || c.expectedApiVersion.GreaterThanOrEqualTo(apiVersion_1_12) {
+		err = json.Unmarshal(body, &image)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var imagePre012 ImagePre012
+		err = json.Unmarshal(body, &imagePre012)
+		if err != nil {
+			return nil, err
+		}
+
+		image.ID = imagePre012.ID
+		image.Parent = imagePre012.Parent
+		image.Comment = imagePre012.Comment
+		image.Created = imagePre012.Created
+		image.Container = imagePre012.Container
+		image.ContainerConfig = imagePre012.ContainerConfig
+		image.DockerVersion = imagePre012.DockerVersion
+		image.Author = imagePre012.Author
+		image.Config = imagePre012.Config
+		image.Architecture = imagePre012.Architecture
+		image.Size = imagePre012.Size
 	}
+
 	return &image, nil
 }
 

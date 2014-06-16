@@ -5,12 +5,13 @@
 package docker
 
 import (
-	"github.com/fsouza/go-dockerclient/engine"
 	"net/http"
 	"net/url"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/fsouza/go-dockerclient/engine"
 )
 
 type DockerVersion struct {
