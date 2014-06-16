@@ -677,6 +677,17 @@ func TestMakePortsAndBindings(t *testing.T) {
 			{
 				ContainerPort: 443,
 				HostPort:      443,
+				Protocol:      "tcp",
+			},
+			{
+				ContainerPort: 444,
+				HostPort:      444,
+				Protocol:      "udp",
+			},
+			{
+				ContainerPort: 445,
+				HostPort:      445,
+				Protocol:      "foobar",
 			},
 		},
 	}
@@ -685,6 +696,27 @@ func TestMakePortsAndBindings(t *testing.T) {
 		len(container.Ports) != len(bindings) {
 		t.Errorf("Unexpected ports and bindings, %#v %#v %#v", container, exposedPorts, bindings)
 	}
+	for key, value := range bindings {
+		switch value[0].HostPort {
+		case "8080":
+			if !reflect.DeepEqual(docker.Port("80/tcp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+		case "443":
+			if !reflect.DeepEqual(docker.Port("443/tcp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+		case "444":
+			if !reflect.DeepEqual(docker.Port("444/udp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+		case "445":
+			if !reflect.DeepEqual(docker.Port("445/tcp"), key) {
+				t.Errorf("Unexpected docker port: %#v", key)
+			}
+		}
+	}
+
 }
 
 func TestExtractFromNonExistentFile(t *testing.T) {
