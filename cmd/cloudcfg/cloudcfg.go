@@ -46,6 +46,7 @@ var (
 	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
 	json         = flag.Bool("json", false, "If true, print raw JSON for responses")
 	yaml         = flag.Bool("yaml", false, "If true, print raw YAML for responses")
+	verbose      = flag.Bool("verbose", false, "If true, print extra information")
 )
 
 func usage() {
@@ -77,7 +78,9 @@ func readConfig(storage string) []byte {
 	if err != nil {
 		log.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
 	}
-	log.Printf("Parsed config file successfully; sending:\n%v\n", string(data))
+	if *verbose {
+		log.Printf("Parsed config file successfully; sending:\n%v\n", string(data))
+	}
 	return data
 }
 
