@@ -10,6 +10,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
     $ cd kubernetes
     $ hack/dev-build-and-up.sh
+    $ hack/build-go.sh
 
 ### Step One: Turn up the redis master.
 
@@ -50,45 +51,10 @@ cluster/cloudcfg.sh list /pods
 
 You'll see a single redis master pod. It will also display the machine that the pod is running on.
 
-```javascript
-Using master: kubernetes-master (external IP: 1.2.3.4)
-{
-    "kind": "cluster#podList",
-    "items": [
-        {
-            "id": "redis-master-2",
-            "labels": {
-                "name": "redis-master"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "name": "master",
-                            "image": "dockerfile/redis",
-                            "ports": [
-                                {
-                                    "hostPort": 6379,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-3.c.{project-id}.internal"
-            }
-        }
-    ]
-}
+```
+Name                Image(s)            Host                                          Labels
+----------          ----------          ----------                                    ----------
+redis-master-2      dockerfile/redis    kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
@@ -121,18 +87,11 @@ The pod that you created in Step One has the label `name=redis-master`, so the c
 
 Once you have that service description, you can create the service with the `cloudcfg` cli:
 
-```js
+```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-master-service.json create /services
-
-Using master: kubernetes-master (external IP: 1.2.3.4)
-{
-    "id": "redismaster",
-    "port": 10000,
-    "labels": {
-        "name": "redis-master"
-    }
-}
-
+Name                Label Query         Port
+----------          ----------          ----------
+redismaster         name=redis-master   10000
 ```
 
 Once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 10000).
@@ -165,45 +124,11 @@ Create a file named `redis-slave-controller.json` that contains:
 
 Then you can create the service by running:
 
-```js
+```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-controller.json create /replicationControllers
-
-Using master: kubernetes-master (external IP: 1.2.3.4)
-{
-    "id": "redisSlaveController",
-    "desiredState": {
-        "replicas": 2,
-        "replicasInSet": {
-            "name": "redisslave"
-        },
-        "podTemplate": {
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/redis-slave",
-                            "ports": [
-                                {
-                                    "hostPort": 6380,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "labels": {
-                "name": "redisslave"
-            }
-        }
-    },
-    "labels": {
-        "name": "redisslave"
-    }
-}
-
+Name                   Image(s)                   Label Query         Replicas
+----------             ----------                 ----------          ----------
+redisSlaveController   brendanburns/redis-slave   name=redisslave     2
 ```
 
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment.  In particular, the redis slave is started with the following command:
@@ -214,111 +139,13 @@ redis-server --slaveof $SERVICE_HOST $REDISMASTER_SERVICE_PORT
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
-```js
+```shell
 $ cluster/cloudcfg.sh list /pods
-
-Using master: kubernetes-master (external IP: 23.236.49.160)
-{
-    "kind": "cluster#podList",
-    "items": [
-        {
-            "id": "redis-master-2",
-            "labels": {
-                "name": "redis-master"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "name": "master",
-                            "image": "dockerfile/redis",
-                            "ports": [
-                                {
-                                    "hostPort": 6379,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-3.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "4d65822107fcfd52",
-            "labels": {
-                "name": "redisslave",
-                "replicationController": "redisSlaveController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/redis-slave",
-                            "ports": [
-                                {
-                                    "hostPort": 6380,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-3.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "78629a0f5f3f164f",
-            "labels": {
-                "name": "redisslave",
-                "replicationController": "redisSlaveController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/redis-slave",
-                            "ports": [
-                                {
-                                    "hostPort": 6380,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-2.c.{project-id}.internal"
-            }
-        }
-    ]
-}
+Name                Image(s)                   Host                                          Labels
+----------          ----------                 ----------                                    ----------
+redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
+4d65822107fcfd52    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
+78629a0f5f3f164f    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
 ```
 
 You will see a single redis master pod and two redis slave pods.
@@ -341,18 +168,11 @@ This time the label query for the service is `name=redis-slave`.
 
 Now that you have created the service specification, create it in your cluster with the `cloudcfg` CLI:
 
-```js
+```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-service.json create /services
-
-Using master: kubernetes-master (external IP: 1.2.3.4)
-{
-    "id": "redisslave",
-    "port": 10001,
-    "labels": {
-        "name": "redisslave"
-    }
-}
-
+Name                Label Query         Port
+----------          ----------          ----------
+redisslave          name=redisslave     10001
 ```
 
 ### Step Five: Create the frontend pod.
@@ -384,251 +204,25 @@ Create a file named `frontend-controller.json`:
 
 With this file, you can turn up your frontend with:
 
-```js
+```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/frontend-controller.json create /replicationControllers
-
-Using master: kubernetes-master (external IP: 1.2.3.4)
-{
-    "id": "frontendController",
-    "desiredState": {
-        "replicas": 3,
-        "replicasInSet": {
-            "name": "frontend"
-        },
-        "podTemplate": {
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/php-redis",
-                            "ports": [
-                                {
-                                    "hostPort": 8080,
-                                    "containerPort": 80
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "labels": {
-                "name": "frontend"
-            }
-        }
-    },
-    "labels": {
-        "name": "frontend"
-    }
-}
-
+Name                 Image(s)                 Label Query         Replicas
+----------           ----------               ----------          ----------
+frontendController   brendanburns/php-redis   name=frontend       3
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
-```js
+```shell
 $ cluster/cloudcfg.sh list /pods
-
-Using master: kubernetes-master (external IP: 1.2.3.4)
-{
-    "kind": "cluster#podList",
-    "items": [
-        {
-            "id": "redis-master-2",
-            "labels": {
-                "name": "redis-master"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "name": "master",
-                            "image": "dockerfile/redis",
-                            "ports": [
-                                {
-                                    "hostPort": 6379,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-3.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "4d65822107fcfd52",
-            "labels": {
-                "name": "redisslave",
-                "replicationController": "redisSlaveController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/redis-slave",
-                            "ports": [
-                                {
-                                    "hostPort": 6380,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-3.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "55104dc76695721d",
-            "labels": {
-                "name": "frontend",
-                "replicationController": "frontendController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/php-redis",
-                            "ports": [
-                                {
-                                    "hostPort": 8080,
-                                    "containerPort": 80
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-3.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "78629a0f5f3f164f",
-            "labels": {
-                "name": "redisslave",
-                "replicationController": "redisSlaveController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/redis-slave",
-                            "ports": [
-                                {
-                                    "hostPort": 6380,
-                                    "containerPort": 6379
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-2.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "380704bb7b4d7c03",
-            "labels": {
-                "name": "frontend",
-                "replicationController": "frontendController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/php-redis",
-                            "ports": [
-                                {
-                                    "hostPort": 8080,
-                                    "containerPort": 80
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-2.c.{project-id}.internal"
-            }
-        },
-        {
-            "id": "365a858149c6e2d1",
-            "labels": {
-                "name": "frontend",
-                "replicationController": "frontendController"
-            },
-            "desiredState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": [
-                        {
-                            "image": "brendanburns/php-redis",
-                            "ports": [
-                                {
-                                    "hostPort": 8080,
-                                    "containerPort": 80
-                                }
-                            ]
-                        }
-                    ]
-                }
-            },
-            "currentState": {
-                "manifest": {
-                    "version": "",
-                    "volumes": null,
-                    "containers": null
-                },
-                "host": "kubernetes-minion-4.c.{project-id}.internal"
-            }
-        }
-    ]
-}
-
+Name                Image(s)                   Host                                          Labels
+----------          ----------                 ----------                                    ----------
+redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
+4d65822107fcfd52    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
+380704bb7b4d7c03    brendanburns/php-redis     kubernetes-minion-3.c.briandpe-api.internal   name=frontend,replicationController=frontendController
+55104dc76695721d    brendanburns/php-redis     kubernetes-minion-2.c.briandpe-api.internal   name=frontend,replicationController=frontendController
+365a858149c6e2d1    brendanburns/php-redis     kubernetes-minion-1.c.briandpe-api.internal   name=frontend,replicationController=frontendController
+78629a0f5f3f164f    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
 ```
 
 You will see a single redis master pod, two redis slaves, and three frontend pods.
@@ -675,6 +269,18 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console], and visit `http://<host-ip>:8080`. You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool.
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:8080`. 
+
+```shell
+$ gcutil listinstances
+```
+
+You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+
+```shell
+$ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
+```
+For details about limiting traffic to specific sources, see the [gcutil documentation][gcutil-docs]
 
 [cloud-console]: https://console.developer.google.com
+[gcutil-docs]: https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall
