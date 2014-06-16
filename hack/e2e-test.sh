@@ -32,12 +32,15 @@ export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/cloudcfg.sh"
 
 source "${KUBE_REPO_ROOT}/cluster/util.sh"
 
-if [[ ${ALREADY_UP} -ne 1 ]]; then
-  # Build a release
-  $(dirname $0)/../release/release.sh
+# Build a release
+$(dirname $0)/../release/release.sh
 
+if [[ ${ALREADY_UP} -ne 1 ]]; then
   # Now bring a test cluster up with that release.
   $(dirname $0)/../cluster/kube-up.sh
+else
+  # Just push instead
+  $(dirname $0)/../cluster/kube-push.sh
 fi
 
 # Detect the project into $PROJECT if it isn't set
