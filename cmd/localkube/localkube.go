@@ -23,14 +23,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
-	"net/http"
+	"net"
 	"os"
+	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -80,36 +80,8 @@ func fake_kubelet() {
 
 // Starts api services (the master). Never returns.
 func api_server() {
-	machineList := util.StringList{*kubelet_address}
-
-	etcdClient := etcd.NewClient([]string{*etcd_server})
-	podRegistry := registry.MakeEtcdRegistry(etcdClient, machineList)
-	controllerRegistry := registry.MakeEtcdRegistry(etcdClient, machineList)
-	serviceRegistry := registry.MakeEtcdRegistry(etcdClient, machineList)
-
-	containerInfo := &client.HTTPContainerInfo{
-		Client: http.DefaultClient,
-		Port:   *kubelet_port,
-	}
-	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
-
-	storage := map[string]apiserver.RESTStorage{
-		"pods": registry.MakePodRegistryStorage(podRegistry, containerInfo, registry.MakeFirstFitScheduler(machineList, podRegistry, random)),
-		"replicationControllers": registry.MakeControllerRegistryStorage(controllerRegistry),
-		"services":               registry.MakeServiceRegistryStorage(serviceRegistry),
-	}
-
-	endpoints := registry.MakeEndpointController(serviceRegistry, podRegistry)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
-
-	s := &http.Server{
-		Addr:           fmt.Sprintf("%s:%d", *master_address, *master_port),
-		Handler:        apiserver.New(storage, *apiPrefix),
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-	log.Fatal(s.ListenAndServe())
+	m := master.New([]string{*etcd_server}, []string{*kubelet_address})
+	log.Fatal(m.Run(net.JoinHostPort(*master_address, strconv.Itoa(int(*master_port))), *apiPrefix))
 }
 
 // Starts up a controller manager. Never returns.
