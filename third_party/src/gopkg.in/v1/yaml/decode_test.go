@@ -571,7 +571,7 @@ longTag:
   label: center/big
 
 inlineMap:
-  # Inlined map
+  # Inlined map 
   << : {"x": 1, "y": 2, "r": 10}
   label: center/big
 
