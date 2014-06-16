@@ -20,13 +20,14 @@ However, initial development was done on GCE and so our instructions and scripts
 
 1. You need a Google Cloud Platform account with billing enabled. Visit
    [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
-2. You must have Go installed: [www.golang.org](http://www.golang.org).
-3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
-4. Get the Kubernetes source:
+2. Make sure you can start up a GCE VM.  At least make sure you can do the [Create an instance](https://developers.google.com/compute/docs/quickstart#addvm) part of the GCE Quickstart.
+3. You must have Go installed: [www.golang.org](http://www.golang.org).
+4. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
+5. Get the Kubernetes source:
 
         git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 
-5. Setting up a cluster requires the `htpasswd` tool in order to hash a randomly generated password for accessing the API server.  This is already installed on recent version of Mac OS X but on Linux you need to install it yourself.  On Debian/Ubuntu you can do this with:
+6. Setting up a cluster requires the `htpasswd` tool in order to hash a randomly generated password for accessing the API server.  This is already installed on recent version of Mac OS X but on Linux you need to install it yourself.  On Debian/Ubuntu you can do this with:
 
         sudo apt-get update
         sudo apt-get install apache2-utils
