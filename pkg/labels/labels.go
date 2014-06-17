@@ -26,11 +26,11 @@ type Labels interface {
 }
 
 // A map of label:value. Implements Labels.
-type LabelSet map[string]string
+type Set map[string]string
 
 // All labels listed as a human readable string. Conveiently, exactly the format
 // that ParseQuery takes.
-func (ls LabelSet) String() string {
+func (ls Set) String() string {
 	query := make([]string, 0, len(ls))
 	for key, value := range ls {
 		query = append(query, key+"="+value)
@@ -39,6 +39,6 @@ func (ls LabelSet) String() string {
 }
 
 // Implement Labels interface.
-func (ls LabelSet) Get(label string) string {
+func (ls Set) Get(label string) string {
 	return ls[label]
 }

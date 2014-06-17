@@ -40,7 +40,7 @@ func (storage *ControllerRegistryStorage) List(query labels.Query) (interface{},
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
 		for _, controller := range controllers {
-			if query.Matches(labels.LabelSet(controller.Labels)) {
+			if query.Matches(labels.Set(controller.Labels)) {
 				result.Items = append(result.Items, controller)
 			}
 		}

@@ -20,24 +20,24 @@ import (
 	"testing"
 )
 
-func matches(t *testing.T, ls LabelSet, want string) {
+func matches(t *testing.T, ls Set, want string) {
 	if ls.String() != want {
 		t.Errorf("Expected '%s', but got '%s'", want, ls.String())
 	}
 }
 
-func TestLabelSetString(t *testing.T) {
-	matches(t, LabelSet{"x": "y"}, "x=y")
-	matches(t, LabelSet{"foo": "bar"}, "foo=bar")
-	matches(t, LabelSet{"foo": "bar", "baz": "qup"}, "foo=bar,baz=qup")
+func TestSetString(t *testing.T) {
+	matches(t, Set{"x": "y"}, "x=y")
+	matches(t, Set{"foo": "bar"}, "foo=bar")
+	matches(t, Set{"foo": "bar", "baz": "qup"}, "foo=bar,baz=qup")
 
 	// TODO: Make our label representation robust enough to handel labels
 	// with ",=!" characters in their names.
 }
 
 func TestLabelGet(t *testing.T) {
-	ls := LabelSet{"x": "y"}
+	ls := Set{"x": "y"}
 	if ls.Get("x") != "y" {
-		t.Errorf("LabelSet.Get is broken")
+		t.Errorf("Set.Get is broken")
 	}
 }

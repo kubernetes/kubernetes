@@ -75,7 +75,7 @@ func (registry *EtcdRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
 			return pods, err
 		}
 		for _, pod := range machinePods {
-			if query.Matches(labels.LabelSet(pod.Labels)) {
+			if query.Matches(labels.Set(pod.Labels)) {
 				pods = append(pods, pod)
 			}
 		}

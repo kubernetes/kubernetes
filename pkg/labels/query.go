@@ -42,7 +42,7 @@ type queryTerm struct {
 
 	// Exactly one of the below three items should be used.
 
-	// If non-nil, we match LabelSet l iff l[*label] == *value.
+	// If non-nil, we match Set l iff l[*label] == *value.
 	label, value *string
 
 	// A list of terms which must all match for this query term to return true.
@@ -89,8 +89,8 @@ func try(queryPiece, op string) (lhs, rhs string, ok bool) {
 	return "", "", false
 }
 
-// Given a LabelSet, return a Query which will match exactly that LabelSet.
-func QueryFromSet(ls LabelSet) Query {
+// Given a Set, return a Query which will match exactly that Set.
+func QueryFromSet(ls Set) Query {
 	var query queryTerm
 	for l, v := range ls {
 		// Make a copy, because we're taking the address below

@@ -58,7 +58,7 @@ func (sr *ServiceRegistryStorage) List(query labels.Query) (interface{}, error) 
 	list.Kind = "cluster#serviceList"
 	var filtered []api.Service
 	for _, service := range list.Items {
-		if query.Matches(labels.LabelSet(service.Labels)) {
+		if query.Matches(labels.Set(service.Labels)) {
 			filtered = append(filtered, service)
 		}
 	}

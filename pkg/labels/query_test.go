@@ -47,7 +47,7 @@ func TestQueryParse(t *testing.T) {
 	}
 }
 
-func expectMatch(t *testing.T, query string, ls LabelSet) {
+func expectMatch(t *testing.T, query string, ls Set) {
 	lq, err := ParseQuery(query)
 	if err != nil {
 		t.Errorf("Unable to parse %v as a query\n", query)
@@ -58,7 +58,7 @@ func expectMatch(t *testing.T, query string, ls LabelSet) {
 	}
 }
 
-func expectNoMatch(t *testing.T, query string, ls LabelSet) {
+func expectNoMatch(t *testing.T, query string, ls Set) {
 	lq, err := ParseQuery(query)
 	if err != nil {
 		t.Errorf("Unable to parse %v as a query\n", query)
@@ -70,21 +70,21 @@ func expectNoMatch(t *testing.T, query string, ls LabelSet) {
 }
 
 func TestEverything(t *testing.T) {
-	if !Everything().Matches(LabelSet{"x": "y"}) {
+	if !Everything().Matches(Set{"x": "y"}) {
 		t.Errorf("Nil query didn't match")
 	}
 }
 
 func TestLabelQueryMatches(t *testing.T) {
-	expectMatch(t, "", LabelSet{"x": "y"})
-	expectMatch(t, "x=y", LabelSet{"x": "y"})
-	expectMatch(t, "x=y,z=w", LabelSet{"x": "y", "z": "w"})
-	expectMatch(t, "x!=y,z!=w", LabelSet{"x": "z", "z": "a"})
-	expectNoMatch(t, "x=y", LabelSet{"x": "z"})
-	expectNoMatch(t, "x=y,z=w", LabelSet{"x": "w", "z": "w"})
-	expectNoMatch(t, "x!=y,z!=w", LabelSet{"x": "z", "z": "w"})
+	expectMatch(t, "", Set{"x": "y"})
+	expectMatch(t, "x=y", Set{"x": "y"})
+	expectMatch(t, "x=y,z=w", Set{"x": "y", "z": "w"})
+	expectMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "a"})
+	expectNoMatch(t, "x=y", Set{"x": "z"})
+	expectNoMatch(t, "x=y,z=w", Set{"x": "w", "z": "w"})
+	expectNoMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "w"})
 
-	labelset := LabelSet{
+	labelset := Set{
 		"foo": "bar",
 		"baz": "blah",
 	}
@@ -96,28 +96,28 @@ func TestLabelQueryMatches(t *testing.T) {
 	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", labelset)
 }
 
-func expectMatchDirect(t *testing.T, query, ls LabelSet) {
+func expectMatchDirect(t *testing.T, query, ls Set) {
 	if !QueryFromSet(query).Matches(ls) {
 		t.Errorf("Wanted %s to match '%s', but it did not.\n", query, ls)
 	}
 }
 
-func expectNoMatchDirect(t *testing.T, query, ls LabelSet) {
+func expectNoMatchDirect(t *testing.T, query, ls Set) {
 	if QueryFromSet(query).Matches(ls) {
 		t.Errorf("Wanted '%s' to not match '%s', but it did.", query, ls)
 	}
 }
 
-func TestLabelSetMatches(t *testing.T) {
-	labelset := LabelSet{
+func TestSetMatches(t *testing.T) {
+	labelset := Set{
 		"foo": "bar",
 		"baz": "blah",
 	}
-	expectMatchDirect(t, LabelSet{}, labelset)
-	expectMatchDirect(t, LabelSet{"foo": "bar"}, labelset)
-	expectMatchDirect(t, LabelSet{"baz": "blah"}, labelset)
-	expectMatchDirect(t, LabelSet{"foo": "bar", "baz": "blah"}, labelset)
-	expectNoMatchDirect(t, LabelSet{"foo": "=blah"}, labelset)
-	expectNoMatchDirect(t, LabelSet{"baz": "=bar"}, labelset)
-	expectNoMatchDirect(t, LabelSet{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
+	expectMatchDirect(t, Set{}, labelset)
+	expectMatchDirect(t, Set{"foo": "bar"}, labelset)
+	expectMatchDirect(t, Set{"baz": "blah"}, labelset)
+	expectMatchDirect(t, Set{"foo": "bar", "baz": "blah"}, labelset)
+	expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
+	expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
+	expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
 }
