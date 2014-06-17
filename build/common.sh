@@ -90,6 +90,7 @@ function build-image() {
   set +e # We are handling the error here manually
   local -r DOCKER_OUTPUT="$(${DOCKER_BUILD_CMD} 2>&1)"
   if [ $? -ne 0 ]; then
+    set -e
     echo "+++ Docker build command failed." >&2
     echo >&2
     echo "${DOCKER_OUTPUT}" >&2
@@ -100,6 +101,8 @@ function build-image() {
     echo >&2
     return 1
   fi
+  set -e
+
 }
 
 # Run a command in the kube-build image.  This assumes that the image has
@@ -109,7 +112,7 @@ function run-build-command() {
 
   local -r DOCKER="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
-  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1
+  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 
   ${DOCKER} "$@"
 
@@ -130,10 +133,11 @@ function copy-output() {
     local DOCKER="docker run -a stdout --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
     # Kill any leftover container
-    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1
+    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 
     echo "+++ Syncing back output directory from boot2docker VM"
     mkdir -p "${LOCAL_OUTPUT_DIR}"
+    rm -rf "${LOCAL_OUTPUT_DIR}/*"
     ${DOCKER} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} ."  \
       | tar xv -C "${LOCAL_OUTPUT_DIR}"
 
@@ -146,3 +150,5 @@ function copy-output() {
     # rsync --blocking-io -av -e "${DOCKER}" foo:${REMOTE_OUTPUT_DIR}/ ${LOCAL_OUTPUT_DIR}
   fi
 }
+
+

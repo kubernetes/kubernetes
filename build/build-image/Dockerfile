@@ -13,15 +13,6 @@
 # limitations under the License.
 
 # This file creates a standard build environment for building Kubernetes
-#
-# Usage:
-#
-# # Assemble the full dev environment. This is slow the first time.
-# docker build -t kube-build .
-#
-# # Mount your source in an interactive container for quick testing:
-# docker run -v `pwd`:/go/src/github.com/GoogleCloudPlatform/kubernetes -i -t docker bash
-#
 
 FROM  google/debian:wheezy
 MAINTAINER  Joe Beda <jbeda@google.com>
@@ -50,14 +41,16 @@ RUN cd /usr/local/go/src && \
   bash -xc 'for platform in $KUBE_CROSSPLATFORMS; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean 2>&1; done'
 
 # Set up Go Environment
-ENV PATH  /usr/local/go/bin:/go/bin:$PATH
+ENV PATH    /go/bin:$PATH
 ENV GOPATH  /go:/go/src/github.com/GoogleCloudPlatform/kubernetes/third_party
-
-# Mark this as a kube-build container
-RUN touch /kube-build-image
+ENV GOOS    linux
+ENV GOARCH  amd64
 
 # Get the code coverage tool and etcd for integration tests
 RUN go get code.google.com/p/go.tools/cmd/cover github.com/coreos/etcd
+
+# Mark this as a kube-build container
+RUN touch /kube-build-image
 
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
 

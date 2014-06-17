@@ -25,3 +25,33 @@ mkdir -p "${KUBE_TARGET}"
 if [[ ! -f "/kube-build-image" ]]; then
   echo "WARNING: This script should be run in the kube-build conrtainer image!" >&2
 fi
+
+function make-binaries() {
+  readonly BINARIES="
+    proxy
+    integration
+    apiserver
+    controller-manager
+    kubelet
+    cloudcfg
+    localkube"
+
+  ARCH_TARGET="${KUBE_TARGET}/${GOOS}/${GOARCH}"
+  mkdir -p "${ARCH_TARGET}"
+
+  function make-binary() {
+    echo "+++ Building $1 for ${GOOS}/${GOARCH}"
+    go build \
+      -o "${ARCH_TARGET}/$1" \
+      github.com/GoogleCloudPlatform/kubernetes/cmd/$1
+  }
+
+  if [[ -n $1 ]]; then
+    make-binary $1
+    exit 0
+  fi
+
+  for b in ${BINARIES}; do
+    make-binary $b
+  done
+}

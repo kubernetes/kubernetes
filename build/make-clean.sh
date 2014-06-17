@@ -14,16 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the docker image necessary for building Kubernetes
+# Make all of the Kubernetes binaries.
 #
-# This script will package the parts of the repo that we need to build
-# Kubernetes into a tar file and put it in the right place in the output
-# directory.  It will then copy over the Dockerfile and build the kube-build
-# image.
+# This makes the docker build image, builds the binaries and copies them out
+# of the docker container.
 
 set -e
 
 source $(dirname $0)/common.sh
 
 build-image
-run-build-command bash
+run-build-command rm -rf output/build/*

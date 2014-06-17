@@ -20,26 +20,4 @@ set -e
 
 source $(dirname $0)/common.sh
 
-readonly BINARIES="
-  proxy
-  integration
-  apiserver
-  controller-manager
-  kubelet
-  cloudcfg
-  localkube"
-
-if [[ -n $1 ]]; then
-  echo "+++ Building $1"
-  go build \
-    -o "${KUBE_TARGET}/$1" \
-    github.com/GoogleCloudPlatform/kubernetes/cmd/$1
-  exit 0
-fi
-
-for b in ${BINARIES}; do
-  echo "+++ Building $b"
-  go build \
-    -o "${KUBE_TARGET}/$b" \
-    github.com/GoogleCloudPlatform/kubernetes/cmd/$b
-done
+make-binaries

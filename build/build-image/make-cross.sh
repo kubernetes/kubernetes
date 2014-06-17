@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,16 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the docker image necessary for building Kubernetes
-#
-# This script will package the parts of the repo that we need to build
-# Kubernetes into a tar file and put it in the right place in the output
-# directory.  It will then copy over the Dockerfile and build the kube-build
-# image.
+# This and builds all go components.
 
 set -e
 
 source $(dirname $0)/common.sh
 
-build-image
-run-build-command bash
+readonly CROSS_BINARIES="
+  cloudcfg
+"
+
+for platform in ${KUBE_CROSSPLATFORMS}; do
+  (
+    export GOOS=${platform%/*}
+    export GOARCH=${platform##*/}
+    for binary in ${CROSS_BINARIES}; do
+      make-binaries "${binary}"
+    done
+  )
+done

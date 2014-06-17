@@ -25,4 +25,3 @@ source $(dirname $0)/common.sh
 
 build-image
 run-build-command build/build-image/make-binaries.sh "$@"
-copy-output
