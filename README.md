@@ -179,7 +179,8 @@ git rebase upstream/master
 ### Regenerating the documentation
 ```
 cd kubernetes/api
-sudo docker build -t kubernetes/raml2html - < raml2html.dockerfile
-sudo docker run -v `pwd`:/data kubernetes/raml2html
+sudo docker build -t kubernetes/raml2html .
+sudo docker run --name="docgen" kubernetes/raml2html
+sudo docker cp docgen:/data/kubernetes.html .
 ```
 
