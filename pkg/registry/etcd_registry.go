@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 
 	"github.com/coreos/go-etcd/etcd"
 
@@ -96,20 +97,32 @@ func (registry *EtcdRegistry) listEtcdNode(key string) ([]*etcd.Node, error) {
 	return result.Node.Nodes, nil
 }
 
-func (registry *EtcdRegistry) listPodsForMachine(machine string) ([]api.Pod, error) {
-	pods := []api.Pod{}
-	key := "/registry/hosts/" + machine + "/pods"
-	nodes, err := registry.listEtcdNode(key)
-	for _, node := range nodes {
-		pod := api.Pod{}
-		err = json.Unmarshal([]byte(node.Value), &pod)
-		if err != nil {
-			return pods, err
-		}
-		pod.CurrentState.Host = machine
-		pods = append(pods, pod)
+// Extract a go object per etcd node into a slice.
+func (r *EtcdRegistry) extractList(key string, slicePtr interface{}) error {
+	nodes, err := r.listEtcdNode(key)
+	if err != nil {
+		return err
 	}
-	return pods, err
+	pv := reflect.ValueOf(slicePtr)
+	if pv.Type().Kind() != reflect.Ptr || pv.Type().Elem().Kind() != reflect.Slice {
+		// This should not happen at runtime.
+		panic("need ptr to slice")
+	}
+	v := pv.Elem()
+	for _, node := range nodes {
+		obj := reflect.New(v.Type().Elem())
+		err = json.Unmarshal([]byte(node.Value), obj.Interface())
+		if err != nil {
+			return err
+		}
+		v.Set(reflect.Append(v, obj.Elem()))
+	}
+	return nil
+}
+
+func (registry *EtcdRegistry) listPodsForMachine(machine string) (pods []api.Pod, err error) {
+	err = registry.extractList("/registry/hosts/"+machine+"/pods", &pods)
+	return
 }
 
 func (registry *EtcdRegistry) GetPod(podID string) (*api.Pod, error) {
@@ -262,17 +275,8 @@ func isEtcdNotFound(err error) bool {
 
 func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, error) {
 	var controllers []api.ReplicationController
-	key := "/registry/controllers"
-	nodes, err := registry.listEtcdNode(key)
-	for _, node := range nodes {
-		var controller api.ReplicationController
-		err = json.Unmarshal([]byte(node.Value), &controller)
-		if err != nil {
-			return controllers, err
-		}
-		controllers = append(controllers, controller)
-	}
-	return controllers, nil
+	err := registry.extractList("/registry/controllers", &controllers)
+	return controllers, err
 }
 
 func makeControllerKey(id string) string {
@@ -323,21 +327,9 @@ func makeServiceKey(name string) string {
 }
 
 func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
-	nodes, err := registry.listEtcdNode("/registry/services/specs")
-	if err != nil {
-		return api.ServiceList{}, err
-	}
-
-	var services []api.Service
-	for _, node := range nodes {
-		var svc api.Service
-		err := json.Unmarshal([]byte(node.Value), &svc)
-		if err != nil {
-			return api.ServiceList{}, err
-		}
-		services = append(services, svc)
-	}
-	return api.ServiceList{Items: services}, nil
+	var list api.ServiceList
+	err := registry.extractList("/registry/services/specs", &list.Items)
+	return list, err
 }
 
 func (registry *EtcdRegistry) CreateService(svc api.Service) error {
