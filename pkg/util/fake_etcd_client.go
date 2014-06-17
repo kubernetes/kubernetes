@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package registry
+package util
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ type EtcdResponseWithError struct {
 
 type FakeEtcdClient struct {
 	Data        map[string]EtcdResponseWithError
-	deletedKeys []string
+	DeletedKeys []string
 	Err         error
 	t           *testing.T
 	Ix          int
@@ -71,18 +71,10 @@ func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, 
 	return f.Set(key, value, ttl)
 }
 func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
-	f.deletedKeys = append(f.deletedKeys, key)
+	f.DeletedKeys = append(f.DeletedKeys, key)
 	return &etcd.Response{}, f.Err
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
 	return nil, fmt.Errorf("unimplemented")
-}
-
-func MakeTestEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
-	registry := MakeEtcdRegistry(client, machines)
-	registry.manifestFactory = &BasicManifestFactory{
-		serviceRegistry: &MockServiceRegistry{},
-	}
-	return registry
 }
