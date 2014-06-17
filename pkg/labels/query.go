@@ -30,6 +30,11 @@ type Query interface {
 	String() string
 }
 
+// Everything returns a query that matches all labels.
+func Everything() Query {
+	return &queryTerm{}
+}
+
 // A single term of a label query.
 type queryTerm struct {
 	// Not inverts the meaning of the items in this term.
@@ -82,6 +87,17 @@ func try(queryPiece, op string) (lhs, rhs string, ok bool) {
 		return pieces[0], pieces[1], true
 	}
 	return "", "", false
+}
+
+// Given a LabelSet, return a Query which will match exactly that LabelSet.
+func QueryFromSet(ls LabelSet) Query {
+	var query queryTerm
+	for l, v := range ls {
+		// Make a copy, because we're taking the address below
+		label, value := l, v
+		query.and = append(query.and, queryTerm{label: &label, value: &value})
+	}
+	return &query
 }
 
 // Takes a string repsenting a label query and returns an object suitable for matching, or an error.
