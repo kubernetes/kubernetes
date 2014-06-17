@@ -28,7 +28,7 @@ import (
 
 // RESTStorage is a generic interface for RESTful storage services
 type RESTStorage interface {
-	List(*url.URL) (interface{}, error)
+	List(LabelQuery) (interface{}, error)
 	Get(id string) (interface{}, error)
 	Delete(id string) error
 	Extract(body string) (interface{}, error)
@@ -141,28 +141,33 @@ func (server *ApiServer) readBody(req *http.Request) (string, error) {
 //   PUT        /foo/bar      update 'bar'
 //   DELETE     /foo/bar      delete 'bar'
 // Returns 404 if the method/pattern doesn't match one of these entries
-func (server *ApiServer) handleREST(parts []string, url *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
 	switch req.Method {
 	case "GET":
 		switch len(parts) {
 		case 1:
-			controllers, err := storage.List(url)
+			query, err := ParseLabelQuery(requestUrl.Query().Get("labels"))
+			if err != nil {
+				server.error(err, w)
+				return
+			}
+			controllers, err := storage.List(query)
 			if err != nil {
 				server.error(err, w)
 				return
 			}
 			server.write(200, controllers, w)
 		case 2:
-			pod, err := storage.Get(parts[1])
+			item, err := storage.Get(parts[1])
 			if err != nil {
 				server.error(err, w)
 				return
 			}
-			if pod == nil {
+			if item == nil {
 				server.notFound(req, w)
 				return
 			}
-			server.write(200, pod, w)
+			server.write(200, item, w)
 		default:
 			server.notFound(req, w)
 		}

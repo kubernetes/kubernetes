@@ -245,30 +245,6 @@ func expectEqual(t *testing.T, expected, observed interface{}) {
 	}
 }
 
-func TestEncodeDecodeLabelQuery(t *testing.T) {
-	queryIn := map[string]string{
-		"foo": "bar",
-		"baz": "blah",
-	}
-	queryString, _ := url.QueryUnescape(EncodeLabelQuery(queryIn))
-	queryOut := DecodeLabelQuery(queryString)
-	expectEqual(t, queryIn, queryOut)
-}
-
-func TestDecodeEmpty(t *testing.T) {
-	query := DecodeLabelQuery("")
-	if len(query) != 0 {
-		t.Errorf("Unexpected query: %#v", query)
-	}
-}
-
-func TestDecodeBad(t *testing.T) {
-	query := DecodeLabelQuery("foo")
-	if len(query) != 0 {
-		t.Errorf("Unexpected query: %#v", query)
-	}
-}
-
 func TestGetController(t *testing.T) {
 	expectedController := api.ReplicationController{
 		JSONBase: api.JSONBase{

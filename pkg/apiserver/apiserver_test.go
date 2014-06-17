@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
 	"testing"
 )
@@ -50,7 +49,7 @@ type SimpleRESTStorage struct {
 	updated Simple
 }
 
-func (storage *SimpleRESTStorage) List(*url.URL) (interface{}, error) {
+func (storage *SimpleRESTStorage) List(LabelQuery) (interface{}, error) {
 	result := SimpleList{
 		Items: storage.list,
 	}
