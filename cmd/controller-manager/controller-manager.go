@@ -29,7 +29,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -53,7 +52,6 @@ func main() {
 			Host: "http://" + *master,
 		})
 
-	go util.Forever(func() { controllerManager.Synchronize() }, 20*time.Second)
-	go util.Forever(func() { controllerManager.WatchControllers() }, 20*time.Second)
+	controllerManager.Run(10 * time.Second)
 	select {}
 }
