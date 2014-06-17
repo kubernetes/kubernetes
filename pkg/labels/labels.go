@@ -29,7 +29,7 @@ type Labels interface {
 // A map of label:value. Implements Labels.
 type Set map[string]string
 
-// All labels listed as a human readable string. Conveiently, exactly the format
+// All labels listed as a human readable string. Conveniently, exactly the format
 // that ParseQuery takes.
 func (ls Set) String() string {
 	query := make([]string, 0, len(ls))
