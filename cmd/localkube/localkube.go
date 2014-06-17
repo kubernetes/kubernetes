@@ -80,7 +80,7 @@ func fake_kubelet() {
 
 // Starts api services (the master). Never returns.
 func api_server() {
-	m := master.New([]string{*etcd_server}, []string{*kubelet_address})
+	m := master.New([]string{*etcd_server}, []string{*kubelet_address}, nil)
 	log.Fatal(m.Run(net.JoinHostPort(*master_address, strconv.Itoa(int(*master_port))), *apiPrefix))
 }
 

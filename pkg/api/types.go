@@ -140,9 +140,10 @@ type ServiceList struct {
 // Defines a service abstraction by a name (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the labels that define the service.
 type Service struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Port     int               `json:"port,omitempty" yaml:"port,omitempty"`
-	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	JSONBase                   `json:",inline" yaml:",inline"`
+	Port                       int               `json:"port,omitempty" yaml:"port,omitempty"`
+	Labels                     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
 }
 
 // Defines the endpoints that implement the actual service, for example:

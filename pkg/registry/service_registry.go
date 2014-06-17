@@ -17,20 +17,28 @@ package registry
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 type ServiceRegistryStorage struct {
 	registry ServiceRegistry
+	cloud    cloudprovider.Interface
+	hosts    []string
 }
 
-func MakeServiceRegistryStorage(registry ServiceRegistry) apiserver.RESTStorage {
-	return &ServiceRegistryStorage{registry: registry}
+func MakeServiceRegistryStorage(registry ServiceRegistry, cloud cloudprovider.Interface, hosts []string) apiserver.RESTStorage {
+	return &ServiceRegistryStorage{
+		registry: registry,
+		cloud:    cloud,
+		hosts:    hosts,
+	}
 }
 
 // GetServiceEnvironmentVariables populates a list of environment variables that are use
@@ -76,6 +84,25 @@ func (sr *ServiceRegistryStorage) Get(id string) (interface{}, error) {
 }
 
 func (sr *ServiceRegistryStorage) Delete(id string) error {
+	svc, err := sr.Get(id)
+	if err != nil {
+		return err
+	}
+	if svc.(api.Service).CreateExternalLoadBalancer {
+		var balancer cloudprovider.TCPLoadBalancer
+		if sr.cloud != nil {
+			balancer, err = sr.cloud.TCPLoadBalancer()
+			if err != nil {
+				return err
+			}
+		}
+		if balancer != nil {
+			err = balancer.DeleteTCPLoadBalancer(id, "us-central1")
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return sr.registry.DeleteService(id)
 }
 
@@ -87,7 +114,26 @@ func (sr *ServiceRegistryStorage) Extract(body string) (interface{}, error) {
 }
 
 func (sr *ServiceRegistryStorage) Create(obj interface{}) error {
-	return sr.registry.CreateService(obj.(api.Service))
+	srv := obj.(api.Service)
+	if srv.CreateExternalLoadBalancer {
+		var balancer cloudprovider.TCPLoadBalancer
+		if sr.cloud != nil {
+			var err error
+			balancer, err = sr.cloud.TCPLoadBalancer()
+			if err != nil {
+				return err
+			}
+		}
+		if balancer != nil {
+			err := balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, sr.hosts)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("requested an external service, but no cloud provider supplied.")
+		}
+	}
+	return sr.registry.CreateService(srv)
 }
 
 func (sr *ServiceRegistryStorage) Update(obj interface{}) error {

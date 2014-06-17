@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -40,29 +41,29 @@ type Master struct {
 }
 
 // Returns a memory (not etcd) backed apiserver.
-func NewMemoryServer(minions []string) *Master {
+func NewMemoryServer(minions []string, cloud cloudprovider.Interface) *Master {
 	m := &Master{
 		podRegistry:        registry.MakeMemoryRegistry(),
 		controllerRegistry: registry.MakeMemoryRegistry(),
 		serviceRegistry:    registry.MakeMemoryRegistry(),
 	}
-	m.init(minions)
+	m.init(minions, cloud)
 	return m
 }
 
 // Returns a new apiserver.
-func New(etcdServers, minions []string) *Master {
+func New(etcdServers, minions []string, cloud cloudprovider.Interface) *Master {
 	etcdClient := etcd.NewClient(etcdServers)
 	m := &Master{
 		podRegistry:        registry.MakeEtcdRegistry(etcdClient, minions),
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minions),
 		serviceRegistry:    registry.MakeEtcdRegistry(etcdClient, minions),
 	}
-	m.init(minions)
+	m.init(minions, cloud)
 	return m
 }
 
-func (m *Master) init(minions []string) {
+func (m *Master) init(minions []string, cloud cloudprovider.Interface) {
 	containerInfo := &client.HTTPContainerInfo{
 		Client: http.DefaultClient,
 		Port:   10250,
@@ -73,7 +74,7 @@ func (m *Master) init(minions []string) {
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(m.podRegistry, containerInfo, registry.MakeFirstFitScheduler(m.minions, m.podRegistry, m.random)),
 		"replicationControllers": registry.MakeControllerRegistryStorage(m.controllerRegistry),
-		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry),
+		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minions),
 	}
 
 }
