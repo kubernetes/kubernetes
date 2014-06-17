@@ -22,9 +22,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -50,7 +51,7 @@ type SimpleRESTStorage struct {
 	updated Simple
 }
 
-func (storage *SimpleRESTStorage) List(*url.URL) (interface{}, error) {
+func (storage *SimpleRESTStorage) List(labels.Query) (interface{}, error) {
 	result := SimpleList{
 		Items: storage.list,
 	}

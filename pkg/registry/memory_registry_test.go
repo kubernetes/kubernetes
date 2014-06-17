@@ -19,11 +19,12 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 func TestListPodsEmpty(t *testing.T) {
 	registry := MakeMemoryRegistry()
-	pods, err := registry.ListPods(nil)
+	pods, err := registry.ListPods(labels.Everything())
 	expectNoError(t, err)
 	if len(pods) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
@@ -33,7 +34,7 @@ func TestListPodsEmpty(t *testing.T) {
 func TestMemoryListPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	registry.CreatePod("machine", api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
-	pods, err := registry.ListPods(nil)
+	pods, err := registry.ListPods(labels.Everything())
 	expectNoError(t, err)
 	if len(pods) != 1 || pods[0].ID != "foo" {
 		t.Errorf("Unexpected pod list: %#v", pods)

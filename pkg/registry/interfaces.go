@@ -17,13 +17,13 @@ package registry
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// PodRegistry is an interface implemented by things that know how to store Pod objects
+// PodRegistry is an interface implemented by things that know how to store Pod objects.
 type PodRegistry interface {
 	// ListPods obtains a list of pods that match query.
-	// Query may be nil in which case all pods are returned.
-	ListPods(query *map[string]string) ([]api.Pod, error)
+	ListPods(query labels.Query) ([]api.Pod, error)
 	// Get a specific pod
 	GetPod(podID string) (*api.Pod, error)
 	// Create a pod based on a specification, schedule it onto a specific machine.
@@ -34,11 +34,21 @@ type PodRegistry interface {
 	DeletePod(podID string) error
 }
 
-// ControllerRegistry is an interface for things that know how to store Controllers
+// ControllerRegistry is an interface for things that know how to store Controllers.
 type ControllerRegistry interface {
 	ListControllers() ([]api.ReplicationController, error)
 	GetController(controllerId string) (*api.ReplicationController, error)
 	CreateController(controller api.ReplicationController) error
 	UpdateController(controller api.ReplicationController) error
 	DeleteController(controllerId string) error
+}
+
+// ServiceRegistry is an interface for things that know how to store services.
+type ServiceRegistry interface {
+	ListServices() (api.ServiceList, error)
+	CreateService(svc api.Service) error
+	GetService(name string) (*api.Service, error)
+	DeleteService(name string) error
+	UpdateService(svc api.Service) error
+	UpdateEndpoints(e api.Endpoints) error
 }

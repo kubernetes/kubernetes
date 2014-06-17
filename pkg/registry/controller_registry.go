@@ -18,10 +18,10 @@ package registry
 
 import (
 	"encoding/json"
-	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // Implementation of RESTStorage for the api server.
@@ -35,13 +35,14 @@ func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTSt
 	}
 }
 
-func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
+func (storage *ControllerRegistryStorage) List(query labels.Query) (interface{}, error) {
 	result := api.ReplicationControllerList{JSONBase: api.JSONBase{Kind: "cluster#replicationControllerList"}}
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
-		result = api.ReplicationControllerList{
-			JSONBase: api.JSONBase{Kind: "cluster#replicationControllerList"},
-			Items:    controllers,
+		for _, controller := range controllers {
+			if query.Matches(labels.Set(controller.Labels)) {
+				result.Items = append(result.Items, controller)
+			}
 		}
 	}
 	return result, err

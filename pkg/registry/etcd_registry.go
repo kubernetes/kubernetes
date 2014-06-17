@@ -23,6 +23,7 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -66,7 +67,7 @@ func makePodKey(machine, podID string) string {
 	return "/registry/hosts/" + machine + "/pods/" + podID
 }
 
-func (registry *EtcdRegistry) ListPods(query *map[string]string) ([]api.Pod, error) {
+func (registry *EtcdRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
 	pods := []api.Pod{}
 	for _, machine := range registry.machines {
 		machinePods, err := registry.listPodsForMachine(machine)
@@ -74,7 +75,7 @@ func (registry *EtcdRegistry) ListPods(query *map[string]string) ([]api.Pod, err
 			return pods, err
 		}
 		for _, pod := range machinePods {
-			if LabelsMatch(pod, query) {
+			if query.Matches(labels.Set(pod.Labels)) {
 				pods = append(pods, pod)
 			}
 		}

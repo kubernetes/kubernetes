@@ -33,7 +33,7 @@ echo "Starting etcd"
 ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
 trap "rm -rf ${ETCD_DIR}" EXIT
 
-etcd -name test -data-dir ${ETCD_DIR} &> /tmp/etcd.log &
+(etcd -name test -data-dir ${ETCD_DIR} &> /tmp/etcd.log) &
 ETCD_PID=$!
 
 sleep 5

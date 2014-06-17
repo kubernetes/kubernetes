@@ -20,6 +20,7 @@ import (
 	"log"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 func MakeEndpointController(serviceRegistry ServiceRegistry, podRegistry PodRegistry) *EndpointController {
@@ -41,7 +42,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	}
 	var resultErr error
 	for _, service := range services.Items {
-		pods, err := e.podRegistry.ListPods(&service.Labels)
+		pods, err := e.podRegistry.ListPods(labels.QueryFromSet(labels.Set(service.Labels)))
 		if err != nil {
 			log.Printf("Error syncing service: %#v, skipping.", service)
 			resultErr = err

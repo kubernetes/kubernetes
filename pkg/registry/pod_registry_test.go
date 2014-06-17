@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 type MockPodRegistry struct {
@@ -35,7 +36,7 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
-func (registry *MockPodRegistry) ListPods(*map[string]string) ([]api.Pod, error) {
+func (registry *MockPodRegistry) ListPods(labels.Query) ([]api.Pod, error) {
 	return registry.pods, registry.err
 }
 
@@ -133,74 +134,6 @@ func TestExtractJson(t *testing.T) {
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)
 	}
-}
-
-func expectLabelMatch(t *testing.T, pod api.Pod, key, value string) {
-	if !LabelMatch(pod, key, value) {
-		t.Errorf("Unexpected match failure: %#v %s %s", pod, key, value)
-	}
-}
-
-func expectNoLabelMatch(t *testing.T, pod api.Pod, key, value string) {
-	if LabelMatch(pod, key, value) {
-		t.Errorf("Unexpected match success: %#v %s %s", pod, key, value)
-	}
-}
-
-func expectLabelsMatch(t *testing.T, pod api.Pod, query *map[string]string) {
-	if !LabelsMatch(pod, query) {
-		t.Errorf("Unexpected match failure: %#v %#v", pod, *query)
-	}
-}
-
-func expectNoLabelsMatch(t *testing.T, pod api.Pod, query *map[string]string) {
-	if LabelsMatch(pod, query) {
-		t.Errorf("Unexpected match success: %#v %#v", pod, *query)
-	}
-}
-
-func TestLabelMatch(t *testing.T) {
-	pod := api.Pod{
-		Labels: map[string]string{
-			"foo": "bar",
-			"baz": "blah",
-		},
-	}
-	expectLabelMatch(t, pod, "foo", "bar")
-	expectLabelMatch(t, pod, "baz", "blah")
-	expectNoLabelMatch(t, pod, "foo", "blah")
-	expectNoLabelMatch(t, pod, "baz", "bar")
-}
-
-func TestLabelsMatch(t *testing.T) {
-	pod := api.Pod{
-		Labels: map[string]string{
-			"foo": "bar",
-			"baz": "blah",
-		},
-	}
-	expectLabelsMatch(t, pod, &map[string]string{})
-	expectLabelsMatch(t, pod, &map[string]string{
-		"foo": "bar",
-	})
-	expectLabelsMatch(t, pod, &map[string]string{
-		"baz": "blah",
-	})
-	expectLabelsMatch(t, pod, &map[string]string{
-		"foo": "bar",
-		"baz": "blah",
-	})
-	expectNoLabelsMatch(t, pod, &map[string]string{
-		"foo": "blah",
-	})
-	expectNoLabelsMatch(t, pod, &map[string]string{
-		"baz": "bar",
-	})
-	expectNoLabelsMatch(t, pod, &map[string]string{
-		"foo":    "bar",
-		"foobar": "bar",
-		"baz":    "blah",
-	})
 }
 
 func TestMakePodStatus(t *testing.T) {

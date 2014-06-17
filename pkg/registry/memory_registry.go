@@ -17,6 +17,7 @@ package registry
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // An implementation of PodRegistry and ControllerRegistry that is backed by memory
@@ -35,10 +36,10 @@ func MakeMemoryRegistry() *MemoryRegistry {
 	}
 }
 
-func (registry *MemoryRegistry) ListPods(labelQuery *map[string]string) ([]api.Pod, error) {
+func (registry *MemoryRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
 	result := []api.Pod{}
 	for _, value := range registry.podData {
-		if LabelsMatch(value, labelQuery) {
+		if query.Matches(labels.Set(value.Labels)) {
 			result = append(result, value)
 		}
 	}

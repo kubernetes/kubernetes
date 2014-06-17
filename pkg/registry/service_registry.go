@@ -17,22 +17,13 @@ package registry
 
 import (
 	"encoding/json"
-	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
-
-type ServiceRegistry interface {
-	ListServices() (api.ServiceList, error)
-	CreateService(svc api.Service) error
-	GetService(name string) (*api.Service, error)
-	DeleteService(name string) error
-	UpdateService(svc api.Service) error
-	UpdateEndpoints(e api.Endpoints) error
-}
 
 type ServiceRegistryStorage struct {
 	registry ServiceRegistry
@@ -59,12 +50,19 @@ func GetServiceEnvironmentVariables(registry ServiceRegistry, machine string) ([
 	return result, nil
 }
 
-func (sr *ServiceRegistryStorage) List(*url.URL) (interface{}, error) {
+func (sr *ServiceRegistryStorage) List(query labels.Query) (interface{}, error) {
 	list, err := sr.registry.ListServices()
 	if err != nil {
 		return nil, err
 	}
 	list.Kind = "cluster#serviceList"
+	var filtered []api.Service
+	for _, service := range list.Items {
+		if query.Matches(labels.Set(service.Labels)) {
+			filtered = append(filtered, service)
+		}
+	}
+	list.Items = filtered
 	return list, err
 }
 
