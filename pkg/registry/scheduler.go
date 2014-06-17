@@ -20,6 +20,7 @@ import (
 	"math/rand"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // Scheduler is an interface implemented by things that know how to schedule pods onto machines.
@@ -90,7 +91,7 @@ func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 
 func (s *FirstFitScheduler) Schedule(pod api.Pod) (string, error) {
 	machineToPods := map[string][]api.Pod{}
-	pods, err := s.registry.ListPods(nil)
+	pods, err := s.registry.ListPods(labels.Everything())
 	if err != nil {
 		return "", err
 	}
