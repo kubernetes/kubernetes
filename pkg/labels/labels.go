@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -35,6 +36,8 @@ func (ls Set) String() string {
 	for key, value := range ls {
 		query = append(query, key+"="+value)
 	}
+	// Sort for determinism.
+	sort.StringSlice(query).Sort()
 	return strings.Join(query, ",")
 }
 
