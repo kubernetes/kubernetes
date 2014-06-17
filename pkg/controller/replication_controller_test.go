@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package registry
+
+package controller
 
 import (
 	"encoding/json"
@@ -30,6 +31,13 @@ import (
 
 // TODO: Move this to a common place, it's needed in multiple tests.
 var apiPath = "/api/v1beta1"
+
+// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
+func expectNoError(t *testing.T, err error) {
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+}
 
 func makeUrl(suffix string) string {
 	return apiPath + suffix

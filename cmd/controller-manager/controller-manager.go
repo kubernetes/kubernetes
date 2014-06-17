@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -48,7 +48,7 @@ func main() {
 	// Set up logger for etcd client
 	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
 
-	controllerManager := registry.MakeReplicationManager(etcd.NewClient([]string{*etcd_servers}),
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient([]string{*etcd_servers}),
 		client.Client{
 			Host: "http://" + *master,
 		})
