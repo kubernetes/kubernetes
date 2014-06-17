@@ -149,6 +149,7 @@ func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 
 func (rm *ReplicationManager) syncReplicationController(controllerSpec api.ReplicationController) error {
 	rm.updateLock.Lock()
+	defer rm.updateLock.Unlock()
 	podList, err := rm.kubeClient.ListPods(controllerSpec.DesiredState.ReplicasInSet)
 	if err != nil {
 		return err
@@ -168,7 +169,6 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 			rm.podControl.deletePod(filteredList[i].ID)
 		}
 	}
-	rm.updateLock.Unlock()
 	return nil
 }
 
