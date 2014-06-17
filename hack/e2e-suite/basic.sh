@@ -26,10 +26,27 @@ detect-project
 # Launch a container
 $CLOUDCFG -p 8080:80 run dockerfile/nginx 2 myNginx
 
+function remove-quotes() {
+  local in=$1
+  stripped="${in%\"}"
+  stripped="${stripped#\"}"
+  echo $stripped
+}
+
+POD_ID_LIST=$($CLOUDCFG -json -l name=myNginx list pods | jq ".items[].id")
 # Container turn up on a clean cluster can take a while for the docker image pull.
-# Sleep for 2 minutes just to be sure.
-echo "Waiting for containers to come up."
-sleep 120
+ALL_RUNNING=false
+while [[ $ALL_RUNNING -ne "true" ]]; do
+  echo "Waiting for containers to come up."
+  sleep 5
+  ALL_RUNNING=true
+  for id in $POD_ID_LIST; do
+    CURRENT_STATUS=$(remove-quotes $($CLOUDCFG -json get "pods/$(remove-quotes ${id})" | jq '.currentState.status'))
+    if [[ $CURRENT_STATUS -ne "Running" ]]; then
+      ALL_RUNNING=false
+    fi
+  done
+done
 
 # Get minion IP addresses
 detect-minions
