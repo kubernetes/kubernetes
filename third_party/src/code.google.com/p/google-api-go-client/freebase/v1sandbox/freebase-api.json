@@ -1,0 +1,411 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/8YSaj7jxmSfjsRrYtwnK2dHVPrQ\"",
+ "discoveryVersion": "v1",
+ "id": "freebase:v1sandbox",
+ "name": "freebase",
+ "version": "v1sandbox",
+ "title": "Freebase Search",
+ "description": "Find Freebase entities using textual queries and other constraints.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/freebase-16.png",
+  "x32": "http://www.google.com/images/icons/product/freebase-32.png"
+ },
+ "documentationLink": "https://developers.google.com/freebase/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/freebase/v1sandbox/",
+ "basePath": "/freebase/v1sandbox/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "freebase/v1sandbox/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "ReconcileCandidate": {
+   "id": "ReconcileCandidate",
+   "type": "object",
+   "properties": {
+    "confidence": {
+     "type": "number",
+     "description": "Percentage likelihood that this candidate is the unique matching entity. Value will be between 0.0 and 1.0",
+     "format": "float"
+    },
+    "lang": {
+     "type": "string",
+     "description": "Language code that candidate and notable names are displayed in."
+    },
+    "mid": {
+     "type": "string",
+     "description": "Freebase MID of candidate entity."
+    },
+    "name": {
+     "type": "string",
+     "description": "Freebase name of matching entity in specified language."
+    },
+    "notable": {
+     "type": "object",
+     "description": "Type or profession the candidate is notable for.",
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "MID of notable category."
+      },
+      "name": {
+       "type": "string",
+       "description": "Name of notable category in specified language."
+      }
+     }
+    }
+   }
+  },
+  "ReconcileGet": {
+   "id": "ReconcileGet",
+   "type": "object",
+   "properties": {
+    "candidate": {
+     "type": "array",
+     "description": "If filled, then the listed candidates are potential matches, and such should be evaluated by a more discerning algorithm or human. The matches are ordered by confidence.",
+     "items": {
+      "$ref": "ReconcileCandidate"
+     }
+    },
+    "costs": {
+     "type": "object",
+     "description": "Server costs for reconciling.",
+     "properties": {
+      "hits": {
+       "type": "integer",
+       "description": "Total number of hits found.",
+       "format": "int32"
+      },
+      "ms": {
+       "type": "integer",
+       "description": "Total milliseconds spent.",
+       "format": "int32"
+      }
+     }
+    },
+    "match": {
+     "$ref": "ReconcileCandidate",
+     "description": "If filled, this entity is guaranteed to match at requested confidence probability (default 99%)."
+    },
+    "warning": {
+     "type": "array",
+     "description": "If filled, then there were recoverable problems that affected the request. For example, some of the properties were ignored because they either are not valid Freebase predicates or are not indexed for reconciliation. The candidates returned should be considered valid results, with the caveat that sections of the request were ignored as specified by the warning text.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "location": {
+        "type": "string",
+        "description": "Location of warning in the request e.g. invalid predicate."
+       },
+       "message": {
+        "type": "string",
+        "description": "Warning message to display to the user."
+       },
+       "reason": {
+        "type": "string",
+        "description": "Code for identifying classes of warnings."
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "methods": {
+  "reconcile": {
+   "id": "freebase.reconcile",
+   "path": "reconcile",
+   "httpMethod": "GET",
+   "description": "Reconcile entities to Freebase open data.",
+   "parameters": {
+    "confidence": {
+     "type": "number",
+     "description": "Required confidence for a candidate to match. Must be between .5 and 1.0",
+     "default": "0.99",
+     "format": "float",
+     "minimum": "0.0",
+     "maximum": "1.0",
+     "location": "query"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Classifications of entity e.g. type, category, title.",
+     "repeated": true,
+     "location": "query"
+    },
+    "lang": {
+     "type": "string",
+     "description": "Languages for names and values. First language is used for display. Default is 'en'.",
+     "repeated": true,
+     "location": "query"
+    },
+    "limit": {
+     "type": "integer",
+     "description": "Maximum number of candidates to return.",
+     "default": "3",
+     "format": "int32",
+     "minimum": "0",
+     "maximum": "25",
+     "location": "query"
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of entity.",
+     "location": "query"
+    },
+    "prop": {
+     "type": "string",
+     "description": "Property values for entity formatted as\n:",
+     "repeated": true,
+     "location": "query"
+    }
+   },
+   "response": {
+    "$ref": "ReconcileGet"
+   }
+  },
+  "search": {
+   "id": "freebase.search",
+   "path": "search",
+   "httpMethod": "GET",
+   "description": "Search Freebase open data.",
+   "parameters": {
+    "as_of_time": {
+     "type": "string",
+     "description": "A mql as_of_time value to use with mql_output queries.",
+     "location": "query"
+    },
+    "callback": {
+     "type": "string",
+     "description": "JS method name for JSONP callbacks.",
+     "pattern": "([A-Za-z0-9_$.]|\\[|\\])+",
+     "location": "query"
+    },
+    "cursor": {
+     "type": "integer",
+     "description": "The cursor value to use for the next page of results.",
+     "format": "int32",
+     "location": "query"
+    },
+    "domain": {
+     "type": "string",
+     "description": "Restrict to topics with this Freebase domain id.",
+     "repeated": true,
+     "location": "query"
+    },
+    "encode": {
+     "type": "string",
+     "description": "The encoding of the response. You can use this parameter to enable html encoding.",
+     "default": "off",
+     "enum": [
+      "html",
+      "off"
+     ],
+     "enumDescriptions": [
+      "Encode certain characters in the response (such as tags and ambersands) using html encoding.",
+      "No encoding of the response. You should not print the results directly on an web page without html-escaping the content first."
+     ],
+     "location": "query"
+    },
+    "exact": {
+     "type": "boolean",
+     "description": "Query on exact name and keys only.",
+     "location": "query"
+    },
+    "filter": {
+     "type": "string",
+     "description": "A filter to apply to the query.",
+     "pattern": "^\\(.*\\)$",
+     "repeated": true,
+     "location": "query"
+    },
+    "format": {
+     "type": "string",
+     "description": "Structural format of the json response.",
+     "default": "entity",
+     "enum": [
+      "ac",
+      "classic",
+      "entity",
+      "guids",
+      "ids",
+      "mids"
+     ],
+     "enumDescriptions": [
+      "Compact format useful for autocomplete/suggest UIs.",
+      "[DEPRECATED] Same format as was returned by api.freebase.com.",
+      "Basic information about the entities.",
+      "[DEPRECATED] Ordered list of a freebase guids.",
+      "Ordered list of freebase ids.",
+      "Ordered list of freebase mids."
+     ],
+     "location": "query"
+    },
+    "help": {
+     "type": "string",
+     "description": "The keyword to request help on.",
+     "enum": [
+      "langs",
+      "mappings",
+      "predicates"
+     ],
+     "enumDescriptions": [
+      "The language codes served by the service.",
+      "The property/path mappings supported by the filter and output request parameters.",
+      "The predicates and path-terminating properties supported by the filter and output request parameters."
+     ],
+     "location": "query"
+    },
+    "indent": {
+     "type": "boolean",
+     "description": "Whether to indent the json results or not.",
+     "location": "query"
+    },
+    "lang": {
+     "type": "string",
+     "description": "The code of the language to run the query with. Default is 'en'.",
+     "repeated": true,
+     "location": "query"
+    },
+    "limit": {
+     "type": "integer",
+     "description": "Maximum number of results to return.",
+     "default": "20",
+     "format": "int32",
+     "location": "query"
+    },
+    "mid": {
+     "type": "string",
+     "description": "A mid to use instead of a query.",
+     "pattern": "^/[mgtx]/[0-2][0-9bcdfghjklmnpqrstvwxyz_]{1,24}$",
+     "repeated": true,
+     "location": "query"
+    },
+    "mql_output": {
+     "type": "string",
+     "description": "The MQL query to run againist the results to extract more data.",
+     "location": "query"
+    },
+    "output": {
+     "type": "string",
+     "description": "An output expression to request data from matches.",
+     "pattern": "^\\(.*\\)$",
+     "location": "query"
+    },
+    "prefixed": {
+     "type": "boolean",
+     "description": "Prefix match against names and aliases.",
+     "location": "query"
+    },
+    "query": {
+     "type": "string",
+     "description": "Query term to search for.",
+     "location": "query"
+    },
+    "scoring": {
+     "type": "string",
+     "description": "Relevance scoring algorithm to use.",
+     "default": "entity",
+     "enum": [
+      "entity",
+      "freebase",
+      "schema"
+     ],
+     "enumDescriptions": [
+      "Use freebase and popularity entity ranking.",
+      "Use freebase entity ranking.",
+      "Use schema ranking for properties and types."
+     ],
+     "location": "query"
+    },
+    "spell": {
+     "type": "string",
+     "description": "Request 'did you mean' suggestions",
+     "default": "no_spelling",
+     "enum": [
+      "always",
+      "no_results",
+      "no_spelling"
+     ],
+     "enumDescriptions": [
+      "Request spelling suggestions for any query at least three characters long.",
+      "Request spelling suggestions if no results were found.",
+      "Don't request spelling suggestions."
+     ],
+     "location": "query"
+    },
+    "stemmed": {
+     "type": "boolean",
+     "description": "Query on stemmed names and aliases. May not be used with prefixed.",
+     "location": "query"
+    },
+    "type": {
+     "type": "string",
+     "description": "Restrict to topics with this Freebase type id.",
+     "repeated": true,
+     "location": "query"
+    },
+    "with": {
+     "type": "string",
+     "description": "A rule to match against.",
+     "repeated": true,
+     "location": "query"
+    },
+    "without": {
+     "type": "string",
+     "description": "A rule to not match against.",
+     "repeated": true,
+     "location": "query"
+    }
+   },
+   "supportsMediaDownload": true
+  }
+ }
+}

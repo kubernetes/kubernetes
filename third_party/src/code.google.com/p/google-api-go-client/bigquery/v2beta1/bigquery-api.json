@@ -1,0 +1,1466 @@
+{
+ "kind": "discovery#restDescription",
+ "discoveryVersion": "v1",
+ "id": "bigquery:v2beta1",
+ "name": "bigquery",
+ "version": "v2beta1",
+ "revision": "20120507",
+ "title": "BigQuery API",
+ "description": "A data platform for customers to create, manage, share and query data.",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://code.google.com/apis/bigquery/docs/v2/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/bigquery/v2beta1/",
+ "basePath": "/bigquery/v2beta1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "bigquery/v2beta1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "csv",
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of text/csv",
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/bigquery": {
+     "description": "View and manage your data in Google BigQuery"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Bigqueryfield": {
+   "id": "Bigqueryfield",
+   "type": "object",
+   "properties": {
+    "fields": {
+     "type": "array",
+     "items": {
+      "$ref": "Bigqueryfield"
+     }
+    },
+    "mode": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "type": {
+     "type": "string"
+    }
+   }
+  },
+  "Bigqueryschema": {
+   "id": "Bigqueryschema",
+   "type": "object",
+   "properties": {
+    "fields": {
+     "type": "array",
+     "items": {
+      "$ref": "Bigqueryfield"
+     }
+    }
+   }
+  },
+  "Dataset": {
+   "id": "Dataset",
+   "type": "object",
+   "properties": {
+    "access": {
+     "type": "array",
+     "description": "[Optional] Describes users' rights on the dataset. You can assign the same role to multiple users, and assign multiple roles to the same user.\nDefault values assigned to a new dataset are as follows: OWNER - Project owners, dataset creator READ - Project readers WRITE - Project writers\nSee ACLs and Rights for a description of these rights. If you specify any of these roles when creating a dataset, the assigned roles will overwrite the defaults listed above.\nTo revoke rights to a dataset, call datasets.update() and omit the names of anyone whose rights you wish to revoke. However, every dataset must have at least one entity granted OWNER role.\nEach access object can have only one of the following members: userByEmail, groupByEmail, domain, or allAuthenticatedUsers.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "allAuthenticatedUsers": {
+        "type": "string",
+        "description": "[Pick one] If True, any authenticated user is granted the assigned role."
+       },
+       "domain": {
+        "type": "string",
+        "description": "[Pick one] A domain to grant access to. Any users signed in with the domain specified will be granted the specified access. Example: \"example.com\"."
+       },
+       "groupByEmail": {
+        "type": "string",
+        "description": "[Pick one] A fully-qualified email address of a mailing list to grant access to. This must be either a Google Groups mailing list (ends in @googlegroups.com) or a group managed by an enterprise version of Google Groups."
+       },
+       "role": {
+        "type": "string",
+        "description": "[Required] Describes the rights granted to the user specified by the other member of the access object. The following string values are supported: READ - User can call any list() or get() method on any collection or resource. WRITE - User can call any method on any collection except for datasets, on which they can call list() and get(). OWNER - User can call any method. The dataset creator is granted this role by default."
+       },
+       "specialGroup": {
+        "type": "string",
+        "description": "[Pick one] A special group to grant access to. The valid values are: projectOwners: Owners of the enclosing project. projectReaders: Readers of the enclosing project. projectWriters: Writers of the enclosing project."
+       },
+       "userByEmail": {
+        "type": "string",
+        "description": "[Pick one] A fully qualified email address of a user to grant access to. For example: fred@example.com."
+       }
+      }
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "[Output only] The date when this dataset was created, in milliseconds since the epoch.",
+     "format": "int64"
+    },
+    "datasetId": {
+     "type": "string",
+     "description": "[Deprecated -- overlaps with datasetRef] A unique ID for this dataset. Must a string of 1-1024 characters satisfying the regular expression [A-Za-z0-9_]."
+    },
+    "datasetReference": {
+     "$ref": "Datasetreference",
+     "description": "[Required] Reference identifying dataset."
+    },
+    "description": {
+     "type": "string",
+     "description": "[Optional] An arbitrary string description for the dataset. This might be shown in BigQuery UI for browsing the dataset."
+    },
+    "friendlyName": {
+     "type": "string",
+     "description": "[Optional] A descriptive name for this dataset, which might be shown in any BigQuery user interfaces for browsing the dataset. Use datasetId for making API calls."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output only] The fully-qualified unique name of this dataset in the format projectId:datasetId. The dataset name without the project name is given in the datasetId field. When creating a new dataset, leave this field blank, and instead specify the datasetId field."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output only] The resource type.",
+     "default": "bigquery#dataset"
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "[Output only] The date when this dataset or any of its tables was last modified, in milliseconds since the epoch.",
+     "format": "int64"
+    },
+    "projectId": {
+     "type": "string",
+     "description": "[Deprecated -- overlaps with datasetRef]."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output only] An URL that can be used to access this resource again. You can use this URL in Get or Update requests to this resource. Not used as an input to helix."
+    }
+   }
+  },
+  "DatasetList": {
+   "id": "DatasetList",
+   "type": "object",
+   "properties": {
+    "datasets": {
+     "type": "array",
+     "description": "An array of one or more summarized dataset resources. Absent when there are no datasets in the specified project.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "datasetId": {
+        "type": "string",
+        "description": "[Deprecated] A unique ID for this dataset; this is the id values without the project name."
+       },
+       "datasetReference": {
+        "$ref": "Datasetreference",
+        "description": "Reference identifying dataset."
+       },
+       "friendlyName": {
+        "type": "string",
+        "description": "A descriptive name for this dataset, if one exists."
+       },
+       "id": {
+        "type": "string",
+        "description": "The fully-qualified unique name of this dataset in the format projectId:datasetId."
+       },
+       "projectId": {
+        "type": "string",
+        "description": "[Deprecated] The ID of the container project."
+       }
+      }
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "A hash of this page of results. See Paging Through Results in the developer's guide."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type.",
+     "default": "bigquery#datasetList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token to request the next page of results. Present only when there is more than one page of results.* See Paging Through Results in the developer's guide."
+    }
+   }
+  },
+  "Datasetreference": {
+   "id": "Datasetreference",
+   "type": "object",
+   "properties": {
+    "datasetId": {
+     "type": "string",
+     "description": "[Required] A unique ID for this dataset, without the project name."
+    },
+    "projectId": {
+     "type": "string",
+     "description": "[Optional] The ID of the container project."
+    }
+   }
+  },
+  "ErrorProto": {
+   "id": "ErrorProto",
+   "type": "object",
+   "properties": {
+    "arguments": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "code": {
+     "type": "string"
+    },
+    "debugInfo": {
+     "type": "string"
+    },
+    "domain": {
+     "type": "string"
+    },
+    "errorMessage": {
+     "type": "string"
+    },
+    "location": {
+     "type": "string"
+    },
+    "locationType": {
+     "type": "string"
+    }
+   }
+  },
+  "Job": {
+   "id": "Job",
+   "type": "object",
+   "properties": {
+    "configuration": {
+     "$ref": "Jobconfiguration"
+    },
+    "id": {
+     "type": "string"
+    },
+    "jobId": {
+     "type": "string"
+    },
+    "jobReference": {
+     "$ref": "Jobreference"
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#job"
+    },
+    "projectId": {
+     "type": "string"
+    },
+    "selfLink": {
+     "type": "string"
+    },
+    "statistics": {
+     "$ref": "Jobstatistics"
+    },
+    "status": {
+     "$ref": "Jobstatus"
+    }
+   }
+  },
+  "JobList": {
+   "id": "JobList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string"
+    },
+    "jobs": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "configuration": {
+        "$ref": "Jobconfiguration"
+       },
+       "endTime": {
+        "type": "string",
+        "format": "int64"
+       },
+       "errorResult": {
+        "$ref": "ErrorProto"
+       },
+       "id": {
+        "type": "string"
+       },
+       "jobId": {
+        "type": "string"
+       },
+       "jobReference": {
+        "$ref": "Jobreference"
+       },
+       "projectId": {
+        "type": "string"
+       },
+       "startTime": {
+        "type": "string",
+        "format": "int64"
+       },
+       "state": {
+        "type": "string"
+       },
+       "statistics": {
+        "$ref": "Jobstatistics"
+       },
+       "status": {
+        "$ref": "Jobstatus"
+       }
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#jobList"
+    },
+    "nextPageToken": {
+     "type": "string"
+    },
+    "totalItems": {
+     "type": "integer",
+     "format": "int32"
+    }
+   }
+  },
+  "JobQueryRequest": {
+   "id": "JobQueryRequest",
+   "type": "object",
+   "properties": {
+    "defaultDataset": {
+     "$ref": "Datasetreference",
+     "description": "[Optional] Specifies the default datasetId and projectId to assume for any unqualified table names in the query. If not set, all table names in the query string must be fully-qualified in the format projectId:datasetId.tableid."
+    },
+    "destinationTable": {
+     "$ref": "Tablereference",
+     "description": "[Optional] Specifies the table the query results should be written to. The table will be created if it does not exist."
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#jobQueryRequest"
+    },
+    "maxResults": {
+     "type": "integer",
+     "description": "[Optional] The maximum number of results to return per page of results. If the response list exceeds the maximum response size for a single response, you will have to page through the results. Default is to return the maximum response size.",
+     "format": "uint32"
+    },
+    "query": {
+     "type": "string",
+     "description": "[Required] A query string, following the BigQuery query syntax of the query to execute. Table names should be qualified by dataset name in the format projectId:datasetId.tableId unless you specify the defaultDataset value. If the table is in the same project as the job, you can omit the project ID. Example: SELECT f1 FROM myProjectId:myDatasetId.myTableId."
+    }
+   }
+  },
+  "JobStopResponse": {
+   "id": "JobStopResponse",
+   "type": "object",
+   "properties": {
+    "job": {
+     "type": "any"
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#jobStopResponse"
+    }
+   }
+  },
+  "Jobconfiguration": {
+   "id": "Jobconfiguration",
+   "type": "object",
+   "properties": {
+    "extract": {
+     "$ref": "Jobconfigurationextract"
+    },
+    "link": {
+     "$ref": "Jobconfigurationlink"
+    },
+    "load": {
+     "$ref": "Jobconfigurationload"
+    },
+    "properties": {
+     "$ref": "Jobconfigurationproperties"
+    },
+    "query": {
+     "$ref": "Jobconfigurationquery"
+    }
+   }
+  },
+  "Jobconfigurationextract": {
+   "id": "Jobconfigurationextract",
+   "type": "object",
+   "properties": {
+    "destinationUri": {
+     "type": "string"
+    },
+    "sourceTable": {
+     "$ref": "Tablereference"
+    }
+   }
+  },
+  "Jobconfigurationlink": {
+   "id": "Jobconfigurationlink",
+   "type": "object",
+   "properties": {
+    "createDisposition": {
+     "type": "string"
+    },
+    "destinationTable": {
+     "$ref": "Tablereference"
+    },
+    "sourceUri": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "Jobconfigurationload": {
+   "id": "Jobconfigurationload",
+   "type": "object",
+   "properties": {
+    "createDisposition": {
+     "type": "string"
+    },
+    "destinationTable": {
+     "$ref": "Tablereference"
+    },
+    "fieldDelimiter": {
+     "type": "string"
+    },
+    "schema": {
+     "$ref": "Bigqueryschema"
+    },
+    "skipLeadingRows": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "sourceUris": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "writeDisposition": {
+     "type": "string"
+    }
+   }
+  },
+  "Jobconfigurationproperties": {
+   "id": "Jobconfigurationproperties",
+   "type": "object",
+   "additionalProperties": {
+    "type": "string"
+   }
+  },
+  "Jobconfigurationquery": {
+   "id": "Jobconfigurationquery",
+   "type": "object",
+   "properties": {
+    "createDisposition": {
+     "type": "string"
+    },
+    "defaultDataset": {
+     "$ref": "Datasetreference"
+    },
+    "destinationTable": {
+     "$ref": "Tablereference"
+    },
+    "query": {
+     "type": "string"
+    },
+    "writeDisposition": {
+     "type": "string"
+    }
+   }
+  },
+  "Jobreference": {
+   "id": "Jobreference",
+   "type": "object",
+   "properties": {
+    "jobId": {
+     "type": "string"
+    },
+    "projectId": {
+     "type": "string"
+    }
+   }
+  },
+  "Jobstatistics": {
+   "id": "Jobstatistics",
+   "type": "object",
+   "properties": {
+    "endTime": {
+     "type": "string",
+     "format": "int64"
+    },
+    "startTime": {
+     "type": "string",
+     "format": "int64"
+    }
+   }
+  },
+  "Jobstatus": {
+   "id": "Jobstatus",
+   "type": "object",
+   "properties": {
+    "errorResult": {
+     "$ref": "ErrorProto"
+    },
+    "errors": {
+     "type": "array",
+     "items": {
+      "$ref": "ErrorProto"
+     }
+    },
+    "state": {
+     "type": "string"
+    }
+   }
+  },
+  "ProjectList": {
+   "id": "ProjectList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#projectList"
+    },
+    "nextPageToken": {
+     "type": "string"
+    },
+    "projects": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "friendlyName": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "projectReference": {
+        "$ref": "Projectreference"
+       }
+      }
+     }
+    },
+    "totalItems": {
+     "type": "integer",
+     "format": "int32"
+    }
+   }
+  },
+  "Projectreference": {
+   "id": "Projectreference",
+   "type": "object",
+   "properties": {
+    "projectId": {
+     "type": "string"
+    }
+   }
+  },
+  "QueryResults": {
+   "id": "QueryResults",
+   "type": "object",
+   "properties": {
+    "job": {
+     "$ref": "Job"
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#queryResults"
+    },
+    "rows": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "f": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "v": {
+           "type": "any"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "schema": {
+     "$ref": "Bigqueryschema"
+    },
+    "totalRows": {
+     "type": "string",
+     "format": "uint64"
+    }
+   }
+  },
+  "Table": {
+   "id": "Table",
+   "type": "object",
+   "properties": {
+    "creationTime": {
+     "type": "string",
+     "format": "int64"
+    },
+    "datasetId": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "friendlyName": {
+     "type": "string"
+    },
+    "id": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#table"
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "format": "int64"
+    },
+    "projectId": {
+     "type": "string"
+    },
+    "schema": {
+     "$ref": "Bigqueryschema"
+    },
+    "selfLink": {
+     "type": "string"
+    },
+    "tableId": {
+     "type": "string"
+    },
+    "tableReference": {
+     "$ref": "Tablereference"
+    }
+   }
+  },
+  "TableDataList": {
+   "id": "TableDataList",
+   "type": "object",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "default": "bigquery#tableDataList"
+    },
+    "rows": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "f": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "v": {
+           "type": "any"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "totalRows": {
+     "type": "string",
+     "format": "int64"
+    }
+   }
+  },
+  "TableList": {
+   "id": "TableList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string",
+     "default": "bigquery#tableList"
+    },
+    "nextPageToken": {
+     "type": "string"
+    },
+    "tables": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "datasetId": {
+        "type": "string"
+       },
+       "friendlyName": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "projectId": {
+        "type": "string"
+       },
+       "tableId": {
+        "type": "string"
+       },
+       "tableReference": {
+        "$ref": "Tablereference"
+       }
+      }
+     }
+    },
+    "totalItems": {
+     "type": "integer",
+     "format": "int32"
+    }
+   }
+  },
+  "Tablereference": {
+   "id": "Tablereference",
+   "type": "object",
+   "properties": {
+    "datasetId": {
+     "type": "string"
+    },
+    "projectId": {
+     "type": "string"
+    },
+    "tableId": {
+     "type": "string"
+    }
+   }
+  }
+ },
+ "resources": {
+  "datasets": {
+   "methods": {
+    "delete": {
+     "id": "bigquery.datasets.delete",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the dataset specified by datasetId value. Before you can delete a dataset, you must delete all its tables, either manually or by specifying deleteContents. Immediately after deletion, you can create another dataset with the same name.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset identifier of dataset being deleted.",
+       "required": true,
+       "location": "path"
+      },
+      "deleteContents": {
+       "type": "boolean",
+       "description": "[Optional] If True, delete all the tables in the dataset. If False and the dataset contains tables, the request will fail. Default is False.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project identifier of dataset being deleted.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "get": {
+     "id": "bigquery.datasets.get",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "GET",
+     "description": "Returns the dataset specified by datasetID.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset identifier of the dataset requested.",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project identifier containing dataset requested.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "insert": {
+     "id": "bigquery.datasets.insert",
+     "path": "projects/{projectId}/datasets",
+     "httpMethod": "POST",
+     "description": "Creates a new empty dataset.",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "description": "Project identifier that will contain dataset being created.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "Dataset"
+     },
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "list": {
+     "id": "bigquery.datasets.list",
+     "path": "projects/{projectId}/datasets",
+     "httpMethod": "GET",
+     "description": "Lists all the datasets in the specified project to which the caller has read access; however, a project owner can list (but not necessarily get) all datasets in his project.",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "[Optional] The maximum number of rows to return. If not specified, it will return up to the maximum amount of data that will fit in a reply.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "[Optional] A page token used when requesting a specific page in a set of paged results.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project identifier containing datasets to be listed.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "response": {
+      "$ref": "DatasetList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "patch": {
+     "id": "bigquery.datasets.patch",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "PATCH",
+     "description": "Updates information in an existing dataset, specified by datasetId. Properties not included in the submitted resource will not be changed. If you include the access property without any values assigned, the request will fail as you must specify at least one owner for a dataset. This method supports patch semantics.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset identifier containing dataset being updated.",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project identifier containing dataset being updated.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "Dataset"
+     },
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "update": {
+     "id": "bigquery.datasets.update",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "PUT",
+     "description": "Updates information in an existing dataset, specified by datasetId. Properties not included in the submitted resource will not be changed. If you include the access property without any values assigned, the request will fail as you must specify at least one owner for a dataset.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset identifier containing dataset being updated.",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project identifier containing dataset being updated.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "Dataset"
+     },
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "methods": {
+    "get": {
+     "id": "bigquery.jobs.get",
+     "path": "projects/{projectId}/jobs/{jobId}",
+     "httpMethod": "GET",
+     "parameters": {
+      "jobId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "jobId"
+     ],
+     "response": {
+      "$ref": "Job"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "insert": {
+     "id": "bigquery.jobs.insert",
+     "path": "projects/{projectId}/jobs",
+     "httpMethod": "POST",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "Job"
+     },
+     "response": {
+      "$ref": "Job"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ],
+     "mediaUpload": {
+      "accept": [
+       "application/octet-stream"
+      ],
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/bigquery/v2beta1/projects/{projectId}/jobs"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/bigquery/v2beta1/projects/{projectId}/jobs"
+       }
+      }
+     }
+    },
+    "list": {
+     "id": "bigquery.jobs.list",
+     "path": "projects/{projectId}/jobs",
+     "httpMethod": "GET",
+     "parameters": {
+      "allUsers": {
+       "type": "boolean",
+       "description": "Whether to display jobs owned by all users in the project",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "maximum number of results to return",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields.",
+       "enum": [
+        "full",
+        "minimal"
+       ],
+       "enumDescriptions": [
+        "Includes all job data.",
+        "Does not include the job configuration."
+       ],
+       "location": "query"
+      },
+      "startIndex": {
+       "type": "integer",
+       "description": "start index for paginated results",
+       "format": "uint32",
+       "location": "query"
+      },
+      "stateFilter": {
+       "type": "string",
+       "description": "filter for job state",
+       "enum": [
+        "done",
+        "pending",
+        "running"
+       ],
+       "enumDescriptions": [
+        "finished jobs",
+        "pending jobs",
+        "running jobs"
+       ],
+       "repeated": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "response": {
+      "$ref": "JobList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "query": {
+     "id": "bigquery.jobs.query",
+     "path": "projects/{projectId}/queries",
+     "httpMethod": "POST",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "description": "project name billed for the query",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "JobQueryRequest"
+     },
+     "response": {
+      "$ref": "QueryResults"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "stop": {
+     "id": "bigquery.jobs.stop",
+     "path": "project/{projectId}/jobs/{jobId}/stop",
+     "httpMethod": "POST",
+     "parameters": {
+      "jobId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "jobId"
+     ],
+     "response": {
+      "$ref": "JobStopResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    }
+   }
+  },
+  "projects": {
+   "methods": {
+    "list": {
+     "id": "bigquery.projects.list",
+     "path": "projects",
+     "httpMethod": "GET",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ProjectList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    }
+   }
+  },
+  "tabledata": {
+   "methods": {
+    "list": {
+     "id": "bigquery.tabledata.list",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}/data",
+     "httpMethod": "GET",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "format": "uint32",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "startIndex": {
+       "type": "string",
+       "format": "uint64",
+       "location": "query"
+      },
+      "tableId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "response": {
+      "$ref": "TableDataList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    }
+   }
+  },
+  "tables": {
+   "methods": {
+    "delete": {
+     "id": "bigquery.tables.delete",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "DELETE",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "get": {
+     "id": "bigquery.tables.get",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "GET",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "insert": {
+     "id": "bigquery.tables.insert",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables",
+     "httpMethod": "POST",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "list": {
+     "id": "bigquery.tables.list",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables",
+     "httpMethod": "GET",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "response": {
+      "$ref": "TableList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "patch": {
+     "id": "bigquery.tables.patch",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "PATCH",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    },
+    "update": {
+     "id": "bigquery.tables.update",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "PUT",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery"
+     ]
+    }
+   }
+  }
+ }
+}

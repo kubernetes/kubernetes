@@ -1,0 +1,130 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/BJXZBhUL6VndsB8q_Dgu-kIvzFE\"",
+ "discoveryVersion": "v1",
+ "id": "groupsmigration:v1",
+ "name": "groupsmigration",
+ "canonicalName": "Groups Migration",
+ "version": "v1",
+ "title": "Groups Migration API",
+ "description": "Groups Migration Api.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/discussions-16.gif",
+  "x32": "http://www.google.com/images/icons/product/discussions-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/google-apps/groups-migration/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/groups/v1/groups/",
+ "basePath": "/groups/v1/groups/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "groups/v1/groups/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "Groups": {
+   "id": "Groups",
+   "type": "object",
+   "description": "JSON response template for groups migration API.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The kind of insert resource this is.",
+     "default": "groupsmigration#groups"
+    },
+    "responseCode": {
+     "type": "string",
+     "description": "The status of the insert request."
+    }
+   }
+  }
+ },
+ "resources": {
+  "archive": {
+   "methods": {
+    "insert": {
+     "id": "groupsmigration.archive.insert",
+     "path": "{groupId}/archive",
+     "httpMethod": "POST",
+     "description": "Inserts a new mail into the archive of the Google group.",
+     "parameters": {
+      "groupId": {
+       "type": "string",
+       "description": "The group ID",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "groupId"
+     ],
+     "response": {
+      "$ref": "Groups"
+     },
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "message/rfc822"
+      ],
+      "maxSize": "16MB",
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/groups/v1/groups/{groupId}/archive"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/groups/v1/groups/{groupId}/archive"
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

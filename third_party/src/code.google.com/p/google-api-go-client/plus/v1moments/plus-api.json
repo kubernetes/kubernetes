@@ -1,0 +1,409 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"-vXktEC13RBC5q_wkxEsszrjKM4/fRqXZNx5yvahLJC3dn8LITx-zWM\"",
+ "discoveryVersion": "v1",
+ "id": "plus:v1moments",
+ "name": "plus",
+ "version": "v1moments",
+ "revision": "20121127",
+ "title": "Google+ API",
+ "description": "The Google+ API enables developers to build on top of the Google+ platform.",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/gplus-16.png",
+  "x32": "http://www.google.com/images/icons/product/gplus-32.png"
+ },
+ "documentationLink": "https://developers.google.com/+/history/",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/plus/v1moments/people/",
+ "basePath": "/plus/v1moments/people/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "plus/v1moments/people/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "ItemScope": {
+   "id": "ItemScope",
+   "type": "object",
+   "properties": {
+    "about": {
+     "$ref": "ItemScope",
+     "description": "The subject matter of the content."
+    },
+    "additionalName": {
+     "type": "array",
+     "description": "An additional name for a Person, can be used for a middle name.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "address": {
+     "$ref": "ItemScope",
+     "description": "Postal address."
+    },
+    "addressCountry": {
+     "type": "string",
+     "description": "Address country."
+    },
+    "addressLocality": {
+     "type": "string",
+     "description": "Address locality."
+    },
+    "addressRegion": {
+     "type": "string",
+     "description": "Address region."
+    },
+    "associated_media": {
+     "type": "array",
+     "description": "The encoding.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "attendeeCount": {
+     "type": "integer",
+     "description": "Number of attendees.",
+     "format": "int32"
+    },
+    "attendees": {
+     "type": "array",
+     "description": "A person attending the event.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "audio": {
+     "$ref": "ItemScope",
+     "description": "From http://schema.org/MusicRecording, the audio file."
+    },
+    "author": {
+     "type": "array",
+     "description": "The person or persons who created this result. In the example of restaurant reviews, this might be the reviewer's name.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "bestRating": {
+     "type": "string",
+     "description": "Best possible rating value that a result might obtain. This property defines the upper bound for the ratingValue. For example, you might have a 5 star rating scale, you would provide 5 as the value for this property."
+    },
+    "birthDate": {
+     "type": "string",
+     "description": "Date of birth."
+    },
+    "byArtist": {
+     "$ref": "ItemScope",
+     "description": "From http://schema.org/MusicRecording, the artist that performed this recording."
+    },
+    "caption": {
+     "type": "string",
+     "description": "The caption for this object."
+    },
+    "contentSize": {
+     "type": "string",
+     "description": "File size in (mega/kilo) bytes."
+    },
+    "contentUrl": {
+     "type": "string",
+     "description": "Actual bytes of the media object, for example the image file or video file."
+    },
+    "contributor": {
+     "type": "array",
+     "description": "A list of contributors to this result.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "dateCreated": {
+     "type": "string",
+     "description": "The date the result was created such as the date that a review was first created."
+    },
+    "dateModified": {
+     "type": "string",
+     "description": "The date the result was last modified such as the date that a review was last edited."
+    },
+    "datePublished": {
+     "type": "string",
+     "description": "The initial date that the result was published. For example, a user writes a comment on a blog, which has a result.dateCreated of when they submit it. If the blog users comment moderation, the result.datePublished value would match the date when the owner approved the message."
+    },
+    "description": {
+     "type": "string",
+     "description": "The string that describes the content of the result."
+    },
+    "duration": {
+     "type": "string",
+     "description": "The duration of the item (movie, audio recording, event, etc.) in ISO 8601 date format."
+    },
+    "embedUrl": {
+     "type": "string",
+     "description": "A URL pointing to a player for a specific video. In general, this is the information in the src element of an embed tag and should not be the same as the content of the loc tag."
+    },
+    "endDate": {
+     "type": "string",
+     "description": "The end date and time of the event (in ISO 8601 date format)."
+    },
+    "familyName": {
+     "type": "string",
+     "description": "Family name. This property can be used with givenName instead of the name property."
+    },
+    "gender": {
+     "type": "string",
+     "description": "Gender of the person."
+    },
+    "geo": {
+     "$ref": "ItemScope",
+     "description": "Geo coordinates."
+    },
+    "givenName": {
+     "type": "string",
+     "description": "Given name. This property can be used with familyName instead of the name property."
+    },
+    "height": {
+     "type": "string",
+     "description": "The height of the media object."
+    },
+    "id": {
+     "type": "string",
+     "description": "An identifier for the target. Your app can choose how to identify targets. The target.id is required if you are writing an activity that does not have a corresponding web page or target.url property."
+    },
+    "image": {
+     "type": "string",
+     "description": "A URL to the image that represents this result. For example, if a user writes a review of a restaurant and attaches a photo of their meal, you might use that photo as the result.image."
+    },
+    "inAlbum": {
+     "$ref": "ItemScope",
+     "description": "From http://schema.org/MusicRecording, which album a song is in."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as an itemScope.",
+     "default": "plus#itemScope"
+    },
+    "latitude": {
+     "type": "number",
+     "description": "Latitude.",
+     "format": "double"
+    },
+    "location": {
+     "$ref": "ItemScope",
+     "description": "The location of the event or organization."
+    },
+    "longitude": {
+     "type": "number",
+     "description": "Longitude.",
+     "format": "double"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the result. In the example of a restaurant review, this might be the summary the user gave their review such as \"Great ambiance, but overpriced.\""
+    },
+    "partOfTVSeries": {
+     "$ref": "ItemScope",
+     "description": "Property of http://schema.org/TVEpisode indicating which series the episode belongs to."
+    },
+    "performers": {
+     "type": "array",
+     "description": "The main performer or performers of the event-for example, a presenter, musician, or actor.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "playerType": {
+     "type": "string",
+     "description": "Player type that is required. For example: Flash or Silverlight."
+    },
+    "postOfficeBoxNumber": {
+     "type": "string",
+     "description": "Post office box number."
+    },
+    "postalCode": {
+     "type": "string",
+     "description": "Postal code."
+    },
+    "ratingValue": {
+     "type": "string",
+     "description": "Rating value."
+    },
+    "reviewRating": {
+     "$ref": "ItemScope",
+     "description": "Review rating."
+    },
+    "startDate": {
+     "type": "string",
+     "description": "The start date and time of the event (in ISO 8601 date format)."
+    },
+    "streetAddress": {
+     "type": "string",
+     "description": "Street address."
+    },
+    "text": {
+     "type": "string",
+     "description": "The text that is the result of the app activity. For example, if a user leaves a review of a restaurant, this might be the text of the review."
+    },
+    "thumbnail": {
+     "$ref": "ItemScope",
+     "description": "Thumbnail image for an image or video."
+    },
+    "thumbnailUrl": {
+     "type": "string",
+     "description": "A URL to a thumbnail image that represents this result."
+    },
+    "tickerSymbol": {
+     "type": "string",
+     "description": "The exchange traded instrument associated with a Corporation object. The tickerSymbol is expressed as an exchange and an instrument name separated by a space character. For the exchange component of the tickerSymbol attribute, we reccommend using the controlled vocaulary of Market Identifier Codes (MIC) specified in ISO15022."
+    },
+    "type": {
+     "type": "string",
+     "description": "The schema.org URL that best describes the referenced target and matches the type of moment."
+    },
+    "url": {
+     "type": "string",
+     "description": "The URL that points to the result object. For example, a permalink directly to a restaurant reviewer's comment."
+    },
+    "width": {
+     "type": "string",
+     "description": "The width of the media object."
+    },
+    "worstRating": {
+     "type": "string",
+     "description": "Worst possible rating value that a result might obtain. This property defines the lower bound for the ratingValue."
+    }
+   }
+  },
+  "Moment": {
+   "id": "Moment",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The moment ID."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a moment.",
+     "default": "plus#moment"
+    },
+    "result": {
+     "$ref": "ItemScope",
+     "description": "The object generated by performing the action on the target. For example, a user writes a review of a restaurant, the target is the restaurant and the result is the review."
+    },
+    "startDate": {
+     "type": "string",
+     "description": "Time stamp of when the action occurred in RFC3339 format.",
+     "format": "date-time"
+    },
+    "target": {
+     "$ref": "ItemScope",
+     "description": "The object on which the action was performed.",
+     "annotations": {
+      "required": [
+       "plus.moments.insert"
+      ]
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "The Google schema for the type of moment to write. For example, http://schemas.google.com/AddActivity.",
+     "annotations": {
+      "required": [
+       "plus.moments.insert"
+      ]
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "moments": {
+   "methods": {
+    "insert": {
+     "id": "plus.moments.insert",
+     "path": "{userId}/moments/{collection}",
+     "httpMethod": "POST",
+     "description": "Record a moment representing a user's activity such as making a purchase or commenting on a blog.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection to which to write moments.",
+       "required": true,
+       "enum": [
+        "vault"
+       ],
+       "enumDescriptions": [
+        "The default collection for writing new moments."
+       ],
+       "location": "path"
+      },
+      "debug": {
+       "type": "boolean",
+       "description": "Return the moment as written. Should be used only for debugging.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user to record activities for. The only valid values are \"me\" and the ID of the authenticated user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId",
+      "collection"
+     ],
+     "request": {
+      "$ref": "Moment"
+     },
+     "response": {
+      "$ref": "Moment"
+     }
+    }
+   }
+  }
+ }
+}

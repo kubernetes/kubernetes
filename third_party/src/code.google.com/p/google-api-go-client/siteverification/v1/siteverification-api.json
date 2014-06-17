@@ -1,0 +1,320 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/T-KUOZ6MW3qGb2TywsMrS2SH2E4\"",
+ "discoveryVersion": "v1",
+ "id": "siteVerification:v1",
+ "name": "siteVerification",
+ "version": "v1",
+ "title": "Google Site Verification API",
+ "description": "Lets you programatically verify ownership of websites or domains with Google.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/site-verification/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/siteVerification/v1/",
+ "basePath": "/siteVerification/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "siteVerification/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "false",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/siteverification": {
+     "description": "Manage the list of sites and domains you control"
+    },
+    "https://www.googleapis.com/auth/siteverification.verify_only": {
+     "description": "Manage your new site verifications with Google"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "SiteVerificationWebResourceGettokenRequest": {
+   "id": "SiteVerificationWebResourceGettokenRequest",
+   "type": "object",
+   "properties": {
+    "site": {
+     "type": "object",
+     "description": "The site for which a verification token will be generated.",
+     "properties": {
+      "identifier": {
+       "type": "string",
+       "description": "The site identifier. If the type is set to SITE, the identifier is a URL. If the type is set to INET_DOMAIN, the site identifier is a domain name."
+      },
+      "type": {
+       "type": "string",
+       "description": "The type of resource to be verified. Can be SITE or INET_DOMAIN (domain name)."
+      }
+     }
+    },
+    "verificationMethod": {
+     "type": "string",
+     "description": "The verification method that will be used to verify this site. For sites, 'FILE' or 'META' methods may be used. For domains, only 'DNS' may be used."
+    }
+   }
+  },
+  "SiteVerificationWebResourceGettokenResponse": {
+   "id": "SiteVerificationWebResourceGettokenResponse",
+   "type": "object",
+   "properties": {
+    "method": {
+     "type": "string",
+     "description": "The verification method to use in conjunction with this token. For FILE, the token should be placed in the top-level directory of the site, stored inside a file of the same name. For META, the token should be placed in the HEAD tag of the default page that is loaded for the site. For DNS, the token should be placed in a TXT record of the domain."
+    },
+    "token": {
+     "type": "string",
+     "description": "The verification token. The token must be placed appropriately in order for verification to succeed."
+    }
+   }
+  },
+  "SiteVerificationWebResourceListResponse": {
+   "id": "SiteVerificationWebResourceListResponse",
+   "type": "object",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The list of sites that are owned by the authenticated user.",
+     "items": {
+      "$ref": "SiteVerificationWebResourceResource"
+     }
+    }
+   }
+  },
+  "SiteVerificationWebResourceResource": {
+   "id": "SiteVerificationWebResourceResource",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The string used to identify this site. This value should be used in the \"id\" portion of the REST URL for the Get, Update, and Delete operations."
+    },
+    "owners": {
+     "type": "array",
+     "description": "The email addresses of all verified owners.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "site": {
+     "type": "object",
+     "description": "The address and type of a site that is verified or will be verified.",
+     "properties": {
+      "identifier": {
+       "type": "string",
+       "description": "The site identifier. If the type is set to SITE, the identifier is a URL. If the type is set to INET_DOMAIN, the site identifier is a domain name."
+      },
+      "type": {
+       "type": "string",
+       "description": "The site type. Can be SITE or INET_DOMAIN (domain name)."
+      }
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "webResource": {
+   "methods": {
+    "delete": {
+     "id": "siteVerification.webResource.delete",
+     "path": "webResource/{id}",
+     "httpMethod": "DELETE",
+     "description": "Relinquish ownership of a website or domain.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The id of a verified site or domain.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification"
+     ]
+    },
+    "get": {
+     "id": "siteVerification.webResource.get",
+     "path": "webResource/{id}",
+     "httpMethod": "GET",
+     "description": "Get the most current data for a website or domain.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The id of a verified site or domain.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification"
+     ]
+    },
+    "getToken": {
+     "id": "siteVerification.webResource.getToken",
+     "path": "token",
+     "httpMethod": "POST",
+     "description": "Get a verification token for placing on a website or domain.",
+     "request": {
+      "$ref": "SiteVerificationWebResourceGettokenRequest"
+     },
+     "response": {
+      "$ref": "SiteVerificationWebResourceGettokenResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification",
+      "https://www.googleapis.com/auth/siteverification.verify_only"
+     ]
+    },
+    "insert": {
+     "id": "siteVerification.webResource.insert",
+     "path": "webResource",
+     "httpMethod": "POST",
+     "description": "Attempt verification of a website or domain.",
+     "parameters": {
+      "verificationMethod": {
+       "type": "string",
+       "description": "The method to use for verifying a site or domain.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "verificationMethod"
+     ],
+     "request": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "response": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification",
+      "https://www.googleapis.com/auth/siteverification.verify_only"
+     ]
+    },
+    "list": {
+     "id": "siteVerification.webResource.list",
+     "path": "webResource",
+     "httpMethod": "GET",
+     "description": "Get the list of your verified websites and domains.",
+     "response": {
+      "$ref": "SiteVerificationWebResourceListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification"
+     ]
+    },
+    "patch": {
+     "id": "siteVerification.webResource.patch",
+     "path": "webResource/{id}",
+     "httpMethod": "PATCH",
+     "description": "Modify the list of owners for your website or domain. This method supports patch semantics.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The id of a verified site or domain.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "response": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification"
+     ]
+    },
+    "update": {
+     "id": "siteVerification.webResource.update",
+     "path": "webResource/{id}",
+     "httpMethod": "PUT",
+     "description": "Modify the list of owners for your website or domain.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The id of a verified site or domain.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "response": {
+      "$ref": "SiteVerificationWebResourceResource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/siteverification"
+     ]
+    }
+   }
+  }
+ }
+}

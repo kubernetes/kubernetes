@@ -1,0 +1,989 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/y4JNZN6WmoC1vLC4va-8Oh8limQ\"",
+ "discoveryVersion": "v1",
+ "id": "doubleclicksearch:v2",
+ "name": "doubleclicksearch",
+ "version": "v2",
+ "title": "DoubleClick Search API",
+ "description": "Report and modify your advertising data in DoubleClick Search (for example, campaigns, ad groups, keywords, and conversions).",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/doubleclick-search/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/doubleclicksearch/v2/",
+ "basePath": "/doubleclicksearch/v2/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "doubleclicksearch/v2/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/doubleclicksearch": {
+     "description": "View and manage your advertising data in DoubleClick Search"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Availability": {
+   "id": "Availability",
+   "type": "object",
+   "description": "A message containing availability data relevant to DoubleClick Search.",
+   "properties": {
+    "advertiserId": {
+     "type": "string",
+     "description": "DS advertiser ID.",
+     "format": "int64",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.updateAvailability"
+      ]
+     }
+    },
+    "agencyId": {
+     "type": "string",
+     "description": "DS agency ID.",
+     "format": "int64",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.updateAvailability"
+      ]
+     }
+    },
+    "availabilityTimestamp": {
+     "type": "string",
+     "description": "The time by which all conversions have been uploaded, in epoch millis UTC.",
+     "format": "uint64",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.updateAvailability"
+      ]
+     }
+    },
+    "segmentationId": {
+     "type": "string",
+     "description": "The numeric segmentation identifier (for example, DoubleClick Search Floodlight activity ID).",
+     "format": "int64"
+    },
+    "segmentationName": {
+     "type": "string",
+     "description": "The friendly segmentation identifier (for example, DoubleClick Search Floodlight activity name)."
+    },
+    "segmentationType": {
+     "type": "string",
+     "description": "The segmentation type that this availability is for (its default value is FLOODLIGHT).",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.updateAvailability"
+      ]
+     }
+    }
+   }
+  },
+  "Conversion": {
+   "id": "Conversion",
+   "type": "object",
+   "description": "A conversion containing data relevant to DoubleClick Search.",
+   "properties": {
+    "adGroupId": {
+     "type": "string",
+     "description": "DS ad group ID.",
+     "format": "int64"
+    },
+    "adId": {
+     "type": "string",
+     "description": "DS ad ID.",
+     "format": "int64"
+    },
+    "advertiserId": {
+     "type": "string",
+     "description": "DS advertiser ID.",
+     "format": "int64"
+    },
+    "agencyId": {
+     "type": "string",
+     "description": "DS agency ID.",
+     "format": "int64"
+    },
+    "campaignId": {
+     "type": "string",
+     "description": "DS campaign ID.",
+     "format": "int64"
+    },
+    "clickId": {
+     "type": "string",
+     "description": "DS click ID for the conversion."
+    },
+    "conversionId": {
+     "type": "string",
+     "description": "Advertiser-provided ID for the conversion, also known as the order ID.",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.insert"
+      ]
+     }
+    },
+    "conversionModifiedTimestamp": {
+     "type": "string",
+     "description": "The time at which the conversion was last modified, in epoch millis UTC.",
+     "format": "uint64"
+    },
+    "conversionTimestamp": {
+     "type": "string",
+     "description": "The time at which the conversion took place, in epoch millis UTC.",
+     "format": "uint64",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.insert"
+      ]
+     }
+    },
+    "criterionId": {
+     "type": "string",
+     "description": "DS criterion (keyword) ID.",
+     "format": "int64"
+    },
+    "currencyCode": {
+     "type": "string",
+     "description": "The currency code for the conversion's revenue. Should be in ISO 4217 alphabetic (3-char) format."
+    },
+    "customDimension": {
+     "type": "array",
+     "description": "Custom dimensions for the conversion, which can be used to filter data in a report.",
+     "items": {
+      "$ref": "CustomDimension"
+     }
+    },
+    "customMetric": {
+     "type": "array",
+     "description": "Custom metrics for the conversion.",
+     "items": {
+      "$ref": "CustomMetric"
+     }
+    },
+    "dsConversionId": {
+     "type": "string",
+     "description": "DS conversion ID.",
+     "format": "int64"
+    },
+    "engineAccountId": {
+     "type": "string",
+     "description": "DS engine account ID.",
+     "format": "int64"
+    },
+    "floodlightOrderId": {
+     "type": "string",
+     "description": "The advertiser-provided order id for the conversion."
+    },
+    "quantityMillis": {
+     "type": "string",
+     "description": "The quantity of this conversion, in millis.",
+     "format": "int64"
+    },
+    "revenueMicros": {
+     "type": "string",
+     "description": "The revenue amount of this TRANSACTION conversion, in micros.",
+     "format": "int64"
+    },
+    "segmentationId": {
+     "type": "string",
+     "description": "The numeric segmentation identifier (for example, DoubleClick Search Floodlight activity ID).",
+     "format": "int64"
+    },
+    "segmentationName": {
+     "type": "string",
+     "description": "The friendly segmentation identifier (for example, DoubleClick Search Floodlight activity name)."
+    },
+    "segmentationType": {
+     "type": "string",
+     "description": "The segmentation type of this conversion (for example, FLOODLIGHT).",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.conversion.insert"
+      ]
+     }
+    },
+    "state": {
+     "type": "string",
+     "description": "The state of the conversion, that is, either ACTIVE or DELETED."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of the conversion, that is, either ACTION or TRANSACTION. An ACTION conversion is an action by the user that has no monetarily quantifiable value, while a TRANSACTION conversion is an action that does have a monetarily quantifiable value. Examples are email list signups (ACTION) versus ecommerce purchases (TRANSACTION)."
+    }
+   }
+  },
+  "ConversionList": {
+   "id": "ConversionList",
+   "type": "object",
+   "description": "A list of conversions.",
+   "properties": {
+    "conversion": {
+     "type": "array",
+     "description": "The conversions being requested.",
+     "items": {
+      "$ref": "Conversion"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this as a ConversionList resource. Value: the fixed string doubleclicksearch#conversionList.",
+     "default": "doubleclicksearch#conversionList"
+    }
+   }
+  },
+  "CustomDimension": {
+   "id": "CustomDimension",
+   "type": "object",
+   "description": "A message containing the custome dimension.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "Custom dimension name."
+    },
+    "value": {
+     "type": "string",
+     "description": "Custom dimension value."
+    }
+   }
+  },
+  "CustomMetric": {
+   "id": "CustomMetric",
+   "type": "object",
+   "description": "A message containing the custome metric.",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "Custom metric name."
+    },
+    "value": {
+     "type": "number",
+     "description": "Custom metric numeric value.",
+     "format": "double"
+    }
+   }
+  },
+  "Report": {
+   "id": "Report",
+   "type": "object",
+   "description": "A DoubleClick Search report. This object contains the report request, some report metadata such as currency code, and the generated report rows or report files.",
+   "properties": {
+    "files": {
+     "type": "array",
+     "description": "Asynchronous report only. Contains a list of generated report files once the report has succesfully completed.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "byteCount": {
+        "type": "string",
+        "description": "The size of this report file in bytes.",
+        "format": "int64"
+       },
+       "url": {
+        "type": "string",
+        "description": "Use this url to download the report file."
+       }
+      }
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "Asynchronous report only. Id of the report."
+    },
+    "isReportReady": {
+     "type": "boolean",
+     "description": "Asynchronous report only. True if and only if the report has completed successfully and the report files are ready to be downloaded."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this as a Report resource. Value: the fixed string doubleclicksearch#report.",
+     "default": "doubleclicksearch#report"
+    },
+    "request": {
+     "$ref": "ReportRequest",
+     "description": "The request that created the report. Optional fields not specified in the original request are filled with default values."
+    },
+    "rowCount": {
+     "type": "integer",
+     "description": "The number of report rows generated by the report, not including headers.",
+     "format": "int32"
+    },
+    "rows": {
+     "type": "array",
+     "description": "Synchronous report only. Generated report rows.",
+     "items": {
+      "$ref": "ReportRow"
+     }
+    },
+    "statisticsCurrencyCode": {
+     "type": "string",
+     "description": "The currency code of all monetary values produced in the report, including values that are set by users (e.g., keyword bid settings) and metrics (e.g., cost and revenue). The currency code of a report is determined by the statisticsCurrency field of the report request."
+    },
+    "statisticsTimeZone": {
+     "type": "string",
+     "description": "If all statistics of the report are sourced from the same time zone, this would be it. Otherwise the field is unset."
+    }
+   }
+  },
+  "ReportRequest": {
+   "id": "ReportRequest",
+   "type": "object",
+   "description": "A request object used to create a DoubleClick Search report.",
+   "properties": {
+    "columns": {
+     "type": "array",
+     "description": "The columns to include in the report. This includes both DoubleClick Search columns and saved columns. For DoubleClick Search columns, only the columnName parameter is required. For saved columns only the savedColumnName parameter is required. Both columnName and savedColumnName cannot be set in the same stanza.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "columnName": {
+        "type": "string",
+        "description": "Name of a DoubleClick Search column to include in the report."
+       },
+       "endDate": {
+        "type": "string",
+        "description": "Inclusive day in YYYY-MM-DD format. When provided, this overrides the overall time range of the report for this column only. Must be provided together with startDate."
+       },
+       "groupByColumn": {
+        "type": "boolean",
+        "description": "Synchronous report only. Set to true to group by this column. Defaults to false.",
+        "default": "false"
+       },
+       "headerText": {
+        "type": "string",
+        "description": "Text used to identify this column in the report output; defaults to columnName or savedColumnName when not specified. This can be used to prevent collisions between DoubleClick Search columns and saved columns with the same name."
+       },
+       "savedColumnName": {
+        "type": "string",
+        "description": "Name of a saved column to include in the report. The report must be scoped at advertiser or lower, and this saved column must already be created in the DoubleClick Search UI."
+       },
+       "startDate": {
+        "type": "string",
+        "description": "Inclusive date in YYYY-MM-DD format. When provided, this overrides the overall time range of the report for this column only. Must be provided together with endDate."
+       }
+      }
+     }
+    },
+    "downloadFormat": {
+     "type": "string",
+     "description": "Format that the report should be returned in. Currently csv or tsv is supported.",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.reports.request"
+      ]
+     }
+    },
+    "filters": {
+     "type": "array",
+     "description": "A list of filters to be applied to the report.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "column": {
+        "type": "object",
+        "description": "Column to perform the filter on. This can be a DoubleClick Search column or a saved column.",
+        "properties": {
+         "columnName": {
+          "type": "string",
+          "description": "Name of a DoubleClick Search column to filter on."
+         },
+         "savedColumnName": {
+          "type": "string",
+          "description": "Name of a saved column to filter on."
+         }
+        }
+       },
+       "operator": {
+        "type": "string",
+        "description": "Operator to use in the filter. See the filter reference for a list of available operators."
+       },
+       "values": {
+        "type": "array",
+        "description": "A list of values to filter the column value against.",
+        "items": {
+         "type": "any"
+        }
+       }
+      }
+     }
+    },
+    "includeDeletedEntities": {
+     "type": "boolean",
+     "description": "Determines if removed entities should be included in the report. Deprecated, please use includeRemovedEntities instead. Defaults to false.",
+     "default": "false"
+    },
+    "includeRemovedEntities": {
+     "type": "boolean",
+     "description": "Determines if removed entities should be included in the report. Defaults to false.",
+     "default": "false"
+    },
+    "maxRowsPerFile": {
+     "type": "integer",
+     "description": "Asynchronous report only. The maximum number of rows per report file. A large report is split into many files based on this field. Acceptable values are 1000000 to 100000000, inclusive.",
+     "format": "int32",
+     "minimum": "1000000",
+     "maximum": "100000000",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.reports.request"
+      ]
+     }
+    },
+    "orderBy": {
+     "type": "array",
+     "description": "Synchronous report only. A list of columns and directions defining sorting to be performed on the report rows.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "column": {
+        "type": "object",
+        "description": "Column to perform the sort on. This can be a DoubleClick Search-defined column or a saved column.",
+        "properties": {
+         "columnName": {
+          "type": "string",
+          "description": "Name of a DoubleClick Search column to sort by."
+         },
+         "savedColumnName": {
+          "type": "string",
+          "description": "Name of a saved column to sort by."
+         }
+        }
+       },
+       "sortOrder": {
+        "type": "string",
+        "description": "The sort direction, which is either ascending or descending."
+       }
+      }
+     }
+    },
+    "reportScope": {
+     "type": "object",
+     "description": "The reportScope is a set of IDs that are used to determine which subset of entities will be returned in the report. The full lineage of IDs from the lowest scoped level desired up through agency is required.",
+     "properties": {
+      "adGroupId": {
+       "type": "string",
+       "description": "DS ad group ID.",
+       "format": "int64"
+      },
+      "adId": {
+       "type": "string",
+       "description": "DS ad ID.",
+       "format": "int64"
+      },
+      "advertiserId": {
+       "type": "string",
+       "description": "DS advertiser ID.",
+       "format": "int64"
+      },
+      "agencyId": {
+       "type": "string",
+       "description": "DS agency ID.",
+       "format": "int64"
+      },
+      "campaignId": {
+       "type": "string",
+       "description": "DS campaign ID.",
+       "format": "int64"
+      },
+      "engineAccountId": {
+       "type": "string",
+       "description": "DS engine account ID.",
+       "format": "int64"
+      },
+      "keywordId": {
+       "type": "string",
+       "description": "DS keyword ID.",
+       "format": "int64"
+      }
+     }
+    },
+    "reportType": {
+     "type": "string",
+     "description": "Determines the type of rows that are returned in the report. For example, if you specify reportType: keyword, each row in the report will contain data about a keyword. See the Types of Reports reference for the columns that are available for each type.",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.reports.generate",
+       "doubleclicksearch.reports.request"
+      ]
+     }
+    },
+    "rowCount": {
+     "type": "integer",
+     "description": "Synchronous report only. The maxinum number of rows to return; additional rows are dropped. Acceptable values are 0 to 10000, inclusive. Defaults to 10000.",
+     "default": "10000",
+     "format": "int32",
+     "minimum": "0",
+     "maximum": "10000",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.reports.generate"
+      ]
+     }
+    },
+    "startRow": {
+     "type": "integer",
+     "description": "Synchronous report only. Zero-based index of the first row to return. Acceptable values are 0 to 50000, inclusive. Defaults to 0.",
+     "default": "0",
+     "format": "int32",
+     "minimum": "0",
+     "maximum": "50000",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.reports.generate"
+      ]
+     }
+    },
+    "statisticsCurrency": {
+     "type": "string",
+     "description": "Specifies the currency in which monetary will be returned. Possible values are: usd, agency (valid if the report is scoped to agency or lower), advertiser (valid if the report is scoped to * advertiser or lower), or account (valid if the report is scoped to engine account or lower).",
+     "annotations": {
+      "required": [
+       "doubleclicksearch.reports.generate",
+       "doubleclicksearch.reports.request"
+      ]
+     }
+    },
+    "timeRange": {
+     "type": "object",
+     "description": "If metrics are requested in a report, this argument will be used to restrict the metrics to a specific time range.",
+     "properties": {
+      "changedAttributesSinceTimestamp": {
+       "type": "string",
+       "description": "Inclusive UTC timestamp in RFC format, e.g., 2013-07-16T10:16:23.555Z. See additional references on how changed attribute reports work.",
+       "format": "date-time"
+      },
+      "changedMetricsSinceTimestamp": {
+       "type": "string",
+       "description": "Inclusive UTC timestamp in RFC format, e.g., 2013-07-16T10:16:23.555Z. See additional references on how changed metrics reports work.",
+       "format": "date-time"
+      },
+      "endDate": {
+       "type": "string",
+       "description": "Inclusive date in YYYY-MM-DD format."
+      },
+      "startDate": {
+       "type": "string",
+       "description": "Inclusive date in YYYY-MM-DD format."
+      }
+     }
+    },
+    "verifySingleTimeZone": {
+     "type": "boolean",
+     "description": "If true, the report would only be created if all the requested stat data are sourced from a single timezone. Defaults to false.",
+     "default": "false"
+    }
+   }
+  },
+  "ReportRow": {
+   "id": "ReportRow",
+   "type": "object",
+   "description": "A row in a DoubleClick Search report.",
+   "additionalProperties": {
+    "type": "any",
+    "description": "Indicates the columns that are represented in this row. That is, each key corresponds to a column with a non-empty cell in this row."
+   }
+  },
+  "UpdateAvailabilityRequest": {
+   "id": "UpdateAvailabilityRequest",
+   "type": "object",
+   "description": "The request to update availability.",
+   "properties": {
+    "availabilities": {
+     "type": "array",
+     "description": "The availabilities being requested.",
+     "items": {
+      "$ref": "Availability"
+     }
+    }
+   }
+  },
+  "UpdateAvailabilityResponse": {
+   "id": "UpdateAvailabilityResponse",
+   "type": "object",
+   "description": "The response to a update availability request.",
+   "properties": {
+    "availabilities": {
+     "type": "array",
+     "description": "The availabilities being returned.",
+     "items": {
+      "$ref": "Availability"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "conversion": {
+   "methods": {
+    "get": {
+     "id": "doubleclicksearch.conversion.get",
+     "path": "agency/{agencyId}/advertiser/{advertiserId}/engine/{engineAccountId}/conversion",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of conversions from a DoubleClick Search engine account.",
+     "parameters": {
+      "adGroupId": {
+       "type": "string",
+       "description": "Numeric ID of the ad group.",
+       "format": "int64",
+       "location": "query"
+      },
+      "adId": {
+       "type": "string",
+       "description": "Numeric ID of the ad.",
+       "format": "int64",
+       "location": "query"
+      },
+      "advertiserId": {
+       "type": "string",
+       "description": "Numeric ID of the advertiser.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      },
+      "agencyId": {
+       "type": "string",
+       "description": "Numeric ID of the agency.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      },
+      "campaignId": {
+       "type": "string",
+       "description": "Numeric ID of the campaign.",
+       "format": "int64",
+       "location": "query"
+      },
+      "criterionId": {
+       "type": "string",
+       "description": "Numeric ID of the criterion.",
+       "format": "int64",
+       "location": "query"
+      },
+      "endDate": {
+       "type": "integer",
+       "description": "Last date (inclusive) on which to retrieve conversions. Format is yyyymmdd.",
+       "required": true,
+       "format": "int32",
+       "minimum": "20091101",
+       "maximum": "99991231",
+       "location": "query"
+      },
+      "engineAccountId": {
+       "type": "string",
+       "description": "Numeric ID of the engine account.",
+       "required": true,
+       "format": "int64",
+       "location": "path"
+      },
+      "rowCount": {
+       "type": "integer",
+       "description": "The number of conversions to return per call.",
+       "required": true,
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "startDate": {
+       "type": "integer",
+       "description": "First date (inclusive) on which to retrieve conversions. Format is yyyymmdd.",
+       "required": true,
+       "format": "int32",
+       "minimum": "20091101",
+       "maximum": "99991231",
+       "location": "query"
+      },
+      "startRow": {
+       "type": "integer",
+       "description": "The 0-based starting index for retrieving conversions results.",
+       "required": true,
+       "format": "uint32",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "agencyId",
+      "advertiserId",
+      "engineAccountId",
+      "endDate",
+      "rowCount",
+      "startDate",
+      "startRow"
+     ],
+     "response": {
+      "$ref": "ConversionList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    },
+    "insert": {
+     "id": "doubleclicksearch.conversion.insert",
+     "path": "conversion",
+     "httpMethod": "POST",
+     "description": "Inserts a batch of new conversions into DoubleClick Search.",
+     "request": {
+      "$ref": "ConversionList"
+     },
+     "response": {
+      "$ref": "ConversionList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    },
+    "patch": {
+     "id": "doubleclicksearch.conversion.patch",
+     "path": "conversion",
+     "httpMethod": "PATCH",
+     "description": "Updates a batch of conversions in DoubleClick Search. This method supports patch semantics.",
+     "parameters": {
+      "advertiserId": {
+       "type": "string",
+       "description": "Numeric ID of the advertiser.",
+       "required": true,
+       "format": "int64",
+       "location": "query"
+      },
+      "agencyId": {
+       "type": "string",
+       "description": "Numeric ID of the agency.",
+       "required": true,
+       "format": "int64",
+       "location": "query"
+      },
+      "endDate": {
+       "type": "integer",
+       "description": "Last date (inclusive) on which to retrieve conversions. Format is yyyymmdd.",
+       "required": true,
+       "format": "int32",
+       "minimum": "20091101",
+       "maximum": "99991231",
+       "location": "query"
+      },
+      "engineAccountId": {
+       "type": "string",
+       "description": "Numeric ID of the engine account.",
+       "required": true,
+       "format": "int64",
+       "location": "query"
+      },
+      "rowCount": {
+       "type": "integer",
+       "description": "The number of conversions to return per call.",
+       "required": true,
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "startDate": {
+       "type": "integer",
+       "description": "First date (inclusive) on which to retrieve conversions. Format is yyyymmdd.",
+       "required": true,
+       "format": "int32",
+       "minimum": "20091101",
+       "maximum": "99991231",
+       "location": "query"
+      },
+      "startRow": {
+       "type": "integer",
+       "description": "The 0-based starting index for retrieving conversions results.",
+       "required": true,
+       "format": "uint32",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "advertiserId",
+      "agencyId",
+      "endDate",
+      "engineAccountId",
+      "rowCount",
+      "startDate",
+      "startRow"
+     ],
+     "request": {
+      "$ref": "ConversionList"
+     },
+     "response": {
+      "$ref": "ConversionList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    },
+    "update": {
+     "id": "doubleclicksearch.conversion.update",
+     "path": "conversion",
+     "httpMethod": "PUT",
+     "description": "Updates a batch of conversions in DoubleClick Search.",
+     "request": {
+      "$ref": "ConversionList"
+     },
+     "response": {
+      "$ref": "ConversionList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    },
+    "updateAvailability": {
+     "id": "doubleclicksearch.conversion.updateAvailability",
+     "path": "conversion/updateAvailability",
+     "httpMethod": "POST",
+     "description": "Updates the availabilities of a batch of floodlight activities in DoubleClick Search.",
+     "request": {
+      "$ref": "UpdateAvailabilityRequest",
+      "parameterName": "empty"
+     },
+     "response": {
+      "$ref": "UpdateAvailabilityResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    }
+   }
+  },
+  "reports": {
+   "methods": {
+    "generate": {
+     "id": "doubleclicksearch.reports.generate",
+     "path": "reports/generate",
+     "httpMethod": "POST",
+     "description": "Generates and returns a report immediately.",
+     "request": {
+      "$ref": "ReportRequest",
+      "parameterName": "reportRequest"
+     },
+     "response": {
+      "$ref": "Report"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    },
+    "get": {
+     "id": "doubleclicksearch.reports.get",
+     "path": "reports/{reportId}",
+     "httpMethod": "GET",
+     "description": "Polls for the status of a report request.",
+     "parameters": {
+      "reportId": {
+       "type": "string",
+       "description": "ID of the report request being polled.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "reportId"
+     ],
+     "response": {
+      "$ref": "Report"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    },
+    "getFile": {
+     "id": "doubleclicksearch.reports.getFile",
+     "path": "reports/{reportId}/files/{reportFragment}",
+     "httpMethod": "GET",
+     "description": "Downloads a report file.",
+     "parameters": {
+      "reportFragment": {
+       "type": "integer",
+       "description": "The index of the report fragment to download.",
+       "required": true,
+       "format": "int32",
+       "minimum": "0",
+       "location": "path"
+      },
+      "reportId": {
+       "type": "string",
+       "description": "ID of the report.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "reportId",
+      "reportFragment"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ],
+     "supportsMediaDownload": true
+    },
+    "request": {
+     "id": "doubleclicksearch.reports.request",
+     "path": "reports",
+     "httpMethod": "POST",
+     "description": "Inserts a report request into the reporting system.",
+     "request": {
+      "$ref": "ReportRequest",
+      "parameterName": "reportRequest"
+     },
+     "response": {
+      "$ref": "Report"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/doubleclicksearch"
+     ]
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,63 @@
+// Package additionalprops provides access to the Example API.
+//
+// Usage example:
+//
+//   import "code.google.com/p/google-api-go-client/additionalprops/v1"
+//   ...
+//   additionalpropsService, err := additionalprops.New(oauthHttpClient)
+package additionalprops
+
+import (
+	"bytes"
+	"code.google.com/p/google-api-go-client/googleapi"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+// Always reference these packages, just in case the auto-generated code
+// below doesn't.
+var _ = bytes.NewBuffer
+var _ = strconv.Itoa
+var _ = fmt.Sprintf
+var _ = json.NewDecoder
+var _ = io.Copy
+var _ = url.Parse
+var _ = googleapi.Version
+var _ = errors.New
+var _ = strings.Replace
+
+const apiId = "additionalprops:v1"
+const apiName = "additionalprops"
+const apiVersion = "v1"
+const basePath = "https://www.googleapis.com/discovery/v1/apis"
+
+func New(client *http.Client) (*Service, error) {
+	if client == nil {
+		return nil, errors.New("client is nil")
+	}
+	s := &Service{client: client, BasePath: basePath}
+	return s, nil
+}
+
+type Service struct {
+	client   *http.Client
+	BasePath string // API endpoint base URL
+}
+
+type TimeseriesDescriptor struct {
+	// Labels: The set of key-value pairs that describe this time series,
+	// including target-specific labels and metric-specific labels.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Metric: The name of the metric.
+	Metric string `json:"metric,omitempty"`
+
+	// Project: The project ID to which this time series belongs.
+	Project string `json:"project,omitempty"`
+}

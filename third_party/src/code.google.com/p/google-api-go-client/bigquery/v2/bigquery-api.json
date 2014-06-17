@@ -1,0 +1,2058 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/Q_buGY2JsMDrpm6SMTOf_s_Obbo\"",
+ "discoveryVersion": "v1",
+ "id": "bigquery:v2",
+ "name": "bigquery",
+ "version": "v2",
+ "title": "BigQuery API",
+ "description": "A data platform for customers to create, manage, share and query data.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/bigquery/docs/overview",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/bigquery/v2/",
+ "basePath": "/bigquery/v2/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "bigquery/v2/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "csv",
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of text/csv",
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/bigquery": {
+     "description": "View and manage your data in Google BigQuery"
+    },
+    "https://www.googleapis.com/auth/cloud-platform": {
+     "description": "View and manage your data across Google Cloud Platform services"
+    },
+    "https://www.googleapis.com/auth/devstorage.full_control": {
+     "description": "Manage your data and permissions in Google Cloud Storage"
+    },
+    "https://www.googleapis.com/auth/devstorage.read_only": {
+     "description": "View your data in Google Cloud Storage"
+    },
+    "https://www.googleapis.com/auth/devstorage.read_write": {
+     "description": "Manage your data in Google Cloud Storage"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Dataset": {
+   "id": "Dataset",
+   "type": "object",
+   "properties": {
+    "access": {
+     "type": "array",
+     "description": "[Optional] An array of objects that define dataset access for one or more entities. You can set this property when inserting or updating a dataset in order to control who is allowed to access the data. If unspecified at dataset creation time, BigQuery adds default dataset access for the following entities: access.specialGroup: projectReaders; access.role: READER; access.specialGroup: projectWriters; access.role: WRITER; access.specialGroup: projectOwners; access.role: OWNER; access.userByEmail: [dataset creator email]; access.role: OWNER;",
+     "items": {
+      "type": "object",
+      "properties": {
+       "domain": {
+        "type": "string",
+        "description": "[Pick one] A domain to grant access to. Any users signed in with the domain specified will be granted the specified access. Example: \"example.com\"."
+       },
+       "groupByEmail": {
+        "type": "string",
+        "description": "[Pick one] An email address of a Google Group to grant access to."
+       },
+       "role": {
+        "type": "string",
+        "description": "[Required] Describes the rights granted to the user specified by the other member of the access object. The following string values are supported: READER, WRITER, OWNER."
+       },
+       "specialGroup": {
+        "type": "string",
+        "description": "[Pick one] A special group to grant access to. Possible values include: projectOwners: Owners of the enclosing project. projectReaders: Readers of the enclosing project. projectWriters: Writers of the enclosing project. allAuthenticatedUsers: All authenticated BigQuery users."
+       },
+       "userByEmail": {
+        "type": "string",
+        "description": "[Pick one] An email address of a user to grant access to. For example: fred@example.com."
+       }
+      }
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "[Output-only] The time when this dataset was created, in milliseconds since the epoch.",
+     "format": "int64"
+    },
+    "datasetReference": {
+     "$ref": "DatasetReference",
+     "description": "[Required] A reference that identifies the dataset."
+    },
+    "description": {
+     "type": "string",
+     "description": "[Optional] A user-friendly description of the dataset."
+    },
+    "etag": {
+     "type": "string",
+     "description": "[Output-only] A hash of the resource."
+    },
+    "friendlyName": {
+     "type": "string",
+     "description": "[Optional] A descriptive name for the dataset."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output-only] The fully-qualified unique name of the dataset in the format projectId:datasetId. The dataset name without the project name is given in the datasetId field. When creating a new dataset, leave this field blank, and instead specify the datasetId field."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output-only] The resource type.",
+     "default": "bigquery#dataset"
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "[Output-only] The date when this dataset or any of its tables was last modified, in milliseconds since the epoch.",
+     "format": "int64"
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output-only] A URL that can be used to access the resource again. You can use this URL in Get or Update requests to the resource."
+    }
+   }
+  },
+  "DatasetList": {
+   "id": "DatasetList",
+   "type": "object",
+   "properties": {
+    "datasets": {
+     "type": "array",
+     "description": "An array of the dataset resources in the project. Each resource contains basic information. For full information about a particular dataset resource, use the Datasets: get method. This property is omitted when there are no datasets in the project.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "datasetReference": {
+        "$ref": "DatasetReference",
+        "description": "The dataset reference. Use this property to access specific parts of the dataset's ID, such as project ID or dataset ID."
+       },
+       "friendlyName": {
+        "type": "string",
+        "description": "A descriptive name for the dataset, if one exists."
+       },
+       "id": {
+        "type": "string",
+        "description": "The fully-qualified, unique, opaque ID of the dataset."
+       },
+       "kind": {
+        "type": "string",
+        "description": "The resource type. This property always returns the value \"bigquery#dataset\".",
+        "default": "bigquery#dataset"
+       }
+      }
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "A hash value of the results page. You can use this property to determine if the page has changed since the last request."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The list type. This property always returns the value \"bigquery#datasetList\".",
+     "default": "bigquery#datasetList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token that can be used to request the next results page. This property is omitted on the final results page."
+    }
+   }
+  },
+  "DatasetReference": {
+   "id": "DatasetReference",
+   "type": "object",
+   "properties": {
+    "datasetId": {
+     "type": "string",
+     "description": "[Required] A unique ID for this dataset, without the project name.",
+     "annotations": {
+      "required": [
+       "bigquery.datasets.update"
+      ]
+     }
+    },
+    "projectId": {
+     "type": "string",
+     "description": "[Optional] The ID of the container project.",
+     "annotations": {
+      "required": [
+       "bigquery.datasets.update"
+      ]
+     }
+    }
+   }
+  },
+  "ErrorProto": {
+   "id": "ErrorProto",
+   "type": "object",
+   "properties": {
+    "debugInfo": {
+     "type": "string",
+     "description": "Debugging information. This property is internal to Google and should not be used."
+    },
+    "location": {
+     "type": "string",
+     "description": "Specifies where the error occurred, if present."
+    },
+    "message": {
+     "type": "string",
+     "description": "A human-readable description of the error."
+    },
+    "reason": {
+     "type": "string",
+     "description": "A short error code that summarizes the error."
+    }
+   }
+  },
+  "GetQueryResultsResponse": {
+   "id": "GetQueryResultsResponse",
+   "type": "object",
+   "properties": {
+    "cacheHit": {
+     "type": "boolean",
+     "description": "Whether the query result was fetched from the query cache."
+    },
+    "etag": {
+     "type": "string",
+     "description": "A hash of this response."
+    },
+    "jobComplete": {
+     "type": "boolean",
+     "description": "Whether the query has completed or not. If rows or totalRows are present, this will always be true. If this is false, totalRows will not be available."
+    },
+    "jobReference": {
+     "$ref": "JobReference",
+     "description": "Reference to the BigQuery Job that was created to run the query. This field will be present even if the original request timed out, in which case GetQueryResults can be used to read the results once the query has completed. Since this API only returns the first page of results, subsequent pages can be fetched via the same mechanism (GetQueryResults)."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type of the response.",
+     "default": "bigquery#getQueryResultsResponse"
+    },
+    "pageToken": {
+     "type": "string",
+     "description": "A token used for paging results."
+    },
+    "rows": {
+     "type": "array",
+     "description": "An object with as many results as can be contained within the maximum permitted reply size. To get any additional rows, you can call GetQueryResults and specify the jobReference returned above. Present only when the query completes successfully.",
+     "items": {
+      "$ref": "TableRow"
+     }
+    },
+    "schema": {
+     "$ref": "TableSchema",
+     "description": "The schema of the results. Present only when the query completes successfully."
+    },
+    "totalRows": {
+     "type": "string",
+     "description": "The total number of rows in the complete query result set, which can be more than the number of rows in this single page of results. Present only when the query completes successfully.",
+     "format": "uint64"
+    }
+   }
+  },
+  "Job": {
+   "id": "Job",
+   "type": "object",
+   "properties": {
+    "configuration": {
+     "$ref": "JobConfiguration",
+     "description": "[Required] Describes the job configuration."
+    },
+    "etag": {
+     "type": "string",
+     "description": "[Output-only] A hash of this resource."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output-only] Opaque ID field of the job"
+    },
+    "jobReference": {
+     "$ref": "JobReference",
+     "description": "[Optional] Reference describing the unique-per-user name of the job."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output-only] The type of the resource.",
+     "default": "bigquery#job"
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output-only] A URL that can be used to access this resource again."
+    },
+    "statistics": {
+     "$ref": "JobStatistics",
+     "description": "[Output-only] Information about the job, including starting time and ending time of the job."
+    },
+    "status": {
+     "$ref": "JobStatus",
+     "description": "[Output-only] The status of this job. Examine this value when polling an asynchronous job to see if the job is complete."
+    }
+   }
+  },
+  "JobConfiguration": {
+   "id": "JobConfiguration",
+   "type": "object",
+   "properties": {
+    "copy": {
+     "$ref": "JobConfigurationTableCopy",
+     "description": "[Pick one] Copies a table."
+    },
+    "dryRun": {
+     "type": "boolean",
+     "description": "[Optional] If set, don't actually run this job. A valid query will return a mostly empty response with some processing statistics, while an invalid query will return the same error it would if it wasn't a dry run. Behavior of non-query jobs is undefined."
+    },
+    "extract": {
+     "$ref": "JobConfigurationExtract",
+     "description": "[Pick one] Configures an extract job."
+    },
+    "link": {
+     "$ref": "JobConfigurationLink",
+     "description": "[Pick one] Configures a link job."
+    },
+    "load": {
+     "$ref": "JobConfigurationLoad",
+     "description": "[Pick one] Configures a load job."
+    },
+    "query": {
+     "$ref": "JobConfigurationQuery",
+     "description": "[Pick one] Configures a query job."
+    }
+   }
+  },
+  "JobConfigurationExtract": {
+   "id": "JobConfigurationExtract",
+   "type": "object",
+   "properties": {
+    "destinationFormat": {
+     "type": "string",
+     "description": "[Experimental] Optional and defaults to CSV. Format with which files should be exported. To export to CSV, specify \"CSV\". Tables with nested or repeated fields cannot be exported as CSV. To export to newline-delimited JSON, specify \"NEWLINE_DELIMITED_JSON\"."
+    },
+    "destinationUri": {
+     "type": "string",
+     "description": "[Pick one] DEPRECATED: Use destinationUris instead, passing only one URI as necessary. The fully-qualified Google Cloud Storage URI where the extracted table should be written."
+    },
+    "destinationUris": {
+     "type": "array",
+     "description": "[Pick one] A list of fully-qualified Google Cloud Storage URIs where the extracted table should be written.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "fieldDelimiter": {
+     "type": "string",
+     "description": "[Optional] Delimiter to use between fields in the exported data. Default is ','"
+    },
+    "printHeader": {
+     "type": "boolean",
+     "description": "[Optional] Whether to print out a header row in the results. Default is true."
+    },
+    "sourceTable": {
+     "$ref": "TableReference",
+     "description": "[Required] A reference to the table being exported."
+    }
+   }
+  },
+  "JobConfigurationLink": {
+   "id": "JobConfigurationLink",
+   "type": "object",
+   "properties": {
+    "createDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies whether the job is allowed to create new tables. The following values are supported: CREATE_IF_NEEDED: If the table does not exist, BigQuery creates the table. CREATE_NEVER: The table must already exist. If it does not, a 'notFound' error is returned in the job result. The default value is CREATE_IF_NEEDED. Creation, truncation and append actions occur as one atomic update upon job completion."
+    },
+    "destinationTable": {
+     "$ref": "TableReference",
+     "description": "[Required] The destination table of the link job."
+    },
+    "sourceUri": {
+     "type": "array",
+     "description": "[Required] URI of source table to link.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "writeDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies the action that occurs if the destination table already exists. The following values are supported: WRITE_TRUNCATE: If the table already exists, BigQuery overwrites the table data. WRITE_APPEND: If the table already exists, BigQuery appends the data to the table. WRITE_EMPTY: If the table already exists and contains data, a 'duplicate' error is returned in the job result. The default value is WRITE_EMPTY. Each action is atomic and only occurs if BigQuery is able to complete the job successfully. Creation, truncation and append actions occur as one atomic update upon job completion."
+    }
+   }
+  },
+  "JobConfigurationLoad": {
+   "id": "JobConfigurationLoad",
+   "type": "object",
+   "properties": {
+    "allowJaggedRows": {
+     "type": "boolean",
+     "description": "[Optional] Accept rows that are missing trailing optional columns. The missing values are treated as nulls. Default is false which treats short rows as errors. Only applicable to CSV, ignored for other formats."
+    },
+    "allowQuotedNewlines": {
+     "type": "boolean",
+     "description": "Indicates if BigQuery should allow quoted data sections that contain newline characters in a CSV file. The default value is false."
+    },
+    "createDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies whether the job is allowed to create new tables. The following values are supported: CREATE_IF_NEEDED: If the table does not exist, BigQuery creates the table. CREATE_NEVER: The table must already exist. If it does not, a 'notFound' error is returned in the job result. The default value is CREATE_IF_NEEDED. Creation, truncation and append actions occur as one atomic update upon job completion."
+    },
+    "destinationTable": {
+     "$ref": "TableReference",
+     "description": "[Required] The destination table to load the data into."
+    },
+    "encoding": {
+     "type": "string",
+     "description": "[Optional] The character encoding of the data. The supported values are UTF-8 or ISO-8859-1. The default value is UTF-8. BigQuery decodes the data after the raw, binary data has been split using the values of the quote and fieldDelimiter properties."
+    },
+    "fieldDelimiter": {
+     "type": "string",
+     "description": "[Optional] The separator for fields in a CSV file. BigQuery converts the string to ISO-8859-1 encoding, and then uses the first byte of the encoded string to split the data in its raw, binary state. BigQuery also supports the escape sequence \"\\t\" to specify a tab separator. The default value is a comma (',')."
+    },
+    "ignoreUnknownValues": {
+     "type": "boolean",
+     "description": "[Optional] Accept rows that contain values that do not match the schema. The unknown values are ignored. Default is false which treats unknown values as errors. For CSV this ignores extra values at the end of a line. For JSON this ignores named values that do not match any column name."
+    },
+    "maxBadRecords": {
+     "type": "integer",
+     "description": "[Optional] The maximum number of bad records that BigQuery can ignore when running the job. If the number of bad records exceeds this value, an 'invalid' error is returned in the job result and the job fails. The default value is 0, which requires that all records are valid.",
+     "format": "int32"
+    },
+    "quote": {
+     "type": "string",
+     "description": "[Optional] The value that is used to quote data sections in a CSV file. BigQuery converts the string to ISO-8859-1 encoding, and then uses the first byte of the encoded string to split the data in its raw, binary state. The default value is a double-quote ('\"'). If your data does not contain quoted sections, set the property value to an empty string. If your data contains quoted newline characters, you must also set the allowQuotedNewlines property to true."
+    },
+    "schema": {
+     "$ref": "TableSchema",
+     "description": "[Optional] The schema for the destination table. The schema can be omitted if the destination table already exists or if the schema can be inferred from the loaded data."
+    },
+    "schemaInline": {
+     "type": "string",
+     "description": "[Deprecated] The inline schema. For CSV schemas, specify as \"Field1:Type1[,Field2:Type2]*\". For example, \"foo:STRING, bar:INTEGER, baz:FLOAT\"."
+    },
+    "schemaInlineFormat": {
+     "type": "string",
+     "description": "[Deprecated] The format of the schemaInline property."
+    },
+    "skipLeadingRows": {
+     "type": "integer",
+     "description": "[Optional] The number of rows at the top of a CSV file that BigQuery will skip when loading the data. The default value is 0. This property is useful if you have header rows in the file that should be skipped.",
+     "format": "int32"
+    },
+    "sourceFormat": {
+     "type": "string",
+     "description": "[Optional] The format of the data files. For CSV files, specify \"CSV\". For datastore backups, specify \"DATASTORE_BACKUP\". For newline-delimited JSON, specify \"NEWLINE_DELIMITED_JSON\". The default value is CSV."
+    },
+    "sourceUris": {
+     "type": "array",
+     "description": "[Required] The fully-qualified URIs that point to your data on Google Cloud Storage.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "writeDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies the action that occurs if the destination table already exists. The following values are supported: WRITE_TRUNCATE: If the table already exists, BigQuery overwrites the table data. WRITE_APPEND: If the table already exists, BigQuery appends the data to the table. WRITE_EMPTY: If the table already exists and contains data, a 'duplicate' error is returned in the job result. The default value is WRITE_EMPTY. Each action is atomic and only occurs if BigQuery is able to complete the job successfully. Creation, truncation and append actions occur as one atomic update upon job completion."
+    }
+   }
+  },
+  "JobConfigurationQuery": {
+   "id": "JobConfigurationQuery",
+   "type": "object",
+   "properties": {
+    "allowLargeResults": {
+     "type": "boolean",
+     "description": "If true, allows the query to produce arbitrarily large result tables at a slight cost in performance. Requires destination_table to be set."
+    },
+    "createDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies whether the job is allowed to create new tables. The following values are supported: CREATE_IF_NEEDED: If the table does not exist, BigQuery creates the table. CREATE_NEVER: The table must already exist. If it does not, a 'notFound' error is returned in the job result. The default value is CREATE_IF_NEEDED. Creation, truncation and append actions occur as one atomic update upon job completion."
+    },
+    "defaultDataset": {
+     "$ref": "DatasetReference",
+     "description": "[Optional] Specifies the default dataset to use for unqualified table names in the query."
+    },
+    "destinationTable": {
+     "$ref": "TableReference",
+     "description": "[Optional] Describes the table where the query results should be stored. If not present, a new table will be created to store the results."
+    },
+    "preserveNulls": {
+     "type": "boolean",
+     "description": "[Deprecated] This property is deprecated."
+    },
+    "priority": {
+     "type": "string",
+     "description": "[Optional] Specifies a priority for the query. Possible values include INTERACTIVE and BATCH. The default value is INTERACTIVE."
+    },
+    "query": {
+     "type": "string",
+     "description": "[Required] BigQuery SQL query to execute."
+    },
+    "useQueryCache": {
+     "type": "boolean",
+     "description": "[Optional] Whether to look for the result in the query cache. The query cache is a best-effort cache that will be flushed whenever tables in the query are modified. Moreover, the query cache is only available when a query does not have a destination table specified."
+    },
+    "writeDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies the action that occurs if the destination table already exists. The following values are supported: WRITE_TRUNCATE: If the table already exists, BigQuery overwrites the table data. WRITE_APPEND: If the table already exists, BigQuery appends the data to the table. WRITE_EMPTY: If the table already exists and contains data, a 'duplicate' error is returned in the job result. The default value is WRITE_EMPTY. Each action is atomic and only occurs if BigQuery is able to complete the job successfully. Creation, truncation and append actions occur as one atomic update upon job completion."
+    }
+   }
+  },
+  "JobConfigurationTableCopy": {
+   "id": "JobConfigurationTableCopy",
+   "type": "object",
+   "properties": {
+    "createDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies whether the job is allowed to create new tables. The following values are supported: CREATE_IF_NEEDED: If the table does not exist, BigQuery creates the table. CREATE_NEVER: The table must already exist. If it does not, a 'notFound' error is returned in the job result. The default value is CREATE_IF_NEEDED. Creation, truncation and append actions occur as one atomic update upon job completion."
+    },
+    "destinationTable": {
+     "$ref": "TableReference",
+     "description": "[Required] The destination table"
+    },
+    "sourceTable": {
+     "$ref": "TableReference",
+     "description": "[Required] Source table to copy."
+    },
+    "writeDisposition": {
+     "type": "string",
+     "description": "[Optional] Specifies the action that occurs if the destination table already exists. The following values are supported: WRITE_TRUNCATE: If the table already exists, BigQuery overwrites the table data. WRITE_APPEND: If the table already exists, BigQuery appends the data to the table. WRITE_EMPTY: If the table already exists and contains data, a 'duplicate' error is returned in the job result. The default value is WRITE_EMPTY. Each action is atomic and only occurs if BigQuery is able to complete the job successfully. Creation, truncation and append actions occur as one atomic update upon job completion."
+    }
+   }
+  },
+  "JobList": {
+   "id": "JobList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "A hash of this page of results."
+    },
+    "jobs": {
+     "type": "array",
+     "description": "List of jobs that were requested.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "configuration": {
+        "$ref": "JobConfiguration",
+        "description": "[Full-projection-only] Specifies the job configuration."
+       },
+       "errorResult": {
+        "$ref": "ErrorProto",
+        "description": "A result object that will be present only if the job has failed."
+       },
+       "id": {
+        "type": "string",
+        "description": "Unique opaque ID of the job."
+       },
+       "jobReference": {
+        "$ref": "JobReference",
+        "description": "Job reference uniquely identifying the job."
+       },
+       "kind": {
+        "type": "string",
+        "description": "The resource type.",
+        "default": "bigquery#job"
+       },
+       "state": {
+        "type": "string",
+        "description": "Running state of the job. When the state is DONE, errorResult can be checked to determine whether the job succeeded or failed."
+       },
+       "statistics": {
+        "$ref": "JobStatistics",
+        "description": "[Output-only] Information about the job, including starting time and ending time of the job."
+       },
+       "status": {
+        "$ref": "JobStatus",
+        "description": "[Full-projection-only] Describes the state of the job."
+       },
+       "user_email": {
+        "type": "string",
+        "description": "[Full-projection-only] User who ran the job."
+       }
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type of the response.",
+     "default": "bigquery#jobList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token to request the next page of results."
+    },
+    "totalItems": {
+     "type": "integer",
+     "description": "Total number of jobs in this collection.",
+     "format": "int32"
+    }
+   }
+  },
+  "JobReference": {
+   "id": "JobReference",
+   "type": "object",
+   "properties": {
+    "jobId": {
+     "type": "string",
+     "description": "[Required] ID of the job.",
+     "annotations": {
+      "required": [
+       "bigquery.jobs.getQueryResults"
+      ]
+     }
+    },
+    "projectId": {
+     "type": "string",
+     "description": "[Required] Project ID being billed for the job.",
+     "annotations": {
+      "required": [
+       "bigquery.jobs.getQueryResults"
+      ]
+     }
+    }
+   }
+  },
+  "JobStatistics": {
+   "id": "JobStatistics",
+   "type": "object",
+   "properties": {
+    "creationTime": {
+     "type": "string",
+     "description": "[Output-only] Creation time of this job, in milliseconds since the epoch. This field will be present on all jobs.",
+     "format": "int64"
+    },
+    "endTime": {
+     "type": "string",
+     "description": "[Output-only] End time of this job, in milliseconds since the epoch. This field will be present whenever a job is in the DONE state.",
+     "format": "int64"
+    },
+    "load": {
+     "$ref": "JobStatistics3",
+     "description": "[Output-only] Statistics for a load job."
+    },
+    "query": {
+     "$ref": "JobStatistics2",
+     "description": "[Output-only] Statistics for a query job."
+    },
+    "startTime": {
+     "type": "string",
+     "description": "[Output-only] Start time of this job, in milliseconds since the epoch. This field will be present when the job transitions from the PENDING state to either RUNNING or DONE.",
+     "format": "int64"
+    },
+    "totalBytesProcessed": {
+     "type": "string",
+     "description": "[Output-only] [Deprecated] Use the bytes processed in the query statistics instead.",
+     "format": "int64"
+    }
+   }
+  },
+  "JobStatistics2": {
+   "id": "JobStatistics2",
+   "type": "object",
+   "properties": {
+    "cacheHit": {
+     "type": "boolean",
+     "description": "[Output-only] Whether the query result was fetched from the query cache."
+    },
+    "totalBytesProcessed": {
+     "type": "string",
+     "description": "[Output-only] Total bytes processed for this job.",
+     "format": "int64"
+    }
+   }
+  },
+  "JobStatistics3": {
+   "id": "JobStatistics3",
+   "type": "object",
+   "properties": {
+    "inputFileBytes": {
+     "type": "string",
+     "description": "[Output-only] Number of bytes of source data in a joad job.",
+     "format": "int64"
+    },
+    "inputFiles": {
+     "type": "string",
+     "description": "[Output-only] Number of source files in a load job.",
+     "format": "int64"
+    },
+    "outputBytes": {
+     "type": "string",
+     "description": "[Output-only] Size of the loaded data in bytes. Note that while an import job is in the running state, this value may change.",
+     "format": "int64"
+    },
+    "outputRows": {
+     "type": "string",
+     "description": "[Output-only] Number of rows imported in a load job. Note that while an import job is in the running state, this value may change.",
+     "format": "int64"
+    }
+   }
+  },
+  "JobStatus": {
+   "id": "JobStatus",
+   "type": "object",
+   "properties": {
+    "errorResult": {
+     "$ref": "ErrorProto",
+     "description": "[Output-only] Final error result of the job. If present, indicates that the job has completed and was unsuccessful."
+    },
+    "errors": {
+     "type": "array",
+     "description": "[Output-only] All errors encountered during the running of the job. Errors here do not necessarily mean that the job has completed or was unsuccessful.",
+     "items": {
+      "$ref": "ErrorProto"
+     }
+    },
+    "state": {
+     "type": "string",
+     "description": "[Output-only] Running state of the job."
+    }
+   }
+  },
+  "JsonObject": {
+   "id": "JsonObject",
+   "type": "object",
+   "description": "Represents a single JSON object.",
+   "additionalProperties": {
+    "$ref": "JsonValue"
+   }
+  },
+  "JsonValue": {
+   "id": "JsonValue",
+   "type": "any"
+  },
+  "ProjectList": {
+   "id": "ProjectList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "A hash of the page of results"
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of list.",
+     "default": "bigquery#projectList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token to request the next page of results."
+    },
+    "projects": {
+     "type": "array",
+     "description": "Projects to which you have at least READ access.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "friendlyName": {
+        "type": "string",
+        "description": "A descriptive name for this project."
+       },
+       "id": {
+        "type": "string",
+        "description": "An opaque ID of this project."
+       },
+       "kind": {
+        "type": "string",
+        "description": "The resource type.",
+        "default": "bigquery#project"
+       },
+       "numericId": {
+        "type": "string",
+        "description": "The numeric ID of this project.",
+        "format": "uint64"
+       },
+       "projectReference": {
+        "$ref": "ProjectReference",
+        "description": "A unique reference to this project."
+       }
+      }
+     }
+    },
+    "totalItems": {
+     "type": "integer",
+     "description": "The total number of projects in the list.",
+     "format": "int32"
+    }
+   }
+  },
+  "ProjectReference": {
+   "id": "ProjectReference",
+   "type": "object",
+   "properties": {
+    "projectId": {
+     "type": "string",
+     "description": "[Required] ID of the project. Can be either the numeric ID or the assigned ID of the project."
+    }
+   }
+  },
+  "QueryRequest": {
+   "id": "QueryRequest",
+   "type": "object",
+   "properties": {
+    "defaultDataset": {
+     "$ref": "DatasetReference",
+     "description": "[Optional] Specifies the default datasetId and projectId to assume for any unqualified table names in the query. If not set, all table names in the query string must be qualified in the format 'datasetId.tableId'."
+    },
+    "dryRun": {
+     "type": "boolean",
+     "description": "[Optional] If set, don't actually run the query. A valid query will return an empty response, while an invalid query will return the same error it would if it wasn't a dry run. The default value is false."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type of the request.",
+     "default": "bigquery#queryRequest"
+    },
+    "maxResults": {
+     "type": "integer",
+     "description": "[Optional] The maximum number of rows of data to return per page of results. Setting this flag to a small value such as 1000 and then paging through results might improve reliability when the query result set is large. In addition to this limit, responses are also limited to 10 MB. By default, there is no maximum row count, and only the byte limit applies.",
+     "format": "uint32"
+    },
+    "preserveNulls": {
+     "type": "boolean",
+     "description": "[Deprecated] If set to false, maps null values in the query response to the column's default value. Only specify if you have older code that can not handle null values in the query response. The default value is true. This flag is deprecated and will be ignored in a future version of BigQuery."
+    },
+    "query": {
+     "type": "string",
+     "description": "[Required] A query string, following the BigQuery query syntax, of the query to execute. Example: \"SELECT count(f1) FROM [myProjectId:myDatasetId.myTableId]\".",
+     "annotations": {
+      "required": [
+       "bigquery.jobs.query"
+      ]
+     }
+    },
+    "timeoutMs": {
+     "type": "integer",
+     "description": "[Optional] How long to wait for the query to complete, in milliseconds, before the request times out and returns. Note that this is only a timeout for the request, not the query. If the query takes longer to run than the timeout value, the call returns without any results and with the 'jobComplete' flag set to false. You can call GetQueryResults() to wait for the query to complete and read the results. The default value is 10000 milliseconds (10 seconds).",
+     "format": "uint32"
+    },
+    "useQueryCache": {
+     "type": "boolean",
+     "description": "[Optional] Whether to look for the result in the query cache. The query cache is a best-effort cache that will be flushed whenever tables in the query are modified. The default value is true."
+    }
+   }
+  },
+  "QueryResponse": {
+   "id": "QueryResponse",
+   "type": "object",
+   "properties": {
+    "cacheHit": {
+     "type": "boolean",
+     "description": "Whether the query result was fetched from the query cache."
+    },
+    "jobComplete": {
+     "type": "boolean",
+     "description": "Whether the query has completed or not. If rows or totalRows are present, this will always be true. If this is false, totalRows will not be available."
+    },
+    "jobReference": {
+     "$ref": "JobReference",
+     "description": "Reference to the Job that was created to run the query. This field will be present even if the original request timed out, in which case GetQueryResults can be used to read the results once the query has completed. Since this API only returns the first page of results, subsequent pages can be fetched via the same mechanism (GetQueryResults)."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type.",
+     "default": "bigquery#queryResponse"
+    },
+    "pageToken": {
+     "type": "string",
+     "description": "A token used for paging results."
+    },
+    "rows": {
+     "type": "array",
+     "description": "An object with as many results as can be contained within the maximum permitted reply size. To get any additional rows, you can call GetQueryResults and specify the jobReference returned above.",
+     "items": {
+      "$ref": "TableRow"
+     }
+    },
+    "schema": {
+     "$ref": "TableSchema",
+     "description": "The schema of the results. Present only when the query completes successfully."
+    },
+    "totalBytesProcessed": {
+     "type": "string",
+     "description": "The total number of bytes processed for this query. If this query was a dry run, this is the number of bytes that would be processed if the query were run.",
+     "format": "int64"
+    },
+    "totalRows": {
+     "type": "string",
+     "description": "The total number of rows in the complete query result set, which can be more than the number of rows in this single page of results.",
+     "format": "uint64"
+    }
+   }
+  },
+  "Table": {
+   "id": "Table",
+   "type": "object",
+   "properties": {
+    "creationTime": {
+     "type": "string",
+     "description": "[Output-only] The time when this table was created, in milliseconds since the epoch.",
+     "format": "int64"
+    },
+    "description": {
+     "type": "string",
+     "description": "[Optional] A user-friendly description of this table."
+    },
+    "etag": {
+     "type": "string",
+     "description": "[Output-only] A hash of this resource."
+    },
+    "expirationTime": {
+     "type": "string",
+     "description": "[Optional] The time when this table expires, in milliseconds since the epoch. If not present, the table will persist indefinitely. Expired tables will be deleted and their storage reclaimed.",
+     "format": "int64"
+    },
+    "friendlyName": {
+     "type": "string",
+     "description": "[Optional] A descriptive name for this table."
+    },
+    "id": {
+     "type": "string",
+     "description": "[Output-only] An opaque ID uniquely identifying the table."
+    },
+    "kind": {
+     "type": "string",
+     "description": "[Output-only] The type of the resource.",
+     "default": "bigquery#table"
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "[Output-only] The time when this table was last modified, in milliseconds since the epoch.",
+     "format": "int64"
+    },
+    "numBytes": {
+     "type": "string",
+     "description": "[Output-only] The size of the table in bytes.",
+     "format": "int64"
+    },
+    "numRows": {
+     "type": "string",
+     "description": "[Output-only] The number of rows of data in this table.",
+     "format": "uint64"
+    },
+    "schema": {
+     "$ref": "TableSchema",
+     "description": "[Optional] Describes the schema of this table."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "[Output-only] A URL that can be used to access this resource again."
+    },
+    "tableReference": {
+     "$ref": "TableReference",
+     "description": "[Required] Reference describing the ID of this table."
+    },
+    "type": {
+     "type": "string",
+     "description": "[Output-only] Describes the table type. The following values are supported: TABLE: A normal BigQuery table. VIEW: A virtual table defined by a SQL query. The default value is TABLE."
+    },
+    "view": {
+     "$ref": "ViewDefinition",
+     "description": "[Optional] The view definition."
+    }
+   }
+  },
+  "TableCell": {
+   "id": "TableCell",
+   "type": "object",
+   "description": "Represents a single cell in the result set. Users of the java client can detect whether their value result is null by calling 'com.google.api.client.util.Data.isNull(cell.getV())'.",
+   "properties": {
+    "v": {
+     "type": "any"
+    }
+   }
+  },
+  "TableDataInsertAllRequest": {
+   "id": "TableDataInsertAllRequest",
+   "type": "object",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The resource type of the response.",
+     "default": "bigquery#tableDataInsertAllRequest"
+    },
+    "rows": {
+     "type": "array",
+     "description": "The rows to insert.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "insertId": {
+        "type": "string",
+        "description": "[Optional] A unique ID for each row. BigQuery uses this property to detect duplicate insertion requests on a best-effort basis."
+       },
+       "json": {
+        "$ref": "JsonObject",
+        "description": "[Required] A JSON object that contains a row of data. The object's properties and values must match the destination table's schema."
+       }
+      }
+     }
+    }
+   }
+  },
+  "TableDataInsertAllResponse": {
+   "id": "TableDataInsertAllResponse",
+   "type": "object",
+   "properties": {
+    "insertErrors": {
+     "type": "array",
+     "description": "An array of errors for rows that were not inserted.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "errors": {
+        "type": "array",
+        "description": "Error information for the row indicated by the index property.",
+        "items": {
+         "$ref": "ErrorProto"
+        }
+       },
+       "index": {
+        "type": "integer",
+        "description": "The index of the row that error applies to.",
+        "format": "uint32"
+       }
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type of the response.",
+     "default": "bigquery#tableDataInsertAllResponse"
+    }
+   }
+  },
+  "TableDataList": {
+   "id": "TableDataList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "A hash of this page of results."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The resource type of the response.",
+     "default": "bigquery#tableDataList"
+    },
+    "pageToken": {
+     "type": "string",
+     "description": "A token used for paging results. Providing this token instead of the startIndex parameter can help you retrieve stable results when an underlying table is changing."
+    },
+    "rows": {
+     "type": "array",
+     "description": "Rows of results.",
+     "items": {
+      "$ref": "TableRow"
+     }
+    },
+    "totalRows": {
+     "type": "string",
+     "description": "The total number of rows in the complete table.",
+     "format": "int64"
+    }
+   }
+  },
+  "TableFieldSchema": {
+   "id": "TableFieldSchema",
+   "type": "object",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "[Optional] The field description."
+    },
+    "fields": {
+     "type": "array",
+     "description": "[Optional] Describes the nested schema fields if the type property is set to RECORD.",
+     "items": {
+      "$ref": "TableFieldSchema"
+     }
+    },
+    "mode": {
+     "type": "string",
+     "description": "[Optional] The field mode. Possible values include NULLABLE, REQUIRED and REPEATED. The default value is NULLABLE."
+    },
+    "name": {
+     "type": "string",
+     "description": "[Required] The field name."
+    },
+    "type": {
+     "type": "string",
+     "description": "[Required] The field data type. Possible values include STRING, INTEGER, FLOAT, BOOLEAN, TIMESTAMP or RECORD (where RECORD indicates that the field contains a nested schema)."
+    }
+   }
+  },
+  "TableList": {
+   "id": "TableList",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "A hash of this page of results."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of list.",
+     "default": "bigquery#tableList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token to request the next page of results."
+    },
+    "tables": {
+     "type": "array",
+     "description": "Tables in the requested dataset.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "friendlyName": {
+        "type": "string",
+        "description": "The user-friendly name for this table."
+       },
+       "id": {
+        "type": "string",
+        "description": "An opaque ID of the table"
+       },
+       "kind": {
+        "type": "string",
+        "description": "The resource type.",
+        "default": "bigquery#table"
+       },
+       "tableReference": {
+        "$ref": "TableReference",
+        "description": "A reference uniquely identifying the table."
+       },
+       "type": {
+        "type": "string",
+        "description": "The type of table. Possible values are: TABLE, VIEW."
+       }
+      }
+     }
+    },
+    "totalItems": {
+     "type": "integer",
+     "description": "The total number of tables in the dataset.",
+     "format": "int32"
+    }
+   }
+  },
+  "TableReference": {
+   "id": "TableReference",
+   "type": "object",
+   "properties": {
+    "datasetId": {
+     "type": "string",
+     "description": "[Required] ID of the dataset containing the table.",
+     "annotations": {
+      "required": [
+       "bigquery.tables.update"
+      ]
+     }
+    },
+    "projectId": {
+     "type": "string",
+     "description": "[Required] ID of the project billed for storage of the table.",
+     "annotations": {
+      "required": [
+       "bigquery.tables.update"
+      ]
+     }
+    },
+    "tableId": {
+     "type": "string",
+     "description": "[Required] ID of the table.",
+     "annotations": {
+      "required": [
+       "bigquery.tables.update"
+      ]
+     }
+    }
+   }
+  },
+  "TableRow": {
+   "id": "TableRow",
+   "type": "object",
+   "description": "Represents a single row in the result set, consisting of one or more fields.",
+   "properties": {
+    "f": {
+     "type": "array",
+     "items": {
+      "$ref": "TableCell"
+     }
+    }
+   }
+  },
+  "TableSchema": {
+   "id": "TableSchema",
+   "type": "object",
+   "properties": {
+    "fields": {
+     "type": "array",
+     "description": "Describes the fields in a table.",
+     "items": {
+      "$ref": "TableFieldSchema"
+     }
+    }
+   }
+  },
+  "ViewDefinition": {
+   "id": "ViewDefinition",
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "[Required] A query that BigQuery executes when the view is referenced."
+    }
+   }
+  }
+ },
+ "resources": {
+  "datasets": {
+   "methods": {
+    "delete": {
+     "id": "bigquery.datasets.delete",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the dataset specified by the datasetId value. Before you can delete a dataset, you must delete all its tables, either manually or by specifying deleteContents. Immediately after deletion, you can create another dataset with the same name.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of dataset being deleted",
+       "required": true,
+       "location": "path"
+      },
+      "deleteContents": {
+       "type": "boolean",
+       "description": "If True, delete all the tables in the dataset. If False and the dataset contains tables, the request will fail. Default is False",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the dataset being deleted",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "get": {
+     "id": "bigquery.datasets.get",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "GET",
+     "description": "Returns the dataset specified by datasetID.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the requested dataset",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the requested dataset",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "insert": {
+     "id": "bigquery.datasets.insert",
+     "path": "projects/{projectId}/datasets",
+     "httpMethod": "POST",
+     "description": "Creates a new empty dataset.",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the new dataset",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "Dataset"
+     },
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "list": {
+     "id": "bigquery.datasets.list",
+     "path": "projects/{projectId}/datasets",
+     "httpMethod": "GET",
+     "description": "Lists all the datasets in the specified project to which the caller has read access; however, a project owner can list (but not necessarily get) all datasets in his project.",
+     "parameters": {
+      "all": {
+       "type": "boolean",
+       "description": "Whether to list all datasets, including hidden ones",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of results to return",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Page token, returned by a previous call, to request the next page of results",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the datasets to be listed",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "response": {
+      "$ref": "DatasetList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "patch": {
+     "id": "bigquery.datasets.patch",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "PATCH",
+     "description": "Updates information in an existing dataset. The update method replaces the entire dataset resource, whereas the patch method only replaces fields that are provided in the submitted dataset resource. This method supports patch semantics.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the dataset being updated",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the dataset being updated",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "Dataset"
+     },
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "update": {
+     "id": "bigquery.datasets.update",
+     "path": "projects/{projectId}/datasets/{datasetId}",
+     "httpMethod": "PUT",
+     "description": "Updates information in an existing dataset. The update method replaces the entire dataset resource, whereas the patch method only replaces fields that are provided in the submitted dataset resource.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the dataset being updated",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the dataset being updated",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "Dataset"
+     },
+     "response": {
+      "$ref": "Dataset"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   }
+  },
+  "jobs": {
+   "methods": {
+    "get": {
+     "id": "bigquery.jobs.get",
+     "path": "projects/{projectId}/jobs/{jobId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the specified job by ID.",
+     "parameters": {
+      "jobId": {
+       "type": "string",
+       "description": "Job ID of the requested job",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the requested job",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "jobId"
+     ],
+     "response": {
+      "$ref": "Job"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "getQueryResults": {
+     "id": "bigquery.jobs.getQueryResults",
+     "path": "projects/{projectId}/queries/{jobId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the results of a query job.",
+     "parameters": {
+      "jobId": {
+       "type": "string",
+       "description": "Job ID of the query job",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to read",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Page token, returned by a previous call, to request the next page of results",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the query job",
+       "required": true,
+       "location": "path"
+      },
+      "startIndex": {
+       "type": "string",
+       "description": "Zero-based index of the starting row",
+       "format": "uint64",
+       "location": "query"
+      },
+      "timeoutMs": {
+       "type": "integer",
+       "description": "How long to wait for the query to complete, in milliseconds, before returning. Default is to return immediately. If the timeout passes before the job completes, the request will fail with a TIMEOUT error",
+       "format": "uint32",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "jobId"
+     ],
+     "response": {
+      "$ref": "GetQueryResultsResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "insert": {
+     "id": "bigquery.jobs.insert",
+     "path": "projects/{projectId}/jobs",
+     "httpMethod": "POST",
+     "description": "Starts a new asynchronous job.",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the project that will be billed for the job",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "Job"
+     },
+     "response": {
+      "$ref": "Job"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform",
+      "https://www.googleapis.com/auth/devstorage.full_control",
+      "https://www.googleapis.com/auth/devstorage.read_only",
+      "https://www.googleapis.com/auth/devstorage.read_write"
+     ],
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "*/*"
+      ],
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/bigquery/v2/projects/{projectId}/jobs"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/bigquery/v2/projects/{projectId}/jobs"
+       }
+      }
+     }
+    },
+    "list": {
+     "id": "bigquery.jobs.list",
+     "path": "projects/{projectId}/jobs",
+     "httpMethod": "GET",
+     "description": "Lists all the Jobs in the specified project that were started by the user.",
+     "parameters": {
+      "allUsers": {
+       "type": "boolean",
+       "description": "Whether to display jobs owned by all users in the project. Default false",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Page token, returned by a previous call, to request the next page of results",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the jobs to list",
+       "required": true,
+       "location": "path"
+      },
+      "projection": {
+       "type": "string",
+       "description": "Restrict information returned to a set of selected fields",
+       "enum": [
+        "full",
+        "minimal"
+       ],
+       "enumDescriptions": [
+        "Includes all job data",
+        "Does not include the job configuration"
+       ],
+       "location": "query"
+      },
+      "stateFilter": {
+       "type": "string",
+       "description": "Filter for job state",
+       "enum": [
+        "done",
+        "pending",
+        "running"
+       ],
+       "enumDescriptions": [
+        "Finished jobs",
+        "Pending jobs",
+        "Running jobs"
+       ],
+       "repeated": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "response": {
+      "$ref": "JobList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "query": {
+     "id": "bigquery.jobs.query",
+     "path": "projects/{projectId}/queries",
+     "httpMethod": "POST",
+     "description": "Runs a BigQuery SQL query synchronously and returns query results if the query completes within a specified timeout.",
+     "parameters": {
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the project billed for the query",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId"
+     ],
+     "request": {
+      "$ref": "QueryRequest"
+     },
+     "response": {
+      "$ref": "QueryResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   }
+  },
+  "projects": {
+   "methods": {
+    "list": {
+     "id": "bigquery.projects.list",
+     "path": "projects",
+     "httpMethod": "GET",
+     "description": "Lists the projects to which you have at least read access.",
+     "parameters": {
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Page token, returned by a previous call, to request the next page of results",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ProjectList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   }
+  },
+  "tabledata": {
+   "methods": {
+    "insertAll": {
+     "id": "bigquery.tabledata.insertAll",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}/insertAll",
+     "httpMethod": "POST",
+     "description": "Inserts the supplied rows into the table.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the destination table.",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the destination table.",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "description": "Table ID of the destination table.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "request": {
+      "$ref": "TableDataInsertAllRequest"
+     },
+     "response": {
+      "$ref": "TableDataInsertAllResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "list": {
+     "id": "bigquery.tabledata.list",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}/data",
+     "httpMethod": "GET",
+     "description": "Retrieves table data from a specified set of rows.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the table to read",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Page token, returned by a previous call, identifying the result set",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the table to read",
+       "required": true,
+       "location": "path"
+      },
+      "startIndex": {
+       "type": "string",
+       "description": "Zero-based index of the starting row to read",
+       "format": "uint64",
+       "location": "query"
+      },
+      "tableId": {
+       "type": "string",
+       "description": "Table ID of the table to read",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "response": {
+      "$ref": "TableDataList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   }
+  },
+  "tables": {
+   "methods": {
+    "delete": {
+     "id": "bigquery.tables.delete",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the table specified by tableId from the dataset. If the table contains data, all the data will be deleted.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the table to delete",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the table to delete",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "description": "Table ID of the table to delete",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "get": {
+     "id": "bigquery.tables.get",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "GET",
+     "description": "Gets the specified table resource by table ID. This method does not return the data in the table, it only returns the table resource, which describes the structure of this table.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the requested table",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the requested table",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "description": "Table ID of the requested table",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "insert": {
+     "id": "bigquery.tables.insert",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables",
+     "httpMethod": "POST",
+     "description": "Creates a new, empty table in the dataset.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the new table",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the new table",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "list": {
+     "id": "bigquery.tables.list",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables",
+     "httpMethod": "GET",
+     "description": "Lists all tables in the specified dataset.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the tables to list",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return",
+       "format": "uint32",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Page token, returned by a previous call, to request the next page of results",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the tables to list",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId"
+     ],
+     "response": {
+      "$ref": "TableList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "patch": {
+     "id": "bigquery.tables.patch",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "PATCH",
+     "description": "Updates information in an existing table. The update method replaces the entire table resource, whereas the patch method only replaces fields that are provided in the submitted table resource. This method supports patch semantics.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the table to update",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the table to update",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "description": "Table ID of the table to update",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    },
+    "update": {
+     "id": "bigquery.tables.update",
+     "path": "projects/{projectId}/datasets/{datasetId}/tables/{tableId}",
+     "httpMethod": "PUT",
+     "description": "Updates information in an existing table. The update method replaces the entire table resource, whereas the patch method only replaces fields that are provided in the submitted table resource.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Dataset ID of the table to update",
+       "required": true,
+       "location": "path"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "Project ID of the table to update",
+       "required": true,
+       "location": "path"
+      },
+      "tableId": {
+       "type": "string",
+       "description": "Table ID of the table to update",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "projectId",
+      "datasetId",
+      "tableId"
+     ],
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/bigquery",
+      "https://www.googleapis.com/auth/cloud-platform"
+     ]
+    }
+   }
+  }
+ }
+}

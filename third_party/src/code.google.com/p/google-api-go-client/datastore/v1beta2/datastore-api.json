@@ -1,0 +1,1077 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/-F8QVVz5h8Pedx8KHkOr-HeXpnU\"",
+ "discoveryVersion": "v1",
+ "id": "datastore:v1beta2",
+ "name": "datastore",
+ "version": "v1beta2",
+ "title": "Google Cloud Datastore API",
+ "description": "API for accessing Google Cloud Datastore.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/datastore/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/datastore/v1beta2/datasets/",
+ "basePath": "/datastore/v1beta2/datasets/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "datastore/v1beta2/datasets/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "proto",
+   "enum": [
+    "json",
+    "proto"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json",
+    "Responses with Content-Type of application/x-protobuf"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/datastore": {
+     "description": "View and manage your Google Cloud Datastore data"
+    },
+    "https://www.googleapis.com/auth/userinfo.email": {
+     "description": "View your email address"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "AllocateIdsRequest": {
+   "id": "AllocateIdsRequest",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.AllocateIdsRequest",
+   "properties": {
+    "keys": {
+     "type": "array",
+     "description": "A list of keys with incomplete key paths to allocate IDs for. No key may be reserved/read-only.",
+     "items": {
+      "$ref": "Key"
+     }
+    }
+   }
+  },
+  "AllocateIdsResponse": {
+   "id": "AllocateIdsResponse",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.AllocateIdsResponse",
+   "properties": {
+    "header": {
+     "$ref": "ResponseHeader"
+    },
+    "keys": {
+     "type": "array",
+     "description": "The keys specified in the request (in the same order), each with its key path completed with a newly allocated ID.",
+     "items": {
+      "$ref": "Key"
+     }
+    }
+   }
+  },
+  "BeginTransactionRequest": {
+   "id": "BeginTransactionRequest",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.BeginTransactionRequest",
+   "properties": {
+    "isolationLevel": {
+     "type": "string",
+     "description": "The transaction isolation level. Either snapshot or serializable. The default isolation level is snapshot isolation, which means that another transaction may not concurrently modify the data that is modified by this transaction. Optionally, a transaction can request to be made serializable which means that another transaction cannot concurrently modify the data that is read or modified by this transaction.",
+     "enum": [
+      "SERIALIZABLE",
+      "SNAPSHOT"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    }
+   }
+  },
+  "BeginTransactionResponse": {
+   "id": "BeginTransactionResponse",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.BeginTransactionResponse",
+   "properties": {
+    "header": {
+     "$ref": "ResponseHeader"
+    },
+    "transaction": {
+     "type": "string",
+     "description": "The transaction identifier (always present).",
+     "format": "byte"
+    }
+   }
+  },
+  "CommitRequest": {
+   "id": "CommitRequest",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.CommitRequest",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "The type of commit to perform. Either TRANSACTIONAL or NON_TRANSACTIONAL.",
+     "enum": [
+      "NON_TRANSACTIONAL",
+      "TRANSACTIONAL"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
+    "mutation": {
+     "$ref": "Mutation",
+     "description": "The mutation to perform. Optional."
+    },
+    "transaction": {
+     "type": "string",
+     "description": "The transaction identifier, returned by a call to beginTransaction. Must be set when mode is TRANSACTIONAL.",
+     "format": "byte"
+    }
+   }
+  },
+  "CommitResponse": {
+   "id": "CommitResponse",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.CommitResponse",
+   "properties": {
+    "header": {
+     "$ref": "ResponseHeader"
+    },
+    "mutationResult": {
+     "$ref": "MutationResult",
+     "description": "The result of performing the mutation (if any)."
+    }
+   }
+  },
+  "CompositeFilter": {
+   "id": "CompositeFilter",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.CompositeFilter",
+   "properties": {
+    "filters": {
+     "type": "array",
+     "description": "The list of filters to combine. Must contain at least one filter.",
+     "items": {
+      "$ref": "Filter"
+     }
+    },
+    "operator": {
+     "type": "string",
+     "description": "The operator for combining multiple filters. Only \"and\" is currently supported.",
+     "enum": [
+      "AND"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "Entity": {
+   "id": "Entity",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Entity",
+   "properties": {
+    "key": {
+     "$ref": "Key",
+     "description": "The entity's key.\n\nAn entity must have a key, unless otherwise documented (for example, an entity in Value.entityValue may have no key). An entity's kind is its key's path's last element's kind, or null if it has no key."
+    },
+    "properties": {
+     "type": "object",
+     "description": "The entity's properties.",
+     "additionalProperties": {
+      "$ref": "Property",
+      "description": "The name of the property. Properties with names matching regex \"__.*__\" are reserved. A reserved property name is forbidden in certain documented contexts. The name cannot be \"\"."
+     }
+    }
+   }
+  },
+  "EntityResult": {
+   "id": "EntityResult",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.EntityResult",
+   "properties": {
+    "entity": {
+     "$ref": "Entity",
+     "description": "The resulting entity."
+    }
+   }
+  },
+  "Filter": {
+   "id": "Filter",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Filter",
+   "properties": {
+    "compositeFilter": {
+     "$ref": "CompositeFilter",
+     "description": "A composite filter."
+    },
+    "propertyFilter": {
+     "$ref": "PropertyFilter",
+     "description": "A filter on a property."
+    }
+   }
+  },
+  "GqlQuery": {
+   "id": "GqlQuery",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.GqlQuery",
+   "properties": {
+    "allowLiteral": {
+     "type": "boolean",
+     "description": "When false, the query string must not contain a literal."
+    },
+    "nameArgs": {
+     "type": "array",
+     "description": "A named argument must set field GqlQueryArg.name. No two named arguments may have the same name. For each non-reserved named binding site in the query string, there must be a named argument with that name, but not necessarily the inverse.",
+     "items": {
+      "$ref": "GqlQueryArg"
+     }
+    },
+    "numberArgs": {
+     "type": "array",
+     "description": "Numbered binding site @1 references the first numbered argument, effectively using 1-based indexing, rather than the usual 0. A numbered argument must NOT set field GqlQueryArg.name. For each binding site numbered i in query_string, there must be an ith numbered argument. The inverse must also be true.",
+     "items": {
+      "$ref": "GqlQueryArg"
+     }
+    },
+    "queryString": {
+     "type": "string"
+    }
+   }
+  },
+  "GqlQueryArg": {
+   "id": "GqlQueryArg",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.GqlQueryArg",
+   "properties": {
+    "cursor": {
+     "type": "string",
+     "format": "byte"
+    },
+    "name": {
+     "type": "string",
+     "description": "Must match regex \"[A-Za-z_$][A-Za-z_$0-9]*\". Must not match regex \"__.*__\". Must not be \"\"."
+    },
+    "value": {
+     "$ref": "Value"
+    }
+   }
+  },
+  "Key": {
+   "id": "Key",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Key",
+   "properties": {
+    "partitionId": {
+     "$ref": "PartitionId",
+     "description": "Entities are partitioned into subsets, currently identified by a dataset (usually implicitly specified by the project) and namespace ID. Queries are scoped to a single partition."
+    },
+    "path": {
+     "type": "array",
+     "description": "The entity path. An entity path consists of one or more elements composed of a kind and a string or numerical identifier, which identify entities. The first element identifies a root entity, the second element identifies a child of the root entity, the third element a child of the second entity, and so forth. The entities identified by all prefixes of the path are called the element's ancestors. An entity path is always fully complete: ALL of the entity's ancestors are required to be in the path along with the entity identifier itself. The only exception is that in some documented cases, the identifier in the last path element (for the entity) itself may be omitted. A path can never be empty.",
+     "items": {
+      "$ref": "KeyPathElement"
+     }
+    }
+   }
+  },
+  "KeyPathElement": {
+   "id": "KeyPathElement",
+   "type": "object",
+   "description": "A (kind, ID/name) pair used to construct a key path.\n\nAt most one of name or ID may be set. If either is set, the element is complete. If neither is set, the element is incomplete.",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Key.PathElement",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The ID of the entity. Always \u003e 0.",
+     "format": "int64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "The kind of the entity. Kinds matching regex \"__.*__\" are reserved/read-only. Cannot be \"\"."
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the entity. Names matching regex \"__.*__\" are reserved/read-only. Cannot be \"\"."
+    }
+   }
+  },
+  "KindExpression": {
+   "id": "KindExpression",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.KindExpression",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The name of the kind."
+    }
+   }
+  },
+  "LookupRequest": {
+   "id": "LookupRequest",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.LookupRequest",
+   "properties": {
+    "keys": {
+     "type": "array",
+     "description": "Keys of entities to look up from the datastore.",
+     "items": {
+      "$ref": "Key"
+     }
+    },
+    "readOptions": {
+     "$ref": "ReadOptions",
+     "description": "Options for this lookup request. Optional."
+    }
+   }
+  },
+  "LookupResponse": {
+   "id": "LookupResponse",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.LookupResponse",
+   "properties": {
+    "deferred": {
+     "type": "array",
+     "description": "A list of keys that were not looked up due to resource constraints.",
+     "items": {
+      "$ref": "Key"
+     }
+    },
+    "found": {
+     "type": "array",
+     "description": "Entities found.",
+     "items": {
+      "$ref": "EntityResult"
+     }
+    },
+    "header": {
+     "$ref": "ResponseHeader"
+    },
+    "missing": {
+     "type": "array",
+     "description": "Entities not found, with only the key populated.",
+     "items": {
+      "$ref": "EntityResult"
+     }
+    }
+   }
+  },
+  "Mutation": {
+   "id": "Mutation",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Mutation",
+   "properties": {
+    "delete": {
+     "type": "array",
+     "description": "Keys of entities to delete. Each key must have a complete key path and must not be reserved/read-only.",
+     "items": {
+      "$ref": "Key"
+     }
+    },
+    "force": {
+     "type": "boolean",
+     "description": "Ignore a user specified read-only period. Optional."
+    },
+    "insert": {
+     "type": "array",
+     "description": "Entities to insert. Each inserted entity's key must have a complete path and must not be reserved/read-only.",
+     "items": {
+      "$ref": "Entity"
+     }
+    },
+    "insertAutoId": {
+     "type": "array",
+     "description": "Insert entities with a newly allocated ID. Each inserted entity's key must omit the final identifier in its path and must not be reserved/read-only.",
+     "items": {
+      "$ref": "Entity"
+     }
+    },
+    "update": {
+     "type": "array",
+     "description": "Entities to update. Each updated entity's key must have a complete path and must not be reserved/read-only.",
+     "items": {
+      "$ref": "Entity"
+     }
+    },
+    "upsert": {
+     "type": "array",
+     "description": "Entities to upsert. Each upserted entity's key must have a complete path and must not be reserved/read-only.",
+     "items": {
+      "$ref": "Entity"
+     }
+    }
+   }
+  },
+  "MutationResult": {
+   "id": "MutationResult",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.MutationResult",
+   "properties": {
+    "indexUpdates": {
+     "type": "integer",
+     "description": "Number of index writes.",
+     "format": "int32"
+    },
+    "insertAutoIdKeys": {
+     "type": "array",
+     "description": "Keys for insertAutoId entities. One per entity from the request, in the same order.",
+     "items": {
+      "$ref": "Key"
+     }
+    }
+   }
+  },
+  "PartitionId": {
+   "id": "PartitionId",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.PartitionId",
+   "properties": {
+    "datasetId": {
+     "type": "string",
+     "description": "The dataset ID."
+    },
+    "namespace": {
+     "type": "string",
+     "description": "The namespace."
+    }
+   }
+  },
+  "Property": {
+   "id": "Property",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Property",
+   "properties": {
+    "blobKeyValue": {
+     "type": "string",
+     "description": "A blob key value."
+    },
+    "blobValue": {
+     "type": "string",
+     "description": "A blob value.",
+     "format": "byte"
+    },
+    "booleanValue": {
+     "type": "boolean",
+     "description": "A boolean value."
+    },
+    "dateTimeValue": {
+     "type": "string",
+     "description": "A timestamp value.",
+     "format": "date-time"
+    },
+    "doubleValue": {
+     "type": "number",
+     "description": "A double value.",
+     "format": "double"
+    },
+    "entityValue": {
+     "$ref": "Entity",
+     "description": "An entity value. May have no key. May have a key with an incomplete key path. May have a reserved/read-only key."
+    },
+    "indexed": {
+     "type": "boolean",
+     "description": "If the value should be indexed.\n\nThe indexed property may be set for a null value. When indexed is true, stringValue is limited to 500 characters and the blob value is limited to 500 bytes. Input values by default have indexed set to true; however, you can explicitly set indexed to true if you want. (An output value never has indexed explicitly set to true.) If a value is itself an entity, it cannot have indexed set to true."
+    },
+    "integerValue": {
+     "type": "string",
+     "description": "An integer value.",
+     "format": "int64"
+    },
+    "keyValue": {
+     "$ref": "Key",
+     "description": "A key value."
+    },
+    "listValue": {
+     "type": "array",
+     "description": "A list value. Cannot contain another list value. Cannot also have a meaning and indexing set.",
+     "items": {
+      "$ref": "Value"
+     }
+    },
+    "meaning": {
+     "type": "integer",
+     "description": "The meaning field is reserved and should not be used.",
+     "format": "int32"
+    },
+    "stringValue": {
+     "type": "string",
+     "description": "A UTF-8 encoded string value."
+    }
+   }
+  },
+  "PropertyExpression": {
+   "id": "PropertyExpression",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.PropertyExpression",
+   "properties": {
+    "aggregationFunction": {
+     "type": "string",
+     "description": "The aggregation function to apply to the property. Optional. Can only be used when grouping by at least one property. Must then be set on all properties in the projection that are not being grouped by. Aggregation functions: first selects the first result as determined by the query's order.",
+     "enum": [
+      "FIRST"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    },
+    "property": {
+     "$ref": "PropertyReference",
+     "description": "The property to project."
+    }
+   }
+  },
+  "PropertyFilter": {
+   "id": "PropertyFilter",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.PropertyFilter",
+   "properties": {
+    "operator": {
+     "type": "string",
+     "description": "The operator to filter by. One of lessThan, lessThanOrEqual, greaterThan, greaterThanOrEqual, equal, or hasAncestor.",
+     "enum": [
+      "EQUAL",
+      "GREATER_THAN",
+      "GREATER_THAN_OR_EQUAL",
+      "HAS_ANCESTOR",
+      "LESS_THAN",
+      "LESS_THAN_OR_EQUAL"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "property": {
+     "$ref": "PropertyReference",
+     "description": "The property to filter by."
+    },
+    "value": {
+     "$ref": "Value",
+     "description": "The value to compare the property to."
+    }
+   }
+  },
+  "PropertyOrder": {
+   "id": "PropertyOrder",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.PropertyOrder",
+   "properties": {
+    "direction": {
+     "type": "string",
+     "description": "The direction to order by. One of ascending or descending. Optional, defaults to ascending.",
+     "enum": [
+      "ASCENDING",
+      "DESCENDING"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
+    "property": {
+     "$ref": "PropertyReference",
+     "description": "The property to order by."
+    }
+   }
+  },
+  "PropertyReference": {
+   "id": "PropertyReference",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.PropertyReference",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "The name of the property."
+    }
+   }
+  },
+  "Query": {
+   "id": "Query",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Query",
+   "properties": {
+    "endCursor": {
+     "type": "string",
+     "description": "An ending point for the query results. Optional. Query cursors are returned in query result batches.",
+     "format": "byte"
+    },
+    "filter": {
+     "$ref": "Filter",
+     "description": "The filter to apply (optional)."
+    },
+    "groupBy": {
+     "type": "array",
+     "description": "The properties to group by (if empty, no grouping is applied to the result set).",
+     "items": {
+      "$ref": "PropertyReference"
+     }
+    },
+    "kinds": {
+     "type": "array",
+     "description": "The kinds to query (if empty, returns entities from all kinds).",
+     "items": {
+      "$ref": "KindExpression"
+     }
+    },
+    "limit": {
+     "type": "integer",
+     "description": "The maximum number of results to return. Applies after all other constraints. Optional.",
+     "format": "int32"
+    },
+    "offset": {
+     "type": "integer",
+     "description": "The number of results to skip. Applies before limit, but after all other constraints (optional, defaults to 0).",
+     "format": "int32"
+    },
+    "order": {
+     "type": "array",
+     "description": "The order to apply to the query results (if empty, order is unspecified).",
+     "items": {
+      "$ref": "PropertyOrder"
+     }
+    },
+    "projection": {
+     "type": "array",
+     "description": "The projection to return. If not set the entire entity is returned.",
+     "items": {
+      "$ref": "PropertyExpression"
+     }
+    },
+    "startCursor": {
+     "type": "string",
+     "description": "A starting point for the query results. Optional. Query cursors are returned in query result batches.",
+     "format": "byte"
+    }
+   }
+  },
+  "QueryResultBatch": {
+   "id": "QueryResultBatch",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.QueryResultBatch",
+   "properties": {
+    "endCursor": {
+     "type": "string",
+     "description": "A cursor that points to the position after the last result in the batch. May be absent.",
+     "format": "byte"
+    },
+    "entityResultType": {
+     "type": "string",
+     "description": "The result type for every entity in entityResults. full for full entities, projection for entities with only projected properties, keyOnly for entities with only a key.",
+     "enum": [
+      "FULL",
+      "KEY_ONLY",
+      "PROJECTION"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "entityResults": {
+     "type": "array",
+     "description": "The results for this batch.",
+     "items": {
+      "$ref": "EntityResult"
+     }
+    },
+    "moreResults": {
+     "type": "string",
+     "description": "The state of the query after the current batch. One of notFinished, moreResultsAfterLimit, noMoreResults.",
+     "enum": [
+      "MORE_RESULTS_AFTER_LIMIT",
+      "NOT_FINISHED",
+      "NO_MORE_RESULTS"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "skippedResults": {
+     "type": "integer",
+     "description": "The number of results skipped because of Query.offset.",
+     "format": "int32"
+    }
+   }
+  },
+  "ReadOptions": {
+   "id": "ReadOptions",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.ReadOptions",
+   "properties": {
+    "readConsistency": {
+     "type": "string",
+     "description": "The read consistency to use. One of default, strong, or eventual. Cannot be set when transaction is set. Lookup and ancestor queries default to strong, global queries default to eventual and cannot be set to strong. Optional. Default is default.",
+     "enum": [
+      "DEFAULT",
+      "EVENTUAL",
+      "STRONG"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      ""
+     ]
+    },
+    "transaction": {
+     "type": "string",
+     "description": "The transaction to use. Optional.",
+     "format": "byte"
+    }
+   }
+  },
+  "ResponseHeader": {
+   "id": "ResponseHeader",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.ResponseHeader",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The kind, fixed to \"datastore#responseHeader\".",
+     "default": "datastore#responseHeader"
+    }
+   }
+  },
+  "RollbackRequest": {
+   "id": "RollbackRequest",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.RollbackRequest",
+   "properties": {
+    "transaction": {
+     "type": "string",
+     "description": "The transaction identifier, returned by a call to beginTransaction.",
+     "format": "byte"
+    }
+   }
+  },
+  "RollbackResponse": {
+   "id": "RollbackResponse",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.RollbackResponse",
+   "properties": {
+    "header": {
+     "$ref": "ResponseHeader"
+    }
+   }
+  },
+  "RunQueryRequest": {
+   "id": "RunQueryRequest",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.RunQueryRequest",
+   "properties": {
+    "gqlQuery": {
+     "$ref": "GqlQuery",
+     "description": "The GQL query to run. Either this field or field query must be set, but not both."
+    },
+    "partitionId": {
+     "$ref": "PartitionId",
+     "description": "Entities are partitioned into subsets, identified by a dataset (usually implicitly specified by the project) and namespace ID. Queries are scoped to a single partition."
+    },
+    "query": {
+     "$ref": "Query",
+     "description": "The query to run. Either this field or field gql_query must be set, but not both."
+    },
+    "readOptions": {
+     "$ref": "ReadOptions",
+     "description": "The options for this query."
+    }
+   }
+  },
+  "RunQueryResponse": {
+   "id": "RunQueryResponse",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.RunQueryResponse",
+   "properties": {
+    "batch": {
+     "$ref": "QueryResultBatch",
+     "description": "A batch of query results (always present)."
+    },
+    "header": {
+     "$ref": "ResponseHeader"
+    }
+   }
+  },
+  "Value": {
+   "id": "Value",
+   "type": "object",
+   "externalTypeName": "apphosting.client.datastoreservice.proto.Value",
+   "properties": {
+    "blobKeyValue": {
+     "type": "string",
+     "description": "A blob key value."
+    },
+    "blobValue": {
+     "type": "string",
+     "description": "A blob value.",
+     "format": "byte"
+    },
+    "booleanValue": {
+     "type": "boolean",
+     "description": "A boolean value."
+    },
+    "dateTimeValue": {
+     "type": "string",
+     "description": "A timestamp value.",
+     "format": "date-time"
+    },
+    "doubleValue": {
+     "type": "number",
+     "description": "A double value.",
+     "format": "double"
+    },
+    "entityValue": {
+     "$ref": "Entity",
+     "description": "An entity value. May have no key. May have a key with an incomplete key path. May have a reserved/read-only key."
+    },
+    "indexed": {
+     "type": "boolean",
+     "description": "If the value should be indexed.\n\nThe indexed property may be set for a null value. When indexed is true, stringValue is limited to 500 characters and the blob value is limited to 500 bytes. Input values by default have indexed set to true; however, you can explicitly set indexed to true if you want. (An output value never has indexed explicitly set to true.) If a value is itself an entity, it cannot have indexed set to true."
+    },
+    "integerValue": {
+     "type": "string",
+     "description": "An integer value.",
+     "format": "int64"
+    },
+    "keyValue": {
+     "$ref": "Key",
+     "description": "A key value."
+    },
+    "listValue": {
+     "type": "array",
+     "description": "A list value. Cannot contain another list value. Cannot also have a meaning and indexing set.",
+     "items": {
+      "$ref": "Value"
+     }
+    },
+    "meaning": {
+     "type": "integer",
+     "description": "The meaning field is reserved and should not be used.",
+     "format": "int32"
+    },
+    "stringValue": {
+     "type": "string",
+     "description": "A UTF-8 encoded string value."
+    }
+   }
+  }
+ },
+ "resources": {
+  "datasets": {
+   "methods": {
+    "allocateIds": {
+     "id": "datastore.datasets.allocateIds",
+     "path": "{datasetId}/allocateIds",
+     "httpMethod": "POST",
+     "description": "Allocate IDs for incomplete keys (useful for referencing an entity before it is inserted).",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Identifies the dataset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "AllocateIdsRequest"
+     },
+     "response": {
+      "$ref": "AllocateIdsResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/datastore",
+      "https://www.googleapis.com/auth/userinfo.email"
+     ]
+    },
+    "beginTransaction": {
+     "id": "datastore.datasets.beginTransaction",
+     "path": "{datasetId}/beginTransaction",
+     "httpMethod": "POST",
+     "description": "Begin a new transaction.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Identifies the dataset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "BeginTransactionRequest"
+     },
+     "response": {
+      "$ref": "BeginTransactionResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/datastore",
+      "https://www.googleapis.com/auth/userinfo.email"
+     ]
+    },
+    "commit": {
+     "id": "datastore.datasets.commit",
+     "path": "{datasetId}/commit",
+     "httpMethod": "POST",
+     "description": "Commit a transaction, optionally creating, deleting or modifying some entities.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Identifies the dataset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "CommitRequest"
+     },
+     "response": {
+      "$ref": "CommitResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/datastore",
+      "https://www.googleapis.com/auth/userinfo.email"
+     ]
+    },
+    "lookup": {
+     "id": "datastore.datasets.lookup",
+     "path": "{datasetId}/lookup",
+     "httpMethod": "POST",
+     "description": "Look up some entities by key.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Identifies the dataset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "LookupRequest"
+     },
+     "response": {
+      "$ref": "LookupResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/datastore",
+      "https://www.googleapis.com/auth/userinfo.email"
+     ]
+    },
+    "rollback": {
+     "id": "datastore.datasets.rollback",
+     "path": "{datasetId}/rollback",
+     "httpMethod": "POST",
+     "description": "Roll back a transaction.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Identifies the dataset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "RollbackRequest"
+     },
+     "response": {
+      "$ref": "RollbackResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/datastore",
+      "https://www.googleapis.com/auth/userinfo.email"
+     ]
+    },
+    "runQuery": {
+     "id": "datastore.datasets.runQuery",
+     "path": "{datasetId}/runQuery",
+     "httpMethod": "POST",
+     "description": "Query for entities.",
+     "parameters": {
+      "datasetId": {
+       "type": "string",
+       "description": "Identifies the dataset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "datasetId"
+     ],
+     "request": {
+      "$ref": "RunQueryRequest"
+     },
+     "response": {
+      "$ref": "RunQueryResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/datastore",
+      "https://www.googleapis.com/auth/userinfo.email"
+     ]
+    }
+   }
+  }
+ }
+}

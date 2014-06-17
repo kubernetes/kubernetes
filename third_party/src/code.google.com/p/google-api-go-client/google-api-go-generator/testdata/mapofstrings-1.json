@@ -1,0 +1,38 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "additionalprops:v1",
+ "name": "additionalprops",
+ "version": "v1",
+ "title": "Example API",
+ "description": "The Example API demonstrates an associative array.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "protocol": "rest",
+ "schemas": {
+  "TimeseriesDescriptor": {
+   "id": "TimeseriesDescriptor",
+   "type": "object",
+   "description": "The descriptions of a time series.",
+   "properties": {
+    "labels": {
+     "type": "object",
+     "description": "The set of key-value pairs that describe this time series, including target-specific labels and metric-specific labels.",
+     "additionalProperties": {
+      "type": "string",
+      "description": "The label's name."
+     }
+    },
+    "metric": {
+     "type": "string",
+     "description": "The name of the metric."
+    },
+    "project": {
+     "type": "string",
+     "description": "The project ID to which this time series belongs."
+    }
+   }
+  }
+ }
+}

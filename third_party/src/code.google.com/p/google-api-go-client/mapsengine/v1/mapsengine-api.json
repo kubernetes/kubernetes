@@ -1,0 +1,3167 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/3m5rB86FE5KuW1K3jAl88AxCreg\"",
+ "discoveryVersion": "v1",
+ "id": "mapsengine:v1",
+ "name": "mapsengine",
+ "canonicalName": "Maps Engine",
+ "version": "v1",
+ "title": "Google Maps Engine API",
+ "description": "The Google Maps Engine API allows developers to store and query geospatial vector and raster data.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/maps_engine-16.png",
+  "x32": "http://www.google.com/images/icons/product/maps_engine-32.png"
+ },
+ "documentationLink": "https://developers.google.com/maps-engine/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/mapsengine/v1/",
+ "basePath": "/mapsengine/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "mapsengine/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/mapsengine": {
+     "description": "View and manage your Google Maps Engine data"
+    },
+    "https://www.googleapis.com/auth/mapsengine.readonly": {
+     "description": "View your Google Maps Engine data"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "AcquisitionTime": {
+   "id": "AcquisitionTime",
+   "type": "object",
+   "description": "Acquisition time represents acquired time of a raster.",
+   "properties": {
+    "end": {
+     "type": "string",
+     "description": "The end time if acquisition time is a range. The value is an RFC 3339 formatted date-time value (1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "precision": {
+     "type": "string",
+     "description": "The precision of acquisition time. Valid values include: 'year', 'month', 'day', 'hour', 'minute' and 'second'.",
+     "enum": [
+      "day",
+      "hour",
+      "minute",
+      "month",
+      "second",
+      "year"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "start": {
+     "type": "string",
+     "description": "The acquisition time, or start time if acquisition time is a range. The value is an RFC 3339 formatted date-time value (1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    }
+   }
+  },
+  "Border": {
+   "id": "Border",
+   "type": "object",
+   "description": "Border in line style. Both color and width are required.",
+   "properties": {
+    "color": {
+     "type": "string",
+     "description": "Color of the border.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "opacity": {
+     "type": "number",
+     "description": "Opacity of the border.",
+     "format": "double"
+    },
+    "width": {
+     "type": "number",
+     "description": "Width of the border, in pixels.",
+     "format": "double",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    }
+   }
+  },
+  "Color": {
+   "id": "Color",
+   "type": "object",
+   "description": "Basic color used in styling.",
+   "properties": {
+    "color": {
+     "type": "string",
+     "description": "The CSS style color, can be in format of \"red\" or \"#7733EE\".",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "opacity": {
+     "type": "number",
+     "description": "Opacity ranges from 0 to 1, inclusive. If not provided, default to 1.",
+     "format": "double"
+    }
+   }
+  },
+  "Datasource": {
+   "id": "Datasource",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The ID of a datasource."
+    }
+   }
+  },
+  "DisplayRule": {
+   "id": "DisplayRule",
+   "type": "object",
+   "description": "A display rule of the vector style.",
+   "properties": {
+    "filters": {
+     "type": "array",
+     "description": "This display rule will only be applied to features that match all of the filters here. If filters is empty, then the rule applies to all features.",
+     "items": {
+      "$ref": "Filter"
+     }
+    },
+    "lineOptions": {
+     "$ref": "LineStyle",
+     "description": "Style applied to lines. Required for LineString Geometry."
+    },
+    "name": {
+     "type": "string",
+     "description": "Display rule name. Name is not unique and cannot be used for identification purpose."
+    },
+    "pointOptions": {
+     "$ref": "PointStyle",
+     "description": "Style applied to points. Required for Point Geometry."
+    },
+    "polygonOptions": {
+     "$ref": "PolygonStyle",
+     "description": "Style applied to polygons. Required for Polygon Geometry."
+    },
+    "zoomLevels": {
+     "$ref": "ZoomLevels",
+     "description": "The zoom levels that this display rule apply.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    }
+   }
+  },
+  "Feature": {
+   "id": "Feature",
+   "type": "object",
+   "description": "A feature within a table.",
+   "properties": {
+    "geometry": {
+     "$ref": "GeoJsonGeometry",
+     "description": "The geometry member of this Feature."
+    },
+    "properties": {
+     "$ref": "GeoJsonProperties",
+     "description": "Key/value pairs of this Feature."
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a feature.",
+     "default": "Feature"
+    }
+   }
+  },
+  "FeatureInfo": {
+   "id": "FeatureInfo",
+   "type": "object",
+   "description": "A feature info contains information about individual feature.",
+   "properties": {
+    "content": {
+     "type": "string",
+     "description": "HTML template of the info window. If not provided, a default template with all attributes will be generated."
+    }
+   }
+  },
+  "FeaturesBatchDeleteRequest": {
+   "id": "FeaturesBatchDeleteRequest",
+   "type": "object",
+   "description": "The request sent to features.BatchDelete.",
+   "properties": {
+    "gx_ids": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "primaryKeys": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "FeaturesBatchInsertRequest": {
+   "id": "FeaturesBatchInsertRequest",
+   "type": "object",
+   "description": "The request sent to features.Insert.",
+   "properties": {
+    "features": {
+     "type": "array",
+     "items": {
+      "$ref": "Feature"
+     }
+    }
+   }
+  },
+  "FeaturesBatchPatchRequest": {
+   "id": "FeaturesBatchPatchRequest",
+   "type": "object",
+   "description": "The request sent to features.BatchPatch.",
+   "properties": {
+    "features": {
+     "type": "array",
+     "items": {
+      "$ref": "Feature"
+     }
+    }
+   }
+  },
+  "FeaturesListResponse": {
+   "id": "FeaturesListResponse",
+   "type": "object",
+   "description": "The response returned by a call to features.List.",
+   "properties": {
+    "allowedQueriesPerSecond": {
+     "type": "number",
+     "description": "An indicator of the maximum rate at which queries may be made, if all queries were as expensive as this query.",
+     "format": "double"
+    },
+    "features": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "Feature"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    },
+    "schema": {
+     "$ref": "Schema",
+     "description": "The feature schema."
+    },
+    "type": {
+     "type": "string",
+     "default": "FeatureCollection"
+    }
+   }
+  },
+  "File": {
+   "id": "File",
+   "type": "object",
+   "description": "A single File, which is a component of an Asset.",
+   "properties": {
+    "filename": {
+     "type": "string",
+     "description": "The name of the file.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasters.upload",
+       "mapsengine.tables.upload"
+      ]
+     }
+    },
+    "size": {
+     "type": "string",
+     "description": "The size of the file in bytes.",
+     "format": "int64"
+    },
+    "uploadStatus": {
+     "type": "string",
+     "description": "The upload status of the file.",
+     "enum": [
+      "canceled",
+      "complete",
+      "failed",
+      "inProgress"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      ""
+     ]
+    }
+   }
+  },
+  "Filter": {
+   "id": "Filter",
+   "type": "object",
+   "description": "Conditions for filtering features.",
+   "properties": {
+    "column": {
+     "type": "string",
+     "description": "The column name to filter on.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "operator": {
+     "type": "string",
+     "description": "Operation used to evaluate the filter.",
+     "enum": [
+      "!=",
+      "\u003c",
+      "\u003c=",
+      "==",
+      "\u003e",
+      "\u003e=",
+      "contains",
+      "endsWith",
+      "startsWith"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "value": {
+     "type": "any",
+     "description": "Value to be evaluated against attribute.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    }
+   }
+  },
+  "GeoJsonGeometry": {
+   "id": "GeoJsonGeometry",
+   "description": "A geometry object",
+   "type": "object",
+   "variant": {
+    "discriminant": "type",
+    "map": [
+     {
+      "type_value": "GeometryCollection",
+      "$ref": "GeoJsonGeometryCollection"
+     },
+     {
+      "type_value": "LineString",
+      "$ref": "GeoJsonLineString"
+     },
+     {
+      "type_value": "MultiLineString",
+      "$ref": "GeoJsonMultiLineString"
+     },
+     {
+      "type_value": "MultiPoint",
+      "$ref": "GeoJsonMultiPoint"
+     },
+     {
+      "type_value": "MultiPolygon",
+      "$ref": "GeoJsonMultiPolygon"
+     },
+     {
+      "type_value": "Point",
+      "$ref": "GeoJsonPoint"
+     },
+     {
+      "type_value": "Polygon",
+      "$ref": "GeoJsonPolygon"
+     }
+    ]
+   }
+  },
+  "GeoJsonGeometryCollection": {
+   "id": "GeoJsonGeometryCollection",
+   "type": "object",
+   "description": "Geometry Collection",
+   "properties": {
+    "geometries": {
+     "type": "array",
+     "description": "The geometry objects that are contained within this geometry collection.",
+     "items": {
+      "$ref": "GeoJsonGeometry"
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a geometry collection.",
+     "enum": [
+      "GeometryCollection"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonLineString": {
+   "id": "GeoJsonLineString",
+   "type": "object",
+   "description": "Line String",
+   "properties": {
+    "coordinates": {
+     "type": "array",
+     "description": "The coordinates of this line string as an array of two or more positions.",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "number",
+       "format": "double"
+      }
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a line string.",
+     "enum": [
+      "LineString"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonMultiLineString": {
+   "id": "GeoJsonMultiLineString",
+   "type": "object",
+   "description": "Multi Line String",
+   "properties": {
+    "coordinates": {
+     "type": "array",
+     "description": "The coordinates of this multi-line string as an array of line string coordinate arrays.",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "number",
+        "format": "double"
+       }
+      }
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a multi-line string.",
+     "enum": [
+      "MultiLineString"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonMultiPoint": {
+   "id": "GeoJsonMultiPoint",
+   "type": "object",
+   "properties": {
+    "coordinates": {
+     "type": "array",
+     "description": "The coordinates of this multi-point as an array of positions.",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "number",
+       "format": "double"
+      }
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a multi-point.",
+     "enum": [
+      "MultiPoint"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonMultiPolygon": {
+   "id": "GeoJsonMultiPolygon",
+   "type": "object",
+   "description": "Multi Polygon",
+   "properties": {
+    "coordinates": {
+     "type": "array",
+     "description": "The coordinates of this multi-polygon as an array of polygon coordinate arrays.",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "array",
+        "items": {
+         "type": "number",
+         "format": "double"
+        }
+       }
+      }
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a multi-polygon.",
+     "enum": [
+      "MultiPolygon"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonPoint": {
+   "id": "GeoJsonPoint",
+   "type": "object",
+   "properties": {
+    "coordinates": {
+     "type": "array",
+     "description": "The coordinates of this point as a position in [longitude, latitude] or [longitude, latitude, altitude] form.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a point.",
+     "enum": [
+      "Point"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonPolygon": {
+   "id": "GeoJsonPolygon",
+   "type": "object",
+   "description": "Polygon",
+   "properties": {
+    "coordinates": {
+     "type": "array",
+     "description": "The coordinates of this polygon as an array of linear ring coordinate arrays. A linear ring is a closed line string with 4 or more positions. The first and last positions are equivalent. For polygons with multiple rings, the first must be the exterior ring and any others must be interior rings or holes.",
+     "items": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "number",
+        "format": "double"
+       }
+      }
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a polygon.",
+     "enum": [
+      "Polygon"
+     ],
+     "enumDescriptions": [
+      ""
+     ]
+    }
+   }
+  },
+  "GeoJsonProperties": {
+   "id": "GeoJsonProperties",
+   "type": "object",
+   "description": "The properties associated with a feature.",
+   "additionalProperties": {
+    "type": "any"
+   }
+  },
+  "IconStyle": {
+   "id": "IconStyle",
+   "type": "object",
+   "description": "Style for icon, this is part of point style.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Custom icon id."
+    },
+    "name": {
+     "type": "string",
+     "description": "Stock icon name. To use a stock icon, prefix it with 'gx_'. See Stock icon names for valid icon names. For example, to specify small_red, set name to 'gx_small_red'."
+    }
+   }
+  },
+  "Image": {
+   "id": "Image",
+   "type": "object",
+   "description": "A geo-referenced raster.",
+   "properties": {
+    "acquisitionTime": {
+     "$ref": "AcquisitionTime",
+     "description": "The acquisition time of this Raster."
+    },
+    "attribution": {
+     "type": "string",
+     "description": "The name of the attribution to be used for this Raster.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasters.upload"
+      ]
+     }
+    },
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this Raster. The numbers represent latitudes and longitudes in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this raster. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of this Raster, supplied by the author."
+    },
+    "draftAccessList": {
+     "type": "string",
+     "description": "The Map Editors access list to share this Raster with.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasters.upload"
+      ]
+     }
+    },
+    "files": {
+     "type": "array",
+     "description": "The files associated with this Raster.",
+     "items": {
+      "$ref": "File"
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "A globally unique ID, used to refer to this Raster."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this raster. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "maskType": {
+     "type": "string",
+     "description": "The mask processing type of this Raster. Valid values include \"autoMask\", \"alphaChannelMask\", \"noMask\", \"imageMask\".",
+     "default": "autoMask",
+     "enum": [
+      "alphaChannelMask",
+      "autoMask",
+      "imageMask",
+      "noMask"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this Raster, supplied by the author.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasters.upload"
+      ]
+     }
+    },
+    "processingStatus": {
+     "type": "string",
+     "description": "The processing status of this Raster. The raster processing status values can be:\n\n'notReady': The raster is not ready to be processed - some files have not been uploaded.\n'ready': The raster is queued for processing.\n'processing': The raster is currently processing.\n'complete': Processing has completed successfully.\n'failed': Processing failed to complete.",
+     "enum": [
+      "complete",
+      "failed",
+      "notReady",
+      "processing",
+      "ready"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project that this Raster is in.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasters.upload"
+      ]
+     }
+    },
+    "rasterType": {
+     "type": "string",
+     "description": "The type of this Raster. Always \"image\" today.",
+     "default": "image"
+    },
+    "tags": {
+     "type": "array",
+     "description": "Tags of this Raster.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "LabelStyle": {
+   "id": "LabelStyle",
+   "type": "object",
+   "description": "Text label style.",
+   "properties": {
+    "color": {
+     "type": "string",
+     "description": "Color of the text. If not provided, default to black."
+    },
+    "column": {
+     "type": "string",
+     "description": "The column value of the feature to be displayed.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "fontStyle": {
+     "type": "string",
+     "description": "Font style of the label, defaults to 'normal'.",
+     "enum": [
+      "italic",
+      "normal"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
+    "fontWeight": {
+     "type": "string",
+     "description": "Font weight of the label, defaults to 'normal'.",
+     "enum": [
+      "bold",
+      "normal"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
+    "opacity": {
+     "type": "number",
+     "description": "Opacity of the text.",
+     "format": "double"
+    },
+    "outline": {
+     "$ref": "Color",
+     "description": "Outline color of the text."
+    },
+    "size": {
+     "type": "number",
+     "description": "Font size of the label, in pixels. 8 \u003c= size \u003c= 15. If not provided, a default size will be provided.",
+     "format": "double"
+    }
+   }
+  },
+  "LatLngBox": {
+   "id": "LatLngBox",
+   "type": "array",
+   "description": "A rectangular geographic bounds.",
+   "items": {
+    "type": "number",
+    "format": "double"
+   }
+  },
+  "Layer": {
+   "id": "Layer",
+   "type": "object",
+   "description": "A Layer combines multiple datasources, with styling information, for presentation on a map.",
+   "properties": {
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this Layer. The numbers represent latitudes and longitudes in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this layer. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "datasourceType": {
+     "type": "string",
+     "description": "The type of the datasources used to build this Layer. One of either \"table\" or \"image\".",
+     "enum": [
+      "image",
+      "table"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ],
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "datasources": {
+     "type": "array",
+     "description": "An array of datasources used to build this Layer. If datasourceType is \"image\", then each element in this array is a reference to an Image or RasterCollection. If datasourceType is \"table\" then each element in this array is a reference to a Vector Table.",
+     "items": {
+      "$ref": "Datasource"
+     }
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of this Layer, supplied by the author."
+    },
+    "draftAccessList": {
+     "type": "string",
+     "description": "The name of an access list of the Map Editor type. The user on whose behalf the request is being sent must be an editor on that access list. Read About access lists in the Google Maps Engine help center for more information.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "A globally unique ID, used to refer to this Layer."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this layer. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this Layer, supplied by the author.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "processingStatus": {
+     "type": "string",
+     "description": "The processing status of this layer.",
+     "enum": [
+      "complete",
+      "failed",
+      "notReady",
+      "processing",
+      "ready"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project that this Layer is in.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "publishedAccessList": {
+     "type": "string",
+     "description": "The access list to whom view permissions are granted. The value must be the name of a Maps Engine access list of the Map Viewer type, and the user must be a viewer on that list. Read About access lists in the Google Maps Engine help center for more information."
+    },
+    "style": {
+     "$ref": "VectorStyle",
+     "description": "The Styling information for a vector layer."
+    },
+    "tags": {
+     "type": "array",
+     "description": "Tags of this Layer.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "LayersListResponse": {
+   "id": "LayersListResponse",
+   "type": "object",
+   "description": "The response returned by a call to layers.List.",
+   "properties": {
+    "layers": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "Layer"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    }
+   }
+  },
+  "LineStyle": {
+   "id": "LineStyle",
+   "type": "object",
+   "description": "Style for lines.",
+   "properties": {
+    "border": {
+     "$ref": "Border",
+     "description": "Border of the line. 0 \u003c border.width \u003c= 5."
+    },
+    "dash": {
+     "type": "array",
+     "description": "Dash defines the pattern of the line, the values are pixel lengths of alternating dash and gap. If dash is not provided, then it means a solid line. Dash can contain up to 10 values and must contain even number of values.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "label": {
+     "$ref": "LabelStyle",
+     "description": "Label style for the line."
+    },
+    "stroke": {
+     "type": "object",
+     "description": "Stroke of the line.",
+     "properties": {
+      "color": {
+       "type": "string",
+       "description": "Color of the line.",
+       "annotations": {
+        "required": [
+         "mapsengine.layers.create"
+        ]
+       }
+      },
+      "opacity": {
+       "type": "number",
+       "description": "Opacity of the line.",
+       "format": "double"
+      },
+      "width": {
+       "type": "number",
+       "description": "Width of the line, in pixels. 0 \u003c= width \u003c= 10. If width is set to 0, the line will be invisible.",
+       "format": "double",
+       "annotations": {
+        "required": [
+         "mapsengine.layers.create"
+        ]
+       }
+      }
+     }
+    }
+   }
+  },
+  "Map": {
+   "id": "Map",
+   "type": "object",
+   "description": "A Map is a collection of Layers, optionally contained within folders.",
+   "properties": {
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this Map. The numbers represent latitude and longitude in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "contents": {
+     "type": "array",
+     "description": "The contents of this Map.",
+     "items": {
+      "$ref": "MapItem"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this map. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "defaultViewport": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which defines the rectangular bounding box of the default viewport. The numbers represent latitude and longitude in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of this Map, supplied by the author."
+    },
+    "id": {
+     "type": "string",
+     "description": "A globally unique ID, used to refer to this Map."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this map. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this Map, supplied by the author."
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project that this Map is in."
+    },
+    "tags": {
+     "type": "array",
+     "description": "Tags of this Map.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "versions": {
+     "type": "array",
+     "description": "An array containing the available versions of this Map. Currently may only contain \"published\".",
+     "items": {
+      "type": "string",
+      "enum": [
+       "draft",
+       "published"
+      ],
+      "enumDescriptions": [
+       "",
+       ""
+      ]
+     }
+    }
+   }
+  },
+  "MapFolder": {
+   "id": "MapFolder",
+   "type": "object",
+   "properties": {
+    "contents": {
+     "type": "array",
+     "description": "The contents of this Folder.",
+     "items": {
+      "$ref": "MapItem"
+     }
+    },
+    "defaultViewport": {
+     "$ref": "LatLngBox",
+     "description": "An array of four numbers (west, south, east, north) which defines the rectangular bounding box of the default viewport. The numbers represent latitude and longitude in decimal degrees."
+    },
+    "key": {
+     "type": "string",
+     "description": "A user defined alias for this Folder, specific to this Map."
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this Folder."
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a Folder. (( constant \"folder\" ))",
+     "default": "folder"
+    },
+    "visibility": {
+     "type": "string",
+     "description": "The visibility setting of this Folder. One of \"defaultOn\" or \"defaultOff\"."
+    }
+   }
+  },
+  "MapItem": {
+   "id": "MapItem",
+   "description": "A map item.",
+   "type": "object",
+   "variant": {
+    "discriminant": "type",
+    "map": [
+     {
+      "type_value": "folder",
+      "$ref": "MapFolder"
+     },
+     {
+      "type_value": "kmlLink",
+      "$ref": "MapKmlLink"
+     },
+     {
+      "type_value": "layer",
+      "$ref": "MapLayer"
+     }
+    ]
+   }
+  },
+  "MapKmlLink": {
+   "id": "MapKmlLink",
+   "type": "object",
+   "properties": {
+    "defaultViewport": {
+     "$ref": "LatLngBox",
+     "description": "An array of four numbers (west, south, east, north) which defines the rectangular bounding box of the default viewport. The numbers represent latitude and longitude in decimal degrees."
+    },
+    "kmlUrl": {
+     "type": "string",
+     "description": "The URL to the KML file represented by this KmlLink."
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this KmlLink."
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a KmlLink. (( constant \"kmlLink\" ))",
+     "default": "kmlLink"
+    },
+    "visibility": {
+     "type": "string",
+     "description": "The visibility setting of this KmlLink. One of \"defaultOn\" or \"defaultOff\"."
+    }
+   }
+  },
+  "MapLayer": {
+   "id": "MapLayer",
+   "type": "object",
+   "properties": {
+    "defaultViewport": {
+     "$ref": "LatLngBox",
+     "description": "An array of four numbers (west, south, east, north) which defines the rectangular bounding box of the default viewport. The numbers represent latitude and longitude in decimal degrees."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this Layer. This ID can be used to request more details about this Layer."
+    },
+    "key": {
+     "type": "string",
+     "description": "A user defined alias for this Layer, specific to this Map."
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this Layer."
+    },
+    "type": {
+     "type": "string",
+     "description": "Identifies this object as a Layer. (( constant \"layer\" ))",
+     "default": "layer"
+    },
+    "visibility": {
+     "type": "string",
+     "description": "The visibility setting of this Layer. One of \"defaultOn\" or \"defaultOff\"."
+    }
+   }
+  },
+  "MapsListResponse": {
+   "id": "MapsListResponse",
+   "type": "object",
+   "description": "The response returned by a call to maps.List.",
+   "properties": {
+    "maps": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "Map"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    }
+   }
+  },
+  "Parent": {
+   "id": "Parent",
+   "type": "object",
+   "description": "A list of the parents of an asset.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The ID of this parent."
+    }
+   }
+  },
+  "ParentsListResponse": {
+   "id": "ParentsListResponse",
+   "type": "object",
+   "description": "The response returned by a call to parents.List.",
+   "properties": {
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    },
+    "parents": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "Parent"
+     }
+    }
+   }
+  },
+  "PointStyle": {
+   "id": "PointStyle",
+   "type": "object",
+   "description": "Style for points.",
+   "properties": {
+    "icon": {
+     "$ref": "IconStyle",
+     "description": "Icon for the point; exactly one field in 'icon' must be set.",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "label": {
+     "$ref": "LabelStyle",
+     "description": "Label style for the point."
+    }
+   }
+  },
+  "PolygonStyle": {
+   "id": "PolygonStyle",
+   "type": "object",
+   "description": "Style for polygons.",
+   "properties": {
+    "fill": {
+     "$ref": "Color",
+     "description": "Fill color of the polygon. If not provided, the polygon will be transparent and not visible if there is no border."
+    },
+    "stroke": {
+     "$ref": "Border",
+     "description": "Border of the polygon. 0 \u003c border.width \u003c= 10."
+    }
+   }
+  },
+  "ProcessResponse": {
+   "id": "ProcessResponse",
+   "type": "object",
+   "description": "The response returned by a call to any asset's Process method."
+  },
+  "Project": {
+   "id": "Project",
+   "type": "object",
+   "description": "A project groups a collection of resources.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "An ID used to refer to this project."
+    },
+    "name": {
+     "type": "string",
+     "description": "A user provided name for this project."
+    }
+   }
+  },
+  "ProjectsListResponse": {
+   "id": "ProjectsListResponse",
+   "type": "object",
+   "description": "The response returned by a call to projects.List.",
+   "properties": {
+    "projects": {
+     "type": "array",
+     "description": "Projects returned.",
+     "items": {
+      "$ref": "Project"
+     }
+    }
+   }
+  },
+  "PublishResponse": {
+   "id": "PublishResponse",
+   "type": "object",
+   "description": "The response returned by a call to any asset's Publish method."
+  },
+  "Raster": {
+   "id": "Raster",
+   "type": "object",
+   "description": "A raster resource.",
+   "properties": {
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this Raster. The numbers represent latitudes and longitudes in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this raster. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of this Raster, supplied by the author."
+    },
+    "id": {
+     "type": "string",
+     "description": "A globally unique ID, used to refer to this Raster."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this raster. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this Raster, supplied by the author."
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project that this Raster is in."
+    },
+    "rasterType": {
+     "type": "string",
+     "description": "The type of this Raster. Always \"image\" today.",
+     "default": "image"
+    },
+    "tags": {
+     "type": "array",
+     "description": "Tags of this Raster.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "RasterCollection": {
+   "id": "RasterCollection",
+   "type": "object",
+   "description": "A raster collection groups multiple Raster resources for inclusion in a Layer.",
+   "properties": {
+    "attribution": {
+     "type": "string",
+     "description": "The name of the attribution to be used for this RasterCollection.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasterCollections.create"
+      ]
+     }
+    },
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this RasterCollection. The numbers represent latitudes and longitudes in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this rasterCollection. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of this RasterCollection, supplied by the author."
+    },
+    "draftAccessList": {
+     "type": "string",
+     "description": "The name of an access list of the Map Editor type. The user on whose behalf the request is being sent must be an editor on that access list. Read About access lists in the Google Maps Engine help center for more information.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasterCollections.create"
+      ]
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "A globally unique ID, used to refer to this RasterCollection."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this rasterCollection. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "mosaic": {
+     "type": "boolean",
+     "description": "True if this RasterCollection is a mosaic.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasterCollections.create"
+      ]
+     }
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this RasterCollection, supplied by the author.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasterCollections.create"
+      ]
+     }
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project that this RasterCollection is in.",
+     "annotations": {
+      "required": [
+       "mapsengine.rasterCollections.create"
+      ]
+     }
+    },
+    "rasterType": {
+     "type": "string",
+     "description": "The type of rasters contained within this RasterCollection.",
+     "enum": [
+      "image"
+     ],
+     "enumDescriptions": [
+      ""
+     ],
+     "annotations": {
+      "required": [
+       "mapsengine.rasterCollections.create"
+      ]
+     }
+    },
+    "tags": {
+     "type": "array",
+     "description": "Tags of this RasterCollection.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "RastercollectionsListResponse": {
+   "id": "RastercollectionsListResponse",
+   "type": "object",
+   "description": "The response returned by a call to raster_collections.List.",
+   "properties": {
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    },
+    "rasterCollections": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "RasterCollection"
+     }
+    }
+   }
+  },
+  "RastersListResponse": {
+   "id": "RastersListResponse",
+   "type": "object",
+   "description": "The response returned by a call to rasterCollections.rasters.List.",
+   "properties": {
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    },
+    "rasters": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "Raster"
+     }
+    }
+   }
+  },
+  "Resource": {
+   "id": "Resource",
+   "type": "object",
+   "description": "An asset is any Google Maps Engine resource that has a globally unique ID. Assets include maps, layers, vector tables, raster collections, and rasters. Projects and features are not considered assets.\n\nMore detailed information about an asset can be obtained by querying the asset's particular endpoint.",
+   "properties": {
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this asset. The numbers represent latitude and longitude in decimal degrees.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this asset. The value is an RFC 3339-formatted date-time value (for example, 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "description": {
+     "type": "string",
+     "description": "The asset's description."
+    },
+    "id": {
+     "type": "string",
+     "description": "The asset's globally unique ID."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this asset. The value is an RFC 3339-formatted date-time value (for example, 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "name": {
+     "type": "string",
+     "description": "The asset's name."
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project to which the asset belongs."
+    },
+    "resource": {
+     "type": "string",
+     "description": "The URL to query to retrieve the asset's complete object. The assets endpoint only returns high-level information about a resource."
+    },
+    "tags": {
+     "type": "array",
+     "description": "An array of text strings, with each string representing a tag. More information about tags can be found in the Tagging data article of the Maps Engine help center.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of asset. One of raster, rasterCollection, table, map, or layer.",
+     "enum": [
+      "layer",
+      "map",
+      "raster",
+      "rasterCollection",
+      "table"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    }
+   }
+  },
+  "ResourcesListResponse": {
+   "id": "ResourcesListResponse",
+   "type": "object",
+   "description": "The response returned by a call to resources.List.",
+   "properties": {
+    "assets": {
+     "type": "array",
+     "description": "Assets returned.",
+     "items": {
+      "$ref": "Resource"
+     }
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    }
+   }
+  },
+  "Schema": {
+   "id": "Schema",
+   "type": "object",
+   "description": "A schema indicating the properties which may be associated with features within a Table, and the types of those properties.",
+   "properties": {
+    "columns": {
+     "type": "array",
+     "description": "An array of column objects. The first object in the array must be named geometry and be of type points, lineStrings, polygons, or mixedGeometry.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string",
+        "description": "The column name."
+       },
+       "type": {
+        "type": "string",
+        "description": "The type of data stored in this column. Accepted values are:\n \n- integer \n- double \n- boolean \n- string \n- mixedGeometry \n- points \n- lineStrings \n- polygons",
+        "enum": [
+         "boolean",
+         "datetime",
+         "double",
+         "integer",
+         "lineStrings",
+         "mixedGeometry",
+         "points",
+         "polygons",
+         "string"
+        ],
+        "enumDescriptions": [
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         "",
+         ""
+        ]
+       }
+      }
+     },
+     "annotations": {
+      "required": [
+       "mapsengine.tables.create"
+      ]
+     }
+    },
+    "primaryGeometry": {
+     "type": "string",
+     "description": "The name of the column that contains a feature's geometry. This field can be omitted during table create; Google Maps Engine supports only a single geometry column, which must be named geometry and be the first object in the columns array."
+    },
+    "primaryKey": {
+     "type": "string",
+     "description": "The name of the column that contains the unique identifier of a Feature."
+    }
+   }
+  },
+  "Table": {
+   "id": "Table",
+   "type": "object",
+   "description": "A collection of geographic features, and associated metadata.",
+   "properties": {
+    "bbox": {
+     "type": "array",
+     "description": "An array of four numbers (west, south, east, north) which define the rectangular bounding box which contains all of the data in this table.",
+     "items": {
+      "type": "number",
+      "format": "double"
+     }
+    },
+    "creationTime": {
+     "type": "string",
+     "description": "The creation time of this table. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of this table, supplied by the author."
+    },
+    "draftAccessList": {
+     "type": "string",
+     "description": "The name of an access list of the Map Editor type. The user on whose behalf the request is being sent must be an editor on that access list. Read About access lists in the Google Maps Engine help center for more information.",
+     "annotations": {
+      "required": [
+       "mapsengine.tables.create",
+       "mapsengine.tables.upload"
+      ]
+     }
+    },
+    "files": {
+     "type": "array",
+     "description": "The files associated with this table.",
+     "items": {
+      "$ref": "File"
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "A globally unique ID, used to refer to this table."
+    },
+    "lastModifiedTime": {
+     "type": "string",
+     "description": "The last modified time of this table. The value is an RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z).",
+     "format": "date-time"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of this table, supplied by the author.",
+     "annotations": {
+      "required": [
+       "mapsengine.tables.create",
+       "mapsengine.tables.upload"
+      ]
+     }
+    },
+    "processingStatus": {
+     "type": "string",
+     "description": "The processing status of this table. The supported processing status values are:\n \n- notReady: The table is not ready to be processed - some files have not been uploaded. \n- ready: The table is queued for processing. \n- processing: The table is currently processing. \n- complete: Processing has completed successfully. \n- failed: Processing failed to complete.",
+     "enum": [
+      "complete",
+      "failed",
+      "notReady",
+      "processing",
+      "ready"
+     ],
+     "enumDescriptions": [
+      "",
+      "",
+      "",
+      "",
+      ""
+     ]
+    },
+    "projectId": {
+     "type": "string",
+     "description": "The ID of the project to which the table belongs.",
+     "annotations": {
+      "required": [
+       "mapsengine.tables.create",
+       "mapsengine.tables.upload"
+      ]
+     }
+    },
+    "publishedAccessList": {
+     "type": "string",
+     "description": "The access list to whom view permissions are granted. The value must be the name of a Maps Engine access list of the Map Viewer type, and the user must be a viewer on that list. Read About access lists in the Google Maps Engine help center for more information."
+    },
+    "schema": {
+     "$ref": "Schema",
+     "description": "The schema for this table."
+    },
+    "sourceEncoding": {
+     "type": "string",
+     "description": "Encoding of the uploaded files. Valid values include UTF-8, CP1251, ISO 8859-1, and Shift_JIS.",
+     "default": "UTF-8"
+    },
+    "tags": {
+     "type": "array",
+     "description": "An array of text strings, with each string representing a tag. More information about tags can be found in the Tagging data article of the Maps Engine help center.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "TablesListResponse": {
+   "id": "TablesListResponse",
+   "type": "object",
+   "description": "The response returned by a call to tables.List.",
+   "properties": {
+    "nextPageToken": {
+     "type": "string",
+     "description": "Next page token."
+    },
+    "tables": {
+     "type": "array",
+     "description": "Resources returned.",
+     "items": {
+      "$ref": "Table"
+     }
+    }
+   }
+  },
+  "VectorStyle": {
+   "id": "VectorStyle",
+   "type": "object",
+   "description": "A vector style contains styling information for vector layer.",
+   "properties": {
+    "displayRules": {
+     "type": "array",
+     "description": "Display rules of the vector style. The first matched rule will apply to the features. If no display rule is provided, a default display rule will be generated according to Geometry type.",
+     "items": {
+      "$ref": "DisplayRule"
+     }
+    },
+    "featureInfo": {
+     "$ref": "FeatureInfo",
+     "description": "Individual feature info, this is called Info Window in Maps Engine UI. If not provided, a default template with all attributes will be generated."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of the vector style. Currently, only displayRule is supported.",
+     "enum": [
+      "displayRule"
+     ],
+     "enumDescriptions": [
+      ""
+     ],
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    }
+   }
+  },
+  "ZoomLevels": {
+   "id": "ZoomLevels",
+   "type": "object",
+   "description": "Zoom level range. Zoom levels are restricted between 0 and 24, inclusive.",
+   "properties": {
+    "max": {
+     "type": "integer",
+     "description": "Maximum zoom level.",
+     "format": "int32",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    },
+    "min": {
+     "type": "integer",
+     "description": "Minimum zoom level.",
+     "format": "int32",
+     "annotations": {
+      "required": [
+       "mapsengine.layers.create"
+      ]
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "assets": {
+   "methods": {
+    "get": {
+     "id": "mapsengine.assets.get",
+     "path": "assets/{id}",
+     "httpMethod": "GET",
+     "description": "Return metadata for a particular asset.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the asset.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Resource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "list": {
+     "id": "mapsengine.assets.list",
+     "path": "assets",
+     "httpMethod": "GET",
+     "description": "Return all assets readable by the current user.",
+     "parameters": {
+      "bbox": {
+       "type": "string",
+       "description": "A bounding box, expressed as \"west,south,east,north\". If set, only assets which intersect this bounding box will be returned.",
+       "location": "query"
+      },
+      "createdAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "createdBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "creatorEmail": {
+       "type": "string",
+       "description": "An email address representing a user. Returned assets that have been created by the user associated with the provided email address.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of items to include in a single response page. The maximum supported value is 100.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "modifiedAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "modifiedBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "The ID of a Maps Engine project, used to filter the response. To list all available projects with their IDs, send a Projects: list request. You can also find your project ID as the value of the DashboardPlace:cid URL parameter when signed in to mapsengine.google.com.",
+       "location": "query"
+      },
+      "type": {
+       "type": "string",
+       "description": "An asset type restriction. If set, only resources of this type will be returned.",
+       "enum": [
+        "layer",
+        "map",
+        "rasterCollection",
+        "table"
+       ],
+       "enumDescriptions": [
+        "Return layers.",
+        "Return maps.",
+        "Return raster collections.",
+        "Return tables."
+       ],
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "ResourcesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    }
+   },
+   "resources": {
+    "parents": {
+     "methods": {
+      "list": {
+       "id": "mapsengine.assets.parents.list",
+       "path": "assets/{id}/parents",
+       "httpMethod": "GET",
+       "description": "Return all parent ids of the specified asset.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the asset whose parents will be listed.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in a single response page. The maximum supported value is 50.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "ParentsListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "layers": {
+   "methods": {
+    "create": {
+     "id": "mapsengine.layers.create",
+     "path": "layers",
+     "httpMethod": "POST",
+     "description": "Create a layer asset.",
+     "parameters": {
+      "process": {
+       "type": "boolean",
+       "description": "Whether to queue the created layer for processing.",
+       "location": "query"
+      }
+     },
+     "request": {
+      "$ref": "Layer"
+     },
+     "response": {
+      "$ref": "Layer"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    },
+    "get": {
+     "id": "mapsengine.layers.get",
+     "path": "layers/{id}",
+     "httpMethod": "GET",
+     "description": "Return metadata for a particular layer.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the layer.",
+       "required": true,
+       "location": "path"
+      },
+      "version": {
+       "type": "string",
+       "enum": [
+        "draft",
+        "published"
+       ],
+       "enumDescriptions": [
+        "The draft version.",
+        "The published version."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Layer"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "list": {
+     "id": "mapsengine.layers.list",
+     "path": "layers",
+     "httpMethod": "GET",
+     "description": "Return all layers readable by the current user.",
+     "parameters": {
+      "bbox": {
+       "type": "string",
+       "description": "A bounding box, expressed as \"west,south,east,north\". If set, only assets which intersect this bounding box will be returned.",
+       "location": "query"
+      },
+      "createdAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "createdBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "creatorEmail": {
+       "type": "string",
+       "description": "An email address representing a user. Returned assets that have been created by the user associated with the provided email address.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of items to include in a single response page. The maximum supported value is 100.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "modifiedAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "modifiedBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "The ID of a Maps Engine project, used to filter the response. To list all available projects with their IDs, send a Projects: list request. You can also find your project ID as the value of the DashboardPlace:cid URL parameter when signed in to mapsengine.google.com.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "LayersListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "process": {
+     "id": "mapsengine.layers.process",
+     "path": "layers/{id}/process",
+     "httpMethod": "POST",
+     "description": "Process a layer asset.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the layer.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "ProcessResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    },
+    "publish": {
+     "id": "mapsengine.layers.publish",
+     "path": "layers/{id}/publish",
+     "httpMethod": "POST",
+     "description": "Publish a layer asset.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the layer.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "PublishResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    }
+   },
+   "resources": {
+    "parents": {
+     "methods": {
+      "list": {
+       "id": "mapsengine.layers.parents.list",
+       "path": "layers/{id}/parents",
+       "httpMethod": "GET",
+       "description": "Return all parent ids of the specified layer.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the layer whose parents will be listed.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in a single response page. The maximum supported value is 50.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "ParentsListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "maps": {
+   "methods": {
+    "get": {
+     "id": "mapsengine.maps.get",
+     "path": "maps/{id}",
+     "httpMethod": "GET",
+     "description": "Return metadata for a particular map.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the map.",
+       "required": true,
+       "location": "path"
+      },
+      "version": {
+       "type": "string",
+       "enum": [
+        "draft",
+        "published"
+       ],
+       "enumDescriptions": [
+        "The draft version.",
+        "The published version."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Map"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "list": {
+     "id": "mapsengine.maps.list",
+     "path": "maps",
+     "httpMethod": "GET",
+     "description": "Return all maps readable by the current user.",
+     "parameters": {
+      "bbox": {
+       "type": "string",
+       "description": "A bounding box, expressed as \"west,south,east,north\". If set, only assets which intersect this bounding box will be returned.",
+       "location": "query"
+      },
+      "createdAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "createdBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "creatorEmail": {
+       "type": "string",
+       "description": "An email address representing a user. Returned assets that have been created by the user associated with the provided email address.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of items to include in a single response page. The maximum supported value is 100.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "modifiedAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "modifiedBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "The ID of a Maps Engine project, used to filter the response. To list all available projects with their IDs, send a Projects: list request. You can also find your project ID as the value of the DashboardPlace:cid URL parameter when signed in to mapsengine.google.com.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "MapsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    }
+   }
+  },
+  "projects": {
+   "methods": {
+    "list": {
+     "id": "mapsengine.projects.list",
+     "path": "projects",
+     "httpMethod": "GET",
+     "description": "Return all projects readable by the current user.",
+     "response": {
+      "$ref": "ProjectsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    }
+   }
+  },
+  "rasterCollections": {
+   "methods": {
+    "create": {
+     "id": "mapsengine.rasterCollections.create",
+     "path": "rasterCollections",
+     "httpMethod": "POST",
+     "description": "Create a raster collection asset.",
+     "request": {
+      "$ref": "RasterCollection"
+     },
+     "response": {
+      "$ref": "RasterCollection"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    },
+    "get": {
+     "id": "mapsengine.rasterCollections.get",
+     "path": "rasterCollections/{id}",
+     "httpMethod": "GET",
+     "description": "Return metadata for a particular raster collection.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the raster collection.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "RasterCollection"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "list": {
+     "id": "mapsengine.rasterCollections.list",
+     "path": "rasterCollections",
+     "httpMethod": "GET",
+     "description": "Return all raster collections readable by the current user.",
+     "parameters": {
+      "bbox": {
+       "type": "string",
+       "description": "A bounding box, expressed as \"west,south,east,north\". If set, only assets which intersect this bounding box will be returned.",
+       "location": "query"
+      },
+      "createdAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "createdBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "creatorEmail": {
+       "type": "string",
+       "description": "An email address representing a user. Returned assets that have been created by the user associated with the provided email address.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of items to include in a single response page. The maximum supported value is 100.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "modifiedAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "modifiedBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "The ID of a Maps Engine project, used to filter the response. To list all available projects with their IDs, send a Projects: list request. You can also find your project ID as the value of the DashboardPlace:cid URL parameter when signed in to mapsengine.google.com.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "RastercollectionsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    }
+   },
+   "resources": {
+    "parents": {
+     "methods": {
+      "list": {
+       "id": "mapsengine.rasterCollections.parents.list",
+       "path": "rasterCollections/{id}/parents",
+       "httpMethod": "GET",
+       "description": "Return all parent ids of the specified raster collection.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the raster collection whose parents will be listed.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in a single response page. The maximum supported value is 50.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "ParentsListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    },
+    "rasters": {
+     "methods": {
+      "list": {
+       "id": "mapsengine.rasterCollections.rasters.list",
+       "path": "rasterCollections/{id}/rasters",
+       "httpMethod": "GET",
+       "description": "Return all rasters within a raster collection.",
+       "parameters": {
+        "bbox": {
+         "type": "string",
+         "description": "A bounding box, expressed as \"west,south,east,north\". If set, only assets which intersect this bounding box will be returned.",
+         "location": "query"
+        },
+        "createdAfter": {
+         "type": "string",
+         "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or after this time.",
+         "format": "date-time",
+         "location": "query"
+        },
+        "createdBefore": {
+         "type": "string",
+         "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or before this time.",
+         "format": "date-time",
+         "location": "query"
+        },
+        "creatorEmail": {
+         "type": "string",
+         "description": "An email address representing a user. Returned assets that have been created by the user associated with the provided email address.",
+         "location": "query"
+        },
+        "id": {
+         "type": "string",
+         "description": "The ID of the raster collection to which these rasters belong.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in a single response page. The maximum supported value is 100.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "modifiedAfter": {
+         "type": "string",
+         "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or after this time.",
+         "format": "date-time",
+         "location": "query"
+        },
+        "modifiedBefore": {
+         "type": "string",
+         "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or before this time.",
+         "format": "date-time",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "RastersListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "rasters": {
+   "methods": {
+    "get": {
+     "id": "mapsengine.rasters.get",
+     "path": "rasters/{id}",
+     "httpMethod": "GET",
+     "description": "Return metadata for a single raster.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the raster.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Image"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "upload": {
+     "id": "mapsengine.rasters.upload",
+     "path": "rasters/upload",
+     "httpMethod": "POST",
+     "description": "Create a skeleton raster asset for upload.",
+     "request": {
+      "$ref": "Image"
+     },
+     "response": {
+      "$ref": "Image"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    }
+   },
+   "resources": {
+    "files": {
+     "methods": {
+      "insert": {
+       "id": "mapsengine.rasters.files.insert",
+       "path": "rasters/{id}/files",
+       "httpMethod": "POST",
+       "description": "Upload a file to a raster asset.",
+       "parameters": {
+        "filename": {
+         "type": "string",
+         "description": "The file name of this uploaded file.",
+         "required": true,
+         "location": "query"
+        },
+        "id": {
+         "type": "string",
+         "description": "The ID of the raster asset.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "id",
+        "filename"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine"
+       ],
+       "supportsMediaUpload": true,
+       "mediaUpload": {
+        "accept": [
+         "*/*"
+        ],
+        "maxSize": "1GB",
+        "protocols": {
+         "simple": {
+          "multipart": true,
+          "path": "/upload/mapsengine/v1/rasters/{id}/files"
+         },
+         "resumable": {
+          "multipart": true,
+          "path": "/resumable/upload/mapsengine/v1/rasters/{id}/files"
+         }
+        }
+       }
+      }
+     }
+    },
+    "parents": {
+     "methods": {
+      "list": {
+       "id": "mapsengine.rasters.parents.list",
+       "path": "rasters/{id}/parents",
+       "httpMethod": "GET",
+       "description": "Return all parent ids of the specified rasters.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the rasters whose parents will be listed.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in a single response page. The maximum supported value is 50.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "ParentsListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "tables": {
+   "methods": {
+    "create": {
+     "id": "mapsengine.tables.create",
+     "path": "tables",
+     "httpMethod": "POST",
+     "description": "Create a table asset.",
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    },
+    "get": {
+     "id": "mapsengine.tables.get",
+     "path": "tables/{id}",
+     "httpMethod": "GET",
+     "description": "Return metadata for a particular table, including the schema.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the table.",
+       "required": true,
+       "location": "path"
+      },
+      "version": {
+       "type": "string",
+       "enum": [
+        "draft",
+        "published"
+       ],
+       "enumDescriptions": [
+        "The draft version.",
+        "The published version."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "list": {
+     "id": "mapsengine.tables.list",
+     "path": "tables",
+     "httpMethod": "GET",
+     "description": "Return all tables readable by the current user.",
+     "parameters": {
+      "bbox": {
+       "type": "string",
+       "description": "A bounding box, expressed as \"west,south,east,north\". If set, only assets which intersect this bounding box will be returned.",
+       "location": "query"
+      },
+      "createdAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "createdBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been created at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "creatorEmail": {
+       "type": "string",
+       "description": "An email address representing a user. Returned assets that have been created by the user associated with the provided email address.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of items to include in a single response page. The maximum supported value is 100.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "modifiedAfter": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or after this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "modifiedBefore": {
+       "type": "string",
+       "description": "An RFC 3339 formatted date-time value (e.g. 1970-01-01T00:00:00Z). Returned assets will have been modified at or before this time.",
+       "format": "date-time",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+       "location": "query"
+      },
+      "projectId": {
+       "type": "string",
+       "description": "The ID of a Maps Engine project, used to filter the response. To list all available projects with their IDs, send a Projects: list request. You can also find your project ID as the value of the DashboardPlace:cid URL parameter when signed in to mapsengine.google.com.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "TablesListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine",
+      "https://www.googleapis.com/auth/mapsengine.readonly"
+     ]
+    },
+    "upload": {
+     "id": "mapsengine.tables.upload",
+     "path": "tables/upload",
+     "httpMethod": "POST",
+     "description": "Create a placeholder table asset to which table files can be uploaded.\nOnce the placeholder has been created, files are uploaded to the https://www.googleapis.com/upload/mapsengine/v1/tables/table_id/files endpoint.\nSee Table Upload in the Developer's Guide or Table.files: insert in the reference documentation for more information.",
+     "request": {
+      "$ref": "Table"
+     },
+     "response": {
+      "$ref": "Table"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/mapsengine"
+     ]
+    }
+   },
+   "resources": {
+    "features": {
+     "methods": {
+      "batchDelete": {
+       "id": "mapsengine.tables.features.batchDelete",
+       "path": "tables/{id}/features/batchDelete",
+       "httpMethod": "POST",
+       "description": "Delete all features matching the given IDs.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the table that contains the features to be deleted.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "request": {
+        "$ref": "FeaturesBatchDeleteRequest"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine"
+       ]
+      },
+      "batchInsert": {
+       "id": "mapsengine.tables.features.batchInsert",
+       "path": "tables/{id}/features/batchInsert",
+       "httpMethod": "POST",
+       "description": "Append features to an existing table.\n\nA single batchInsert request can create:\n\n- Up to 50 features.\n- A combined total of 10 000 vertices.\nFeature limits are documented in the Supported data formats and limits article of the Google Maps Engine help center. Note that free and paid accounts have different limits.\n\nFor more information about inserting features, read Creating features in the Google Maps Engine developer's guide.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the table to append the features to.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "request": {
+        "$ref": "FeaturesBatchInsertRequest"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine"
+       ]
+      },
+      "batchPatch": {
+       "id": "mapsengine.tables.features.batchPatch",
+       "path": "tables/{id}/features/batchPatch",
+       "httpMethod": "POST",
+       "description": "Update the supplied features.\n\nA single batchPatch request can update:\n\n- Up to 50 features.\n- A combined total of 10 000 vertices.\nFeature limits are documented in the Supported data formats and limits article of the Google Maps Engine help center. Note that free and paid accounts have different limits.\n\nFeature updates use HTTP PATCH semantics:\n\n- A supplied value replaces an existing value (if any) in that field.\n- Omitted fields remain unchanged.\n- Complex values in geometries and properties must be replaced as atomic units. For example, providing just the coordinates of a geometry is not allowed; the complete geometry, including type, must be supplied.\n- Setting a property's value to null deletes that property.\nFor more information about updating features, read Updating features in the Google Maps Engine developer's guide.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the table containing the features to be patched.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "request": {
+        "$ref": "FeaturesBatchPatchRequest"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine"
+       ]
+      },
+      "get": {
+       "id": "mapsengine.tables.features.get",
+       "path": "tables/{tableId}/features/{id}",
+       "httpMethod": "GET",
+       "description": "Return a single feature, given its ID.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the feature to get.",
+         "required": true,
+         "location": "path"
+        },
+        "select": {
+         "type": "string",
+         "description": "A SQL-like projection clause used to specify returned properties. If this parameter is not included, all properties are returned.",
+         "location": "query"
+        },
+        "tableId": {
+         "type": "string",
+         "description": "The ID of the table.",
+         "required": true,
+         "location": "path"
+        },
+        "version": {
+         "type": "string",
+         "description": "The table version to access. See Accessing Public Data for information.",
+         "enum": [
+          "draft",
+          "published"
+         ],
+         "enumDescriptions": [
+          "The draft version.",
+          "The published version."
+         ],
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "tableId",
+        "id"
+       ],
+       "response": {
+        "$ref": "Feature"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      },
+      "list": {
+       "id": "mapsengine.tables.features.list",
+       "path": "tables/{id}/features",
+       "httpMethod": "GET",
+       "description": "Return all features readable by the current user.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the table to which these features belong.",
+         "required": true,
+         "location": "path"
+        },
+        "include": {
+         "type": "string",
+         "description": "A comma separated list of optional data to include. Optional data available: schema.",
+         "location": "query"
+        },
+        "intersects": {
+         "type": "string",
+         "description": "A geometry literal that specifies the spatial restriction of the query.",
+         "location": "query"
+        },
+        "limit": {
+         "type": "integer",
+         "description": "The total number of features to return from the query, irrespective of the number of pages.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in the response, used for paging.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "orderBy": {
+         "type": "string",
+         "description": "An SQL-like order by clause used to sort results. If this parameter is not included, the order of features is undefined.",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        },
+        "select": {
+         "type": "string",
+         "description": "A SQL-like projection clause used to specify returned properties. If this parameter is not included, all properties are returned.",
+         "location": "query"
+        },
+        "version": {
+         "type": "string",
+         "description": "The table version to access. See Accessing Public Data for information.",
+         "enum": [
+          "draft",
+          "published"
+         ],
+         "enumDescriptions": [
+          "The draft version.",
+          "The published version."
+         ],
+         "location": "query"
+        },
+        "where": {
+         "type": "string",
+         "description": "An SQL-like predicate used to filter results.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "FeaturesListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    },
+    "files": {
+     "methods": {
+      "insert": {
+       "id": "mapsengine.tables.files.insert",
+       "path": "tables/{id}/files",
+       "httpMethod": "POST",
+       "description": "Upload a file to a placeholder table asset. See Table Upload in the Developer's Guide for more information.\nSupported file types are listed in the Supported data formats and limits article of the Google Maps Engine help center.",
+       "parameters": {
+        "filename": {
+         "type": "string",
+         "description": "The file name of this uploaded file.",
+         "required": true,
+         "location": "query"
+        },
+        "id": {
+         "type": "string",
+         "description": "The ID of the table asset.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "id",
+        "filename"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine"
+       ],
+       "supportsMediaUpload": true,
+       "mediaUpload": {
+        "accept": [
+         "*/*"
+        ],
+        "maxSize": "1GB",
+        "protocols": {
+         "simple": {
+          "multipart": true,
+          "path": "/upload/mapsengine/v1/tables/{id}/files"
+         },
+         "resumable": {
+          "multipart": true,
+          "path": "/resumable/upload/mapsengine/v1/tables/{id}/files"
+         }
+        }
+       }
+      }
+     }
+    },
+    "parents": {
+     "methods": {
+      "list": {
+       "id": "mapsengine.tables.parents.list",
+       "path": "tables/{id}/parents",
+       "httpMethod": "GET",
+       "description": "Return all parent ids of the specified table.",
+       "parameters": {
+        "id": {
+         "type": "string",
+         "description": "The ID of the table whose parents will be listed.",
+         "required": true,
+         "location": "path"
+        },
+        "maxResults": {
+         "type": "integer",
+         "description": "The maximum number of items to include in a single response page. The maximum supported value is 50.",
+         "format": "uint32",
+         "location": "query"
+        },
+        "pageToken": {
+         "type": "string",
+         "description": "The continuation token, used to page through large result sets. To get the next page of results, set this parameter to the value of nextPageToken from the previous response.",
+         "location": "query"
+        }
+       },
+       "parameterOrder": [
+        "id"
+       ],
+       "response": {
+        "$ref": "ParentsListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/mapsengine",
+        "https://www.googleapis.com/auth/mapsengine.readonly"
+       ]
+      }
+     }
+    }
+   }
+  }
+ }
+}

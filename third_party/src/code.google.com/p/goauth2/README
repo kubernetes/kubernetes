@@ -1,0 +1,7 @@
+This is the repository for goauth2; an OAuth 2.0 client library for Go.
+
+To contribute, follow the Go Programming Language's contribution process:
+	http://golang.org/doc/contribute.html
+Except use the goauth2 repository instead of the go repo.
+
+Contact Andrew Gerrand <adg@golang.org> with any enquiries.

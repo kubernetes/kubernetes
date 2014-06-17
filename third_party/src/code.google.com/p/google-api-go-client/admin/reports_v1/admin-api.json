@@ -1,0 +1,728 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/WhvzCm5J5nAWPdnVXhGkrRz8-Wc\"",
+ "discoveryVersion": "v1",
+ "id": "admin:reports_v1",
+ "name": "admin",
+ "canonicalName": "reports",
+ "version": "reports_v1",
+ "title": "Admin Reports API",
+ "description": "Allows the administrators of Google Apps customers to fetch reports about the usage, collaboration, security and risk for their users.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "packagePath": "admin",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/admin-sdk/reports/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/admin/reports/v1/",
+ "basePath": "/admin/reports/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "admin/reports/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/admin.reports.audit.readonly": {
+     "description": "View audit reports of Google Apps for your domain"
+    },
+    "https://www.googleapis.com/auth/admin.reports.usage.readonly": {
+     "description": "View usage reports of Google Apps for your domain"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Activities": {
+   "id": "Activities",
+   "type": "object",
+   "description": "JSON template for a collection of activites.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "items": {
+     "type": "array",
+     "description": "Each record in read response.",
+     "items": {
+      "$ref": "Activity"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of list response this is.",
+     "default": "admin#reports#activities"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token for retrieving the next page"
+    }
+   }
+  },
+  "Activity": {
+   "id": "Activity",
+   "type": "object",
+   "description": "JSON template for the activity resource.",
+   "properties": {
+    "actor": {
+     "type": "object",
+     "description": "User doing the action.",
+     "properties": {
+      "callerType": {
+       "type": "string",
+       "description": "User or OAuth 2LO request."
+      },
+      "email": {
+       "type": "string",
+       "description": "Email address of the user."
+      },
+      "key": {
+       "type": "string",
+       "description": "For OAuth 2LO API requests, consumer_key of the requestor."
+      },
+      "profileId": {
+       "type": "string",
+       "description": "Obfuscated user id of the user."
+      }
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the entry."
+    },
+    "events": {
+     "type": "array",
+     "description": "Activity events.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "name": {
+        "type": "string",
+        "description": "Name of event."
+       },
+       "parameters": {
+        "type": "array",
+        "description": "Parameter value pairs for various applications.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "boolValue": {
+           "type": "boolean",
+           "description": "Boolean value of the parameter."
+          },
+          "intValue": {
+           "type": "string",
+           "description": "Integral value of the parameter.",
+           "format": "int64"
+          },
+          "name": {
+           "type": "string",
+           "description": "The name of the parameter."
+          },
+          "value": {
+           "type": "string",
+           "description": "String value of the parameter."
+          }
+         }
+        }
+       },
+       "type": {
+        "type": "string",
+        "description": "Type of event."
+       }
+      }
+     }
+    },
+    "id": {
+     "type": "object",
+     "description": "Unique identifier for each activity record.",
+     "properties": {
+      "applicationName": {
+       "type": "string",
+       "description": "Application name to which the event belongs."
+      },
+      "customerId": {
+       "type": "string",
+       "description": "Obfuscated customer ID of the source customer."
+      },
+      "time": {
+       "type": "string",
+       "description": "Time of occurrence of the activity.",
+       "format": "date-time"
+      },
+      "uniqueQualifier": {
+       "type": "string",
+       "description": "Unique qualifier if multiple events have the same time.",
+       "format": "int64"
+      }
+     }
+    },
+    "ipAddress": {
+     "type": "string",
+     "description": "IP Address of the user doing the action."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of resource this is.",
+     "default": "admin#reports#activity"
+    },
+    "ownerDomain": {
+     "type": "string",
+     "description": "Domain of source customer."
+    }
+   }
+  },
+  "Channel": {
+   "id": "Channel",
+   "type": "object",
+   "description": "An notification channel used to watch for resource changes.",
+   "properties": {
+    "address": {
+     "type": "string",
+     "description": "The address where notifications are delivered for this channel."
+    },
+    "expiration": {
+     "type": "string",
+     "description": "Date and time of notification channel expiration, expressed as a Unix timestamp, in milliseconds. Optional.",
+     "format": "int64"
+    },
+    "id": {
+     "type": "string",
+     "description": "A UUID or similar unique string that identifies this channel."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this as a notification channel used to watch for changes to a resource. Value: the fixed string \"api#channel\".",
+     "default": "api#channel"
+    },
+    "params": {
+     "type": "object",
+     "description": "Additional parameters controlling delivery channel behavior. Optional.",
+     "additionalProperties": {
+      "type": "string",
+      "description": "Declares a new parameter by name."
+     }
+    },
+    "payload": {
+     "type": "boolean",
+     "description": "A Boolean value to indicate whether payload is wanted. Optional."
+    },
+    "resourceId": {
+     "type": "string",
+     "description": "An opaque ID that identifies the resource being watched on this channel. Stable across different API versions."
+    },
+    "resourceUri": {
+     "type": "string",
+     "description": "A version-specific identifier for the watched resource."
+    },
+    "token": {
+     "type": "string",
+     "description": "An arbitrary string delivered to the target address with each notification delivered over this channel. Optional."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of delivery mechanism used for this channel."
+    }
+   }
+  },
+  "UsageReport": {
+   "id": "UsageReport",
+   "type": "object",
+   "description": "JSON template for a usage report.",
+   "properties": {
+    "date": {
+     "type": "string",
+     "description": "The date to which the record belongs.",
+     "readOnly": true
+    },
+    "entity": {
+     "type": "object",
+     "description": "Information about the type of the item.",
+     "readOnly": true,
+     "properties": {
+      "customerId": {
+       "type": "string",
+       "description": "Obfuscated customer id for the record.",
+       "readOnly": true
+      },
+      "profileId": {
+       "type": "string",
+       "description": "Obfuscated user id for the record.",
+       "readOnly": true
+      },
+      "type": {
+       "type": "string",
+       "description": "The type of item, can be a customer or user.",
+       "readOnly": true
+      },
+      "userEmail": {
+       "type": "string",
+       "description": "user's email.",
+       "readOnly": true
+      }
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The kind of object.",
+     "default": "admin#reports#usageReport"
+    },
+    "parameters": {
+     "type": "array",
+     "description": "Parameter value pairs for various applications.",
+     "readOnly": true,
+     "items": {
+      "type": "object",
+      "properties": {
+       "boolValue": {
+        "type": "boolean",
+        "description": "Boolean value of the parameter.",
+        "readOnly": true
+       },
+       "datetimeValue": {
+        "type": "string",
+        "description": "RFC 3339 formatted value of the parameter.",
+        "format": "date-time",
+        "readOnly": true
+       },
+       "intValue": {
+        "type": "string",
+        "description": "Integral value of the parameter.",
+        "format": "int64",
+        "readOnly": true
+       },
+       "msgValue": {
+        "type": "array",
+        "description": "Nested message value of the parameter.",
+        "readOnly": true,
+        "items": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "any"
+         }
+        }
+       },
+       "name": {
+        "type": "string",
+        "description": "The name of the parameter."
+       },
+       "stringValue": {
+        "type": "string",
+        "description": "String value of the parameter.",
+        "readOnly": true
+       }
+      }
+     }
+    }
+   }
+  },
+  "UsageReports": {
+   "id": "UsageReports",
+   "type": "object",
+   "description": "JSON template for a collection of usage reports.",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of the resource."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The kind of object.",
+     "default": "admin#reports#usageReports"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token for retrieving the next page"
+    },
+    "usageReports": {
+     "type": "array",
+     "description": "Various application parameter records.",
+     "items": {
+      "$ref": "UsageReport"
+     }
+    },
+    "warnings": {
+     "type": "array",
+     "description": "Warnings if any.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Machine readable code / warning type."
+       },
+       "data": {
+        "type": "array",
+        "description": "Key-Value pairs to give detailed information on the warning.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "key": {
+           "type": "string",
+           "description": "Key associated with a key-value pair to give detailed information on the warning."
+          },
+          "value": {
+           "type": "string",
+           "description": "Value associated with a key-value pair to give detailed information on the warning."
+          }
+         }
+        }
+       },
+       "message": {
+        "type": "string",
+        "description": "Human readable message for the warning."
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "activities": {
+   "methods": {
+    "list": {
+     "id": "reports.activities.list",
+     "path": "activity/users/{userKey}/applications/{applicationName}",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of activities for a specific customer and application.",
+     "parameters": {
+      "actorIpAddress": {
+       "type": "string",
+       "description": "IP Address of host where the event was performed. Supports both IPv4 and IPv6 addresses.",
+       "location": "query"
+      },
+      "applicationName": {
+       "type": "string",
+       "description": "Application name for which the events are to be retrieved.",
+       "required": true,
+       "pattern": "(admin)|(docs)|(login)",
+       "location": "path"
+      },
+      "customerId": {
+       "type": "string",
+       "description": "Represents the customer for which the data is to be fetched.",
+       "pattern": "C.+",
+       "location": "query"
+      },
+      "endTime": {
+       "type": "string",
+       "description": "Return events which occured at or before this time.",
+       "pattern": "(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)T(\\d\\d):(\\d\\d):(\\d\\d)(?:\\.(\\d+))?(?:(Z)|([-+])(\\d\\d):(\\d\\d))",
+       "location": "query"
+      },
+      "eventName": {
+       "type": "string",
+       "description": "Name of the event being queried.",
+       "location": "query"
+      },
+      "filters": {
+       "type": "string",
+       "description": "Event parameters in the form [parameter1 name][operator][parameter1 value],[parameter2 name][operator][parameter2 value],...",
+       "pattern": "(.+[\u003c,\u003c=,==,\u003e=,\u003e,\u003c\u003e].+,)*(.+[\u003c,\u003c=,==,\u003e=,\u003e,\u003c\u003e].+)",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Number of activity records to be shown in each page.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page.",
+       "location": "query"
+      },
+      "startTime": {
+       "type": "string",
+       "description": "Return events which occured at or after this time.",
+       "pattern": "(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)T(\\d\\d):(\\d\\d):(\\d\\d)(?:\\.(\\d+))?(?:(Z)|([-+])(\\d\\d):(\\d\\d))",
+       "location": "query"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Represents the profile id or the user email for which the data should be filtered. When 'all' is specified as the userKey, it returns usageReports for all users.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "applicationName"
+     ],
+     "response": {
+      "$ref": "Activities"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.reports.audit.readonly"
+     ],
+     "supportsSubscription": true
+    },
+    "watch": {
+     "id": "reports.activities.watch",
+     "path": "activity/users/{userKey}/applications/{applicationName}/watch",
+     "httpMethod": "POST",
+     "description": "Push changes to activities",
+     "parameters": {
+      "actorIpAddress": {
+       "type": "string",
+       "description": "IP Address of host where the event was performed. Supports both IPv4 and IPv6 addresses.",
+       "location": "query"
+      },
+      "applicationName": {
+       "type": "string",
+       "description": "Application name for which the events are to be retrieved.",
+       "required": true,
+       "pattern": "(admin)|(docs)|(login)",
+       "location": "path"
+      },
+      "customerId": {
+       "type": "string",
+       "description": "Represents the customer for which the data is to be fetched.",
+       "pattern": "C.+",
+       "location": "query"
+      },
+      "endTime": {
+       "type": "string",
+       "description": "Return events which occured at or before this time.",
+       "pattern": "(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)T(\\d\\d):(\\d\\d):(\\d\\d)(?:\\.(\\d+))?(?:(Z)|([-+])(\\d\\d):(\\d\\d))",
+       "location": "query"
+      },
+      "eventName": {
+       "type": "string",
+       "description": "Name of the event being queried.",
+       "location": "query"
+      },
+      "filters": {
+       "type": "string",
+       "description": "Event parameters in the form [parameter1 name][operator][parameter1 value],[parameter2 name][operator][parameter2 value],...",
+       "pattern": "(.+[\u003c,\u003c=,==,\u003e=,\u003e,\u003c\u003e].+,)*(.+[\u003c,\u003c=,==,\u003e=,\u003e,\u003c\u003e].+)",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Number of activity records to be shown in each page.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page.",
+       "location": "query"
+      },
+      "startTime": {
+       "type": "string",
+       "description": "Return events which occured at or after this time.",
+       "pattern": "(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)T(\\d\\d):(\\d\\d):(\\d\\d)(?:\\.(\\d+))?(?:(Z)|([-+])(\\d\\d):(\\d\\d))",
+       "location": "query"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Represents the profile id or the user email for which the data should be filtered. When 'all' is specified as the userKey, it returns usageReports for all users.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "applicationName"
+     ],
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "response": {
+      "$ref": "Channel"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.reports.audit.readonly"
+     ],
+     "supportsSubscription": true
+    }
+   }
+  },
+  "channels": {
+   "methods": {
+    "stop": {
+     "id": "admin.channels.stop",
+     "path": "/admin/reports_v1/channels/stop",
+     "httpMethod": "POST",
+     "description": "Stop watching resources through this channel",
+     "request": {
+      "$ref": "Channel",
+      "parameterName": "resource"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.reports.audit.readonly"
+     ]
+    }
+   }
+  },
+  "customerUsageReports": {
+   "methods": {
+    "get": {
+     "id": "reports.customerUsageReports.get",
+     "path": "usage/dates/{date}",
+     "httpMethod": "GET",
+     "description": "Retrieves a report which is a collection of properties / statistics for a specific customer.",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Represents the customer for which the data is to be fetched.",
+       "pattern": "C.+",
+       "location": "query"
+      },
+      "date": {
+       "type": "string",
+       "description": "Represents the date in yyyy-mm-dd format for which the data is to be fetched.",
+       "required": true,
+       "pattern": "(\\d){4}-(\\d){2}-(\\d){2}",
+       "location": "path"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page.",
+       "location": "query"
+      },
+      "parameters": {
+       "type": "string",
+       "description": "Represents the application name, parameter name pairs to fetch in csv as app_name1:param_name1, app_name2:param_name2.",
+       "pattern": "(((accounts)|(gmail)|(calendar)|(docs)|(gplus)):.+,)*(((accounts)|(gmail)|(calendar)|(docs)|(gplus)):.+)",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "date"
+     ],
+     "response": {
+      "$ref": "UsageReports"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.reports.usage.readonly"
+     ]
+    }
+   }
+  },
+  "userUsageReport": {
+   "methods": {
+    "get": {
+     "id": "reports.userUsageReport.get",
+     "path": "usage/users/{userKey}/dates/{date}",
+     "httpMethod": "GET",
+     "description": "Retrieves a report which is a collection of properties / statistics for a set of users.",
+     "parameters": {
+      "customerId": {
+       "type": "string",
+       "description": "Represents the customer for which the data is to be fetched.",
+       "pattern": "C.+",
+       "location": "query"
+      },
+      "date": {
+       "type": "string",
+       "description": "Represents the date in yyyy-mm-dd format for which the data is to be fetched.",
+       "required": true,
+       "pattern": "(\\d){4}-(\\d){2}-(\\d){2}",
+       "location": "path"
+      },
+      "filters": {
+       "type": "string",
+       "description": "Represents the set of filters including parameter operator value.",
+       "pattern": "(((accounts)|(gmail)|(calendar)|(docs)|(gplus)):.+[\u003c,\u003c=,==,\u003e=,\u003e,!=].+,)*(((accounts)|(gmail)|(calendar)|(docs)|(gplus)):.+[\u003c,\u003c=,==,\u003e=,\u003e,!=].+)",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Maximum number of results to return. Maximum allowed is 1000",
+       "format": "uint32",
+       "maximum": "1000",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token to specify next page.",
+       "location": "query"
+      },
+      "parameters": {
+       "type": "string",
+       "description": "Represents the application name, parameter name pairs to fetch in csv as app_name1:param_name1, app_name2:param_name2.",
+       "pattern": "(((accounts)|(gmail)|(calendar)|(docs)|(gplus)):.+,)*(((accounts)|(gmail)|(calendar)|(docs)|(gplus)):.+)",
+       "location": "query"
+      },
+      "userKey": {
+       "type": "string",
+       "description": "Represents the profile id or the user email for which the data should be filtered.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userKey",
+      "date"
+     ],
+     "response": {
+      "$ref": "UsageReports"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/admin.reports.usage.readonly"
+     ]
+    }
+   }
+  }
+ }
+}
