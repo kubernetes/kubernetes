@@ -177,10 +177,9 @@ git rebase upstream/master
 ```
 
 ### Regenerating the documentation
-Install [nodejs](http://nodejs.org/download/), [npm](https://www.npmjs.org/), and
-[raml2html](https://github.com/kevinrenskers/raml2html), then run:
 ```
 cd kubernetes/api
-raml2html kubernetes.raml > kubernetes.html
+sudo docker build -t kubernetes/raml2html - < raml2html.dockerfile
+sudo docker run -v `pwd`:/data kubernetes/raml2html
 ```
 
