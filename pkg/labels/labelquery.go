@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package labels
 
 import (
 	"fmt"
@@ -26,9 +26,11 @@ type Labels interface {
 	Get(label string) (value string)
 }
 
-// A map of label:value.
+// A map of label:value. Implements Labels.
 type LabelSet map[string]string
 
+// All labels listed as a human readable string. Conveiently, exactly the format
+// that ParseQuery takes.
 func (ls LabelSet) String() string {
 	query := make([]string, 0, len(ls))
 	for key, value := range ls {
@@ -37,12 +39,13 @@ func (ls LabelSet) String() string {
 	return strings.Join(query, ",")
 }
 
+// Implement Labels interface.
 func (ls LabelSet) Get(label string) string {
 	return ls[label]
 }
 
-// Represents a query.
-type LabelQuery interface {
+// Represents a label query.
+type Query interface {
 	// Returns true if this query matches the given set of labels.
 	Matches(Labels) bool
 
@@ -51,7 +54,7 @@ type LabelQuery interface {
 }
 
 // A single term of a label query.
-type labelQueryTerm struct {
+type queryTerm struct {
 	// Not inverts the meaning of the items in this term.
 	not bool
 
@@ -61,14 +64,14 @@ type labelQueryTerm struct {
 	label, value *string
 
 	// A list of terms which must all match for this query term to return true.
-	and []labelQueryTerm
+	and []queryTerm
 
 	// A list of terms, any one of which will cause this query term to return true.
 	// Parsing/printing not implemented.
-	or []labelQueryTerm
+	or []queryTerm
 }
 
-func (l *labelQueryTerm) Matches(ls Labels) bool {
+func (l *queryTerm) Matches(ls Labels) bool {
 	matches := !l.not
 	switch {
 	case l.label != nil && l.value != nil:
@@ -105,19 +108,19 @@ func try(queryPiece, op string) (lhs, rhs string, ok bool) {
 }
 
 // Takes a string repsenting a label query and returns an object suitable for matching, or an error.
-func ParseLabelQuery(query string) (LabelQuery, error) {
+func ParseQuery(query string) (Query, error) {
 	parts := strings.Split(query, ",")
-	var items []labelQueryTerm
+	var items []queryTerm
 	for _, part := range parts {
 		if part == "" {
 			continue
 		}
 		if lhs, rhs, ok := try(part, "!="); ok {
-			items = append(items, labelQueryTerm{not: true, label: &lhs, value: &rhs})
+			items = append(items, queryTerm{not: true, label: &lhs, value: &rhs})
 		} else if lhs, rhs, ok := try(part, "=="); ok {
-			items = append(items, labelQueryTerm{label: &lhs, value: &rhs})
+			items = append(items, queryTerm{label: &lhs, value: &rhs})
 		} else if lhs, rhs, ok := try(part, "="); ok {
-			items = append(items, labelQueryTerm{label: &lhs, value: &rhs})
+			items = append(items, queryTerm{label: &lhs, value: &rhs})
 		} else {
 			return nil, fmt.Errorf("invalid label query: '%s'; can't understand '%s'", query, part)
 		}
@@ -125,11 +128,11 @@ func ParseLabelQuery(query string) (LabelQuery, error) {
 	if len(items) == 1 {
 		return &items[0], nil
 	}
-	return &labelQueryTerm{and: items}, nil
+	return &queryTerm{and: items}, nil
 }
 
-// Returns this query as a string in a form that ParseLabelQuery can parse.
-func (l *labelQueryTerm) String() (out string) {
+// Returns this query as a string in a form that ParseQuery can parse.
+func (l *queryTerm) String() (out string) {
 	if len(l.and) > 0 {
 		for _, part := range l.and {
 			if out != "" {
@@ -158,7 +161,7 @@ func (p parseErr) Error() string {
 	return fmt.Sprintf("%v: %v", p.Reason, p.Pos)
 }
 
-func fromLiteral(expr *ast.BinaryExpr) (*labelQueryTerm, error) {
+func fromLiteral(expr *ast.BinaryExpr) (*queryTerm, error) {
 	lhs, ok := expr.X.(*ast.Ident)
 	if !ok {
 		return nil, parseErr{"expected literal", expr.X.Pos()}
@@ -166,7 +169,7 @@ func fromLiteral(expr *ast.BinaryExpr) (*labelQueryTerm, error) {
 
 }
 
-func fromBinaryExpr(expr *ast.BinaryExpr) (*labelQueryTerm, error) {
+func fromBinaryExpr(expr *ast.BinaryExpr) (*queryTerm, error) {
 	switch expr.Op {
 		case token.EQL, token.NEQ:
 			return fromLiteral(expr)
@@ -181,13 +184,13 @@ func fromBinaryExpr(expr *ast.BinaryExpr) (*labelQueryTerm, error) {
 	}
 	switch expr.Op {
 		case token.AND, token.LAND:
-			return &labelQueryTerm{And: []LabelQuery{lhs, rhs}}
+			return &queryTerm{And: []LabelQuery{lhs, rhs}}
 		case token.OR, token.LOR:
-			return &labelQueryTerm{Or: []LabelQuery{lhs, rhs}}
+			return &queryTerm{Or: []LabelQuery{lhs, rhs}}
 	}
 }
 
-func fromUnaryExpr(expr *ast.UnaryExpr) (*labelQueryTerm, error) {
+func fromUnaryExpr(expr *ast.UnaryExpr) (*queryTerm, error) {
 	if expr.Op == token.NOT {
 		lqt, err := fromExpr(expr.X)
 		if err != nil {
@@ -199,7 +202,7 @@ func fromUnaryExpr(expr *ast.UnaryExpr) (*labelQueryTerm, error) {
 	return nil, parseErr{"unrecognized unary expression", expr.OpPos}
 }
 
-func fromExpr(expr ast.Expr) (*labelQueryTerm, error) {
+func fromExpr(expr ast.Expr) (*queryTerm, error) {
 	switch v := expr.(type) {
 		case *ast.UnaryExpr:
 			return fromUnaryExpr(v)

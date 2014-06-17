@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package labels
 
 import (
 	"testing"
 )
 
-func TestLabelQueryParse(t *testing.T) {
+func TestQueryParse(t *testing.T) {
 	testGoodStrings := []string{
 		"x=a,y=b,z=c",
 		"",
@@ -31,7 +31,7 @@ func TestLabelQueryParse(t *testing.T) {
 		"x==a==b",
 	}
 	for _, test := range testGoodStrings {
-		lq, err := ParseLabelQuery(test)
+		lq, err := ParseQuery(test)
 		if err != nil {
 			t.Errorf("%v: error %v (%#v)\n", test, err, err)
 		}
@@ -40,7 +40,7 @@ func TestLabelQueryParse(t *testing.T) {
 		}
 	}
 	for _, test := range testBadStrings {
-		_, err := ParseLabelQuery(test)
+		_, err := ParseQuery(test)
 		if err == nil {
 			t.Errorf("%v: did not get expected error\n", test)
 		}
@@ -48,7 +48,7 @@ func TestLabelQueryParse(t *testing.T) {
 }
 
 func shouldMatch(t *testing.T, query string, ls LabelSet) {
-	lq, err := ParseLabelQuery(query)
+	lq, err := ParseQuery(query)
 	if err != nil {
 		t.Errorf("Unable to parse %v as a query\n", query)
 		return
@@ -59,7 +59,7 @@ func shouldMatch(t *testing.T, query string, ls LabelSet) {
 }
 
 func shouldNotMatch(t *testing.T, query string, ls LabelSet) {
-	lq, err := ParseLabelQuery(query)
+	lq, err := ParseQuery(query)
 	if err != nil {
 		t.Errorf("Unable to parse %v as a query\n", query)
 		return
