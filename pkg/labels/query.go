@@ -21,29 +21,6 @@ import (
 	"strings"
 )
 
-// Labels allows you to present labels.
-type Labels interface {
-	Get(label string) (value string)
-}
-
-// A map of label:value. Implements Labels.
-type LabelSet map[string]string
-
-// All labels listed as a human readable string. Conveiently, exactly the format
-// that ParseQuery takes.
-func (ls LabelSet) String() string {
-	query := make([]string, 0, len(ls))
-	for key, value := range ls {
-		query = append(query, key+"="+value)
-	}
-	return strings.Join(query, ",")
-}
-
-// Implement Labels interface.
-func (ls LabelSet) Get(label string) string {
-	return ls[label]
-}
-
 // Represents a label query.
 type Query interface {
 	// Returns true if this query matches the given set of labels.
@@ -150,75 +127,3 @@ func (l *queryTerm) String() (out string) {
 	}
 	return ""
 }
-
-/*
-type parseErr struct {
-	Reason string
-	Pos token.Pos
-}
-
-func (p parseErr) Error() string {
-	return fmt.Sprintf("%v: %v", p.Reason, p.Pos)
-}
-
-func fromLiteral(expr *ast.BinaryExpr) (*queryTerm, error) {
-	lhs, ok := expr.X.(*ast.Ident)
-	if !ok {
-		return nil, parseErr{"expected literal", expr.X.Pos()}
-	}
-
-}
-
-func fromBinaryExpr(expr *ast.BinaryExpr) (*queryTerm, error) {
-	switch expr.Op {
-		case token.EQL, token.NEQ:
-			return fromLiteral(expr)
-	}
-	lhs, err := fromExpr(expr.X)
-	if err != nil {
-		return nil, err
-	}
-	rhs, err := fromExpr(expr.Y)
-	if err != nil {
-		return nil, err
-	}
-	switch expr.Op {
-		case token.AND, token.LAND:
-			return &queryTerm{And: []LabelQuery{lhs, rhs}}
-		case token.OR, token.LOR:
-			return &queryTerm{Or: []LabelQuery{lhs, rhs}}
-	}
-}
-
-func fromUnaryExpr(expr *ast.UnaryExpr) (*queryTerm, error) {
-	if expr.Op == token.NOT {
-		lqt, err := fromExpr(expr.X)
-		if err != nil {
-			return nil, err
-		}
-		lqt.not = !lqt.not
-		return lqt, nil
-	}
-	return nil, parseErr{"unrecognized unary expression", expr.OpPos}
-}
-
-func fromExpr(expr ast.Expr) (*queryTerm, error) {
-	switch v := expr.(type) {
-		case *ast.UnaryExpr:
-			return fromUnaryExpr(v)
-		case *ast.BinaryExpr:
-			return fromBinaryExpr(v)
-	}
-	return nil, parseErr{"unrecognized expression type", expr.Pos()}
-}
-
-// Takes a string repsenting a label query and returns an object suitable for matching, or an error.
-func ParseLabelQuery(query string) (LabelQuery, error) {
-	expr, err := parser.ParseExpr(query)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("%v: %v (%#v)", query, expr, expr)
-	return fromExpr(expr)
-}
-*/

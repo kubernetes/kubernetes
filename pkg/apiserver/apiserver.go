@@ -24,11 +24,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // RESTStorage is a generic interface for RESTful storage services
 type RESTStorage interface {
-	List(LabelQuery) (interface{}, error)
+	List(labels.Query) (interface{}, error)
 	Get(id string) (interface{}, error)
 	Delete(id string) error
 	Extract(body string) (interface{}, error)
@@ -146,7 +148,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 	case "GET":
 		switch len(parts) {
 		case 1:
-			query, err := ParseLabelQuery(requestUrl.Query().Get("labels"))
+			query, err := labels.ParseQuery(requestUrl.Query().Get("labels"))
 			if err != nil {
 				server.error(err, w)
 				return
