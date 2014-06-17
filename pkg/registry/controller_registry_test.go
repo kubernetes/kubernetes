@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 type MockControllerRegistry struct {
@@ -71,7 +72,7 @@ func TestListEmptyControllerList(t *testing.T) {
 	storage := ControllerRegistryStorage{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(nil)
+	controllers, err := storage.List(labels.Everything())
 	expectNoError(t, err)
 	if len(controllers.(api.ReplicationControllerList).Items) != 0 {
 		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
@@ -96,7 +97,7 @@ func TestListControllerList(t *testing.T) {
 	storage := ControllerRegistryStorage{
 		registry: &mockRegistry,
 	}
-	controllersObj, err := storage.List(nil)
+	controllersObj, err := storage.List(labels.Everything())
 	controllers := controllersObj.(api.ReplicationControllerList)
 	expectNoError(t, err)
 	if len(controllers.Items) != 2 {

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -307,7 +308,7 @@ func TestEtcdEmptyListPods(t *testing.T) {
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	pods, err := registry.ListPods(nil)
+	pods, err := registry.ListPods(labels.Everything())
 	expectNoError(t, err)
 	if len(pods) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
@@ -322,7 +323,7 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	pods, err := registry.ListPods(nil)
+	pods, err := registry.ListPods(labels.Everything())
 	expectNoError(t, err)
 	if len(pods) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
@@ -348,7 +349,7 @@ func TestEtcdListPods(t *testing.T) {
 		E: nil,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	pods, err := registry.ListPods(nil)
+	pods, err := registry.ListPods(labels.Everything())
 	expectNoError(t, err)
 	if len(pods) != 2 || pods[0].ID != "foo" || pods[1].ID != "bar" {
 		t.Errorf("Unexpected pod list: %#v", pods)

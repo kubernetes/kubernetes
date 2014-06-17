@@ -18,11 +18,11 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // PodRegistryStorage implements the RESTStorage interface in terms of a PodRegistry
@@ -40,41 +40,11 @@ func MakePodRegistryStorage(registry PodRegistry, containerInfo client.Container
 	}
 }
 
-// LabelMatch tests to see if a Pod's labels map contains 'key' mapping to 'value'
-func LabelMatch(pod api.Pod, queryKey, queryValue string) bool {
-	for key, value := range pod.Labels {
-		if queryKey == key && queryValue == value {
-			return true
-		}
-	}
-	return false
-}
-
-// LabelMatch tests to see if a Pod's labels map contains all key/value pairs in 'labelQuery'
-func LabelsMatch(pod api.Pod, labelQuery *map[string]string) bool {
-	if labelQuery == nil {
-		return true
-	}
-	for key, value := range *labelQuery {
-		if !LabelMatch(pod, key, value) {
-			return false
-		}
-	}
-	return true
-}
-
-func (storage *PodRegistryStorage) List(url *url.URL) (interface{}, error) {
+func (storage *PodRegistryStorage) List(query labels.Query) (interface{}, error) {
 	var result api.PodList
-	var query *map[string]string
-	if url != nil {
-		queryMap := client.DecodeLabelQuery(url.Query().Get("labels"))
-		query = &queryMap
-	}
 	pods, err := storage.registry.ListPods(query)
 	if err == nil {
-		result = api.PodList{
-			Items: pods,
-		}
+		result.Items = pods
 	}
 	result.Kind = "cluster#podList"
 	return result, err
