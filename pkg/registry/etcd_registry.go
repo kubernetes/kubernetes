@@ -121,7 +121,9 @@ func (r *EtcdRegistry) extractList(key string, slicePtr interface{}) error {
 	return nil
 }
 
-// Unmarshals json found at key into objPtr.
+// Unmarshals json found at key into objPtr. On a not found error, will either return
+// a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
+// empty responses and nil response nodes exactly like a not found error.
 func (r *EtcdRegistry) extractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
 	response, err := r.etcdClient.Get(key, false, false)
 	returnZero := false
@@ -147,6 +149,16 @@ func (r *EtcdRegistry) extractObj(key string, objPtr interface{}, ignoreNotFound
 	return json.Unmarshal([]byte(response.Node.Value), objPtr)
 }
 
+// json marshals obj, and stores under key.
+func (r *EtcdRegistry) setObj(key string, obj interface{}) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	_, err = r.etcdClient.Set(key, string(data), 0)
+	return err
+}
+
 func (registry *EtcdRegistry) GetPod(podID string) (*api.Pod, error) {
 	pod, _, err := registry.findPod(podID)
 	return &pod, err
@@ -162,12 +174,7 @@ func (registry *EtcdRegistry) loadManifests(machine string) (manifests []api.Con
 }
 
 func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest) error {
-	containerData, err := json.Marshal(manifests)
-	if err != nil {
-		return err
-	}
-	_, err = registry.etcdClient.Set(makeContainerKey(machine), string(containerData), 0)
-	return err
+	return registry.setObj(makeContainerKey(machine), manifests)
 }
 
 func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
@@ -302,13 +309,7 @@ func (registry *EtcdRegistry) CreateController(controller api.ReplicationControl
 }
 
 func (registry *EtcdRegistry) UpdateController(controller api.ReplicationController) error {
-	controllerData, err := json.Marshal(controller)
-	if err != nil {
-		return err
-	}
-	key := makeControllerKey(controller.ID)
-	_, err = registry.etcdClient.Set(key, string(controllerData), 0)
-	return err
+	return registry.setObj(makeControllerKey(controller.ID), controller)
 }
 
 func (registry *EtcdRegistry) DeleteController(controllerID string) error {
@@ -328,13 +329,7 @@ func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
 }
 
 func (registry *EtcdRegistry) CreateService(svc api.Service) error {
-	key := makeServiceKey(svc.ID)
-	data, err := json.Marshal(svc)
-	if err != nil {
-		return err
-	}
-	_, err = registry.etcdClient.Set(key, string(data), 0)
-	return err
+	return registry.setObj(makeServiceKey(svc.ID), svc)
 }
 
 func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
@@ -363,10 +358,5 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 }
 
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
-	data, err := json.Marshal(e)
-	if err != nil {
-		return err
-	}
-	_, err = registry.etcdClient.Set("/registry/services/endpoints/"+e.Name, string(data), 0)
-	return err
+	return registry.setObj("/registry/services/endpoints/"+e.Name, e)
 }
