@@ -40,23 +40,5 @@ KUBE_GO_PACKAGE_DIR="${GOPATH}/src/${KUBE_GO_PACKAGE}"
 
   rm "${KUBE_GO_PACKAGE_DIR}" >/dev/null 2>&1 || true
   ln -s "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
-
-  # Link in each of the third party packages
-  THIRD_PARTY_BASE="${KUBE_REPO_ROOT}/third_party"
-  source "${THIRD_PARTY_BASE}/deps.sh"
-  for p in ${PACKAGES}; do
-    PACKAGE_DIR="${GOPATH}/src/${p}"
-    PACKAGE_BASE=$(dirname "${PACKAGE_DIR}")
-
-    if [ ! -d "${PACKAGE_BASE}" ]; then
-      mkdir -p "${PACKAGE_BASE}"
-    fi
-
-    rm "${PACKAGE_DIR}" >/dev/null 2>&1 || true
-    ln -s "${THIRD_PARTY_BASE}/src/${p}" "${PACKAGE_DIR}"
-  done
-
-  for p in ${PACKAGES}; do
-    go install $p
-  done
 )
+export GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/third_party"

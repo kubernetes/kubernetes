@@ -88,7 +88,7 @@ func (sr *ServiceRegistryStorage) Delete(id string) error {
 	if err != nil {
 		return err
 	}
-	if svc.(api.Service).CreateExternalLoadBalancer {
+	if svc.(*api.Service).CreateExternalLoadBalancer {
 		var balancer cloudprovider.TCPLoadBalancer
 		if sr.cloud != nil {
 			balancer, err = sr.cloud.TCPLoadBalancer()
