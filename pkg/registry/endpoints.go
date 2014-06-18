@@ -43,7 +43,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	}
 	var resultErr error
 	for _, service := range services.Items {
-		pods, err := e.podRegistry.ListPods(labels.Set(service.Selector).AsQuery())
+		pods, err := e.podRegistry.ListPods(labels.Set(service.Selector).AsSelector())
 		if err != nil {
 			log.Printf("Error syncing service: %#v, skipping.", service)
 			resultErr = err

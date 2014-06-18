@@ -21,17 +21,17 @@ import (
 	"strings"
 )
 
-// Represents a label query.
-type Query interface {
-	// Returns true if this query matches the given set of labels.
+// Represents a selector.
+type Selector interface {
+	// Returns true if this selector matches the given set of labels.
 	Matches(Labels) bool
 
-	// Prints a human readable version of this label query.
+	// Prints a human readable version of this selector.
 	String() string
 }
 
-// Everything returns a query that matches all labels.
-func Everything() Query {
+// Everything returns a selector that matches all labels.
+func Everything() Selector {
 	return andTerm{}
 }
 
@@ -59,7 +59,7 @@ func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.label, t.value)
 }
 
-type andTerm []Query
+type andTerm []Selector
 
 func (t andTerm) Matches(ls Labels) bool {
 	for _, q := range t {
@@ -78,17 +78,17 @@ func (t andTerm) String() string {
 	return strings.Join(terms, ",")
 }
 
-func try(queryPiece, op string) (lhs, rhs string, ok bool) {
-	pieces := strings.Split(queryPiece, op)
+func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
+	pieces := strings.Split(selectorPiece, op)
 	if len(pieces) == 2 {
 		return pieces[0], pieces[1], true
 	}
 	return "", "", false
 }
 
-// Given a Set, return a Query which will match exactly that Set.
-func QueryFromSet(ls Set) Query {
-	var items []Query
+// Given a Set, return a Selector which will match exactly that Set.
+func SelectorFromSet(ls Set) Selector {
+	var items []Selector
 	for label, value := range ls {
 		items = append(items, &hasTerm{label: label, value: value})
 	}
@@ -98,10 +98,10 @@ func QueryFromSet(ls Set) Query {
 	return andTerm(items)
 }
 
-// Takes a string repsenting a label query and returns an object suitable for matching, or an error.
-func ParseQuery(query string) (Query, error) {
-	parts := strings.Split(query, ",")
-	var items []Query
+// Takes a string repsenting a selector and returns an object suitable for matching, or an error.
+func ParseSelector(selector string) (Selector, error) {
+	parts := strings.Split(selector, ",")
+	var items []Selector
 	for _, part := range parts {
 		if part == "" {
 			continue
@@ -113,7 +113,7 @@ func ParseQuery(query string) (Query, error) {
 		} else if lhs, rhs, ok := try(part, "="); ok {
 			items = append(items, &hasTerm{label: lhs, value: rhs})
 		} else {
-			return nil, fmt.Errorf("invalid label query: '%s'; can't understand '%s'", query, part)
+			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
 		}
 	}
 	if len(items) == 1 {

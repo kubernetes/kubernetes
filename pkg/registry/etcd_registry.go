@@ -59,7 +59,7 @@ func (registry *EtcdRegistry) helper() *util.EtcdHelper {
 	return &util.EtcdHelper{registry.etcdClient}
 }
 
-func (registry *EtcdRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
+func (registry *EtcdRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	pods := []api.Pod{}
 	for _, machine := range registry.machines {
 		var machinePods []api.Pod
@@ -68,7 +68,7 @@ func (registry *EtcdRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
 			return pods, err
 		}
 		for _, pod := range machinePods {
-			if query.Matches(labels.Set(pod.Labels)) {
+			if selector.Matches(labels.Set(pod.Labels)) {
 				pod.CurrentState.Host = machine
 				pods = append(pods, pod)
 			}

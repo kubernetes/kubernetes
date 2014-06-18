@@ -31,7 +31,7 @@ import (
 
 // RESTStorage is a generic interface for RESTful storage services
 type RESTStorage interface {
-	List(labels.Query) (interface{}, error)
+	List(labels.Selector) (interface{}, error)
 	Get(id string) (interface{}, error)
 	Delete(id string) error
 	Extract(body string) (interface{}, error)
@@ -149,12 +149,12 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 	case "GET":
 		switch len(parts) {
 		case 1:
-			query, err := labels.ParseQuery(requestUrl.Query().Get("labels"))
+			selector, err := labels.ParseSelector(requestUrl.Query().Get("labels"))
 			if err != nil {
 				server.error(err, w)
 				return
 			}
-			controllers, err := storage.List(query)
+			controllers, err := storage.List(selector)
 			if err != nil {
 				server.error(err, w)
 				return

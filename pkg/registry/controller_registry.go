@@ -35,12 +35,12 @@ func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTSt
 	}
 }
 
-func (storage *ControllerRegistryStorage) List(query labels.Query) (interface{}, error) {
+func (storage *ControllerRegistryStorage) List(selector labels.Selector) (interface{}, error) {
 	result := api.ReplicationControllerList{JSONBase: api.JSONBase{Kind: "cluster#replicationControllerList"}}
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
 		for _, controller := range controllers {
-			if query.Matches(labels.Set(controller.Labels)) {
+			if selector.Matches(labels.Set(controller.Labels)) {
 				result.Items = append(result.Items, controller)
 			}
 		}

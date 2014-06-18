@@ -39,7 +39,7 @@ var (
 	versionFlag  = flag.Bool("v", false, "Print the version number.")
 	httpServer   = flag.String("h", "", "The host to connect to.")
 	config       = flag.String("c", "", "Path to the config file.")
-	labelQuery   = flag.String("l", "", "Label query to use for listing")
+	selector     = flag.String("l", "", "Selector (label query) to use for listing")
 	updatePeriod = flag.Duration("u", 60*time.Second, "Update interarrival period")
 	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
@@ -143,8 +143,8 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	switch method {
 	case "get", "list":
 		url := readUrl(parseStorage())
-		if len(*labelQuery) > 0 && method == "list" {
-			url = url + "?labels=" + *labelQuery
+		if len(*selector) > 0 && method == "list" {
+			url = url + "?labels=" + *selector
 		}
 		request, err = http.NewRequest("GET", url, nil)
 	case "delete":

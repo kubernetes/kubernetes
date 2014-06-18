@@ -117,13 +117,13 @@ func TestListPodsLabels(t *testing.T) {
 	client := Client{
 		Host: testServer.URL,
 	}
-	query := map[string]string{"foo": "bar", "name": "baz"}
-	receivedPodList, err := client.ListPods(query)
+	selector := map[string]string{"foo": "bar", "name": "baz"}
+	receivedPodList, err := client.ListPods(selector)
 	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "GET", nil)
-	queryString := fakeHandler.RequestReceived.URL.Query().Get("labels")
-	queryString, _ = url.QueryUnescape(queryString)
-	parsedQueryString := DecodeLabelQuery(queryString)
-	expectEqual(t, query, parsedQueryString)
+	selectorString := fakeHandler.RequestReceived.URL.Query().Get("labels")
+	selectorString, _ = url.QueryUnescape(selectorString)
+	parsedSelectorString := DecodeSelector(selectorString)
+	expectEqual(t, selector, parsedSelectorString)
 	if err != nil {
 		t.Errorf("Unexpected error in listing pods: %#v", err)
 	}

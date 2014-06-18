@@ -62,7 +62,7 @@ func (y *YAMLPrinter) Print(data string, w io.Writer) error {
 type HumanReadablePrinter struct{}
 
 var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
-var replicationControllerColumns = []string{"Name", "Image(s)", "Label Query", "Replicas"}
+var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Replicas"}
 var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
 
 func (h *HumanReadablePrinter) unknown(data string, w io.Writer) error {
