@@ -99,7 +99,7 @@ func (h *HumanReadablePrinter) makeLabelsList(labels map[string]string) string {
 
 func (h *HumanReadablePrinter) printPod(pod api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host, h.makeLabelsList(pod.Labels))
+		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, h.makeLabelsList(pod.Labels))
 	return err
 }
 
