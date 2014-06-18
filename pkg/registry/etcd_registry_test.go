@@ -354,6 +354,10 @@ func TestEtcdListPods(t *testing.T) {
 	if len(pods) != 2 || pods[0].ID != "foo" || pods[1].ID != "bar" {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
+	if pods[0].CurrentState.Host != "machine" ||
+		pods[1].CurrentState.Host != "machine" {
+		t.Errorf("Failed to populate host name.")
+	}
 }
 
 func TestEtcdListControllersNotFound(t *testing.T) {
