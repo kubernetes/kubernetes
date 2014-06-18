@@ -22,11 +22,13 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 type MockPodRegistry struct {
 	err  error
+	pod  *api.Pod
 	pods []api.Pod
 }
 
@@ -50,7 +52,7 @@ func (registry *MockPodRegistry) ListPods(query labels.Query) ([]api.Pod, error)
 }
 
 func (registry *MockPodRegistry) GetPod(podId string) (*api.Pod, error) {
-	return &api.Pod{}, registry.err
+	return registry.pod, registry.err
 }
 
 func (registry *MockPodRegistry) CreatePod(machine string, pod api.Pod) error {
@@ -142,6 +144,45 @@ func TestExtractJson(t *testing.T) {
 	pod.Kind = "cluster#pod"
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)
+	}
+}
+
+func TestGetPod(t *testing.T) {
+	mockRegistry := MockPodRegistry{
+		pod: &api.Pod{
+			JSONBase: api.JSONBase{ID: "foo"},
+		},
+	}
+	storage := PodRegistryStorage{
+		registry: &mockRegistry,
+	}
+	obj, err := storage.Get("foo")
+	pod := obj.(*api.Pod)
+	expectNoError(t, err)
+	if !reflect.DeepEqual(*mockRegistry.pod, *pod) {
+		t.Errorf("Unexpected pod.  Expected %#v, Got %#v", *mockRegistry.pod, *pod)
+	}
+}
+
+func TestGetPodCloud(t *testing.T) {
+	fakeCloud := &cloudprovider.FakeCloud{}
+	mockRegistry := MockPodRegistry{
+		pod: &api.Pod{
+			JSONBase: api.JSONBase{ID: "foo"},
+		},
+	}
+	storage := PodRegistryStorage{
+		registry: &mockRegistry,
+		cloud:    fakeCloud,
+	}
+	obj, err := storage.Get("foo")
+	pod := obj.(*api.Pod)
+	expectNoError(t, err)
+	if !reflect.DeepEqual(*mockRegistry.pod, *pod) {
+		t.Errorf("Unexpected pod.  Expected %#v, Got %#v", *mockRegistry.pod, *pod)
+	}
+	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "ip-address" {
+		t.Errorf("Unexpected calls: %#v", fakeCloud.Calls)
 	}
 }
 

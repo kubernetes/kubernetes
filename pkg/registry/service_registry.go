@@ -91,13 +91,11 @@ func (sr *ServiceRegistryStorage) Delete(id string) error {
 	}
 	if svc.(*api.Service).CreateExternalLoadBalancer {
 		var balancer cloudprovider.TCPLoadBalancer
+		var ok bool
 		if sr.cloud != nil {
-			balancer, err = sr.cloud.TCPLoadBalancer()
-			if err != nil {
-				return err
-			}
+			balancer, ok = sr.cloud.TCPLoadBalancer()
 		}
-		if balancer != nil {
+		if ok && balancer != nil {
 			err = balancer.DeleteTCPLoadBalancer(id, "us-central1")
 			if err != nil {
 				return err
@@ -118,14 +116,11 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) error {
 	srv := obj.(api.Service)
 	if srv.CreateExternalLoadBalancer {
 		var balancer cloudprovider.TCPLoadBalancer
+		var ok bool
 		if sr.cloud != nil {
-			var err error
-			balancer, err = sr.cloud.TCPLoadBalancer()
-			if err != nil {
-				return err
-			}
+			balancer, ok = sr.cloud.TCPLoadBalancer()
 		}
-		if balancer != nil {
+		if ok && balancer != nil {
 			err := balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, sr.hosts)
 			if err != nil {
 				return err

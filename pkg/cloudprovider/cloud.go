@@ -16,10 +16,16 @@ limitations under the License.
 
 package cloudprovider
 
+import (
+	"net"
+)
+
 // CloudInterface is an abstract, pluggable interface for cloud providers
 type Interface interface {
-	// TCPLoadBalancer returns a balancer interface, or nil if none is supported.  Returns an error if one occurs.
-	TCPLoadBalancer() (TCPLoadBalancer, error)
+	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
+	TCPLoadBalancer() (TCPLoadBalancer, bool)
+	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
+	Instances() (Instances, bool)
 }
 
 type TCPLoadBalancer interface {
@@ -28,4 +34,8 @@ type TCPLoadBalancer interface {
 	CreateTCPLoadBalancer(name, region string, port int, hosts []string) error
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	DeleteTCPLoadBalancer(name, region string) error
+}
+
+type Instances interface {
+	IPAddress(name string) (net.IP, error)
 }
