@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -48,13 +49,12 @@ func main() {
 	}, "/api/v1beta1")
 	server := httptest.NewServer(apiserver)
 
-	controllerManager := registry.MakeReplicationManager(etcd.NewClient(servers),
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers),
 		client.Client{
 			Host: server.URL,
 		})
 
-	go controllerManager.Synchronize()
-	go controllerManager.WatchControllers()
+	controllerManager.Run(10 * time.Second)
 
 	// Ok. we're good to go.
 	log.Printf("API Server started on %s", server.URL)
