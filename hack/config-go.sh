@@ -21,6 +21,20 @@ if [ "$(which go)" == "" ]; then
 	exit 1
 fi
 
+# Travis continuous build uses a head go release that doesn't report
+# a version number, so we skip this check on Travis.  Its unnecessary
+# there anyway.
+if [ ${TRAVIS} != "true" ]; then
+  GO_VERSION=($(go version))
+
+  if [ ${GO_VERSION[2]} \< "go1.2" ]; then
+    echo "Detected go version: ${GO_VERSION}."
+    echo "Kubernetes requires go version 1.2 or greater."
+    echo "Please install Go version 1.2 or later"
+    exit 1
+  fi
+fi
+
 pushd $(dirname "${BASH_SOURCE}")/.. >/dev/null
 KUBE_REPO_ROOT="${PWD}"
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
