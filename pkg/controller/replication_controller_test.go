@@ -317,3 +317,79 @@ func TestHandleWatchResponse(t *testing.T) {
 		t.Errorf("Unexpected mismatch.  Expected %#v, Saw: %#v", controller, controllerOut)
 	}
 }
+
+func TestSyncronize(t *testing.T) {
+	controllerSpec1 := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			Replicas: 4,
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo/bar",
+							},
+						},
+					},
+				},
+				Labels: map[string]string{
+					"name": "foo",
+					"type": "production",
+				},
+			},
+		},
+	}
+	controllerSpec2 := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			Replicas: 3,
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "bar/baz",
+							},
+						},
+					},
+				},
+				Labels: map[string]string{
+					"name": "bar",
+					"type": "production",
+				},
+			},
+		},
+	}
+
+	fakeEtcd := util.MakeFakeEtcdClient(t)
+	fakeEtcd.Data["/registry/controllers"] = util.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: util.MakeJSONString(controllerSpec1),
+					},
+					{
+						Value: util.MakeJSONString(controllerSpec2),
+					},
+				},
+			},
+		},
+	}
+
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: "{}",
+		T:            t,
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.Client{
+		Host: testServer.URL,
+	}
+	manager := MakeReplicationManager(fakeEtcd, client)
+	fakePodControl := FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	manager.synchronize()
+
+	validateSyncReplication(t, &fakePodControl, 7, 0)
+}

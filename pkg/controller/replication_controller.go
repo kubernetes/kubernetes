@@ -35,7 +35,7 @@ import (
 // with actual running pods.
 // TODO: Remove the etcd dependency and re-factor in terms of a generic watch interface
 type ReplicationManager struct {
-	etcdClient *etcd.Client
+	etcdClient util.EtcdClient
 	kubeClient client.ClientInterface
 	podControl PodControlInterface
 	updateLock sync.Mutex
@@ -74,7 +74,7 @@ func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
 }
 
-func MakeReplicationManager(etcdClient *etcd.Client, kubeClient client.ClientInterface) *ReplicationManager {
+func MakeReplicationManager(etcdClient util.EtcdClient, kubeClient client.ClientInterface) *ReplicationManager {
 	return &ReplicationManager{
 		kubeClient: kubeClient,
 		etcdClient: etcdClient,

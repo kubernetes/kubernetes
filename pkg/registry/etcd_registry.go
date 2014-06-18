@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/coreos/go-etcd/etcd"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -31,21 +29,9 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// EtcdClient is an injectable interface for testing.
-type EtcdClient interface {
-	AddChild(key, data string, ttl uint64) (*etcd.Response, error)
-	Get(key string, sort, recursive bool) (*etcd.Response, error)
-	Set(key, value string, ttl uint64) (*etcd.Response, error)
-	Create(key, value string, ttl uint64) (*etcd.Response, error)
-	Delete(key string, recursive bool) (*etcd.Response, error)
-	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
-	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
-	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
-}
-
 // EtcdRegistry is an implementation of both ControllerRegistry and PodRegistry which is backed with etcd.
 type EtcdRegistry struct {
-	etcdClient      EtcdClient
+	etcdClient      util.EtcdClient
 	machines        []string
 	manifestFactory ManifestFactory
 }
@@ -54,7 +40,7 @@ type EtcdRegistry struct {
 // 'client' is the connection to etcd
 // 'machines' is the list of machines
 // 'scheduler' is the scheduling algorithm to use.
-func MakeEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
+func MakeEtcdRegistry(client util.EtcdClient, machines []string) *EtcdRegistry {
 	registry := &EtcdRegistry{
 		etcdClient: client,
 		machines:   machines,

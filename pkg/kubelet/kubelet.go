@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
@@ -62,7 +61,7 @@ type DockerInterface interface {
 // The main kubelet implementation
 type Kubelet struct {
 	Hostname           string
-	Client             registry.EtcdClient
+	Client             util.EtcdClient
 	DockerClient       DockerInterface
 	FileCheckFrequency time.Duration
 	SyncFrequency      time.Duration

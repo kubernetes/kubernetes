@@ -26,7 +26,7 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-func MakeTestEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
+func MakeTestEtcdRegistry(client util.EtcdClient, machines []string) *EtcdRegistry {
 	registry := MakeEtcdRegistry(client, machines)
 	registry.manifestFactory = &BasicManifestFactory{
 		serviceRegistry: &MockServiceRegistry{},
