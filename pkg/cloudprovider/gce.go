@@ -19,6 +19,7 @@ package cloudprovider
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -79,6 +80,10 @@ func NewGCECloud() (*GCECloud, error) {
 }
 
 func (gce *GCECloud) TCPLoadBalancer() (TCPLoadBalancer, error) {
+	return gce, nil
+}
+
+func (gce *GCECloud) Instances() (Instances, error) {
 	return gce, nil
 }
 
@@ -161,4 +166,16 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	}
 	_, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
 	return err
+}
+
+func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
+	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, instance).Do()
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+	if ip == nil {
+		return nil, fmt.Errorf("Invalid network IP: %s", res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+	}
+	return ip, nil
 }

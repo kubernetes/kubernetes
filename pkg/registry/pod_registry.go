@@ -18,10 +18,14 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -30,13 +34,15 @@ type PodRegistryStorage struct {
 	registry      PodRegistry
 	containerInfo client.ContainerInfo
 	scheduler     Scheduler
+	cloud         cloudprovider.Interface
 }
 
-func MakePodRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler) apiserver.RESTStorage {
+func MakePodRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler, cloud cloudprovider.Interface) apiserver.RESTStorage {
 	return &PodRegistryStorage{
 		registry:      registry,
 		containerInfo: containerInfo,
 		scheduler:     scheduler,
+		cloud:         cloud,
 	}
 }
 
@@ -63,6 +69,31 @@ func makePodStatus(info interface{}) string {
 	return "Pending"
 }
 
+func getInstanceIP(cloud cloudprovider.Interface, host string) string {
+	if cloud == nil {
+		return ""
+	}
+	instances, err := cloud.Instances()
+	if instances == nil {
+		return ""
+	}
+	if err != nil {
+		log.Printf("Error getting instances: %#v", err)
+		return ""
+	}
+	ix := strings.Index(host, ".")
+	if ix != -1 {
+		host = host[:ix]
+	}
+	var addr net.IP
+	addr, err = instances.IPAddress(host)
+	if err != nil {
+		log.Printf("Error getting instance IP: %#v", err)
+		return ""
+	}
+	return addr.String()
+}
+
 func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	pod, err := storage.registry.GetPod(id)
 	if err != nil {
@@ -74,6 +105,8 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	}
 	pod.CurrentState.Info = info
 	pod.CurrentState.Status = makePodStatus(info)
+	pod.CurrentState.HostIP = getInstanceIP(storage.cloud, pod.CurrentState.Host)
+
 	pod.Kind = "cluster#pod"
 	return pod, err
 }
