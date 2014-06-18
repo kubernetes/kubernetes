@@ -26,44 +26,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-type MockPodRegistry struct {
-	err  error
-	pod  *api.Pod
-	pods []api.Pod
-}
-
 func expectNoError(t *testing.T, err error) {
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-}
-
-func (registry *MockPodRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
-	if registry.err != nil {
-		return registry.pods, registry.err
-	}
-	var filtered []api.Pod
-	for _, pod := range registry.pods {
-		if query.Matches(labels.Set(pod.Labels)) {
-			filtered = append(filtered, pod)
-		}
-	}
-	return filtered, nil
-}
-
-func (registry *MockPodRegistry) GetPod(podId string) (*api.Pod, error) {
-	return registry.pod, registry.err
-}
-
-func (registry *MockPodRegistry) CreatePod(machine string, pod api.Pod) error {
-	return registry.err
-}
-
-func (registry *MockPodRegistry) UpdatePod(pod api.Pod) error {
-	return registry.err
-}
-func (registry *MockPodRegistry) DeletePod(podId string) error {
-	return registry.err
 }
 
 func TestListPodsError(t *testing.T) {
