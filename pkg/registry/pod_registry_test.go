@@ -36,8 +36,17 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
-func (registry *MockPodRegistry) ListPods(labels.Query) ([]api.Pod, error) {
-	return registry.pods, registry.err
+func (registry *MockPodRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
+	if registry.err != nil {
+		return registry.pods, registry.err
+	}
+	var filtered []api.Pod
+	for _, pod := range registry.pods {
+		if query.Matches(labels.Set(pod.Labels)) {
+			filtered = append(filtered, pod)
+		}
+	}
+	return filtered, nil
 }
 
 func (registry *MockPodRegistry) GetPod(podId string) (*api.Pod, error) {
@@ -62,7 +71,7 @@ func TestListPodsError(t *testing.T) {
 	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
-	pods, err := storage.List(nil)
+	pods, err := storage.List(labels.Everything())
 	if err != mockRegistry.err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.err, err)
 	}
@@ -76,7 +85,7 @@ func TestListEmptyPodList(t *testing.T) {
 	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
-	pods, err := storage.List(nil)
+	pods, err := storage.List(labels.Everything())
 	expectNoError(t, err)
 	if len(pods.(api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
@@ -101,7 +110,7 @@ func TestListPodList(t *testing.T) {
 	storage := PodRegistryStorage{
 		registry: &mockRegistry,
 	}
-	podsObj, err := storage.List(nil)
+	podsObj, err := storage.List(labels.Everything())
 	pods := podsObj.(api.PodList)
 	expectNoError(t, err)
 	if len(pods.Items) != 2 {

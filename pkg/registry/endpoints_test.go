@@ -72,6 +72,9 @@ func TestSyncEndpointsItems(t *testing.T) {
 						},
 					},
 				},
+				Labels: map[string]string{
+					"foo": "bar",
+				},
 			},
 		},
 	}
