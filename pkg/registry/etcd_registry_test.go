@@ -26,8 +26,16 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+func MakeTestEtcdRegistry(client util.EtcdClient, machines []string) *EtcdRegistry {
+	registry := MakeEtcdRegistry(client, machines)
+	registry.manifestFactory = &BasicManifestFactory{
+		serviceRegistry: &MockServiceRegistry{},
+	}
+	return registry
+}
+
 func TestEtcdGetPod(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	fakeClient.Set("/registry/hosts/machine/pods/foo", util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pod, err := registry.GetPod("foo")
@@ -38,8 +46,8 @@ func TestEtcdGetPod(t *testing.T) {
 }
 
 func TestEtcdGetPodNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -55,8 +63,8 @@ func TestEtcdGetPodNotFound(t *testing.T) {
 }
 
 func TestEtcdCreatePod(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -97,8 +105,8 @@ func TestEtcdCreatePod(t *testing.T) {
 }
 
 func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value: util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}),
@@ -118,14 +126,14 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 }
 
 func TestEtcdCreatePodWithContainersError(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -150,14 +158,14 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 }
 
 func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -198,8 +206,8 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 }
 
 func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/hosts/machine/pods/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/hosts/machine/pods/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -245,7 +253,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 }
 
 func TestEtcdDeletePod(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
@@ -256,11 +264,11 @@ func TestEtcdDeletePod(t *testing.T) {
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
 	expectNoError(t, err)
-	if len(fakeClient.deletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.deletedKeys)
+	if len(fakeClient.DeletedKeys) != 1 {
+		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
-	if fakeClient.deletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.deletedKeys[0], key)
+	if fakeClient.DeletedKeys[0] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 	response, _ := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	if response.Node.Value != "[]" {
@@ -269,7 +277,7 @@ func TestEtcdDeletePod(t *testing.T) {
 }
 
 func TestEtcdDeletePodMultipleContainers(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
@@ -279,11 +287,11 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
 	expectNoError(t, err)
-	if len(fakeClient.deletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.deletedKeys)
+	if len(fakeClient.DeletedKeys) != 1 {
+		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
-	if fakeClient.deletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.deletedKeys[0], key)
+	if fakeClient.DeletedKeys[0] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 	response, _ := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	var manifests []api.ContainerManifest
@@ -297,9 +305,9 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 }
 
 func TestEtcdEmptyListPods(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{},
@@ -316,9 +324,9 @@ func TestEtcdEmptyListPods(t *testing.T) {
 }
 
 func TestEtcdListPodsNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
@@ -331,9 +339,9 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 }
 
 func TestEtcdListPods(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
@@ -361,9 +369,9 @@ func TestEtcdListPods(t *testing.T) {
 }
 
 func TestEtcdListControllersNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/controllers"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
@@ -376,9 +384,9 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 }
 
 func TestEtcdListServicesNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/services/specs"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{ErrorCode: 100},
 	}
@@ -391,9 +399,9 @@ func TestEtcdListServicesNotFound(t *testing.T) {
 }
 
 func TestEtcdListControllers(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/controllers"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
@@ -417,7 +425,7 @@ func TestEtcdListControllers(t *testing.T) {
 }
 
 func TestEtcdGetController(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	ctrl, err := registry.GetController("foo")
@@ -428,8 +436,8 @@ func TestEtcdGetController(t *testing.T) {
 }
 
 func TestEtcdGetControllerNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/controllers/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/controllers/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -448,21 +456,21 @@ func TestEtcdGetControllerNotFound(t *testing.T) {
 }
 
 func TestEtcdDeleteController(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeleteController("foo")
 	expectNoError(t, err)
-	if len(fakeClient.deletedKeys) != 1 {
-		t.Errorf("Expected 1 delete, found %#v", fakeClient.deletedKeys)
+	if len(fakeClient.DeletedKeys) != 1 {
+		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
 	key := "/registry/controllers/foo"
-	if fakeClient.deletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.deletedKeys[0], key)
+	if fakeClient.DeletedKeys[0] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 }
 
 func TestEtcdCreateController(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.CreateController(api.ReplicationController{
 		JSONBase: api.JSONBase{
@@ -481,7 +489,7 @@ func TestEtcdCreateController(t *testing.T) {
 }
 
 func TestEtcdUpdateController(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.UpdateController(api.ReplicationController{
@@ -498,9 +506,9 @@ func TestEtcdUpdateController(t *testing.T) {
 }
 
 func TestEtcdListServices(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	key := "/registry/services/specs"
-	fakeClient.Data[key] = EtcdResponseWithError{
+	fakeClient.Data[key] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
@@ -524,8 +532,8 @@ func TestEtcdListServices(t *testing.T) {
 }
 
 func TestEtcdCreateService(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/services/specs/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/services/specs/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -547,7 +555,7 @@ func TestEtcdCreateService(t *testing.T) {
 }
 
 func TestEtcdGetService(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	service, err := registry.GetService("foo")
@@ -558,8 +566,8 @@ func TestEtcdGetService(t *testing.T) {
 }
 
 func TestEtcdGetServiceNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/services/specs/foo"] = EtcdResponseWithError{
+	fakeClient := util.MakeFakeEtcdClient(t)
+	fakeClient.Data["/registry/services/specs/foo"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -575,25 +583,25 @@ func TestEtcdGetServiceNotFound(t *testing.T) {
 }
 
 func TestEtcdDeleteService(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeleteService("foo")
 	expectNoError(t, err)
-	if len(fakeClient.deletedKeys) != 2 {
-		t.Errorf("Expected 2 delete, found %#v", fakeClient.deletedKeys)
+	if len(fakeClient.DeletedKeys) != 2 {
+		t.Errorf("Expected 2 delete, found %#v", fakeClient.DeletedKeys)
 	}
 	key := "/registry/services/specs/foo"
-	if fakeClient.deletedKeys[0] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.deletedKeys[0], key)
+	if fakeClient.DeletedKeys[0] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 	key = "/registry/services/endpoints/foo"
-	if fakeClient.deletedKeys[1] != key {
-		t.Errorf("Unexpected key: %s, expected %s", fakeClient.deletedKeys[1], key)
+	if fakeClient.DeletedKeys[1] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[1], key)
 	}
 }
 
 func TestEtcdUpdateService(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.UpdateService(api.Service{
@@ -610,7 +618,7 @@ func TestEtcdUpdateService(t *testing.T) {
 }
 
 func TestEtcdUpdateEndpoints(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	endpoints := api.Endpoints{
 		Name:      "foo",

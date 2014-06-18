@@ -29,10 +29,9 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 )
@@ -86,13 +85,12 @@ func api_server() {
 
 // Starts up a controller manager. Never returns.
 func controller_manager() {
-	controllerManager := registry.MakeReplicationManager(etcd.NewClient([]string{*etcd_server}),
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient([]string{*etcd_server}),
 		client.Client{
 			Host: fmt.Sprintf("http://%s:%d", *master_address, *master_port),
 		})
 
-	go util.Forever(func() { controllerManager.Synchronize() }, 20*time.Second)
-	go util.Forever(func() { controllerManager.WatchControllers() }, 20*time.Second)
+	controllerManager.Run(20 * time.Second)
 	select {}
 }
 

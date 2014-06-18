@@ -27,7 +27,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
@@ -398,13 +397,13 @@ func (cr *channelReader) GetList() [][]api.ContainerManifest {
 }
 
 func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
-	fakeClient := registry.MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
 	channel := make(chan []api.ContainerManifest)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = registry.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: nil,
 	}
@@ -420,13 +419,13 @@ func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
 }
 
 func TestGetKubeletStateFromEtcd(t *testing.T) {
-	fakeClient := registry.MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
 	channel := make(chan []api.ContainerManifest)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = registry.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value: util.MakeJSONString([]api.Container{}),
@@ -444,13 +443,13 @@ func TestGetKubeletStateFromEtcd(t *testing.T) {
 }
 
 func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
-	fakeClient := registry.MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
 	channel := make(chan []api.ContainerManifest)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = registry.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{
 			ErrorCode: 100,
@@ -466,13 +465,13 @@ func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 }
 
 func TestGetKubeletStateFromEtcdError(t *testing.T) {
-	fakeClient := registry.MakeFakeEtcdClient(t)
+	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
 	channel := make(chan []api.ContainerManifest)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = registry.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{
 			ErrorCode: 200, // non not found error
@@ -554,7 +553,7 @@ func TestSyncManifestsDeletes(t *testing.T) {
 }
 
 func TestEventWriting(t *testing.T) {
-	fakeEtcd := registry.MakeFakeEtcdClient(t)
+	fakeEtcd := util.MakeFakeEtcdClient(t)
 	kubelet := &Kubelet{
 		Client: fakeEtcd,
 	}
@@ -581,7 +580,7 @@ func TestEventWriting(t *testing.T) {
 }
 
 func TestEventWritingError(t *testing.T) {
-	fakeEtcd := registry.MakeFakeEtcdClient(t)
+	fakeEtcd := util.MakeFakeEtcdClient(t)
 	kubelet := &Kubelet{
 		Client: fakeEtcd,
 	}

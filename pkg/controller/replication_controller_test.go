@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package registry
+
+package controller
 
 import (
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -30,6 +32,13 @@ import (
 
 // TODO: Move this to a common place, it's needed in multiple tests.
 var apiPath = "/api/v1beta1"
+
+// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
+func expectNoError(t *testing.T, err error) {
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+}
 
 func makeUrl(suffix string) string {
 	return apiPath + suffix
@@ -307,5 +316,154 @@ func TestHandleWatchResponse(t *testing.T) {
 	}
 	if !reflect.DeepEqual(controller, *controllerOut) {
 		t.Errorf("Unexpected mismatch.  Expected %#v, Saw: %#v", controller, controllerOut)
+	}
+}
+
+func TestSyncronize(t *testing.T) {
+	controllerSpec1 := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			Replicas: 4,
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo/bar",
+							},
+						},
+					},
+				},
+				Labels: map[string]string{
+					"name": "foo",
+					"type": "production",
+				},
+			},
+		},
+	}
+	controllerSpec2 := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			Replicas: 3,
+			PodTemplate: api.PodTemplate{
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "bar/baz",
+							},
+						},
+					},
+				},
+				Labels: map[string]string{
+					"name": "bar",
+					"type": "production",
+				},
+			},
+		},
+	}
+
+	fakeEtcd := util.MakeFakeEtcdClient(t)
+	fakeEtcd.Data["/registry/controllers"] = util.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: util.MakeJSONString(controllerSpec1),
+					},
+					{
+						Value: util.MakeJSONString(controllerSpec2),
+					},
+				},
+			},
+		},
+	}
+
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: "{}",
+		T:            t,
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.Client{
+		Host: testServer.URL,
+	}
+	manager := MakeReplicationManager(fakeEtcd, client)
+	fakePodControl := FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	manager.synchronize()
+
+	validateSyncReplication(t, &fakePodControl, 7, 0)
+}
+
+type asyncTimeout struct {
+	doneChan chan bool
+}
+
+func beginTimeout(d time.Duration) *asyncTimeout {
+	a := &asyncTimeout{doneChan: make(chan bool)}
+	go func() {
+		select {
+		case <-a.doneChan:
+			return
+		case <-time.After(d):
+			panic("Timeout expired!")
+		}
+	}()
+	return a
+}
+
+func (a *asyncTimeout) done() {
+	close(a.doneChan)
+}
+
+func TestWatchControllers(t *testing.T) {
+	defer beginTimeout(20 * time.Second).done()
+	fakeEtcd := util.MakeFakeEtcdClient(t)
+	manager := MakeReplicationManager(fakeEtcd, nil)
+	var testControllerSpec api.ReplicationController
+	receivedCount := 0
+	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
+		if !reflect.DeepEqual(controllerSpec, testControllerSpec) {
+			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
+		}
+		receivedCount++
+		return nil
+	}
+
+	go manager.watchControllers()
+	time.Sleep(10 * time.Millisecond)
+
+	// Test normal case
+	testControllerSpec.ID = "foo"
+	fakeEtcd.WatchResponse <- &etcd.Response{
+		Action: "set",
+		Node: &etcd.Node{
+			Value: util.MakeJSONString(testControllerSpec),
+		},
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	if receivedCount != 1 {
+		t.Errorf("Expected 1 call but got %v", receivedCount)
+	}
+
+	// Test error case
+	fakeEtcd.WatchInjectError <- fmt.Errorf("Injected error")
+	time.Sleep(10 * time.Millisecond)
+
+	// Did everything shut down?
+	if _, open := <-fakeEtcd.WatchResponse; open {
+		t.Errorf("An injected error did not cause a graceful shutdown")
+	}
+
+	// Test purposeful shutdown
+	go manager.watchControllers()
+	time.Sleep(10 * time.Millisecond)
+	fakeEtcd.WatchStop <- true
+	time.Sleep(10 * time.Millisecond)
+
+	// Did everything shut down?
+	if _, open := <-fakeEtcd.WatchResponse; open {
+		t.Errorf("A stop did not cause a graceful shutdown")
 	}
 }

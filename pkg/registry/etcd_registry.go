@@ -13,38 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package registry
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"reflect"
-
-	"github.com/coreos/go-etcd/etcd"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// EtcdClient is an injectable interface for testing.
-type EtcdClient interface {
-	AddChild(key, data string, ttl uint64) (*etcd.Response, error)
-	Get(key string, sort, recursive bool) (*etcd.Response, error)
-	Set(key, value string, ttl uint64) (*etcd.Response, error)
-	Create(key, value string, ttl uint64) (*etcd.Response, error)
-	Delete(key string, recursive bool) (*etcd.Response, error)
-	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
-	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
-	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
-}
-
 // EtcdRegistry is an implementation of both ControllerRegistry and PodRegistry which is backed with etcd.
 type EtcdRegistry struct {
-	etcdClient      EtcdClient
+	etcdClient      util.EtcdClient
 	machines        []string
 	manifestFactory ManifestFactory
 }
@@ -53,7 +40,7 @@ type EtcdRegistry struct {
 // 'client' is the connection to etcd
 // 'machines' is the list of machines
 // 'scheduler' is the scheduling algorithm to use.
-func MakeEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
+func MakeEtcdRegistry(client util.EtcdClient, machines []string) *EtcdRegistry {
 	registry := &EtcdRegistry{
 		etcdClient: client,
 		machines:   machines,
@@ -68,11 +55,15 @@ func makePodKey(machine, podID string) string {
 	return "/registry/hosts/" + machine + "/pods/" + podID
 }
 
+func (registry *EtcdRegistry) helper() *util.EtcdHelper {
+	return &util.EtcdHelper{registry.etcdClient}
+}
+
 func (registry *EtcdRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
 	pods := []api.Pod{}
 	for _, machine := range registry.machines {
 		var machinePods []api.Pod
-		err := registry.extractList("/registry/hosts/"+machine+"/pods", &machinePods)
+		err := registry.helper().ExtractList("/registry/hosts/"+machine+"/pods", &machinePods)
 		if err != nil {
 			return pods, err
 		}
@@ -86,80 +77,6 @@ func (registry *EtcdRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
 	return pods, nil
 }
 
-func (registry *EtcdRegistry) listEtcdNode(key string) ([]*etcd.Node, error) {
-	result, err := registry.etcdClient.Get(key, false, true)
-	if err != nil {
-		nodes := make([]*etcd.Node, 0)
-		if isEtcdNotFound(err) {
-			return nodes, nil
-		} else {
-			return nodes, err
-		}
-	}
-	return result.Node.Nodes, nil
-}
-
-// Extract a go object per etcd node into a slice.
-func (r *EtcdRegistry) extractList(key string, slicePtr interface{}) error {
-	nodes, err := r.listEtcdNode(key)
-	if err != nil {
-		return err
-	}
-	pv := reflect.ValueOf(slicePtr)
-	if pv.Type().Kind() != reflect.Ptr || pv.Type().Elem().Kind() != reflect.Slice {
-		// This should not happen at runtime.
-		panic("need ptr to slice")
-	}
-	v := pv.Elem()
-	for _, node := range nodes {
-		obj := reflect.New(v.Type().Elem())
-		err = json.Unmarshal([]byte(node.Value), obj.Interface())
-		if err != nil {
-			return err
-		}
-		v.Set(reflect.Append(v, obj.Elem()))
-	}
-	return nil
-}
-
-// Unmarshals json found at key into objPtr. On a not found error, will either return
-// a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
-// empty responses and nil response nodes exactly like a not found error.
-func (r *EtcdRegistry) extractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
-	response, err := r.etcdClient.Get(key, false, false)
-	returnZero := false
-	if err != nil {
-		if ignoreNotFound && isEtcdNotFound(err) {
-			returnZero = true
-		} else {
-			return err
-		}
-	}
-	if !returnZero && (response.Node == nil || len(response.Node.Value) == 0) {
-		if ignoreNotFound {
-			returnZero = true
-		} else {
-			return fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
-		}
-	}
-	if returnZero {
-		pv := reflect.ValueOf(objPtr)
-		pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
-		return nil
-	}
-	return json.Unmarshal([]byte(response.Node.Value), objPtr)
-}
-
-// json marshals obj, and stores under key.
-func (r *EtcdRegistry) setObj(key string, obj interface{}) error {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return err
-	}
-	_, err = r.etcdClient.Set(key, string(data), 0)
-	return err
-}
-
 func (registry *EtcdRegistry) GetPod(podID string) (*api.Pod, error) {
 	pod, _, err := registry.findPod(podID)
 	return &pod, err
@@ -170,12 +87,12 @@ func makeContainerKey(machine string) string {
 }
 
 func (registry *EtcdRegistry) loadManifests(machine string) (manifests []api.ContainerManifest, err error) {
-	err = registry.extractObj(makeContainerKey(machine), &manifests, true)
+	err = registry.helper().ExtractObj(makeContainerKey(machine), &manifests, true)
 	return
 }
 
 func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest) error {
-	return registry.setObj(makeContainerKey(machine), manifests)
+	return registry.helper().SetObj(makeContainerKey(machine), manifests)
 }
 
 func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
@@ -249,7 +166,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 
 func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (pod api.Pod, err error) {
 	key := makePodKey(machine, podID)
-	err = registry.extractObj(key, &pod, false)
+	err = registry.helper().ExtractObj(key, &pod, false)
 	if err != nil {
 		return
 	}
@@ -267,26 +184,9 @@ func (registry *EtcdRegistry) findPod(podID string) (api.Pod, string, error) {
 	return api.Pod{}, "", fmt.Errorf("pod not found %s", podID)
 }
 
-func isEtcdNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	switch err.(type) {
-	case *etcd.EtcdError:
-		etcdError := err.(*etcd.EtcdError)
-		if etcdError == nil {
-			return false
-		}
-		if etcdError.ErrorCode == 100 {
-			return true
-		}
-	}
-	return false
-}
-
 func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, error) {
 	var controllers []api.ReplicationController
-	err := registry.extractList("/registry/controllers", &controllers)
+	err := registry.helper().ExtractList("/registry/controllers", &controllers)
 	return controllers, err
 }
 
@@ -297,7 +197,7 @@ func makeControllerKey(id string) string {
 func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
-	err := registry.extractObj(key, &controller, false)
+	err := registry.helper().ExtractObj(key, &controller, false)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +210,7 @@ func (registry *EtcdRegistry) CreateController(controller api.ReplicationControl
 }
 
 func (registry *EtcdRegistry) UpdateController(controller api.ReplicationController) error {
-	return registry.setObj(makeControllerKey(controller.ID), controller)
+	return registry.helper().SetObj(makeControllerKey(controller.ID), controller)
 }
 
 func (registry *EtcdRegistry) DeleteController(controllerID string) error {
@@ -325,18 +225,18 @@ func makeServiceKey(name string) string {
 
 func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
 	var list api.ServiceList
-	err := registry.extractList("/registry/services/specs", &list.Items)
+	err := registry.helper().ExtractList("/registry/services/specs", &list.Items)
 	return list, err
 }
 
 func (registry *EtcdRegistry) CreateService(svc api.Service) error {
-	return registry.setObj(makeServiceKey(svc.ID), svc)
+	return registry.helper().SetObj(makeServiceKey(svc.ID), svc)
 }
 
 func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
-	err := registry.extractObj(key, &svc, false)
+	err := registry.helper().ExtractObj(key, &svc, false)
 	if err != nil {
 		return nil, err
 	}
@@ -359,5 +259,5 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 }
 
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
-	return registry.setObj("/registry/services/endpoints/"+e.Name, e)
+	return registry.helper().SetObj("/registry/services/endpoints/"+e.Name, e)
 }
