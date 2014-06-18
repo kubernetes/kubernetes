@@ -1,7 +1,9 @@
 # Kubernetes Design Overview
 
 - [Overview](#overview)
-- [Key Concept: Container Pod](#key-concept-container-pod)
+- [Key Concepts](#key-concepts)
+  - [Pods](#pods)
+  - [Labels](#labels)
 - [The Kubernetes Node](#the-kubernetes-node)
   - [Kubelet](#kubelet)
   - [Kubernetes Proxy](#kubernetes-proxy)
@@ -9,7 +11,6 @@
   - [etcd](#etcd)
   - [Kubernetes API Server](#kubernetes-api-server)
   - [Kubernetes Controller Manager Server](#kubernetes-controller-manager-server)
-  - [Key Concept: Labels](#key-concept-labels)
 - [Network Model](#network-model)
 - [Release Process](#release-process)
 - [GCE Cluster Configuration](#gce-cluster-configuration)
@@ -17,17 +18,50 @@
 
 ## Overview
 
-Kubernetes builds on top of [Docker](http://www.docker.io) to construct a clustered container scheduling service.  The goals of the project are to enable users to ask a Kubernetes cluster to run a set of containers.  The system will automatically pick a worker node to run those containers on.
+Kubernetes builds on top of [Docker](http://www.docker.io) to construct a clustered container scheduling service.  Kubernetes enables users to ask a cluster to run a set of containers.  The system will automatically pick worker nodes to run those containers on, which we think of more as "scheduling" than "orchestration". Kubernetes also provides ways for containers to find and communicate with each other and ways to manage both tightly coupled and loosely coupled sets of cooperating containers.
 
-As container based applications and systems get larger, some tools are provided to facilitate sanity. This includes ways for containers to find and communicate with each other and ways to work with and manage sets of containers that do similar work.
+## Key Concepts
 
-When looking at the architecture of the system, we'll break it down to services that run on the worker node and services that play a "master" role.
+While Docker itself works with individual containers, Kubernetes provides higher-level organizational constructs in support of common cluster-level usage patterns, currently focused on service applications.
 
-## Key Concept: Container Pod
+### Pods
 
-While Docker itself works with individual containers, Kubernetes works with a `pod`.  A `pod` is a group of containers that are scheduled onto the same physical node.  In addition to defining the containers that run in the pod, the containers in the pod all use the same network namespace/IP and define a set of storage volumes.  Ports are also mapped on a per-pod basis.
+A `pod` (as in a pod of whales or pea pod) is a relatively tightly coupled group of containers that are scheduled onto the same physical node.  In addition to defining the containers that run in the pod, the containers in the pod all use the same network namespace/IP (and port space), and define a set of shared storage volumes. Pods facilitate data sharing and IPC among their constituents, serve as units of scheduling, deployment, and horizontal scaling/replication, and share fate. In the future, they may share resources ([LPC2013](http://www.linuxplumbersconf.org/2013/ocw//system/presentations/1239/original/lmctfy%20(1).pdf)).
+
+While pods can be used for vertical integration of application stacks, their primary motivation is to support co-located, co-managed helper programs, such as:
+- content management systems, file and data loaders, local cache managers, etc.
+- log and checkpoint backup, compression, rotation, snapshotting, etc.
+- data change watchers, log tailers, logging and monitoring adapters, event publishers, etc.
+- proxies, bridges, and adapters
+- controllers, managers, configurators, and updaters
+
+### Labels
+
+Loosely coupled cooperating pods are organized using key/value labels.
+
+Each pod can have a set of key/value labels set on it, with at most one label with a particular key. 
+
+Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `environment` (e.g., with values `dev`, `qa`, or `production`), `service`, `tier` (e.g., with values `frontend` or `backend`), `partition`, and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
+
+Via a "label selector" the user can identify a set of `pods`.  
+
+This simple mechanism is a key part of how Kubernetes's mechanisms supporting horizontal scaling, `services` and `replicationControllers`, keep track of their members.  The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. Sets supported by future versions of Kubernetes, such as worker pools, will use the same mechanism.
+
+Pods may be removed from these sets by changing their labels. This flexibility may be used to remove pods from service for debugging, data recovery, etc.
+
+For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
+
+Sets identified by labels and label selectors could be overlapping (think Venn diagrams). For instance, a service might point to all pods with `tier in (frontend), environment in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `tier=frontend, environment=prod, track=stable` and another `replicationController` (with `replicas` set to 1) for the canary with labels `tier=frontend, environment=prod, track=canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc. 
+
+Note that the superset described in the previous example is also heterogeneous. In long-lived, highly available, horizontally scaled, distributed, continuously evolving service applications, heterogeneity is inevitable, due to canaries, incremental rollouts, live reconfiguration, simultaneous updates and auto-scaling, hardware upgrades, and so on.
+
+Pods may belong to multiple sets simultaneously, which enables representation of service substructure and/or superstructure. In particular, labels are intended to facilitate the creation of non-hierarchical, multi-dimensional deployment structures. They are useful for a variety of management purposes (e.g., configuration, deployment) and for application introspection and analysis (e.g., logging, monitoring, alerting, analytics). Without the ability to form sets by intersecting labels, many implicitly related, overlapping flat sets would need to be created, for each subset and/or superset desired, which would lose semantic information and be difficult to keep consistent. Purely hierarchically nested sets wouldn't readily support slicing sets across different dimensions.
+
+Since labels can be set at pod creation time, no separate set add/remove operations are necessary, which makes them easier to use than manual set management. Additionally, since labels are directly attached to pods and label selectors are fairly simple, it's easy for users and for clients and tools to determine what sets they belong to. OTOH, with sets formed by just explicitly enumerating members, one would (conceptually) need to search all sets to determine which ones a pod belonged to.
 
 ## The Kubernetes Node
+
+When looking at the architecture of the system, we'll break it down to services that run on the worker node and services that play a "master" role.
 
 The Kubernetes node has the services necessary to run Docker containers and be managed from the master systems.
 
@@ -77,16 +111,6 @@ Beyond just servicing REST operations, validating them and storing them in `etcd
 ### Kubernetes Controller Manager Server
 
 The `replicationController` type described above isn't strictly necessary for Kubernetes to be useful.  It is really a service that is layered on top of the simple `pod` API.  To enforce this layering, the logic for the replicationController is actually broken out into another server.  This server watches `etcd` for changes to `replicationController` objects and then uses the public Kubernetes API to implement the replication algorithm.
-
-### Key Concept: Labels
-
-Pods are organized using labels.  Each pod can have a set of key/value labels set on it.
-
-Via a "label query" the user can identify a set of `pods`.  This simple mechanism is a key part of how both `services` and `replicationControllers` work.  The set of pods that a `service` points at is defined with a label query.  Similarly the population of pods that a `replicationController` is monitoring is also defined with a label query.
-
-Label queries would typically be used to identify and group pods into, say, a tier in an application.  You could also idenitfy the stack such as `dev`, `staging` or `production`.
-
-These sets could be overlapping.  For instance, a service might point to all pods with `tier in (frontend), stack in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `tier=frontend,stack=prod,canary=no` and another `replicationController` (with `replicas` set to 1) for the canary with labels `tier=frontend, stack=prod, canary=yes`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc.
 
 ## Network Model
 
