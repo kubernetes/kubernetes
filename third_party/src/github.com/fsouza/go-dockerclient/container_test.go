@@ -678,6 +678,7 @@ func TestAttachToContainerLogs(t *testing.T) {
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
 	var buf bytes.Buffer
 	opts := AttachToContainerOptions{
 		Container:    "a123456",
@@ -722,6 +723,7 @@ func TestAttachToContainer(t *testing.T) {
 	}))
 	defer server.Close()
 	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
 	var stdout, stderr bytes.Buffer
 	opts := AttachToContainerOptions{
 		Container:    "a123456",
@@ -732,6 +734,7 @@ func TestAttachToContainer(t *testing.T) {
 		Stdout:       true,
 		Stderr:       true,
 		Stream:       true,
+		RawTerminal:  true,
 	}
 	var err = client.AttachToContainer(opts)
 	if err != nil {
@@ -749,9 +752,137 @@ func TestAttachToContainer(t *testing.T) {
 	}
 }
 
+func TestAttachToContainerSentinel(t *testing.T) {
+	var reader = strings.NewReader("send value")
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
+		w.Write([]byte("hello"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var stdout, stderr bytes.Buffer
+	success := make(chan struct{})
+	opts := AttachToContainerOptions{
+		Container:    "a123456",
+		OutputStream: &stdout,
+		ErrorStream:  &stderr,
+		InputStream:  reader,
+		Stdin:        true,
+		Stdout:       true,
+		Stderr:       true,
+		Stream:       true,
+		RawTerminal:  true,
+		Success:      success,
+	}
+	go client.AttachToContainer(opts)
+	success <- <-success
+}
+
+func TestAttachToContainerRawTerminalFalse(t *testing.T) {
+	input := strings.NewReader("send value")
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := []byte{1, 0, 0, 0, 0, 0, 0, 5}
+		w.Write(prefix)
+		w.Write([]byte("hello"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var stdout, stderr bytes.Buffer
+	opts := AttachToContainerOptions{
+		Container:    "a123456",
+		OutputStream: &stdout,
+		ErrorStream:  &stderr,
+		InputStream:  input,
+		Stdin:        true,
+		Stdout:       true,
+		Stderr:       true,
+		Stream:       true,
+		RawTerminal:  false,
+	}
+	err := client.AttachToContainer(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := map[string][]string{
+		"stdin":  {"1"},
+		"stdout": {"1"},
+		"stderr": {"1"},
+		"stream": {"1"},
+	}
+	got := map[string][]string(req.URL.Query())
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf("AttachToContainer: wrong query string. Want %#v. Got %#v.", expected, got)
+	}
+	t.Log(stderr.String())
+	t.Log(stdout.String())
+	if stdout.String() != "hello" {
+		t.Errorf("AttachToContainer: wrong content written to stdout. Want %q. Got %q.", "hello", stderr.String())
+	}
+}
+
 func TestAttachToContainerWithoutContainer(t *testing.T) {
 	var client Client
 	err := client.AttachToContainer(AttachToContainerOptions{})
+	expected := &NoSuchContainer{ID: ""}
+	if !reflect.DeepEqual(err, expected) {
+		t.Errorf("AttachToContainer: wrong error. Want %#v. Got %#v.", expected, err)
+	}
+}
+
+func TestLogs(t *testing.T) {
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("something happened!"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var buf bytes.Buffer
+	opts := LogsOptions{
+		Container:    "a123456",
+		OutputStream: &buf,
+		Follow:       true,
+		Stdout:       true,
+		Stderr:       true,
+		Timestamps:   true,
+	}
+	err := client.Logs(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "something happened!"
+	if buf.String() != expected {
+		t.Errorf("Logs: wrong output. Want %q. Got %q.", expected, buf.String())
+	}
+	if req.Method != "GET" {
+		t.Errorf("Logs: wrong HTTP method. Want GET. Got %s.", req.Method)
+	}
+	u, _ := url.Parse(client.getURL("/containers/a123456/logs"))
+	if req.URL.Path != u.Path {
+		t.Errorf("AttachToContainer for logs: wrong HTTP path. Want %q. Got %q.", u.Path, req.URL.Path)
+	}
+	expectedQs := map[string][]string{
+		"follow":     {"1"},
+		"stdout":     {"1"},
+		"stderr":     {"1"},
+		"timestamps": {"1"},
+	}
+	got := map[string][]string(req.URL.Query())
+	if !reflect.DeepEqual(got, expectedQs) {
+		t.Errorf("Logs: wrong query string. Want %#v. Got %#v.", expectedQs, got)
+	}
+}
+
+func TestLogsNoContainer(t *testing.T) {
+	var client Client
+	err := client.Logs(LogsOptions{})
 	expected := &NoSuchContainer{ID: ""}
 	if !reflect.DeepEqual(err, expected) {
 		t.Errorf("AttachToContainer: wrong error. Want %#v. Got %#v.", expected, err)
@@ -792,9 +923,10 @@ func TestExportContainerViaUnixSocket(t *testing.T) {
 	endpoint := "unix://" + tempSocket
 	u, _ := parseEndpoint(endpoint)
 	client := Client{
-		endpoint:    endpoint,
-		endpointURL: u,
-		client:      http.DefaultClient,
+		endpoint:               endpoint,
+		endpointURL:            u,
+		client:                 http.DefaultClient,
+		SkipServerVersionCheck: true,
 	}
 	listening := make(chan string)
 	done := make(chan int)

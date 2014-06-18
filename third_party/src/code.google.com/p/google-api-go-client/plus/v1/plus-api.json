@@ -1,0 +1,1945 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/NWyyDxpG_jUB4-BRItKBh_G9Iew\"",
+ "discoveryVersion": "v1",
+ "id": "plus:v1",
+ "name": "plus",
+ "version": "v1",
+ "title": "Google+ API",
+ "description": "The Google+ API enables developers to build on top of the Google+ platform.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/gplus-16.png",
+  "x32": "http://www.google.com/images/icons/product/gplus-32.png"
+ },
+ "documentationLink": "https://developers.google.com/+/api/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/plus/v1/",
+ "basePath": "/plus/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "plus/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/plus.login": {
+     "description": "Know your basic profile info and list of people in your circles."
+    },
+    "https://www.googleapis.com/auth/plus.me": {
+     "description": "Know who you are on Google"
+    },
+    "https://www.googleapis.com/auth/userinfo.email": {
+     "description": "View your email address"
+    },
+    "https://www.googleapis.com/auth/userinfo.profile": {
+     "description": "View basic information about your account"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Acl": {
+   "id": "Acl",
+   "type": "object",
+   "properties": {
+    "description": {
+     "type": "string",
+     "description": "Description of the access granted, suitable for display."
+    },
+    "items": {
+     "type": "array",
+     "description": "The list of access entries.",
+     "items": {
+      "$ref": "PlusAclentryResource"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a collection of access controls. Value: \"plus#acl\".",
+     "default": "plus#acl"
+    }
+   }
+  },
+  "Activity": {
+   "id": "Activity",
+   "type": "object",
+   "properties": {
+    "access": {
+     "$ref": "Acl",
+     "description": "Identifies who has access to see this activity."
+    },
+    "actor": {
+     "type": "object",
+     "description": "The person who performed this activity.",
+     "properties": {
+      "displayName": {
+       "type": "string",
+       "description": "The name of the actor, suitable for display."
+      },
+      "id": {
+       "type": "string",
+       "description": "The ID of the actor's Person resource."
+      },
+      "image": {
+       "type": "object",
+       "description": "The image representation of the actor.",
+       "properties": {
+        "url": {
+         "type": "string",
+         "description": "The URL of the actor's profile photo. To resize the image and crop it to a square, append the query string ?sz=x, where x is the dimension in pixels of each side."
+        }
+       }
+      },
+      "name": {
+       "type": "object",
+       "description": "An object representation of the individual components of name.",
+       "properties": {
+        "familyName": {
+         "type": "string",
+         "description": "The family name (\"last name\") of the actor."
+        },
+        "givenName": {
+         "type": "string",
+         "description": "The given name (\"first name\") of the actor."
+        }
+       }
+      },
+      "url": {
+       "type": "string",
+       "description": "The link to the actor's Google profile."
+      }
+     }
+    },
+    "address": {
+     "type": "string",
+     "description": "Street address where this activity occurred."
+    },
+    "annotation": {
+     "type": "string",
+     "description": "Additional content added by the person who shared this activity, applicable only when resharing an activity."
+    },
+    "crosspostSource": {
+     "type": "string",
+     "description": "If this activity is a crosspost from another system, this property specifies the ID of the original activity."
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "geocode": {
+     "type": "string",
+     "description": "Latitude and longitude where this activity occurred. Format is latitude followed by longitude, space separated."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this activity."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as an activity. Value: \"plus#activity\".",
+     "default": "plus#activity"
+    },
+    "location": {
+     "$ref": "Place",
+     "description": "The location where this activity occurred."
+    },
+    "object": {
+     "type": "object",
+     "description": "The object of this activity.",
+     "properties": {
+      "actor": {
+       "type": "object",
+       "description": "If this activity's object is itself another activity, such as when a person reshares an activity, this property specifies the original activity's actor.",
+       "properties": {
+        "displayName": {
+         "type": "string",
+         "description": "The original actor's name, which is suitable for display."
+        },
+        "id": {
+         "type": "string",
+         "description": "ID of the original actor."
+        },
+        "image": {
+         "type": "object",
+         "description": "The image representation of the original actor.",
+         "properties": {
+          "url": {
+           "type": "string",
+           "description": "A URL that points to a thumbnail photo of the original actor."
+          }
+         }
+        },
+        "url": {
+         "type": "string",
+         "description": "A link to the original actor's Google profile."
+        }
+       }
+      },
+      "attachments": {
+       "type": "array",
+       "description": "The media objects attached to this activity.",
+       "items": {
+        "type": "object",
+        "properties": {
+         "content": {
+          "type": "string",
+          "description": "If the attachment is an article, this property contains a snippet of text from the article. It can also include descriptions for other types."
+         },
+         "displayName": {
+          "type": "string",
+          "description": "The title of the attachment, such as a photo caption or an article title."
+         },
+         "embed": {
+          "type": "object",
+          "description": "If the attachment is a video, the embeddable link.",
+          "properties": {
+           "type": {
+            "type": "string",
+            "description": "Media type of the link."
+           },
+           "url": {
+            "type": "string",
+            "description": "URL of the link."
+           }
+          }
+         },
+         "fullImage": {
+          "type": "object",
+          "description": "The full image URL for photo attachments.",
+          "properties": {
+           "height": {
+            "type": "integer",
+            "description": "The height, in pixels, of the linked resource.",
+            "format": "uint32"
+           },
+           "type": {
+            "type": "string",
+            "description": "Media type of the link."
+           },
+           "url": {
+            "type": "string",
+            "description": "URL of the image."
+           },
+           "width": {
+            "type": "integer",
+            "description": "The width, in pixels, of the linked resource.",
+            "format": "uint32"
+           }
+          }
+         },
+         "id": {
+          "type": "string",
+          "description": "The ID of the attachment."
+         },
+         "image": {
+          "type": "object",
+          "description": "The preview image for photos or videos.",
+          "properties": {
+           "height": {
+            "type": "integer",
+            "description": "The height, in pixels, of the linked resource.",
+            "format": "uint32"
+           },
+           "type": {
+            "type": "string",
+            "description": "Media type of the link."
+           },
+           "url": {
+            "type": "string",
+            "description": "Image URL."
+           },
+           "width": {
+            "type": "integer",
+            "description": "The width, in pixels, of the linked resource.",
+            "format": "uint32"
+           }
+          }
+         },
+         "objectType": {
+          "type": "string",
+          "description": "The type of media object. Possible values include, but are not limited to, the following values:  \n- \"photo\" - A photo. \n- \"album\" - A photo album. \n- \"video\" - A video. \n- \"article\" - An article, specified by a link."
+         },
+         "thumbnails": {
+          "type": "array",
+          "description": "If the attachment is an album, this property is a list of potential additional thumbnails from the album.",
+          "items": {
+           "type": "object",
+           "properties": {
+            "description": {
+             "type": "string",
+             "description": "Potential name of the thumbnail."
+            },
+            "image": {
+             "type": "object",
+             "description": "Image resource.",
+             "properties": {
+              "height": {
+               "type": "integer",
+               "description": "The height, in pixels, of the linked resource.",
+               "format": "uint32"
+              },
+              "type": {
+               "type": "string",
+               "description": "Media type of the link."
+              },
+              "url": {
+               "type": "string",
+               "description": "Image url."
+              },
+              "width": {
+               "type": "integer",
+               "description": "The width, in pixels, of the linked resource.",
+               "format": "uint32"
+              }
+             }
+            },
+            "url": {
+             "type": "string",
+             "description": "URL of the webpage containing the image."
+            }
+           }
+          }
+         },
+         "url": {
+          "type": "string",
+          "description": "The link to the attachment, which should be of type text/html."
+         }
+        }
+       }
+      },
+      "content": {
+       "type": "string",
+       "description": "The HTML-formatted content, which is suitable for display."
+      },
+      "id": {
+       "type": "string",
+       "description": "The ID of the object. When resharing an activity, this is the ID of the activity that is being reshared."
+      },
+      "objectType": {
+       "type": "string",
+       "description": "The type of the object. Possible values include, but are not limited to, the following values:  \n- \"note\" - Textual content. \n- \"activity\" - A Google+ activity."
+      },
+      "originalContent": {
+       "type": "string",
+       "description": "The content (text) as provided by the author, which is stored without any HTML formatting. When creating or updating an activity, this value must be supplied as plain text in the request."
+      },
+      "plusoners": {
+       "type": "object",
+       "description": "People who +1'd this activity.",
+       "properties": {
+        "selfLink": {
+         "type": "string",
+         "description": "The URL for the collection of people who +1'd this activity."
+        },
+        "totalItems": {
+         "type": "integer",
+         "description": "Total number of people who +1'd this activity.",
+         "format": "uint32"
+        }
+       }
+      },
+      "replies": {
+       "type": "object",
+       "description": "Comments in reply to this activity.",
+       "properties": {
+        "selfLink": {
+         "type": "string",
+         "description": "The URL for the collection of comments in reply to this activity."
+        },
+        "totalItems": {
+         "type": "integer",
+         "description": "Total number of comments on this activity.",
+         "format": "uint32"
+        }
+       }
+      },
+      "resharers": {
+       "type": "object",
+       "description": "People who reshared this activity.",
+       "properties": {
+        "selfLink": {
+         "type": "string",
+         "description": "The URL for the collection of resharers."
+        },
+        "totalItems": {
+         "type": "integer",
+         "description": "Total number of people who reshared this activity.",
+         "format": "uint32"
+        }
+       }
+      },
+      "url": {
+       "type": "string",
+       "description": "The URL that points to the linked resource."
+      }
+     }
+    },
+    "placeId": {
+     "type": "string",
+     "description": "ID of the place where this activity occurred."
+    },
+    "placeName": {
+     "type": "string",
+     "description": "Name of the place where this activity occurred."
+    },
+    "provider": {
+     "type": "object",
+     "description": "The service provider that initially published this activity.",
+     "properties": {
+      "title": {
+       "type": "string",
+       "description": "Name of the service provider."
+      }
+     }
+    },
+    "published": {
+     "type": "string",
+     "description": "The time at which this activity was initially published. Formatted as an RFC 3339 timestamp.",
+     "format": "date-time"
+    },
+    "radius": {
+     "type": "string",
+     "description": "Radius, in meters, of the region where this activity occurred, centered at the latitude and longitude identified in geocode."
+    },
+    "title": {
+     "type": "string",
+     "description": "Title of this activity."
+    },
+    "updated": {
+     "type": "string",
+     "description": "The time at which this activity was last updated. Formatted as an RFC 3339 timestamp.",
+     "format": "date-time"
+    },
+    "url": {
+     "type": "string",
+     "description": "The link to this activity."
+    },
+    "verb": {
+     "type": "string",
+     "description": "This activity's verb, which indicates the action that was performed. Possible values include, but are not limited to, the following values:  \n- \"post\" - Publish content to the stream. \n- \"share\" - Reshare an activity."
+    }
+   }
+  },
+  "ActivityFeed": {
+   "id": "ActivityFeed",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this collection of activities. Deprecated."
+    },
+    "items": {
+     "type": "array",
+     "description": "The activities in this page of results.",
+     "items": {
+      "$ref": "Activity"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a collection of activities. Value: \"plus#activityFeed\".",
+     "default": "plus#activityFeed"
+    },
+    "nextLink": {
+     "type": "string",
+     "description": "Link to the next page of activities."
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The continuation token, which is used to page through large result sets. Provide this value in a subsequent request to return the next page of results."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Link to this activity resource."
+    },
+    "title": {
+     "type": "string",
+     "description": "The title of this collection of activities, which is a truncated portion of the content."
+    },
+    "updated": {
+     "type": "string",
+     "description": "The time at which this collection of activities was last updated. Formatted as an RFC 3339 timestamp.",
+     "format": "date-time"
+    }
+   }
+  },
+  "Comment": {
+   "id": "Comment",
+   "type": "object",
+   "properties": {
+    "actor": {
+     "type": "object",
+     "description": "The person who posted this comment.",
+     "properties": {
+      "displayName": {
+       "type": "string",
+       "description": "The name of this actor, suitable for display."
+      },
+      "id": {
+       "type": "string",
+       "description": "The ID of the actor."
+      },
+      "image": {
+       "type": "object",
+       "description": "The image representation of this actor.",
+       "properties": {
+        "url": {
+         "type": "string",
+         "description": "The URL of the actor's profile photo. To resize the image and crop it to a square, append the query string ?sz=x, where x is the dimension in pixels of each side."
+        }
+       }
+      },
+      "url": {
+       "type": "string",
+       "description": "A link to the Person resource for this actor."
+      }
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this comment."
+    },
+    "inReplyTo": {
+     "type": "array",
+     "description": "The activity this comment replied to.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "id": {
+        "type": "string",
+        "description": "The ID of the activity."
+       },
+       "url": {
+        "type": "string",
+        "description": "The URL of the activity."
+       }
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a comment. Value: \"plus#comment\".",
+     "default": "plus#comment"
+    },
+    "object": {
+     "type": "object",
+     "description": "The object of this comment.",
+     "properties": {
+      "content": {
+       "type": "string",
+       "description": "The HTML-formatted content, suitable for display."
+      },
+      "objectType": {
+       "type": "string",
+       "description": "The object type of this comment. Possible values are:  \n- \"comment\" - A comment in reply to an activity.",
+       "default": "comment"
+      },
+      "originalContent": {
+       "type": "string",
+       "description": "The content (text) as provided by the author, stored without any HTML formatting. When creating or updating a comment, this value must be supplied as plain text in the request."
+      }
+     }
+    },
+    "plusoners": {
+     "type": "object",
+     "description": "People who +1'd this comment.",
+     "properties": {
+      "totalItems": {
+       "type": "integer",
+       "description": "Total number of people who +1'd this comment.",
+       "format": "uint32"
+      }
+     }
+    },
+    "published": {
+     "type": "string",
+     "description": "The time at which this comment was initially published. Formatted as an RFC 3339 timestamp.",
+     "format": "date-time"
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Link to this comment resource."
+    },
+    "updated": {
+     "type": "string",
+     "description": "The time at which this comment was last updated. Formatted as an RFC 3339 timestamp.",
+     "format": "date-time"
+    },
+    "verb": {
+     "type": "string",
+     "description": "This comment's verb, indicating what action was performed. Possible values are:  \n- \"post\" - Publish content to the stream.",
+     "default": "post"
+    }
+   }
+  },
+  "CommentFeed": {
+   "id": "CommentFeed",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this collection of comments."
+    },
+    "items": {
+     "type": "array",
+     "description": "The comments in this page of results.",
+     "items": {
+      "$ref": "Comment"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a collection of comments. Value: \"plus#commentFeed\".",
+     "default": "plus#commentFeed"
+    },
+    "nextLink": {
+     "type": "string",
+     "description": "Link to the next page of activities."
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The continuation token, which is used to page through large result sets. Provide this value in a subsequent request to return the next page of results."
+    },
+    "title": {
+     "type": "string",
+     "description": "The title of this collection of comments."
+    },
+    "updated": {
+     "type": "string",
+     "description": "The time at which this collection of comments was last updated. Formatted as an RFC 3339 timestamp.",
+     "format": "date-time"
+    }
+   }
+  },
+  "ItemScope": {
+   "id": "ItemScope",
+   "type": "object",
+   "properties": {
+    "about": {
+     "$ref": "ItemScope",
+     "description": "The subject matter of the content."
+    },
+    "additionalName": {
+     "type": "array",
+     "description": "An additional name for a Person, can be used for a middle name.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "address": {
+     "$ref": "ItemScope",
+     "description": "Postal address."
+    },
+    "addressCountry": {
+     "type": "string",
+     "description": "Address country."
+    },
+    "addressLocality": {
+     "type": "string",
+     "description": "Address locality."
+    },
+    "addressRegion": {
+     "type": "string",
+     "description": "Address region."
+    },
+    "associated_media": {
+     "type": "array",
+     "description": "The encoding.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "attendeeCount": {
+     "type": "integer",
+     "description": "Number of attendees.",
+     "format": "int32"
+    },
+    "attendees": {
+     "type": "array",
+     "description": "A person attending the event.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "audio": {
+     "$ref": "ItemScope",
+     "description": "From http://schema.org/MusicRecording, the audio file."
+    },
+    "author": {
+     "type": "array",
+     "description": "The person or persons who created this result. In the example of restaurant reviews, this might be the reviewer's name.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "bestRating": {
+     "type": "string",
+     "description": "Best possible rating value that a result might obtain. This property defines the upper bound for the ratingValue. For example, you might have a 5 star rating scale, you would provide 5 as the value for this property."
+    },
+    "birthDate": {
+     "type": "string",
+     "description": "Date of birth."
+    },
+    "byArtist": {
+     "$ref": "ItemScope",
+     "description": "From http://schema.org/MusicRecording, the artist that performed this recording."
+    },
+    "caption": {
+     "type": "string",
+     "description": "The caption for this object."
+    },
+    "contentSize": {
+     "type": "string",
+     "description": "File size in (mega/kilo) bytes."
+    },
+    "contentUrl": {
+     "type": "string",
+     "description": "Actual bytes of the media object, for example the image file or video file."
+    },
+    "contributor": {
+     "type": "array",
+     "description": "A list of contributors to this result.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "dateCreated": {
+     "type": "string",
+     "description": "The date the result was created such as the date that a review was first created."
+    },
+    "dateModified": {
+     "type": "string",
+     "description": "The date the result was last modified such as the date that a review was last edited."
+    },
+    "datePublished": {
+     "type": "string",
+     "description": "The initial date that the result was published. For example, a user writes a comment on a blog, which has a result.dateCreated of when they submit it. If the blog users comment moderation, the result.datePublished value would match the date when the owner approved the message."
+    },
+    "description": {
+     "type": "string",
+     "description": "The string that describes the content of the result."
+    },
+    "duration": {
+     "type": "string",
+     "description": "The duration of the item (movie, audio recording, event, etc.) in ISO 8601 date format."
+    },
+    "embedUrl": {
+     "type": "string",
+     "description": "A URL pointing to a player for a specific video. In general, this is the information in the src element of an embed tag and should not be the same as the content of the loc tag."
+    },
+    "endDate": {
+     "type": "string",
+     "description": "The end date and time of the event (in ISO 8601 date format)."
+    },
+    "familyName": {
+     "type": "string",
+     "description": "Family name. This property can be used with givenName instead of the name property."
+    },
+    "gender": {
+     "type": "string",
+     "description": "Gender of the person."
+    },
+    "geo": {
+     "$ref": "ItemScope",
+     "description": "Geo coordinates."
+    },
+    "givenName": {
+     "type": "string",
+     "description": "Given name. This property can be used with familyName instead of the name property."
+    },
+    "height": {
+     "type": "string",
+     "description": "The height of the media object."
+    },
+    "id": {
+     "type": "string",
+     "description": "An identifier for the target. Your app can choose how to identify targets. The target.id is required if you are writing an activity that does not have a corresponding web page or target.url property."
+    },
+    "image": {
+     "type": "string",
+     "description": "A URL to the image that represents this result. For example, if a user writes a review of a restaurant and attaches a photo of their meal, you might use that photo as the result.image."
+    },
+    "inAlbum": {
+     "$ref": "ItemScope",
+     "description": "From http://schema.org/MusicRecording, which album a song is in."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as an itemScope.",
+     "default": "plus#itemScope"
+    },
+    "latitude": {
+     "type": "number",
+     "description": "Latitude.",
+     "format": "double"
+    },
+    "location": {
+     "$ref": "ItemScope",
+     "description": "The location of the event or organization."
+    },
+    "longitude": {
+     "type": "number",
+     "description": "Longitude.",
+     "format": "double"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the result. In the example of a restaurant review, this might be the summary the user gave their review such as \"Great ambiance, but overpriced.\""
+    },
+    "partOfTVSeries": {
+     "$ref": "ItemScope",
+     "description": "Property of http://schema.org/TVEpisode indicating which series the episode belongs to."
+    },
+    "performers": {
+     "type": "array",
+     "description": "The main performer or performers of the event-for example, a presenter, musician, or actor.",
+     "items": {
+      "$ref": "ItemScope"
+     }
+    },
+    "playerType": {
+     "type": "string",
+     "description": "Player type that is required. For example: Flash or Silverlight."
+    },
+    "postOfficeBoxNumber": {
+     "type": "string",
+     "description": "Post office box number."
+    },
+    "postalCode": {
+     "type": "string",
+     "description": "Postal code."
+    },
+    "ratingValue": {
+     "type": "string",
+     "description": "Rating value."
+    },
+    "reviewRating": {
+     "$ref": "ItemScope",
+     "description": "Review rating."
+    },
+    "startDate": {
+     "type": "string",
+     "description": "The start date and time of the event (in ISO 8601 date format)."
+    },
+    "streetAddress": {
+     "type": "string",
+     "description": "Street address."
+    },
+    "text": {
+     "type": "string",
+     "description": "The text that is the result of the app activity. For example, if a user leaves a review of a restaurant, this might be the text of the review."
+    },
+    "thumbnail": {
+     "$ref": "ItemScope",
+     "description": "Thumbnail image for an image or video."
+    },
+    "thumbnailUrl": {
+     "type": "string",
+     "description": "A URL to a thumbnail image that represents this result."
+    },
+    "tickerSymbol": {
+     "type": "string",
+     "description": "The exchange traded instrument associated with a Corporation object. The tickerSymbol is expressed as an exchange and an instrument name separated by a space character. For the exchange component of the tickerSymbol attribute, we recommend using the controlled vocabulary of Market Identifier Codes (MIC) specified in ISO15022."
+    },
+    "type": {
+     "type": "string",
+     "description": "The schema.org URL that best describes the referenced target and matches the type of moment."
+    },
+    "url": {
+     "type": "string",
+     "description": "The URL that points to the result object. For example, a permalink directly to a restaurant reviewer's comment."
+    },
+    "width": {
+     "type": "string",
+     "description": "The width of the media object."
+    },
+    "worstRating": {
+     "type": "string",
+     "description": "Worst possible rating value that a result might obtain. This property defines the lower bound for the ratingValue."
+    }
+   }
+  },
+  "Moment": {
+   "id": "Moment",
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The moment ID."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a moment.",
+     "default": "plus#moment"
+    },
+    "result": {
+     "$ref": "ItemScope",
+     "description": "The object generated by performing the action on the target. For example, a user writes a review of a restaurant, the target is the restaurant and the result is the review."
+    },
+    "startDate": {
+     "type": "string",
+     "description": "Time stamp of when the action occurred in RFC3339 format.",
+     "format": "date-time"
+    },
+    "target": {
+     "$ref": "ItemScope",
+     "description": "The object on which the action was performed.",
+     "annotations": {
+      "required": [
+       "plus.moments.insert"
+      ]
+     }
+    },
+    "type": {
+     "type": "string",
+     "description": "The Google schema for the type of moment to write. For example, http://schemas.google.com/AddActivity.",
+     "annotations": {
+      "required": [
+       "plus.moments.insert"
+      ]
+     }
+    }
+   }
+  },
+  "MomentsFeed": {
+   "id": "MomentsFeed",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "items": {
+     "type": "array",
+     "description": "The moments in this page of results.",
+     "items": {
+      "$ref": "Moment"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a collection of moments. Value: \"plus#momentsFeed\".",
+     "default": "plus#momentsFeed"
+    },
+    "nextLink": {
+     "type": "string",
+     "description": "Link to the next page of moments."
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The continuation token, which is used to page through large result sets. Provide this value in a subsequent request to return the next page of results."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Link to this page of moments."
+    },
+    "title": {
+     "type": "string",
+     "description": "The title of this collection of moments."
+    },
+    "updated": {
+     "type": "string",
+     "description": "The RFC 339 timestamp for when this collection of moments was last updated.",
+     "format": "date-time"
+    }
+   }
+  },
+  "PeopleFeed": {
+   "id": "PeopleFeed",
+   "type": "object",
+   "properties": {
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "items": {
+     "type": "array",
+     "description": "The people in this page of results. Each item includes the id, displayName, image, and url for the person. To retrieve additional profile data, see the people.get method.",
+     "items": {
+      "$ref": "Person"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a collection of people. Value: \"plus#peopleFeed\".",
+     "default": "plus#peopleFeed"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The continuation token, which is used to page through large result sets. Provide this value in a subsequent request to return the next page of results."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Link to this resource."
+    },
+    "title": {
+     "type": "string",
+     "description": "The title of this collection of people."
+    },
+    "totalItems": {
+     "type": "integer",
+     "description": "The total number of people available in this list. The number of people in a response might be smaller due to paging. This might not be set for all collections.",
+     "format": "int32"
+    }
+   }
+  },
+  "Person": {
+   "id": "Person",
+   "type": "object",
+   "properties": {
+    "aboutMe": {
+     "type": "string",
+     "description": "A short biography for this person."
+    },
+    "ageRange": {
+     "type": "object",
+     "description": "The age range of the person. Valid ranges are 17 or younger, 18 to 20, and 21 or older. Age is determined from the user's birthday using Western age reckoning.",
+     "properties": {
+      "max": {
+       "type": "integer",
+       "description": "The age range's upper bound, if any. Possible values include, but are not limited to, the following:  \n- \"17\" - for age 17 \n- \"20\" - for age 20",
+       "format": "int32"
+      },
+      "min": {
+       "type": "integer",
+       "description": "The age range's lower bound, if any. Possible values include, but are not limited to, the following:  \n- \"21\" - for age 21 \n- \"18\" - for age 18",
+       "format": "int32"
+      }
+     }
+    },
+    "birthday": {
+     "type": "string",
+     "description": "The person's date of birth, represented as YYYY-MM-DD."
+    },
+    "braggingRights": {
+     "type": "string",
+     "description": "The \"bragging rights\" line of this person."
+    },
+    "circledByCount": {
+     "type": "integer",
+     "description": "For followers who are visible, the number of people who have added this person or page to a circle.",
+     "format": "int32"
+    },
+    "cover": {
+     "type": "object",
+     "description": "The cover photo content.",
+     "properties": {
+      "coverInfo": {
+       "type": "object",
+       "description": "Extra information about the cover photo.",
+       "properties": {
+        "leftImageOffset": {
+         "type": "integer",
+         "description": "The difference between the left position of the cover image and the actual displayed cover image. Only valid for banner layout.",
+         "format": "int32"
+        },
+        "topImageOffset": {
+         "type": "integer",
+         "description": "The difference between the top position of the cover image and the actual displayed cover image. Only valid for banner layout.",
+         "format": "int32"
+        }
+       }
+      },
+      "coverPhoto": {
+       "type": "object",
+       "description": "The person's primary cover image.",
+       "properties": {
+        "height": {
+         "type": "integer",
+         "description": "The height of the image.",
+         "format": "int32"
+        },
+        "url": {
+         "type": "string",
+         "description": "The URL of the image."
+        },
+        "width": {
+         "type": "integer",
+         "description": "The width of the image.",
+         "format": "int32"
+        }
+       }
+      },
+      "layout": {
+       "type": "string",
+       "description": "The layout of the cover art. Possible values include, but are not limited to, the following values:  \n- \"banner\" - One large image banner."
+      }
+     }
+    },
+    "currentLocation": {
+     "type": "string",
+     "description": "The current location for this person."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The name of this person, which is suitable for display."
+    },
+    "domain": {
+     "type": "string",
+     "description": "The hosted domain name for the user's Google Apps account. For instance, example.com. The plus.profile.emails.read or email scope is needed to get this domain name."
+    },
+    "emails": {
+     "type": "array",
+     "description": "A list of email addresses that this person has, including their Google account email address, and the public verified email addresses on their Google+ profile. The plus.profile.emails.read scope is needed to retrieve these email addresses, or the email scope can be used to retrieve just the Google account email address.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "The type of address. Possible values include, but are not limited to, the following values:  \n- \"account\" - Google account email address. \n- \"home\" - Home email address. \n- \"work\" - Work email address. \n- \"other\" - Other."
+       },
+       "value": {
+        "type": "string",
+        "description": "The email address."
+       }
+      }
+     }
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag of this response for caching purposes."
+    },
+    "gender": {
+     "type": "string",
+     "description": "The person's gender. Possible values include, but are not limited to, the following values:  \n- \"male\" - Male gender. \n- \"female\" - Female gender. \n- \"other\" - Other."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of this person."
+    },
+    "image": {
+     "type": "object",
+     "description": "The representation of the person's profile photo.",
+     "properties": {
+      "url": {
+       "type": "string",
+       "description": "The URL of the person's profile photo. To resize the image and crop it to a square, append the query string ?sz=x, where x is the dimension in pixels of each side."
+      }
+     }
+    },
+    "isPlusUser": {
+     "type": "boolean",
+     "description": "Whether this user has signed up for Google+."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a person. Value: \"plus#person\".",
+     "default": "plus#person"
+    },
+    "language": {
+     "type": "string",
+     "description": "The user's preferred language for rendering."
+    },
+    "name": {
+     "type": "object",
+     "description": "An object representation of the individual components of a person's name.",
+     "properties": {
+      "familyName": {
+       "type": "string",
+       "description": "The family name (last name) of this person."
+      },
+      "formatted": {
+       "type": "string",
+       "description": "The full name of this person, including middle names, suffixes, etc."
+      },
+      "givenName": {
+       "type": "string",
+       "description": "The given name (first name) of this person."
+      },
+      "honorificPrefix": {
+       "type": "string",
+       "description": "The honorific prefixes (such as \"Dr.\" or \"Mrs.\") for this person."
+      },
+      "honorificSuffix": {
+       "type": "string",
+       "description": "The honorific suffixes (such as \"Jr.\") for this person."
+      },
+      "middleName": {
+       "type": "string",
+       "description": "The middle name of this person."
+      }
+     }
+    },
+    "nickname": {
+     "type": "string",
+     "description": "The nickname of this person."
+    },
+    "objectType": {
+     "type": "string",
+     "description": "Type of person within Google+. Possible values include, but are not limited to, the following values:  \n- \"person\" - represents an actual person. \n- \"page\" - represents a page."
+    },
+    "occupation": {
+     "type": "string",
+     "description": "The occupation of this person."
+    },
+    "organizations": {
+     "type": "array",
+     "description": "A list of current or past organizations with which this person is associated.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "department": {
+        "type": "string",
+        "description": "The department within the organization. Deprecated."
+       },
+       "description": {
+        "type": "string",
+        "description": "A short description of the person's role in this organization. Deprecated."
+       },
+       "endDate": {
+        "type": "string",
+        "description": "The date that the person left this organization."
+       },
+       "location": {
+        "type": "string",
+        "description": "The location of this organization. Deprecated."
+       },
+       "name": {
+        "type": "string",
+        "description": "The name of the organization."
+       },
+       "primary": {
+        "type": "boolean",
+        "description": "If \"true\", indicates this organization is the person's primary one, which is typically interpreted as the current one."
+       },
+       "startDate": {
+        "type": "string",
+        "description": "The date that the person joined this organization."
+       },
+       "title": {
+        "type": "string",
+        "description": "The person's job title or role within the organization."
+       },
+       "type": {
+        "type": "string",
+        "description": "The type of organization. Possible values include, but are not limited to, the following values:  \n- \"work\" - Work. \n- \"school\" - School."
+       }
+      }
+     }
+    },
+    "placesLived": {
+     "type": "array",
+     "description": "A list of places where this person has lived.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "primary": {
+        "type": "boolean",
+        "description": "If \"true\", this place of residence is this person's primary residence."
+       },
+       "value": {
+        "type": "string",
+        "description": "A place where this person has lived. For example: \"Seattle, WA\", \"Near Toronto\"."
+       }
+      }
+     }
+    },
+    "plusOneCount": {
+     "type": "integer",
+     "description": "If a Google+ Page, the number of people who have +1'd this page.",
+     "format": "int32"
+    },
+    "relationshipStatus": {
+     "type": "string",
+     "description": "The person's relationship status. Possible values include, but are not limited to, the following values:  \n- \"single\" - Person is single. \n- \"in_a_relationship\" - Person is in a relationship. \n- \"engaged\" - Person is engaged. \n- \"married\" - Person is married. \n- \"its_complicated\" - The relationship is complicated. \n- \"open_relationship\" - Person is in an open relationship. \n- \"widowed\" - Person is widowed. \n- \"in_domestic_partnership\" - Person is in a domestic partnership. \n- \"in_civil_union\" - Person is in a civil union."
+    },
+    "skills": {
+     "type": "string",
+     "description": "The person's skills."
+    },
+    "tagline": {
+     "type": "string",
+     "description": "The brief description (tagline) of this person."
+    },
+    "url": {
+     "type": "string",
+     "description": "The URL of this person's profile."
+    },
+    "urls": {
+     "type": "array",
+     "description": "A list of URLs for this person.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "label": {
+        "type": "string",
+        "description": "The label of the URL."
+       },
+       "type": {
+        "type": "string",
+        "description": "The type of URL. Possible values include, but are not limited to, the following values:  \n- \"otherProfile\" - URL for another profile. \n- \"contributor\" - URL to a site for which this person is a contributor. \n- \"website\" - URL for this Google+ Page's primary website. \n- \"other\" - Other URL."
+       },
+       "value": {
+        "type": "string",
+        "description": "The URL value."
+       }
+      }
+     }
+    },
+    "verified": {
+     "type": "boolean",
+     "description": "Whether the person or Google+ Page has been verified."
+    }
+   }
+  },
+  "Place": {
+   "id": "Place",
+   "type": "object",
+   "properties": {
+    "address": {
+     "type": "object",
+     "description": "The physical address of the place.",
+     "properties": {
+      "formatted": {
+       "type": "string",
+       "description": "The formatted address for display."
+      }
+     }
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The display name of the place."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Identifies this resource as a place. Value: \"plus#place\".",
+     "default": "plus#place"
+    },
+    "position": {
+     "type": "object",
+     "description": "The position of the place.",
+     "properties": {
+      "latitude": {
+       "type": "number",
+       "description": "The latitude of this position.",
+       "format": "double"
+      },
+      "longitude": {
+       "type": "number",
+       "description": "The longitude of this position.",
+       "format": "double"
+      }
+     }
+    }
+   }
+  },
+  "PlusAclentryResource": {
+   "id": "PlusAclentryResource",
+   "type": "object",
+   "properties": {
+    "displayName": {
+     "type": "string",
+     "description": "A descriptive name for this entry. Suitable for display."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the entry. For entries of type \"person\" or \"circle\", this is the ID of the resource. For other types, this property is not set."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of entry describing to whom access is granted. Possible values are:  \n- \"person\" - Access to an individual. \n- \"circle\" - Access to members of a circle. \n- \"myCircles\" - Access to members of all the person's circles. \n- \"extendedCircles\" - Access to members of all the person's circles, plus all of the people in their circles. \n- \"domain\" - Access to members of the person's Google Apps domain. \n- \"public\" - Access to anyone on the web."
+    }
+   }
+  }
+ },
+ "resources": {
+  "activities": {
+   "methods": {
+    "get": {
+     "id": "plus.activities.get",
+     "path": "activities/{activityId}",
+     "httpMethod": "GET",
+     "description": "Get an activity.",
+     "parameters": {
+      "activityId": {
+       "type": "string",
+       "description": "The ID of the activity to get.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "activityId"
+     ],
+     "response": {
+      "$ref": "Activity"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "list": {
+     "id": "plus.activities.list",
+     "path": "people/{userId}/activities/{collection}",
+     "httpMethod": "GET",
+     "description": "List all of the activities in the specified collection for a particular user.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection of activities to list.",
+       "required": true,
+       "enum": [
+        "public"
+       ],
+       "enumDescriptions": [
+        "All public activities created by the specified user."
+       ],
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of activities to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "20",
+       "format": "uint32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user to get activities for. The special value \"me\" can be used to indicate the authenticated user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId",
+      "collection"
+     ],
+     "response": {
+      "$ref": "ActivityFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "search": {
+     "id": "plus.activities.search",
+     "path": "activities",
+     "httpMethod": "GET",
+     "description": "Search public activities.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "Specify the preferred language to search with. See search language codes for available values.",
+       "default": "en-US",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of activities to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "10",
+       "format": "uint32",
+       "minimum": "1",
+       "maximum": "20",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Specifies how to order search results.",
+       "default": "recent",
+       "enum": [
+        "best",
+        "recent"
+       ],
+       "enumDescriptions": [
+        "Sort activities by relevance to the user, most relevant first.",
+        "Sort activities by published date, most recent first."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response. This token can be of any length.",
+       "location": "query"
+      },
+      "query": {
+       "type": "string",
+       "description": "Full-text search query string.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "query"
+     ],
+     "response": {
+      "$ref": "ActivityFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    }
+   }
+  },
+  "comments": {
+   "methods": {
+    "get": {
+     "id": "plus.comments.get",
+     "path": "comments/{commentId}",
+     "httpMethod": "GET",
+     "description": "Get a comment.",
+     "parameters": {
+      "commentId": {
+       "type": "string",
+       "description": "The ID of the comment to get.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "commentId"
+     ],
+     "response": {
+      "$ref": "Comment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "list": {
+     "id": "plus.comments.list",
+     "path": "activities/{activityId}/comments",
+     "httpMethod": "GET",
+     "description": "List all of the comments for an activity.",
+     "parameters": {
+      "activityId": {
+       "type": "string",
+       "description": "The ID of the activity to get comments for.",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of comments to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "20",
+       "format": "uint32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response.",
+       "location": "query"
+      },
+      "sortOrder": {
+       "type": "string",
+       "description": "The order in which to sort the list of comments.",
+       "default": "ascending",
+       "enum": [
+        "ascending",
+        "descending"
+       ],
+       "enumDescriptions": [
+        "Sort oldest comments first.",
+        "Sort newest comments first."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "activityId"
+     ],
+     "response": {
+      "$ref": "CommentFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    }
+   }
+  },
+  "moments": {
+   "methods": {
+    "insert": {
+     "id": "plus.moments.insert",
+     "path": "people/{userId}/moments/{collection}",
+     "httpMethod": "POST",
+     "description": "Record a moment representing a user's activity such as making a purchase or commenting on a blog.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection to which to write moments.",
+       "required": true,
+       "enum": [
+        "vault"
+       ],
+       "enumDescriptions": [
+        "The default collection for writing new moments."
+       ],
+       "location": "path"
+      },
+      "debug": {
+       "type": "boolean",
+       "description": "Return the moment as written. Should be used only for debugging.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user to record activities for. The only valid values are \"me\" and the ID of the authenticated user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId",
+      "collection"
+     ],
+     "request": {
+      "$ref": "Moment"
+     },
+     "response": {
+      "$ref": "Moment"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "list": {
+     "id": "plus.moments.list",
+     "path": "people/{userId}/moments/{collection}",
+     "httpMethod": "GET",
+     "description": "List all of the moments for a particular user.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection of moments to list.",
+       "required": true,
+       "enum": [
+        "vault"
+       ],
+       "enumDescriptions": [
+        "All moments created by the requesting application for the authenticated user."
+       ],
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of moments to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "20",
+       "format": "uint32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response.",
+       "location": "query"
+      },
+      "targetUrl": {
+       "type": "string",
+       "description": "Only moments containing this targetUrl will be returned.",
+       "location": "query"
+      },
+      "type": {
+       "type": "string",
+       "description": "Only moments of this type will be returned.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "The ID of the user to get moments for. The special value \"me\" can be used to indicate the authenticated user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId",
+      "collection"
+     ],
+     "response": {
+      "$ref": "MomentsFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "remove": {
+     "id": "plus.moments.remove",
+     "path": "moments/{id}",
+     "httpMethod": "DELETE",
+     "description": "Delete a moment.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the moment to delete.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "people": {
+   "methods": {
+    "get": {
+     "id": "plus.people.get",
+     "path": "people/{userId}",
+     "httpMethod": "GET",
+     "description": "Get a person's profile. If your app uses scope https://www.googleapis.com/auth/plus.login, this method is guaranteed to return ageRange and language.",
+     "parameters": {
+      "userId": {
+       "type": "string",
+       "description": "The ID of the person to get the profile for. The special value \"me\" can be used to indicate the authenticated user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId"
+     ],
+     "response": {
+      "$ref": "Person"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+     ]
+    },
+    "list": {
+     "id": "plus.people.list",
+     "path": "people/{userId}/people/{collection}",
+     "httpMethod": "GET",
+     "description": "List all of the people in the specified collection.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection of people to list.",
+       "required": true,
+       "enum": [
+        "connected",
+        "visible"
+       ],
+       "enumDescriptions": [
+        "The list of visible people in the authenticated user's circles who also use the requesting app. This list is limited to users who made their app activities visible to the authenticated user.",
+        "The list of people who this user has added to one or more circles, limited to the circles visible to the requesting application."
+       ],
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of people to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "100",
+       "format": "uint32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "The order to return people in.",
+       "enum": [
+        "alphabetical",
+        "best"
+       ],
+       "enumDescriptions": [
+        "Order the people by their display name.",
+        "Order people based on the relevence to the viewer."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response.",
+       "location": "query"
+      },
+      "userId": {
+       "type": "string",
+       "description": "Get the collection of people for the person identified. Use \"me\" to indicate the authenticated user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userId",
+      "collection"
+     ],
+     "response": {
+      "$ref": "PeopleFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "listByActivity": {
+     "id": "plus.people.listByActivity",
+     "path": "activities/{activityId}/people/{collection}",
+     "httpMethod": "GET",
+     "description": "List all of the people in the specified collection for a particular activity.",
+     "parameters": {
+      "activityId": {
+       "type": "string",
+       "description": "The ID of the activity to get the list of people for.",
+       "required": true,
+       "location": "path"
+      },
+      "collection": {
+       "type": "string",
+       "description": "The collection of people to list.",
+       "required": true,
+       "enum": [
+        "plusoners",
+        "resharers"
+       ],
+       "enumDescriptions": [
+        "List all people who have +1'd this activity.",
+        "List all people who have reshared this activity."
+       ],
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of people to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "20",
+       "format": "uint32",
+       "minimum": "1",
+       "maximum": "100",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "activityId",
+      "collection"
+     ],
+     "response": {
+      "$ref": "PeopleFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    },
+    "search": {
+     "id": "plus.people.search",
+     "path": "people",
+     "httpMethod": "GET",
+     "description": "Search all public profiles.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "Specify the preferred language to search with. See search language codes for available values.",
+       "default": "en-US",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of people to include in the response, which is used for paging. For any response, the actual number returned might be less than the specified maxResults.",
+       "default": "25",
+       "format": "uint32",
+       "minimum": "1",
+       "maximum": "50",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response. This token can be of any length.",
+       "location": "query"
+      },
+      "query": {
+       "type": "string",
+       "description": "Specify a query string for full text search of public text in all profiles.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "query"
+     ],
+     "response": {
+      "$ref": "PeopleFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me"
+     ]
+    }
+   }
+  }
+ }
+}

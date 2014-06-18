@@ -1,0 +1,351 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"BgGnx7p-6wsAbOn4St99QhtBGbA/TKLTAqrqg3ZwD--yrgL0HXd_jYw\"",
+ "discoveryVersion": "v1",
+ "id": "latitude:v1",
+ "name": "latitude",
+ "version": "v1",
+ "revision": "20120710",
+ "title": "Google Latitude API",
+ "description": "Lets you read and update your current location and work with your location history",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/latitude/v1/using",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/latitude/v1/",
+ "basePath": "/latitude/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "latitude/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "atom",
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/atom+xml",
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "false",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/latitude.all.best": {
+     "description": "Manage your best-available location and location history"
+    },
+    "https://www.googleapis.com/auth/latitude.all.city": {
+     "description": "Manage your city-level location and location history"
+    },
+    "https://www.googleapis.com/auth/latitude.current.best": {
+     "description": "Manage your best-available location"
+    },
+    "https://www.googleapis.com/auth/latitude.current.city": {
+     "description": "Manage your city-level location"
+    }
+   }
+  }
+ },
+ "features": [
+  "dataWrapper"
+ ],
+ "schemas": {
+  "LatitudeCurrentlocationResourceJson": {
+   "$ref": "Location"
+  },
+  "Location": {
+   "id": "Location",
+   "type": "object",
+   "description": "A Location resource identifies a user's position at a particular time. It may include metadata about the user's position, such as a venue if the location was recorded at the time of a check-in.",
+   "properties": {
+    "accuracy": {
+     "type": "any",
+     "description": "Accuracy of the latitude and longitude coordinates, in non-negative meters. Optional."
+    },
+    "activityId": {
+     "type": "any",
+     "description": "Unique ID of the Buzz message that corresponds to the check-in associated with this location. Available only for check-in locations. Optional."
+    },
+    "altitude": {
+     "type": "any",
+     "description": "Altitude of the location, in meters. Optional."
+    },
+    "altitudeAccuracy": {
+     "type": "any",
+     "description": "Accuracy of the altitude value, in meters. Optional."
+    },
+    "heading": {
+     "type": "any",
+     "description": "Direction of travel of the user when this location was recorded. In degrees, clockwise relative to true north. Optional."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Kind of this item.",
+     "default": "latitude#location"
+    },
+    "latitude": {
+     "type": "any",
+     "description": "Latitude of the location, in decimal degrees."
+    },
+    "longitude": {
+     "type": "any",
+     "description": "Longitude of the location, in decimal degrees."
+    },
+    "speed": {
+     "type": "any",
+     "description": "Ground speed of the user at the time this location was recorded, in meters per second. Non-negative. Optional."
+    },
+    "timestampMs": {
+     "type": "any",
+     "description": "Timestamp of the Location Resource, in milliseconds since the epoch (UTC). This is also the Location Resource's unique id."
+    }
+   }
+  },
+  "LocationFeed": {
+   "id": "LocationFeed",
+   "type": "object",
+   "properties": {
+    "items": {
+     "type": "array",
+     "items": {
+      "$ref": "Location"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "default": "latitude#locationFeed"
+    }
+   }
+  }
+ },
+ "resources": {
+  "currentLocation": {
+   "methods": {
+    "delete": {
+     "id": "latitude.currentLocation.delete",
+     "path": "currentLocation",
+     "httpMethod": "DELETE",
+     "description": "Deletes the authenticated user's current location.",
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city",
+      "https://www.googleapis.com/auth/latitude.current.best",
+      "https://www.googleapis.com/auth/latitude.current.city"
+     ]
+    },
+    "get": {
+     "id": "latitude.currentLocation.get",
+     "path": "currentLocation",
+     "httpMethod": "GET",
+     "description": "Returns the authenticated user's current location.",
+     "parameters": {
+      "granularity": {
+       "type": "string",
+       "description": "Granularity of the requested location.",
+       "default": "city",
+       "enum": [
+        "best",
+        "city"
+       ],
+       "enumDescriptions": [
+        "Request best available granularity.",
+        "Request city-level granularty."
+       ],
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "LatitudeCurrentlocationResourceJson"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city",
+      "https://www.googleapis.com/auth/latitude.current.best",
+      "https://www.googleapis.com/auth/latitude.current.city"
+     ]
+    },
+    "insert": {
+     "id": "latitude.currentLocation.insert",
+     "path": "currentLocation",
+     "httpMethod": "POST",
+     "description": "Updates or creates the user's current location.",
+     "request": {
+      "$ref": "LatitudeCurrentlocationResourceJson"
+     },
+     "response": {
+      "$ref": "LatitudeCurrentlocationResourceJson"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city",
+      "https://www.googleapis.com/auth/latitude.current.best",
+      "https://www.googleapis.com/auth/latitude.current.city"
+     ]
+    }
+   }
+  },
+  "location": {
+   "methods": {
+    "delete": {
+     "id": "latitude.location.delete",
+     "path": "location/{locationId}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a location from the user's location history.",
+     "parameters": {
+      "locationId": {
+       "type": "string",
+       "description": "Timestamp of the location to delete (ms since epoch).",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "locationId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city"
+     ]
+    },
+    "get": {
+     "id": "latitude.location.get",
+     "path": "location/{locationId}",
+     "httpMethod": "GET",
+     "description": "Reads a location from the user's location history.",
+     "parameters": {
+      "granularity": {
+       "type": "string",
+       "description": "Granularity of the location to return.",
+       "default": "city",
+       "enum": [
+        "best",
+        "city"
+       ],
+       "enumDescriptions": [
+        "Request best available granularity.",
+        "Request city-level granularty."
+       ],
+       "location": "query"
+      },
+      "locationId": {
+       "type": "string",
+       "description": "Timestamp of the location to read (ms since epoch).",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "locationId"
+     ],
+     "response": {
+      "$ref": "Location"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city"
+     ]
+    },
+    "insert": {
+     "id": "latitude.location.insert",
+     "path": "location",
+     "httpMethod": "POST",
+     "description": "Inserts or updates a location in the user's location history.",
+     "request": {
+      "$ref": "Location"
+     },
+     "response": {
+      "$ref": "Location"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city"
+     ]
+    },
+    "list": {
+     "id": "latitude.location.list",
+     "path": "location",
+     "httpMethod": "GET",
+     "description": "Lists the user's location history.",
+     "parameters": {
+      "granularity": {
+       "type": "string",
+       "description": "Granularity of the requested locations.",
+       "default": "city",
+       "enum": [
+        "best",
+        "city"
+       ],
+       "enumDescriptions": [
+        "Request best available granularity.",
+        "Request city-level granularty."
+       ],
+       "location": "query"
+      },
+      "max-results": {
+       "type": "string",
+       "description": "Maximum number of locations to return.",
+       "location": "query"
+      },
+      "max-time": {
+       "type": "string",
+       "description": "Maximum timestamp of locations to return (ms since epoch).",
+       "location": "query"
+      },
+      "min-time": {
+       "type": "string",
+       "description": "Minimum timestamp of locations to return (ms since epoch).",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "LocationFeed"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/latitude.all.best",
+      "https://www.googleapis.com/auth/latitude.all.city"
+     ]
+    }
+   }
+  }
+ }
+}

@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/fsouza/go-dockerclient/utils"
 	"io"
 	"io/ioutil"
 	"net"
@@ -23,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/fsouza/go-dockerclient/utils"
 )
 
 const userAgent = "go-dockerclient"
@@ -33,30 +34,192 @@ var (
 
 	// ErrConnectionRefused is returned when the client cannot connect to the given endpoint.
 	ErrConnectionRefused = errors.New("cannot connect to Docker endpoint")
+
+	apiVersion_1_12, _ = NewApiVersion("1.12")
 )
+
+// ApiVersion is an internal representation of a version of the Remote API.
+type ApiVersion []int
+
+// NewApiVersion returns an instance of ApiVersion for the given string.
+//
+// The given string must be in the form <major>.<minor>.<patch>, where <major>,
+// <minor> and <patch> are integer numbers.
+func NewApiVersion(input string) (ApiVersion, error) {
+	if !strings.Contains(input, ".") {
+		return nil, fmt.Errorf("Unable to parse version '%s'", input)
+	}
+
+	arr := strings.Split(input, ".")
+	ret := make(ApiVersion, len(arr))
+
+	var err error
+	for i, val := range arr {
+		ret[i], err = strconv.Atoi(val)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return ret, nil
+}
+
+func (version ApiVersion) String() string {
+	var str string
+	for i, val := range version {
+		str += strconv.Itoa(val)
+		if i < len(version)-1 {
+			str += "."
+		}
+	}
+	return str
+}
+
+func (version ApiVersion) LessThan(other ApiVersion) bool {
+	return version.compare(other) < 0
+}
+
+func (version ApiVersion) LessThanOrEqualTo(other ApiVersion) bool {
+	return version.compare(other) <= 0
+}
+
+func (version ApiVersion) GreaterThan(other ApiVersion) bool {
+	return version.compare(other) > 0
+}
+
+func (version ApiVersion) GreaterThanOrEqualTo(other ApiVersion) bool {
+	return version.compare(other) >= 0
+}
+
+func (version ApiVersion) compare(other ApiVersion) int {
+	for i, v := range version {
+		if i <= len(other)-1 {
+			otherVersion := other[i]
+
+			if v < otherVersion {
+				return -1
+			} else if v > otherVersion {
+				return 1
+			}
+		}
+	}
+	if len(version) > len(other) {
+		return 1
+	}
+	if len(version) < len(other) {
+		return -1
+	}
+	return 0
+}
 
 // Client is the basic type of this package. It provides methods for
 // interaction with the API.
 type Client struct {
-	endpoint     string
-	endpointURL  *url.URL
-	eventMonitor *eventMonitoringState
-	client       *http.Client
+	SkipServerVersionCheck bool
+
+	endpoint            string
+	endpointURL         *url.URL
+	eventMonitor        *eventMonitoringState
+	client              *http.Client
+	requestedApiVersion ApiVersion
+	serverApiVersion    ApiVersion
+	expectedApiVersion  ApiVersion
 }
 
-// NewClient returns a Client instance ready for communication with the
-// given server endpoint.
+// NewClient returns a Client instance ready for communication with the given
+// server endpoint. It will use the latest remote API version available in the
+// server.
 func NewClient(endpoint string) (*Client, error) {
+	client, err := NewVersionedClient(endpoint, "")
+	if err != nil {
+		return nil, err
+	}
+	client.SkipServerVersionCheck = true
+	return client, nil
+}
+
+// NewVersionedClient returns a Client instance ready for communication with
+// the given server endpoint, using a specific remote API version.
+func NewVersionedClient(endpoint string, apiVersionString string) (*Client, error) {
 	u, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
+
+	var requestedApiVersion ApiVersion
+	if strings.Contains(apiVersionString, ".") {
+		requestedApiVersion, err = NewApiVersion(apiVersionString)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Client{
-		endpoint:     endpoint,
-		endpointURL:  u,
-		client:       http.DefaultClient,
-		eventMonitor: new(eventMonitoringState),
+		endpoint:            endpoint,
+		endpointURL:         u,
+		client:              http.DefaultClient,
+		eventMonitor:        new(eventMonitoringState),
+		requestedApiVersion: requestedApiVersion,
 	}, nil
+}
+
+func (c *Client) checkApiVersion() error {
+	serverApiVersionString, err := c.getServerApiVersionString()
+	if err != nil {
+		return err
+	}
+	c.serverApiVersion, err = NewApiVersion(serverApiVersionString)
+	if err != nil {
+		return err
+	}
+	if c.requestedApiVersion == nil {
+		c.expectedApiVersion = c.serverApiVersion
+	} else {
+		c.expectedApiVersion = c.requestedApiVersion
+	}
+	return nil
+}
+
+func parseApiVersionString(input string) (version uint16, err error) {
+	version = 0
+
+	if !strings.Contains(input, ".") {
+		return 0, fmt.Errorf("Unable to parse version '%s'", input)
+	}
+
+	arr := strings.Split(input, ".")
+
+	major, err := strconv.Atoi(arr[0])
+	if err != nil {
+		return version, err
+	}
+
+	minor, err := strconv.Atoi(arr[1])
+	if err != nil {
+		return version, err
+	}
+
+	version = uint16(major)<<8 | uint16(minor)
+	return version, nil
+}
+
+func (c *Client) getServerApiVersionString() (version string, err error) {
+	body, status, err := c.do("GET", "/version", nil)
+	if err != nil {
+		return "", err
+	}
+	if status != http.StatusOK {
+		return "", fmt.Errorf("Received unexpected status %d while trying to retrieve the server version", status)
+	}
+
+	var versionResponse map[string]string
+	err = json.Unmarshal(body, &versionResponse)
+	if err != nil {
+		return "", err
+	}
+
+	version = versionResponse["ApiVersion"]
+	return version, nil
 }
 
 func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) {
@@ -68,6 +231,14 @@ func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) 
 		}
 		params = bytes.NewBuffer(buf)
 	}
+
+	if path != "/version" && !c.SkipServerVersionCheck && c.expectedApiVersion == nil {
+		err := c.checkApiVersion()
+		if err != nil {
+			return nil, -1, err
+		}
+	}
+
 	req, err := http.NewRequest(method, c.getURL(path), params)
 	if err != nil {
 		return nil, -1, err
@@ -88,6 +259,9 @@ func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) 
 		}
 		clientconn := httputil.NewClientConn(dial, nil)
 		resp, err = clientconn.Do(req)
+		if err != nil {
+			return nil, -1, err
+		}
 		defer clientconn.Close()
 	} else {
 		resp, err = c.client.Do(req)
@@ -112,6 +286,13 @@ func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) 
 func (c *Client) stream(method, path string, headers map[string]string, in io.Reader, out io.Writer) error {
 	if (method == "POST" || method == "PUT") && in == nil {
 		in = bytes.NewReader(nil)
+	}
+
+	if path != "/version" && !c.SkipServerVersionCheck && c.expectedApiVersion == nil {
+		err := c.checkApiVersion()
+		if err != nil {
+			return err
+		}
 	}
 	req, err := http.NewRequest(method, c.getURL(path), in)
 	if err != nil {
@@ -183,7 +364,13 @@ func (c *Client) stream(method, path string, headers map[string]string, in io.Re
 	return nil
 }
 
-func (c *Client) hijack(method, path string, success chan struct{}, in io.Reader, errStream io.Writer, out io.Writer) error {
+func (c *Client) hijack(method, path string, success chan struct{}, setRawTerminal bool, in io.Reader, stderr, stdout io.Writer) error {
+	if path != "/version" && !c.SkipServerVersionCheck && c.expectedApiVersion == nil {
+		err := c.checkApiVersion()
+		if err != nil {
+			return err
+		}
+	}
 	req, err := http.NewRequest(method, c.getURL(path), nil)
 	if err != nil {
 		return err
@@ -212,10 +399,10 @@ func (c *Client) hijack(method, path string, success chan struct{}, in io.Reader
 	errs := make(chan error, 2)
 	go func() {
 		var err error
-		if in != nil {
-			_, err = io.Copy(out, br)
+		if setRawTerminal {
+			_, err = io.Copy(stdout, br)
 		} else {
-			_, err = utils.StdCopy(out, errStream, br)
+			_, err = utils.StdCopy(stdout, stderr, br)
 		}
 		errs <- err
 		wg.Done()
@@ -244,7 +431,12 @@ func (c *Client) getURL(path string) string {
 	if c.endpointURL.Scheme == "unix" {
 		urlStr = ""
 	}
-	return fmt.Sprintf("%s%s", urlStr, path)
+
+	if c.requestedApiVersion != nil {
+		return fmt.Sprintf("%s/v%s%s", urlStr, c.requestedApiVersion, path)
+	} else {
+		return fmt.Sprintf("%s%s", urlStr, path)
+	}
 }
 
 type jsonMessage struct {

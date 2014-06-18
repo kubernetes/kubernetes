@@ -1,0 +1,1338 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"5M1WkxnZyJhziV-cW1kdtwscs8E/cLXdvPSJ73RAjLVWqio6ofbcpRI\"",
+ "discoveryVersion": "v1",
+ "id": "mirror:v1",
+ "name": "mirror",
+ "version": "v1",
+ "title": "Google Mirror API",
+ "description": "API for interacting with Glass users via the timeline.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/glass",
+ "labels": [
+  "limited_availability"
+ ],
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/mirror/v1/",
+ "basePath": "/mirror/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "mirror/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/glass.location": {
+     "description": "View your location"
+    },
+    "https://www.googleapis.com/auth/glass.timeline": {
+     "description": "View and manage your Glass timeline"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Account": {
+   "id": "Account",
+   "type": "object",
+   "description": "Represents an account passed into the Account Manager on Glass.",
+   "properties": {
+    "authTokens": {
+     "type": "array",
+     "items": {
+      "$ref": "AuthToken"
+     }
+    },
+    "features": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "password": {
+     "type": "string"
+    },
+    "userData": {
+     "type": "array",
+     "items": {
+      "$ref": "UserData"
+     }
+    }
+   }
+  },
+  "Attachment": {
+   "id": "Attachment",
+   "type": "object",
+   "description": "Represents media content, such as a photo, that can be attached to a timeline item.",
+   "properties": {
+    "contentType": {
+     "type": "string",
+     "description": "The MIME type of the attachment."
+    },
+    "contentUrl": {
+     "type": "string",
+     "description": "The URL for the content."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the attachment."
+    },
+    "isProcessingContent": {
+     "type": "boolean",
+     "description": "Indicates that the contentUrl is not available because the attachment content is still being processed. If the caller wishes to retrieve the content, it should try again later."
+    }
+   }
+  },
+  "AttachmentsListResponse": {
+   "id": "AttachmentsListResponse",
+   "type": "object",
+   "description": "A list of Attachments. This is the response from the server to GET requests on the attachments collection.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The list of attachments.",
+     "items": {
+      "$ref": "Attachment"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#attachmentsList.",
+     "default": "mirror#attachmentsList"
+    }
+   }
+  },
+  "AuthToken": {
+   "id": "AuthToken",
+   "type": "object",
+   "properties": {
+    "authToken": {
+     "type": "string"
+    },
+    "type": {
+     "type": "string"
+    }
+   }
+  },
+  "Command": {
+   "id": "Command",
+   "type": "object",
+   "description": "A single menu command that is part of a Contact.",
+   "properties": {
+    "type": {
+     "type": "string",
+     "description": "The type of operation this command corresponds to. Allowed values are:  \n- TAKE_A_NOTE - Shares a timeline item with the transcription of user speech from the \"Take a note\" voice menu command.  \n- POST_AN_UPDATE - Shares a timeline item with the transcription of user speech from the \"Post an update\" voice menu command.",
+     "annotations": {
+      "required": [
+       "mirror.contacts.insert",
+       "mirror.contacts.update"
+      ]
+     }
+    }
+   }
+  },
+  "Contact": {
+   "id": "Contact",
+   "type": "object",
+   "description": "A person or group that can be used as a creator or a contact.",
+   "properties": {
+    "acceptCommands": {
+     "type": "array",
+     "description": "A list of voice menu commands that a contact can handle. Glass shows up to three contacts for each voice menu command. If there are more than that, the three contacts with the highest priority are shown for that particular command.",
+     "items": {
+      "$ref": "Command"
+     }
+    },
+    "acceptTypes": {
+     "type": "array",
+     "description": "A list of MIME types that a contact supports. The contact will be shown to the user if any of its acceptTypes matches any of the types of the attachments on the item. If no acceptTypes are given, the contact will be shown for all items.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The name to display for this contact.",
+     "annotations": {
+      "required": [
+       "mirror.contacts.insert",
+       "mirror.contacts.update"
+      ]
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "An ID for this contact. This is generated by the application and is treated as an opaque token.",
+     "annotations": {
+      "required": [
+       "mirror.contacts.insert",
+       "mirror.contacts.update"
+      ]
+     }
+    },
+    "imageUrls": {
+     "type": "array",
+     "description": "Set of image URLs to display for a contact. Most contacts will have a single image, but a \"group\" contact may include up to 8 image URLs and they will be resized and cropped into a mosaic on the client.",
+     "items": {
+      "type": "string"
+     },
+     "annotations": {
+      "required": [
+       "mirror.contacts.insert",
+       "mirror.contacts.update"
+      ]
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#contact.",
+     "default": "mirror#contact"
+    },
+    "phoneNumber": {
+     "type": "string",
+     "description": "Primary phone number for the contact. This can be a fully-qualified number, with country calling code and area code, or a local number."
+    },
+    "priority": {
+     "type": "integer",
+     "description": "Priority for the contact to determine ordering in a list of contacts. Contacts with higher priorities will be shown before ones with lower priorities.",
+     "format": "uint32"
+    },
+    "sharingFeatures": {
+     "type": "array",
+     "description": "A list of sharing features that a contact can handle. Allowed values are:  \n- ADD_CAPTION",
+     "items": {
+      "type": "string"
+     }
+    },
+    "source": {
+     "type": "string",
+     "description": "The ID of the application that created this contact. This is populated by the API"
+    },
+    "speakableName": {
+     "type": "string",
+     "description": "Name of this contact as it should be pronounced. If this contact's name must be spoken as part of a voice disambiguation menu, this name is used as the expected pronunciation. This is useful for contact names with unpronounceable characters or whose display spelling is otherwise not phonetic."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type for this contact. This is used for sorting in UIs. Allowed values are:  \n- INDIVIDUAL - Represents a single person. This is the default. \n- GROUP - Represents more than a single person."
+    }
+   }
+  },
+  "ContactsListResponse": {
+   "id": "ContactsListResponse",
+   "type": "object",
+   "description": "A list of Contacts representing contacts. This is the response from the server to GET requests on the contacts collection.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "Contact list.",
+     "items": {
+      "$ref": "Contact"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#contacts.",
+     "default": "mirror#contacts"
+    }
+   }
+  },
+  "Location": {
+   "id": "Location",
+   "type": "object",
+   "description": "A geographic location that can be associated with a timeline item.",
+   "properties": {
+    "accuracy": {
+     "type": "number",
+     "description": "The accuracy of the location fix in meters.",
+     "format": "double"
+    },
+    "address": {
+     "type": "string",
+     "description": "The full address of the location."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The name to be displayed. This may be a business name or a user-defined place, such as \"Home\"."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the location."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#location.",
+     "default": "mirror#location"
+    },
+    "latitude": {
+     "type": "number",
+     "description": "The latitude, in degrees.",
+     "format": "double"
+    },
+    "longitude": {
+     "type": "number",
+     "description": "The longitude, in degrees.",
+     "format": "double"
+    },
+    "timestamp": {
+     "type": "string",
+     "description": "The time at which this location was captured, formatted according to RFC 3339.",
+     "format": "date-time"
+    }
+   }
+  },
+  "LocationsListResponse": {
+   "id": "LocationsListResponse",
+   "type": "object",
+   "description": "A list of Locations. This is the response from the server to GET requests on the locations collection.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The list of locations.",
+     "items": {
+      "$ref": "Location"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#locationsList.",
+     "default": "mirror#locationsList"
+    }
+   }
+  },
+  "MenuItem": {
+   "id": "MenuItem",
+   "type": "object",
+   "description": "A custom menu item that can be presented to the user by a timeline item.",
+   "properties": {
+    "action": {
+     "type": "string",
+     "description": "Controls the behavior when the user picks the menu option. Allowed values are:  \n- CUSTOM - Custom action set by the service. When the user selects this menuItem, the API triggers a notification to your callbackUrl with the userActions.type set to CUSTOM and the userActions.payload set to the ID of this menu item. This is the default value. \n- Built-in actions:  \n- REPLY - Initiate a reply to the timeline item using the voice recording UI. The creator attribute must be set in the timeline item for this menu to be available. \n- REPLY_ALL - Same behavior as REPLY. The original timeline item's recipients will be added to the reply item. \n- DELETE - Delete the timeline item. \n- SHARE - Share the timeline item with the available contacts. \n- READ_ALOUD - Read the timeline item's speakableText aloud; if this field is not set, read the text field; if none of those fields are set, this menu item is ignored. \n- GET_MEDIA_INPUT - Allow users to provide media payloads to Glassware from a menu item (currently, only transcribed text from voice input is supported). Subscribe to notifications when users invoke this menu item to receive the timeline item ID. Retrieve the media from the timeline item in the payload property. \n- VOICE_CALL - Initiate a phone call using the timeline item's creator.phoneNumber attribute as recipient. \n- NAVIGATE - Navigate to the timeline item's location. \n- TOGGLE_PINNED - Toggle the isPinned state of the timeline item. \n- OPEN_URI - Open the payload of the menu item in the browser. \n- PLAY_VIDEO - Open the payload of the menu item in the Glass video player. \n- SEND_MESSAGE - Initiate sending a message to the timeline item's creator:  \n- If the creator.phoneNumber is set and Glass is connected to an Android phone, the message is an SMS. \n- Otherwise, if the creator.email is set, the message is an email."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID for this menu item. This is generated by the application and is treated as an opaque token."
+    },
+    "payload": {
+     "type": "string",
+     "description": "A generic payload whose meaning changes depending on this MenuItem's action.  \n- When the action is OPEN_URI, the payload is the URL of the website to view. \n- When the action is PLAY_VIDEO, the payload is the streaming URL of the video \n- When the action is GET_MEDIA_INPUT, the payload is the text transcription of a user's speech input"
+    },
+    "removeWhenSelected": {
+     "type": "boolean",
+     "description": "If set to true on a CUSTOM menu item, that item will be removed from the menu after it is selected."
+    },
+    "values": {
+     "type": "array",
+     "description": "For CUSTOM items, a list of values controlling the appearance of the menu item in each of its states. A value for the DEFAULT state must be provided. If the PENDING or CONFIRMED states are missing, they will not be shown.",
+     "items": {
+      "$ref": "MenuValue"
+     }
+    }
+   }
+  },
+  "MenuValue": {
+   "id": "MenuValue",
+   "type": "object",
+   "description": "A single value that is part of a MenuItem.",
+   "properties": {
+    "displayName": {
+     "type": "string",
+     "description": "The name to display for the menu item. If you specify this property for a built-in menu item, the default contextual voice command for that menu item is not shown."
+    },
+    "iconUrl": {
+     "type": "string",
+     "description": "URL of an icon to display with the menu item."
+    },
+    "state": {
+     "type": "string",
+     "description": "The state that this value applies to. Allowed values are:  \n- DEFAULT - Default value shown when displayed in the menuItems list. \n- PENDING - Value shown when the menuItem has been selected by the user but can still be cancelled. \n- CONFIRMED - Value shown when the menuItem has been selected by the user and can no longer be cancelled."
+    }
+   }
+  },
+  "Notification": {
+   "id": "Notification",
+   "type": "object",
+   "description": "A notification delivered by the API.",
+   "properties": {
+    "collection": {
+     "type": "string",
+     "description": "The collection that generated the notification."
+    },
+    "itemId": {
+     "type": "string",
+     "description": "The ID of the item that generated the notification."
+    },
+    "operation": {
+     "type": "string",
+     "description": "The type of operation that generated the notification."
+    },
+    "userActions": {
+     "type": "array",
+     "description": "A list of actions taken by the user that triggered the notification.",
+     "items": {
+      "$ref": "UserAction"
+     }
+    },
+    "userToken": {
+     "type": "string",
+     "description": "The user token provided by the service when it subscribed for notifications."
+    },
+    "verifyToken": {
+     "type": "string",
+     "description": "The secret verify token provided by the service when it subscribed for notifications."
+    }
+   }
+  },
+  "NotificationConfig": {
+   "id": "NotificationConfig",
+   "type": "object",
+   "description": "Controls how notifications for a timeline item are presented to the user.",
+   "properties": {
+    "deliveryTime": {
+     "type": "string",
+     "description": "The time at which the notification should be delivered.",
+     "format": "date-time"
+    },
+    "level": {
+     "type": "string",
+     "description": "Describes how important the notification is. Allowed values are:  \n- DEFAULT - Notifications of default importance. A chime will be played to alert users."
+    }
+   }
+  },
+  "Subscription": {
+   "id": "Subscription",
+   "type": "object",
+   "description": "A subscription to events on a collection.",
+   "properties": {
+    "callbackUrl": {
+     "type": "string",
+     "description": "The URL where notifications should be delivered (must start with https://).",
+     "annotations": {
+      "required": [
+       "mirror.subscriptions.insert",
+       "mirror.subscriptions.update"
+      ]
+     }
+    },
+    "collection": {
+     "type": "string",
+     "description": "The collection to subscribe to. Allowed values are:  \n- timeline - Changes in the timeline including insertion, deletion, and updates. \n- locations - Location updates.",
+     "annotations": {
+      "required": [
+       "mirror.subscriptions.insert",
+       "mirror.subscriptions.update"
+      ]
+     }
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the subscription."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#subscription.",
+     "default": "mirror#subscription"
+    },
+    "notification": {
+     "$ref": "Notification",
+     "description": "Container object for notifications. This is not populated in the Subscription resource."
+    },
+    "operation": {
+     "type": "array",
+     "description": "A list of operations that should be subscribed to. An empty list indicates that all operations on the collection should be subscribed to. Allowed values are:  \n- UPDATE - The item has been updated. \n- INSERT - A new item has been inserted. \n- DELETE - The item has been deleted. \n- MENU_ACTION - A custom menu item has been triggered by the user.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "updated": {
+     "type": "string",
+     "description": "The time at which this subscription was last modified, formatted according to RFC 3339.",
+     "format": "date-time"
+    },
+    "userToken": {
+     "type": "string",
+     "description": "An opaque token sent to the subscriber in notifications so that it can determine the ID of the user."
+    },
+    "verifyToken": {
+     "type": "string",
+     "description": "A secret token sent to the subscriber in notifications so that it can verify that the notification was generated by Google."
+    }
+   }
+  },
+  "SubscriptionsListResponse": {
+   "id": "SubscriptionsListResponse",
+   "type": "object",
+   "description": "A list of Subscriptions. This is the response from the server to GET requests on the subscription collection.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The list of subscriptions.",
+     "items": {
+      "$ref": "Subscription"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#subscriptionsList.",
+     "default": "mirror#subscriptionsList"
+    }
+   }
+  },
+  "TimelineItem": {
+   "id": "TimelineItem",
+   "type": "object",
+   "description": "Each item in the user's timeline is represented as a TimelineItem JSON structure, described below.",
+   "properties": {
+    "attachments": {
+     "type": "array",
+     "description": "A list of media attachments associated with this item. As a convenience, you can refer to attachments in your HTML payloads with the attachment or cid scheme. For example:  \n- attachment: \u003cimg src=\"attachment:attachment_index\"\u003e where attachment_index is the 0-based index of this array. \n- cid: \u003cimg src=\"cid:attachment_id\"\u003e where attachment_id is the ID of the attachment.",
+     "items": {
+      "$ref": "Attachment"
+     }
+    },
+    "bundleId": {
+     "type": "string",
+     "description": "The bundle ID for this item. Services can specify a bundleId to group many items together. They appear under a single top-level item on the device."
+    },
+    "canonicalUrl": {
+     "type": "string",
+     "description": "A canonical URL pointing to the canonical/high quality version of the data represented by the timeline item."
+    },
+    "created": {
+     "type": "string",
+     "description": "The time at which this item was created, formatted according to RFC 3339.",
+     "format": "date-time"
+    },
+    "creator": {
+     "$ref": "Contact",
+     "description": "The user or group that created this item."
+    },
+    "displayTime": {
+     "type": "string",
+     "description": "The time that should be displayed when this item is viewed in the timeline, formatted according to RFC 3339. This user's timeline is sorted chronologically on display time, so this will also determine where the item is displayed in the timeline. If not set by the service, the display time defaults to the updated time.",
+     "format": "date-time"
+    },
+    "etag": {
+     "type": "string",
+     "description": "ETag for this item."
+    },
+    "html": {
+     "type": "string",
+     "description": "HTML content for this item. If both text and html are provided for an item, the html will be rendered in the timeline.\nAllowed HTML elements - You can use these elements in your timeline cards.\n \n- Headers: h1, h2, h3, h4, h5, h6 \n- Images: img \n- Lists: li, ol, ul \n- HTML5 semantics: article, aside, details, figure, figcaption, footer, header, nav, section, summary, time \n- Structural: blockquote, br, div, hr, p, span \n- Style: b, big, center, em, i, u, s, small, strike, strong, style, sub, sup \n- Tables: table, tbody, td, tfoot, th, thead, tr  \nBlocked HTML elements: These elements and their contents are removed from HTML payloads.\n \n- Document headers: head, title \n- Embeds: audio, embed, object, source, video \n- Frames: frame, frameset \n- Scripting: applet, script  \nOther elements: Any elements that aren't listed are removed, but their contents are preserved."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the timeline item. This is unique within a user's timeline."
+    },
+    "inReplyTo": {
+     "type": "string",
+     "description": "If this item was generated as a reply to another item, this field will be set to the ID of the item being replied to. This can be used to attach a reply to the appropriate conversation or post."
+    },
+    "isBundleCover": {
+     "type": "boolean",
+     "description": "Whether this item is a bundle cover.\n\nIf an item is marked as a bundle cover, it will be the entry point to the bundle of items that have the same bundleId as that item. It will be shown only on the main timeline — not within the opened bundle.\n\nOn the main timeline, items that are shown are:  \n- Items that have isBundleCover set to true  \n- Items that do not have a bundleId  In a bundle sub-timeline, items that are shown are:  \n- Items that have the bundleId in question AND isBundleCover set to false"
+    },
+    "isDeleted": {
+     "type": "boolean",
+     "description": "When true, indicates this item is deleted, and only the ID property is set."
+    },
+    "isPinned": {
+     "type": "boolean",
+     "description": "When true, indicates this item is pinned, which means it's grouped alongside \"active\" items like navigation and hangouts, on the opposite side of the home screen from historical (non-pinned) timeline items. You can allow the user to toggle the value of this property with the TOGGLE_PINNED built-in menu item."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#timelineItem.",
+     "default": "mirror#timelineItem"
+    },
+    "location": {
+     "$ref": "Location",
+     "description": "The geographic location associated with this item."
+    },
+    "menuItems": {
+     "type": "array",
+     "description": "A list of menu items that will be presented to the user when this item is selected in the timeline.",
+     "items": {
+      "$ref": "MenuItem"
+     }
+    },
+    "notification": {
+     "$ref": "NotificationConfig",
+     "description": "Controls how notifications for this item are presented on the device. If this is missing, no notification will be generated."
+    },
+    "pinScore": {
+     "type": "integer",
+     "description": "For pinned items, this determines the order in which the item is displayed in the timeline, with a higher score appearing closer to the clock. Note: setting this field is currently not supported.",
+     "format": "int32"
+    },
+    "recipients": {
+     "type": "array",
+     "description": "A list of users or groups that this item has been shared with.",
+     "items": {
+      "$ref": "Contact"
+     }
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "A URL that can be used to retrieve this item."
+    },
+    "sourceItemId": {
+     "type": "string",
+     "description": "Opaque string you can use to map a timeline item to data in your own service."
+    },
+    "speakableText": {
+     "type": "string",
+     "description": "The speakable version of the content of this item. Along with the READ_ALOUD menu item, use this field to provide text that would be clearer when read aloud, or to provide extended information to what is displayed visually on Glass.\n\nGlassware should also specify the speakableType field, which will be spoken before this text in cases where the additional context is useful, for example when the user requests that the item be read aloud following a notification."
+    },
+    "speakableType": {
+     "type": "string",
+     "description": "A speakable description of the type of this item. This will be announced to the user prior to reading the content of the item in cases where the additional context is useful, for example when the user requests that the item be read aloud following a notification.\n\nThis should be a short, simple noun phrase such as \"Email\", \"Text message\", or \"Daily Planet News Update\".\n\nGlassware are encouraged to populate this field for every timeline item, even if the item does not contain speakableText or text so that the user can learn the type of the item without looking at the screen."
+    },
+    "text": {
+     "type": "string",
+     "description": "Text content of this item."
+    },
+    "title": {
+     "type": "string",
+     "description": "The title of this item."
+    },
+    "updated": {
+     "type": "string",
+     "description": "The time at which this item was last modified, formatted according to RFC 3339.",
+     "format": "date-time"
+    }
+   }
+  },
+  "TimelineListResponse": {
+   "id": "TimelineListResponse",
+   "type": "object",
+   "description": "A list of timeline items. This is the response from the server to GET requests on the timeline collection.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "Items in the timeline.",
+     "items": {
+      "$ref": "TimelineItem"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The type of resource. This is always mirror#timeline.",
+     "default": "mirror#timeline"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The next page token. Provide this as the pageToken parameter in the request to retrieve the next page of results."
+    }
+   }
+  },
+  "UserAction": {
+   "id": "UserAction",
+   "type": "object",
+   "description": "Represents an action taken by the user that triggered a notification.",
+   "properties": {
+    "payload": {
+     "type": "string",
+     "description": "An optional payload for the action.\n\nFor actions of type CUSTOM, this is the ID of the custom menu item that was selected."
+    },
+    "type": {
+     "type": "string",
+     "description": "The type of action. The value of this can be:  \n- SHARE - the user shared an item. \n- REPLY - the user replied to an item. \n- REPLY_ALL - the user replied to all recipients of an item. \n- CUSTOM - the user selected a custom menu item on the timeline item. \n- DELETE - the user deleted the item. \n- PIN - the user pinned the item. \n- UNPIN - the user unpinned the item. \n- LAUNCH - the user initiated a voice command.  In the future, additional types may be added. UserActions with unrecognized types should be ignored."
+    }
+   }
+  },
+  "UserData": {
+   "id": "UserData",
+   "type": "object",
+   "properties": {
+    "key": {
+     "type": "string"
+    },
+    "value": {
+     "type": "string"
+    }
+   }
+  }
+ },
+ "resources": {
+  "accounts": {
+   "methods": {
+    "insert": {
+     "id": "mirror.accounts.insert",
+     "path": "accounts/{userToken}/{accountType}/{accountName}",
+     "httpMethod": "POST",
+     "description": "Inserts a new account for a user",
+     "parameters": {
+      "accountName": {
+       "type": "string",
+       "description": "The name of the account to be passed to the Android Account Manager.",
+       "required": true,
+       "location": "path"
+      },
+      "accountType": {
+       "type": "string",
+       "description": "Account type to be passed to Android Account Manager.",
+       "required": true,
+       "location": "path"
+      },
+      "userToken": {
+       "type": "string",
+       "description": "The ID for the user.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "userToken",
+      "accountType",
+      "accountName"
+     ],
+     "request": {
+      "$ref": "Account"
+     },
+     "response": {
+      "$ref": "Account"
+     }
+    }
+   }
+  },
+  "contacts": {
+   "methods": {
+    "delete": {
+     "id": "mirror.contacts.delete",
+     "path": "contacts/{id}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a contact.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the contact.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "get": {
+     "id": "mirror.contacts.get",
+     "path": "contacts/{id}",
+     "httpMethod": "GET",
+     "description": "Gets a single contact by ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the contact.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Contact"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "insert": {
+     "id": "mirror.contacts.insert",
+     "path": "contacts",
+     "httpMethod": "POST",
+     "description": "Inserts a new contact.",
+     "request": {
+      "$ref": "Contact"
+     },
+     "response": {
+      "$ref": "Contact"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "list": {
+     "id": "mirror.contacts.list",
+     "path": "contacts",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of contacts for the authenticated user.",
+     "response": {
+      "$ref": "ContactsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "patch": {
+     "id": "mirror.contacts.patch",
+     "path": "contacts/{id}",
+     "httpMethod": "PATCH",
+     "description": "Updates a contact in place. This method supports patch semantics.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the contact.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "Contact"
+     },
+     "response": {
+      "$ref": "Contact"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "update": {
+     "id": "mirror.contacts.update",
+     "path": "contacts/{id}",
+     "httpMethod": "PUT",
+     "description": "Updates a contact in place.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the contact.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "Contact"
+     },
+     "response": {
+      "$ref": "Contact"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    }
+   }
+  },
+  "locations": {
+   "methods": {
+    "get": {
+     "id": "mirror.locations.get",
+     "path": "locations/{id}",
+     "httpMethod": "GET",
+     "description": "Gets a single location by ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the location or latest for the last known location.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "Location"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "list": {
+     "id": "mirror.locations.list",
+     "path": "locations",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of locations for the user.",
+     "response": {
+      "$ref": "LocationsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    }
+   }
+  },
+  "subscriptions": {
+   "methods": {
+    "delete": {
+     "id": "mirror.subscriptions.delete",
+     "path": "subscriptions/{id}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a subscription.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the subscription.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "insert": {
+     "id": "mirror.subscriptions.insert",
+     "path": "subscriptions",
+     "httpMethod": "POST",
+     "description": "Creates a new subscription.",
+     "request": {
+      "$ref": "Subscription"
+     },
+     "response": {
+      "$ref": "Subscription"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "list": {
+     "id": "mirror.subscriptions.list",
+     "path": "subscriptions",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of subscriptions for the authenticated user and service.",
+     "response": {
+      "$ref": "SubscriptionsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "update": {
+     "id": "mirror.subscriptions.update",
+     "path": "subscriptions/{id}",
+     "httpMethod": "PUT",
+     "description": "Updates an existing subscription in place.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the subscription.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "Subscription"
+     },
+     "response": {
+      "$ref": "Subscription"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    }
+   }
+  },
+  "timeline": {
+   "methods": {
+    "delete": {
+     "id": "mirror.timeline.delete",
+     "path": "timeline/{id}",
+     "httpMethod": "DELETE",
+     "description": "Deletes a timeline item.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the timeline item.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "get": {
+     "id": "mirror.timeline.get",
+     "path": "timeline/{id}",
+     "httpMethod": "GET",
+     "description": "Gets a single timeline item by ID.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the timeline item.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "response": {
+      "$ref": "TimelineItem"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "insert": {
+     "id": "mirror.timeline.insert",
+     "path": "timeline",
+     "httpMethod": "POST",
+     "description": "Inserts a new item into the timeline.",
+     "request": {
+      "$ref": "TimelineItem"
+     },
+     "response": {
+      "$ref": "TimelineItem"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ],
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "audio/*",
+       "image/*",
+       "video/*"
+      ],
+      "maxSize": "10MB",
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/mirror/v1/timeline"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/mirror/v1/timeline"
+       }
+      }
+     }
+    },
+    "list": {
+     "id": "mirror.timeline.list",
+     "path": "timeline",
+     "httpMethod": "GET",
+     "description": "Retrieves a list of timeline items for the authenticated user.",
+     "parameters": {
+      "bundleId": {
+       "type": "string",
+       "description": "If provided, only items with the given bundleId will be returned.",
+       "location": "query"
+      },
+      "includeDeleted": {
+       "type": "boolean",
+       "description": "If true, tombstone records for deleted items will be returned.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of items to include in the response, used for paging.",
+       "format": "uint32",
+       "location": "query"
+      },
+      "orderBy": {
+       "type": "string",
+       "description": "Controls the order in which timeline items are returned.",
+       "enum": [
+        "displayTime",
+        "writeTime"
+       ],
+       "enumDescriptions": [
+        "Results will be ordered by displayTime (default). This is the same ordering as is used in the timeline on the device.",
+        "Results will be ordered by the time at which they were last written to the data store."
+       ],
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Token for the page of results to return.",
+       "location": "query"
+      },
+      "pinnedOnly": {
+       "type": "boolean",
+       "description": "If true, only pinned items will be returned.",
+       "location": "query"
+      },
+      "sourceItemId": {
+       "type": "string",
+       "description": "If provided, only items with the given sourceItemId will be returned.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "TimelineListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "patch": {
+     "id": "mirror.timeline.patch",
+     "path": "timeline/{id}",
+     "httpMethod": "PATCH",
+     "description": "Updates a timeline item in place. This method supports patch semantics.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the timeline item.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "TimelineItem"
+     },
+     "response": {
+      "$ref": "TimelineItem"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ]
+    },
+    "update": {
+     "id": "mirror.timeline.update",
+     "path": "timeline/{id}",
+     "httpMethod": "PUT",
+     "description": "Updates a timeline item in place.",
+     "parameters": {
+      "id": {
+       "type": "string",
+       "description": "The ID of the timeline item.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "id"
+     ],
+     "request": {
+      "$ref": "TimelineItem"
+     },
+     "response": {
+      "$ref": "TimelineItem"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/glass.location",
+      "https://www.googleapis.com/auth/glass.timeline"
+     ],
+     "supportsMediaUpload": true,
+     "mediaUpload": {
+      "accept": [
+       "audio/*",
+       "image/*",
+       "video/*"
+      ],
+      "maxSize": "10MB",
+      "protocols": {
+       "simple": {
+        "multipart": true,
+        "path": "/upload/mirror/v1/timeline/{id}"
+       },
+       "resumable": {
+        "multipart": true,
+        "path": "/resumable/upload/mirror/v1/timeline/{id}"
+       }
+      }
+     }
+    }
+   },
+   "resources": {
+    "attachments": {
+     "methods": {
+      "delete": {
+       "id": "mirror.timeline.attachments.delete",
+       "path": "timeline/{itemId}/attachments/{attachmentId}",
+       "httpMethod": "DELETE",
+       "description": "Deletes an attachment from a timeline item.",
+       "parameters": {
+        "attachmentId": {
+         "type": "string",
+         "description": "The ID of the attachment.",
+         "required": true,
+         "location": "path"
+        },
+        "itemId": {
+         "type": "string",
+         "description": "The ID of the timeline item the attachment belongs to.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "itemId",
+        "attachmentId"
+       ],
+       "scopes": [
+        "https://www.googleapis.com/auth/glass.timeline"
+       ]
+      },
+      "get": {
+       "id": "mirror.timeline.attachments.get",
+       "path": "timeline/{itemId}/attachments/{attachmentId}",
+       "httpMethod": "GET",
+       "description": "Retrieves an attachment on a timeline item by item ID and attachment ID.",
+       "parameters": {
+        "attachmentId": {
+         "type": "string",
+         "description": "The ID of the attachment.",
+         "required": true,
+         "location": "path"
+        },
+        "itemId": {
+         "type": "string",
+         "description": "The ID of the timeline item the attachment belongs to.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "itemId",
+        "attachmentId"
+       ],
+       "response": {
+        "$ref": "Attachment"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/glass.timeline"
+       ],
+       "supportsMediaDownload": true
+      },
+      "insert": {
+       "id": "mirror.timeline.attachments.insert",
+       "path": "timeline/{itemId}/attachments",
+       "httpMethod": "POST",
+       "description": "Adds a new attachment to a timeline item.",
+       "parameters": {
+        "itemId": {
+         "type": "string",
+         "description": "The ID of the timeline item the attachment belongs to.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "itemId"
+       ],
+       "response": {
+        "$ref": "Attachment"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/glass.timeline"
+       ],
+       "supportsMediaUpload": true,
+       "mediaUpload": {
+        "accept": [
+         "audio/*",
+         "image/*",
+         "video/*"
+        ],
+        "maxSize": "10MB",
+        "protocols": {
+         "simple": {
+          "multipart": true,
+          "path": "/upload/mirror/v1/timeline/{itemId}/attachments"
+         },
+         "resumable": {
+          "multipart": true,
+          "path": "/resumable/upload/mirror/v1/timeline/{itemId}/attachments"
+         }
+        }
+       }
+      },
+      "list": {
+       "id": "mirror.timeline.attachments.list",
+       "path": "timeline/{itemId}/attachments",
+       "httpMethod": "GET",
+       "description": "Returns a list of attachments for a timeline item.",
+       "parameters": {
+        "itemId": {
+         "type": "string",
+         "description": "The ID of the timeline item whose attachments should be listed.",
+         "required": true,
+         "location": "path"
+        }
+       },
+       "parameterOrder": [
+        "itemId"
+       ],
+       "response": {
+        "$ref": "AttachmentsListResponse"
+       },
+       "scopes": [
+        "https://www.googleapis.com/auth/glass.timeline"
+       ]
+      }
+     }
+    }
+   }
+  }
+ }
+}

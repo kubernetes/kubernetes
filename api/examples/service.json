@@ -1,5 +1,5 @@
 {
-  "id": "example2",
+  "id": "example",
   "port": 8000,
   "labels": {
      "name": "nginx"

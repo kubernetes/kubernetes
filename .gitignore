@@ -15,3 +15,7 @@
 
 # Go test binaries
 *.test
+
+# Mercurial files
+**/.hg
+**/.hg*

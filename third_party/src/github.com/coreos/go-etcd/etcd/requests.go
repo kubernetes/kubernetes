@@ -136,8 +136,7 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 	var err error
 	var respBody []byte
 
-	reqs := make([]http.Request, 0)
-	resps := make([]http.Response, 0)
+	var numReqs = 1
 
 	checkRetry := c.CheckRetry
 	if checkRetry == nil {
@@ -176,15 +175,24 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 		}()
 	}
 
-	// if we connect to a follower, we will retry until we find a leader
+	// If we connect to a follower and consistency is required, retry until
+	// we connect to a leader
+	sleep := 25 * time.Millisecond
+	maxSleep := time.Second
 	for attempt := 0; ; attempt++ {
-		select {
-		case <-cancelled:
-			return nil, ErrRequestCancelled
-		default:
+		if attempt > 0 {
+			select {
+			case <-cancelled:
+				return nil, ErrRequestCancelled
+			case <-time.After(sleep):
+				sleep = sleep * 2
+				if sleep > maxSleep {
+					sleep = maxSleep
+				}
+			}
 		}
 
-		logger.Debug("begin attempt", attempt, "for", rr.RelativePath)
+		logger.Debug("Connecting to etcd: attempt", attempt+1, "for", rr.RelativePath)
 
 		if rr.Method == "GET" && c.config.Consistency == WEAK_CONSISTENCY {
 			// If it's a GET and consistency level is set to WEAK,
@@ -223,6 +231,12 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 		reqLock.Unlock()
 
 		resp, err = c.httpClient.Do(req)
+		defer func() {
+			if resp != nil {
+				resp.Body.Close()
+			}
+		}()
+
 		// If the request was cancelled, return ErrRequestCancelled directly
 		select {
 		case <-cancelled:
@@ -230,13 +244,13 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 		default:
 		}
 
-		reqs = append(reqs, *req)
+		numReqs++
 
 		// network error, change a machine!
 		if err != nil {
 			logger.Debug("network error:", err.Error())
-			resps = append(resps, http.Response{})
-			if checkErr := checkRetry(c.cluster, reqs, resps, err); checkErr != nil {
+			lastResp := http.Response{}
+			if checkErr := checkRetry(c.cluster, numReqs, lastResp, err); checkErr != nil {
 				return nil, checkErr
 			}
 
@@ -245,8 +259,6 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 		}
 
 		// if there is no error, it should receive response
-		resps = append(resps, *resp)
-		defer resp.Body.Close()
 		logger.Debug("recv.response.from", httpPath)
 
 		if validHttpStatusCode[resp.StatusCode] {
@@ -270,13 +282,15 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 				c.cluster.updateLeaderFromURL(u)
 				logger.Debug("recv.response.relocate", u.String())
 			}
+			resp.Body.Close()
 			continue
 		}
 
-		if checkErr := checkRetry(c.cluster, reqs, resps,
+		if checkErr := checkRetry(c.cluster, numReqs, *resp,
 			errors.New("Unexpected HTTP status code")); checkErr != nil {
 			return nil, checkErr
 		}
+		resp.Body.Close()
 	}
 
 	r := &RawResponse{
@@ -288,26 +302,18 @@ func (c *Client) SendRequest(rr *RawRequest) (*RawResponse, error) {
 	return r, nil
 }
 
-// DefaultCheckRetry checks retry cases
-// If it has retried 2 * machine number, stop to retry it anymore
-// If resp is nil, sleep for 200ms
+// DefaultCheckRetry defines the retrying behaviour for bad HTTP requests
+// If we have retried 2 * machine number, stop retrying.
 // If status code is InternalServerError, sleep for 200ms.
-func DefaultCheckRetry(cluster *Cluster, reqs []http.Request,
-	resps []http.Response, err error) error {
+func DefaultCheckRetry(cluster *Cluster, numReqs int, lastResp http.Response,
+	err error) error {
 
-	if len(reqs) >= 2*len(cluster.Machines) {
+	if numReqs >= 2*len(cluster.Machines) {
 		return newError(ErrCodeEtcdNotReachable,
 			"Tried to connect to each peer twice and failed", 0)
 	}
 
-	resp := &resps[len(resps)-1]
-
-	if resp == nil {
-		time.Sleep(time.Millisecond * 200)
-		return nil
-	}
-
-	code := resp.StatusCode
+	code := lastResp.StatusCode
 	if code == http.StatusInternalServerError {
 		time.Sleep(time.Millisecond * 200)
 

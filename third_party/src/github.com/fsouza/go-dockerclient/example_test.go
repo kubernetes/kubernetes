@@ -19,6 +19,7 @@ func ExampleClient_AttachToContainer() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	client.SkipServerVersionCheck = true
 	// Reading logs from container a84849 and sending them to buf.
 	var buf bytes.Buffer
 	err = client.AttachToContainer(docker.AttachToContainerOptions{

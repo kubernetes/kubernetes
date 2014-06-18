@@ -190,8 +190,12 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 			server.error(err, w)
 			return
 		}
-		storage.Create(obj)
-		server.write(200, obj, w)
+		err = storage.Create(obj)
+		if err != nil {
+			server.error(err, w)
+		} else {
+			server.write(200, obj, w)
+		}
 		return
 	case "DELETE":
 		if len(parts) != 2 {

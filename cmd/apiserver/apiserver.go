@@ -24,6 +24,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -32,6 +33,7 @@ var (
 	port                        = flag.Uint("port", 8080, "The port to listen on.  Default 8080.")
 	address                     = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
 	apiPrefix                   = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
+	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	etcdServerList, machineList util.StringList
 )
 
@@ -47,12 +49,27 @@ func main() {
 		log.Fatal("No machines specified!")
 	}
 
-	var m *master.Master
+	var cloud cloudprovider.Interface
+	switch *cloudProvider {
+	case "gce":
+		var err error
+		cloud, err = cloudprovider.NewGCECloud()
+		if err != nil {
+			log.Fatal("Couldn't connect to GCE cloud: %#v", err)
+		}
+	default:
+		if len(*cloudProvider) > 0 {
+			log.Printf("Unknown cloud provider: %s", *cloudProvider)
+		} else {
+			log.Print("No cloud provider specified.")
+		}
+	}
 
+	var m *master.Master
 	if len(etcdServerList) > 0 {
-		m = master.New(etcdServerList, machineList)
+		m = master.New(etcdServerList, machineList, cloud)
 	} else {
-		m = master.NewMemoryServer(machineList)
+		m = master.NewMemoryServer(machineList, cloud)
 	}
 
 	log.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))

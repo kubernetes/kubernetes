@@ -51,11 +51,11 @@ type Client struct {
 	// If CheckRetry is nil, client will call the default one
 	// `DefaultCheckRetry`.
 	// Argument cluster is the etcd.Cluster object that these requests have been made on.
-	// Argument reqs is all of the http.Requests that have been made so far.
-	// Argument resps is all of the http.Responses from these requests.
+	// Argument numReqs is the number of http.Requests that have been made so far.
+	// Argument lastResp is the http.Responses from the last request.
 	// Argument err is the reason of the failure.
-	CheckRetry func(cluster *Cluster, reqs []http.Request,
-		resps []http.Response, err error) error
+	CheckRetry func(cluster *Cluster, numReqs int,
+		lastResp http.Response, err error) error
 }
 
 // NewClient create a basic client that is configured to be used

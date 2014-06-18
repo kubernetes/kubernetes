@@ -37,6 +37,7 @@ func TestEventListeners(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create client: %s", err)
 	}
+	client.SkipServerVersionCheck = true
 
 	listener := make(chan *APIEvents, 10)
 	defer func() { time.Sleep(10 * time.Millisecond); client.RemoveEventListener(listener) }()

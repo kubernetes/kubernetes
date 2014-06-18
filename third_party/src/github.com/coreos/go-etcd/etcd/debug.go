@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"strings"
@@ -21,31 +22,31 @@ type etcdLogger struct {
 }
 
 func (p *etcdLogger) Debug(args ...interface{}) {
-	args[0] = "DEBUG: " + args[0].(string)
-	p.log.Println(args)
+	msg := "DEBUG: " + fmt.Sprint(args)
+	p.log.Println(msg)
 }
 
-func (p *etcdLogger) Debugf(fmt string, args ...interface{}) {
-	args[0] = "DEBUG: " + args[0].(string)
+func (p *etcdLogger) Debugf(f string, args ...interface{}) {
+	msg := "DEBUG: " + fmt.Sprintf(f, args)
 	// Append newline if necessary
-	if !strings.HasSuffix(fmt, "\n") {
-		fmt = fmt + "\n"
+	if !strings.HasSuffix(msg, "\n") {
+		msg = msg + "\n"
 	}
-	p.log.Printf(fmt, args)
+	p.log.Print(msg)
 }
 
 func (p *etcdLogger) Warning(args ...interface{}) {
-	args[0] = "WARNING: " + args[0].(string)
-	p.log.Println(args)
+	msg := "WARNING: " + fmt.Sprint(args)
+	p.log.Println(msg)
 }
 
-func (p *etcdLogger) Warningf(fmt string, args ...interface{}) {
+func (p *etcdLogger) Warningf(f string, args ...interface{}) {
+	msg := "WARNING: " + fmt.Sprintf(f, args)
 	// Append newline if necessary
-	if !strings.HasSuffix(fmt, "\n") {
-		fmt = fmt + "\n"
+	if !strings.HasSuffix(msg, "\n") {
+		msg = msg + "\n"
 	}
-	args[0] = "WARNING: " + args[0].(string)
-	p.log.Printf(fmt, args)
+	p.log.Print(msg)
 }
 
 func init() {

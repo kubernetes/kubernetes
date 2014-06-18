@@ -1,0 +1,264 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/WlcQEurGo0sEddzjdUrIBdx9npM\"",
+ "discoveryVersion": "v1",
+ "id": "oauth2:v1",
+ "name": "oauth2",
+ "version": "v1",
+ "title": "Google OAuth2 API",
+ "description": "Lets you access OAuth2 protocol related APIs.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/accounts/docs/OAuth2",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/",
+ "basePath": "/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/plus.login": {
+     "description": "Know your basic profile info and list of people in your circles."
+    },
+    "https://www.googleapis.com/auth/plus.me": {
+     "description": "Know who you are on Google"
+    },
+    "https://www.googleapis.com/auth/userinfo.email": {
+     "description": "View your email address"
+    },
+    "https://www.googleapis.com/auth/userinfo.profile": {
+     "description": "View basic information about your account"
+    }
+   }
+  }
+ },
+ "schemas": {
+  "Tokeninfo": {
+   "id": "Tokeninfo",
+   "type": "object",
+   "properties": {
+    "access_type": {
+     "type": "string",
+     "description": "The access type granted with this token. It can be offline or online."
+    },
+    "audience": {
+     "type": "string",
+     "description": "Who is the intended audience for this token. In general the same as issued_to."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email address of the user. Present only if the email scope is present in the request."
+    },
+    "email_verified": {
+     "type": "boolean",
+     "description": "Boolean flag which is true if the email address is verified. Present only if the email scope is present in the request."
+    },
+    "expires_in": {
+     "type": "integer",
+     "description": "The expiry time of the token, as number of seconds left until expiry.",
+     "format": "int32"
+    },
+    "issued_at": {
+     "type": "integer",
+     "description": "The issue time of the token, as number of seconds.",
+     "format": "int32"
+    },
+    "issued_to": {
+     "type": "string",
+     "description": "To whom was the token issued to. In general the same as audience."
+    },
+    "issuer": {
+     "type": "string",
+     "description": "Who issued the token."
+    },
+    "nonce": {
+     "type": "string",
+     "description": "Nonce of the id token."
+    },
+    "scope": {
+     "type": "string",
+     "description": "The space separated list of scopes granted to this token."
+    },
+    "user_id": {
+     "type": "string",
+     "description": "The Gaia obfuscated user id."
+    },
+    "verified_email": {
+     "type": "boolean",
+     "description": "Boolean flag which is true if the email address is verified. Present only if the email scope is present in the request."
+    }
+   }
+  },
+  "Userinfoplus": {
+   "id": "Userinfoplus",
+   "type": "object",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "The user's email address."
+    },
+    "family_name": {
+     "type": "string",
+     "description": "The user's last name."
+    },
+    "gender": {
+     "type": "string",
+     "description": "The user's gender."
+    },
+    "given_name": {
+     "type": "string",
+     "description": "The user's first name."
+    },
+    "hd": {
+     "type": "string",
+     "description": "The hosted domain e.g. example.com if the user is Google apps user."
+    },
+    "id": {
+     "type": "string",
+     "description": "The focus obfuscated gaia id of the user."
+    },
+    "link": {
+     "type": "string",
+     "description": "URL of the profile page."
+    },
+    "locale": {
+     "type": "string",
+     "description": "The user's preferred locale."
+    },
+    "name": {
+     "type": "string",
+     "description": "The user's full name."
+    },
+    "picture": {
+     "type": "string",
+     "description": "URL of the user's picture image."
+    },
+    "verified_email": {
+     "type": "boolean",
+     "description": "Boolean flag which is true if the email address is verified. Always verified because we only return the user's primary email address.",
+     "default": "true"
+    }
+   }
+  }
+ },
+ "methods": {
+  "tokeninfo": {
+   "id": "oauth2.tokeninfo",
+   "path": "oauth2/v1/tokeninfo",
+   "httpMethod": "POST",
+   "description": "Get token info",
+   "parameters": {
+    "access_token": {
+     "type": "string",
+     "description": "The oauth2 access token",
+     "location": "query"
+    },
+    "id_token": {
+     "type": "string",
+     "description": "The ID token",
+     "location": "query"
+    }
+   },
+   "response": {
+    "$ref": "Tokeninfo"
+   }
+  }
+ },
+ "resources": {
+  "userinfo": {
+   "methods": {
+    "get": {
+     "id": "oauth2.userinfo.get",
+     "path": "oauth2/v1/userinfo",
+     "httpMethod": "GET",
+     "description": "Get user info",
+     "response": {
+      "$ref": "Userinfoplus"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/plus.login",
+      "https://www.googleapis.com/auth/plus.me",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+     ]
+    }
+   },
+   "resources": {
+    "v2": {
+     "resources": {
+      "me": {
+       "methods": {
+        "get": {
+         "id": "oauth2.userinfo.v2.me.get",
+         "path": "userinfo/v2/me",
+         "httpMethod": "GET",
+         "description": "Get user info",
+         "response": {
+          "$ref": "Userinfoplus"
+         },
+         "scopes": [
+          "https://www.googleapis.com/auth/plus.login",
+          "https://www.googleapis.com/auth/plus.me",
+          "https://www.googleapis.com/auth/userinfo.email",
+          "https://www.googleapis.com/auth/userinfo.profile"
+         ]
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ }
+}

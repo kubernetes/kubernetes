@@ -1,0 +1,3643 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"5M1WkxnZyJhziV-cW1kdtwscs8E/wBs-qNgKobkZmtJOx0i4cFgYtC8\"",
+ "discoveryVersion": "v1",
+ "id": "games:v1",
+ "name": "games",
+ "canonicalName": "Games",
+ "version": "v1",
+ "title": "Google Play Game Services API",
+ "description": "The API for Google Play Game Services.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/games/services/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/games/v1/",
+ "basePath": "/games/v1/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "games/v1/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "auth": {
+  "oauth2": {
+   "scopes": {
+    "https://www.googleapis.com/auth/games": {
+     "description": "Share your Google+ profile information and view and manage your game activity"
+    },
+    "https://www.googleapis.com/auth/plus.login": {
+     "description": "Know your basic profile info and list of people in your circles."
+    }
+   }
+  }
+ },
+ "schemas": {
+  "AchievementDefinition": {
+   "id": "AchievementDefinition",
+   "type": "object",
+   "description": "This is a JSON template for an achievement definition object.",
+   "properties": {
+    "achievementType": {
+     "type": "string",
+     "description": "The type of the achievement.\nPossible values are:  \n- \"STANDARD\" - Achievement is either locked or unlocked. \n- \"INCREMENTAL\" - Achievement is incremental."
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of the achievement."
+    },
+    "formattedTotalSteps": {
+     "type": "string",
+     "description": "The total steps for an incremental achievement as a string."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the achievement."
+    },
+    "initialState": {
+     "type": "string",
+     "description": "The initial state of the achievement.\nPossible values are:  \n- \"HIDDEN\" - Achievement is hidden. \n- \"REVEALED\" - Achievement is revealed. \n- \"UNLOCKED\" - Achievement is unlocked."
+    },
+    "isRevealedIconUrlDefault": {
+     "type": "boolean",
+     "description": "Indicates whether the revealed icon image being returned is a default image, or is provided by the game."
+    },
+    "isUnlockedIconUrlDefault": {
+     "type": "boolean",
+     "description": "Indicates whether the unlocked icon image being returned is a default image, or is game-provided."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementDefinition.",
+     "default": "games#achievementDefinition"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the achievement."
+    },
+    "revealedIconUrl": {
+     "type": "string",
+     "description": "The image URL for the revealed achievement icon."
+    },
+    "totalSteps": {
+     "type": "integer",
+     "description": "The total steps for an incremental achievement.",
+     "format": "int32"
+    },
+    "unlockedIconUrl": {
+     "type": "string",
+     "description": "The image URL for the unlocked achievement icon."
+    }
+   }
+  },
+  "AchievementDefinitionsListResponse": {
+   "id": "AchievementDefinitionsListResponse",
+   "type": "object",
+   "description": "This is a JSON template for a list of achievement definition objects.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The achievement definitions.",
+     "items": {
+      "$ref": "AchievementDefinition"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementDefinitionsListResponse.",
+     "default": "games#achievementDefinitionsListResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token corresponding to the next page of results."
+    }
+   }
+  },
+  "AchievementIncrementResponse": {
+   "id": "AchievementIncrementResponse",
+   "type": "object",
+   "description": "This is a JSON template for an achievement increment response",
+   "properties": {
+    "currentSteps": {
+     "type": "integer",
+     "description": "The current steps recorded for this incremental achievement.",
+     "format": "int32"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementIncrementResponse.",
+     "default": "games#achievementIncrementResponse"
+    },
+    "newlyUnlocked": {
+     "type": "boolean",
+     "description": "Whether the the current steps for the achievement has reached the number of steps required to unlock."
+    }
+   }
+  },
+  "AchievementRevealResponse": {
+   "id": "AchievementRevealResponse",
+   "type": "object",
+   "description": "This is a JSON template for an achievement reveal response",
+   "properties": {
+    "currentState": {
+     "type": "string",
+     "description": "The current state of the achievement for which a reveal was attempted. This might be UNLOCKED if the achievement was already unlocked.\nPossible values are:  \n- \"REVEALED\" - Achievement is revealed. \n- \"UNLOCKED\" - Achievement is unlocked."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementRevealResponse.",
+     "default": "games#achievementRevealResponse"
+    }
+   }
+  },
+  "AchievementSetStepsAtLeastResponse": {
+   "id": "AchievementSetStepsAtLeastResponse",
+   "type": "object",
+   "description": "This is a JSON template for an achievement set steps at least response.",
+   "properties": {
+    "currentSteps": {
+     "type": "integer",
+     "description": "The current steps recorded for this incremental achievement.",
+     "format": "int32"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementSetStepsAtLeastResponse.",
+     "default": "games#achievementSetStepsAtLeastResponse"
+    },
+    "newlyUnlocked": {
+     "type": "boolean",
+     "description": "Whether the the current steps for the achievement has reached the number of steps required to unlock."
+    }
+   }
+  },
+  "AchievementUnlockResponse": {
+   "id": "AchievementUnlockResponse",
+   "type": "object",
+   "description": "This is a JSON template for an achievement unlock response",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementUnlockResponse.",
+     "default": "games#achievementUnlockResponse"
+    },
+    "newlyUnlocked": {
+     "type": "boolean",
+     "description": "Whether this achievement was newly unlocked (that is, whether the unlock request for the achievement was the first for the player)."
+    }
+   }
+  },
+  "AchievementUpdateMultipleRequest": {
+   "id": "AchievementUpdateMultipleRequest",
+   "type": "object",
+   "description": "This is a JSON template for a list of achievement update requests.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementUpdateMultipleRequest.",
+     "default": "games#achievementUpdateMultipleRequest"
+    },
+    "updates": {
+     "type": "array",
+     "description": "The individual achievement update requests.",
+     "items": {
+      "$ref": "AchievementUpdateRequest"
+     }
+    }
+   }
+  },
+  "AchievementUpdateMultipleResponse": {
+   "id": "AchievementUpdateMultipleResponse",
+   "type": "object",
+   "description": "This is a JSON template for an achievement unlock response.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementUpdateListResponse.",
+     "default": "games#achievementUpdateMultipleResponse"
+    },
+    "updatedAchievements": {
+     "type": "array",
+     "description": "The updated state of the achievements.",
+     "items": {
+      "$ref": "AchievementUpdateResponse"
+     }
+    }
+   }
+  },
+  "AchievementUpdateRequest": {
+   "id": "AchievementUpdateRequest",
+   "type": "object",
+   "description": "This is a JSON template for a request to update an achievement.",
+   "properties": {
+    "achievementId": {
+     "type": "string",
+     "description": "The achievement this update is being applied to."
+    },
+    "incrementPayload": {
+     "$ref": "GamesAchievementIncrement",
+     "description": "The payload if an update of type INCREMENT was requested for the achievement."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementUpdateRequest.",
+     "default": "games#achievementUpdateRequest"
+    },
+    "setStepsAtLeastPayload": {
+     "$ref": "GamesAchievementSetStepsAtLeast",
+     "description": "The payload if an update of type SET_STEPS_AT_LEAST was requested for the achievement."
+    },
+    "updateType": {
+     "type": "string",
+     "description": "The type of update being applied.\nPossible values are:  \n- \"REVEAL\" - Achievement is revealed. \n- \"UNLOCK\" - Achievement is unlocked. \n- \"INCREMENT\" - Achievement is incremented. \n- \"SET_STEPS_AT_LEAST\" - Achievement progress is set to at least the passed value."
+    }
+   }
+  },
+  "AchievementUpdateResponse": {
+   "id": "AchievementUpdateResponse",
+   "type": "object",
+   "description": "This is a JSON template for an achievement update response.",
+   "properties": {
+    "achievementId": {
+     "type": "string",
+     "description": "The achievement this update is was applied to."
+    },
+    "currentState": {
+     "type": "string",
+     "description": "The current state of the achievement.\nPossible values are:  \n- \"HIDDEN\" - Achievement is hidden. \n- \"REVEALED\" - Achievement is revealed. \n- \"UNLOCKED\" - Achievement is unlocked."
+    },
+    "currentSteps": {
+     "type": "integer",
+     "description": "The current steps recorded for this achievement if it is incremental.",
+     "format": "int32"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#achievementUpdateResponse.",
+     "default": "games#achievementUpdateResponse"
+    },
+    "newlyUnlocked": {
+     "type": "boolean",
+     "description": "Whether this achievement was newly unlocked (that is, whether the unlock request for the achievement was the first for the player)."
+    },
+    "updateOccurred": {
+     "type": "boolean",
+     "description": "Whether the requested updates actually affected the achievement."
+    }
+   }
+  },
+  "AggregateStats": {
+   "id": "AggregateStats",
+   "type": "object",
+   "description": "This is a JSON template for aggregate stats.",
+   "properties": {
+    "count": {
+     "type": "string",
+     "description": "The number of messages sent between a pair of peers.",
+     "format": "int64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#aggregateStats.",
+     "default": "games#aggregateStats"
+    },
+    "max": {
+     "type": "string",
+     "description": "The maximum amount.",
+     "format": "int64"
+    },
+    "min": {
+     "type": "string",
+     "description": "The minimum amount.",
+     "format": "int64"
+    },
+    "sum": {
+     "type": "string",
+     "description": "The total number of bytes sent for messages between a pair of peers.",
+     "format": "int64"
+    }
+   }
+  },
+  "AnonymousPlayer": {
+   "id": "AnonymousPlayer",
+   "type": "object",
+   "description": "This is a JSON template for an anonymous player",
+   "properties": {
+    "avatarImageUrl": {
+     "type": "string",
+     "description": "The base URL for the image to display for the anonymous player."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The name to display for the anonymous player."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#anonymousPlayer.",
+     "default": "games#anonymousPlayer"
+    }
+   }
+  },
+  "Application": {
+   "id": "Application",
+   "type": "object",
+   "description": "This is a JSON template for the Application resource.",
+   "properties": {
+    "achievement_count": {
+     "type": "integer",
+     "description": "The number of achievements visible to the currently authenticated player.",
+     "format": "int32"
+    },
+    "assets": {
+     "type": "array",
+     "description": "The assets of the application.",
+     "items": {
+      "$ref": "ImageAsset"
+     }
+    },
+    "author": {
+     "type": "string",
+     "description": "The author of the application."
+    },
+    "category": {
+     "$ref": "ApplicationCategory",
+     "description": "The category of the application."
+    },
+    "description": {
+     "type": "string",
+     "description": "The description of the application."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the application."
+    },
+    "instances": {
+     "type": "array",
+     "description": "The instances of the application.",
+     "items": {
+      "$ref": "Instance"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#application.",
+     "default": "games#application"
+    },
+    "lastUpdatedTimestamp": {
+     "type": "string",
+     "description": "The last updated timestamp of the application.",
+     "format": "int64"
+    },
+    "leaderboard_count": {
+     "type": "integer",
+     "description": "The number of leaderboards visible to the currently authenticated player.",
+     "format": "int32"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the application."
+    }
+   }
+  },
+  "ApplicationCategory": {
+   "id": "ApplicationCategory",
+   "type": "object",
+   "description": "This is a JSON template for an application category object.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#applicationCategory.",
+     "default": "games#applicationCategory"
+    },
+    "primary": {
+     "type": "string",
+     "description": "The primary category."
+    },
+    "secondary": {
+     "type": "string",
+     "description": "The secondary category."
+    }
+   }
+  },
+  "GamesAchievementIncrement": {
+   "id": "GamesAchievementIncrement",
+   "type": "object",
+   "description": "This is a JSON template for the payload to request to increment an achievement.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#GamesAchievementIncrement.",
+     "default": "games#GamesAchievementIncrement"
+    },
+    "requestId": {
+     "type": "string",
+     "description": "The requestId associated with an increment to an achievement.",
+     "format": "int64"
+    },
+    "steps": {
+     "type": "integer",
+     "description": "The number of steps to be incremented.",
+     "format": "int32"
+    }
+   }
+  },
+  "GamesAchievementSetStepsAtLeast": {
+   "id": "GamesAchievementSetStepsAtLeast",
+   "type": "object",
+   "description": "This is a JSON template for the payload to request to increment an achievement.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#GamesAchievementSetStepsAtLeast.",
+     "default": "games#GamesAchievementSetStepsAtLeast"
+    },
+    "steps": {
+     "type": "integer",
+     "description": "The minimum number of steps for the achievement to be set to.",
+     "format": "int32"
+    }
+   }
+  },
+  "ImageAsset": {
+   "id": "ImageAsset",
+   "type": "object",
+   "description": "This is a JSON template for an image asset object.",
+   "properties": {
+    "height": {
+     "type": "integer",
+     "description": "The height of the asset.",
+     "format": "int32"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#imageAsset.",
+     "default": "games#imageAsset"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the asset."
+    },
+    "url": {
+     "type": "string",
+     "description": "The URL of the asset."
+    },
+    "width": {
+     "type": "integer",
+     "description": "The width of the asset.",
+     "format": "int32"
+    }
+   }
+  },
+  "Instance": {
+   "id": "Instance",
+   "type": "object",
+   "description": "This is a JSON template for the Instance resource.",
+   "properties": {
+    "acquisitionUri": {
+     "type": "string",
+     "description": "URI which shows where a user can acquire this instance."
+    },
+    "androidInstance": {
+     "$ref": "InstanceAndroidDetails",
+     "description": "Platform dependent details for Android."
+    },
+    "iosInstance": {
+     "$ref": "InstanceIosDetails",
+     "description": "Platform dependent details for iOS."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#instance.",
+     "default": "games#instance"
+    },
+    "name": {
+     "type": "string",
+     "description": "Localized display name."
+    },
+    "platformType": {
+     "type": "string",
+     "description": "The platform type.\nPossible values are:  \n- \"ANDROID\" - Instance is for Android. \n- \"IOS\" - Instance is for iOS \n- \"WEB_APP\" - Instance is for Web App."
+    },
+    "realtimePlay": {
+     "type": "boolean",
+     "description": "Flag to show if this game instance supports realtime play."
+    },
+    "turnBasedPlay": {
+     "type": "boolean",
+     "description": "Flag to show if this game instance supports turn based play."
+    },
+    "webInstance": {
+     "$ref": "InstanceWebDetails",
+     "description": "Platform dependent details for Web."
+    }
+   }
+  },
+  "InstanceAndroidDetails": {
+   "id": "InstanceAndroidDetails",
+   "type": "object",
+   "description": "This is a JSON template for the Android instance details resource.",
+   "properties": {
+    "enablePiracyCheck": {
+     "type": "boolean",
+     "description": "Flag indicating whether the anti-piracy check is enabled."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#instanceAndroidDetails.",
+     "default": "games#instanceAndroidDetails"
+    },
+    "packageName": {
+     "type": "string",
+     "description": "Android package name which maps to Google Play URL."
+    },
+    "preferred": {
+     "type": "boolean",
+     "description": "Indicates that this instance is the default for new installations."
+    }
+   }
+  },
+  "InstanceIosDetails": {
+   "id": "InstanceIosDetails",
+   "type": "object",
+   "description": "This is a JSON template for the iOS details resource.",
+   "properties": {
+    "bundleIdentifier": {
+     "type": "string",
+     "description": "Bundle identifier."
+    },
+    "itunesAppId": {
+     "type": "string",
+     "description": "iTunes App ID."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#instanceIosDetails.",
+     "default": "games#instanceIosDetails"
+    },
+    "preferredForIpad": {
+     "type": "boolean",
+     "description": "Indicates that this instance is the default for new installations on iPad devices."
+    },
+    "preferredForIphone": {
+     "type": "boolean",
+     "description": "Indicates that this instance is the default for new installations on iPhone devices."
+    },
+    "supportIpad": {
+     "type": "boolean",
+     "description": "Flag to indicate if this instance supports iPad."
+    },
+    "supportIphone": {
+     "type": "boolean",
+     "description": "Flag to indicate if this instance supports iPhone."
+    }
+   }
+  },
+  "InstanceWebDetails": {
+   "id": "InstanceWebDetails",
+   "type": "object",
+   "description": "This is a JSON template for the Web details resource.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#instanceWebDetails.",
+     "default": "games#instanceWebDetails"
+    },
+    "launchUrl": {
+     "type": "string",
+     "description": "Launch URL for the game."
+    },
+    "preferred": {
+     "type": "boolean",
+     "description": "Indicates that this instance is the default for new installations."
+    }
+   }
+  },
+  "Leaderboard": {
+   "id": "Leaderboard",
+   "type": "object",
+   "description": "This is a JSON template for the Leaderboard resource.",
+   "properties": {
+    "iconUrl": {
+     "type": "string",
+     "description": "The icon for the leaderboard."
+    },
+    "id": {
+     "type": "string",
+     "description": "The leaderboard ID."
+    },
+    "isIconUrlDefault": {
+     "type": "boolean",
+     "description": "Indicates whether the icon image being returned is a default image, or is game-provided."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#leaderboard.",
+     "default": "games#leaderboard"
+    },
+    "name": {
+     "type": "string",
+     "description": "The name of the leaderboard."
+    },
+    "order": {
+     "type": "string",
+     "description": "How scores are ordered.\nPossible values are:  \n- \"LARGER_IS_BETTER\" - Larger values are better; scores are sorted in descending order. \n- \"SMALLER_IS_BETTER\" - Smaller values are better; scores are sorted in ascending order."
+    }
+   }
+  },
+  "LeaderboardEntry": {
+   "id": "LeaderboardEntry",
+   "type": "object",
+   "description": "This is a JSON template for the Leaderboard Entry resource.",
+   "properties": {
+    "formattedScore": {
+     "type": "string",
+     "description": "The localized string for the numerical value of this score."
+    },
+    "formattedScoreRank": {
+     "type": "string",
+     "description": "The localized string for the rank of this score for this leaderboard."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#leaderboardEntry.",
+     "default": "games#leaderboardEntry"
+    },
+    "player": {
+     "$ref": "Player",
+     "description": "The player who holds this score."
+    },
+    "scoreRank": {
+     "type": "string",
+     "description": "The rank of this score for this leaderboard.",
+     "format": "int64"
+    },
+    "scoreTag": {
+     "type": "string",
+     "description": "Additional information about the score. Values must contain no more than 64 URI-safe characters as defined by section 2.3 of RFC 3986."
+    },
+    "scoreValue": {
+     "type": "string",
+     "description": "The numerical value of this score.",
+     "format": "int64"
+    },
+    "timeSpan": {
+     "type": "string",
+     "description": "The time span of this high score.\nPossible values are:  \n- \"ALL_TIME\" - The score is an all-time high score. \n- \"WEEKLY\" - The score is a weekly high score. \n- \"DAILY\" - The score is a daily high score."
+    },
+    "writeTimestampMillis": {
+     "type": "string",
+     "description": "The timestamp at which this score was recorded, in milliseconds since the epoch in UTC.",
+     "format": "int64"
+    }
+   }
+  },
+  "LeaderboardListResponse": {
+   "id": "LeaderboardListResponse",
+   "type": "object",
+   "description": "This is a JSON template for a list of leaderboard objects.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The leaderboards.",
+     "items": {
+      "$ref": "Leaderboard"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#leaderboardListResponse.",
+     "default": "games#leaderboardListResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token corresponding to the next page of results."
+    }
+   }
+  },
+  "LeaderboardScoreRank": {
+   "id": "LeaderboardScoreRank",
+   "type": "object",
+   "description": "This is a JSON template for a score rank in a leaderboard.",
+   "properties": {
+    "formattedNumScores": {
+     "type": "string",
+     "description": "The number of scores in the leaderboard as a string."
+    },
+    "formattedRank": {
+     "type": "string",
+     "description": "The rank in the leaderboard as a string."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#leaderboardScoreRank.",
+     "default": "games#leaderboardScoreRank"
+    },
+    "numScores": {
+     "type": "string",
+     "description": "The number of scores in the leaderboard.",
+     "format": "int64"
+    },
+    "rank": {
+     "type": "string",
+     "description": "The rank in the leaderboard.",
+     "format": "int64"
+    }
+   }
+  },
+  "LeaderboardScores": {
+   "id": "LeaderboardScores",
+   "type": "object",
+   "description": "This is a JSON template for a ListScores response.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The scores in the leaderboard.",
+     "items": {
+      "$ref": "LeaderboardEntry"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#leaderboardScores.",
+     "default": "games#leaderboardScores"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The pagination token for the next page of results."
+    },
+    "numScores": {
+     "type": "string",
+     "description": "The total number of scores in the leaderboard.",
+     "format": "int64"
+    },
+    "playerScore": {
+     "$ref": "LeaderboardEntry",
+     "description": "The score of the requesting player on the leaderboard. The player's score may appear both here and in the list of scores above. If you are viewing a public leaderboard and the player is not sharing their gameplay information publicly, the scoreRank and formattedScoreRank values will not be present."
+    },
+    "prevPageToken": {
+     "type": "string",
+     "description": "The pagination token for the previous page of results."
+    }
+   }
+  },
+  "NetworkDiagnostics": {
+   "id": "NetworkDiagnostics",
+   "type": "object",
+   "description": "This is a JSON template for network diagnostics reported for a client.",
+   "properties": {
+    "androidNetworkSubtype": {
+     "type": "integer",
+     "description": "The Android network subtype.",
+     "format": "int32"
+    },
+    "androidNetworkType": {
+     "type": "integer",
+     "description": "The Android network type.",
+     "format": "int32"
+    },
+    "iosNetworkType": {
+     "type": "integer",
+     "description": "iOS network type as defined in Reachability.h.",
+     "format": "int32"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#networkDiagnostics.",
+     "default": "games#networkDiagnostics"
+    },
+    "registrationLatencyMillis": {
+     "type": "integer",
+     "description": "The amount of time in milliseconds it took for the client to establish a connection with the XMPP server.",
+     "format": "int32"
+    }
+   }
+  },
+  "ParticipantResult": {
+   "id": "ParticipantResult",
+   "type": "object",
+   "description": "This is a JSON template for a result for a match participant.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#participantResult.",
+     "default": "games#participantResult"
+    },
+    "participantId": {
+     "type": "string",
+     "description": "The ID of the participant."
+    },
+    "placing": {
+     "type": "integer",
+     "description": "The placement or ranking of the participant in the match results; a number from one to the number of participants in the match. Multiple participants may have the same placing value in case of a type.",
+     "format": "int32"
+    },
+    "result": {
+     "type": "string",
+     "description": "The result of the participant for this match.\nPossible values are:  \n- \"MATCH_RESULT_WIN\" - The participant won the match. \n- \"MATCH_RESULT_LOSS\" - The participant lost the match. \n- \"MATCH_RESULT_TIE\" - The participant tied the match. \n- \"MATCH_RESULT_NONE\" - There was no winner for the match (nobody wins or loses this kind of game.) \n- \"MATCH_RESULT_DISCONNECT\" - The participant disconnected / left during the match. \n- \"MATCH_RESULT_DISAGREED\" - Different clients reported different results for this participant."
+    }
+   }
+  },
+  "PeerChannelDiagnostics": {
+   "id": "PeerChannelDiagnostics",
+   "type": "object",
+   "description": "This is a JSON template for peer channel diagnostics.",
+   "properties": {
+    "bytesReceived": {
+     "$ref": "AggregateStats",
+     "description": "Number of bytes received."
+    },
+    "bytesSent": {
+     "$ref": "AggregateStats",
+     "description": "Number of bytes sent."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#peerChannelDiagnostics.",
+     "default": "games#peerChannelDiagnostics"
+    },
+    "numMessagesLost": {
+     "type": "integer",
+     "description": "Number of messages lost.",
+     "format": "int32"
+    },
+    "numMessagesReceived": {
+     "type": "integer",
+     "description": "Number of messages received.",
+     "format": "int32"
+    },
+    "numMessagesSent": {
+     "type": "integer",
+     "description": "Number of messages sent.",
+     "format": "int32"
+    },
+    "numSendFailures": {
+     "type": "integer",
+     "description": "Number of send failures.",
+     "format": "int32"
+    },
+    "roundtripLatencyMillis": {
+     "$ref": "AggregateStats",
+     "description": "Roundtrip latency stats in milliseconds."
+    }
+   }
+  },
+  "PeerSessionDiagnostics": {
+   "id": "PeerSessionDiagnostics",
+   "type": "object",
+   "description": "This is a JSON template for peer session diagnostics.",
+   "properties": {
+    "connectedTimestampMillis": {
+     "type": "string",
+     "description": "Connected time in milliseconds.",
+     "format": "int64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#peerSessionDiagnostics.",
+     "default": "games#peerSessionDiagnostics"
+    },
+    "participantId": {
+     "type": "string",
+     "description": "The participant ID of the peer."
+    },
+    "reliableChannel": {
+     "$ref": "PeerChannelDiagnostics",
+     "description": "Reliable channel diagnostics."
+    },
+    "unreliableChannel": {
+     "$ref": "PeerChannelDiagnostics",
+     "description": "Unreliable channel diagnostics."
+    }
+   }
+  },
+  "Played": {
+   "id": "Played",
+   "type": "object",
+   "description": "This is a JSON template for 3P metadata about a player playing a game.",
+   "properties": {
+    "autoMatched": {
+     "type": "boolean",
+     "description": "True if the player was auto-matched with the currently authenticated user."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#played.",
+     "default": "games#played"
+    },
+    "timeMillis": {
+     "type": "string",
+     "description": "The last time the player played the game in milliseconds since the epoch in UTC.",
+     "format": "int64"
+    }
+   }
+  },
+  "Player": {
+   "id": "Player",
+   "type": "object",
+   "description": "This is a JSON template for a Player resource.",
+   "properties": {
+    "avatarImageUrl": {
+     "type": "string",
+     "description": "The base URL for the image that represents the player."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The name to display for the player."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#player.",
+     "default": "games#player"
+    },
+    "lastPlayedWith": {
+     "$ref": "Played",
+     "description": "Details about the last time this player played a multiplayer game with the currently authenticated player. Populated for PLAYED_WITH player collection members."
+    },
+    "name": {
+     "type": "object",
+     "description": "An object representation of the individual components of the player's name.",
+     "properties": {
+      "familyName": {
+       "type": "string",
+       "description": "The family name (last name) of this player."
+      },
+      "givenName": {
+       "type": "string",
+       "description": "The given name (first name) of this player."
+      }
+     }
+    },
+    "playerId": {
+     "type": "string",
+     "description": "The ID of the player."
+    }
+   }
+  },
+  "PlayerAchievement": {
+   "id": "PlayerAchievement",
+   "type": "object",
+   "description": "This is a JSON template for an achievement object.",
+   "properties": {
+    "achievementState": {
+     "type": "string",
+     "description": "The state of the achievement.\nPossible values are:  \n- \"HIDDEN\" - Achievement is hidden. \n- \"REVEALED\" - Achievement is revealed. \n- \"UNLOCKED\" - Achievement is unlocked."
+    },
+    "currentSteps": {
+     "type": "integer",
+     "description": "The current steps for an incremental achievement.",
+     "format": "int32"
+    },
+    "formattedCurrentStepsString": {
+     "type": "string",
+     "description": "The current steps for an incremental achievement as a string."
+    },
+    "id": {
+     "type": "string",
+     "description": "The ID of the achievement."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerAchievement.",
+     "default": "games#playerAchievement"
+    },
+    "lastUpdatedTimestamp": {
+     "type": "string",
+     "description": "The timestamp of the last modification to this achievement's state.",
+     "format": "int64"
+    }
+   }
+  },
+  "PlayerAchievementListResponse": {
+   "id": "PlayerAchievementListResponse",
+   "type": "object",
+   "description": "This is a JSON template for a list of achievement objects.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The achievements.",
+     "items": {
+      "$ref": "PlayerAchievement"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerAchievementListResponse.",
+     "default": "games#playerAchievementListResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token corresponding to the next page of results."
+    }
+   }
+  },
+  "PlayerLeaderboardScore": {
+   "id": "PlayerLeaderboardScore",
+   "type": "object",
+   "description": "This is a JSON template for a player leaderboard score object.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerLeaderboardScore.",
+     "default": "games#playerLeaderboardScore"
+    },
+    "leaderboard_id": {
+     "type": "string",
+     "description": "The ID of the leaderboard this score is in."
+    },
+    "publicRank": {
+     "$ref": "LeaderboardScoreRank",
+     "description": "The public rank of the score in this leaderboard. This object will not be present if the user is not sharing their scores publicly."
+    },
+    "scoreString": {
+     "type": "string",
+     "description": "The formatted value of this score."
+    },
+    "scoreTag": {
+     "type": "string",
+     "description": "Additional information about the score. Values must contain no more than 64 URI-safe characters as defined by section 2.3 of RFC 3986."
+    },
+    "scoreValue": {
+     "type": "string",
+     "description": "The numerical value of this score.",
+     "format": "int64"
+    },
+    "socialRank": {
+     "$ref": "LeaderboardScoreRank",
+     "description": "The social rank of the score in this leaderboard."
+    },
+    "timeSpan": {
+     "type": "string",
+     "description": "The time span of this score.\nPossible values are:  \n- \"ALL_TIME\" - The score is an all-time score. \n- \"WEEKLY\" - The score is a weekly score. \n- \"DAILY\" - The score is a daily score."
+    },
+    "writeTimestamp": {
+     "type": "string",
+     "description": "The timestamp at which this score was recorded, in milliseconds since the epoch in UTC.",
+     "format": "int64"
+    }
+   }
+  },
+  "PlayerLeaderboardScoreListResponse": {
+   "id": "PlayerLeaderboardScoreListResponse",
+   "type": "object",
+   "description": "This is a JSON template for a list of player leaderboard scores.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The leaderboard scores.",
+     "items": {
+      "$ref": "PlayerLeaderboardScore"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerLeaderboardScoreListResponse.",
+     "default": "games#playerLeaderboardScoreListResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The pagination token for the next page of results."
+    },
+    "player": {
+     "$ref": "Player",
+     "description": "The Player resources for the owner of this score."
+    }
+   }
+  },
+  "PlayerListResponse": {
+   "id": "PlayerListResponse",
+   "type": "object",
+   "description": "This is a JSON template for a third party player list response.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The players.",
+     "items": {
+      "$ref": "Player"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerListResponse.",
+     "default": "games#playerListResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "Token corresponding to the next page of results."
+    }
+   }
+  },
+  "PlayerScore": {
+   "id": "PlayerScore",
+   "type": "object",
+   "description": "This is a JSON template for a player score.",
+   "properties": {
+    "formattedScore": {
+     "type": "string",
+     "description": "The formatted score for this player score."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerScore.",
+     "default": "games#playerScore"
+    },
+    "score": {
+     "type": "string",
+     "description": "The numerical value for this player score.",
+     "format": "int64"
+    },
+    "scoreTag": {
+     "type": "string",
+     "description": "Additional information about this score. Values will contain no more than 64 URI-safe characters as defined by section 2.3 of RFC 3986."
+    },
+    "timeSpan": {
+     "type": "string",
+     "description": "The time span for this player score.\nPossible values are:  \n- \"ALL_TIME\" - The score is an all-time score. \n- \"WEEKLY\" - The score is a weekly score. \n- \"DAILY\" - The score is a daily score."
+    }
+   }
+  },
+  "PlayerScoreListResponse": {
+   "id": "PlayerScoreListResponse",
+   "type": "object",
+   "description": "This is a JSON template for a list of score submission statuses.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerScoreListResponse.",
+     "default": "games#playerScoreListResponse"
+    },
+    "submittedScores": {
+     "type": "array",
+     "description": "The score submissions statuses.",
+     "items": {
+      "$ref": "PlayerScoreResponse"
+     }
+    }
+   }
+  },
+  "PlayerScoreResponse": {
+   "id": "PlayerScoreResponse",
+   "type": "object",
+   "description": "This is a JSON template for a list of leaderboard entry resources.",
+   "properties": {
+    "beatenScoreTimeSpans": {
+     "type": "array",
+     "description": "The time spans where the submitted score is better than the existing score for that time span.\nPossible values are:  \n- \"ALL_TIME\" - The score is an all-time score. \n- \"WEEKLY\" - The score is a weekly score. \n- \"DAILY\" - The score is a daily score.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "formattedScore": {
+     "type": "string",
+     "description": "The formatted value of the submitted score."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerScoreResponse.",
+     "default": "games#playerScoreResponse"
+    },
+    "leaderboardId": {
+     "type": "string",
+     "description": "The leaderboard ID that this score was submitted to."
+    },
+    "scoreTag": {
+     "type": "string",
+     "description": "Additional information about this score. Values will contain no more than 64 URI-safe characters as defined by section 2.3 of RFC 3986."
+    },
+    "unbeatenScores": {
+     "type": "array",
+     "description": "The scores in time spans that have not been beaten. As an example, the submitted score may be better than the player's DAILY score, but not better than the player's scores for the WEEKLY or ALL_TIME time spans.",
+     "items": {
+      "$ref": "PlayerScore"
+     }
+    }
+   }
+  },
+  "PlayerScoreSubmissionList": {
+   "id": "PlayerScoreSubmissionList",
+   "type": "object",
+   "description": "This is a JSON template for a list of score submission requests",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#playerScoreSubmissionList.",
+     "default": "games#playerScoreSubmissionList"
+    },
+    "scores": {
+     "type": "array",
+     "description": "The score submissions.",
+     "items": {
+      "$ref": "ScoreSubmission"
+     }
+    }
+   }
+  },
+  "PushToken": {
+   "id": "PushToken",
+   "type": "object",
+   "description": "This is a JSON template for a push token resource.",
+   "properties": {
+    "clientRevision": {
+     "type": "string",
+     "description": "The revision of the client SDK used by your application, in the same format that's used by revisions.check. Used to send backward compatible messages. Format: [PLATFORM_TYPE]:[VERSION_NUMBER]. Possible values of PLATFORM_TYPE are:  \n- IOS - Push token is for iOS"
+    },
+    "id": {
+     "$ref": "PushTokenId",
+     "description": "Unique identifier for this push token."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#pushToken.",
+     "default": "games#pushToken"
+    },
+    "language": {
+     "type": "string",
+     "description": "The preferred language for notifications that are sent using this token."
+    }
+   }
+  },
+  "PushTokenId": {
+   "id": "PushTokenId",
+   "type": "object",
+   "description": "This is a JSON template for a push token ID resource.",
+   "properties": {
+    "ios": {
+     "type": "object",
+     "description": "A push token ID for iOS devices.",
+     "properties": {
+      "apns_device_token": {
+       "type": "string",
+       "description": "Device token supplied by an iOS system call to register for remote notifications. Encode this field as web-safe base64.",
+       "format": "byte"
+      },
+      "apns_environment": {
+       "type": "string",
+       "description": "Use SANDBOX during development for the APNS test server at gateway.sandbox.push.apple.com or PRODUCTION for the production server at gateway.push.apple.com."
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#pushTokenId.",
+     "default": "games#pushTokenId"
+    }
+   }
+  },
+  "RevisionCheckResponse": {
+   "id": "RevisionCheckResponse",
+   "type": "object",
+   "description": "This is a JSON template for the result of checking a revision.",
+   "properties": {
+    "apiVersion": {
+     "type": "string",
+     "description": "The version of the API this client revision should use when calling API methods."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#revisionCheckResponse.",
+     "default": "games#revisionCheckResponse"
+    },
+    "revisionStatus": {
+     "type": "string",
+     "description": "The result of the revision check.\nPossible values are:  \n- \"OK\" - The revision being used is current. \n- \"DEPRECATED\" - There is currently a newer version available, but the revision being used still works. \n- \"INVALID\" - The revision being used is not supported in any released version."
+    }
+   }
+  },
+  "Room": {
+   "id": "Room",
+   "type": "object",
+   "description": "This is a JSON template for a room resource object.",
+   "properties": {
+    "applicationId": {
+     "type": "string",
+     "description": "The ID of the application being played."
+    },
+    "autoMatchingCriteria": {
+     "$ref": "RoomAutoMatchingCriteria",
+     "description": "Criteria for auto-matching players into this room."
+    },
+    "autoMatchingStatus": {
+     "$ref": "RoomAutoMatchStatus",
+     "description": "Auto-matching status for this room. Not set if the room is not currently in the auto-matching queue."
+    },
+    "creationDetails": {
+     "$ref": "RoomModification",
+     "description": "Details about the room creation."
+    },
+    "description": {
+     "type": "string",
+     "description": "This short description is generated by our servers and worded relative to the player requesting the room. It is intended to be displayed when the room is shown in a list (that is, an invitation to a room.)"
+    },
+    "inviterId": {
+     "type": "string",
+     "description": "The ID of the participant that invited the user to the room. Not set if the user was not invited to the room."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#room.",
+     "default": "games#room"
+    },
+    "lastUpdateDetails": {
+     "$ref": "RoomModification",
+     "description": "Details about the last update to the room."
+    },
+    "participants": {
+     "type": "array",
+     "description": "The participants involved in the room, along with their statuses. Includes participants who have left or declined invitations.",
+     "items": {
+      "$ref": "RoomParticipant"
+     }
+    },
+    "roomId": {
+     "type": "string",
+     "description": "Globally unique ID for a room."
+    },
+    "roomStatusVersion": {
+     "type": "integer",
+     "description": "The version of the room status: an increasing counter, used by the client to ignore out-of-order updates to room status.",
+     "format": "int32"
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the room.\nPossible values are:  \n- \"ROOM_INVITING\" - One or more players have been invited and not responded. \n- \"ROOM_AUTO_MATCHING\" - One or more slots need to be filled by auto-matching. \n- \"ROOM_CONNECTING\" - Players have joined and are connecting to each other (either before or after auto-matching). \n- \"ROOM_ACTIVE\" - All players have joined and connected to each other. \n- \"ROOM_DELETED\" - The room should no longer be shown on the client. Returned in sync calls when a player joins a room (as a tombstone), or for rooms where all joined participants have left."
+    },
+    "variant": {
+     "type": "integer",
+     "description": "The variant / mode of the application being played; can be any integer value, or left blank.",
+     "format": "int32"
+    }
+   }
+  },
+  "RoomAutoMatchStatus": {
+   "id": "RoomAutoMatchStatus",
+   "type": "object",
+   "description": "This is a JSON template for status of room automatching that is in progress.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomAutoMatchStatus.",
+     "default": "games#roomAutoMatchStatus"
+    },
+    "waitEstimateSeconds": {
+     "type": "integer",
+     "description": "An estimate for the amount of time (in seconds) that auto-matching is expected to take to complete.",
+     "format": "int32"
+    }
+   }
+  },
+  "RoomAutoMatchingCriteria": {
+   "id": "RoomAutoMatchingCriteria",
+   "type": "object",
+   "description": "This is a JSON template for a room auto-match criteria object.",
+   "properties": {
+    "exclusiveBitmask": {
+     "type": "string",
+     "description": "A bitmask indicating when auto-matches are valid. When ANDed with other exclusive bitmasks, the result must be zero. Can be used to support exclusive roles within a game.",
+     "format": "int64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomAutoMatchingCriteria.",
+     "default": "games#roomAutoMatchingCriteria"
+    },
+    "maxAutoMatchingPlayers": {
+     "type": "integer",
+     "description": "The maximum number of players that should be added to the room by auto-matching.",
+     "format": "int32"
+    },
+    "minAutoMatchingPlayers": {
+     "type": "integer",
+     "description": "The minimum number of players that should be added to the room by auto-matching.",
+     "format": "int32"
+    }
+   }
+  },
+  "RoomClientAddress": {
+   "id": "RoomClientAddress",
+   "type": "object",
+   "description": "This is a JSON template for the client address when setting up a room.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomClientAddress.",
+     "default": "games#roomClientAddress"
+    },
+    "xmppAddress": {
+     "type": "string",
+     "description": "The XMPP address of the client on the Google Games XMPP network."
+    }
+   }
+  },
+  "RoomCreateRequest": {
+   "id": "RoomCreateRequest",
+   "type": "object",
+   "description": "This is a JSON template for a room creation request.",
+   "properties": {
+    "autoMatchingCriteria": {
+     "$ref": "RoomAutoMatchingCriteria",
+     "description": "Criteria for auto-matching players into this room."
+    },
+    "capabilities": {
+     "type": "array",
+     "description": "The capabilities that this client supports for realtime communication.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "clientAddress": {
+     "$ref": "RoomClientAddress",
+     "description": "Client address for the player creating the room."
+    },
+    "invitedPlayerIds": {
+     "type": "array",
+     "description": "The player IDs to invite to the room.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomCreateRequest.",
+     "default": "games#roomCreateRequest"
+    },
+    "networkDiagnostics": {
+     "$ref": "NetworkDiagnostics",
+     "description": "Network diagnostics for the client creating the room."
+    },
+    "requestId": {
+     "type": "string",
+     "description": "A randomly generated numeric ID. This number is used at the server to ensure that the request is handled correctly across retries.",
+     "format": "int64"
+    },
+    "variant": {
+     "type": "integer",
+     "description": "The variant / mode of the application to be played. This can be any integer value, or left blank. You should use a small number of variants to keep the auto-matching pool as large as possible.",
+     "format": "int32"
+    }
+   }
+  },
+  "RoomJoinRequest": {
+   "id": "RoomJoinRequest",
+   "type": "object",
+   "description": "This is a JSON template for a join room request.",
+   "properties": {
+    "capabilities": {
+     "type": "array",
+     "description": "The capabilities that this client supports for realtime communication.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "clientAddress": {
+     "$ref": "RoomClientAddress",
+     "description": "Client address for the player joining the room."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomJoinRequest.",
+     "default": "games#roomJoinRequest"
+    },
+    "networkDiagnostics": {
+     "$ref": "NetworkDiagnostics",
+     "description": "Network diagnostics for the client joining the room."
+    }
+   }
+  },
+  "RoomLeaveDiagnostics": {
+   "id": "RoomLeaveDiagnostics",
+   "type": "object",
+   "description": "This is a JSON template for room leave diagnostics.",
+   "properties": {
+    "androidNetworkSubtype": {
+     "type": "integer",
+     "description": "Android network subtype. http://developer.android.com/reference/android/net/NetworkInfo.html#getSubtype()",
+     "format": "int32"
+    },
+    "androidNetworkType": {
+     "type": "integer",
+     "description": "Android network type. http://developer.android.com/reference/android/net/NetworkInfo.html#getType()",
+     "format": "int32"
+    },
+    "iosNetworkType": {
+     "type": "integer",
+     "description": "iOS network type as defined in Reachability.h.",
+     "format": "int32"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomLeaveDiagnostics.",
+     "default": "games#roomLeaveDiagnostics"
+    },
+    "peerSession": {
+     "type": "array",
+     "description": "Diagnostics about all peer sessions.",
+     "items": {
+      "$ref": "PeerSessionDiagnostics"
+     }
+    },
+    "socketsUsed": {
+     "type": "boolean",
+     "description": "Whether or not sockets were used."
+    }
+   }
+  },
+  "RoomLeaveRequest": {
+   "id": "RoomLeaveRequest",
+   "type": "object",
+   "description": "This is a JSON template for a leave room request.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomLeaveRequest.",
+     "default": "games#roomLeaveRequest"
+    },
+    "leaveDiagnostics": {
+     "$ref": "RoomLeaveDiagnostics",
+     "description": "Diagnostics for a player leaving the room."
+    },
+    "reason": {
+     "type": "string",
+     "description": "Reason for leaving the match.\nPossible values are:  \n- \"PLAYER_LEFT\" - The player chose to leave the room.. \n- \"GAME_LEFT\" - The game chose to remove the player from the room. \n- \"REALTIME_ABANDONED\" - The player switched to another application and abandoned the room. \n- \"REALTIME_PEER_CONNECTION_FAILURE\" - The client was unable to establish a connection to other peer(s). \n- \"REALTIME_SERVER_CONNECTION_FAILURE\" - The client was unable to communicate with the server. \n- \"REALTIME_SERVER_ERROR\" - The client received an error response when it tried to communicate with the server. \n- \"REALTIME_TIMEOUT\" - The client timed out while waiting for a room."
+    }
+   }
+  },
+  "RoomList": {
+   "id": "RoomList",
+   "type": "object",
+   "description": "This is a JSON template for a list of rooms.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The rooms.",
+     "items": {
+      "$ref": "Room"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomList.",
+     "default": "games#roomList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The pagination token for the next page of results."
+    }
+   }
+  },
+  "RoomModification": {
+   "id": "RoomModification",
+   "type": "object",
+   "description": "This is a JSON template for room modification metadata.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomModification.",
+     "default": "games#roomModification"
+    },
+    "modifiedTimestampMillis": {
+     "type": "string",
+     "description": "The timestamp at which they modified the room, in milliseconds since the epoch in UTC.",
+     "format": "int64"
+    },
+    "participantId": {
+     "type": "string",
+     "description": "The ID of the participant that modified the room."
+    }
+   }
+  },
+  "RoomP2PStatus": {
+   "id": "RoomP2PStatus",
+   "type": "object",
+   "description": "This is a JSON template for an update on the status of a peer in a room.",
+   "properties": {
+    "connectionSetupLatencyMillis": {
+     "type": "integer",
+     "description": "The amount of time in milliseconds it took to establish connections with this peer.",
+     "format": "int32"
+    },
+    "error": {
+     "type": "string",
+     "description": "The error code in event of a failure.\nPossible values are:  \n- \"P2P_FAILED\" - The client failed to establish a P2P connection with the peer. \n- \"PRESENCE_FAILED\" - The client failed to register to receive P2P connections. \n- \"RELAY_SERVER_FAILED\" - The client received an error when trying to use the relay server to establish a P2P connection with the peer."
+    },
+    "error_reason": {
+     "type": "string",
+     "description": "More detailed diagnostic message returned in event of a failure."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomP2PStatus.",
+     "default": "games#roomP2PStatus"
+    },
+    "participantId": {
+     "type": "string",
+     "description": "The ID of the participant."
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the peer in the room.\nPossible values are:  \n- \"CONNECTION_ESTABLISHED\" - The client established a P2P connection with the peer. \n- \"CONNECTION_FAILED\" - The client failed to establish directed presence with the peer."
+    },
+    "unreliableRoundtripLatencyMillis": {
+     "type": "integer",
+     "description": "The amount of time in milliseconds it took to send packets back and forth on the unreliable channel with this peer.",
+     "format": "int32"
+    }
+   }
+  },
+  "RoomP2PStatuses": {
+   "id": "RoomP2PStatuses",
+   "type": "object",
+   "description": "This is a JSON template for an update on the status of peers in a room.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomP2PStatuses.",
+     "default": "games#roomP2PStatuses"
+    },
+    "updates": {
+     "type": "array",
+     "description": "The updates for the peers.",
+     "items": {
+      "$ref": "RoomP2PStatus"
+     }
+    }
+   }
+  },
+  "RoomParticipant": {
+   "id": "RoomParticipant",
+   "type": "object",
+   "description": "This is a JSON template for a participant in a room.",
+   "properties": {
+    "autoMatched": {
+     "type": "boolean",
+     "description": "True if this participant was auto-matched with the requesting player."
+    },
+    "autoMatchedPlayer": {
+     "$ref": "AnonymousPlayer",
+     "description": "Information about a player that has been anonymously auto-matched against the requesting player. (Either player or autoMatchedPlayer will be set.)"
+    },
+    "capabilities": {
+     "type": "array",
+     "description": "The capabilities which can be used when communicating with this participant.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "clientAddress": {
+     "$ref": "RoomClientAddress",
+     "description": "Client address for the participant."
+    },
+    "connected": {
+     "type": "boolean",
+     "description": "True if this participant is in the fully connected set of peers in the room."
+    },
+    "id": {
+     "type": "string",
+     "description": "An identifier for the participant in the scope of the room. Cannot be used to identify a player across rooms or in other contexts."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomParticipant.",
+     "default": "games#roomParticipant"
+    },
+    "leaveReason": {
+     "type": "string",
+     "description": "The reason the participant left the room; populated if the participant status is PARTICIPANT_LEFT.\nPossible values are:  \n- \"PLAYER_LEFT\" - The player explicitly chose to leave the room. \n- \"GAME_LEFT\" - The game chose to remove the player from the room. \n- \"ABANDONED\" - The player switched to another application and abandoned the room.\n- \"PEER_CONNECTION_FAILURE\" - The client was unable to establish or maintain a connection to other peer(s) in the room.\n- \"SERVER_ERROR\" - The client received an error response when it tried to communicate with the server. \n- \"TIMEOUT\" - The client timed out while waiting for players to join and connect. \n- \"PRESENCE_FAILURE\" - The client's XMPP connection ended abruptly."
+    },
+    "player": {
+     "$ref": "Player",
+     "description": "Information about the player. Not populated if this player was anonymously auto-matched against the requesting player. (Either player or autoMatchedPlayer will be set.)"
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the participant with respect to the room.\nPossible values are:  \n- \"PARTICIPANT_INVITED\" - The participant has been invited to join the room, but has not yet responded. \n- \"PARTICIPANT_JOINED\" - The participant has joined the room (either after creating it or accepting an invitation.) \n- \"PARTICIPANT_DECLINED\" - The participant declined an invitation to join the room. \n- \"PARTICIPANT_LEFT\" - The participant joined the room and then left it."
+    }
+   }
+  },
+  "RoomStatus": {
+   "id": "RoomStatus",
+   "type": "object",
+   "description": "This is a JSON template for the status of a room that the player has joined.",
+   "properties": {
+    "autoMatchingStatus": {
+     "$ref": "RoomAutoMatchStatus",
+     "description": "Auto-matching status for this room. Not set if the room is not currently in the automatching queue."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#roomStatus.",
+     "default": "games#roomStatus"
+    },
+    "participants": {
+     "type": "array",
+     "description": "The participants involved in the room, along with their statuses. Includes participants who have left or declined invitations.",
+     "items": {
+      "$ref": "RoomParticipant"
+     }
+    },
+    "roomId": {
+     "type": "string",
+     "description": "Globally unique ID for a room."
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the room.\nPossible values are:  \n- \"ROOM_INVITING\" - One or more players have been invited and not responded. \n- \"ROOM_AUTO_MATCHING\" - One or more slots need to be filled by auto-matching. \n- \"ROOM_CONNECTING\" - Players have joined are connecting to each other (either before or after auto-matching). \n- \"ROOM_ACTIVE\" - All players have joined and connected to each other. \n- \"ROOM_DELETED\" - All joined players have left."
+    },
+    "statusVersion": {
+     "type": "integer",
+     "description": "The version of the status for the room: an increasing counter, used by the client to ignore out-of-order updates to room status.",
+     "format": "int32"
+    }
+   }
+  },
+  "ScoreSubmission": {
+   "id": "ScoreSubmission",
+   "type": "object",
+   "description": "This is a JSON template for a request to submit a score to leaderboards.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#scoreSubmission.",
+     "default": "games#scoreSubmission"
+    },
+    "leaderboardId": {
+     "type": "string",
+     "description": "The leaderboard this score is being submitted to."
+    },
+    "score": {
+     "type": "string",
+     "description": "The new score being submitted.",
+     "format": "int64"
+    },
+    "scoreTag": {
+     "type": "string",
+     "description": "Additional information about this score. Values will contain no more than 64 URI-safe characters as defined by section 2.3 of RFC 3986.",
+     "pattern": "[a-zA-Z0-9-._~]{0,64}"
+    }
+   }
+  },
+  "TurnBasedAutoMatchingCriteria": {
+   "id": "TurnBasedAutoMatchingCriteria",
+   "type": "object",
+   "description": "This is a JSON template for an turn-based auto-match criteria object.",
+   "properties": {
+    "exclusiveBitmask": {
+     "type": "string",
+     "description": "A bitmask indicating when auto-matches are valid. When ANDed with other exclusive bitmasks, the result must be zero. Can be used to support exclusive roles within a game.",
+     "format": "int64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedAutoMatchingCriteria.",
+     "default": "games#turnBasedAutoMatchingCriteria"
+    },
+    "maxAutoMatchingPlayers": {
+     "type": "integer",
+     "description": "The maximum number of players that should be added to the match by auto-matching.",
+     "format": "int32"
+    },
+    "minAutoMatchingPlayers": {
+     "type": "integer",
+     "description": "The minimum number of players that should be added to the match by auto-matching.",
+     "format": "int32"
+    }
+   }
+  },
+  "TurnBasedMatch": {
+   "id": "TurnBasedMatch",
+   "type": "object",
+   "description": "This is a JSON template for a turn-based match resource object.",
+   "properties": {
+    "applicationId": {
+     "type": "string",
+     "description": "The ID of the application being played."
+    },
+    "autoMatchingCriteria": {
+     "$ref": "TurnBasedAutoMatchingCriteria",
+     "description": "Criteria for auto-matching players into this match."
+    },
+    "creationDetails": {
+     "$ref": "TurnBasedMatchModification",
+     "description": "Details about the match creation."
+    },
+    "data": {
+     "$ref": "TurnBasedMatchData",
+     "description": "The data / game state for this match."
+    },
+    "description": {
+     "type": "string",
+     "description": "This short description is generated by our servers based on turn state and is localized and worded relative to the player requesting the match. It is intended to be displayed when the match is shown in a list."
+    },
+    "inviterId": {
+     "type": "string",
+     "description": "The ID of the participant that invited the user to the match. Not set if the user was not invited to the match."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatch.",
+     "default": "games#turnBasedMatch"
+    },
+    "lastUpdateDetails": {
+     "$ref": "TurnBasedMatchModification",
+     "description": "Details about the last update to the match."
+    },
+    "matchId": {
+     "type": "string",
+     "description": "Globally unique ID for a turn-based match."
+    },
+    "matchNumber": {
+     "type": "integer",
+     "description": "The number of the match in a chain of rematches. Will be set to 1 for the first match and incremented by 1 for each rematch.",
+     "format": "int32"
+    },
+    "matchVersion": {
+     "type": "integer",
+     "description": "The version of this match: an increasing counter, used to avoid out-of-date updates to the match.",
+     "format": "int32"
+    },
+    "participants": {
+     "type": "array",
+     "description": "The participants involved in the match, along with their statuses. Includes participants who have left or declined invitations.",
+     "items": {
+      "$ref": "TurnBasedMatchParticipant"
+     }
+    },
+    "pendingParticipantId": {
+     "type": "string",
+     "description": "The ID of the participant that is taking a turn."
+    },
+    "previousMatchData": {
+     "$ref": "TurnBasedMatchData",
+     "description": "The data / game state for the previous match; set for the first turn of rematches only."
+    },
+    "rematchId": {
+     "type": "string",
+     "description": "The ID of a rematch of this match. Only set for completed matches that have been rematched."
+    },
+    "results": {
+     "type": "array",
+     "description": "The results reported for this match.",
+     "items": {
+      "$ref": "ParticipantResult"
+     }
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the match.\nPossible values are:  \n- \"MATCH_AUTO_MATCHING\" - One or more slots need to be filled by auto-matching; the match cannot be established until they are filled. \n- \"MATCH_ACTIVE\" - The match has started. \n- \"MATCH_COMPLETE\" - The match has finished. \n- \"MATCH_CANCELED\" - The match was canceled. \n- \"MATCH_EXPIRED\" - The match expired due to inactivity. \n- \"MATCH_DELETED\" - The match should no longer be shown on the client. Returned only for tombstones for matches when sync is called."
+    },
+    "userMatchStatus": {
+     "type": "string",
+     "description": "The status of the current user in the match. Derived from the match type, match status, the user's participant status, and the pending participant for the match.\nPossible values are:  \n- \"USER_INVITED\" - The user has been invited to join the match and has not responded yet. \n- \"USER_AWAITING_TURN\" - The user is waiting for their turn. \n- \"USER_TURN\" - The user has an action to take in the match. \n- \"USER_MATCH_COMPLETED\" - The match has ended (it is completed, canceled, or expired.)"
+    },
+    "variant": {
+     "type": "integer",
+     "description": "The variant / mode of the application being played; can be any integer value, or left blank.",
+     "format": "int32"
+    },
+    "withParticipantId": {
+     "type": "string",
+     "description": "The ID of another participant in the match that can be used when describing the participants the user is playing with."
+    }
+   }
+  },
+  "TurnBasedMatchCreateRequest": {
+   "id": "TurnBasedMatchCreateRequest",
+   "type": "object",
+   "description": "This is a JSON template for a turn-based match creation request.",
+   "properties": {
+    "autoMatchingCriteria": {
+     "$ref": "TurnBasedAutoMatchingCriteria",
+     "description": "Criteria for auto-matching players into this match."
+    },
+    "invitedPlayerIds": {
+     "type": "array",
+     "description": "The player ids to invite to the match.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchCreateRequest.",
+     "default": "games#turnBasedMatchCreateRequest"
+    },
+    "requestId": {
+     "type": "string",
+     "description": "A randomly generated numeric ID. This number is used at the server to ensure that the request is handled correctly across retries.",
+     "format": "int64"
+    },
+    "variant": {
+     "type": "integer",
+     "description": "The variant / mode of the application to be played. This can be any integer value, or left blank. You should use a small number of variants to keep the auto-matching pool as large as possible.",
+     "format": "int32"
+    }
+   }
+  },
+  "TurnBasedMatchData": {
+   "id": "TurnBasedMatchData",
+   "type": "object",
+   "description": "This is a JSON template for a turn-based match data object.",
+   "properties": {
+    "data": {
+     "type": "string",
+     "description": "The byte representation of the data (limited to 128 kB), as a Base64-encoded string with the URL_SAFE encoding option.",
+     "format": "byte"
+    },
+    "dataAvailable": {
+     "type": "boolean",
+     "description": "True if this match has data available but it wasn't returned in a list response; fetching the match individually will retrieve this data."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchData.",
+     "default": "games#turnBasedMatchData"
+    }
+   }
+  },
+  "TurnBasedMatchDataRequest": {
+   "id": "TurnBasedMatchDataRequest",
+   "type": "object",
+   "description": "This is a JSON template for sending a turn-based match data object.",
+   "properties": {
+    "data": {
+     "type": "string",
+     "description": "The byte representation of the data (limited to 128 kB), as a Base64-encoded string with the URL_SAFE encoding option.",
+     "format": "byte"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchDataRequest.",
+     "default": "games#turnBasedMatchDataRequest"
+    }
+   }
+  },
+  "TurnBasedMatchList": {
+   "id": "TurnBasedMatchList",
+   "type": "object",
+   "description": "This is a JSON template for a list of turn-based matches.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The matches.",
+     "items": {
+      "$ref": "TurnBasedMatch"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchList.",
+     "default": "games#turnBasedMatchList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The pagination token for the next page of results."
+    }
+   }
+  },
+  "TurnBasedMatchModification": {
+   "id": "TurnBasedMatchModification",
+   "type": "object",
+   "description": "This is a JSON template for turn-based match modification metadata.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchModification.",
+     "default": "games#turnBasedMatchModification"
+    },
+    "modifiedTimestampMillis": {
+     "type": "string",
+     "description": "The timestamp at which they modified the match, in milliseconds since the epoch in UTC.",
+     "format": "int64"
+    },
+    "participantId": {
+     "type": "string",
+     "description": "The ID of the participant that modified the match."
+    }
+   }
+  },
+  "TurnBasedMatchParticipant": {
+   "id": "TurnBasedMatchParticipant",
+   "type": "object",
+   "description": "This is a JSON template for a participant in a turn-based match.",
+   "properties": {
+    "autoMatched": {
+     "type": "boolean",
+     "description": "True if this participant was auto-matched with the requesting player."
+    },
+    "autoMatchedPlayer": {
+     "$ref": "AnonymousPlayer",
+     "description": "Information about a player that has been anonymously auto-matched against the requesting player. (Either player or autoMatchedPlayer will be set.)"
+    },
+    "id": {
+     "type": "string",
+     "description": "An identifier for the participant in the scope of the match. Cannot be used to identify a player across matches or in other contexts."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchParticipant.",
+     "default": "games#turnBasedMatchParticipant"
+    },
+    "player": {
+     "$ref": "Player",
+     "description": "Information about the player. Not populated if this player was anonymously auto-matched against the requesting player. (Either player or autoMatchedPlayer will be set.)"
+    },
+    "status": {
+     "type": "string",
+     "description": "The status of the participant with respect to the match.\nPossible values are:  \n- \"PARTICIPANT_NOT_INVITED_YET\" - The participant is slated to be invited to the match, but the invitation has not been sent; the invite will be sent when it becomes their turn. \n- \"PARTICIPANT_INVITED\" - The participant has been invited to join the match, but has not yet responded. \n- \"PARTICIPANT_JOINED\" - The participant has joined the match (either after creating it or accepting an invitation.) \n- \"PARTICIPANT_DECLINED\" - The participant declined an invitation to join the match. \n- \"PARTICIPANT_LEFT\" - The participant joined the match and then left it. \n- \"PARTICIPANT_FINISHED\" - The participant finished playing in the match. \n- \"PARTICIPANT_UNRESPONSIVE\" - The participant did not take their turn in the allotted time."
+    }
+   }
+  },
+  "TurnBasedMatchRematch": {
+   "id": "TurnBasedMatchRematch",
+   "type": "object",
+   "description": "This is a JSON template for a rematch response.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchRematch.",
+     "default": "games#turnBasedMatchRematch"
+    },
+    "previousMatch": {
+     "$ref": "TurnBasedMatch",
+     "description": "The old match that the rematch was created from; will be updated such that the rematchId field will point at the new match."
+    },
+    "rematch": {
+     "$ref": "TurnBasedMatch",
+     "description": "The newly created match; a rematch of the old match with the same participants."
+    }
+   }
+  },
+  "TurnBasedMatchResults": {
+   "id": "TurnBasedMatchResults",
+   "type": "object",
+   "description": "This is a JSON template for a turn-based match results object.",
+   "properties": {
+    "data": {
+     "$ref": "TurnBasedMatchDataRequest",
+     "description": "The final match data."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchResults.",
+     "default": "games#turnBasedMatchResults"
+    },
+    "matchVersion": {
+     "type": "integer",
+     "description": "The version of the match being updated.",
+     "format": "int32"
+    },
+    "results": {
+     "type": "array",
+     "description": "The match results for the participants in the match.",
+     "items": {
+      "$ref": "ParticipantResult"
+     }
+    }
+   }
+  },
+  "TurnBasedMatchSync": {
+   "id": "TurnBasedMatchSync",
+   "type": "object",
+   "description": "This is a JSON template for a list of turn-based matches returned from a sync.",
+   "properties": {
+    "items": {
+     "type": "array",
+     "description": "The matches.",
+     "items": {
+      "$ref": "TurnBasedMatch"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchSync.",
+     "default": "games#turnBasedMatchSync"
+    },
+    "moreAvailable": {
+     "type": "boolean",
+     "description": "True if there were more matches available to fetch at the time the response was generated (which were not returned due to page size limits.)"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The pagination token for the next page of results."
+    }
+   }
+  },
+  "TurnBasedMatchTurn": {
+   "id": "TurnBasedMatchTurn",
+   "type": "object",
+   "description": "This is a JSON template for the object representing a turn.",
+   "properties": {
+    "data": {
+     "$ref": "TurnBasedMatchDataRequest",
+     "description": "The shared game state data after the turn is over."
+    },
+    "kind": {
+     "type": "string",
+     "description": "Uniquely identifies the type of this resource. Value is always the fixed string games#turnBasedMatchTurn.",
+     "default": "games#turnBasedMatchTurn"
+    },
+    "matchVersion": {
+     "type": "integer",
+     "description": "The version of this match: an increasing counter, used to avoid out-of-date updates to the match.",
+     "format": "int32"
+    },
+    "pendingParticipantId": {
+     "type": "string",
+     "description": "The ID of the participant who should take their turn next. May be set to the current player's participant ID to update match state without changing the turn. If not set, the match will wait for other player(s) to join via automatching; this is only valid if automatch criteria is set on the match with remaining slots for automatched players."
+    },
+    "results": {
+     "type": "array",
+     "description": "The match results for the participants in the match.",
+     "items": {
+      "$ref": "ParticipantResult"
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "achievementDefinitions": {
+   "methods": {
+    "list": {
+     "id": "games.achievementDefinitions.list",
+     "path": "achievements",
+     "httpMethod": "GET",
+     "description": "Lists all the achievement definitions for your application.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of achievement resources to return in the response, used for paging. For any response, the actual number of achievement resources returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "200",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "AchievementDefinitionsListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "achievements": {
+   "methods": {
+    "increment": {
+     "id": "games.achievements.increment",
+     "path": "achievements/{achievementId}/increment",
+     "httpMethod": "POST",
+     "description": "Increments the steps of the achievement with the given ID for the currently authenticated player.",
+     "parameters": {
+      "achievementId": {
+       "type": "string",
+       "description": "The ID of the achievement used by this method.",
+       "required": true,
+       "location": "path"
+      },
+      "requestId": {
+       "type": "string",
+       "description": "A randomly generated numeric ID for each request specified by the caller. This number is used at the server to ensure that the request is handled correctly across retries.",
+       "format": "int64",
+       "location": "query"
+      },
+      "stepsToIncrement": {
+       "type": "integer",
+       "description": "The number of steps to increment.",
+       "required": true,
+       "format": "int32",
+       "minimum": "1",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "achievementId",
+      "stepsToIncrement"
+     ],
+     "response": {
+      "$ref": "AchievementIncrementResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "list": {
+     "id": "games.achievements.list",
+     "path": "players/{playerId}/achievements",
+     "httpMethod": "GET",
+     "description": "Lists the progress for all your application's achievements for the currently authenticated player.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of achievement resources to return in the response, used for paging. For any response, the actual number of achievement resources returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "200",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      },
+      "playerId": {
+       "type": "string",
+       "description": "A player ID. A value of me may be used in place of the authenticated player's ID.",
+       "required": true,
+       "location": "path"
+      },
+      "state": {
+       "type": "string",
+       "description": "Tells the server to return only achievements with the specified state. If this parameter isn't specified, all achievements are returned.",
+       "enum": [
+        "ALL",
+        "HIDDEN",
+        "REVEALED",
+        "UNLOCKED"
+       ],
+       "enumDescriptions": [
+        "List all achievements. This is the default.",
+        "List only hidden achievements.",
+        "List only revealed achievements.",
+        "List only unlocked achievements."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "playerId"
+     ],
+     "response": {
+      "$ref": "PlayerAchievementListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "reveal": {
+     "id": "games.achievements.reveal",
+     "path": "achievements/{achievementId}/reveal",
+     "httpMethod": "POST",
+     "description": "Sets the state of the achievement with the given ID to REVEALED for the currently authenticated player.",
+     "parameters": {
+      "achievementId": {
+       "type": "string",
+       "description": "The ID of the achievement used by this method.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "achievementId"
+     ],
+     "response": {
+      "$ref": "AchievementRevealResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "setStepsAtLeast": {
+     "id": "games.achievements.setStepsAtLeast",
+     "path": "achievements/{achievementId}/setStepsAtLeast",
+     "httpMethod": "POST",
+     "description": "Sets the steps for the currently authenticated player towards unlocking an achievement. If the steps parameter is less than the current number of steps that the player already gained for the achievement, the achievement is not modified.",
+     "parameters": {
+      "achievementId": {
+       "type": "string",
+       "description": "The ID of the achievement used by this method.",
+       "required": true,
+       "location": "path"
+      },
+      "steps": {
+       "type": "integer",
+       "description": "The minimum value to set the steps to.",
+       "required": true,
+       "format": "int32",
+       "minimum": "1",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "achievementId",
+      "steps"
+     ],
+     "response": {
+      "$ref": "AchievementSetStepsAtLeastResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "unlock": {
+     "id": "games.achievements.unlock",
+     "path": "achievements/{achievementId}/unlock",
+     "httpMethod": "POST",
+     "description": "Unlocks this achievement for the currently authenticated player.",
+     "parameters": {
+      "achievementId": {
+       "type": "string",
+       "description": "The ID of the achievement used by this method.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "achievementId"
+     ],
+     "response": {
+      "$ref": "AchievementUnlockResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "updateMultiple": {
+     "id": "games.achievements.updateMultiple",
+     "path": "achievements/updateMultiple",
+     "httpMethod": "POST",
+     "description": "Updates multiple achievements for the currently authenticated player.",
+     "request": {
+      "$ref": "AchievementUpdateMultipleRequest"
+     },
+     "response": {
+      "$ref": "AchievementUpdateMultipleResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "applications": {
+   "methods": {
+    "get": {
+     "id": "games.applications.get",
+     "path": "applications/{applicationId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the metadata of the application with the given ID. If the requested application is not available for the specified platformType, the returned response will not include any instance data.",
+     "parameters": {
+      "applicationId": {
+       "type": "string",
+       "description": "The application being requested.",
+       "required": true,
+       "location": "path"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "platformType": {
+       "type": "string",
+       "description": "Restrict application details returned to the specific platform.",
+       "enum": [
+        "ANDROID",
+        "IOS",
+        "WEB_APP"
+       ],
+       "enumDescriptions": [
+        "Retrieve applications that can be played on Android.",
+        "Retrieve applications that can be played on iOS.",
+        "Retrieve applications that can be played on desktop web."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "applicationId"
+     ],
+     "response": {
+      "$ref": "Application"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "played": {
+     "id": "games.applications.played",
+     "path": "applications/played",
+     "httpMethod": "POST",
+     "description": "Indicate that the the currently authenticated user is playing your application.",
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "leaderboards": {
+   "methods": {
+    "get": {
+     "id": "games.leaderboards.get",
+     "path": "leaderboards/{leaderboardId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the metadata of the leaderboard with the given ID.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "leaderboardId": {
+       "type": "string",
+       "description": "The ID of the leaderboard.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "leaderboardId"
+     ],
+     "response": {
+      "$ref": "Leaderboard"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "list": {
+     "id": "games.leaderboards.list",
+     "path": "leaderboards",
+     "httpMethod": "GET",
+     "description": "Lists all the leaderboard metadata for your application.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of leaderboards to return in the response. For any response, the actual number of leaderboards returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "200",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "LeaderboardListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "players": {
+   "methods": {
+    "get": {
+     "id": "games.players.get",
+     "path": "players/{playerId}",
+     "httpMethod": "GET",
+     "description": "Retrieves the Player resource with the given ID. To retrieve the player for the currently authenticated user, set playerId to me.",
+     "parameters": {
+      "playerId": {
+       "type": "string",
+       "description": "A player ID. A value of me may be used in place of the authenticated player's ID.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "playerId"
+     ],
+     "response": {
+      "$ref": "Player"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "list": {
+     "id": "games.players.list",
+     "path": "players/me/players/{collection}",
+     "httpMethod": "GET",
+     "description": "Get the collection of players for the currently authenticated user.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "Collection of players being retrieved",
+       "required": true,
+       "enum": [
+        "playedWith"
+       ],
+       "enumDescriptions": [
+        "Retrieve a list of players you have played a multiplayer game (realtime or turn-based) with recently."
+       ],
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of player resources to return in the response, used for paging. For any response, the actual number of player resources returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "15",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "collection"
+     ],
+     "response": {
+      "$ref": "PlayerListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "pushtokens": {
+   "methods": {
+    "remove": {
+     "id": "games.pushtokens.remove",
+     "path": "pushtokens/remove",
+     "httpMethod": "POST",
+     "description": "Removes a push token for the current user and application. Removing a non-existent push token will report success.",
+     "request": {
+      "$ref": "PushTokenId"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "update": {
+     "id": "games.pushtokens.update",
+     "path": "pushtokens",
+     "httpMethod": "PUT",
+     "description": "Registers a push token for the current user and application.",
+     "request": {
+      "$ref": "PushToken"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "revisions": {
+   "methods": {
+    "check": {
+     "id": "games.revisions.check",
+     "path": "revisions/check",
+     "httpMethod": "GET",
+     "description": "Checks whether the games client is out of date.",
+     "parameters": {
+      "clientRevision": {
+       "type": "string",
+       "description": "The revision of the client SDK used by your application. Format:\n[PLATFORM_TYPE]:[VERSION_NUMBER]. Possible values of PLATFORM_TYPE are:\n \n- \"ANDROID\" - Client is running the Android SDK. \n- \"IOS\" - Client is running the iOS SDK. \n- \"WEB_APP\" - Client is running as a Web App.",
+       "required": true,
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "clientRevision"
+     ],
+     "response": {
+      "$ref": "RevisionCheckResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "rooms": {
+   "methods": {
+    "create": {
+     "id": "games.rooms.create",
+     "path": "rooms/create",
+     "httpMethod": "POST",
+     "description": "Create a room. For internal use by the Games SDK only. Calling this method directly is unsupported.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      }
+     },
+     "request": {
+      "$ref": "RoomCreateRequest"
+     },
+     "response": {
+      "$ref": "Room"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "decline": {
+     "id": "games.rooms.decline",
+     "path": "rooms/{roomId}/decline",
+     "httpMethod": "POST",
+     "description": "Decline an invitation to join a room. For internal use by the Games SDK only. Calling this method directly is unsupported.",
+     "parameters": {
+      "roomId": {
+       "type": "string",
+       "description": "The ID of the room.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "roomId"
+     ],
+     "response": {
+      "$ref": "Room"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "dismiss": {
+     "id": "games.rooms.dismiss",
+     "path": "rooms/{roomId}/dismiss",
+     "httpMethod": "POST",
+     "description": "Dismiss an invitation to join a room. For internal use by the Games SDK only. Calling this method directly is unsupported.",
+     "parameters": {
+      "roomId": {
+       "type": "string",
+       "description": "The ID of the room.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "roomId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "get": {
+     "id": "games.rooms.get",
+     "path": "rooms/{roomId}",
+     "httpMethod": "GET",
+     "description": "Get the data for a room.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "roomId": {
+       "type": "string",
+       "description": "The ID of the room.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "roomId"
+     ],
+     "response": {
+      "$ref": "Room"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "join": {
+     "id": "games.rooms.join",
+     "path": "rooms/{roomId}/join",
+     "httpMethod": "POST",
+     "description": "Join a room. For internal use by the Games SDK only. Calling this method directly is unsupported.",
+     "parameters": {
+      "roomId": {
+       "type": "string",
+       "description": "The ID of the room.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "roomId"
+     ],
+     "request": {
+      "$ref": "RoomJoinRequest"
+     },
+     "response": {
+      "$ref": "Room"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "leave": {
+     "id": "games.rooms.leave",
+     "path": "rooms/{roomId}/leave",
+     "httpMethod": "POST",
+     "description": "Leave a room. For internal use by the Games SDK only. Calling this method directly is unsupported.",
+     "parameters": {
+      "roomId": {
+       "type": "string",
+       "description": "The ID of the room.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "roomId"
+     ],
+     "request": {
+      "$ref": "RoomLeaveRequest"
+     },
+     "response": {
+      "$ref": "Room"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "list": {
+     "id": "games.rooms.list",
+     "path": "rooms",
+     "httpMethod": "GET",
+     "description": "Returns invitations to join rooms.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of rooms to return in the response, used for paging. For any response, the actual number of rooms to return may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "RoomList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "reportStatus": {
+     "id": "games.rooms.reportStatus",
+     "path": "rooms/{roomId}/reportstatus",
+     "httpMethod": "POST",
+     "description": "Updates sent by a client reporting the status of peers in a room. For internal use by the Games SDK only. Calling this method directly is unsupported.",
+     "parameters": {
+      "roomId": {
+       "type": "string",
+       "description": "The ID of the room.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "roomId"
+     ],
+     "request": {
+      "$ref": "RoomP2PStatuses"
+     },
+     "response": {
+      "$ref": "RoomStatus"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "scores": {
+   "methods": {
+    "get": {
+     "id": "games.scores.get",
+     "path": "players/{playerId}/leaderboards/{leaderboardId}/scores/{timeSpan}",
+     "httpMethod": "GET",
+     "description": "Get high scores, and optionally ranks, in leaderboards for the currently authenticated player. For a specific time span, leaderboardId can be set to ALL to retrieve data for all leaderboards in a given time span.\nNOTE: You cannot ask for 'ALL' leaderboards and 'ALL' timeSpans in the same request; only one parameter may be set to 'ALL'.",
+     "parameters": {
+      "includeRankType": {
+       "type": "string",
+       "description": "The types of ranks to return. If the parameter is omitted, no ranks will be returned.",
+       "enum": [
+        "ALL",
+        "PUBLIC",
+        "SOCIAL"
+       ],
+       "enumDescriptions": [
+        "Retrieve public and social ranks.",
+        "Retrieve public ranks, if the player is sharing their gameplay activity publicly.",
+        "Retrieve the social rank."
+       ],
+       "location": "query"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "leaderboardId": {
+       "type": "string",
+       "description": "The ID of the leaderboard. Can be set to 'ALL' to retrieve data for all leaderboards for this application.",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of leaderboard scores to return in the response. For any response, the actual number of leaderboard scores returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "25",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      },
+      "playerId": {
+       "type": "string",
+       "description": "A player ID. A value of me may be used in place of the authenticated player's ID.",
+       "required": true,
+       "location": "path"
+      },
+      "timeSpan": {
+       "type": "string",
+       "description": "The time span for the scores and ranks you're requesting.",
+       "required": true,
+       "enum": [
+        "ALL",
+        "ALL_TIME",
+        "DAILY",
+        "WEEKLY"
+       ],
+       "enumDescriptions": [
+        "Get the high scores for all time spans. If this is used, maxResults values will be ignored.",
+        "Get the all time high score.",
+        "List the top scores for the current day.",
+        "List the top scores for the current week."
+       ],
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "playerId",
+      "leaderboardId",
+      "timeSpan"
+     ],
+     "response": {
+      "$ref": "PlayerLeaderboardScoreListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "list": {
+     "id": "games.scores.list",
+     "path": "leaderboards/{leaderboardId}/scores/{collection}",
+     "httpMethod": "GET",
+     "description": "Lists the scores in a leaderboard, starting from the top.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection of scores you're requesting.",
+       "required": true,
+       "enum": [
+        "PUBLIC",
+        "SOCIAL"
+       ],
+       "enumDescriptions": [
+        "List all scores in the public leaderboard.",
+        "List only social scores."
+       ],
+       "location": "path"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "leaderboardId": {
+       "type": "string",
+       "description": "The ID of the leaderboard.",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of leaderboard scores to return in the response. For any response, the actual number of leaderboard scores returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "25",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      },
+      "timeSpan": {
+       "type": "string",
+       "description": "The time span for the scores and ranks you're requesting.",
+       "required": true,
+       "enum": [
+        "ALL_TIME",
+        "DAILY",
+        "WEEKLY"
+       ],
+       "enumDescriptions": [
+        "List the all-time top scores.",
+        "List the top scores for the current day.",
+        "List the top scores for the current week."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "leaderboardId",
+      "collection",
+      "timeSpan"
+     ],
+     "response": {
+      "$ref": "LeaderboardScores"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "listWindow": {
+     "id": "games.scores.listWindow",
+     "path": "leaderboards/{leaderboardId}/window/{collection}",
+     "httpMethod": "GET",
+     "description": "Lists the scores in a leaderboard around (and including) a player's score.",
+     "parameters": {
+      "collection": {
+       "type": "string",
+       "description": "The collection of scores you're requesting.",
+       "required": true,
+       "enum": [
+        "PUBLIC",
+        "SOCIAL"
+       ],
+       "enumDescriptions": [
+        "List all scores in the public leaderboard.",
+        "List only social scores."
+       ],
+       "location": "path"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "leaderboardId": {
+       "type": "string",
+       "description": "The ID of the leaderboard.",
+       "required": true,
+       "location": "path"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of leaderboard scores to return in the response. For any response, the actual number of leaderboard scores returned may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "25",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      },
+      "resultsAbove": {
+       "type": "integer",
+       "description": "The preferred number of scores to return above the player's score. More scores may be returned if the player is at the bottom of the leaderboard; fewer may be returned if the player is at the top. Must be less than or equal to maxResults.",
+       "format": "int32",
+       "location": "query"
+      },
+      "returnTopIfAbsent": {
+       "type": "boolean",
+       "description": "True if the top scores should be returned when the player is not in the leaderboard. Defaults to true.",
+       "location": "query"
+      },
+      "timeSpan": {
+       "type": "string",
+       "description": "The time span for the scores and ranks you're requesting.",
+       "required": true,
+       "enum": [
+        "ALL_TIME",
+        "DAILY",
+        "WEEKLY"
+       ],
+       "enumDescriptions": [
+        "List the all-time top scores.",
+        "List the top scores for the current day.",
+        "List the top scores for the current week."
+       ],
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "leaderboardId",
+      "collection",
+      "timeSpan"
+     ],
+     "response": {
+      "$ref": "LeaderboardScores"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "submit": {
+     "id": "games.scores.submit",
+     "path": "leaderboards/{leaderboardId}/scores",
+     "httpMethod": "POST",
+     "description": "Submits a score to the specified leaderboard.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "leaderboardId": {
+       "type": "string",
+       "description": "The ID of the leaderboard.",
+       "required": true,
+       "location": "path"
+      },
+      "score": {
+       "type": "string",
+       "description": "The score you're submitting. The submitted score is ignored if it is worse than a previously submitted score, where worse depends on the leaderboard sort order. The meaning of the score value depends on the leaderboard format type. For fixed-point, the score represents the raw value. For time, the score represents elapsed time in milliseconds. For currency, the score represents a value in micro units.",
+       "required": true,
+       "format": "int64",
+       "location": "query"
+      },
+      "scoreTag": {
+       "type": "string",
+       "description": "Additional information about the score you're submitting. Values must contain no more than 64 URI-safe characters as defined by section 2.3 of RFC 3986.",
+       "pattern": "[a-zA-Z0-9-._~]{0,64}",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "leaderboardId",
+      "score"
+     ],
+     "response": {
+      "$ref": "PlayerScoreResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "submitMultiple": {
+     "id": "games.scores.submitMultiple",
+     "path": "leaderboards/scores",
+     "httpMethod": "POST",
+     "description": "Submits multiple scores to leaderboards.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      }
+     },
+     "request": {
+      "$ref": "PlayerScoreSubmissionList"
+     },
+     "response": {
+      "$ref": "PlayerScoreListResponse"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  },
+  "turnBasedMatches": {
+   "methods": {
+    "cancel": {
+     "id": "games.turnBasedMatches.cancel",
+     "path": "turnbasedmatches/{matchId}/cancel",
+     "httpMethod": "PUT",
+     "description": "Cancel a turn-based match.",
+     "parameters": {
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "create": {
+     "id": "games.turnBasedMatches.create",
+     "path": "turnbasedmatches/create",
+     "httpMethod": "POST",
+     "description": "Create a turn-based match.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      }
+     },
+     "request": {
+      "$ref": "TurnBasedMatchCreateRequest"
+     },
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "decline": {
+     "id": "games.turnBasedMatches.decline",
+     "path": "turnbasedmatches/{matchId}/decline",
+     "httpMethod": "PUT",
+     "description": "Decline an invitation to play a turn-based match.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "dismiss": {
+     "id": "games.turnBasedMatches.dismiss",
+     "path": "turnbasedmatches/{matchId}/dismiss",
+     "httpMethod": "PUT",
+     "description": "Dismiss a turn-based match from the match list. The match will no longer show up in the list and will not generate notifications.",
+     "parameters": {
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "finish": {
+     "id": "games.turnBasedMatches.finish",
+     "path": "turnbasedmatches/{matchId}/finish",
+     "httpMethod": "PUT",
+     "description": "Finish a turn-based match. Each player should make this call once, after all results are in. Only the player whose turn it is may make the first call to Finish, and can pass in the final match state.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "request": {
+      "$ref": "TurnBasedMatchResults"
+     },
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "get": {
+     "id": "games.turnBasedMatches.get",
+     "path": "turnbasedmatches/{matchId}",
+     "httpMethod": "GET",
+     "description": "Get the data for a turn-based match.",
+     "parameters": {
+      "includeMatchData": {
+       "type": "boolean",
+       "description": "Get match data along with metadata.",
+       "location": "query"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "join": {
+     "id": "games.turnBasedMatches.join",
+     "path": "turnbasedmatches/{matchId}/join",
+     "httpMethod": "PUT",
+     "description": "Join a turn-based match.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "leave": {
+     "id": "games.turnBasedMatches.leave",
+     "path": "turnbasedmatches/{matchId}/leave",
+     "httpMethod": "PUT",
+     "description": "Leave a turn-based match when it is not the current player's turn, without canceling the match.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "leaveTurn": {
+     "id": "games.turnBasedMatches.leaveTurn",
+     "path": "turnbasedmatches/{matchId}/leaveTurn",
+     "httpMethod": "PUT",
+     "description": "Leave a turn-based match during the current player's turn, without canceling the match.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      },
+      "matchVersion": {
+       "type": "integer",
+       "description": "The version of the match being updated.",
+       "required": true,
+       "format": "int32",
+       "location": "query"
+      },
+      "pendingParticipantId": {
+       "type": "string",
+       "description": "The ID of another participant who should take their turn next. If not set, the match will wait for other player(s) to join via automatching; this is only valid if automatch criteria is set on the match with remaining slots for automatched players.",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "matchId",
+      "matchVersion"
+     ],
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "list": {
+     "id": "games.turnBasedMatches.list",
+     "path": "turnbasedmatches",
+     "httpMethod": "GET",
+     "description": "Returns turn-based matches the player is or was involved in.",
+     "parameters": {
+      "includeMatchData": {
+       "type": "boolean",
+       "description": "True if match data should be returned in the response. Note that not all data will necessarily be returned if include_match_data is true; the server may decide to only return data for some of the matches to limit download size for the client. The remainder of the data for these matches will be retrievable on request.",
+       "location": "query"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "maxCompletedMatches": {
+       "type": "integer",
+       "description": "The maximum number of completed or canceled matches to return in the response. If not set, all matches returned could be completed or canceled.",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of matches to return in the response, used for paging. For any response, the actual number of matches to return may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "TurnBasedMatchList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "rematch": {
+     "id": "games.turnBasedMatches.rematch",
+     "path": "turnbasedmatches/{matchId}/rematch",
+     "httpMethod": "POST",
+     "description": "Create a rematch of a match that was previously completed, with the same participants. This can be called by only one player on a match still in their list; the player must have called Finish first. Returns the newly created match; it will be the caller's turn.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      },
+      "requestId": {
+       "type": "string",
+       "description": "A randomly generated numeric ID for each request specified by the caller. This number is used at the server to ensure that the request is handled correctly across retries.",
+       "format": "int64",
+       "location": "query"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "response": {
+      "$ref": "TurnBasedMatchRematch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "sync": {
+     "id": "games.turnBasedMatches.sync",
+     "path": "turnbasedmatches/sync",
+     "httpMethod": "GET",
+     "description": "Returns turn-based matches the player is or was involved in that changed since the last sync call, with the least recent changes coming first. Matches that should be removed from the local cache will have a status of MATCH_DELETED.",
+     "parameters": {
+      "includeMatchData": {
+       "type": "boolean",
+       "description": "True if match data should be returned in the response. Note that not all data will necessarily be returned if include_match_data is true; the server may decide to only return data for some of the matches to limit download size for the client. The remainder of the data for these matches will be retrievable on request.",
+       "location": "query"
+      },
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "maxCompletedMatches": {
+       "type": "integer",
+       "description": "The maximum number of completed or canceled matches to return in the response. If not set, all matches returned could be completed or canceled.",
+       "format": "int32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "The maximum number of matches to return in the response, used for paging. For any response, the actual number of matches to return may be less than the specified maxResults.",
+       "format": "int32",
+       "minimum": "1",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "The token returned by the previous request.",
+       "location": "query"
+      }
+     },
+     "response": {
+      "$ref": "TurnBasedMatchSync"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    },
+    "takeTurn": {
+     "id": "games.turnBasedMatches.takeTurn",
+     "path": "turnbasedmatches/{matchId}/turn",
+     "httpMethod": "PUT",
+     "description": "Commit the results of a player turn.",
+     "parameters": {
+      "language": {
+       "type": "string",
+       "description": "The preferred language to use for strings returned by this method.",
+       "location": "query"
+      },
+      "matchId": {
+       "type": "string",
+       "description": "The ID of the match.",
+       "required": true,
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "matchId"
+     ],
+     "request": {
+      "$ref": "TurnBasedMatchTurn"
+     },
+     "response": {
+      "$ref": "TurnBasedMatch"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/games",
+      "https://www.googleapis.com/auth/plus.login"
+     ]
+    }
+   }
+  }
+ }
+}

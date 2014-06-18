@@ -1,0 +1,903 @@
+{
+ "kind": "discovery#restDescription",
+ "etag": "\"kEk3sFj6Ef5_yR1-H3bAO6qw9mI/KRARk1zfvD1Ng7hyNLY5ZbidGLY\"",
+ "discoveryVersion": "v1",
+ "id": "identitytoolkit:v3",
+ "name": "identitytoolkit",
+ "canonicalName": "Identity Toolkit",
+ "version": "v3",
+ "title": "Google Identity Toolkit API",
+ "description": "Help the third party sites to implement federated login.",
+ "ownerDomain": "google.com",
+ "ownerName": "Google",
+ "icons": {
+  "x16": "http://www.google.com/images/icons/product/search-16.gif",
+  "x32": "http://www.google.com/images/icons/product/search-32.gif"
+ },
+ "documentationLink": "https://developers.google.com/identity-toolkit/v3/",
+ "protocol": "rest",
+ "baseUrl": "https://www.googleapis.com/identitytoolkit/v3/relyingparty/",
+ "basePath": "/identitytoolkit/v3/relyingparty/",
+ "rootUrl": "https://www.googleapis.com/",
+ "servicePath": "identitytoolkit/v3/relyingparty/",
+ "batchPath": "batch",
+ "parameters": {
+  "alt": {
+   "type": "string",
+   "description": "Data format for the response.",
+   "default": "json",
+   "enum": [
+    "json"
+   ],
+   "enumDescriptions": [
+    "Responses with Content-Type of application/json"
+   ],
+   "location": "query"
+  },
+  "fields": {
+   "type": "string",
+   "description": "Selector specifying which fields to include in a partial response.",
+   "location": "query"
+  },
+  "key": {
+   "type": "string",
+   "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+   "location": "query"
+  },
+  "oauth_token": {
+   "type": "string",
+   "description": "OAuth 2.0 token for the current user.",
+   "location": "query"
+  },
+  "prettyPrint": {
+   "type": "boolean",
+   "description": "Returns response with indentations and line breaks.",
+   "default": "true",
+   "location": "query"
+  },
+  "quotaUser": {
+   "type": "string",
+   "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters. Overrides userIp if both are provided.",
+   "location": "query"
+  },
+  "userIp": {
+   "type": "string",
+   "description": "IP address of the site where the request originates. Use this if you want to enforce per-user limits.",
+   "location": "query"
+  }
+ },
+ "schemas": {
+  "CreateAuthUriResponse": {
+   "id": "CreateAuthUriResponse",
+   "type": "object",
+   "description": "Response of creating the IDP authentication URL.",
+   "properties": {
+    "authUri": {
+     "type": "string",
+     "description": "The URI used by the IDP to authenticate the user."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string identitytoolkit#CreateAuthUriResponse\".",
+     "default": "identitytoolkit#CreateAuthUriResponse"
+    },
+    "providerId": {
+     "type": "string",
+     "description": "The provider ID of the auth URI."
+    },
+    "providers": {
+     "type": "array",
+     "description": "Existing IDP's for the user.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "registered": {
+     "type": "boolean",
+     "description": "Whether the user is registered if the identifier is an email."
+    }
+   }
+  },
+  "DeleteAccountResponse": {
+   "id": "DeleteAccountResponse",
+   "type": "object",
+   "description": "Respone of deleting account.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#DeleteAccountResponse\".",
+     "default": "identitytoolkit#DeleteAccountResponse"
+    }
+   }
+  },
+  "DownloadAccountResponse": {
+   "id": "DownloadAccountResponse",
+   "type": "object",
+   "description": "Respone of downloading accounts in batch.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#DownloadAccountResponse\".",
+     "default": "identitytoolkit#DownloadAccountResponse"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The next page token. To be used in a subsequent request to return the next page of results."
+    },
+    "users": {
+     "type": "array",
+     "description": "The user accounts data.",
+     "items": {
+      "$ref": "UserInfo"
+     }
+    }
+   }
+  },
+  "GetAccountInfoResponse": {
+   "id": "GetAccountInfoResponse",
+   "type": "object",
+   "description": "Response of getting account information.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#GetAccountInfoResponse\".",
+     "default": "identitytoolkit#GetAccountInfoResponse"
+    },
+    "users": {
+     "type": "array",
+     "description": "The info of the users.",
+     "items": {
+      "$ref": "UserInfo"
+     }
+    }
+   }
+  },
+  "GetOobConfirmationCodeResponse": {
+   "id": "GetOobConfirmationCodeResponse",
+   "type": "object",
+   "description": "Response of getting a code for user confirmation (reset password, change email etc.).",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#GetOobConfirmationCodeResponse\".",
+     "default": "identitytoolkit#GetOobConfirmationCodeResponse"
+    },
+    "oobCode": {
+     "type": "string",
+     "description": "The code to be send to the user."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyCreateAuthUriRequest": {
+   "id": "IdentitytoolkitRelyingpartyCreateAuthUriRequest",
+   "type": "object",
+   "description": "Request to get the IDP authentication URL.",
+   "properties": {
+    "appId": {
+     "type": "string",
+     "description": "The app ID of the mobile app, base64(CERT_SHA1):PACKAGE_NAME for Android, BUNDLE_ID for iOS."
+    },
+    "clientId": {
+     "type": "string",
+     "description": "The relying party OAuth client ID."
+    },
+    "context": {
+     "type": "string",
+     "description": "The opaque value used by the client to maintain context info between the authentication request and the IDP callback."
+    },
+    "continueUri": {
+     "type": "string",
+     "description": "The URI to which the IDP redirects the user after the federated login flow."
+    },
+    "identifier": {
+     "type": "string",
+     "description": "The email or federated ID of the user."
+    },
+    "openidRealm": {
+     "type": "string",
+     "description": "Optional realm for OpenID protocol. The sub string \"scheme://domain:port\" of the param \"continueUri\" is used if this is not set."
+    },
+    "otaApp": {
+     "type": "string",
+     "description": "The native app package for OTA installation."
+    },
+    "providerId": {
+     "type": "string",
+     "description": "The IdP ID. For white listed IdPs it's a short domain name e.g. google.com, aol.com, live.net and yahoo.com. For other OpenID IdPs it's the OP identifier."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyDeleteAccountRequest": {
+   "id": "IdentitytoolkitRelyingpartyDeleteAccountRequest",
+   "type": "object",
+   "description": "Request to delete account.",
+   "properties": {
+    "localId": {
+     "type": "string",
+     "description": "The local ID of the user."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyDownloadAccountRequest": {
+   "id": "IdentitytoolkitRelyingpartyDownloadAccountRequest",
+   "type": "object",
+   "description": "Request to download user account in batch.",
+   "properties": {
+    "maxResults": {
+     "type": "integer",
+     "description": "The max number of results to return in the response.",
+     "format": "uint32"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "The token for the next page. This should be taken from the previous response."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyGetAccountInfoRequest": {
+   "id": "IdentitytoolkitRelyingpartyGetAccountInfoRequest",
+   "type": "object",
+   "description": "Request to get the account information.",
+   "properties": {
+    "email": {
+     "type": "array",
+     "description": "The list of emails of the users to inquiry.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "idToken": {
+     "type": "string",
+     "description": "The GITKit token of the authenticated user."
+    },
+    "localId": {
+     "type": "array",
+     "description": "The list of local ID's of the users to inquiry.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyResetPasswordRequest": {
+   "id": "IdentitytoolkitRelyingpartyResetPasswordRequest",
+   "type": "object",
+   "description": "Request to reset the password.",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "The email address of the user."
+    },
+    "newPassword": {
+     "type": "string",
+     "description": "The new password inputted by the user."
+    },
+    "oldPassword": {
+     "type": "string",
+     "description": "The old password inputted by the user."
+    },
+    "oobCode": {
+     "type": "string",
+     "description": "The confirmation code."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartySetAccountInfoRequest": {
+   "id": "IdentitytoolkitRelyingpartySetAccountInfoRequest",
+   "type": "object",
+   "description": "Request to set the account information.",
+   "properties": {
+    "captchaChallenge": {
+     "type": "string",
+     "description": "The captcha challenge."
+    },
+    "captchaResponse": {
+     "type": "string",
+     "description": "Response to the captcha."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The name of the user."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email of the user."
+    },
+    "emailVerified": {
+     "type": "boolean",
+     "description": "Mark the email as verified or not."
+    },
+    "idToken": {
+     "type": "string",
+     "description": "The GITKit token of the authenticated user."
+    },
+    "localId": {
+     "type": "string",
+     "description": "The local ID of the user."
+    },
+    "oobCode": {
+     "type": "string",
+     "description": "The out-of-band code of the change email request."
+    },
+    "password": {
+     "type": "string",
+     "description": "The new password of the user."
+    },
+    "provider": {
+     "type": "array",
+     "description": "The associated IDPs of the user.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "upgradeToFederatedLogin": {
+     "type": "boolean",
+     "description": "Mark the user to upgrade to federated login."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyUploadAccountRequest": {
+   "id": "IdentitytoolkitRelyingpartyUploadAccountRequest",
+   "type": "object",
+   "description": "Request to upload user account in batch.",
+   "properties": {
+    "hashAlgorithm": {
+     "type": "string"
+    },
+    "memoryCost": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "rounds": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "saltSeparator": {
+     "type": "string",
+     "format": "byte"
+    },
+    "signerKey": {
+     "type": "string",
+     "format": "byte"
+    },
+    "users": {
+     "type": "array",
+     "description": "The account info to be stored.",
+     "items": {
+      "$ref": "UserInfo"
+     }
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyVerifyAssertionRequest": {
+   "id": "IdentitytoolkitRelyingpartyVerifyAssertionRequest",
+   "type": "object",
+   "description": "Request to verify the IDP assertion.",
+   "properties": {
+    "pendingIdToken": {
+     "type": "string",
+     "description": "The GITKit token for the non-trusted IDP pending to be confirmed by the user."
+    },
+    "postBody": {
+     "type": "string",
+     "description": "The post body if the request is a HTTP POST."
+    },
+    "requestUri": {
+     "type": "string",
+     "description": "The URI to which the IDP redirects the user back. It may contain federated login result params added by the IDP."
+    }
+   }
+  },
+  "IdentitytoolkitRelyingpartyVerifyPasswordRequest": {
+   "id": "IdentitytoolkitRelyingpartyVerifyPasswordRequest",
+   "type": "object",
+   "description": "Request to verify the password.",
+   "properties": {
+    "captchaChallenge": {
+     "type": "string",
+     "description": "The captcha challenge."
+    },
+    "captchaResponse": {
+     "type": "string",
+     "description": "Response to the captcha."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email of the user."
+    },
+    "password": {
+     "type": "string",
+     "description": "The password inputed by the user."
+    },
+    "pendingIdToken": {
+     "type": "string",
+     "description": "The GITKit token for the non-trusted IDP, which is to be confirmed by the user."
+    }
+   }
+  },
+  "Relyingparty": {
+   "id": "Relyingparty",
+   "type": "object",
+   "description": "Request of getting a code for user confirmation (reset password, change email etc.)",
+   "properties": {
+    "captchaResp": {
+     "type": "string",
+     "description": "The recaptcha response from the user."
+    },
+    "challenge": {
+     "type": "string",
+     "description": "The recaptcha challenge presented to the user."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email of the user."
+    },
+    "idToken": {
+     "type": "string",
+     "description": "The user's Gitkit login token for email change."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#relyingparty\".",
+     "default": "identitytoolkit#relyingparty"
+    },
+    "newEmail": {
+     "type": "string",
+     "description": "The new email if the code is for email change."
+    },
+    "requestType": {
+     "type": "string",
+     "description": "The request type."
+    },
+    "userIp": {
+     "type": "string",
+     "description": "The IP address of the user."
+    }
+   }
+  },
+  "ResetPasswordResponse": {
+   "id": "ResetPasswordResponse",
+   "type": "object",
+   "description": "Response of resetting the password.",
+   "properties": {
+    "email": {
+     "type": "string",
+     "description": "The user's email."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#ResetPasswordResponse\".",
+     "default": "identitytoolkit#ResetPasswordResponse"
+    }
+   }
+  },
+  "SetAccountInfoResponse": {
+   "id": "SetAccountInfoResponse",
+   "type": "object",
+   "description": "Respone of setting the account information.",
+   "properties": {
+    "displayName": {
+     "type": "string",
+     "description": "The name of the user."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email of the user."
+    },
+    "idToken": {
+     "type": "string",
+     "description": "The Gitkit id token to login the newly sign up user."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#SetAccountInfoResponse\".",
+     "default": "identitytoolkit#SetAccountInfoResponse"
+    },
+    "providerUserInfo": {
+     "type": "array",
+     "description": "The user's profiles at the associated IdPs.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "displayName": {
+        "type": "string",
+        "description": "The user's display name at the IDP."
+       },
+       "photoUrl": {
+        "type": "string",
+        "description": "The user's photo url at the IDP."
+       },
+       "providerId": {
+        "type": "string",
+        "description": "The IdP ID. For whitelisted IdPs it's a short domain name, e.g., google.com, aol.com, live.net and yahoo.com. For other OpenID IdPs it's the OP identifier."
+       }
+      }
+     }
+    }
+   }
+  },
+  "UploadAccountResponse": {
+   "id": "UploadAccountResponse",
+   "type": "object",
+   "description": "Respone of uploading accounts in batch.",
+   "properties": {
+    "error": {
+     "type": "array",
+     "description": "The error encountered while processing the account info.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "index": {
+        "type": "integer",
+        "description": "The index of the malformed account, starting from 0.",
+        "format": "int32"
+       },
+       "message": {
+        "type": "string",
+        "description": "Detailed error message for the account info."
+       }
+      }
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#UploadAccountResponse\".",
+     "default": "identitytoolkit#UploadAccountResponse"
+    }
+   }
+  },
+  "UserInfo": {
+   "id": "UserInfo",
+   "type": "object",
+   "description": "Template for an individual account info.",
+   "properties": {
+    "displayName": {
+     "type": "string",
+     "description": "The name of the user."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email of the user."
+    },
+    "emailVerified": {
+     "type": "boolean",
+     "description": "Whether the email has been verified."
+    },
+    "localId": {
+     "type": "string",
+     "description": "The local ID of the user."
+    },
+    "passwordHash": {
+     "type": "string",
+     "description": "The user's hashed password.",
+     "format": "byte"
+    },
+    "passwordUpdatedAt": {
+     "type": "number",
+     "description": "The timestamp when the password was last updated.",
+     "format": "double"
+    },
+    "photoUrl": {
+     "type": "string",
+     "description": "The URL of the user profile photo."
+    },
+    "providerUserInfo": {
+     "type": "array",
+     "description": "The IDP of the user.",
+     "items": {
+      "type": "object",
+      "properties": {
+       "displayName": {
+        "type": "string",
+        "description": "The user's display name at the IDP."
+       },
+       "federatedId": {
+        "type": "string",
+        "description": "User's identifier at IDP."
+       },
+       "photoUrl": {
+        "type": "string",
+        "description": "The user's photo url at the IDP."
+       },
+       "providerId": {
+        "type": "string",
+        "description": "The IdP ID. For white listed IdPs it's a short domain name, e.g., google.com, aol.com, live.net and yahoo.com. For other OpenID IdPs it's the OP identifier."
+       }
+      }
+     }
+    },
+    "salt": {
+     "type": "string",
+     "description": "The user's password salt.",
+     "format": "byte"
+    },
+    "version": {
+     "type": "integer",
+     "description": "Version of the user's password.",
+     "format": "int32"
+    }
+   }
+  },
+  "VerifyAssertionResponse": {
+   "id": "VerifyAssertionResponse",
+   "type": "object",
+   "description": "Response of verifying the IDP assertion.",
+   "properties": {
+    "action": {
+     "type": "string",
+     "description": "The action code."
+    },
+    "appInstallationUrl": {
+     "type": "string",
+     "description": "URL for OTA app installation."
+    },
+    "appScheme": {
+     "type": "string",
+     "description": "The custom scheme used by mobile app."
+    },
+    "context": {
+     "type": "string",
+     "description": "The opaque value used by the client to maintain context info between the authentication request and the IDP callback."
+    },
+    "dateOfBirth": {
+     "type": "string",
+     "description": "The birth date of the IdP account."
+    },
+    "displayName": {
+     "type": "string",
+     "description": "The display name of the user."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email returned by the IdP. NOTE: The federated login user may not own the email."
+    },
+    "emailRecycled": {
+     "type": "boolean",
+     "description": "It's true if the email is recycled."
+    },
+    "emailVerified": {
+     "type": "boolean",
+     "description": "The value is true if the IDP is also the email provider. It means the user owns the email."
+    },
+    "federatedId": {
+     "type": "string",
+     "description": "The unique ID identifies the IdP account."
+    },
+    "firstName": {
+     "type": "string",
+     "description": "The first name of the user."
+    },
+    "fullName": {
+     "type": "string",
+     "description": "The full name of the user."
+    },
+    "idToken": {
+     "type": "string",
+     "description": "The ID token."
+    },
+    "inputEmail": {
+     "type": "string",
+     "description": "It's the identifier param in the createAuthUri request if the identifier is an email. It can be used to check whether the user input email is different from the asserted email."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#VerifyAssertionResponse\".",
+     "default": "identitytoolkit#VerifyAssertionResponse"
+    },
+    "language": {
+     "type": "string",
+     "description": "The language preference of the user."
+    },
+    "lastName": {
+     "type": "string",
+     "description": "The last name of the user."
+    },
+    "localId": {
+     "type": "string",
+     "description": "The RP local ID if it's already been mapped to the IdP account identified by the federated ID."
+    },
+    "needConfirmation": {
+     "type": "boolean",
+     "description": "Whether the assertion is from a non-trusted IDP and need account linking confirmation."
+    },
+    "nickName": {
+     "type": "string",
+     "description": "The nick name of the user."
+    },
+    "oauthRequestToken": {
+     "type": "string",
+     "description": "The user approved request token for the OpenID OAuth extension."
+    },
+    "oauthScope": {
+     "type": "string",
+     "description": "The scope for the OpenID OAuth extension."
+    },
+    "originalEmail": {
+     "type": "string",
+     "description": "The original email stored in the mapping storage. It's returned when the federated ID is associated to a different email."
+    },
+    "photoUrl": {
+     "type": "string",
+     "description": "The URI of the public accessible profiel picture."
+    },
+    "providerId": {
+     "type": "string",
+     "description": "The IdP ID. For white listed IdPs it's a short domain name e.g. google.com, aol.com, live.net and yahoo.com. If the \"providerId\" param is set to OpenID OP identifer other than the whilte listed IdPs the OP identifier is returned. If the \"identifier\" param is federated ID in the createAuthUri request. The domain part of the federated ID is returned."
+    },
+    "timeZone": {
+     "type": "string",
+     "description": "The timezone of the user."
+    },
+    "verifiedProvider": {
+     "type": "array",
+     "description": "When action is 'map', contains the idps which can be used for confirmation.",
+     "items": {
+      "type": "string"
+     }
+    }
+   }
+  },
+  "VerifyPasswordResponse": {
+   "id": "VerifyPasswordResponse",
+   "type": "object",
+   "description": "Request of verifying the password.",
+   "properties": {
+    "displayName": {
+     "type": "string",
+     "description": "The name of the user."
+    },
+    "email": {
+     "type": "string",
+     "description": "The email returned by the IdP. NOTE: The federated login user may not own the email."
+    },
+    "idToken": {
+     "type": "string",
+     "description": "The GITKit token for authenticated user."
+    },
+    "kind": {
+     "type": "string",
+     "description": "The fixed string \"identitytoolkit#VerifyPasswordResponse\".",
+     "default": "identitytoolkit#VerifyPasswordResponse"
+    },
+    "localId": {
+     "type": "string",
+     "description": "The RP local ID if it's already been mapped to the IdP account identified by the federated ID."
+    },
+    "photoUrl": {
+     "type": "string",
+     "description": "The URI of the user's photo at IdP"
+    },
+    "registered": {
+     "type": "boolean",
+     "description": "Whether the email is registered."
+    }
+   }
+  }
+ },
+ "resources": {
+  "relyingparty": {
+   "methods": {
+    "createAuthUri": {
+     "id": "identitytoolkit.relyingparty.createAuthUri",
+     "path": "createAuthUri",
+     "httpMethod": "POST",
+     "description": "Creates the URI used by the IdP to authenticate the user.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyCreateAuthUriRequest"
+     },
+     "response": {
+      "$ref": "CreateAuthUriResponse"
+     }
+    },
+    "deleteAccount": {
+     "id": "identitytoolkit.relyingparty.deleteAccount",
+     "path": "deleteAccount",
+     "httpMethod": "POST",
+     "description": "Delete user account.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyDeleteAccountRequest"
+     },
+     "response": {
+      "$ref": "DeleteAccountResponse"
+     }
+    },
+    "downloadAccount": {
+     "id": "identitytoolkit.relyingparty.downloadAccount",
+     "path": "downloadAccount",
+     "httpMethod": "POST",
+     "description": "Batch download user accounts.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyDownloadAccountRequest"
+     },
+     "response": {
+      "$ref": "DownloadAccountResponse"
+     }
+    },
+    "getAccountInfo": {
+     "id": "identitytoolkit.relyingparty.getAccountInfo",
+     "path": "getAccountInfo",
+     "httpMethod": "POST",
+     "description": "Returns the account info.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyGetAccountInfoRequest"
+     },
+     "response": {
+      "$ref": "GetAccountInfoResponse"
+     }
+    },
+    "getOobConfirmationCode": {
+     "id": "identitytoolkit.relyingparty.getOobConfirmationCode",
+     "path": "getOobConfirmationCode",
+     "httpMethod": "POST",
+     "description": "Get a code for user action confirmation.",
+     "request": {
+      "$ref": "Relyingparty"
+     },
+     "response": {
+      "$ref": "GetOobConfirmationCodeResponse"
+     }
+    },
+    "resetPassword": {
+     "id": "identitytoolkit.relyingparty.resetPassword",
+     "path": "resetPassword",
+     "httpMethod": "POST",
+     "description": "Set account info for a user.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyResetPasswordRequest"
+     },
+     "response": {
+      "$ref": "ResetPasswordResponse"
+     }
+    },
+    "setAccountInfo": {
+     "id": "identitytoolkit.relyingparty.setAccountInfo",
+     "path": "setAccountInfo",
+     "httpMethod": "POST",
+     "description": "Set account info for a user.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartySetAccountInfoRequest"
+     },
+     "response": {
+      "$ref": "SetAccountInfoResponse"
+     }
+    },
+    "uploadAccount": {
+     "id": "identitytoolkit.relyingparty.uploadAccount",
+     "path": "uploadAccount",
+     "httpMethod": "POST",
+     "description": "Batch upload existing user accounts.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyUploadAccountRequest"
+     },
+     "response": {
+      "$ref": "UploadAccountResponse"
+     }
+    },
+    "verifyAssertion": {
+     "id": "identitytoolkit.relyingparty.verifyAssertion",
+     "path": "verifyAssertion",
+     "httpMethod": "POST",
+     "description": "Verifies the assertion returned by the IdP.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyVerifyAssertionRequest"
+     },
+     "response": {
+      "$ref": "VerifyAssertionResponse"
+     }
+    },
+    "verifyPassword": {
+     "id": "identitytoolkit.relyingparty.verifyPassword",
+     "path": "verifyPassword",
+     "httpMethod": "POST",
+     "description": "Verifies the user entered password.",
+     "request": {
+      "$ref": "IdentitytoolkitRelyingpartyVerifyPasswordRequest"
+     },
+     "response": {
+      "$ref": "VerifyPasswordResponse"
+     }
+    }
+   }
+  }
+ }
+}

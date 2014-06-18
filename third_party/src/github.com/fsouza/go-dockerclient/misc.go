@@ -6,8 +6,9 @@ package docker
 
 import (
 	"bytes"
-	"github.com/fsouza/go-dockerclient/engine"
 	"io"
+
+	"github.com/fsouza/go-dockerclient/engine"
 )
 
 // Version returns version information about the docker server.

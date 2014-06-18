@@ -75,7 +75,7 @@ gcutil addinstance ${MASTER_NAME}\
   --image ${IMAGE} \
   --tags ${MASTER_TAG} \
   --network ${NETWORK} \
-  --service_account_scopes="storage-ro" \
+  --service_account_scopes="storage-ro,compute-rw" \
   --automatic_restart \
   --metadata_from_file startup-script:${KUBE_TEMP}/master-start.sh &
 
