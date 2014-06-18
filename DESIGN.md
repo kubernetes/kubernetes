@@ -37,25 +37,27 @@ While pods can be used for vertical integration of application stacks, their pri
 
 ### Labels
 
-Loosely coupled cooperating pods are organized using key/value labels.  
+Loosely coupled cooperating pods are organized using key/value labels.
 
 Each pod can have a set of key/value labels set on it, with at most one label with a particular key. 
 
-Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `stage` (e.g., with values `dev`, `qa`, or `production`), `service`, `tier` (e.g., with values `frontend` or `backend`), `partition`, and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
+Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `environment` (e.g., with values `dev`, `qa`, or `production`), `service`, `tier` (e.g., with values `frontend` or `backend`), `partition`, and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
 
-Via a "label query" the user can identify a set of `pods`.  
+Via a "label selector" the user can identify a set of `pods`.  
 
-This simple mechanism is a key part of how Kubernetes's mechanisms supporting horizontal scaling, `services` and `replicationControllers`, keep track of their members.  The set of pods that a `service` targets is defined with a label query. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label query. Sets supported by future versions of Kubernetes, such as worker pools, will use the same mechanism.
+This simple mechanism is a key part of how Kubernetes's mechanisms supporting horizontal scaling, `services` and `replicationControllers`, keep track of their members.  The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. Sets supported by future versions of Kubernetes, such as worker pools, will use the same mechanism.
 
 Pods may be removed from these sets by changing their labels. This flexibility may be used to remove pods from service for debugging, data recovery, etc.
 
-Sets identified by labels and label queries could be overlapping (think Venn diagrams). For instance, a service might point to all pods with `tier in (frontend), stage in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `tier=frontend, stage=prod, track=stable` and another `replicationController` (with `replicas` set to 1) for the canary with labels `tier=frontend, stage=prod, track=canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc. 
+For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
+
+Sets identified by labels and label selectors could be overlapping (think Venn diagrams). For instance, a service might point to all pods with `tier in (frontend), environment in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `tier=frontend, environment=prod, track=stable` and another `replicationController` (with `replicas` set to 1) for the canary with labels `tier=frontend, environment=prod, track=canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc. 
 
 Note that the superset described in the previous example is also heterogeneous. In long-lived, highly available, horizontally scaled, distributed, continuously evolving service applications, heterogeneity is inevitable, due to canaries, incremental rollouts, live reconfiguration, simultaneous updates and auto-scaling, hardware upgrades, and so on.
 
 Pods may belong to multiple sets simultaneously, which enables representation of service substructure and/or superstructure. In particular, labels are intended to facilitate the creation of non-hierarchical, multi-dimensional deployment structures. They are useful for a variety of management purposes (e.g., configuration, deployment) and for application introspection and analysis (e.g., logging, monitoring, alerting, analytics). Without the ability to form sets by intersecting labels, many implicitly related, overlapping flat sets would need to be created, for each subset and/or superset desired, which would lose semantic information and be difficult to keep consistent. Purely hierarchically nested sets wouldn't readily support slicing sets across different dimensions.
 
-Since labels can be set at pod creation time, no separate set add/remove operations are necessary, which makes them easier to use than manual set management. Additionally, since labels are directly attached to pods and label queries are fairly simple, it's easy for users and for clients and tools to determine what sets they belong to. OTOH, with sets formed by just explicitly enumerating members, one would (conceptually) need to search all sets to determine which ones a pod belonged to.
+Since labels can be set at pod creation time, no separate set add/remove operations are necessary, which makes them easier to use than manual set management. Additionally, since labels are directly attached to pods and label selectors are fairly simple, it's easy for users and for clients and tools to determine what sets they belong to. OTOH, with sets formed by just explicitly enumerating members, one would (conceptually) need to search all sets to determine which ones a pod belonged to.
 
 ## The Kubernetes Node
 
