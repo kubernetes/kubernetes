@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -77,7 +78,7 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "apiserver panic. Look in log for details.")
-			log.Printf("ApiServer panic'd: %#v\n", x)
+			log.Printf("ApiServer panic'd: %#v\n%s\n", x, debug.Stack())
 		}
 	}()
 	log.Printf("%s %s", req.Method, req.RequestURI)
