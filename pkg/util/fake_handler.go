@@ -32,6 +32,7 @@ type LogInterface interface {
 // FakeHandler is to assist in testing HTTP requests.
 type FakeHandler struct {
 	RequestReceived *http.Request
+	RequestBody     string
 	StatusCode      int
 	ResponseBody    string
 	// For logging - you can use a *testing.T
@@ -48,7 +49,7 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	if err != nil && f.T != nil {
 		f.T.Logf("Received read error: %#v", err)
 	}
-	f.ResponseBody = string(bodyReceived)
+	f.RequestBody = string(bodyReceived)
 }
 
 func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
@@ -59,8 +60,8 @@ func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMeth
 		t.Errorf("Unexpected method: %s", f.RequestReceived.Method)
 	}
 	if body != nil {
-		if *body != f.ResponseBody {
-			t.Errorf("Received body:\n%s\n Doesn't match expected body:\n%s", f.ResponseBody, *body)
+		if *body != f.RequestBody {
+			t.Errorf("Received body:\n%s\n Doesn't match expected body:\n%s", f.RequestBody, *body)
 		}
 	}
 }
