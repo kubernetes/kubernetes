@@ -1,9 +1,9 @@
 # Kubernetes Design Overview
 
 - [Overview](#overview)
-- [Key Concepts]
-  - [Pods](#key-concept-container-pod)
-  - [Labels](#key-concept-labels)
+- [Key Concepts](#key-concepts)
+  - [Pods](#pods)
+  - [Labels](#labels)
 - [The Kubernetes Node](#the-kubernetes-node)
   - [Kubelet](#kubelet)
   - [Kubernetes Proxy](#kubernetes-proxy)
