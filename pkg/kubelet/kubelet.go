@@ -148,7 +148,7 @@ func (kl *Kubelet) LogEvent(event *api.Event) error {
 	response, err = kl.Client.AddChild(fmt.Sprintf("/events/%s", event.Container.Name), string(data), 60*60*48 /* 2 days */)
 	// TODO(bburns) : examine response here.
 	if err != nil {
-		log.Printf("Error writing event: %s\n", err)
+		log.Printf("Error writing event: %v\n", err)
 		if response != nil {
 			log.Printf("Response was: %#v\n", *response)
 		}
@@ -473,7 +473,7 @@ func (kl *Kubelet) WatchFiles(config_path string, updateChannel chan<- manifestU
 	} else if statInfo.Mode().IsRegular() {
 		manifest, err := kl.extractFromFile(config_path)
 		if err != nil {
-			log.Printf("Error polling file: %#v", err)
+			log.Printf("Error polling file: %v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, []api.ContainerManifest{manifest}}
@@ -523,7 +523,7 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- mani
 	}
 	manifests, err := kl.ResponseToManifests(response)
 	if err != nil {
-		log.Printf("Error parsing response (%#v): %s", response, err)
+		log.Printf("Error parsing response (%#v): %v", response, err)
 		return err
 	}
 	log.Printf("Got state from etcd: %+v", manifests)
@@ -602,7 +602,7 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, updateChannel c
 		log.Printf("Got etcd change: %#v", watchResponse)
 		manifests, err := kl.extractFromEtcd(watchResponse)
 		if err != nil {
-			log.Printf("Error handling response from etcd: %#v", err)
+			log.Printf("Error handling response from etcd: %v", err)
 			continue
 		}
 		log.Printf("manifests: %#v", manifests)
@@ -669,14 +669,14 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			var exists bool
 			exists, actualName, err := kl.ContainerExists(&manifest, &element)
 			if err != nil {
-				log.Printf("Error detecting container: %#v skipping.", err)
+				log.Printf("Error detecting container: %v skipping.", err)
 				continue
 			}
 			if !exists {
 				log.Printf("%#v doesn't exist, creating", element)
 				err = kl.pullImage(element.Image)
 				if err != nil {
-					log.Printf("Error pulling container: %#v", err)
+					log.Printf("Error pulling container: %v", err)
 					continue
 				}
 				// netName has the '/' prefix, so slice it off
@@ -687,7 +687,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 
 				if err != nil {
 					// TODO(bburns) : Perhaps blacklist a container after N failures?
-					log.Printf("Error creating container: %#v", err)
+					log.Printf("Error creating container: %v", err)
 					desired[actualName] = true
 					continue
 				}
@@ -709,7 +709,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			log.Printf("Killing: %s", container)
 			err = kl.KillContainer(container)
 			if err != nil {
-				log.Printf("Error killing container: %#v", err)
+				log.Printf("Error killing container: %v", err)
 			}
 		}
 	}
@@ -739,7 +739,7 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 
 		err := handler.SyncManifests(manifests)
 		if err != nil {
-			log.Printf("Couldn't sync containers : %#v", err)
+			log.Printf("Couldn't sync containers : %v", err)
 		}
 	}
 }
