@@ -24,7 +24,7 @@ fi
 # Travis continuous build uses a head go release that doesn't report
 # a version number, so we skip this check on Travis.  Its unnecessary
 # there anyway.
-if [ ${TRAVIS} != "true" ]; then
+if [ "${TRAVIS}" != "true" ]; then
   GO_VERSION=($(go version))
 
   if [ ${GO_VERSION[2]} \< "go1.2" ]; then
