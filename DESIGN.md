@@ -41,7 +41,7 @@ Loosely coupled cooperating pods are organized using key/value labels.
 
 Each pod can have a set of key/value labels set on it, with at most one label with a particular key. 
 
-Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `stage` (e.g., with values `dev`, `qa`, or `production`), `service`, `tier` (e.g., with values `frontend` or `backend), `partition`, and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
+Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `stage` (e.g., with values `dev`, `qa`, or `production`), `service`, `tier` (e.g., with values `frontend` or `backend`), `partition`, and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
 
 Via a "label query" the user can identify a set of `pods`.  
 
