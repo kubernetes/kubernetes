@@ -45,3 +45,8 @@ func (ls Set) String() string {
 func (ls Set) Get(label string) string {
 	return ls[label]
 }
+
+// Convenience function: convert these labels to a query.
+func (ls Set) AsQuery() Query {
+	return QueryFromSet(ls)
+}

@@ -49,7 +49,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		list: api.ServiceList{
 			Items: []api.Service{
 				{
-					Labels: map[string]string{
+					Selector: map[string]string{
 						"foo": "bar",
 					},
 				},
@@ -92,7 +92,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		list: api.ServiceList{
 			Items: []api.Service{
 				{
-					Labels: map[string]string{
+					Selector: map[string]string{
 						"foo": "bar",
 					},
 				},

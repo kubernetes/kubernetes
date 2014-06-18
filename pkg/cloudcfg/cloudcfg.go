@@ -255,6 +255,9 @@ func createService(name string, port int, client client.ClientInterface) (api.Se
 		Labels: map[string]string{
 			"name": name,
 		},
+		Selector: map[string]string{
+			"name": name,
+		},
 	}
 	svc, err := client.CreateService(svc)
 	return svc, err

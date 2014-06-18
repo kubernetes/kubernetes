@@ -138,11 +138,17 @@ type ServiceList struct {
 }
 
 // Defines a service abstraction by a name (for example, mysql) consisting of local port
-// (for example 3306) that the proxy listens on, and the labels that define the service.
+// (for example 3306) that the proxy listens on, and the selector that determines which pods
+// will answer requests sent through the proxy.
 type Service struct {
-	JSONBase                   `json:",inline" yaml:",inline"`
-	Port                       int               `json:"port,omitempty" yaml:"port,omitempty"`
-	Labels                     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	JSONBase `json:",inline" yaml:",inline"`
+	Port     int `json:"port,omitempty" yaml:"port,omitempty"`
+
+	// This service's labels.
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+
+	// This service will route traffic to pods having labels matching this selector.
+	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
 }
 
