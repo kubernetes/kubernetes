@@ -22,6 +22,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -392,4 +393,77 @@ func TestSyncronize(t *testing.T) {
 	manager.synchronize()
 
 	validateSyncReplication(t, &fakePodControl, 7, 0)
+}
+
+type asyncTimeout struct {
+	doneChan chan bool
+}
+
+func beginTimeout(d time.Duration) *asyncTimeout {
+	a := &asyncTimeout{doneChan: make(chan bool)}
+	go func() {
+		select {
+		case <-a.doneChan:
+			return
+		case <-time.After(d):
+			panic("Timeout expired!")
+		}
+	}()
+	return a
+}
+
+func (a *asyncTimeout) done() {
+	close(a.doneChan)
+}
+
+func TestWatchControllers(t *testing.T) {
+	defer beginTimeout(20 * time.Second).done()
+	fakeEtcd := util.MakeFakeEtcdClient(t)
+	manager := MakeReplicationManager(fakeEtcd, nil)
+	var testControllerSpec api.ReplicationController
+	receivedCount := 0
+	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
+		if !reflect.DeepEqual(controllerSpec, testControllerSpec) {
+			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
+		}
+		receivedCount++
+		return nil
+	}
+
+	go manager.watchControllers()
+	time.Sleep(10 * time.Millisecond)
+
+	// Test normal case
+	testControllerSpec.ID = "foo"
+	fakeEtcd.WatchResponse <- &etcd.Response{
+		Action: "set",
+		Node: &etcd.Node{
+			Value: util.MakeJSONString(testControllerSpec),
+		},
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	if receivedCount != 1 {
+		t.Errorf("Expected 1 call but got %v", receivedCount)
+	}
+
+	// Test error case
+	fakeEtcd.WatchInjectError <- fmt.Errorf("Injected error")
+	time.Sleep(10 * time.Millisecond)
+
+	// Did everything shut down?
+	if _, open := <-fakeEtcd.WatchResponse; open {
+		t.Errorf("An injected error did not cause a graceful shutdown")
+	}
+
+	// Test purposeful shutdown
+	go manager.watchControllers()
+	time.Sleep(10 * time.Millisecond)
+	fakeEtcd.WatchStop <- true
+	time.Sleep(10 * time.Millisecond)
+
+	// Did everything shut down?
+	if _, open := <-fakeEtcd.WatchResponse; open {
+		t.Errorf("A stop did not cause a graceful shutdown")
+	}
 }

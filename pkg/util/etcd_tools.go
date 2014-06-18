@@ -94,25 +94,19 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 // empty responses and nil response nodes exactly like a not found error.
 func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
 	response, err := h.Client.Get(key, false, false)
-	returnZero := false
-	if err != nil {
-		if ignoreNotFound && IsEtcdNotFound(err) {
-			returnZero = true
-		} else {
+
+	if err != nil && !IsEtcdNotFound(err) {
+		return err
+	}
+	if err != nil || response.Node == nil || len(response.Node.Value) == 0 {
+		if ignoreNotFound {
+			pv := reflect.ValueOf(objPtr)
+			pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
+			return nil
+		} else if err != nil {
 			return err
 		}
-	}
-	if !returnZero && (response.Node == nil || len(response.Node.Value) == 0) {
-		if ignoreNotFound {
-			returnZero = true
-		} else {
-			return fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
-		}
-	}
-	if returnZero {
-		pv := reflect.ValueOf(objPtr)
-		pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
-		return nil
+		return fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
 	}
 	return json.Unmarshal([]byte(response.Node.Value), objPtr)
 }
