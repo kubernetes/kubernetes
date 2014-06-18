@@ -22,10 +22,10 @@ import (
 
 // CloudInterface is an abstract, pluggable interface for cloud providers
 type Interface interface {
-	// TCPLoadBalancer returns a balancer interface, or nil if none is supported.  Returns an error if one occurs.
-	TCPLoadBalancer() (TCPLoadBalancer, error)
-	// Instances returns an instances interface, or nil if none is supported.  Returns an error if one occurs.
-	Instances() (Instances, error)
+	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
+	TCPLoadBalancer() (TCPLoadBalancer, bool)
+	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
+	Instances() (Instances, bool)
 }
 
 type TCPLoadBalancer interface {

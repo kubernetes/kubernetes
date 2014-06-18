@@ -35,8 +35,12 @@ func (f *FakeCloud) ClearCalls() {
 	f.Calls = []string{}
 }
 
-func (f *FakeCloud) TCPLoadBalancer() (TCPLoadBalancer, error) {
-	return f, nil
+func (f *FakeCloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
+	return f, true
+}
+
+func (f *FakeCloud) Instances() (Instances, bool) {
+	return f, true
 }
 
 func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {

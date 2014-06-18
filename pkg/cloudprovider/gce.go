@@ -79,12 +79,12 @@ func NewGCECloud() (*GCECloud, error) {
 	}, nil
 }
 
-func (gce *GCECloud) TCPLoadBalancer() (TCPLoadBalancer, error) {
-	return gce, nil
+func (gce *GCECloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
+	return gce, true
 }
 
-func (gce *GCECloud) Instances() (Instances, error) {
-	return gce, nil
+func (gce *GCECloud) Instances() (Instances, bool) {
+	return gce, true
 }
 
 func makeHostLink(projectID, zone, host string) string {

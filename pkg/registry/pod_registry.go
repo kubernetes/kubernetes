@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -73,20 +72,15 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 	if cloud == nil {
 		return ""
 	}
-	instances, err := cloud.Instances()
-	if instances == nil {
-		return ""
-	}
-	if err != nil {
-		log.Printf("Error getting instances: %#v", err)
+	instances, ok := cloud.Instances()
+	if instances == nil || !ok {
 		return ""
 	}
 	ix := strings.Index(host, ".")
 	if ix != -1 {
 		host = host[:ix]
 	}
-	var addr net.IP
-	addr, err = instances.IPAddress(host)
+	addr, err := instances.IPAddress(host)
 	if err != nil {
 		log.Printf("Error getting instance IP: %#v", err)
 		return ""
@@ -99,12 +93,17 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	if err != nil {
 		return pod, err
 	}
-	info, err := storage.containerInfo.GetContainerInfo(pod.CurrentState.Host, id)
-	if err != nil {
-		return pod, err
+	if pod == nil {
+		return pod, nil
 	}
-	pod.CurrentState.Info = info
-	pod.CurrentState.Status = makePodStatus(info)
+	if storage.containerInfo != nil {
+		info, err := storage.containerInfo.GetContainerInfo(pod.CurrentState.Host, id)
+		if err != nil {
+			return pod, err
+		}
+		pod.CurrentState.Info = info
+		pod.CurrentState.Status = makePodStatus(info)
+	}
 	pod.CurrentState.HostIP = getInstanceIP(storage.cloud, pod.CurrentState.Host)
 
 	pod.Kind = "cluster#pod"
