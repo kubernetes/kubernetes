@@ -1570,11 +1570,18 @@ implemented, either.</p>
             "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
                 "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
             </span>}
+            <span class="hljs-string">"selector"</span>: {
+                "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
+            </span>}
         </span>},
         {
             "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example2"</span></span>,
             "<span class="hljs-attribute">port</span>": <span class="hljs-value"><span class="hljs-number">8080</span></span>,
             "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">env</span>": <span class="hljs-value"><span class="hljs-string">"prod"</span></span>,
+                "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"jetty"</span>
+            </span>}
+            <span class="hljs-string">"selector"</span>: {
                 "<span class="hljs-attribute">env</span>": <span class="hljs-value"><span class="hljs-string">"prod"</span></span>,
                 "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"jetty"</span>
             </span>}
@@ -1663,6 +1670,10 @@ implemented, either.</p>
     "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
       "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">selector</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
+      "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
     </span>}
   </span>}
 </span>}
@@ -1671,9 +1682,12 @@ implemented, either.</p>
                                         
                                             <strong>Example:</strong>
                                             <pre>{
-  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example2"</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example"</span></span>,
   "<span class="hljs-attribute">port</span>": <span class="hljs-value"><span class="hljs-number">8000</span></span>,
   "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
+     "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
+  </span>}
+  <span class="hljs-string">"selector"</span>: {
      "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
   </span>}
 </span>}
@@ -1791,9 +1805,12 @@ implemented, either.</p>
                                                 
                                                     <strong>Example:</strong>
                                                     <pre>{
-  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example2"</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example"</span></span>,
   "<span class="hljs-attribute">port</span>": <span class="hljs-value"><span class="hljs-number">8000</span></span>,
   "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
+     "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
+  </span>}
+  <span class="hljs-string">"selector"</span>: {
      "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
   </span>}
 </span>}
@@ -1886,6 +1903,10 @@ implemented, either.</p>
     "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
       "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
+    </span>}</span>,
+    "<span class="hljs-attribute">selector</span>": <span class="hljs-value">{
+      "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
+      "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span>
     </span>}
   </span>}
 </span>}
@@ -1894,9 +1915,12 @@ implemented, either.</p>
                                         
                                             <strong>Example:</strong>
                                             <pre>{
-  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example2"</span></span>,
+  "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"example"</span></span>,
   "<span class="hljs-attribute">port</span>": <span class="hljs-value"><span class="hljs-number">8000</span></span>,
   "<span class="hljs-attribute">labels</span>": <span class="hljs-value">{
+     "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
+  </span>}
+  <span class="hljs-string">"selector"</span>: {
      "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span>
   </span>}
 </span>}
