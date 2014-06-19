@@ -4,5 +4,8 @@
   "labels": {
      "name": "nginx"
   },
+  "selector": {
+     "name": "nginx"
+  },
   "createExternalLoadBalancer": true
 }
