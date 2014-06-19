@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	file               = flag.String("config", "", "Path to the config file")
+	file               = flag.String("config", "", "Path to the config file/dir")
 	etcdServers        = flag.String("etcd_servers", "", "Url of etcd servers in the cluster")
 	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
 	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking file for new data")

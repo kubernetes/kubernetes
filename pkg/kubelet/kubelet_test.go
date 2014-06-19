@@ -729,26 +729,14 @@ func TestMakePortsAndBindings(t *testing.T) {
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan []api.ContainerManifest)
-	reader := startReading(changeChannel)
-
-	err := kubelet.extractFromFile("/some/fake/file", changeChannel)
-	close(changeChannel)
-
+	_, err := kubelet.extractFromFile("/some/fake/file")
 	if err == nil {
 		t.Error("Unexpected non-error.")
-	}
-
-	list := reader.GetList()
-	if len(list) != 0 {
-		t.Errorf("Unexpected list: %#v", list)
 	}
 }
 
 func TestExtractFromBadDataFile(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan []api.ContainerManifest)
-	reader := startReading(changeChannel)
 
 	badData := []byte{1, 2, 3}
 	file, err := ioutil.TempFile("", "foo")
@@ -756,44 +744,68 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	name := file.Name()
 	file.Close()
 	ioutil.WriteFile(name, badData, 0755)
-	err = kubelet.extractFromFile(name, changeChannel)
-	close(changeChannel)
+	_, err = kubelet.extractFromFile(name)
 
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}
 
-	list := reader.GetList()
-	if len(list) != 0 {
-		t.Errorf("Unexpected list: %#v", list)
-	}
 }
 
 func TestExtractFromValidDataFile(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan []api.ContainerManifest)
-	reader := startReading(changeChannel)
 
-	manifests := []api.ContainerManifest{
-		{Id: "bar"},
-	}
-	data, err := json.Marshal(manifests[0]) // Right now, files only support a single manifest
+	manifest := api.ContainerManifest{Id: "bar"}
+	data, err := json.Marshal(manifest)
 	expectNoError(t, err)
 	file, err := ioutil.TempFile("", "foo")
 	expectNoError(t, err)
 	name := file.Name()
 	expectNoError(t, file.Close())
 	ioutil.WriteFile(name, data, 0755)
-	err = kubelet.extractFromFile(name, changeChannel)
-	close(changeChannel)
 
+	read, err := kubelet.extractFromFile(name)
 	expectNoError(t, err)
-	read := reader.GetList()
-	if len(read) != 1 {
-		t.Errorf("Unexpected channel traffic: %#v", read)
+	if !reflect.DeepEqual(read, manifest) {
+		t.Errorf("Unexpected difference.  Expected %#v, got %#v", manifest, read)
 	}
-	if !reflect.DeepEqual(read[0], manifests) {
-		t.Errorf("Unexpected difference.  Expected %#v, got %#v", manifests, read[0])
+}
+
+func TestExtractFromEmptyDir(t *testing.T) {
+	kubelet := Kubelet{}
+
+	dirName, err := ioutil.TempDir("", "foo")
+	expectNoError(t, err)
+
+	_, err = kubelet.extractFromDir(dirName)
+	expectNoError(t, err)
+}
+
+func TestExtractFromDir(t *testing.T) {
+	kubelet := Kubelet{}
+
+	manifests := []api.ContainerManifest{
+		{Id: "foo"},
+		{Id: "bar"},
+	}
+
+	dirName, err := ioutil.TempDir("", "foo")
+	expectNoError(t, err)
+
+	for _, manifest := range manifests {
+		data, err := json.Marshal(manifest)
+		expectNoError(t, err)
+		file, err := ioutil.TempFile(dirName, "kub")
+		expectNoError(t, err)
+		name := file.Name()
+		expectNoError(t, file.Close())
+		ioutil.WriteFile(name, data, 0755)
+	}
+
+	read, err := kubelet.extractFromDir(dirName)
+	expectNoError(t, err)
+	if !reflect.DeepEqual(read, manifests) {
+		t.Errorf("Unexpected difference.  Expected %#v, got %#v", manifests, read)
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -364,28 +365,43 @@ func (kl *Kubelet) KillContainer(name string) error {
 	return err
 }
 
-func (kl *Kubelet) extractFromFile(name string, changeChannel chan<- []api.ContainerManifest) error {
+func (kl *Kubelet) extractFromFile(name string) (api.ContainerManifest, error) {
 	var file *os.File
 	var err error
+	var manifest api.ContainerManifest
+
 	if file, err = os.Open(name); err != nil {
-		return err
+		return manifest, err
 	}
 
-	return kl.extractFromReader(file, changeChannel)
-}
-
-func (kl *Kubelet) extractFromReader(reader io.Reader, changeChannel chan<- []api.ContainerManifest) error {
-	var manifest api.ContainerManifest
-	data, err := ioutil.ReadAll(reader)
+	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Printf("Couldn't read from reader: %v", err)
-		return err
+		log.Printf("Couldn't read from file: %v", err)
+		return manifest, err
 	}
 	if err = kl.ExtractYAMLData(data, &manifest); err != nil {
-		return err
+		return manifest, err
 	}
-	changeChannel <- []api.ContainerManifest{manifest}
-	return nil
+	return manifest, nil
+}
+
+func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) {
+	var manifests []api.ContainerManifest
+
+	files, err := filepath.Glob(filepath.Join(name, "*"))
+	if err != nil {
+		return manifests, err
+	}
+
+	for _, file := range files {
+		manifest, err := kl.extractFromFile(file)
+		if err != nil {
+			log.Printf("Couldn't read from file %s: %v", file, err)
+			return manifests, err
+		}
+		manifests = append(manifests, manifest)
+	}
+	return manifests, nil
 }
 
 func (kl *Kubelet) extractMultipleFromReader(reader io.Reader, changeChannel chan<- []api.ContainerManifest) error {
@@ -407,10 +423,28 @@ func (kl *Kubelet) extractMultipleFromReader(reader io.Reader, changeChannel cha
 func (kl *Kubelet) WatchFile(file string, changeChannel chan<- []api.ContainerManifest) {
 	for {
 		var err error
+
 		time.Sleep(kl.FileCheckFrequency)
-		err = kl.extractFromFile(file, changeChannel)
+
+		fileInfo, err := os.Stat(file)
 		if err != nil {
 			log.Printf("Error polling file: %#v", err)
+			continue
+		}
+		if fileInfo.IsDir() {
+			manifests, err := kl.extractFromDir(file)
+			if err != nil {
+				log.Printf("Error polling dir: %#v", err)
+				continue
+			}
+			changeChannel <- manifests
+		} else {
+			manifest, err := kl.extractFromFile(file)
+			if err != nil {
+				log.Printf("Error polling file: %#v", err)
+				continue
+			}
+			changeChannel <- []api.ContainerManifest{manifest}
 		}
 	}
 }
@@ -672,7 +706,7 @@ func (kl *Kubelet) RunSyncLoop(etcdChannel, fileChannel, serverChannel, httpChan
 	for {
 		select {
 		case manifests := <-fileChannel:
-			log.Printf("Got new configuration from file... %v", manifests)
+			log.Printf("Got new configuration from file/dir... %v", manifests)
 			lastFile = manifests
 		case manifests := <-etcdChannel:
 			log.Printf("Got new configuration from etcd... %v", manifests)
