@@ -148,7 +148,21 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api
 		} else {
 			return nil, fmt.Errorf("response node is null %#v", response)
 		}
+	} else if response.Action == "delete" {
+		// Ensure that the final state of a replication controller is applied before it is deleted.
+		// Otherwise, a replication controller could be modified and then deleted (for example, from 3 to 0
+		// replicas), and it would be non-deterministic which of its pods continued to exist.
+		if response.PrevNode != nil {
+			var controllerSpec api.ReplicationController
+			if err := json.Unmarshal([]byte(response.PrevNode.Value), &controllerSpec); err != nil {
+				return nil, err
+			}
+			return &controllerSpec, nil
+		} else {
+			return nil, fmt.Errorf("previous node is null %#v", response)
+		}
 	}
+
 	return nil, nil
 }
 
