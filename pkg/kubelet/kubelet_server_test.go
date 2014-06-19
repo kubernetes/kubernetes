@@ -15,8 +15,9 @@ import (
 )
 
 type fakeKubelet struct {
-	infoFunc func(name string) (string, error)
-	idFunc   func(name string) (string, bool, error)
+	infoFunc  func(name string) (string, error)
+	idFunc    func(name string) (string, bool, error)
+	statsFunc func(name string) (*api.ContainerStats, error)
 }
 
 func (fk *fakeKubelet) GetContainerInfo(name string) (string, error) {
@@ -25,6 +26,10 @@ func (fk *fakeKubelet) GetContainerInfo(name string) (string, error) {
 
 func (fk *fakeKubelet) GetContainerID(name string) (string, bool, error) {
 	return fk.idFunc(name)
+}
+
+func (fk *fakeKubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
+	return fk.statsFunc(name)
 }
 
 // If we made everything distribute a list of ContainerManifests, we could just use
