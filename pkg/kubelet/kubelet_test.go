@@ -966,14 +966,14 @@ func TestGetContainerStats(t *testing.T) {
 		StatsPercentiles: &info.ContainerStatsPercentiles{
 			MaxMemoryUsage: 1024000,
 			MemoryUsagePercentiles: []info.Percentile{
-				info.Percentile{50, 100},
-				info.Percentile{80, 180},
-				info.Percentile{90, 190},
+				{50, 100},
+				{80, 180},
+				{90, 190},
 			},
 			CpuUsagePercentiles: []info.Percentile{
-				info.Percentile{51, 101},
-				info.Percentile{81, 181},
-				info.Percentile{91, 191},
+				{51, 101},
+				{81, 181},
+				{91, 191},
 			},
 		},
 	}

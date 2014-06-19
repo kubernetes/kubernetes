@@ -141,14 +141,14 @@ func TestContainerStats(t *testing.T) {
 	expectedStats := &api.ContainerStats{
 		MaxMemoryUsage: 1024001,
 		CpuUsagePercentiles: []api.Percentile{
-			api.Percentile{50, 150},
-			api.Percentile{80, 180},
-			api.Percentile{90, 190},
+			{50, 150},
+			{80, 180},
+			{90, 190},
 		},
 		MemoryUsagePercentiles: []api.Percentile{
-			api.Percentile{50, 150},
-			api.Percentile{80, 180},
-			api.Percentile{90, 190},
+			{50, 150},
+			{80, 180},
+			{90, 190},
 		},
 	}
 	expectedContainerName := "goodcontainer"
