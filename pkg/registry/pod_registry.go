@@ -32,16 +32,25 @@ import (
 type PodRegistryStorage struct {
 	registry      PodRegistry
 	containerInfo client.ContainerInfo
+	podCache      client.ContainerInfo
 	scheduler     Scheduler
 	cloud         cloudprovider.Interface
 }
 
-func MakePodRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler, cloud cloudprovider.Interface) apiserver.RESTStorage {
+// MakePodRegistryStorage makes a RESTStorage object for a pod registry.
+// Parameters:
+//   registry The pod registry
+//   containerInfo Source of fresh container info
+//   scheduler The scheduler for assigning pods to machines
+//   cloud Interface to a cloud provider (may be null)
+//   podCache Source of cached container info
+func MakePodRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler, cloud cloudprovider.Interface, podCache client.ContainerInfo) apiserver.RESTStorage {
 	return &PodRegistryStorage{
 		registry:      registry,
 		containerInfo: containerInfo,
 		scheduler:     scheduler,
 		cloud:         cloud,
+		podCache:      podCache,
 	}
 }
 
@@ -50,7 +59,20 @@ func (storage *PodRegistryStorage) List(query labels.Query) (interface{}, error)
 	pods, err := storage.registry.ListPods(query)
 	if err == nil {
 		result.Items = pods
+		// Get cached info for the list currently.
+		// TODO: Optionally use fresh info
+		if storage.podCache != nil {
+			for ix, pod := range pods {
+				info, err := storage.podCache.GetContainerInfo(pod.CurrentState.Host, pod.ID)
+				if err != nil {
+					log.Printf("Error getting container info: %#v", err)
+					continue
+				}
+				result.Items[ix].CurrentState.Info = info
+			}
+		}
 	}
+
 	result.Kind = "cluster#podList"
 	return result, err
 }
