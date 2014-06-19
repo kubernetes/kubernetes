@@ -84,10 +84,10 @@ func (sr *ServiceRegistryStorage) Get(id string) (interface{}, error) {
 	return service, err
 }
 
-func (sr *ServiceRegistryStorage) Delete(id string) error {
+func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	svc, err := sr.Get(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if svc.(*api.Service).CreateExternalLoadBalancer {
 		var balancer cloudprovider.TCPLoadBalancer
@@ -98,11 +98,11 @@ func (sr *ServiceRegistryStorage) Delete(id string) error {
 		if ok && balancer != nil {
 			err = balancer.DeleteTCPLoadBalancer(id, "us-central1")
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return sr.registry.DeleteService(id)
+	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), sr.registry.DeleteService(id)
 }
 
 func (sr *ServiceRegistryStorage) Extract(body string) (interface{}, error) {
@@ -112,7 +112,7 @@ func (sr *ServiceRegistryStorage) Extract(body string) (interface{}, error) {
 	return svc, err
 }
 
-func (sr *ServiceRegistryStorage) Create(obj interface{}) error {
+func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(api.Service)
 	if srv.CreateExternalLoadBalancer {
 		var balancer cloudprovider.TCPLoadBalancer
@@ -123,15 +123,16 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) error {
 		if ok && balancer != nil {
 			err := balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, sr.hosts)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		} else {
-			return fmt.Errorf("requested an external service, but no cloud provider supplied.")
+			return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
 		}
 	}
-	return sr.registry.CreateService(srv)
+	// TODO actually wait for the object to be fully created here.
+	return apiserver.MakeAsync(func() interface{} { return obj }), sr.registry.CreateService(srv)
 }
 
-func (sr *ServiceRegistryStorage) Update(obj interface{}) error {
-	return sr.registry.UpdateService(obj.(api.Service))
+func (sr *ServiceRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
+	return apiserver.MakeAsync(func() interface{} { return obj }), sr.registry.UpdateService(obj.(api.Service))
 }

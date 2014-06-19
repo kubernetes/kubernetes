@@ -57,8 +57,8 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 	return controller, err
 }
 
-func (storage *ControllerRegistryStorage) Delete(id string) error {
-	return storage.registry.DeleteController(id)
+func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{}, error) {
+	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.DeleteController(id)
 }
 
 func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, error) {
@@ -68,10 +68,10 @@ func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, err
 	return result, err
 }
 
-func (storage *ControllerRegistryStorage) Create(controller interface{}) error {
-	return storage.registry.CreateController(controller.(api.ReplicationController))
+func (storage *ControllerRegistryStorage) Create(controller interface{}) (<-chan interface{}, error) {
+	return apiserver.MakeAsync(func() interface{} { return controller }), storage.registry.CreateController(controller.(api.ReplicationController))
 }
 
-func (storage *ControllerRegistryStorage) Update(controller interface{}) error {
-	return storage.registry.UpdateController(controller.(api.ReplicationController))
+func (storage *ControllerRegistryStorage) Update(controller interface{}) (<-chan interface{}, error) {
+	return apiserver.MakeAsync(func() interface{} { return controller }), storage.registry.UpdateController(controller.(api.ReplicationController))
 }

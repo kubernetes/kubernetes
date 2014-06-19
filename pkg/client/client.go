@@ -95,7 +95,7 @@ func (client Client) rawRequest(method, path string, requestBody io.Reader, targ
 	if err != nil {
 		return body, err
 	}
-	if response.StatusCode != 200 {
+	if response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent {
 		return nil, fmt.Errorf("request [%s %s] failed (%d) %s: %s", method, client.makeURL(path), response.StatusCode, response.Status, string(body))
 	}
 	if target != nil {
