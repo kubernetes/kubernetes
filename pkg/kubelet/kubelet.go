@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
+	dregistry "github.com/dotcloud/docker/registry"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
@@ -58,6 +59,7 @@ type DockerInterface interface {
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
+	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 }
 
 type CadvisorInterface interface {
@@ -217,14 +219,19 @@ func (kl *Kubelet) ListContainers() ([]string, error) {
 }
 
 func (kl *Kubelet) pullImage(image string) error {
-	kl.pullLock.Lock()
-	defer kl.pullLock.Unlock()
-	cmd := exec.Command("docker", "pull", image)
-	err := cmd.Start()
+	registry, repo, err := dregistry.ResolveRepositoryName(image)
 	if err != nil {
 		return err
 	}
-	return cmd.Wait()
+	kl.pullLock.Lock()
+	defer kl.pullLock.Unlock()
+	opts := docker.PullImageOptions{
+		Repository: repo,
+		Registry:   registry,
+	}
+	authConfig := docker.AuthConfiguration{}
+
+	return kl.DockerClient.PullImage(opts, authConfig)
 }
 
 // Converts "-" to "_-_" and "_" to "___" so that we can use "--" to meaningfully separate parts of a docker name.

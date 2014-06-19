@@ -45,8 +45,6 @@ var (
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 )
 
-const dockerBinary = "/usr/bin/docker"
-
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
