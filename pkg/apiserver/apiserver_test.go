@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -49,6 +50,7 @@ type SimpleRESTStorage struct {
 	item    Simple
 	deleted string
 	updated Simple
+	channel <-chan interface{}
 }
 
 func (storage *SimpleRESTStorage) List(labels.Selector) (interface{}, error) {
@@ -62,9 +64,9 @@ func (storage *SimpleRESTStorage) Get(id string) (interface{}, error) {
 	return storage.item, storage.err
 }
 
-func (storage *SimpleRESTStorage) Delete(id string) error {
+func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) {
 	storage.deleted = id
-	return storage.err
+	return storage.channel, storage.err
 }
 
 func (storage *SimpleRESTStorage) Extract(body string) (interface{}, error) {
@@ -73,13 +75,13 @@ func (storage *SimpleRESTStorage) Extract(body string) (interface{}, error) {
 	return item, storage.err
 }
 
-func (storage *SimpleRESTStorage) Create(interface{}) error {
-	return storage.err
+func (storage *SimpleRESTStorage) Create(interface{}) (<-chan interface{}, error) {
+	return storage.channel, storage.err
 }
 
-func (storage *SimpleRESTStorage) Update(object interface{}) error {
+func (storage *SimpleRESTStorage) Update(object interface{}) (<-chan interface{}, error) {
 	storage.updated = object.(Simple)
-	return storage.err
+	return storage.channel, storage.err
 }
 
 func extractBody(response *http.Response, object interface{}) (string, error) {
@@ -270,7 +272,7 @@ func TestCreate(t *testing.T) {
 	expectNoError(t, err)
 	response, err := client.Do(request)
 	expectNoError(t, err)
-	if response.StatusCode != 200 {
+	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
@@ -279,5 +281,60 @@ func TestCreate(t *testing.T) {
 	expectNoError(t, err)
 	if !reflect.DeepEqual(itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
+	}
+}
+
+func TestSyncCreate(t *testing.T) {
+	channel := make(chan interface{}, 1)
+	storage := SimpleRESTStorage{
+		channel: channel,
+	}
+	handler := New(map[string]RESTStorage{
+		"foo": &storage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	simple := Simple{Name: "foo"}
+	data, _ := json.Marshal(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
+	expectNoError(t, err)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		expectNoError(t, err)
+		if response.StatusCode != 200 {
+			t.Errorf("Unexpected response %#v", response)
+		}
+		wg.Done()
+	}()
+	output := Simple{Name: "bar"}
+	channel <- output
+	wg.Wait()
+	var itemOut Simple
+	body, err := extractBody(response, &itemOut)
+	expectNoError(t, err)
+	if !reflect.DeepEqual(itemOut, output) {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
+	}
+}
+
+func TestSyncCreateTimeout(t *testing.T) {
+	handler := New(map[string]RESTStorage{
+		"foo": &SimpleRESTStorage{},
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	simple := Simple{Name: "foo"}
+	data, _ := json.Marshal(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true&timeout=1us", bytes.NewBuffer(data))
+	expectNoError(t, err)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != 500 {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }

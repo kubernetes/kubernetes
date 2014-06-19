@@ -25,18 +25,29 @@ import (
 	"net/url"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // RESTStorage is a generic interface for RESTful storage services
 type RESTStorage interface {
 	List(labels.Selector) (interface{}, error)
 	Get(id string) (interface{}, error)
-	Delete(id string) error
+	Delete(id string) (<-chan interface{}, error)
 	Extract(body string) (interface{}, error)
-	Create(interface{}) error
-	Update(interface{}) error
+	Create(interface{}) (<-chan interface{}, error)
+	Update(interface{}) (<-chan interface{}, error)
+}
+
+func MakeAsync(fn func() interface{}) <-chan interface{} {
+	channel := make(chan interface{}, 1)
+	go func() {
+		defer util.HandleCrash()
+		channel <- fn()
+	}()
+	return channel
 }
 
 // Status is a return value for calls that don't return other objects
@@ -135,6 +146,17 @@ func (server *ApiServer) readBody(req *http.Request) (string, error) {
 	return string(body), err
 }
 
+func (server *ApiServer) waitForObject(out <-chan interface{}, timeout time.Duration) (interface{}, error) {
+	tick := time.After(timeout)
+	var obj interface{}
+	select {
+	case obj = <-out:
+		return obj, nil
+	case <-tick:
+		return nil, fmt.Errorf("Timed out waiting for synchronization.")
+	}
+}
+
 // handleREST is the main dispatcher for the server.  It switches on the HTTP method, and then
 // on path length, according to the following table:
 //   Method     Path          Action
@@ -144,7 +166,17 @@ func (server *ApiServer) readBody(req *http.Request) (string, error) {
 //   PUT        /foo/bar      update 'bar'
 //   DELETE     /foo/bar      delete 'bar'
 // Returns 404 if the method/pattern doesn't match one of these entries
+// The server accepts several query parameters:
+//    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
+//    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
+//    labels=<label-selector> Used for filtering list operations
 func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+	sync := requestUrl.Query().Get("sync") == "true"
+	timeout, err := time.ParseDuration(requestUrl.Query().Get("timeout"))
+	if err != nil && len(requestUrl.Query().Get("timeout")) > 0 {
+		log.Printf("Failed to parse: %#v '%s'", err, requestUrl.Query().Get("timeout"))
+		timeout = time.Second * 30
+	}
 	switch req.Method {
 	case "GET":
 		switch len(parts) {
@@ -159,7 +191,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 				server.error(err, w)
 				return
 			}
-			server.write(200, controllers, w)
+			server.write(http.StatusOK, controllers, w)
 		case 2:
 			item, err := storage.Get(parts[1])
 			if err != nil {
@@ -190,24 +222,44 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 			server.error(err, w)
 			return
 		}
-		err = storage.Create(obj)
+		out, err := storage.Create(obj)
+		if err == nil && sync {
+			obj, err = server.waitForObject(out, timeout)
+		}
 		if err != nil {
 			server.error(err, w)
-		} else {
-			server.write(200, obj, w)
+			return
 		}
+		var statusCode int
+		if sync {
+			statusCode = http.StatusOK
+		} else {
+			statusCode = http.StatusAccepted
+		}
+		server.write(statusCode, obj, w)
 		return
 	case "DELETE":
 		if len(parts) != 2 {
 			server.notFound(req, w)
 			return
 		}
-		err := storage.Delete(parts[1])
+		out, err := storage.Delete(parts[1])
+		var obj interface{}
+		obj = Status{Success: true}
+		if err == nil && sync {
+			obj, err = server.waitForObject(out, timeout)
+		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
-		server.write(200, Status{Success: true}, w)
+		var statusCode int
+		if sync {
+			statusCode = http.StatusOK
+		} else {
+			statusCode = http.StatusAccepted
+		}
+		server.write(statusCode, obj, w)
 		return
 	case "PUT":
 		if len(parts) != 2 {
@@ -223,12 +275,21 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 			server.error(err, w)
 			return
 		}
-		err = storage.Update(obj)
+		out, err := storage.Update(obj)
+		if err == nil && sync {
+			obj, err = server.waitForObject(out, timeout)
+		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
-		server.write(200, obj, w)
+		var statusCode int
+		if sync {
+			statusCode = http.StatusOK
+		} else {
+			statusCode = http.StatusAccepted
+		}
+		server.write(statusCode, obj, w)
 		return
 	default:
 		server.notFound(req, w)

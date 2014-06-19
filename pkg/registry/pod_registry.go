@@ -132,8 +132,8 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	return pod, err
 }
 
-func (storage *PodRegistryStorage) Delete(id string) error {
-	return storage.registry.DeletePod(id)
+func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error) {
+	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.DeletePod(id)
 }
 
 func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
@@ -143,18 +143,19 @@ func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
 	return pod, err
 }
 
-func (storage *PodRegistryStorage) Create(pod interface{}) error {
+func (storage *PodRegistryStorage) Create(pod interface{}) (<-chan interface{}, error) {
 	podObj := pod.(api.Pod)
 	if len(podObj.ID) == 0 {
-		return fmt.Errorf("id is unspecified: %#v", pod)
+		return nil, fmt.Errorf("id is unspecified: %#v", pod)
 	}
 	machine, err := storage.scheduler.Schedule(podObj)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return storage.registry.CreatePod(machine, podObj)
+
+	return apiserver.MakeAsync(func() interface{} { return pod }), storage.registry.CreatePod(machine, podObj)
 }
 
-func (storage *PodRegistryStorage) Update(pod interface{}) error {
-	return storage.registry.UpdatePod(pod.(api.Pod))
+func (storage *PodRegistryStorage) Update(pod interface{}) (<-chan interface{}, error) {
+	return apiserver.MakeAsync(func() interface{} { return pod }), storage.registry.UpdatePod(pod.(api.Pod))
 }
