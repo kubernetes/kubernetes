@@ -114,6 +114,9 @@ hack/local-up.sh
 
 This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down. While it's running, you can use `hack/localcfg.sh` in place of `cluster/cloudcfg.sh` to talk to it.
 
+## Running kubernetes in Docker containers
+There are two Docker images to get you started. First you need to deploy [google/kubernetes-node](kubernetes-node/) to all Docker nodes in your cluster, then you can deploy [google/kubernetes-server](kubernetes-server/) and use `cmd/cloudcfg/cloudcfg` to schedule your containers.
+
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)
 
