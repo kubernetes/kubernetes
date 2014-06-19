@@ -1006,3 +1006,33 @@ func TestGetContainerStats(t *testing.T) {
 	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
+
+func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	kubelet := Kubelet{
+		DockerClient: &fakeDocker,
+	}
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			Names: []string{"foo"},
+		},
+	}
+
+	stats, _ := kubelet.GetContainerStats("foo")
+	// When there's no cAdvisor, the stats should be either nil or empty
+	if stats == nil {
+		return
+	}
+	if stats.MaxMemoryUsage != 0 {
+		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.MaxMemoryUsage)
+	}
+	if len(stats.CpuUsagePercentiles) > 0 {
+		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.CpuUsagePercentiles)
+	}
+	if len(stats.MemoryUsagePercentiles) > 0 {
+		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.MemoryUsagePercentiles)
+	}
+}
