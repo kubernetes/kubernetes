@@ -139,7 +139,7 @@ func TestControllerParsing(t *testing.T) {
 		},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
-			ReplicasInSet: map[string]string{
+			ReplicaSelector: map[string]string{
 				"name": "nginx",
 			},
 			PodTemplate: api.PodTemplate{

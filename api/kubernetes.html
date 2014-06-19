@@ -970,7 +970,7 @@ implemented, either.</p>
             "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span></span>,
             "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
                 "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
-                "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{
+                "<span class="hljs-attribute">replicaSelector</span>": <span class="hljs-value">{
                     "<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"testRun"</span>
                 </span>}</span>,
                 "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
@@ -1074,7 +1074,7 @@ implemented, either.</p>
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
           "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Number of pods desired in the set"</span>
         </span>}</span>,
-        "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">replicaSelector</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
           "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Required labels used to identify pods in the set"</span>
@@ -1100,7 +1100,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"nginxController"</span></span>,
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
-      "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
+      "<span class="hljs-attribute">replicaSelector</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
       "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
            "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
@@ -1231,7 +1231,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"nginxController"</span></span>,
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
-      "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
+      "<span class="hljs-attribute">replicaSelector</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
       "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
            "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{
@@ -1333,7 +1333,7 @@ implemented, either.</p>
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
           "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Number of pods desired in the set"</span>
         </span>}</span>,
-        "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{
+        "<span class="hljs-attribute">replicaSelector</span>": <span class="hljs-value">{
           "<span class="hljs-attribute">type</span>": <span class="hljs-value"><span class="hljs-string">"object"</span></span>,
           "<span class="hljs-attribute">required</span>": <span class="hljs-value"><span class="hljs-literal">false</span></span>,
           "<span class="hljs-attribute">description</span>": <span class="hljs-value"><span class="hljs-string">"Required labels used to identify pods in the set"</span>
@@ -1359,7 +1359,7 @@ implemented, either.</p>
     "<span class="hljs-attribute">id</span>": <span class="hljs-value"><span class="hljs-string">"nginxController"</span></span>,
     "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
       "<span class="hljs-attribute">replicas</span>": <span class="hljs-value"><span class="hljs-number">2</span></span>,
-      "<span class="hljs-attribute">replicasInSet</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
+      "<span class="hljs-attribute">replicaSelector</span>": <span class="hljs-value">{"<span class="hljs-attribute">name</span>": <span class="hljs-value"><span class="hljs-string">"nginx"</span></span>}</span>,
       "<span class="hljs-attribute">podTemplate</span>": <span class="hljs-value">{
         "<span class="hljs-attribute">desiredState</span>": <span class="hljs-value">{
            "<span class="hljs-attribute">manifest</span>": <span class="hljs-value">{

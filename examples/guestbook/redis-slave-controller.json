@@ -2,7 +2,7 @@
     "id": "redisSlaveController",
     "desiredState": {
       "replicas": 2,
-      "replicasInSet": {"name": "redisslave"},
+      "replicaSelector": {"name": "redisslave"},
       "podTemplate": {
         "desiredState": {
            "manifest": {

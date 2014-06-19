@@ -107,7 +107,7 @@ func (h *HumanReadablePrinter) printPodList(podList api.PodList, w io.Writer) er
 
 func (h *HumanReadablePrinter) printReplicationController(ctrl api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), labels.Set(ctrl.DesiredState.ReplicasInSet), ctrl.DesiredState.Replicas)
+		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), labels.Set(ctrl.DesiredState.ReplicaSelector), ctrl.DesiredState.Replicas)
 	return err
 }
 

@@ -108,7 +108,7 @@ Create a file named `redis-slave-controller.json` that contains:
     "id": "redisSlaveController",
     "desiredState": {
       "replicas": 2,
-      "replicasInSet": {"name": "redis-slave"},
+      "replicaSelector": {"name": "redis-slave"},
       "podTemplate": {
         "desiredState": {
            "manifest": {
@@ -191,7 +191,7 @@ Create a file named `frontend-controller.json`:
   "id": "frontendController",
   "desiredState": {
     "replicas": 3,
-    "replicasInSet": {"name": "frontend"},
+    "replicaSelector": {"name": "frontend"},
     "podTemplate": {
       "desiredState": {
          "manifest": {

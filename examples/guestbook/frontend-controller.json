@@ -2,7 +2,7 @@
     "id": "frontendController",
     "desiredState": {
       "replicas": 1,
-      "replicasInSet": {"name": "frontend"},
+      "replicaSelector": {"name": "frontend"},
       "podTemplate": {
         "desiredState": {
            "manifest": {

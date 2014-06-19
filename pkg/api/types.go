@@ -108,9 +108,9 @@ type Pod struct {
 
 // ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get)
 type ReplicationControllerState struct {
-	Replicas      int               `json:"replicas" yaml:"replicas"`
-	ReplicasInSet map[string]string `json:"replicasInSet,omitempty" yaml:"replicasInSet,omitempty"`
-	PodTemplate   PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty"`
+	Replicas        int               `json:"replicas" yaml:"replicas"`
+	ReplicaSelector map[string]string `json:"replicaSelector,omitempty" yaml:"replicaSelector,omitempty"`
+	PodTemplate     PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty"`
 }
 
 type ReplicationControllerList struct {
