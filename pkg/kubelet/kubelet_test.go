@@ -1036,3 +1036,60 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.MemoryUsagePercentiles)
 	}
 }
+
+func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
+	containerId := "ab2cdf"
+	containerPath := fmt.Sprintf("/docker/%v", containerId)
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	containerInfo := &info.ContainerInfo{}
+	mockCadvisor := &mockCadvisorClient{}
+	expectedErr := fmt.Errorf("some error")
+	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, expectedErr)
+
+	kubelet := Kubelet{
+		DockerClient:   &fakeDocker,
+		CadvisorClient: mockCadvisor,
+	}
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			Names: []string{"foo"},
+			ID:    containerId,
+		},
+	}
+
+	stats, err := kubelet.GetContainerStats("foo")
+	if stats != nil {
+		t.Errorf("non-nil stats on error")
+	}
+	if err == nil {
+		t.Errorf("expect error but received nil error")
+		return
+	}
+	if err.Error() != expectedErr.Error() {
+		t.Errorf("wrong error message. expect %v, got %v", err, expectedErr)
+	}
+	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	mockCadvisor := &mockCadvisorClient{}
+
+	kubelet := Kubelet{
+		DockerClient:   &fakeDocker,
+		CadvisorClient: mockCadvisor,
+	}
+	fakeDocker.containerList = []docker.APIContainers{}
+
+	stats, _ := kubelet.GetContainerStats("foo")
+	if stats != nil {
+		t.Errorf("non-nil stats on non exist container")
+	}
+	mockCadvisor.AssertExpectations(t)
+}
