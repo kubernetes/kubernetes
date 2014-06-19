@@ -373,6 +373,7 @@ func (kl *Kubelet) extractFromFile(name string) (api.ContainerManifest, error) {
 	if file, err = os.Open(name); err != nil {
 		return manifest, err
 	}
+	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
