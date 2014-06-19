@@ -231,7 +231,7 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 	manager := MakeReplicationManager(nil, &client)
 	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
-		Action: "delete",
+		Action: "update",
 	})
 	expectNoError(t, err)
 }
@@ -308,6 +308,40 @@ func TestHandleWatchResponse(t *testing.T) {
 	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
 		Node: &etcd.Node{
+			Value: string(data),
+		},
+	})
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if !reflect.DeepEqual(controller, *controllerOut) {
+		t.Errorf("Unexpected mismatch.  Expected %#v, Saw: %#v", controller, controllerOut)
+	}
+}
+
+func TestHandleWatchResponseDelete(t *testing.T) {
+	body, _ := json.Marshal(makePodList(2))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.Client{
+		Host: testServer.URL,
+	}
+
+	fakePodControl := FakePodControl{}
+
+	manager := MakeReplicationManager(nil, &client)
+	manager.podControl = &fakePodControl
+
+	controller := makeReplicationController(2)
+
+	data, err := json.Marshal(controller)
+	expectNoError(t, err)
+	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
+		Action: "delete",
+		PrevNode: &etcd.Node{
 			Value: string(data),
 		},
 	})
