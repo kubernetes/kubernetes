@@ -85,7 +85,6 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		w.Header().Add("Content-type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		encoder := json.NewEncoder(w)
 		err = encoder.Encode(stats)
 		if err != nil {
@@ -93,6 +92,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprintf(w, "Internal Error: %#v", err)
 			return
 		}
+		w.WriteHeader(http.StatusOK)
 	case u.Path == "/containerInfo":
 		container := u.Query().Get("container")
 		if len(container) == 0 {
