@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
 
@@ -58,11 +59,17 @@ type DockerInterface interface {
 	StopContainer(id string, timeout uint) error
 }
 
+type CadvisorInterface interface {
+	ContainerInfo(name string) (*info.ContainerInfo, error)
+	MachineInfo() (*info.MachineInfo, error)
+}
+
 // The main kubelet implementation
 type Kubelet struct {
 	Hostname           string
 	Client             util.EtcdClient
 	DockerClient       DockerInterface
+	CadvisorClient     CadvisorInterface
 	FileCheckFrequency time.Duration
 	SyncFrequency      time.Duration
 	HTTPCheckFrequency time.Duration
