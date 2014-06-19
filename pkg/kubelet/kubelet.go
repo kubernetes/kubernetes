@@ -34,8 +34,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/src/github.com/fsouza/go-dockerclient"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
