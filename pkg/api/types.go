@@ -45,6 +45,8 @@ type VolumeMount struct {
 	Name      string `yaml:"name,omitempty" json:"name,omitempty"`
 	ReadOnly  bool   `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
+	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
+	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container
