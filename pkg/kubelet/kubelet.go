@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -393,6 +394,8 @@ func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) 
 	if err != nil {
 		return manifests, err
 	}
+
+	sort.Strings(files)
 
 	for _, file := range files {
 		manifest, err := kl.extractFromFile(file)

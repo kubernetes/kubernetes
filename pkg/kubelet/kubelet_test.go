@@ -785,8 +785,8 @@ func TestExtractFromDir(t *testing.T) {
 	kubelet := Kubelet{}
 
 	manifests := []api.ContainerManifest{
-		{Id: "foo"},
-		{Id: "bar"},
+		{Id: "aaaa"},
+		{Id: "bbbb"},
 	}
 
 	dirName, err := ioutil.TempDir("", "foo")
@@ -795,7 +795,7 @@ func TestExtractFromDir(t *testing.T) {
 	for _, manifest := range manifests {
 		data, err := json.Marshal(manifest)
 		expectNoError(t, err)
-		file, err := ioutil.TempFile(dirName, "kub")
+		file, err := ioutil.TempFile(dirName, manifest.Id)
 		expectNoError(t, err)
 		name := file.Name()
 		expectNoError(t, file.Close())
