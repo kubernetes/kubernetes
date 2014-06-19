@@ -58,9 +58,12 @@ func TestPodCacheGet(t *testing.T) {
 func TestPodCacheGetMissing(t *testing.T) {
 	cache := NewPodCache(nil, nil, time.Second*1)
 
-	_, err := cache.GetContainerInfo("host", "foo")
-	if err == nil {
-		t.Errorf("Unexpected non-error")
+	info, err := cache.GetContainerInfo("host", "foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if info != nil {
+		t.Errorf("Unexpected info: %#v", info)
 	}
 }
 

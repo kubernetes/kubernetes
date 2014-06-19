@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -54,7 +53,7 @@ func (p *PodCache) GetContainerInfo(host, id string) (interface{}, error) {
 	defer p.podLock.Unlock()
 	value, ok := p.podInfo[id]
 	if !ok {
-		return nil, fmt.Errorf("Couldn't find any information for %s", id)
+		return nil, nil
 	} else {
 		return value, nil
 	}
