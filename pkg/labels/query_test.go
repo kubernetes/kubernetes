@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestQueryParse(t *testing.T) {
+func TestSelectorParse(t *testing.T) {
 	testGoodStrings := []string{
 		"x=a,y=b,z=c",
 		"",
@@ -31,7 +31,7 @@ func TestQueryParse(t *testing.T) {
 		"x==a==b",
 	}
 	for _, test := range testGoodStrings {
-		lq, err := ParseQuery(test)
+		lq, err := ParseSelector(test)
 		if err != nil {
 			t.Errorf("%v: error %v (%#v)\n", test, err, err)
 		}
@@ -40,42 +40,42 @@ func TestQueryParse(t *testing.T) {
 		}
 	}
 	for _, test := range testBadStrings {
-		_, err := ParseQuery(test)
+		_, err := ParseSelector(test)
 		if err == nil {
 			t.Errorf("%v: did not get expected error\n", test)
 		}
 	}
 }
 
-func expectMatch(t *testing.T, query string, ls Set) {
-	lq, err := ParseQuery(query)
+func expectMatch(t *testing.T, selector string, ls Set) {
+	lq, err := ParseSelector(selector)
 	if err != nil {
-		t.Errorf("Unable to parse %v as a query\n", query)
+		t.Errorf("Unable to parse %v as a selector\n", selector)
 		return
 	}
 	if !lq.Matches(ls) {
-		t.Errorf("Wanted %s to match '%s', but it did not.\n", query, ls)
+		t.Errorf("Wanted %s to match '%s', but it did not.\n", selector, ls)
 	}
 }
 
-func expectNoMatch(t *testing.T, query string, ls Set) {
-	lq, err := ParseQuery(query)
+func expectNoMatch(t *testing.T, selector string, ls Set) {
+	lq, err := ParseSelector(selector)
 	if err != nil {
-		t.Errorf("Unable to parse %v as a query\n", query)
+		t.Errorf("Unable to parse %v as a selector\n", selector)
 		return
 	}
 	if lq.Matches(ls) {
-		t.Errorf("Wanted '%s' to not match '%s', but it did.", query, ls)
+		t.Errorf("Wanted '%s' to not match '%s', but it did.", selector, ls)
 	}
 }
 
 func TestEverything(t *testing.T) {
 	if !Everything().Matches(Set{"x": "y"}) {
-		t.Errorf("Nil query didn't match")
+		t.Errorf("Nil selector didn't match")
 	}
 }
 
-func TestLabelQueryMatches(t *testing.T) {
+func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "", Set{"x": "y"})
 	expectMatch(t, "x=y", Set{"x": "y"})
 	expectMatch(t, "x=y,z=w", Set{"x": "y", "z": "w"})
@@ -96,15 +96,15 @@ func TestLabelQueryMatches(t *testing.T) {
 	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", labelset)
 }
 
-func expectMatchDirect(t *testing.T, query, ls Set) {
-	if !QueryFromSet(query).Matches(ls) {
-		t.Errorf("Wanted %s to match '%s', but it did not.\n", query, ls)
+func expectMatchDirect(t *testing.T, selector, ls Set) {
+	if !SelectorFromSet(selector).Matches(ls) {
+		t.Errorf("Wanted %s to match '%s', but it did not.\n", selector, ls)
 	}
 }
 
-func expectNoMatchDirect(t *testing.T, query, ls Set) {
-	if QueryFromSet(query).Matches(ls) {
-		t.Errorf("Wanted '%s' to not match '%s', but it did.", query, ls)
+func expectNoMatchDirect(t *testing.T, selector, ls Set) {
+	if SelectorFromSet(selector).Matches(ls) {
+		t.Errorf("Wanted '%s' to not match '%s', but it did.", selector, ls)
 	}
 }
 

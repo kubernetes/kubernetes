@@ -36,10 +36,10 @@ func MakeMemoryRegistry() *MemoryRegistry {
 	}
 }
 
-func (registry *MemoryRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
+func (registry *MemoryRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	result := []api.Pod{}
 	for _, value := range registry.podData {
-		if query.Matches(labels.Set(value.Labels)) {
+		if selector.Matches(labels.Set(value.Labels)) {
 			result = append(result, value)
 		}
 	}

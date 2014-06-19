@@ -73,17 +73,19 @@ CONTAINER ID  IMAGE  COMMAND  CREATED  STATUS  PORTS  NAMES
 ### Step Two: Turn up the master service.
 A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables. Services find the containers to load balance based on pod labels.
 
-The pod that you created in Step One has the label `name=redis-master`, so the corresponding service is defined by that label.  Create a file named `redis-master-service.json` that contains:
+The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines which pods will receive the traffic sent to the service.  Create a file named `redis-master-service.json` that contains:
 
 ```js
 {
   "id": "redismaster",
   "port": 10000,
-  "labels": {
+  "selector": {
     "name": "redis-master"
   }
 }
 ```
+
+This will cause all pods to see the redis master apparently running on localhost:10000.
 
 Once you have that service description, you can create the service with the `cloudcfg` cli:
 
@@ -106,7 +108,7 @@ Create a file named `redis-slave-controller.json` that contains:
     "id": "redisSlaveController",
     "desiredState": {
       "replicas": 2,
-      "replicasInSet": {"name": "redis-slave"},
+      "replicaSelector": {"name": "redis-slave"},
       "podTemplate": {
         "desiredState": {
            "manifest": {
@@ -126,7 +128,7 @@ Then you can create the service by running:
 
 ```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-controller.json create /replicationControllers
-Name                   Image(s)                   Label Query         Replicas
+Name                   Image(s)                   Selector            Replicas
 ----------             ----------                 ----------          ----------
 redisSlaveController   brendanburns/redis-slave   name=redisslave     2
 ```
@@ -160,11 +162,14 @@ Just like the master, we want to have a service to proxy connections to the read
   "port": 10001,
   "labels": {
     "name": "redis-slave"
+  },
+  "selector": {
+    "name": "redis-slave"
   }
 }
 ```
 
-This time the label query for the service is `name=redis-slave`.
+This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself--as we've done here--to make it easy to locate them with the `cloudcfg -l "label=value" list sevices` command.
 
 Now that you have created the service specification, create it in your cluster with the `cloudcfg` CLI:
 
@@ -186,7 +191,7 @@ Create a file named `frontend-controller.json`:
   "id": "frontendController",
   "desiredState": {
     "replicas": 3,
-    "replicasInSet": {"name": "frontend"},
+    "replicaSelector": {"name": "frontend"},
     "podTemplate": {
       "desiredState": {
          "manifest": {
@@ -206,7 +211,7 @@ With this file, you can turn up your frontend with:
 
 ```shell
 $ cluster/cloudcfg.sh -c examples/guestbook/frontend-controller.json create /replicationControllers
-Name                 Image(s)                 Label Query         Replicas
+Name                 Image(s)                 Selector            Replicas
 ----------           ----------               ----------          ----------
 frontendController   brendanburns/php-redis   name=frontend       3
 ```

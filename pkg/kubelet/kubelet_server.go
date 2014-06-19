@@ -68,7 +68,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		container := u.Query().Get("container")
 		if len(container) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "Missing container query arg.")
+			fmt.Fprint(w, "Missing container selector arg.")
 			return
 		}
 		id, found, err := s.Kubelet.GetContainerID(container)

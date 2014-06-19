@@ -74,7 +74,7 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 	if err != nil {
 		return err
 	}
-	labels := controller.DesiredState.ReplicasInSet
+	labels := controller.DesiredState.ReplicaSelector
 
 	podList, err := client.ListPods(labels)
 	if err != nil {
@@ -200,7 +200,7 @@ func RunController(image, name string, replicas int, client client.ClientInterfa
 		},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
-			ReplicasInSet: map[string]string{
+			ReplicaSelector: map[string]string{
 				"name": name,
 			},
 			PodTemplate: api.PodTemplate{
@@ -253,6 +253,9 @@ func createService(name string, port int, client client.ClientInterface) (api.Se
 		JSONBase: api.JSONBase{ID: name},
 		Port:     port,
 		Labels: map[string]string{
+			"name": name,
+		},
+		Selector: map[string]string{
 			"name": name,
 		},
 	}

@@ -51,7 +51,7 @@ type SimpleRESTStorage struct {
 	updated Simple
 }
 
-func (storage *SimpleRESTStorage) List(labels.Query) (interface{}, error) {
+func (storage *SimpleRESTStorage) List(labels.Selector) (interface{}, error) {
 	result := SimpleList{
 		Items: storage.list,
 	}

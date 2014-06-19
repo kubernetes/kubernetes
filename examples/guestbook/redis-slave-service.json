@@ -4,4 +4,7 @@
   "labels": {
     "name": "redisslave"
   }
+  "selector": {
+    "name": "redisslave"
+  }
 }

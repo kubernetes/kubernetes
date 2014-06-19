@@ -4,4 +4,7 @@
   "labels": {
      "name": "nginx"
   }
+  "selector": {
+     "name": "nginx"
+  }
 }

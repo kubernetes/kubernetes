@@ -604,16 +604,21 @@ func TestEtcdUpdateService(t *testing.T) {
 	fakeClient := util.MakeFakeEtcdClient(t)
 	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.UpdateService(api.Service{
+	testService := api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Labels: map[string]string{
 			"baz": "bar",
 		},
-	})
+		Selector: map[string]string{
+			"baz": "bar",
+		},
+	}
+	err := registry.UpdateService(testService)
 	expectNoError(t, err)
 	svc, err := registry.GetService("foo")
-	if svc.Labels["baz"] != "bar" {
-		t.Errorf("Unexpected service: %#v", svc)
+	expectNoError(t, err)
+	if !reflect.DeepEqual(*svc, testService) {
+		t.Errorf("Unexpected service: got %#v, wanted %#v", svc, testService)
 	}
 }
 

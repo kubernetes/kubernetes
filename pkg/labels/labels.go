@@ -30,18 +30,23 @@ type Labels interface {
 type Set map[string]string
 
 // All labels listed as a human readable string. Conveniently, exactly the format
-// that ParseQuery takes.
+// that ParseSelector takes.
 func (ls Set) String() string {
-	query := make([]string, 0, len(ls))
+	selector := make([]string, 0, len(ls))
 	for key, value := range ls {
-		query = append(query, key+"="+value)
+		selector = append(selector, key+"="+value)
 	}
 	// Sort for determinism.
-	sort.StringSlice(query).Sort()
-	return strings.Join(query, ",")
+	sort.StringSlice(selector).Sort()
+	return strings.Join(selector, ",")
 }
 
 // Implement Labels interface.
 func (ls Set) Get(label string) string {
 	return ls[label]
+}
+
+// Convenience function: convert these labels to a selector.
+func (ls Set) AsSelector() Selector {
+	return SelectorFromSet(ls)
 }

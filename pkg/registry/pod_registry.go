@@ -54,9 +54,9 @@ func MakePodRegistryStorage(registry PodRegistry, containerInfo client.Container
 	}
 }
 
-func (storage *PodRegistryStorage) List(query labels.Query) (interface{}, error) {
+func (storage *PodRegistryStorage) List(selector labels.Selector) (interface{}, error) {
 	var result api.PodList
-	pods, err := storage.registry.ListPods(query)
+	pods, err := storage.registry.ListPods(selector)
 	if err == nil {
 		result.Items = pods
 		// Get cached info for the list currently.

@@ -33,13 +33,13 @@ func MakeMockPodRegistry(pods []api.Pod) *MockPodRegistry {
 	}
 }
 
-func (registry *MockPodRegistry) ListPods(query labels.Query) ([]api.Pod, error) {
+func (registry *MockPodRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	if registry.err != nil {
 		return registry.pods, registry.err
 	}
 	var filtered []api.Pod
 	for _, pod := range registry.pods {
-		if query.Matches(labels.Set(pod.Labels)) {
+		if selector.Matches(labels.Set(pod.Labels)) {
 			filtered = append(filtered, pod)
 		}
 	}

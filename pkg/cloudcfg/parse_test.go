@@ -63,6 +63,9 @@ func TestParseService(t *testing.T) {
 		Labels: map[string]string{
 			"area": "staging",
 		},
+		Selector: map[string]string{
+			"area": "staging",
+		},
 	})
 }
 

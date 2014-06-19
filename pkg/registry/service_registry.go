@@ -59,7 +59,7 @@ func GetServiceEnvironmentVariables(registry ServiceRegistry, machine string) ([
 	return result, nil
 }
 
-func (sr *ServiceRegistryStorage) List(query labels.Query) (interface{}, error) {
+func (sr *ServiceRegistryStorage) List(selector labels.Selector) (interface{}, error) {
 	list, err := sr.registry.ListServices()
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (sr *ServiceRegistryStorage) List(query labels.Query) (interface{}, error) 
 	list.Kind = "cluster#serviceList"
 	var filtered []api.Service
 	for _, service := range list.Items {
-		if query.Matches(labels.Set(service.Labels)) {
+		if selector.Matches(labels.Set(service.Labels)) {
 			filtered = append(filtered, service)
 		}
 	}

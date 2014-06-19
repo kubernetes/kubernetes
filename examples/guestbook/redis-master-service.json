@@ -1,7 +1,7 @@
 {
   "id": "redismaster",
   "port": 10000,
-  "labels": {
+  "selector": {
     "name": "redis-master"
   }
 }

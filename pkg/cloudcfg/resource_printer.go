@@ -24,6 +24,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"gopkg.in/v1/yaml"
 )
 
@@ -61,8 +62,8 @@ func (y *YAMLPrinter) Print(data string, w io.Writer) error {
 type HumanReadablePrinter struct{}
 
 var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
-var replicationControllerColumns = []string{"Name", "Image(s)", "Label Query", "Replicas"}
-var serviceColumns = []string{"Name", "Label Query", "Port"}
+var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Replicas"}
+var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
 
 func (h *HumanReadablePrinter) unknown(data string, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "Unknown object: %s", data)
@@ -89,17 +90,9 @@ func (h *HumanReadablePrinter) makeImageList(manifest api.ContainerManifest) str
 	return strings.Join(images, ",")
 }
 
-func (h *HumanReadablePrinter) makeLabelsList(labels map[string]string) string {
-	var vals []string
-	for key, value := range labels {
-		vals = append(vals, fmt.Sprintf("%s=%s", key, value))
-	}
-	return strings.Join(vals, ",")
-}
-
 func (h *HumanReadablePrinter) printPod(pod api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, h.makeLabelsList(pod.Labels))
+		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, labels.Set(pod.Labels))
 	return err
 }
 
@@ -114,7 +107,7 @@ func (h *HumanReadablePrinter) printPodList(podList api.PodList, w io.Writer) er
 
 func (h *HumanReadablePrinter) printReplicationController(ctrl api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), h.makeLabelsList(ctrl.DesiredState.ReplicasInSet), ctrl.DesiredState.Replicas)
+		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), labels.Set(ctrl.DesiredState.ReplicaSelector), ctrl.DesiredState.Replicas)
 	return err
 }
 
@@ -128,7 +121,7 @@ func (h *HumanReadablePrinter) printReplicationControllerList(list api.Replicati
 }
 
 func (h *HumanReadablePrinter) printService(svc api.Service, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%d\n", svc.ID, h.makeLabelsList(svc.Labels), svc.Port)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.ID, labels.Set(svc.Labels), labels.Set(svc.Selector), svc.Port)
 	return err
 }
 

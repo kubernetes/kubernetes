@@ -2,7 +2,7 @@
     "id": "nginxController",
     "desiredState": {
       "replicas": 2,
-      "replicasInSet": {"name": "nginx"},
+      "replicaSelector": {"name": "nginx"},
       "podTemplate": {
         "desiredState": {
            "manifest": {

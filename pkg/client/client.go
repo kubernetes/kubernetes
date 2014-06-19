@@ -33,7 +33,7 @@ import (
 
 // ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
 type ClientInterface interface {
-	ListPods(labelQuery map[string]string) (api.PodList, error)
+	ListPods(selector map[string]string) (api.PodList, error)
 	GetPod(name string) (api.Pod, error)
 	DeletePod(name string) error
 	CreatePod(api.Pod) (api.Pod, error)
@@ -112,40 +112,40 @@ func (client Client) makeURL(path string) string {
 	return client.Host + "/api/v1beta1/" + path
 }
 
-// EncodeLabelQuery transforms a label query expressed as a key/value map, into a
+// EncodeSelector transforms a selector expressed as a key/value map, into a
 // comma separated, key=value encoding.
-func EncodeLabelQuery(labelQuery map[string]string) string {
-	query := make([]string, 0, len(labelQuery))
-	for key, value := range labelQuery {
-		query = append(query, key+"="+value)
+func EncodeSelector(selector map[string]string) string {
+	parts := make([]string, 0, len(selector))
+	for key, value := range selector {
+		parts = append(parts, key+"="+value)
 	}
-	return url.QueryEscape(strings.Join(query, ","))
+	return url.QueryEscape(strings.Join(parts, ","))
 }
 
-// DecodeLabelQuery transforms a label query from a comma separated, key=value format into
+// DecodeSelector transforms a selector from a comma separated, key=value format into
 // a key/value map.
-func DecodeLabelQuery(labelQuery string) map[string]string {
+func DecodeSelector(selector string) map[string]string {
 	result := map[string]string{}
-	if len(labelQuery) == 0 {
+	if len(selector) == 0 {
 		return result
 	}
-	parts := strings.Split(labelQuery, ",")
+	parts := strings.Split(selector, ",")
 	for _, part := range parts {
 		pieces := strings.Split(part, "=")
 		if len(pieces) == 2 {
 			result[pieces[0]] = pieces[1]
 		} else {
-			log.Printf("Invalid label query: %s", labelQuery)
+			log.Printf("Invalid selector: %s", selector)
 		}
 	}
 	return result
 }
 
-// ListPods takes a label query, and returns the list of pods that match that query
-func (client Client) ListPods(labelQuery map[string]string) (api.PodList, error) {
+// ListPods takes a selector, and returns the list of pods that match that selector
+func (client Client) ListPods(selector map[string]string) (api.PodList, error) {
 	path := "pods"
-	if labelQuery != nil && len(labelQuery) > 0 {
-		path += "?labels=" + EncodeLabelQuery(labelQuery)
+	if selector != nil && len(selector) > 0 {
+		path += "?labels=" + EncodeSelector(selector)
 	}
 	var result api.PodList
 	_, err := client.rawRequest("GET", path, nil, &result)
