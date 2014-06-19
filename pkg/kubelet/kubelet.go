@@ -34,8 +34,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/src/github.com/fsouza/go-dockerclient"
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
@@ -649,4 +649,47 @@ func (kl *Kubelet) GetContainerInfo(name string) (string, error) {
 	}
 	data, err := json.Marshal(info)
 	return string(data), err
+}
+
+func (kl *Kubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
+	if kl.CadvisorClient == nil {
+		return nil, nil
+	}
+	id, found, err := kl.GetContainerID(name)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+
+	path := fmt.Sprintf("/docker/%v", id)
+	info, err := kl.CadvisorClient.ContainerInfo(path)
+
+	if err != nil {
+		return nil, err
+	}
+	if info.StatsPercentiles == nil {
+		return nil, nil
+	}
+
+	ret := new(api.ContainerStats)
+	ret.MaxMemoryUsage = info.StatsPercentiles.MaxMemoryUsage
+	if len(info.StatsPercentiles.CpuUsagePercentiles) > 0 {
+		percentiles := make([]api.Percentile, len(info.StatsPercentiles.CpuUsagePercentiles))
+		for i, p := range info.StatsPercentiles.CpuUsagePercentiles {
+			percentiles[i].Percentage = p.Percentage
+			percentiles[i].Value = p.Value
+		}
+		ret.CpuUsagePercentiles = percentiles
+	}
+	if len(info.StatsPercentiles.MemoryUsagePercentiles) > 0 {
+		percentiles := make([]api.Percentile, len(info.StatsPercentiles.MemoryUsagePercentiles))
+		for i, p := range info.StatsPercentiles.MemoryUsagePercentiles {
+			percentiles[i].Percentage = p.Percentage
+			percentiles[i].Value = p.Value
+		}
+		ret.MemoryUsagePercentiles = percentiles
+	}
+	return ret, nil
 }
