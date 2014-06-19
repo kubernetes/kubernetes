@@ -38,7 +38,7 @@ export KUBE_REPO_ROOT="$(dirname $0)/.."
 export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/cloudcfg.sh"
 
 source "${KUBE_REPO_ROOT}/cluster/util.sh"
-source "${KUBE_REPO_ROOT}/hack/build-go.sh"
+${KUBE_REPO_ROOT}/hack/build-go.sh
 
 # Build a release
 $(dirname $0)/../release/release.sh
