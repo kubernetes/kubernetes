@@ -18,6 +18,7 @@ package labels
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -101,6 +102,7 @@ func SelectorFromSet(ls Set) Selector {
 // Takes a string repsenting a selector and returns an object suitable for matching, or an error.
 func ParseSelector(selector string) (Selector, error) {
 	parts := strings.Split(selector, ",")
+	sort.StringSlice(parts).Sort()
 	var items []Selector
 	for _, part := range parts {
 		if part == "" {
