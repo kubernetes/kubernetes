@@ -14,15 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
-#
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# If the user doesn't specify a minion, assume we are running in a single node
+# configuration and that we have a local minion.
+KUBE_MINIONS=${KUBE_MINIONS:$(hostname -f)}
 
-set -e
-
-source $(dirname $0)/common.sh
-
-verify-prereqs
-build-image
-run-build-command build/build-image/make-binaries.sh "$@"
+./apiserver -master=127.0.0.1:8080 -etcd_servers="${ETCD_SERVERS}" --machines="${KUBE_MINIONS}"

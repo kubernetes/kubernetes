@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
+# Build the docker image necessary for running Kubernetes
 #
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# This script will make the 'run image' after building all of the necessary
+# binaries.
 
 set -e
 
@@ -26,3 +26,5 @@ source $(dirname $0)/common.sh
 verify-prereqs
 build-image
 run-build-command build/build-image/make-binaries.sh "$@"
+copy-output
+run-image

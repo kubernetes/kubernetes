@@ -14,14 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
-#
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# Clean out the output directory on the docker host.
 
 set -e
 
 source $(dirname $0)/common.sh
 
+verify-prereqs
 build-image
 run-build-command rm -rf output/build/*

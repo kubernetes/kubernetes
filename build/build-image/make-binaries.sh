@@ -20,4 +20,4 @@ set -e
 
 source $(dirname $0)/common.sh
 
-make-binaries
+make-binaries "$@"
