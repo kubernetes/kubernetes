@@ -134,9 +134,12 @@ If you are a company and are looking for a more formal engagement with Google ar
 # Before committing any changes, please link/copy these hooks into your .git
 # directory. This will keep you from accidentally committing non-gofmt'd
 # go code.
+#
+# NOTE: The "../.." part seems odd but is correct, since the newly created
+# links will be 2 levels down the tree.
 cd kubernetes
-ln -s "../../hooks/prepare-commit-msg" .git/hooks/prepare-commit-msg
-ln -s "../../hooks/commit-msg" .git/hooks/commit-msg
+ln -s ../../hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
+ln -s ../../hooks/commit-msg .git/hooks/commit-msg
 ```
 
 ### Unit tests
