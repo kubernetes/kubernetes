@@ -46,6 +46,6 @@ ETCD_PID=$!
 sleep 5
 
 echo "Running localkube as root (so it can talk to docker's unix socket)"
-sudo $(dirname $0)/../output/go/localkube
+sudo $(dirname $0)/../output/go/localkube $*
 
 kill $ETCD_PID

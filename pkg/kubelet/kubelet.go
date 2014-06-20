@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,6 +26,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,12 +80,14 @@ type Kubelet struct {
 // Starts background goroutines. If file, manifest_url, or address are empty,
 // they are not watched. Never returns.
 func (kl *Kubelet) RunKubelet(file, manifest_url, etcd_servers, address string, port uint) {
-	fileChannel := make(chan api.ContainerManifest)
+	fileChannel := make(chan []api.ContainerManifest)
 	etcdChannel := make(chan []api.ContainerManifest)
-	httpChannel := make(chan api.ContainerManifest)
-	serverChannel := make(chan api.ContainerManifest)
+	httpChannel := make(chan []api.ContainerManifest)
+	serverChannel := make(chan []api.ContainerManifest)
 
-	go util.Forever(func() { kl.WatchFile(file, fileChannel) }, 20*time.Second)
+	if file != "" {
+		go util.Forever(func() { kl.WatchFile(file, fileChannel) }, 20*time.Second)
+	}
 	if manifest_url != "" {
 		go util.Forever(func() { kl.WatchHTTP(manifest_url, httpChannel) }, 20*time.Second)
 	}
@@ -363,72 +366,114 @@ func (kl *Kubelet) KillContainer(name string) error {
 	return err
 }
 
-func (kl *Kubelet) extractFromFile(lastData []byte, name string, changeChannel chan<- api.ContainerManifest) ([]byte, error) {
+func (kl *Kubelet) extractFromFile(name string) (api.ContainerManifest, error) {
 	var file *os.File
 	var err error
-	if file, err = os.Open(name); err != nil {
-		return lastData, err
-	}
-
-	return kl.extractFromReader(lastData, file, changeChannel)
-}
-
-func (kl *Kubelet) extractFromReader(lastData []byte, reader io.Reader, changeChannel chan<- api.ContainerManifest) ([]byte, error) {
 	var manifest api.ContainerManifest
-	data, err := ioutil.ReadAll(reader)
+
+	if file, err = os.Open(name); err != nil {
+		return manifest, err
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Printf("Couldn't read file: %v", err)
-		return lastData, err
+		log.Printf("Couldn't read from file: %v", err)
+		return manifest, err
 	}
 	if err = kl.ExtractYAMLData(data, &manifest); err != nil {
-		return lastData, err
+		return manifest, err
 	}
-	if !bytes.Equal(lastData, data) {
-		lastData = data
-		// Ok, we have a valid configuration, send to channel for
-		// rejiggering.
-		changeChannel <- manifest
-		return data, nil
+	return manifest, nil
+}
+
+func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) {
+	var manifests []api.ContainerManifest
+
+	files, err := filepath.Glob(filepath.Join(name, "*"))
+	if err != nil {
+		return manifests, err
 	}
-	return lastData, nil
+
+	sort.Strings(files)
+
+	for _, file := range files {
+		manifest, err := kl.extractFromFile(file)
+		if err != nil {
+			log.Printf("Couldn't read from file %s: %v", file, err)
+			return manifests, err
+		}
+		manifests = append(manifests, manifest)
+	}
+	return manifests, nil
+}
+
+func (kl *Kubelet) extractMultipleFromReader(reader io.Reader, changeChannel chan<- []api.ContainerManifest) error {
+	var manifests []api.ContainerManifest
+	data, err := ioutil.ReadAll(reader)
+	if err != nil {
+		log.Printf("Couldn't read from reader: %v", err)
+		return err
+	}
+	if err = kl.ExtractYAMLData(data, &manifests); err != nil {
+		return err
+	}
+	changeChannel <- manifests
+	return nil
 }
 
 // Watch a file for changes to the set of pods that should run on this Kubelet
 // This function loops forever and is intended to be run as a goroutine
-func (kl *Kubelet) WatchFile(file string, changeChannel chan<- api.ContainerManifest) {
-	var lastData []byte
+func (kl *Kubelet) WatchFile(file string, changeChannel chan<- []api.ContainerManifest) {
 	for {
 		var err error
+
 		time.Sleep(kl.FileCheckFrequency)
-		lastData, err = kl.extractFromFile(lastData, file, changeChannel)
+
+		fileInfo, err := os.Stat(file)
 		if err != nil {
 			log.Printf("Error polling file: %#v", err)
+			continue
+		}
+		if fileInfo.IsDir() {
+			manifests, err := kl.extractFromDir(file)
+			if err != nil {
+				log.Printf("Error polling dir: %#v", err)
+				continue
+			}
+			changeChannel <- manifests
+		} else {
+			manifest, err := kl.extractFromFile(file)
+			if err != nil {
+				log.Printf("Error polling file: %#v", err)
+				continue
+			}
+			changeChannel <- []api.ContainerManifest{manifest}
 		}
 	}
 }
 
-func (kl *Kubelet) extractFromHTTP(lastData []byte, url string, changeChannel chan<- api.ContainerManifest) ([]byte, error) {
+func (kl *Kubelet) extractFromHTTP(url string, changeChannel chan<- []api.ContainerManifest) error {
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return lastData, err
+		return err
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		return lastData, err
+		return err
 	}
 	defer response.Body.Close()
-	return kl.extractFromReader(lastData, response.Body, changeChannel)
+	return kl.extractMultipleFromReader(response.Body, changeChannel)
 }
 
 // Watch an HTTP endpoint for changes to the set of pods that should run on this Kubelet
 // This function runs forever and is intended to be run as a goroutine
-func (kl *Kubelet) WatchHTTP(url string, changeChannel chan<- api.ContainerManifest) {
-	var lastData []byte
+func (kl *Kubelet) WatchHTTP(url string, changeChannel chan<- []api.ContainerManifest) {
 	for {
 		var err error
 		time.Sleep(kl.HTTPCheckFrequency)
-		lastData, err = kl.extractFromHTTP(lastData, url, changeChannel)
+		err = kl.extractFromHTTP(url, changeChannel)
 		if err != nil {
 			log.Printf("Error syncing http: %#v", err)
 		}
@@ -655,27 +700,27 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 }
 
 // runSyncLoop is the main loop for processing changes. It watches for changes from
-// four channels (file, etcd, server, and http) and creates a union of the two. For
+// four channels (file, etcd, server, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync_frequency seconds.
 // Never returns.
-func (kl *Kubelet) RunSyncLoop(etcdChannel <-chan []api.ContainerManifest, fileChannel, serverChannel, httpChannel <-chan api.ContainerManifest, handler SyncHandler) {
+func (kl *Kubelet) RunSyncLoop(etcdChannel, fileChannel, serverChannel, httpChannel <-chan []api.ContainerManifest, handler SyncHandler) {
 	var lastFile, lastEtcd, lastHttp, lastServer []api.ContainerManifest
 	for {
 		select {
-		case manifest := <-fileChannel:
-			log.Printf("Got new manifest from file... %v", manifest)
-			lastFile = []api.ContainerManifest{manifest}
+		case manifests := <-fileChannel:
+			log.Printf("Got new configuration from file/dir... %v", manifests)
+			lastFile = manifests
 		case manifests := <-etcdChannel:
 			log.Printf("Got new configuration from etcd... %v", manifests)
 			lastEtcd = manifests
-		case manifest := <-httpChannel:
-			log.Printf("Got new manifest from external http... %v", manifest)
-			lastHttp = []api.ContainerManifest{manifest}
-		case manifest := <-serverChannel:
-			log.Printf("Got new manifest from our server... %v", manifest)
-			lastServer = []api.ContainerManifest{manifest}
+		case manifests := <-httpChannel:
+			log.Printf("Got new configuration from external http... %v", manifests)
+			lastHttp = manifests
+		case manifests := <-serverChannel:
+			log.Printf("Got new configuration from our server... %v", manifests)
+			lastServer = manifests
 		case <-time.After(kl.SyncFrequency):
 		}
 
@@ -683,6 +728,7 @@ func (kl *Kubelet) RunSyncLoop(etcdChannel <-chan []api.ContainerManifest, fileC
 		manifests = append(manifests, lastEtcd...)
 		manifests = append(manifests, lastHttp...)
 		manifests = append(manifests, lastServer...)
+
 		err := handler.SyncManifests(manifests)
 		if err != nil {
 			log.Printf("Couldn't sync containers : %#v", err)

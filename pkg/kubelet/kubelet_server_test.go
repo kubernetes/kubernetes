@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -33,37 +32,9 @@ func (fk *fakeKubelet) GetContainerStats(name string) (*api.ContainerStats, erro
 	return fk.statsFunc(name)
 }
 
-// If we made everything distribute a list of ContainerManifests, we could just use
-// channelReader.
-type channelReaderSingle struct {
-	list []api.ContainerManifest
-	wg   sync.WaitGroup
-}
-
-func startReadingSingle(channel <-chan api.ContainerManifest) *channelReaderSingle {
-	cr := &channelReaderSingle{}
-	cr.wg.Add(1)
-	go func() {
-		for {
-			manifest, ok := <-channel
-			if !ok {
-				break
-			}
-			cr.list = append(cr.list, manifest)
-		}
-		cr.wg.Done()
-	}()
-	return cr
-}
-
-func (cr *channelReaderSingle) GetList() []api.ContainerManifest {
-	cr.wg.Wait()
-	return cr.list
-}
-
 type serverTestFramework struct {
-	updateChan      chan api.ContainerManifest
-	updateReader    *channelReaderSingle
+	updateChan      chan []api.ContainerManifest
+	updateReader    *channelReader
 	serverUnderTest *KubeletServer
 	fakeKubelet     *fakeKubelet
 	testHttpServer  *httptest.Server
@@ -71,9 +42,9 @@ type serverTestFramework struct {
 
 func makeServerTest() *serverTestFramework {
 	fw := &serverTestFramework{
-		updateChan: make(chan api.ContainerManifest),
+		updateChan: make(chan []api.ContainerManifest),
 	}
-	fw.updateReader = startReadingSingle(fw.updateChan)
+	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{}
 	fw.serverUnderTest = &KubeletServer{
 		Kubelet:       fw.fakeKubelet,
@@ -91,8 +62,10 @@ func readResp(resp *http.Response) (string, error) {
 
 func TestContainer(t *testing.T) {
 	fw := makeServerTest()
-	expected := api.ContainerManifest{Id: "test_manifest"}
-	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected)))
+	expected := []api.ContainerManifest{
+		{Id: "test_manifest"},
+	}
+	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected[0]))) // Only send a single ContainerManifest
 	resp, err := http.Post(fw.testHttpServer.URL+"/container", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
@@ -102,6 +75,28 @@ func TestContainer(t *testing.T) {
 	received := fw.updateReader.GetList()
 	if len(received) != 1 {
 		t.Errorf("Expected 1 manifest, but got %v", len(received))
+	}
+	if !reflect.DeepEqual(expected, received[0]) {
+		t.Errorf("Expected %#v, but got %#v", expected, received[0])
+	}
+}
+
+func TestContainers(t *testing.T) {
+	fw := makeServerTest()
+	expected := []api.ContainerManifest{
+		{Id: "test_manifest_1"},
+		{Id: "test_manifest_2"},
+	}
+	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected)))
+	resp, err := http.Post(fw.testHttpServer.URL+"/containers", "application/json", body)
+	if err != nil {
+		t.Errorf("Post returned: %v", err)
+	}
+	resp.Body.Close()
+	close(fw.updateChan)
+	received := fw.updateReader.GetList()
+	if len(received) != 1 {
+		t.Errorf("Expected 1 update, but got %v", len(received))
 	}
 	if !reflect.DeepEqual(expected, received[0]) {
 		t.Errorf("Expected %#v, but got %#v", expected, received[0])
