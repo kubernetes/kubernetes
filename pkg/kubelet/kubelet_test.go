@@ -89,7 +89,7 @@ type FakeDockerClient struct {
 	container     *docker.Container
 	err           error
 	called        []string
-	stopped       string
+	stopped       []string
 }
 
 func (f *FakeDockerClient) clearCalls() {
@@ -122,7 +122,7 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.appendCall("stop")
-	f.stopped = id
+	f.stopped = append(f.stopped, id)
 	return nil
 }
 
@@ -497,6 +497,11 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 			Names: []string{"bar--foo"},
 			ID:    "1234",
 		},
+		{
+			// network container
+			Names: []string{"k8snet--foo--"},
+			ID:    "9876",
+		},
 	}
 	fakeDocker.container = &docker.Container{
 		ID: "1234",
@@ -513,11 +518,12 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	if len(fakeDocker.called) != 4 ||
+	if len(fakeDocker.called) != 5 ||
 		fakeDocker.called[0] != "list" ||
 		fakeDocker.called[1] != "list" ||
-		fakeDocker.called[2] != "inspect" ||
-		fakeDocker.called[3] != "list" {
+		fakeDocker.called[2] != "list" ||
+		fakeDocker.called[3] != "inspect" ||
+		fakeDocker.called[4] != "list" {
 		t.Errorf("Unexpected call sequence: %#v", fakeDocker.called)
 	}
 }
@@ -533,6 +539,11 @@ func TestSyncManifestsDeletes(t *testing.T) {
 			ID:    "1234",
 		},
 		{
+			// network container
+			Names: []string{"k8snet--foo--"},
+			ID:    "9876",
+		},
+		{
 			Names: []string{"foo"},
 			ID:    "4567",
 		},
@@ -542,12 +553,15 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{})
 	expectNoError(t, err)
-	if len(fakeDocker.called) != 3 ||
+	if len(fakeDocker.called) != 5 ||
 		fakeDocker.called[0] != "list" ||
 		fakeDocker.called[1] != "list" ||
 		fakeDocker.called[2] != "stop" ||
-		fakeDocker.stopped != "1234" {
-		t.Errorf("Unexpected call sequence: %#v", fakeDocker.called)
+		fakeDocker.called[3] != "list" ||
+		fakeDocker.called[4] != "stop" ||
+		fakeDocker.stopped[0] != "1234" ||
+		fakeDocker.stopped[1] != "9876" {
+		t.Errorf("Unexpected call sequence: %#v %s", fakeDocker.called, fakeDocker.stopped)
 	}
 }
 
