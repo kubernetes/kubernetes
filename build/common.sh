@@ -269,7 +269,7 @@ function ensure-gcs-docker-registry() {
   DOCKER+="-e STORAGE_PATH=${KUBE_DOCKER_REG_PREFIX} "
   DOCKER+="-e GCP_OAUTH2_REFRESH_TOKEN=${REFRESH_TOKEN} "
   DOCKER+="-p 127.0.0.1:5000:5000 "
-  DOCKER+="jbeda/docker-registry"
+  DOCKER+="google/docker-registry"
 
   ${DOCKER}
 
