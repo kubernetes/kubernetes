@@ -85,14 +85,7 @@ func (p *PodCache) UpdateAllContainers() {
 	}
 }
 
-func (p *PodCache) synchronizeContainers() {
-	ticker := time.Tick(p.period)
-	for _ = range ticker {
-		p.UpdateAllContainers()
-	}
-}
-
 // Loop runs forever, it is expected to be placed in a go routine.
 func (p *PodCache) Loop() {
-	util.Forever(func() { p.synchronizeContainers() }, 0)
+	util.Forever(func() { p.UpdateAllContainers() }, p.period)
 }
