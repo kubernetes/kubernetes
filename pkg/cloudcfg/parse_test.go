@@ -1,7 +1,6 @@
 package cloudcfg
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -16,7 +15,7 @@ func TestParseBadStorage(t *testing.T) {
 }
 
 func DoParseTest(t *testing.T, storage string, obj interface{}) {
-	json_data, _ := json.Marshal(obj)
+	json_data, _ := api.Encode(obj)
 	yaml_data, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yaml_data))
 

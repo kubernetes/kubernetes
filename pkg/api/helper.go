@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"gopkg.in/v1/yaml"
 )
 
 var knownTypes = map[string]reflect.Type{}
@@ -29,6 +31,7 @@ func init() {
 		PodList{}, Pod{},
 		ReplicationControllerList{}, ReplicationController{},
 		ServiceList{}, Service{},
+		Status{},
 	)
 }
 
@@ -117,7 +120,8 @@ func Decode(data []byte) (interface{}, error) {
 	findKind := struct {
 		Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	}{}
-	err := json.Unmarshal(data, &findKind)
+	// yaml is a superset of json, so we use it to decode here. That way, we understand both.
+	err := yaml.Unmarshal(data, &findKind)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't get kind: %#v", err)
 	}
@@ -126,7 +130,7 @@ func Decode(data []byte) (interface{}, error) {
 		return nil, fmt.Errorf("%v is not a known type", findKind.Kind)
 	}
 	obj := reflect.New(objType).Interface()
-	err = json.Unmarshal(data, obj)
+	err = yaml.Unmarshal(data, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +147,7 @@ func Decode(data []byte) (interface{}, error) {
 // if data.Kind is set and doesn't match the type of obj. Obj should be a
 // pointer to an api type.
 func DecodeInto(data []byte, obj interface{}) error {
-	err := json.Unmarshal(data, obj)
+	err := yaml.Unmarshal(data, obj)
 	if err != nil {
 		return err
 	}

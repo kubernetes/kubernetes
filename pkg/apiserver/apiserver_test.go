@@ -42,13 +42,13 @@ func expectNoError(t *testing.T, err error) {
 }
 
 type Simple struct {
-	JSONBase api.JSONBase `json:",inline"`
-	Name     string
+	api.JSONBase `yaml:",inline" json:",inline"`
+	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
 }
 
 type SimpleList struct {
-	JSONBase api.JSONBase `json:",inline"`
-	Items    []Simple
+	api.JSONBase `yaml:",inline" json:",inline"`
+	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
 type SimpleRESTStorage struct {
@@ -155,6 +155,7 @@ func TestNonEmptyList(t *testing.T) {
 
 	var listOut SimpleList
 	body, err := extractBody(resp, &listOut)
+	expectNoError(t, err)
 	if len(listOut.Items) != 1 {
 		t.Errorf("Unexpected response: %#v", listOut)
 		return

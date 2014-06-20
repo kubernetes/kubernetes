@@ -99,7 +99,7 @@ func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) 
 			}
 		}
 	}
-	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), sr.registry.DeleteService(id)
+	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), sr.registry.DeleteService(id)
 }
 
 func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {

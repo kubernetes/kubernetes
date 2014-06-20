@@ -61,7 +61,19 @@ func TestTypes(t *testing.T) {
 			},
 		},
 		&Service{},
-		&ServiceList{},
+		&ServiceList{
+			Items: []Service{
+				{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				}, {
+					Labels: map[string]string{
+						"foo": "baz",
+					},
+				},
+			},
+		},
 		&ReplicationControllerList{},
 		&ReplicationController{},
 		&PodList{},

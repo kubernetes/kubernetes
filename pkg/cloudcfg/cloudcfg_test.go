@@ -164,7 +164,7 @@ func TestDoRequest(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error")
 	}
-	if body != expectedBody {
+	if string(body) != expectedBody {
 		t.Errorf("Expected body: '%s', saw: '%s'", expectedBody, body)
 	}
 	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)

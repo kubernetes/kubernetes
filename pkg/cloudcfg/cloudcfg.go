@@ -113,7 +113,7 @@ func RequestWithBodyData(data []byte, url, method string) (*http.Request, error)
 }
 
 // Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
-func DoRequest(request *http.Request, auth *client.AuthInfo) (string, error) {
+func DoRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
 	if auth != nil {
 		request.SetBasicAuth(auth.User, auth.Password)
 	}
@@ -123,11 +123,11 @@ func DoRequest(request *http.Request, auth *client.AuthInfo) (string, error) {
 	client := &http.Client{Transport: tr}
 	response, err := client.Do(request)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
-	return string(body), err
+	return body, err
 }
 
 // StopController stops a controller named 'name' by setting replicas to zero

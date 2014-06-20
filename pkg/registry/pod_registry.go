@@ -130,7 +130,7 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 }
 
 func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.DeletePod(id)
+	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), storage.registry.DeletePod(id)
 }
 
 func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {

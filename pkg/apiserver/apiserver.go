@@ -50,11 +50,6 @@ func MakeAsync(fn func() interface{}) <-chan interface{} {
 	return channel
 }
 
-// Status is a return value for calls that don't return other objects
-type Status struct {
-	Success bool
-}
-
 // ApiServer is an HTTPHandler that delegates to RESTStorage objects.
 // It handles URLs of the form:
 // ${prefix}/${storage_key}[/${object_name}]
@@ -248,7 +243,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 		}
 		out, err := storage.Delete(parts[1])
 		var obj interface{}
-		obj = Status{Success: true}
+		obj = api.Status{Status: api.StatusSuccess}
 		if err == nil && sync {
 			obj, err = server.waitForObject(out, timeout)
 		}
