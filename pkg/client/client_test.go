@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -66,6 +67,12 @@ func TestListPods(t *testing.T) {
 	c.Validate(t, receivedPodList, err)
 }
 
+func validateLabels(a, b string) bool {
+	sA, _ := labels.ParseSelector(a)
+	sB, _ := labels.ParseSelector(b)
+	return sA.String() == sB.String()
+}
+
 func TestListPodsLabels(t *testing.T) {
 	c := &TestClient{
 		Request: Request{Method: "GET", Path: "/pods", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
@@ -86,8 +93,10 @@ func TestListPodsLabels(t *testing.T) {
 			},
 		},
 	}
+	c.Setup()
+	c.QueryValidator["labels"] = validateLabels
 	selector := map[string]string{"foo": "bar", "name": "baz"}
-	receivedPodList, err := c.Setup().ListPods(selector)
+	receivedPodList, err := c.ListPods(selector)
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -280,6 +289,11 @@ type TestClient struct {
 	server   *httptest.Server
 	handler  *util.FakeHandler
 	Target   interface{}
+	// For query args, an optional function to validate the contents
+	// useful when the contents can change but still be correct.
+	// Maps from query arg key to validator.
+	// If no validator is present, string equality is used.
+	QueryValidator map[string]func(string, string) bool
 }
 
 func (c *TestClient) Setup() *TestClient {
@@ -294,6 +308,7 @@ func (c *TestClient) Setup() *TestClient {
 		c.Client = &Client{}
 	}
 	c.Client.Host = c.server.URL
+	c.QueryValidator = map[string]func(string, string) bool{}
 	return c
 }
 
@@ -312,8 +327,15 @@ func (c *TestClient) Validate(t *testing.T, received interface{}, err error) {
 
 	requestBody := body(c.Request.Body, c.Request.RawBody)
 	c.handler.ValidateRequest(t, makeUrl(c.Request.Path), c.Request.Method, requestBody)
-	if expected, received := c.Request.Query.Encode(), c.handler.RequestReceived.URL.Query().Encode(); expected != received {
-		t.Errorf("bad query for request %#v: expected %s, got %s", c.Request, expected, received)
+	for key, values := range c.Request.Query {
+		validator, ok := c.QueryValidator[key]
+		if !ok {
+			validator = func(a, b string) bool { return a == b }
+		}
+		observed := c.handler.RequestReceived.URL.Query().Get(key)
+		if !validator(values[0], observed) {
+			t.Errorf("Unexpected query arg for key: %s.  Expected %s, Received %s", key, values[0], observed)
+		}
 	}
 	if c.Request.Header != "" {
 		if c.handler.RequestReceived.Header.Get(c.Request.Header) == "" {
