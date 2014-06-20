@@ -3,7 +3,7 @@
   "port": 10001,
   "labels": {
     "name": "redisslave"
-  }
+  },
   "selector": {
     "name": "redisslave"
   }
