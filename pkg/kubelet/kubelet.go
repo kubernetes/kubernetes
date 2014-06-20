@@ -296,15 +296,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
-func makeCommandLine(container *api.Container) []string {
-	var cmdList []string
-	if len(container.Command) > 0 {
-		cmdList = strings.Split(container.Command, " ")
-	}
-	return cmdList
-}
-
-func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.Container) (name string, err error) {
+func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.Container, netMode string) (name string, err error) {
 	name = manifestAndContainerToDockerName(manifest, container)
 
 	envVariables := makeEnvironmentVariables(container)
@@ -319,7 +311,7 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 			Env:          envVariables,
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
-			Cmd:          makeCommandLine(container),
+			Cmd:          container.Command,
 		},
 	}
 	dockerContainer, err := kl.DockerClient.CreateContainer(opts)
@@ -329,6 +321,7 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 	return name, kl.DockerClient.StartContainer(dockerContainer.ID, &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
+		NetworkMode:  netMode,
 	})
 }
 
@@ -544,12 +537,59 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, changeChannel c
 	}
 }
 
+const networkContainerName = "k8snet"
+
+func (kl *Kubelet) networkContainerExists(manifest *api.ContainerManifest) (string, bool, error) {
+	pods, err := kl.ListContainers()
+	if err != nil {
+		return "", false, err
+	}
+	for _, name := range pods {
+		if strings.Contains(name, networkContainerName+"--"+manifest.Id+"--") {
+			return name, true, nil
+		}
+	}
+	return "", false, nil
+}
+
+func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (string, error) {
+	var ports []api.Port
+	// Docker only exports ports from the network container.  Let's
+	// collect all of the relevant ports an export them.
+	for _, container := range manifest.Containers {
+		ports = append(ports, container.Ports...)
+	}
+	container := &api.Container{
+		Name:    networkContainerName,
+		Image:   "busybox",
+		Command: []string{"sh", "-c", "rm -f nap && mkfifo nap && exec cat nap"},
+		Ports:   ports,
+	}
+	kl.pullImage("busybox")
+	return kl.RunContainer(manifest, container, "")
+}
+
 // Sync the configured list of containers (desired state) with the host current state
 func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	log.Printf("Desired:%#v", config)
 	var err error
 	desired := map[string]bool{}
 	for _, manifest := range config {
+		netName, exists, err := kl.networkContainerExists(&manifest)
+		if err != nil {
+			log.Printf("Failed to introspect network container. (%#v)  Skipping container %s", err, manifest.Id)
+			continue
+		}
+		if !exists {
+			log.Printf("Network container doesn't exit, creating")
+			netName, err = kl.createNetworkContainer(&manifest)
+			if err != nil {
+				log.Printf("Failed to create network container: %#v", err)
+			}
+			// Docker list prefixes '/' for some reason, so let's do that...
+			netName = "/" + netName
+		}
+		desired[netName] = true
 		for _, element := range manifest.Containers {
 			var exists bool
 			exists, actualName, err := kl.ContainerExists(&manifest, &element)
@@ -564,7 +604,9 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 					log.Printf("Error pulling container: %#v", err)
 					continue
 				}
-				actualName, err = kl.RunContainer(&manifest, &element)
+				// netName has the '/' prefix, so slice it off
+				networkContainer := netName[1:]
+				actualName, err = kl.RunContainer(&manifest, &element, "container:"+networkContainer)
 				// For some reason, list gives back names that start with '/'
 				actualName = "/" + actualName
 
