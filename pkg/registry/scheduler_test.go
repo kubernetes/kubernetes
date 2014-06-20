@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package registry
 
 import (
@@ -26,7 +27,7 @@ func expectSchedule(scheduler Scheduler, pod api.Pod, expected string, t *testin
 	actual, err := scheduler.Schedule(pod)
 	expectNoError(t, err)
 	if actual != expected {
-		t.Errorf("Unexpected scheduling value: %d, expected %d", actual, expected)
+		t.Errorf("Unexpected scheduling value: %v, expected %v", actual, expected)
 	}
 }
 
