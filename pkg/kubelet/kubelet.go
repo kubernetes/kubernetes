@@ -296,14 +296,6 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
-func makeCommandLine(container *api.Container) []string {
-	var cmdList []string
-	if len(container.Command) > 0 {
-		cmdList = strings.Split(container.Command, " ")
-	}
-	return cmdList
-}
-
 func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.Container) (name string, err error) {
 	name = manifestAndContainerToDockerName(manifest, container)
 
@@ -319,7 +311,7 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 			Env:          envVariables,
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
-			Cmd:          makeCommandLine(container),
+			Cmd:          container.Command,
 		},
 	}
 	dockerContainer, err := kl.DockerClient.CreateContainer(opts)

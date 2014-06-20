@@ -57,7 +57,7 @@ type EnvVar struct {
 type Container struct {
 	Name         string        `yaml:"name,omitempty" json:"name,omitempty"`
 	Image        string        `yaml:"image,omitempty" json:"image,omitempty"`
-	Command      string        `yaml:"command,omitempty" json:"command,omitempty"`
+	Command      []string      `yaml:"command,omitempty" json:"command,omitempty"`
 	WorkingDir   string        `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
 	Ports        []Port        `yaml:"ports,omitempty" json:"ports,omitempty"`
 	Env          []EnvVar      `yaml:"env,omitempty" json:"env,omitempty"`
