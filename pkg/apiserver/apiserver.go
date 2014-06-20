@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -130,7 +130,7 @@ func (server *ApiServer) notFound(req *http.Request, w http.ResponseWriter) {
 
 func (server *ApiServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.WriteHeader(statusCode)
-	output, err := json.MarshalIndent(object, "", "    ")
+	output, err := api.EncodeIndent(object)
 	if err != nil {
 		server.error(err, w)
 		return
