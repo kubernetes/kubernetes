@@ -115,7 +115,7 @@ function ensure-gcs-release-bucket() {
   HASH=${HASH:0:5}
   KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-$HASH}
   KUBE_RELEASE_PREFIX=${KUBE_RELEASE_PREFIX-devel/}
-  DOCKER_REG_PREFIX=${DOCKER_REG_PREFIX-docker-reg/}
+  KUBE_DOCKER_REG_PREFIX=${KUBE_DOCKER_REG_PREFIX-docker-reg/}
 
   if ! gsutil ls gs://${KUBE_RELEASE_BUCKET} >/dev/null 2>&1 ; then
     echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
@@ -211,7 +211,7 @@ function ensure-gcs-docker-registry() {
   echo "+++ Starting GCS backed Docker registry"
   local DOCKER="docker run -d --name=${REG_CONTAINER_NAME} "
   DOCKER+="-e GCS_BUCKET=${KUBE_RELEASE_BUCKET} "
-  DOCKER+="-e STORAGE_PATH=${DOCKER_REG_PREFIX} "
+  DOCKER+="-e STORAGE_PATH=${KUBE_DOCKER_REG_PREFIX} "
   DOCKER+="-e GCP_OAUTH2_REFRESH_TOKEN=${REFRESH_TOKEN} "
   DOCKER+="-p 127.0.0.1:5000:5000 "
   DOCKER+="jbeda/docker-registry"
@@ -227,7 +227,7 @@ function push-images-to-gcs() {
 
   # Tag each of our run binaries with the right registry and push
   for b in ${KUBE_RUN_BINARIES} ; do
-    echo "+++ Tagging and pushing ${KUBE_RUN_IMAGE_BASE}-$b"
+    echo "+++ Tagging and pushing ${KUBE_RUN_IMAGE_BASE}-$b to GCS bucket ${KUBE_RELEASE_BUCKET}"
     docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
     docker push "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
     docker rmi "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
