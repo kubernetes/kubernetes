@@ -44,6 +44,9 @@ readonly KUBE_RUN_BINARIES="
     proxy
   "
 
+# ---------------------------------------------------------------------------
+# Basic setup functions
+
 # Verify that the right utilities and such are installed for building Kube.
 function verify-prereqs() {
   if [[ -z "$(which docker)" ]]; then
@@ -105,23 +108,8 @@ function verify-gcs-prereqs() {
   fi
 }
 
-# Create a unique bucket name for releasing Kube and make sure it exists.
-function ensure-gcs-release-bucket() {
-  if which md5 > /dev/null; then
-    HASH=$(md5 -q -s "$GCLOUD_PROJECT")
-  else
-    HASH=$(echo -n "$GCLOUD_PROJECT" | md5sum)
-  fi
-  HASH=${HASH:0:5}
-  KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-$HASH}
-  KUBE_RELEASE_PREFIX=${KUBE_RELEASE_PREFIX-devel/}
-  KUBE_DOCKER_REG_PREFIX=${KUBE_DOCKER_REG_PREFIX-docker-reg/}
-
-  if ! gsutil ls gs://${KUBE_RELEASE_BUCKET} >/dev/null 2>&1 ; then
-    echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
-    gsutil mb gs://${KUBE_RELEASE_BUCKET}
-  fi
-}
+# ---------------------------------------------------------------------------
+# Building
 
 # Set up the context directory for the kube-build image and build it.
 function build-image() {
@@ -188,6 +176,73 @@ function docker-build() {
   set -e
 }
 
+
+# Run a command in the kube-build image.  This assumes that the image has
+# already been built.  This will sync out all output data from the build.
+function run-build-command() {
+  [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
+
+  local -r DOCKER="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+
+  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
+
+  ${DOCKER} "$@"
+}
+
+# If the Docker server is remote, copy the results back out.
+function copy-output() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # When we are on the Mac with boot2docker Now we need to copy the results
+    # back out.  Ideally we would leave the container around and use 'docker cp'
+    # to copy the results out.  However, that doesn't work for mounted volumes
+    # currently (https://github.com/dotcloud/docker/issues/1992).  And it is
+    # just plain broken (https://github.com/dotcloud/docker/issues/6483).
+    #
+    # The easiest thing I (jbeda) could figure out was to launch another
+    # container pointed at the same volume, tar the output directory and ship
+    # that tar over stdou.
+    local DOCKER="docker run -a stdout --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+
+    # Kill any leftover container
+    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
+
+    echo "+++ Syncing back output directory from boot2docker VM"
+    mkdir -p "${LOCAL_OUTPUT_DIR}"
+    rm -rf "${LOCAL_OUTPUT_DIR}/*"
+    ${DOCKER} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} ."  \
+      | tar xv -C "${LOCAL_OUTPUT_DIR}"
+
+    # I (jbeda) also tried getting rsync working using 'docker run' as the
+    # 'remote shell'.  This mostly worked but there was a hang when
+    # closing/finishing things off. Ug.
+    #
+    # local DOCKER="docker run -i --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+    # DOCKER+=" bash -c 'shift ; exec \"\$@\"' --"
+    # rsync --blocking-io -av -e "${DOCKER}" foo:${REMOTE_OUTPUT_DIR}/ ${LOCAL_OUTPUT_DIR}
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Release
+
+# Create a unique bucket name for releasing Kube and make sure it exists.
+function ensure-gcs-release-bucket() {
+  if which md5 > /dev/null; then
+    HASH=$(md5 -q -s "$GCLOUD_PROJECT")
+  else
+    HASH=$(echo -n "$GCLOUD_PROJECT" | md5sum)
+  fi
+  HASH=${HASH:0:5}
+  KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-$HASH}
+  KUBE_RELEASE_PREFIX=${KUBE_RELEASE_PREFIX-devel/}
+  KUBE_DOCKER_REG_PREFIX=${KUBE_DOCKER_REG_PREFIX-docker-reg/}
+
+  if ! gsutil ls gs://${KUBE_RELEASE_BUCKET} >/dev/null 2>&1 ; then
+    echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
+    gsutil mb gs://${KUBE_RELEASE_BUCKET}
+  fi
+}
+
 function ensure-gcs-docker-registry() {
   local -r REG_CONTAINER_NAME="gcs-registry"
 
@@ -233,51 +288,4 @@ function push-images-to-gcs() {
     docker rmi "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
   done
 }
-
-# Run a command in the kube-build image.  This assumes that the image has
-# already been built.  This will sync out all output data from the build.
-function run-build-command() {
-  [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
-
-  local -r DOCKER="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
-
-  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
-
-  ${DOCKER} "$@"
-
-}
-
-# If the Docker server is remote, copy the results back out.
-function copy-output() {
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    # When we are on the Mac with boot2docker Now we need to copy the results
-    # back out.  Ideally we would leave the container around and use 'docker cp'
-    # to copy the results out.  However, that doesn't work for mounted volumes
-    # currently (https://github.com/dotcloud/docker/issues/1992).  And it is
-    # just plain broken (https://github.com/dotcloud/docker/issues/6483).
-    #
-    # The easiest thing I (jbeda) could figure out was to launch another
-    # container pointed at the same volume, tar the output directory and ship
-    # that tar over stdou.
-    local DOCKER="docker run -a stdout --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
-
-    # Kill any leftover container
-    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
-
-    echo "+++ Syncing back output directory from boot2docker VM"
-    mkdir -p "${LOCAL_OUTPUT_DIR}"
-    rm -rf "${LOCAL_OUTPUT_DIR}/*"
-    ${DOCKER} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} ."  \
-      | tar xv -C "${LOCAL_OUTPUT_DIR}"
-
-    # I (jbeda) also tried getting rsync working using 'docker run' as the
-    # 'remote shell'.  This mostly worked but there was a hang when
-    # closing/finishing things off. Ug.
-    #
-    # local DOCKER="docker run -i --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
-    # DOCKER+=" bash -c 'shift ; exec \"\$@\"' --"
-    # rsync --blocking-io -av -e "${DOCKER}" foo:${REMOTE_OUTPUT_DIR}/ ${LOCAL_OUTPUT_DIR}
-  fi
-}
-
 
