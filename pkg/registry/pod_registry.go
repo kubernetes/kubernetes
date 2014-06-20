@@ -136,9 +136,9 @@ func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error)
 	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.DeletePod(id)
 }
 
-func (storage *PodRegistryStorage) Extract(body string) (interface{}, error) {
+func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
 	pod := api.Pod{}
-	err := json.Unmarshal([]byte(body), &pod)
+	err := json.Unmarshal(body, &pod)
 	pod.Kind = "cluster#pod"
 	return pod, err
 }

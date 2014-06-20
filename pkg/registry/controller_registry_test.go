@@ -123,7 +123,7 @@ func TestExtractControllerJson(t *testing.T) {
 	}
 	body, err := json.Marshal(controller)
 	expectNoError(t, err)
-	controllerOut, err := storage.Extract(string(body))
+	controllerOut, err := storage.Extract(body)
 	expectNoError(t, err)
 	// Extract adds a Kind
 	controller.Kind = "cluster#replicationController"

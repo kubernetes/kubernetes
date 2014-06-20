@@ -61,9 +61,9 @@ func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{},
 	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.DeleteController(id)
 }
 
-func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, error) {
+func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, error) {
 	result := api.ReplicationController{}
-	err := json.Unmarshal([]byte(body), &result)
+	err := json.Unmarshal(body, &result)
 	result.Kind = "cluster#replicationController"
 	return result, err
 }

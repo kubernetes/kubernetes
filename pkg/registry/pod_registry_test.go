@@ -104,7 +104,7 @@ func TestExtractJson(t *testing.T) {
 	}
 	body, err := json.Marshal(pod)
 	expectNoError(t, err)
-	podOut, err := storage.Extract(string(body))
+	podOut, err := storage.Extract(body)
 	expectNoError(t, err)
 	// Extract adds in a kind
 	pod.Kind = "cluster#pod"

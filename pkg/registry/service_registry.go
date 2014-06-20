@@ -105,7 +105,7 @@ func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) 
 	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), sr.registry.DeleteService(id)
 }
 
-func (sr *ServiceRegistryStorage) Extract(body string) (interface{}, error) {
+func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
 	var svc api.Service
 	err := json.Unmarshal([]byte(body), &svc)
 	svc.Kind = "cluster#service"

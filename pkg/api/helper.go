@@ -65,7 +65,7 @@ func Encode(obj interface{}) (data []byte, err error) {
 	if _, contains := knownTypes[name]; !contains {
 		return nil, fmt.Errorf("struct %v can't be unmarshalled because it's not in knownTypes", name)
 	}
-	jsonBase.FieldByName("Kind").Set(reflect.ValueOf(name))
+	jsonBase.FieldByName("Kind").SetString(name)
 	return json.Marshal(obj)
 }
 
@@ -104,7 +104,9 @@ func DecodeInto(data []byte, obj interface{}) error {
 		return err
 	}
 	foundName := jsonBase.FieldByName("Kind").Interface().(string)
-	if foundName != "" && foundName != name {
+	if foundName == "" {
+		jsonBase.FieldByName("Kind").SetString(name)
+	} else if foundName != name {
 		return fmt.Errorf("data had kind %v, but passed object was of type %v", foundName, name)
 	}
 	return nil

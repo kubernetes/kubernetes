@@ -36,7 +36,7 @@ type RESTStorage interface {
 	List(labels.Selector) (interface{}, error)
 	Get(id string) (interface{}, error)
 	Delete(id string) (<-chan interface{}, error)
-	Extract(body string) (interface{}, error)
+	Extract(body []byte) (interface{}, error)
 	Create(interface{}) (<-chan interface{}, error)
 	Update(interface{}) (<-chan interface{}, error)
 }
@@ -143,10 +143,10 @@ func (server *ApiServer) error(err error, w http.ResponseWriter) {
 	fmt.Fprintf(w, "Internal Error: %#v", err)
 }
 
-func (server *ApiServer) readBody(req *http.Request) (string, error) {
+func (server *ApiServer) readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
 	body, err := ioutil.ReadAll(req.Body)
-	return string(body), err
+	return body, err
 }
 
 func (server *ApiServer) waitForObject(out <-chan interface{}, timeout time.Duration) (interface{}, error) {

@@ -69,9 +69,9 @@ func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) 
 	return storage.channel, storage.err
 }
 
-func (storage *SimpleRESTStorage) Extract(body string) (interface{}, error) {
+func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
 	var item Simple
-	json.Unmarshal([]byte(body), &item)
+	json.Unmarshal(body, &item)
 	return item, storage.err
 }
 
