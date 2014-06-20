@@ -39,7 +39,7 @@ func main() {
 	servers := []string{"http://localhost:4001"}
 	log.Printf("Creating etcd client pointing to %v", servers)
 	etcdClient := etcd.NewClient(servers)
-	machineList := []string{"machine"}
+	machineList := registry.MakeMinionRegistry([]string{"machine"})
 
 	reg := registry.MakeEtcdRegistry(etcdClient, machineList)
 

@@ -32,7 +32,7 @@ import (
 // EtcdRegistry is an implementation of both ControllerRegistry and PodRegistry which is backed with etcd.
 type EtcdRegistry struct {
 	etcdClient      util.EtcdClient
-	machines        []string
+	machines        MinionRegistry
 	manifestFactory ManifestFactory
 }
 
@@ -40,7 +40,7 @@ type EtcdRegistry struct {
 // 'client' is the connection to etcd
 // 'machines' is the list of machines
 // 'scheduler' is the scheduling algorithm to use.
-func MakeEtcdRegistry(client util.EtcdClient, machines []string) *EtcdRegistry {
+func MakeEtcdRegistry(client util.EtcdClient, machines MinionRegistry) *EtcdRegistry {
 	registry := &EtcdRegistry{
 		etcdClient: client,
 		machines:   machines,
@@ -61,7 +61,11 @@ func (registry *EtcdRegistry) helper() *util.EtcdHelper {
 
 func (registry *EtcdRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	pods := []api.Pod{}
-	for _, machine := range registry.machines {
+	machines, err := registry.machines.List()
+	if err != nil {
+		return nil, err
+	}
+	for _, machine := range machines {
 		var machinePods []api.Pod
 		err := registry.helper().ExtractList("/registry/hosts/"+machine+"/pods", &machinePods)
 		if err != nil {
@@ -175,7 +179,11 @@ func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (pod api.P
 }
 
 func (registry *EtcdRegistry) findPod(podID string) (api.Pod, string, error) {
-	for _, machine := range registry.machines {
+	machines, err := registry.machines.List()
+	if err != nil {
+		return api.Pod{}, "", err
+	}
+	for _, machine := range machines {
 		pod, err := registry.getPodForMachine(machine, podID)
 		if err == nil {
 			return pod, machine, nil

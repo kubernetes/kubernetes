@@ -92,7 +92,7 @@ func TestMinionRegistryStorage(t *testing.T) {
 	if err != nil {
 		t.Errorf("got error calling List")
 	}
-	if !reflect.DeepEqual(list.(string), []string{"baz", "foo"}) {
+	if !reflect.DeepEqual(list.([]string), []string{"baz", "foo"}) {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
 }

@@ -29,7 +29,7 @@ func TestServiceRegistry(t *testing.T) {
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 
-	storage := MakeServiceRegistryStorage(memory, fakeCloud, machines)
+	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
 	svc := api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
@@ -51,7 +51,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 
-	storage := MakeServiceRegistryStorage(memory, fakeCloud, machines)
+	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
 	svc := api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
@@ -76,7 +76,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 	}
 	machines := []string{"foo", "bar", "baz"}
 
-	storage := MakeServiceRegistryStorage(memory, fakeCloud, machines)
+	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
 	svc := api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
@@ -99,7 +99,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 
-	storage := MakeServiceRegistryStorage(memory, fakeCloud, machines)
+	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
 	svc := api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
@@ -123,7 +123,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 
-	storage := MakeServiceRegistryStorage(memory, fakeCloud, machines)
+	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
 	svc := api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
