@@ -175,6 +175,20 @@ type Endpoints struct {
 	Endpoints []string
 }
 
+// Information about a single Minion; the name of the minion according to etcd
+// is in JSONBase.ID.
+type Minion struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	// Queried from cloud provider, if available.
+	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
+}
+
+// A list of minions.
+type MinionList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Minions  []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
+}
+
 // Status is a return value for calls that don't return other objects.
 // Arguably, this could go in apiserver, but I'm including it here so clients needn't
 // import both.

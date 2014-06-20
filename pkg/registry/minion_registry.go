@@ -17,11 +17,11 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -71,7 +71,7 @@ type minionList struct {
 func (m *minionList) List() (currentMinions []string, err error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	// Make a copy to avoid any threading issues
+	// Convert from map to []string
 	for minion := range m.minions {
 		currentMinions = append(currentMinions, minion)
 	}
@@ -110,8 +110,20 @@ func MakeMinionRegistryStorage(m MinionRegistry) apiserver.RESTStorage {
 	}
 }
 
+func (storage *MinionRegistryStorage) toApiMinion(name string) api.Minion {
+	return api.Minion{JSONBase: api.JSONBase{ID: name}}
+}
+
 func (storage *MinionRegistryStorage) List(selector labels.Selector) (interface{}, error) {
-	return storage.registry.List()
+	nameList, err := storage.registry.List()
+	if err != nil {
+		return nil, err
+	}
+	var list api.MinionList
+	for _, name := range nameList {
+		list.Minions = append(list.Minions, storage.toApiMinion(name))
+	}
+	return list, nil
 }
 
 func (storage *MinionRegistryStorage) Get(id string) (interface{}, error) {
@@ -119,17 +131,17 @@ func (storage *MinionRegistryStorage) Get(id string) (interface{}, error) {
 	if !exists {
 		return nil, ErrDoesNotExist
 	}
-	return id, err
+	return storage.toApiMinion(id), err
 }
 
-func (storage *MinionRegistryStorage) Extract(body string) (interface{}, error) {
-	var minion string
-	err := json.Unmarshal([]byte(body), &minion)
+func (storage *MinionRegistryStorage) Extract(body []byte) (interface{}, error) {
+	var minion api.Minion
+	err := api.DecodeInto(body, &minion)
 	return minion, err
 }
 
 func (storage *MinionRegistryStorage) Create(minion interface{}) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return minion }), storage.registry.Insert(minion.(string))
+	return apiserver.MakeAsync(func() interface{} { return minion }), storage.registry.Insert(minion.(api.Minion).ID)
 }
 
 func (storage *MinionRegistryStorage) Update(minion interface{}) (<-chan interface{}, error) {
@@ -144,5 +156,5 @@ func (storage *MinionRegistryStorage) Delete(id string) (<-chan interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.Delete(id)
+	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), storage.registry.Delete(id)
 }

@@ -13,12 +13,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package registry
 
 import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -61,20 +63,20 @@ func TestMinionRegistryStorage(t *testing.T) {
 	m := MakeMinionRegistry([]string{"foo", "bar"})
 	ms := MakeMinionRegistryStorage(m)
 
-	if obj, err := ms.Get("foo"); err != nil || obj.(string) != "foo" {
+	if obj, err := ms.Get("foo"); err != nil || obj.(api.Minion).ID != "foo" {
 		t.Errorf("missing expected object")
 	}
-	if obj, err := ms.Get("bar"); err != nil || obj.(string) != "bar" {
+	if obj, err := ms.Get("bar"); err != nil || obj.(api.Minion).ID != "bar" {
 		t.Errorf("missing expected object")
 	}
 	if _, err := ms.Get("baz"); err != ErrDoesNotExist {
 		t.Errorf("has unexpected object")
 	}
 
-	if _, err := ms.Create("baz"); err != nil {
+	if _, err := ms.Create(api.Minion{JSONBase: api.JSONBase{ID: "baz"}}); err != nil {
 		t.Errorf("insert failed")
 	}
-	if obj, err := ms.Get("baz"); err != nil || obj.(string) != "baz" {
+	if obj, err := ms.Get("baz"); err != nil || obj.(api.Minion).ID != "baz" {
 		t.Errorf("insert didn't actually insert")
 	}
 
@@ -92,7 +94,14 @@ func TestMinionRegistryStorage(t *testing.T) {
 	if err != nil {
 		t.Errorf("got error calling List")
 	}
-	if !reflect.DeepEqual(list.([]string), []string{"baz", "foo"}) {
+	expect := []api.Minion{
+		{
+			JSONBase: api.JSONBase{ID: "baz"},
+		}, {
+			JSONBase: api.JSONBase{ID: "foo"},
+		},
+	}
+	if !reflect.DeepEqual(list.(api.MinionList).Minions, expect) {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
 }
