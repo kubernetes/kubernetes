@@ -29,7 +29,7 @@ import (
 
 type KubeletServer struct {
 	Kubelet       kubeletInterface
-	UpdateChannel chan api.ContainerManifest
+	UpdateChannel chan []api.ContainerManifest
 }
 
 // kubeletInterface contains all the kubelet methods required by the server.
@@ -52,20 +52,31 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	switch {
-	case u.Path == "/container":
+	case u.Path == "/container" || u.Path == "/containers":
 		defer req.Body.Close()
 		data, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			s.error(w, err)
 			return
 		}
-		var manifest api.ContainerManifest
-		err = yaml.Unmarshal(data, &manifest)
-		if err != nil {
-			s.error(w, err)
-			return
+		if u.Path == "/container" {
+			// This is to provide backward compatibility. It only supports a single manifest
+			var manifest api.ContainerManifest
+			err = yaml.Unmarshal(data, &manifest)
+			if err != nil {
+				s.error(w, err)
+				return
+			}
+			s.UpdateChannel <- []api.ContainerManifest{manifest}
+		} else if u.Path == "/containers" {
+			var manifests []api.ContainerManifest
+			err = yaml.Unmarshal(data, &manifests)
+			if err != nil {
+				s.error(w, err)
+				return
+			}
+			s.UpdateChannel <- manifests
 		}
-		s.UpdateChannel <- manifest
 	case u.Path == "/containerStats":
 		container := u.Query().Get("container")
 		if len(container) == 0 {

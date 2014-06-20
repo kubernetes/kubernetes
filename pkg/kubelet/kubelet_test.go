@@ -16,7 +16,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -730,164 +729,120 @@ func TestMakePortsAndBindings(t *testing.T) {
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan api.ContainerManifest)
-	lastData := []byte{1, 2, 3}
-	data, err := kubelet.extractFromFile(lastData, "/some/fake/file", changeChannel)
+	changeChannel := make(chan []api.ContainerManifest)
+	reader := startReading(changeChannel)
+
+	err := kubelet.extractFromFile("/some/fake/file", changeChannel)
+	close(changeChannel)
+
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}
-	if !bytes.Equal(data, lastData) {
-		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
+
+	list := reader.GetList()
+	if len(list) != 0 {
+		t.Errorf("Unexpected list: %#v", list)
 	}
 }
 
 func TestExtractFromBadDataFile(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan api.ContainerManifest)
-	lastData := []byte{1, 2, 3}
+	changeChannel := make(chan []api.ContainerManifest)
+	reader := startReading(changeChannel)
+
+	badData := []byte{1, 2, 3}
 	file, err := ioutil.TempFile("", "foo")
 	expectNoError(t, err)
 	name := file.Name()
 	file.Close()
-	ioutil.WriteFile(name, lastData, 0755)
-	data, err := kubelet.extractFromFile(lastData, name, changeChannel)
+	ioutil.WriteFile(name, badData, 0755)
+	err = kubelet.extractFromFile(name, changeChannel)
+	close(changeChannel)
 
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}
-	if !bytes.Equal(data, lastData) {
-		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
+
+	list := reader.GetList()
+	if len(list) != 0 {
+		t.Errorf("Unexpected list: %#v", list)
 	}
 }
 
-func TestExtractFromSameDataFile(t *testing.T) {
+func TestExtractFromValidDataFile(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan api.ContainerManifest)
-	manifest := api.ContainerManifest{
-		Id: "foo",
+	changeChannel := make(chan []api.ContainerManifest)
+	reader := startReading(changeChannel)
+
+	manifests := []api.ContainerManifest{
+		{Id: "bar"},
 	}
-	lastData, err := json.Marshal(manifest)
+	data, err := json.Marshal(manifests[0]) // Right now, files only support a single manifest
 	expectNoError(t, err)
 	file, err := ioutil.TempFile("", "foo")
 	expectNoError(t, err)
 	name := file.Name()
 	expectNoError(t, file.Close())
-	ioutil.WriteFile(name, lastData, 0755)
-	data, err := kubelet.extractFromFile(lastData, name, changeChannel)
-
-	expectNoError(t, err)
-	if !bytes.Equal(data, lastData) {
-		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
-	}
-}
-
-func TestExtractFromChangedDataFile(t *testing.T) {
-	kubelet := Kubelet{}
-	changeChannel := make(chan api.ContainerManifest)
-	reader := startReadingSingle(changeChannel)
-	oldManifest := api.ContainerManifest{
-		Id: "foo",
-	}
-	newManifest := api.ContainerManifest{
-		Id: "bar",
-	}
-	lastData, err := json.Marshal(oldManifest)
-	expectNoError(t, err)
-	newData, err := json.Marshal(newManifest)
-	expectNoError(t, err)
-	file, err := ioutil.TempFile("", "foo")
-	expectNoError(t, err)
-	name := file.Name()
-	expectNoError(t, file.Close())
-	ioutil.WriteFile(name, newData, 0755)
-	data, err := kubelet.extractFromFile(lastData, name, changeChannel)
+	ioutil.WriteFile(name, data, 0755)
+	err = kubelet.extractFromFile(name, changeChannel)
 	close(changeChannel)
 
 	expectNoError(t, err)
-	if !bytes.Equal(data, newData) {
-		t.Errorf("Unexpected data response.  Expected %#v, found %#v", lastData, data)
-	}
 	read := reader.GetList()
 	if len(read) != 1 {
 		t.Errorf("Unexpected channel traffic: %#v", read)
 	}
-	if !reflect.DeepEqual(read[0], newManifest) {
-		t.Errorf("Unexpected difference.  Expected %#v, got %#v", newManifest, read[0])
+	if !reflect.DeepEqual(read[0], manifests) {
+		t.Errorf("Unexpected difference.  Expected %#v, got %#v", manifests, read[0])
 	}
 }
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	kubelet := Kubelet{}
-	lastData := []byte{1, 2, 3}
-	changeChannel := make(chan api.ContainerManifest)
-	data, err := kubelet.extractFromHTTP(lastData, "http://localhost:12345", changeChannel)
+	changeChannel := make(chan []api.ContainerManifest)
+	reader := startReading(changeChannel)
+
+	err := kubelet.extractFromHTTP("http://localhost:12345", changeChannel)
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}
-	if !bytes.Equal(lastData, data) {
-		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", lastData, data)
+	close(changeChannel)
+	list := reader.GetList()
+
+	if len(list) != 0 {
+		t.Errorf("Unexpected list: %#v", list)
 	}
 }
 
-func TestExtractFromHttpNoChange(t *testing.T) {
+func TestExtractFromHttp(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan api.ContainerManifest)
+	changeChannel := make(chan []api.ContainerManifest)
+	reader := startReading(changeChannel)
 
-	manifest := api.ContainerManifest{
-		Id: "foo",
+	manifests := []api.ContainerManifest{
+		{Id: "foo"},
 	}
-	lastData, err := json.Marshal(manifest)
+	data, err := json.Marshal(manifests)
 
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: string(lastData),
+		ResponseBody: string(data),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 
-	data, err := kubelet.extractFromHTTP(lastData, testServer.URL, changeChannel)
+	err = kubelet.extractFromHTTP(testServer.URL, changeChannel)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !bytes.Equal(lastData, data) {
-		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", lastData, data)
-	}
-}
-
-func TestExtractFromHttpChanges(t *testing.T) {
-	kubelet := Kubelet{}
-	changeChannel := make(chan api.ContainerManifest)
-	reader := startReadingSingle(changeChannel)
-
-	manifest := api.ContainerManifest{
-		Id: "foo",
-	}
-	newManifest := api.ContainerManifest{
-		Id: "bar",
-	}
-	lastData, _ := json.Marshal(manifest)
-	newData, _ := json.Marshal(newManifest)
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(newData),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-
-	data, err := kubelet.extractFromHTTP(lastData, testServer.URL, changeChannel)
 	close(changeChannel)
 
 	read := reader.GetList()
 
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
 	if len(read) != 1 {
 		t.Errorf("Unexpected list: %#v", read)
 	}
-	if !bytes.Equal(newData, data) {
-		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", lastData, data)
-	}
-	if !reflect.DeepEqual(newManifest, read[0]) {
-		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", newManifest, read[0])
+	if !reflect.DeepEqual(manifests, read[0]) {
+		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", manifests, read[0])
 	}
 }
 
