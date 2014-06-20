@@ -16,7 +16,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -73,7 +72,6 @@ func (storage *PodRegistryStorage) List(selector labels.Selector) (interface{}, 
 		}
 	}
 
-	result.Kind = "cluster#podList"
 	return result, err
 }
 
@@ -128,7 +126,6 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	}
 	pod.CurrentState.HostIP = getInstanceIP(storage.cloud, pod.CurrentState.Host)
 
-	pod.Kind = "cluster#pod"
 	return pod, err
 }
 
@@ -138,8 +135,7 @@ func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error)
 
 func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
 	pod := api.Pod{}
-	err := json.Unmarshal(body, &pod)
-	pod.Kind = "cluster#pod"
+	err := api.DecodeInto(body, &pod)
 	return pod, err
 }
 

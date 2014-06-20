@@ -17,8 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -53,7 +51,6 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	controller.Kind = "cluster#replicationController"
 	return controller, err
 }
 
@@ -63,8 +60,7 @@ func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{},
 
 func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, error) {
 	result := api.ReplicationController{}
-	err := json.Unmarshal(body, &result)
-	result.Kind = "cluster#replicationController"
+	err := api.DecodeInto(body, &result)
 	return result, err
 }
 
