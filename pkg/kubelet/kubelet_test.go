@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 
@@ -593,17 +592,6 @@ func TestEventWritingError(t *testing.T) {
 	})
 	if err == nil {
 		t.Errorf("Unexpected non-error")
-	}
-}
-
-func TestMakeCommandLine(t *testing.T) {
-	expected := []string{"echo", "hello", "world"}
-	container := api.Container{
-		Command: strings.Join(expected, " "),
-	}
-	cmdLine := makeCommandLine(&container)
-	if !reflect.DeepEqual(expected, cmdLine) {
-		t.Error("Unexpected command line.  Expected %#v, got %#v", expected, cmdLine)
 	}
 }
 
