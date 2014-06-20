@@ -32,4 +32,6 @@ run-build-command build/build-image/run-tests.sh
 run-build-command build/build-image/run-integration.sh
 copy-output
 run-image
+package-tarballs
 push-images-to-gcs
+copy-release-to-gcs

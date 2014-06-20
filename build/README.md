@@ -49,3 +49,16 @@ The `kube-build` container image is built by first creating a "context" director
 Everything in `build/build-image/` is meant to be run inside of the container.  If it doesn't think it is running in the container it'll throw a warning.  While you can run some of that stuff outside of the container, it wasn't built to do so.
 
 The files necessarily for the release Docker images are in `build/run-images/*`.  All of this is staged into `output/images` similar to build-image.  The `base` image is used as a base for each of the specialized containers and is generally never pushed to a shared repository.
+
+## TODOs
+
+@jbeda is going on vacation and can't complete this work for a while.  Here are the logical next steps:
+
+* [ ] Get a cluster up and running with the Docker images.  Perhaps start with a local cluster and move up to a GCE cluster.
+* [ ] Implement #186 and #187.  This will make it easier to develop Kubernetes.
+* [ ] Deprecate/replace most of the stuff in the hack/
+* [ ] Put together a true client distribution.  You should be able to download the tarball for your platform and get a Kube cluster running in <5 minutes.  Not `git clone`.
+* [ ] Plumb in a version so we can do proper versioned releases.  Probably create a `./VERSION` and dope it with the git hash or something?
+* [ ] Create an install script that'll let us do a `curl https://[URL] | bash` to get that tarball down and ensure that other dependencies (cloud SDK?) are installed and configured correctly.
+* [ ] Support Windows as a client.
+* [ ] Support uploading to the Docker index instead of the GCS bucket.  This'll allow easier installs for those not running on GCE

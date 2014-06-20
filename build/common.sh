@@ -44,6 +44,9 @@ readonly KUBE_RUN_BINARIES="
     proxy
   "
 
+# This is where the final release artifacts are created locally
+readonly RELEASE_DIR="${KUBE_REPO_ROOT}/output/release"
+
 # ---------------------------------------------------------------------------
 # Basic setup functions
 
@@ -176,7 +179,6 @@ function docker-build() {
   set -e
 }
 
-
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
 function run-build-command() {
@@ -289,3 +291,41 @@ function push-images-to-gcs() {
   done
 }
 
+# Package up all of the cross compiled clients
+function package-tarballs() {
+  mkdir -p "${RELEASE_DIR}"
+
+  # Find all of the built cloudcfg binaries
+  for platform in output/build/*/* ; do
+    echo $platform
+    local PLATFORM_TAG=$(echo $platform | awk -F / '{ printf "%s-%s", $3, $4 }')
+    echo "+++ Building client package for $PLATFORM_TAG"
+
+    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/output/release-stage/${PLATFORM_TAG}/kubernetes"
+    mkdir -p "${CLIENT_RELEASE_STAGE}"
+    mkdir -p "${CLIENT_RELEASE_STAGE}/bin"
+
+    cp $platform/* "${CLIENT_RELEASE_STAGE}/bin"
+
+    local CLIENT_PACKAGE_NAME="${RELEASE_DIR}/kubernetes-${PLATFORM_TAG}.tar.gz"
+    tar czf ${CLIENT_PACKAGE_NAME} \
+      -C "${CLIENT_RELEASE_STAGE}/.." \
+      .
+  done
+}
+
+function copy-release-to-gcs() {
+  # TODO: This isn't atomic.  There will be points in time where there will be
+  # no active release.  Also, if something fails, the release could be half-
+  # copied.  The real way to do this would perhaps to have some sort of release
+  # version so that we are never overwriting a destination.
+  local -r GCS_DESTINATION="gs://${KUBE_RELEASE_BUCKET}/${KUBE_RELEASE_PREFIX}"
+
+  echo "+++ Copying client tarballs to ${GCS_DESTINATION}"
+
+  # First delete all objects at the destination
+  gsutil -q rm -f -R "${GCS_DESTINATION}" >/dev/null 2>&1 || true
+
+  # Now upload everything in release directory
+  gsutil -m cp -r "${RELEASE_DIR}" "${GCS_DESTINATION}" >/dev/null 2>&1
+}
