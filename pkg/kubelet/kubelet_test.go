@@ -632,26 +632,32 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 				MountPath: "/mnt/path2",
 				Name:      "disk2",
 				ReadOnly:  true,
+				MountType: "LOCAL",
+			},
+			{
+				MountPath: "/mnt/path3",
+				Name:      "disk3",
+				ReadOnly:  false,
+				MountType: "HOST",
 			},
 		},
 	}
 	volumes, binds := makeVolumesAndBinds(&container)
-	if len(volumes) != len(container.VolumeMounts) ||
-		len(binds) != len(container.VolumeMounts) {
-		t.Errorf("Unexpected volumes and binds: %#v %#v.  Container was: %#v", volumes, binds, container)
+
+	expectedVolumes := []string{"/mnt/path", "/mnt/path2"}
+	expectedBinds := []string{"/exports/disk:/mnt/path", "/exports/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3"}
+	if len(volumes) != len(expectedVolumes) {
+		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Container was: %#v", expectedVolumes, volumes, container)
 	}
-	for ix, volume := range container.VolumeMounts {
-		expectedBind := "/exports/" + volume.Name + ":" + volume.MountPath
-		if volume.ReadOnly {
-			expectedBind = expectedBind + ":ro"
-		}
-		if binds[ix] != expectedBind {
-			t.Errorf("Unexpected bind.  Expected %s.  Found %s", expectedBind, binds[ix])
-		}
-		if _, ok := volumes[volume.MountPath]; !ok {
-			t.Errorf("Map is missing key: %s. %#v", volume.MountPath, volumes)
+	for _, expectedVolume := range expectedVolumes {
+		if _, ok := volumes[expectedVolume]; !ok {
+			t.Errorf("Volumes map is missing key: %s. %#v", expectedVolume, volumes)
 		}
 	}
+	if len(binds) != len(expectedBinds) {
+		t.Errorf("Unexpected binds: Expected %# got %#v.  Container was: %#v", expectedBinds, binds, container)
+	}
+	verifyStringArrayEquals(t, binds, expectedBinds)
 }
 
 func TestMakePortsAndBindings(t *testing.T) {

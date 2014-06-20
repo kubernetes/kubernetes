@@ -255,8 +255,14 @@ func makeVolumesAndBinds(container *api.Container) (map[string]struct{}, []strin
 	volumes := map[string]struct{}{}
 	binds := []string{}
 	for _, volume := range container.VolumeMounts {
-		volumes[volume.MountPath] = struct{}{}
-		basePath := "/exports/" + volume.Name + ":" + volume.MountPath
+		var basePath string
+		if volume.MountType == "HOST" {
+			// Host volumes are not Docker volumes and are directly mounted from the host.
+			basePath = fmt.Sprintf("%s:%s", volume.MountPath, volume.MountPath)
+		} else {
+			volumes[volume.MountPath] = struct{}{}
+			basePath = fmt.Sprintf("/exports/%s:%s", volume.Name, volume.MountPath)
+		}
 		if volume.ReadOnly {
 			basePath += ":ro"
 		}
