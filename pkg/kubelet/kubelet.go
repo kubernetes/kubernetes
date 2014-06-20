@@ -656,19 +656,16 @@ func (kl *Kubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
 		return nil, nil
 	}
 	id, found, err := kl.GetContainerID(name)
-	if err != nil {
+	if err != nil || !found {
 		return nil, err
 	}
-	if !found {
-		return nil, nil
-	}
 
-	path := fmt.Sprintf("/docker/%v", id)
-	info, err := kl.CadvisorClient.ContainerInfo(path)
+	info, err := kl.CadvisorClient.ContainerInfo(fmt.Sprintf("/docker/%v", id))
 
 	if err != nil {
 		return nil, err
 	}
+	// When the stats data for the container is not available yet.
 	if info.StatsPercentiles == nil {
 		return nil, nil
 	}
