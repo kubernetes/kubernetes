@@ -29,6 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/google/cadvisor/info"
+	"github.com/stretchr/testify/mock"
 )
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -904,4 +906,184 @@ func TestWatchEtcd(t *testing.T) {
 		!reflect.DeepEqual(read[0], manifest) {
 		t.Errorf("Unexpected manifest(s) %#v %#v", read[0], manifest)
 	}
+}
+
+type mockCadvisorClient struct {
+	mock.Mock
+}
+
+func (self *mockCadvisorClient) ContainerInfo(name string) (*info.ContainerInfo, error) {
+	args := self.Called(name)
+	return args.Get(0).(*info.ContainerInfo), args.Error(1)
+}
+
+func (self *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
+	args := self.Called()
+	return args.Get(0).(*info.MachineInfo), args.Error(1)
+}
+
+func areSamePercentiles(
+	cadvisorPercentiles []info.Percentile,
+	kubePercentiles []api.Percentile,
+	t *testing.T,
+) {
+	if len(cadvisorPercentiles) != len(kubePercentiles) {
+		t.Errorf("cadvisor gives %v percentiles; kubelet got %v", len(cadvisorPercentiles), len(kubePercentiles))
+		return
+	}
+	for _, ap := range cadvisorPercentiles {
+		found := false
+		for _, kp := range kubePercentiles {
+			if ap.Percentage == kp.Percentage {
+				found = true
+				if ap.Value != kp.Value {
+					t.Errorf("%v percentile from cadvisor is %v; kubelet got %v",
+						ap.Percentage,
+						ap.Value,
+						kp.Value)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("Unable to find %v percentile in kubelet's data", ap.Percentage)
+		}
+	}
+}
+
+func TestGetContainerStats(t *testing.T) {
+	containerId := "ab2cdf"
+	containerPath := fmt.Sprintf("/docker/%v", containerId)
+	containerInfo := &info.ContainerInfo{
+		ContainerReference: info.ContainerReference{
+			Name: containerPath,
+		},
+		StatsPercentiles: &info.ContainerStatsPercentiles{
+			MaxMemoryUsage: 1024000,
+			MemoryUsagePercentiles: []info.Percentile{
+				{50, 100},
+				{80, 180},
+				{90, 190},
+			},
+			CpuUsagePercentiles: []info.Percentile{
+				{51, 101},
+				{81, 181},
+				{91, 191},
+			},
+		},
+	}
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	mockCadvisor := &mockCadvisorClient{}
+	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, nil)
+
+	kubelet := Kubelet{
+		DockerClient:   &fakeDocker,
+		CadvisorClient: mockCadvisor,
+	}
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			Names: []string{"foo"},
+			ID:    containerId,
+		},
+	}
+
+	stats, err := kubelet.GetContainerStats("foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if stats.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
+		t.Errorf("wrong max memory usage")
+	}
+	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CpuUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
+	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	kubelet := Kubelet{
+		DockerClient: &fakeDocker,
+	}
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			Names: []string{"foo"},
+		},
+	}
+
+	stats, _ := kubelet.GetContainerStats("foo")
+	// When there's no cAdvisor, the stats should be either nil or empty
+	if stats == nil {
+		return
+	}
+	if stats.MaxMemoryUsage != 0 {
+		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.MaxMemoryUsage)
+	}
+	if len(stats.CpuUsagePercentiles) > 0 {
+		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.CpuUsagePercentiles)
+	}
+	if len(stats.MemoryUsagePercentiles) > 0 {
+		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.MemoryUsagePercentiles)
+	}
+}
+
+func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
+	containerId := "ab2cdf"
+	containerPath := fmt.Sprintf("/docker/%v", containerId)
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	containerInfo := &info.ContainerInfo{}
+	mockCadvisor := &mockCadvisorClient{}
+	expectedErr := fmt.Errorf("some error")
+	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, expectedErr)
+
+	kubelet := Kubelet{
+		DockerClient:   &fakeDocker,
+		CadvisorClient: mockCadvisor,
+	}
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			Names: []string{"foo"},
+			ID:    containerId,
+		},
+	}
+
+	stats, err := kubelet.GetContainerStats("foo")
+	if stats != nil {
+		t.Errorf("non-nil stats on error")
+	}
+	if err == nil {
+		t.Errorf("expect error but received nil error")
+		return
+	}
+	if err.Error() != expectedErr.Error() {
+		t.Errorf("wrong error message. expect %v, got %v", err, expectedErr)
+	}
+	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	mockCadvisor := &mockCadvisorClient{}
+
+	kubelet := Kubelet{
+		DockerClient:   &fakeDocker,
+		CadvisorClient: mockCadvisor,
+	}
+	fakeDocker.containerList = []docker.APIContainers{}
+
+	stats, _ := kubelet.GetContainerStats("foo")
+	if stats != nil {
+		t.Errorf("non-nil stats on non exist container")
+	}
+	mockCadvisor.AssertExpectations(t)
 }

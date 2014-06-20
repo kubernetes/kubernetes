@@ -68,6 +68,20 @@ type Container struct {
 	VolumeMounts []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 }
 
+// Percentile represents a pair which contains a percentage from 0 to 100 and
+// its corresponding value.
+type Percentile struct {
+	Percentage int    `json:"percentage,omitempty"`
+	Value      uint64 `json:"value,omitempty"`
+}
+
+// ContainerStats represents statistical information of a container
+type ContainerStats struct {
+	CpuUsagePercentiles    []Percentile `json:"cpu_usage_percentiles,omitempty"`
+	MemoryUsagePercentiles []Percentile `json:"memory_usage_percentiles,omitempty"`
+	MaxMemoryUsage         uint64       `json:"max_memory_usage,omitempty"`
+}
+
 // Event is the representation of an event logged to etcd backends
 type Event struct {
 	Event     string             `json:"event,omitempty"`

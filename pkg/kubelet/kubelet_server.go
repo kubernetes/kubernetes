@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +36,7 @@ type KubeletServer struct {
 // For testablitiy.
 type kubeletInterface interface {
 	GetContainerID(name string) (string, bool, error)
+	GetContainerStats(name string) (*api.ContainerStats, error)
 	GetContainerInfo(name string) (string, error)
 }
 
@@ -64,6 +66,33 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		s.UpdateChannel <- manifest
+	case u.Path == "/containerStats":
+		container := u.Query().Get("container")
+		if len(container) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "Missing container query arg.")
+			return
+		}
+		stats, err := s.Kubelet.GetContainerStats(container)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Internal Error: %#v", err)
+			return
+		}
+		if stats == nil {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, "{}")
+			return
+		}
+		data, err := json.Marshal(stats)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Internal Error: %#v", err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Content-type", "application/json")
+		w.Write(data)
 	case u.Path == "/containerInfo":
 		container := u.Query().Get("container")
 		if len(container) == 0 {

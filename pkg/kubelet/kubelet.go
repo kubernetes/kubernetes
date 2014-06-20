@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
 
@@ -58,11 +59,17 @@ type DockerInterface interface {
 	StopContainer(id string, timeout uint) error
 }
 
+type CadvisorInterface interface {
+	ContainerInfo(name string) (*info.ContainerInfo, error)
+	MachineInfo() (*info.MachineInfo, error)
+}
+
 // The main kubelet implementation
 type Kubelet struct {
 	Hostname           string
 	Client             util.EtcdClient
 	DockerClient       DockerInterface
+	CadvisorClient     CadvisorInterface
 	FileCheckFrequency time.Duration
 	SyncFrequency      time.Duration
 	HTTPCheckFrequency time.Duration
@@ -640,4 +647,44 @@ func (kl *Kubelet) GetContainerInfo(name string) (string, error) {
 	}
 	data, err := json.Marshal(info)
 	return string(data), err
+}
+
+func (kl *Kubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
+	if kl.CadvisorClient == nil {
+		return nil, nil
+	}
+	id, found, err := kl.GetContainerID(name)
+	if err != nil || !found {
+		return nil, err
+	}
+
+	info, err := kl.CadvisorClient.ContainerInfo(fmt.Sprintf("/docker/%v", id))
+
+	if err != nil {
+		return nil, err
+	}
+	// When the stats data for the container is not available yet.
+	if info.StatsPercentiles == nil {
+		return nil, nil
+	}
+
+	ret := new(api.ContainerStats)
+	ret.MaxMemoryUsage = info.StatsPercentiles.MaxMemoryUsage
+	if len(info.StatsPercentiles.CpuUsagePercentiles) > 0 {
+		percentiles := make([]api.Percentile, len(info.StatsPercentiles.CpuUsagePercentiles))
+		for i, p := range info.StatsPercentiles.CpuUsagePercentiles {
+			percentiles[i].Percentage = p.Percentage
+			percentiles[i].Value = p.Value
+		}
+		ret.CpuUsagePercentiles = percentiles
+	}
+	if len(info.StatsPercentiles.MemoryUsagePercentiles) > 0 {
+		percentiles := make([]api.Percentile, len(info.StatsPercentiles.MemoryUsagePercentiles))
+		for i, p := range info.StatsPercentiles.MemoryUsagePercentiles {
+			percentiles[i].Percentage = p.Percentage
+			percentiles[i].Value = p.Value
+		}
+		ret.MemoryUsagePercentiles = percentiles
+	}
+	return ret, nil
 }

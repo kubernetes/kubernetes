@@ -2,6 +2,7 @@ package kubelet
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -15,8 +16,9 @@ import (
 )
 
 type fakeKubelet struct {
-	infoFunc func(name string) (string, error)
-	idFunc   func(name string) (string, bool, error)
+	infoFunc  func(name string) (string, error)
+	idFunc    func(name string) (string, bool, error)
+	statsFunc func(name string) (*api.ContainerStats, error)
 }
 
 func (fk *fakeKubelet) GetContainerInfo(name string) (string, error) {
@@ -25,6 +27,10 @@ func (fk *fakeKubelet) GetContainerInfo(name string) (string, error) {
 
 func (fk *fakeKubelet) GetContainerID(name string) (string, bool, error) {
 	return fk.idFunc(name)
+}
+
+func (fk *fakeKubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
+	return fk.statsFunc(name)
 }
 
 // If we made everything distribute a list of ContainerManifests, we could just use
@@ -127,5 +133,44 @@ func TestContainerInfo(t *testing.T) {
 	}
 	if got != expected {
 		t.Errorf("Expected: '%v', got: '%v'", expected, got)
+	}
+}
+
+func TestContainerStats(t *testing.T) {
+	fw := makeServerTest()
+	expectedStats := &api.ContainerStats{
+		MaxMemoryUsage: 1024001,
+		CpuUsagePercentiles: []api.Percentile{
+			{50, 150},
+			{80, 180},
+			{90, 190},
+		},
+		MemoryUsagePercentiles: []api.Percentile{
+			{50, 150},
+			{80, 180},
+			{90, 190},
+		},
+	}
+	expectedContainerName := "goodcontainer"
+	fw.fakeKubelet.statsFunc = func(name string) (*api.ContainerStats, error) {
+		if name != expectedContainerName {
+			return nil, fmt.Errorf("bad container name: %v", name)
+		}
+		return expectedStats, nil
+	}
+
+	resp, err := http.Get(fw.testHttpServer.URL + fmt.Sprintf("/containerStats?container=%v", expectedContainerName))
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	var receivedStats api.ContainerStats
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&receivedStats)
+	if err != nil {
+		t.Fatalf("received invalid json data: %v", err)
+	}
+	if !reflect.DeepEqual(&receivedStats, expectedStats) {
+		t.Errorf("received wrong data: %#v", receivedStats)
 	}
 }
