@@ -71,4 +71,34 @@ func TestTypes(t *testing.T) {
 	}
 }
 
+func TestNonPtr(t *testing.T) {
+	obj := interface{}(Pod{Labels: map[string]string{"name": "foo"}})
+	data, err := Encode(obj)
+	obj2, err2 := Decode(data)
+	if err != nil || err2 != nil {
+		t.Errorf("Failure: %v %v", err2, err2)
+	}
+	if _, ok := obj2.(*Pod); !ok {
+		t.Errorf("Got wrong type")
+	}
+	if !reflect.DeepEqual(obj2, &Pod{Labels: map[string]string{"name": "foo"}}) {
+		t.Errorf("Something changed: %#v", obj2)
+	}
+}
+
+func TestPtr(t *testing.T) {
+	obj := interface{}(&Pod{Labels: map[string]string{"name": "foo"}})
+	data, err := Encode(obj)
+	obj2, err2 := Decode(data)
+	if err != nil || err2 != nil {
+		t.Errorf("Failure: %v %v", err2, err2)
+	}
+	if _, ok := obj2.(*Pod); !ok {
+		t.Errorf("Got wrong type")
+	}
+	if !reflect.DeepEqual(obj2, &Pod{Labels: map[string]string{"name": "foo"}}) {
+		t.Errorf("Something changed: %#v", obj2)
+	}
+}
+
 // TODO: test rejection of bad JSON.
