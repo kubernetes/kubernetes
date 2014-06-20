@@ -47,6 +47,17 @@ func TestSelectorParse(t *testing.T) {
 	}
 }
 
+func TestDeterministicParse(t *testing.T) {
+	s1, err := ParseSelector("x=a,a=x")
+	s2, err2 := ParseSelector("a=x,x=a")
+	if err != nil || err2 != nil {
+		t.Errorf("Unexpected parse error")
+	}
+	if s1.String() != s2.String() {
+		t.Errorf("Non-deterministic parse")
+	}
+}
+
 func expectMatch(t *testing.T, selector string, ls Set) {
 	lq, err := ParseSelector(selector)
 	if err != nil {
