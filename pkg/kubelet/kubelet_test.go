@@ -375,16 +375,16 @@ type channelReader struct {
 	wg   sync.WaitGroup
 }
 
-func startReading(channel <-chan []api.ContainerManifest) *channelReader {
+func startReading(channel <-chan manifestUpdate) *channelReader {
 	cr := &channelReader{}
 	cr.wg.Add(1)
 	go func() {
 		for {
-			containers, ok := <-channel
+			update, ok := <-channel
 			if !ok {
 				break
 			}
-			cr.list = append(cr.list, containers)
+			cr.list = append(cr.list, update.manifests)
 		}
 		cr.wg.Done()
 	}()
@@ -401,7 +401,7 @@ func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
-	channel := make(chan []api.ContainerManifest)
+	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
@@ -423,7 +423,7 @@ func TestGetKubeletStateFromEtcd(t *testing.T) {
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
-	channel := make(chan []api.ContainerManifest)
+	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{
@@ -447,7 +447,7 @@ func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
-	channel := make(chan []api.ContainerManifest)
+	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
@@ -469,7 +469,7 @@ func TestGetKubeletStateFromEtcdError(t *testing.T) {
 	kubelet := Kubelet{
 		Client: fakeClient,
 	}
-	channel := make(chan []api.ContainerManifest)
+	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
 		R: &etcd.Response{},
@@ -811,14 +811,14 @@ func TestExtractFromDir(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan []api.ContainerManifest)
-	reader := startReading(changeChannel)
+	updateChannel := make(chan manifestUpdate)
+	reader := startReading(updateChannel)
 
-	err := kubelet.extractFromHTTP("http://localhost:12345", changeChannel)
+	err := kubelet.extractFromHTTP("http://localhost:12345", updateChannel)
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}
-	close(changeChannel)
+	close(updateChannel)
 	list := reader.GetList()
 
 	if len(list) != 0 {
@@ -828,8 +828,8 @@ func TestExtractFromHttpBadness(t *testing.T) {
 
 func TestExtractFromHttp(t *testing.T) {
 	kubelet := Kubelet{}
-	changeChannel := make(chan []api.ContainerManifest)
-	reader := startReading(changeChannel)
+	updateChannel := make(chan manifestUpdate)
+	reader := startReading(updateChannel)
 
 	manifests := []api.ContainerManifest{
 		{Id: "foo"},
@@ -842,11 +842,11 @@ func TestExtractFromHttp(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 
-	err = kubelet.extractFromHTTP(testServer.URL, changeChannel)
+	err = kubelet.extractFromHTTP(testServer.URL, updateChannel)
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	close(changeChannel)
+	close(updateChannel)
 
 	read := reader.GetList()
 
@@ -860,9 +860,9 @@ func TestExtractFromHttp(t *testing.T) {
 
 func TestWatchEtcd(t *testing.T) {
 	watchChannel := make(chan *etcd.Response)
-	changeChannel := make(chan []api.ContainerManifest)
+	updateChannel := make(chan manifestUpdate)
 	kubelet := Kubelet{}
-	reader := startReading(changeChannel)
+	reader := startReading(updateChannel)
 
 	manifest := []api.ContainerManifest{
 		{
@@ -872,7 +872,7 @@ func TestWatchEtcd(t *testing.T) {
 	data, err := json.Marshal(manifest)
 	expectNoError(t, err)
 
-	go kubelet.WatchEtcd(watchChannel, changeChannel)
+	go kubelet.WatchEtcd(watchChannel, updateChannel)
 
 	watchChannel <- &etcd.Response{
 		Node: &etcd.Node{
@@ -880,7 +880,7 @@ func TestWatchEtcd(t *testing.T) {
 		},
 	}
 	close(watchChannel)
-	close(changeChannel)
+	close(updateChannel)
 
 	read := reader.GetList()
 	if len(read) != 1 ||

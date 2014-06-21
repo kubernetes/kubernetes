@@ -33,7 +33,7 @@ func (fk *fakeKubelet) GetContainerStats(name string) (*api.ContainerStats, erro
 }
 
 type serverTestFramework struct {
-	updateChan      chan []api.ContainerManifest
+	updateChan      chan manifestUpdate
 	updateReader    *channelReader
 	serverUnderTest *KubeletServer
 	fakeKubelet     *fakeKubelet
@@ -42,7 +42,7 @@ type serverTestFramework struct {
 
 func makeServerTest() *serverTestFramework {
 	fw := &serverTestFramework{
-		updateChan: make(chan []api.ContainerManifest),
+		updateChan: make(chan manifestUpdate),
 	}
 	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{}
