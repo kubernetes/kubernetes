@@ -183,10 +183,10 @@ func TestContainerExists(t *testing.T) {
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			Names: []string{"foo--qux--1234"},
+			Names: []string{"/k8s--foo--qux--1234"},
 		},
 		{
-			Names: []string{"bar--qux--1234"},
+			Names: []string{"/k8s--bar--qux--1234"},
 		},
 	}
 	fakeDocker.container = &docker.Container{
@@ -494,13 +494,13 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			// format is <container-id>--<manifest-id>
-			Names: []string{"bar--foo"},
+			// format is k8s--<container-id>--<manifest-id>
+			Names: []string{"/k8s--bar--foo"},
 			ID:    "1234",
 		},
 		{
 			// network container
-			Names: []string{"k8snet--foo--"},
+			Names: []string{"/k8s--net--foo--"},
 			ID:    "9876",
 		},
 	}
@@ -535,13 +535,13 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			// the '--' is required for the kubelet to manage the container
-			Names: []string{"foo--bar"},
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s--foo--bar"},
 			ID:    "1234",
 		},
 		{
 			// network container
-			Names: []string{"k8snet--foo--"},
+			Names: []string{"/k8s--net--foo--"},
 			ID:    "9876",
 		},
 		{

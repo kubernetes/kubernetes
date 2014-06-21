@@ -229,10 +229,12 @@ func unescapeDash(in string) (out string) {
 	return
 }
 
+const containerNamePrefix = "k8s"
+
 // Creates a name which can be reversed to identify both manifest id and container name.
 func manifestAndContainerToDockerName(manifest *api.ContainerManifest, container *api.Container) string {
 	// Note, manifest.Id could be blank.
-	return fmt.Sprintf("%s--%s--%x", escapeDash(container.Name), escapeDash(manifest.Id), rand.Uint32())
+	return fmt.Sprintf("%s--%s--%s--%x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.Id), rand.Uint32())
 }
 
 // Upacks a container name, returning the manifest id and container name we would have used to
@@ -244,11 +246,14 @@ func dockerNameToManifestAndContainer(name string) (manifestId, containerName st
 		name = name[1:]
 	}
 	parts := strings.Split(name, "--")
-	if len(parts) > 0 {
-		containerName = unescapeDash(parts[0])
+	if len(parts) == 0 || parts[0] != containerNamePrefix {
+		return
 	}
 	if len(parts) > 1 {
-		manifestId = unescapeDash(parts[1])
+		containerName = unescapeDash(parts[1])
+	}
+	if len(parts) > 2 {
+		manifestId = unescapeDash(parts[2])
 	}
 	return
 }
@@ -595,7 +600,7 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, changeChannel c
 	}
 }
 
-const networkContainerName = "k8snet"
+const networkContainerName = "net"
 
 func (kl *Kubelet) networkContainerExists(manifest *api.ContainerManifest) (string, bool, error) {
 	pods, err := kl.ListContainers()
@@ -603,7 +608,7 @@ func (kl *Kubelet) networkContainerExists(manifest *api.ContainerManifest) (stri
 		return "", false, err
 	}
 	for _, name := range pods {
-		if strings.Contains(name, networkContainerName+"--"+manifest.Id+"--") {
+		if strings.Contains(name, containerNamePrefix+"--"+networkContainerName+"--"+manifest.Id+"--") {
 			return name, true, nil
 		}
 	}
@@ -683,9 +688,9 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	existingContainers, _ := kl.ListContainers()
 	log.Printf("Existing:\n%#v Desired: %#v", existingContainers, desired)
 	for _, container := range existingContainers {
-		// This is slightly hacky, but we ignore containers that lack '--' in their name
-		// to allow users to manually spin up their own containers if they want.
-		if !strings.Contains(container, "--") {
+		// Skip containers that we didn't create to allow users to manually
+		// spin up their own containers if they want.
+		if !strings.HasPrefix(container, "/"+containerNamePrefix+"--") {
 			continue
 		}
 		if !desired[container] {
