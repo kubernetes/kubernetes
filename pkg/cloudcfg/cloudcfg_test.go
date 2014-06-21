@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -289,6 +290,39 @@ func TestRequestWithBodyNoSuchFile(t *testing.T) {
 	}
 	if err == nil {
 		t.Error("Unexpected non-error")
+	}
+}
+
+func TestLoadAuthInfo(t *testing.T) {
+	testAuthInfo := &client.AuthInfo{
+		User:     "TestUser",
+		Password: "TestPassword",
+	}
+	aifile, err := ioutil.TempFile("", "testAuthInfo")
+	if err != nil {
+		t.Error("Could not open temp file")
+	}
+	defer os.Remove(aifile.Name())
+	defer aifile.Close()
+
+	ai, err := LoadAuthInfo(aifile.Name())
+	if err == nil {
+		t.Error("LoadAuthInfo didn't fail on empty file")
+	}
+	data, err := json.Marshal(testAuthInfo)
+	if err != nil {
+		t.Fatal("Unexpected JSON marshal error")
+	}
+	_, err = aifile.Write(data)
+	if err != nil {
+		t.Fatal("Unexpected error in writing test file")
+	}
+	ai, err = LoadAuthInfo(aifile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *testAuthInfo != *ai {
+		t.Error("Test data and loaded data are not equal")
 	}
 }
 
