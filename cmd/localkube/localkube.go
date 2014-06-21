@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -96,6 +97,7 @@ func controller_manager() {
 
 func main() {
 	flag.Parse()
+	rand.Seed(time.Now().UTC().UnixNano())
 
 	// Set up logger for etcd client
 	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
