@@ -32,6 +32,7 @@ import (
 type ResourcePrinter interface {
 	// Print receives an arbitrary JSON body, formats it and prints it to a writer
 	Print([]byte, io.Writer) error
+	PrintObj(interface{}, io.Writer)
 }
 
 // Identity printer simply copies the body out to the output stream
@@ -42,6 +43,14 @@ func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 	return err
 }
 
+func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
+	data, err := api.EncodeIndent(obj)
+	if err != nil {
+		return err
+	}
+	return i.Print(data, output)
+}
+
 // YAMLPrinter parses JSON, and re-formats as YAML
 type YAMLPrinter struct{}
 
@@ -50,6 +59,15 @@ func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
+	output, err := yaml.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(w, string(output))
+	return err
+}
+
+func (y *YAMLPrinter) PrintObj(obj interface{}, w io.Writer) error {
 	output, err := yaml.Marshal(obj)
 	if err != nil {
 		return err
@@ -168,6 +186,10 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	if err != nil {
 		return err
 	}
+	return h.PrintObj(obj, output)
+}
+
+func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) {
 	switch o := obj.(type) {
 	case *api.Pod:
 		h.printHeader(podColumns, w)
