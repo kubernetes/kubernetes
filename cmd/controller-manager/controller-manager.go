@@ -47,10 +47,9 @@ func main() {
 	// Set up logger for etcd client
 	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
 
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient([]string{*etcd_servers}),
-		client.Client{
-			Host: "http://" + *master,
-		})
+	controllerManager := controller.MakeReplicationManager(
+		etcd.NewClient([]string{*etcd_servers}),
+		client.New("http://"+*master, nil))
 
 	controllerManager.Run(10 * time.Second)
 	select {}

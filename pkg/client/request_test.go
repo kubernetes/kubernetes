@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudcfg
+package client
 
 import (
+	"io/ioutil"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -37,7 +37,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	auth := client.AuthInfo{User: "user", Password: "pass"}
+	auth := AuthInfo{User: "user", Password: "pass"}
 	s := New(testServer.URL, &auth)
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
@@ -65,7 +65,7 @@ func TestDoRequestNewWay(t *testing.T) {
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{}
+	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	reqBodyExpected, _ := api.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
 	expectedBody, _ := api.Encode(expectedObj)
@@ -75,7 +75,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	auth := client.AuthInfo{User: "user", Password: "pass"}
+	auth := AuthInfo{User: "user", Password: "pass"}
 	s := New(testServer.URL, &auth)
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
@@ -83,6 +83,51 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		Selector("name=foo").
 		Timeout(time.Second).
 		Body(reqObj).
+		Do()
+	if err != nil {
+		t.Errorf("Unexpected error: %v %#v", err, err)
+		return
+	}
+	if obj == nil {
+		t.Error("nil obj")
+	} else if !reflect.DeepEqual(obj, expectedObj) {
+		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
+	}
+	tmpStr := string(reqBodyExpected)
+	fakeHandler.ValidateRequest(t, "/foo/bar/baz", "POST", &tmpStr)
+	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
+		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
+	}
+	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
+		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
+	}
+}
+
+func TestDoRequestNewWayFile(t *testing.T) {
+	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	reqBodyExpected, err := api.Encode(reqObj)
+	expectNoError(t, err)
+	file, err := ioutil.TempFile("", "foo")
+	expectNoError(t, err)
+	_, err = file.Write(reqBodyExpected)
+	expectNoError(t, err)
+
+	expectedObj := &api.Service{Port: 12345}
+	expectedBody, _ := api.Encode(expectedObj)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	auth := AuthInfo{User: "user", Password: "pass"}
+	s := New(testServer.URL, &auth)
+	obj, err := s.Verb("POST").
+		Path("foo/bar").
+		Path("baz").
+		Selector("name=foo").
+		Timeout(time.Second).
+		Body(file.Name()).
 		Do()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)

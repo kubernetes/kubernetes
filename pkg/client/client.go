@@ -59,36 +59,34 @@ type AuthInfo struct {
 // Client is the actual implementation of a Kubernetes client.
 // Host is the http://... base for the URL
 type Client struct {
-	Host       string
-	Auth       *AuthInfo
+	host       string
+	auth       *AuthInfo
 	httpClient *http.Client
 }
 
-// Underlying base implementation of performing a request.
-// method is the HTTP method (e.g. "GET")
-// path is the path on the host to hit
-// requestBody is the body of the request. Can be nil.
-// target the interface to marshal the JSON response into.  Can be nil.
-func (client Client) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
-	request, err := http.NewRequest(method, client.makeURL(path), requestBody)
+// Create a new client object.
+func New(host string, auth *AuthInfo) *Client {
+	return &Client{
+		auth: auth,
+		host: host,
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		},
+	}
+}
+
+// Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
+func (c *Client) doRequest(request *http.Request) ([]byte, error) {
+	if c.auth != nil {
+		request.SetBasicAuth(c.auth.User, c.auth.Password)
+	}
+	response, err := c.httpClient.Do(request)
 	if err != nil {
 		return []byte{}, err
-	}
-	if client.Auth != nil {
-		request.SetBasicAuth(client.Auth.User, client.Auth.Password)
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	var httpClient *http.Client
-	if client.httpClient != nil {
-		httpClient = client.httpClient
-	} else {
-		httpClient = &http.Client{Transport: tr}
-	}
-	response, err := httpClient.Do(request)
-	if err != nil {
-		return nil, err
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
@@ -96,10 +94,27 @@ func (client Client) rawRequest(method, path string, requestBody io.Reader, targ
 		return body, err
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent {
-		return nil, fmt.Errorf("request [%s %s] failed (%d) %s: %s", method, client.makeURL(path), response.StatusCode, response.Status, string(body))
+		return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
+	}
+	return body, err
+}
+
+// Underlying base implementation of performing a request.
+// method is the HTTP method (e.g. "GET")
+// path is the path on the host to hit
+// requestBody is the body of the request. Can be nil.
+// target the interface to marshal the JSON response into.  Can be nil.
+func (c *Client) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
+	request, err := http.NewRequest(method, c.makeURL(path), requestBody)
+	if err != nil {
+		return []byte{}, err
+	}
+	body, err := c.doRequest(request)
+	if err != nil {
+		return body, err
 	}
 	if target != nil {
-		err = json.Unmarshal(body, target)
+		err = api.DecodeInto(body, target)
 	}
 	if err != nil {
 		log.Printf("Failed to parse: %s\n", string(body))
@@ -109,7 +124,7 @@ func (client Client) rawRequest(method, path string, requestBody io.Reader, targ
 }
 
 func (client Client) makeURL(path string) string {
-	return client.Host + "/api/v1beta1/" + path
+	return client.host + "/api/v1beta1/" + path
 }
 
 // EncodeSelector transforms a selector expressed as a key/value map, into a

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudcfg
+package client
 
 import (
 	"bytes"
@@ -26,46 +26,33 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // Server contains info locating a kubernetes api server.
 // Example usage:
 // auth, err := LoadAuth(filename)
-// s := New(url, auth)
-// resp, err := s.Verb("GET").
+// c := New(url, auth)
+// resp, err := c.Verb("GET").
 //	Path("api/v1beta1").
 //	Path("pods").
 //	Selector("area=staging").
 //	Timeout(10*time.Second).
 //	Do()
 // list, ok := resp.(api.PodList)
-type Server struct {
-	auth   *client.AuthInfo
-	rawUrl string
-}
-
-// Create a new server object.
-func New(serverUrl string, auth *client.AuthInfo) *Server {
-	return &Server{
-		auth:   auth,
-		rawUrl: serverUrl,
-	}
-}
 
 // Begin a request with a verb (GET, POST, PUT, DELETE)
-func (s *Server) Verb(verb string) *Request {
+func (c *Client) Verb(verb string) *Request {
 	return &Request{
 		verb: verb,
-		s:    s,
+		c:    c,
 		path: "/",
 	}
 }
 
 // Request allows for building up a request to a server in a chained fashion.
 type Request struct {
-	s        *Server
+	c        *Client
 	err      error
 	verb     string
 	path     string
@@ -118,7 +105,7 @@ func (r *Request) Do() (interface{}, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	finalUrl := r.s.rawUrl + r.path
+	finalUrl := r.c.host + r.path
 	query := url.Values{}
 	if r.selector != nil {
 		query.Add("labels", r.selector.String())
@@ -150,7 +137,7 @@ func (r *Request) Do() (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	str, err := doRequest(req, r.s.auth)
+	str, err := r.c.doRequest(req)
 	if err != nil {
 		return nil, err
 	}

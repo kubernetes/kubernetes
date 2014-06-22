@@ -17,13 +17,10 @@ limitations under the License.
 package cloudcfg
 
 import (
-	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -90,7 +87,7 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 	return nil
 }
 
-// RequestWithBody is a helper method that creates an HTTP request with the specified url, method
+/*// RequestWithBody is a helper method that creates an HTTP request with the specified url, method
 // and a body read from 'configFile'
 func requestWithBody(configFile, url, method string) (*http.Request, error) {
 	if len(configFile) == 0 {
@@ -127,7 +124,7 @@ func doRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	return body, err
-}
+}*/
 
 // StopController stops a controller named 'name' by setting replicas to zero
 func StopController(name string, client client.ClientInterface) error {

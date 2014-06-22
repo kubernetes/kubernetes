@@ -49,10 +49,7 @@ func main() {
 	}, "/api/v1beta1")
 	server := httptest.NewServer(apiserver)
 
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers),
-		client.Client{
-			Host: server.URL,
-		})
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(server.URL, nil))
 
 	controllerManager.Run(10 * time.Second)
 
@@ -61,9 +58,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.Client{
-		Host: server.URL,
-	}
+	kubeClient := client.New(server.URL, nil)
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		log.Fatalf("Unexpected error: %#v", err)
