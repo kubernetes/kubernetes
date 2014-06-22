@@ -29,7 +29,7 @@ import (
 
 type KubeletServer struct {
 	Kubelet       kubeletInterface
-	UpdateChannel chan []api.ContainerManifest
+	UpdateChannel chan manifestUpdate
 }
 
 // kubeletInterface contains all the kubelet methods required by the server.
@@ -67,7 +67,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				s.error(w, err)
 				return
 			}
-			s.UpdateChannel <- []api.ContainerManifest{manifest}
+			s.UpdateChannel <- manifestUpdate{httpServerSource, []api.ContainerManifest{manifest}}
 		} else if u.Path == "/containers" {
 			var manifests []api.ContainerManifest
 			err = yaml.Unmarshal(data, &manifests)
@@ -75,7 +75,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				s.error(w, err)
 				return
 			}
-			s.UpdateChannel <- manifests
+			s.UpdateChannel <- manifestUpdate{httpServerSource, manifests}
 		}
 	case u.Path == "/containerStats":
 		container := u.Query().Get("container")
