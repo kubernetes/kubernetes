@@ -123,6 +123,7 @@ func (s *Server) Verb(verb string) *Request {
 	return &Request{
 		verb: verb,
 		s:    s,
+		path: "/",
 	}
 }
 
@@ -181,7 +182,7 @@ func (r *Request) Do() (interface{}, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	finalUrl := path.Join(r.s.rawUrl, r.path)
+	finalUrl := r.s.rawUrl + r.path
 	query := url.Values{}
 	if r.selector != nil {
 		query.Add("labels", r.selector.String())

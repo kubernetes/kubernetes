@@ -165,17 +165,9 @@ func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) erro
 // TODO replace this with something that returns a concrete printer object, rather than
 //  having the secondary switch below.
 func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
-	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
-	defer w.Flush()
 	var mapObj map[string]interface{}
 	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {
 		return err
-	}
-
-	// Don't complain about empty objects returned by DELETE commands.
-	if len(mapObj) == 0 {
-		fmt.Fprint(w, "<empty>")
-		return nil
 	}
 
 	if _, contains := mapObj["kind"]; !contains {
@@ -189,7 +181,9 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	return h.PrintObj(obj, output)
 }
 
-func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) {
+func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error {
+	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
+	defer w.Flush()
 	switch o := obj.(type) {
 	case *api.Pod:
 		h.printHeader(podColumns, w)
@@ -212,6 +206,7 @@ func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) {
 	case *api.Status:
 		return h.printStatus(o, w)
 	default:
-		return h.unknown(data, w)
+		_, err := fmt.Fprintf(w, "Error: unknown type %#v", obj)
+		return err
 	}
 }
