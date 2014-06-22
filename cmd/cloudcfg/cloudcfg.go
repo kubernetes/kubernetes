@@ -21,10 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -135,10 +133,6 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		return strings.Trim(flag.Arg(1), "/")
 	}
 
-	readUrl := func(storage string) string {
-		return *httpServer + path.Join("/api/v1beta1", storage)
-	}
-
 	verb := ""
 	switch method {
 	case "get", "list":
@@ -177,7 +171,7 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	}
 
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
-		log.Fatalf("Failed to print: %#v\nRaw received text:\n%v\n", err, string(body))
+		log.Fatalf("Failed to print: %#v\nRaw received object:\n%#v\n", err, obj)
 	}
 	fmt.Print("\n")
 

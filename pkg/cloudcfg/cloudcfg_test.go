@@ -22,9 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"reflect"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -159,7 +157,7 @@ func TestDoRequest(t *testing.T) {
 	testServer := httptest.NewTLSServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := client.AuthInfo{User: "user", Password: "pass"}
-	body, err := DoRequest(request, &auth)
+	body, err := doRequest(request, &auth)
 	if request.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *request)
 	}
@@ -170,43 +168,6 @@ func TestDoRequest(t *testing.T) {
 		t.Errorf("Expected body: '%s', saw: '%s'", expectedBody, body)
 	}
 	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
-}
-
-func TestDoRequestNewWay(t *testing.T) {
-	reqBody := "request body"
-	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := api.Encode(expectedObj)
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(expectedBody),
-		T:            t,
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	auth := client.AuthInfo{User: "user", Password: "pass"}
-	s := New(testServer.URL, &auth)
-	obj, err := s.Verb("POST").
-		Path("foo/bar").
-		Path("baz").
-		Selector("name=foo").
-		Timeout(time.Second).
-		Body([]byte(reqBody)).
-		Do()
-	if err != nil {
-		t.Errorf("Unexpected error: %v %#v", err, err)
-		return
-	}
-	if obj == nil {
-		t.Error("nil obj")
-	} else if !reflect.DeepEqual(obj, expectedObj) {
-		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
-	}
-	fakeHandler.ValidateRequest(t, "/foo/bar/baz", "POST", &reqBody)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
-		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
-	}
-	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
-		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
-	}
 }
 
 func TestRunController(t *testing.T) {
@@ -323,7 +284,7 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 }
 
 func TestRequestWithBodyNoSuchFile(t *testing.T) {
-	request, err := RequestWithBody("non/existent/file.json", "http://www.google.com", "GET")
+	request, err := requestWithBody("non/existent/file.json", "http://www.google.com", "GET")
 	if request != nil {
 		t.Error("Unexpected non-nil result")
 	}
@@ -372,7 +333,7 @@ func TestRequestWithBody(t *testing.T) {
 	expectNoError(t, err)
 	_, err = file.Write(data)
 	expectNoError(t, err)
-	request, err := RequestWithBody(file.Name(), "http://www.google.com", "GET")
+	request, err := requestWithBody(file.Name(), "http://www.google.com", "GET")
 	if request == nil {
 		t.Error("Unexpected nil result")
 	}

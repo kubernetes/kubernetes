@@ -32,7 +32,7 @@ import (
 type ResourcePrinter interface {
 	// Print receives an arbitrary JSON body, formats it and prints it to a writer
 	Print([]byte, io.Writer) error
-	PrintObj(interface{}, io.Writer)
+	PrintObj(interface{}, io.Writer) error
 }
 
 // Identity printer simply copies the body out to the output stream

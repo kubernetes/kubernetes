@@ -21,20 +21,16 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"gopkg.in/v1/yaml"
 )
 
@@ -94,137 +90,9 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 	return nil
 }
 
-// Server contains info locating a kubernetes api server.
-// Example usage:
-// auth, err := LoadAuth(filename)
-// s := New(url, auth)
-// resp, err := s.Verb("GET").
-//	Path("api/v1beta1").
-//	Path("pods").
-//	Selector("area=staging").
-//	Timeout(10*time.Second).
-//	Do()
-// list, ok := resp.(api.PodList)
-type Server struct {
-	auth   *client.AuthInfo
-	rawUrl string
-}
-
-// Create a new server object.
-func New(serverUrl string, auth *client.AuthInfo) *Server {
-	return &Server{
-		auth:   auth,
-		rawUrl: serverUrl,
-	}
-}
-
-// Begin a request with a verb (GET, POST, PUT, DELETE)
-func (s *Server) Verb(verb string) *Request {
-	return &Request{
-		verb: verb,
-		s:    s,
-		path: "/",
-	}
-}
-
-// Request allows for building up a request to a server in a chained fashion.
-type Request struct {
-	s        *Server
-	err      error
-	verb     string
-	path     string
-	body     interface{}
-	selector labels.Selector
-	timeout  time.Duration
-}
-
-// Append an item to the request path. You must call Path at least once.
-func (r *Request) Path(item string) *Request {
-	if r.err != nil {
-		return r
-	}
-	r.path = path.Join(r.path, item)
-	return r
-}
-
-// Use the given item as a resource label selector. Optional.
-func (r *Request) Selector(item string) *Request {
-	if r.err != nil {
-		return r
-	}
-	r.selector, r.err = labels.ParseSelector(item)
-	return r
-}
-
-// Use the given duration as a timeout. Optional.
-func (r *Request) Timeout(d time.Duration) *Request {
-	if r.err != nil {
-		return r
-	}
-	r.timeout = d
-	return r
-}
-
-// Use obj as the body of the request. Optional.
-// If obj is a string, try to read a file of that name.
-// If obj is a []byte, send it directly.
-// Otherwise, assume obj is an api type and marshall it correctly.
-func (r *Request) Body(obj interface{}) *Request {
-	if r.err != nil {
-		return r
-	}
-	r.body = obj
-	return r
-}
-
-// Format and xecute the request. Returns the API object received, or an error.
-func (r *Request) Do() (interface{}, error) {
-	if r.err != nil {
-		return nil, r.err
-	}
-	finalUrl := r.s.rawUrl + r.path
-	query := url.Values{}
-	if r.selector != nil {
-		query.Add("labels", r.selector.String())
-	}
-	if r.timeout != 0 {
-		query.Add("timeout", r.timeout.String())
-	}
-	finalUrl += "?" + query.Encode()
-	var body io.Reader
-	if r.body != nil {
-		switch t := r.body.(type) {
-		case string:
-			data, err := ioutil.ReadFile(t)
-			if err != nil {
-				return nil, err
-			}
-			body = bytes.NewBuffer(data)
-		case []byte:
-			body = bytes.NewBuffer(t)
-		default:
-			data, err := api.Encode(r.body)
-			if err != nil {
-				return nil, err
-			}
-			body = bytes.NewBuffer(data)
-		}
-	}
-	req, err := http.NewRequest(r.verb, finalUrl, body)
-	if err != nil {
-		return nil, err
-	}
-	str, err := DoRequest(req, r.s.auth)
-	if err != nil {
-		return nil, err
-	}
-	return api.Decode([]byte(str))
-}
-
 // RequestWithBody is a helper method that creates an HTTP request with the specified url, method
 // and a body read from 'configFile'
-// FIXME: need to be public API?
-func RequestWithBody(configFile, url, method string) (*http.Request, error) {
+func requestWithBody(configFile, url, method string) (*http.Request, error) {
 	if len(configFile) == 0 {
 		return nil, fmt.Errorf("empty config file.")
 	}
@@ -232,19 +100,19 @@ func RequestWithBody(configFile, url, method string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return RequestWithBodyData(data, url, method)
+	return requestWithBodyData(data, url, method)
 }
 
 // RequestWithBodyData is a helper method that creates an HTTP request with the specified url, method
 // and body data
-func RequestWithBodyData(data []byte, url, method string) (*http.Request, error) {
+func requestWithBodyData(data []byte, url, method string) (*http.Request, error) {
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	request.ContentLength = int64(len(data))
 	return request, err
 }
 
 // Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
-func DoRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
+func doRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
 	if auth != nil {
 		request.SetBasicAuth(auth.User, auth.Password)
 	}
