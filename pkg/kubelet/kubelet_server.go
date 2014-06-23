@@ -29,7 +29,7 @@ import (
 
 type KubeletServer struct {
 	Kubelet       kubeletInterface
-	UpdateChannel chan manifestUpdate
+	UpdateChannel chan<- manifestUpdate
 }
 
 // kubeletInterface contains all the kubelet methods required by the server.
