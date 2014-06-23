@@ -151,11 +151,11 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	r := s.Verb(verb).
 		Path("api/v1beta1").
 		Path(parseStorage()).
-		Selector(*selector)
+		ParseSelector(*selector)
 	if method == "create" || method == "update" {
 		r.Body(readConfig(parseStorage()))
 	}
-	obj, err := r.Do()
+	obj, err := r.Do().Get()
 	if err != nil {
 		log.Fatalf("Got request error: %v\n", err)
 		return false

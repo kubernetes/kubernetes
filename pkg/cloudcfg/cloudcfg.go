@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"gopkg.in/v1/yaml"
 )
 
@@ -71,9 +72,9 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 	if err != nil {
 		return err
 	}
-	labels := controller.DesiredState.ReplicaSelector
+	s := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 
-	podList, err := client.ListPods(labels)
+	podList, err := client.ListPods(s)
 	if err != nil {
 		return err
 	}

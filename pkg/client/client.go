@@ -17,23 +17,20 @@ limitations under the License.
 package client
 
 import (
-	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
 type ClientInterface interface {
-	ListPods(selector map[string]string) (api.PodList, error)
+	ListPods(selector labels.Selector) (api.PodList, error)
 	GetPod(name string) (api.Pod, error)
 	DeletePod(name string) error
 	CreatePod(api.Pod) (api.Pod, error)
@@ -123,143 +120,79 @@ func (c *Client) rawRequest(method, path string, requestBody io.Reader, target i
 	return body, err
 }
 
-func (client Client) makeURL(path string) string {
+func (client *Client) makeURL(path string) string {
 	return client.host + "/api/v1beta1/" + path
 }
 
-// EncodeSelector transforms a selector expressed as a key/value map, into a
-// comma separated, key=value encoding.
-func EncodeSelector(selector map[string]string) string {
-	parts := make([]string, 0, len(selector))
-	for key, value := range selector {
-		parts = append(parts, key+"="+value)
-	}
-	return url.QueryEscape(strings.Join(parts, ","))
-}
-
-// DecodeSelector transforms a selector from a comma separated, key=value format into
-// a key/value map.
-func DecodeSelector(selector string) map[string]string {
-	result := map[string]string{}
-	if len(selector) == 0 {
-		return result
-	}
-	parts := strings.Split(selector, ",")
-	for _, part := range parts {
-		pieces := strings.Split(part, "=")
-		if len(pieces) == 2 {
-			result[pieces[0]] = pieces[1]
-		} else {
-			log.Printf("Invalid selector: %s", selector)
-		}
-	}
-	return result
-}
-
 // ListPods takes a selector, and returns the list of pods that match that selector
-func (client Client) ListPods(selector map[string]string) (api.PodList, error) {
-	path := "pods"
-	if selector != nil && len(selector) > 0 {
-		path += "?labels=" + EncodeSelector(selector)
-	}
-	var result api.PodList
-	_, err := client.rawRequest("GET", path, nil, &result)
-	return result, err
+func (client *Client) ListPods(selector labels.Selector) (result api.PodList, err error) {
+	err = client.Get().Path("pods").Selector(selector).Do().Into(&result)
+	return
 }
 
 // GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (client Client) GetPod(name string) (api.Pod, error) {
-	var result api.Pod
-	_, err := client.rawRequest("GET", "pods/"+name, nil, &result)
-	return result, err
+func (client *Client) GetPod(name string) (result api.Pod, err error) {
+	err = client.Get().Path("pods").Path(name).Do().Into(&result)
+	return
 }
 
 // DeletePod takes the name of the pod, and returns an error if one occurs
-func (client Client) DeletePod(name string) error {
-	_, err := client.rawRequest("DELETE", "pods/"+name, nil, nil)
-	return err
+func (client *Client) DeletePod(name string) error {
+	return client.Delete().Path("pods").Path(name).Do().Error()
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs
-func (client Client) CreatePod(pod api.Pod) (api.Pod, error) {
-	var result api.Pod
-	body, err := json.Marshal(pod)
-	if err == nil {
-		_, err = client.rawRequest("POST", "pods", bytes.NewBuffer(body), &result)
-	}
-	return result, err
+func (client *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
+	err = client.Post().Path("pods").Body(pod).Do().Into(&result)
+	return
 }
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs
-func (client Client) UpdatePod(pod api.Pod) (api.Pod, error) {
-	var result api.Pod
-	body, err := json.Marshal(pod)
-	if err == nil {
-		_, err = client.rawRequest("PUT", "pods/"+pod.ID, bytes.NewBuffer(body), &result)
-	}
-	return result, err
+func (client *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
+	err = client.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(&result)
+	return
 }
 
 // GetReplicationController returns information about a particular replication controller
-func (client Client) GetReplicationController(name string) (api.ReplicationController, error) {
-	var result api.ReplicationController
-	_, err := client.rawRequest("GET", "replicationControllers/"+name, nil, &result)
-	return result, err
+func (client *Client) GetReplicationController(name string) (result api.ReplicationController, err error) {
+	err = client.Get().Path("replicationControllers").Path(name).Do().Into(&result)
+	return
 }
 
 // CreateReplicationController creates a new replication controller
-func (client Client) CreateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
-	var result api.ReplicationController
-	body, err := json.Marshal(controller)
-	if err == nil {
-		_, err = client.rawRequest("POST", "replicationControllers", bytes.NewBuffer(body), &result)
-	}
-	return result, err
+func (client *Client) CreateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
+	err = client.Post().Path("replicationControllers").Body(controller).Do().Into(&result)
+	return
 }
 
 // UpdateReplicationController updates an existing replication controller
-func (client Client) UpdateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
-	var result api.ReplicationController
-	body, err := json.Marshal(controller)
-	if err == nil {
-		_, err = client.rawRequest("PUT", "replicationControllers/"+controller.ID, bytes.NewBuffer(body), &result)
-	}
-	return result, err
+func (client *Client) UpdateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
+	err = client.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(&result)
+	return
 }
 
-func (client Client) DeleteReplicationController(name string) error {
-	_, err := client.rawRequest("DELETE", "replicationControllers/"+name, nil, nil)
-	return err
+func (client *Client) DeleteReplicationController(name string) error {
+	return client.Delete().Path("replicationControllers").Path(name).Do().Error()
 }
 
 // GetReplicationController returns information about a particular replication controller
-func (client Client) GetService(name string) (api.Service, error) {
-	var result api.Service
-	_, err := client.rawRequest("GET", "services/"+name, nil, &result)
-	return result, err
+func (client *Client) GetService(name string) (result api.Service, err error) {
+	err = client.Get().Path("services").Path(name).Do().Into(&result)
+	return
 }
 
 // CreateReplicationController creates a new replication controller
-func (client Client) CreateService(svc api.Service) (api.Service, error) {
-	var result api.Service
-	body, err := json.Marshal(svc)
-	if err == nil {
-		_, err = client.rawRequest("POST", "services", bytes.NewBuffer(body), &result)
-	}
-	return result, err
+func (client *Client) CreateService(svc api.Service) (result api.Service, err error) {
+	err = client.Post().Path("services").Body(svc).Do().Into(&result)
+	return
 }
 
 // UpdateReplicationController updates an existing replication controller
-func (client Client) UpdateService(svc api.Service) (api.Service, error) {
-	var result api.Service
-	body, err := json.Marshal(svc)
-	if err == nil {
-		_, err = client.rawRequest("PUT", "services/"+svc.ID, bytes.NewBuffer(body), &result)
-	}
-	return result, err
+func (client *Client) UpdateService(svc api.Service) (result api.Service, err error) {
+	err = client.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(&result)
+	return
 }
 
-func (client Client) DeleteService(name string) error {
-	_, err := client.rawRequest("DELETE", "services/"+name, nil, nil)
-	return err
+func (client *Client) DeleteService(name string) error {
+	return client.Delete().Path("services").Path(name).Do().Error()
 }

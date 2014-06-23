@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -44,7 +45,7 @@ type FakeKubeClient struct {
 	ctrl    api.ReplicationController
 }
 
-func (client *FakeKubeClient) ListPods(selector map[string]string) (api.PodList, error) {
+func (client *FakeKubeClient) ListPods(selector labels.Selector) (api.PodList, error) {
 	client.actions = append(client.actions, Action{action: "list-pods"})
 	return client.pods, nil
 }

@@ -34,7 +34,6 @@ import (
 // auth, err := LoadAuth(filename)
 // c := New(url, auth)
 // resp, err := c.Verb("GET").
-//	Path("api/v1beta1").
 //	Path("pods").
 //	Selector("area=staging").
 //	Timeout(10*time.Second).
@@ -46,17 +45,39 @@ func (c *Client) Verb(verb string) *Request {
 	return &Request{
 		verb: verb,
 		c:    c,
-		path: "/",
+		path: "/api/v1beta1",
 	}
 }
 
+// Begin a POST request.
+func (c *Client) Post() *Request {
+	return c.Verb("POST")
+}
+
+// Begin a PUT request.
+func (c *Client) Put() *Request {
+	return c.Verb("PUT")
+}
+
+// Begin a GET request.
+func (c *Client) Get() *Request {
+	return c.Verb("GET")
+}
+
+// Begin a DELETE request.
+func (c *Client) Delete() *Request {
+	return c.Verb("DELETE")
+}
+
 // Request allows for building up a request to a server in a chained fashion.
+// Any errors are stored until the end of your call, so you only have to
+// check once.
 type Request struct {
 	c        *Client
 	err      error
 	verb     string
 	path     string
-	body     interface{}
+	body     io.Reader
 	selector labels.Selector
 	timeout  time.Duration
 }
@@ -70,12 +91,21 @@ func (r *Request) Path(item string) *Request {
 	return r
 }
 
-// Use the given item as a resource label selector. Optional.
-func (r *Request) Selector(item string) *Request {
+// Parse the given string as a resource label selector. Optional.
+func (r *Request) ParseSelector(item string) *Request {
 	if r.err != nil {
 		return r
 	}
 	r.selector, r.err = labels.ParseSelector(item)
+	return r
+}
+
+// Use the given selector.
+func (r *Request) Selector(s labels.Selector) *Request {
+	if r.err != nil {
+		return r
+	}
+	r.selector = s
 	return r
 }
 
@@ -96,14 +126,31 @@ func (r *Request) Body(obj interface{}) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.body = obj
+	switch t := obj.(type) {
+	case string:
+		data, err := ioutil.ReadFile(t)
+		if err != nil {
+			r.err = err
+			return r
+		}
+		r.body = bytes.NewBuffer(data)
+	case []byte:
+		r.body = bytes.NewBuffer(t)
+	default:
+		data, err := api.Encode(obj)
+		if err != nil {
+			r.err = err
+			return r
+		}
+		r.body = bytes.NewBuffer(data)
+	}
 	return r
 }
 
-// Format and xecute the request. Returns the API object received, or an error.
-func (r *Request) Do() (interface{}, error) {
+// Format and execute the request.
+func (r *Request) Do() Result {
 	if r.err != nil {
-		return nil, r.err
+		return Result{err: r.err}
 	}
 	finalUrl := r.c.host + r.path
 	query := url.Values{}
@@ -114,32 +161,42 @@ func (r *Request) Do() (interface{}, error) {
 		query.Add("timeout", r.timeout.String())
 	}
 	finalUrl += "?" + query.Encode()
-	var body io.Reader
-	if r.body != nil {
-		switch t := r.body.(type) {
-		case string:
-			data, err := ioutil.ReadFile(t)
-			if err != nil {
-				return nil, err
-			}
-			body = bytes.NewBuffer(data)
-		case []byte:
-			body = bytes.NewBuffer(t)
-		default:
-			data, err := api.Encode(r.body)
-			if err != nil {
-				return nil, err
-			}
-			body = bytes.NewBuffer(data)
-		}
-	}
-	req, err := http.NewRequest(r.verb, finalUrl, body)
+	req, err := http.NewRequest(r.verb, finalUrl, r.body)
 	if err != nil {
-		return nil, err
+		return Result{err: err}
 	}
-	str, err := r.c.doRequest(req)
-	if err != nil {
-		return nil, err
+	respBody, err := r.c.doRequest(req)
+	return Result{respBody, err}
+}
+
+// Result contains the result of calling Request.Do().
+type Result struct {
+	body []byte
+	err  error
+}
+
+// Raw returns the raw result.
+func (r Result) Raw() ([]byte, error) {
+	return r.body, r.err
+}
+
+// Get returns the result as an object.
+func (r Result) Get() (interface{}, error) {
+	if r.err != nil {
+		return nil, r.err
 	}
-	return api.Decode([]byte(str))
+	return api.Decode(r.body)
+}
+
+// Into stores the result into obj, if possible..
+func (r Result) Into(obj interface{}) error {
+	if r.err != nil {
+		return r.err
+	}
+	return api.DecodeInto(r.body, obj)
+}
+
+// Returns the error executing the request, nil if no error occurred.
+func (r Result) Error() error {
+	return r.err
 }

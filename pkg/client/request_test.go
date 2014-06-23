@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -42,10 +43,10 @@ func TestDoRequestNewWay(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		Selector("name=foo").
+		ParseSelector("name=foo").
 		Timeout(time.Second).
 		Body([]byte(reqBody)).
-		Do()
+		Do().Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -55,7 +56,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	} else if !reflect.DeepEqual(obj, expectedObj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	fakeHandler.ValidateRequest(t, "/foo/bar/baz", "POST", &reqBody)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &reqBody)
 	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
@@ -80,10 +81,10 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		Selector("name=foo").
+		Selector(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(reqObj).
-		Do()
+		Do().Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -94,7 +95,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/foo/bar/baz", "POST", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
@@ -125,10 +126,10 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		Selector("name=foo").
+		ParseSelector("name=foo").
 		Timeout(time.Second).
 		Body(file.Name()).
-		Do()
+		Do().Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -139,11 +140,27 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/foo/bar/baz", "POST", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
+	}
+}
+
+func TestVerbs(t *testing.T) {
+	c := New("", nil)
+	if r := c.Post(); r.verb != "POST" {
+		t.Errorf("Post verb is wrong")
+	}
+	if r := c.Put(); r.verb != "PUT" {
+		t.Errorf("Put verb is wrong")
+	}
+	if r := c.Get(); r.verb != "GET" {
+		t.Errorf("Get verb is wrong")
+	}
+	if r := c.Delete(); r.verb != "DELETE" {
+		t.Errorf("Delete verb is wrong")
 	}
 }

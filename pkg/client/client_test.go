@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -96,7 +95,7 @@ func TestListPodsLabels(t *testing.T) {
 	}
 	c.Setup()
 	c.QueryValidator["labels"] = validateLabels
-	selector := map[string]string{"foo": "bar", "name": "baz"}
+	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
 	receivedPodList, err := c.ListPods(selector)
 	c.Validate(t, receivedPodList, err)
 }
@@ -260,7 +259,7 @@ func TestCreateController(t *testing.T) {
 
 func body(obj interface{}, raw *string) *string {
 	if obj != nil {
-		bs, _ := json.Marshal(obj)
+		bs, _ := api.Encode(obj)
 		body := string(bs)
 		return &body
 	}
