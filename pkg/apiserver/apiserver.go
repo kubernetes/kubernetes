@@ -125,7 +125,7 @@ func (server *ApiServer) notFound(req *http.Request, w http.ResponseWriter) {
 
 func (server *ApiServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.WriteHeader(statusCode)
-	output, err := api.EncodeIndent(object)
+	output, err := api.Encode(object)
 	if err != nil {
 		server.error(err, w)
 		return

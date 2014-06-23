@@ -28,9 +28,12 @@ var knownTypes = map[string]reflect.Type{}
 
 func init() {
 	AddKnownTypes(
-		PodList{}, Pod{},
-		ReplicationControllerList{}, ReplicationController{},
-		ServiceList{}, Service{},
+		PodList{},
+		Pod{},
+		ReplicationControllerList{},
+		ReplicationController{},
+		ServiceList{},
+		Service{},
 		Status{},
 	)
 }
@@ -52,25 +55,13 @@ func AddKnownTypes(types ...interface{}) {
 // format.
 func Encode(obj interface{}) (data []byte, err error) {
 	obj = checkPtr(obj)
-	fieldToReset, err := prepareEncode(obj)
-	if err != nil {
-		return nil, err
-	}
-	data, err = json.Marshal(obj)
-	fieldToReset.SetString("")
-	return
-}
-
-// Just like Encode, but produces indented output.
-func EncodeIndent(obj interface{}) (data []byte, err error) {
-	obj = checkPtr(obj)
-	fieldToReset, err := prepareEncode(obj)
+	jsonBase, err := prepareEncode(obj)
 	if err != nil {
 		return nil, err
 	}
 	data, err = json.MarshalIndent(obj, "", "	")
-	fieldToReset.SetString("")
-	return
+	jsonBase.Kind = ""
+	return data, err
 }
 
 func checkPtr(obj interface{}) interface{} {
@@ -83,35 +74,34 @@ func checkPtr(obj interface{}) interface{} {
 	return v2.Interface()
 }
 
-func prepareEncode(obj interface{}) (reflect.Value, error) {
+func prepareEncode(obj interface{}) (*JSONBase, error) {
 	name, jsonBase, err := nameAndJSONBase(obj)
 	if err != nil {
-		return reflect.Value{}, err
+		return nil, err
 	}
 	if _, contains := knownTypes[name]; !contains {
-		return reflect.Value{}, fmt.Errorf("struct %v won't be unmarshalable because it's not in knownTypes", name)
+		return nil, fmt.Errorf("struct %v won't be unmarshalable because it's not in knownTypes", name)
 	}
-	kind := jsonBase.FieldByName("Kind")
-	kind.SetString(name)
-	return kind, nil
+	jsonBase.Kind = name
+	return jsonBase, nil
 }
 
 // Returns the name of the type (sans pointer), and its kind field. Takes pointer-to-struct..
-func nameAndJSONBase(obj interface{}) (string, reflect.Value, error) {
+func nameAndJSONBase(obj interface{}) (string, *JSONBase, error) {
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
-		return "", reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
+		return "", nil, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
 	}
 	v = v.Elem()
 	name := v.Type().Name()
 	if v.Kind() != reflect.Struct {
-		return "", reflect.Value{}, fmt.Errorf("expected struct, but got %v", name)
+		return "", nil, fmt.Errorf("expected struct, but got %v", name)
 	}
 	jsonBase := v.FieldByName("JSONBase")
 	if !jsonBase.IsValid() {
-		return "", reflect.Value{}, fmt.Errorf("struct %v lacks embedded JSON type", name)
+		return "", nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
 	}
-	return name, jsonBase, nil
+	return name, jsonBase.Addr().Interface().(*JSONBase), nil
 }
 
 // Decode converts a JSON string back into a pointer to an api object. Deduces the type
@@ -139,7 +129,7 @@ func Decode(data []byte) (interface{}, error) {
 		return nil, err
 	}
 	// Don't leave these set. Track type with go's type.
-	jsonBase.FieldByName("Kind").SetString("")
+	jsonBase.Kind = ""
 	return obj, nil
 }
 
@@ -155,11 +145,10 @@ func DecodeInto(data []byte, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	foundName := jsonBase.FieldByName("Kind").Interface().(string)
-	if foundName != "" && foundName != name {
-		return fmt.Errorf("data had kind %v, but passed object was of type %v", foundName, name)
+	if jsonBase.Kind != "" && jsonBase.Kind != name {
+		return fmt.Errorf("data had kind %v, but passed object was of type %v", jsonBase.Kind, name)
 	}
 	// Don't leave these set. Track type with go's type.
-	jsonBase.FieldByName("Kind").SetString("")
+	jsonBase.Kind = ""
 	return nil
 }
