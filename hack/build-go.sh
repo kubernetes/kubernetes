@@ -24,6 +24,10 @@ cd "${KUBE_TARGET}"
 
 BINARIES="proxy integration apiserver controller-manager kubelet cloudcfg localkube"
 
+if [ $# -gt 0 ]; then
+  BINARIES="$@"
+fi
+
 for b in $BINARIES; do
   echo "+++ Building ${b}"
   go build "${KUBE_GO_PACKAGE}"/cmd/${b}
