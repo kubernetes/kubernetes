@@ -37,39 +37,86 @@ readonly REMOTE_OUTPUT_DIR="/go/src/${KUBE_GO_PACKAGE}/output/build"
 readonly DOCKER_CONTAINER_NAME=kube-build
 readonly DOCKER_MOUNT="-v ${LOCAL_OUTPUT_DIR}:${REMOTE_OUTPUT_DIR}"
 
-# Verify that the right utilitites and such are installed.
-if [[ -z "$(which docker)" ]]; then
-  echo "Can't find 'docker' in PATH, please fix and retry." >&2
-  echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
-  exit 1
-fi
+readonly KUBE_RUN_IMAGE_BASE="kubernetes"
+readonly KUBE_RUN_BINARIES="
+    apiserver
+    controller-manager
+    proxy
+  "
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  if [[ -z "$(which boot2docker)" ]]; then
-    echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
-    echo "See: https://docs.docker.com/installation/mac/" >&2
-    exit 1
-  fi
-  if [[ $(boot2docker status) != "running" ]]; then
-    echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
-    exit 1
-  fi
-fi
+# This is where the final release artifacts are created locally
+readonly RELEASE_DIR="${KUBE_REPO_ROOT}/output/release"
 
-if ! docker info > /dev/null 2>&1 ; then
-  echo "Can't connect to 'docker' daemon.  please fix and retry." >&2
-  echo >&2
-  echo "Possible causes:" >&2
-  echo "  - On Mac OS X, boot2docker VM isn't started" >&2
-  echo "  - On Mac OS X, DOCKER_HOST env variable isn't set approriately" >&2
-  echo "  - On Linux, user isn't in 'docker' group.  Add and relogin." >&2
-  echo "  - On Linux, Docker daemon hasn't been started or has crashed" >&2
-  exit 1
-fi
+# ---------------------------------------------------------------------------
+# Basic setup functions
+
+# Verify that the right utilities and such are installed for building Kube.
+function verify-prereqs() {
+  if [[ -z "$(which docker)" ]]; then
+    echo "Can't find 'docker' in PATH, please fix and retry." >&2
+    echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
+    return 1
+  fi
+
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ -z "$(which boot2docker)" ]]; then
+      echo "It looks like you are running on Mac OS X and boot2docker can't be found." >&2
+      echo "See: https://docs.docker.com/installation/mac/" >&2
+      return 1
+    fi
+    if [[ $(boot2docker status) != "running" ]]; then
+      echo "boot2docker VM isn't started.  Please run 'boot2docker start'" >&2
+      return 1
+    fi
+  fi
+
+  if ! docker info > /dev/null 2>&1 ; then
+    echo "Can't connect to 'docker' daemon.  please fix and retry." >&2
+    echo >&2
+    echo "Possible causes:" >&2
+    echo "  - On Mac OS X, boot2docker VM isn't started" >&2
+    echo "  - On Mac OS X, DOCKER_HOST env variable isn't set approriately" >&2
+    echo "  - On Linux, user isn't in 'docker' group.  Add and relogin." >&2
+    echo "  - On Linux, Docker daemon hasn't been started or has crashed" >&2
+    return 1
+  fi
+}
+
+# Verify things are set up for uploading to GCS
+function verify-gcs-prereqs() {
+  if [[ -z "$(which gsutil)" || -z "$(which gcloud)" ]]; then
+    echo "Releasing Kubernetes requires gsutil and gcloud.  Please download,"
+    echo "install and authorize through the Google Cloud SDK: "
+    echo
+    echo "  https://developers.google.com/cloud/sdk/"
+    return 1
+  fi
+
+  FIND_ACCOUNT="gcloud auth list 2>/dev/null | grep '(active)' | awk '{ print \$2 }'"
+  GCLOUD_ACCOUNT=${GCLOUD_ACCOUNT-$(eval ${FIND_ACCOUNT})}
+  if [[ -z "${GCLOUD_ACCOUNT}" ]]; then
+    echo "No account authorized through gcloud.  Please fix with:"
+    echo
+    echo "  gcloud auth login"
+    return 1
+  fi
+
+  FIND_PROJECT="gcloud config list project | tail -n 1 | awk '{ print \$3 }'"
+  GCLOUD_PROJECT=${GCLOUD_PROJECT-$(eval ${FIND_PROJECT})}
+  if [[ -z "${GCLOUD_PROJECT}" ]]; then
+    echo "No account authorized through gcloud.  Please fix with:"
+    echo
+    echo "  gcloud config set project <project id>"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Building
 
 # Set up the context directory for the kube-build image and build it.
 function build-image() {
-  local -r BUILD_CONTEXT_DIR=${KUBE_REPO_ROOT}/output/build-image
+  local -r BUILD_CONTEXT_DIR="${KUBE_REPO_ROOT}/output/images/${KUBE_BUILD_IMAGE}"
   local -r SOURCE="
     api
     build
@@ -79,19 +126,47 @@ function build-image() {
     third_party
     LICENSE
   "
-  local -r DOCKER_BUILD_CMD="docker build -t ${KUBE_BUILD_IMAGE} ${BUILD_CONTEXT_DIR}"
-
-  echo "+++ Building Docker image ${KUBE_BUILD_IMAGE}.  First run can take minutes."
-
   mkdir -p ${BUILD_CONTEXT_DIR}
   tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz ${SOURCE}
   cp build/build-image/Dockerfile ${BUILD_CONTEXT_DIR}/Dockerfile
+  docker-build "${KUBE_BUILD_IMAGE}" "${BUILD_CONTEXT_DIR}"
+}
 
+# Builds the runtime image.  Assumes that the appropriate binaries are already
+# built and in output/build/.
+function run-image() {
+  local -r BUILD_CONTEXT_BASE="${KUBE_REPO_ROOT}/output/images/${KUBE_RUN_IMAGE_BASE}"
+
+  # First build the base image.  This one brings in all of the binaries.
+  mkdir -p "${BUILD_CONTEXT_BASE}"
+  tar czf ${BUILD_CONTEXT_BASE}/kube-bins.tar.gz \
+    -C "output/build/linux/amd64" \
+    ${KUBE_RUN_BINARIES}
+  cp -R build/run-images/base/* "${BUILD_CONTEXT_BASE}/"
+  docker-build "${KUBE_RUN_IMAGE_BASE}" "${BUILD_CONTEXT_BASE}"
+
+  for b in $KUBE_RUN_BINARIES ; do
+    local SUB_CONTEXT_DIR="${BUILD_CONTEXT_BASE}-$b"
+    mkdir -p "${SUB_CONTEXT_DIR}"
+    cp -R build/run-images/$b/* "${SUB_CONTEXT_DIR}/"
+    docker-build "${KUBE_RUN_IMAGE_BASE}-$b" "${SUB_CONTEXT_DIR}"
+  done
+}
+
+# Build a docker image from a Dockerfile.
+# $1 is the name of the image to build
+# $2 is the location of the "context" directory, with the Dockerfile at the root.
+function docker-build() {
+  local -r IMAGE=$1
+  local -r CONTEXT_DIR=$2
+  local -r BUILD_CMD="docker build -t ${IMAGE} ${CONTEXT_DIR}"
+
+  echo "+++ Building Docker image ${IMAGE}. This can take a while."
   set +e # We are handling the error here manually
-  local -r DOCKER_OUTPUT="$(${DOCKER_BUILD_CMD} 2>&1)"
+  local -r DOCKER_OUTPUT="$(${BUILD_CMD} 2>&1)"
   if [ $? -ne 0 ]; then
     set -e
-    echo "+++ Docker build command failed." >&2
+    echo "+++ Docker build command failed for ${IMAGE}" >&2
     echo >&2
     echo "${DOCKER_OUTPUT}" >&2
     echo >&2
@@ -102,7 +177,6 @@ function build-image() {
     return 1
   fi
   set -e
-
 }
 
 # Run a command in the kube-build image.  This assumes that the image has
@@ -115,7 +189,6 @@ function run-build-command() {
   docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 
   ${DOCKER} "$@"
-
 }
 
 # If the Docker server is remote, copy the results back out.
@@ -151,4 +224,108 @@ function copy-output() {
   fi
 }
 
+# ---------------------------------------------------------------------------
+# Release
 
+# Create a unique bucket name for releasing Kube and make sure it exists.
+function ensure-gcs-release-bucket() {
+  if which md5 > /dev/null; then
+    HASH=$(md5 -q -s "$GCLOUD_PROJECT")
+  else
+    HASH=$(echo -n "$GCLOUD_PROJECT" | md5sum)
+  fi
+  HASH=${HASH:0:5}
+  KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-$HASH}
+  KUBE_RELEASE_PREFIX=${KUBE_RELEASE_PREFIX-devel/}
+  KUBE_DOCKER_REG_PREFIX=${KUBE_DOCKER_REG_PREFIX-docker-reg/}
+
+  if ! gsutil ls gs://${KUBE_RELEASE_BUCKET} >/dev/null 2>&1 ; then
+    echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
+    gsutil mb gs://${KUBE_RELEASE_BUCKET}
+  fi
+}
+
+function ensure-gcs-docker-registry() {
+  local -r REG_CONTAINER_NAME="gcs-registry"
+
+  local -r RUNNING=$(docker inspect ${REG_CONTAINER_NAME} 2>/dev/null \
+    | build/json-extractor.py 0.State.Running 2>/dev/null)
+
+  [[ "$RUNNING" != "true" ]] || return 0
+
+  # Grovel around and find the OAuth token in the gcloud config
+  local -r BOTO=~/.config/gcloud/legacy_credentials/${GCLOUD_ACCOUNT}/.boto
+  local -r REFRESH_TOKEN=$(grep 'gs_oauth2_refresh_token =' $BOTO | awk '{ print $3 }')
+
+  if [[ -z $REFRESH_TOKEN ]]; then
+    echo "Couldn't find OAuth 2 refresh token in ${BOTO}" >&2
+    return 1
+  fi
+
+  # If we have an old one sitting around, remove it
+  docker rm ${REG_CONTAINER_NAME} >/dev/null 2>&1 || true
+
+  echo "+++ Starting GCS backed Docker registry"
+  local DOCKER="docker run -d --name=${REG_CONTAINER_NAME} "
+  DOCKER+="-e GCS_BUCKET=${KUBE_RELEASE_BUCKET} "
+  DOCKER+="-e STORAGE_PATH=${KUBE_DOCKER_REG_PREFIX} "
+  DOCKER+="-e GCP_OAUTH2_REFRESH_TOKEN=${REFRESH_TOKEN} "
+  DOCKER+="-p 127.0.0.1:5000:5000 "
+  DOCKER+="google/docker-registry"
+
+  ${DOCKER}
+
+  # Give it time to spin up before we start throwing stuff at it
+  sleep 5
+}
+
+function push-images-to-gcs() {
+  ensure-gcs-docker-registry
+
+  # Tag each of our run binaries with the right registry and push
+  for b in ${KUBE_RUN_BINARIES} ; do
+    echo "+++ Tagging and pushing ${KUBE_RUN_IMAGE_BASE}-$b to GCS bucket ${KUBE_RELEASE_BUCKET}"
+    docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
+    docker push "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
+    docker rmi "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
+  done
+}
+
+# Package up all of the cross compiled clients
+function package-tarballs() {
+  mkdir -p "${RELEASE_DIR}"
+
+  # Find all of the built cloudcfg binaries
+  for platform in output/build/*/* ; do
+    echo $platform
+    local PLATFORM_TAG=$(echo $platform | awk -F / '{ printf "%s-%s", $3, $4 }')
+    echo "+++ Building client package for $PLATFORM_TAG"
+
+    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/output/release-stage/${PLATFORM_TAG}/kubernetes"
+    mkdir -p "${CLIENT_RELEASE_STAGE}"
+    mkdir -p "${CLIENT_RELEASE_STAGE}/bin"
+
+    cp $platform/* "${CLIENT_RELEASE_STAGE}/bin"
+
+    local CLIENT_PACKAGE_NAME="${RELEASE_DIR}/kubernetes-${PLATFORM_TAG}.tar.gz"
+    tar czf ${CLIENT_PACKAGE_NAME} \
+      -C "${CLIENT_RELEASE_STAGE}/.." \
+      .
+  done
+}
+
+function copy-release-to-gcs() {
+  # TODO: This isn't atomic.  There will be points in time where there will be
+  # no active release.  Also, if something fails, the release could be half-
+  # copied.  The real way to do this would perhaps to have some sort of release
+  # version so that we are never overwriting a destination.
+  local -r GCS_DESTINATION="gs://${KUBE_RELEASE_BUCKET}/${KUBE_RELEASE_PREFIX}"
+
+  echo "+++ Copying client tarballs to ${GCS_DESTINATION}"
+
+  # First delete all objects at the destination
+  gsutil -q rm -f -R "${GCS_DESTINATION}" >/dev/null 2>&1 || true
+
+  # Now upload everything in release directory
+  gsutil -m cp -r "${RELEASE_DIR}" "${GCS_DESTINATION}" >/dev/null 2>&1
+}

@@ -14,15 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
-#
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# Build a Kubernetes release.  This will build the binaries, create the Docker
+# images and other build artifacts.  All intermediate artifacts will be hosted
+# publicly on Google Cloud Storage currently.
 
 set -e
 
 source $(dirname $0)/common.sh
 
 verify-prereqs
+verify-gcs-prereqs
+ensure-gcs-release-bucket
 build-image
-run-build-command build/build-image/make-binaries.sh "$@"
+run-build-command build/build-image/make-binaries.sh
+run-build-command build/build-image/make-cross.sh
+run-build-command build/build-image/run-tests.sh
+run-build-command build/build-image/run-integration.sh
+copy-output
+run-image
+package-tarballs
+push-images-to-gcs
+copy-release-to-gcs

@@ -1,5 +1,3 @@
-#! /bin/bash
-
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
-#
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# This file creates a minimal container for running Kubernetes binaries
 
-set -e
+FROM  busybox
+MAINTAINER  Joe Beda <jbeda@google.com>
 
-source $(dirname $0)/common.sh
+WORKDIR /kubernetes
 
-verify-prereqs
-build-image
-run-build-command build/build-image/make-binaries.sh "$@"
+# Upload Kubernetes
+ADD kube-bins.tar.gz /kubernetes

@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
+# Copies any built binaries off the Docker machine.
 #
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# This is a no-op on Linux when the Docker daemon is local.  This is only
+# necessary on Mac OS X with boot2docker.
 
 set -e
 
 source $(dirname $0)/common.sh
 
+verify-prereqs
 copy-output

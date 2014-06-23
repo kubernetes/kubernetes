@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
+# Make all of the Kubernetes binaries for cross compile targets
 #
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# This makes the docker build image, builds the cross binaries and copies them
+# out of the docker container.
 
 set -e
 
 source $(dirname $0)/common.sh
 
+verify-prereqs
 build-image
 run-build-command build/build-image/make-cross.sh
