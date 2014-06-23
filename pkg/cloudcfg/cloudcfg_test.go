@@ -258,17 +258,6 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 	}
 }
 
-/*
-func TestRequestWithBodyNoSuchFile(t *testing.T) {
-	request, err := requestWithBody("non/existent/file.json", "http://www.google.com", "GET")
-	if request != nil {
-		t.Error("Unexpected non-nil result")
-	}
-	if err == nil {
-		t.Error("Unexpected non-error")
-	}
-}*/
-
 func TestLoadAuthInfo(t *testing.T) {
 	testAuthInfo := &client.AuthInfo{
 		User:     "TestUser",

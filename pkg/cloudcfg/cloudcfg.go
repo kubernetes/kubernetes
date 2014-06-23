@@ -88,45 +88,6 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 	return nil
 }
 
-/*// RequestWithBody is a helper method that creates an HTTP request with the specified url, method
-// and a body read from 'configFile'
-func requestWithBody(configFile, url, method string) (*http.Request, error) {
-	if len(configFile) == 0 {
-		return nil, fmt.Errorf("empty config file.")
-	}
-	data, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		return nil, err
-	}
-	return requestWithBodyData(data, url, method)
-}
-
-// RequestWithBodyData is a helper method that creates an HTTP request with the specified url, method
-// and body data
-func requestWithBodyData(data []byte, url, method string) (*http.Request, error) {
-	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
-	request.ContentLength = int64(len(data))
-	return request, err
-}
-
-// Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
-func doRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
-	if auth != nil {
-		request.SetBasicAuth(auth.User, auth.Password)
-	}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	response, err := client.Do(request)
-	if err != nil {
-		return []byte{}, err
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	return body, err
-}*/
-
 // StopController stops a controller named 'name' by setting replicas to zero
 func StopController(name string, client client.ClientInterface) error {
 	controller, err := client.GetReplicationController(name)
