@@ -89,10 +89,12 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "apiserver panic. Look in log for details.")
-			log.Printf("ApiServer panic'd: %#v\n%s\n", x, debug.Stack())
+			log.Printf("ApiServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 		}
 	}()
-	log.Printf("%s %s", req.Method, req.RequestURI)
+	logger := MakeLogged(req, w)
+	w = logger
+	defer logger.Log()
 	url, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		server.error(err, w)
@@ -113,6 +115,7 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	storage := server.storage[requestParts[0]]
 	if storage == nil {
+		logger.Addf("'%v' has no storage object", requestParts[0])
 		server.notFound(req, w)
 		return
 	} else {
@@ -121,7 +124,7 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (server *ApiServer) notFound(req *http.Request, w http.ResponseWriter) {
-	w.WriteHeader(404)
+	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, "Not Found: %#v", req)
 }
 
@@ -202,7 +205,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 				server.notFound(req, w)
 				return
 			}
-			server.write(200, item, w)
+			server.write(http.StatusOK, item, w)
 		default:
 			server.notFound(req, w)
 		}
