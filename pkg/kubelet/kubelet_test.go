@@ -827,16 +827,16 @@ func TestExtractFromHttpBadness(t *testing.T) {
 	}
 }
 
-func TestExtractFromHttp(t *testing.T) {
+func TestExtractFromHttpSingle(t *testing.T) {
 	kubelet := Kubelet{}
 	updateChannel := make(chan manifestUpdate)
 	reader := startReading(updateChannel)
 
 	manifests := []api.ContainerManifest{
-		{Id: "foo"},
+		{Version: "v1beta1", Id: "foo"},
 	}
-	// TODO: provide a mechanism for taking arrays of
-	// manifests or a single manifest.
+	// Taking a single-manifest from a URL allows kubelet to be used
+	// in the implementation of google's container VM image.
 	data, err := json.Marshal(manifests[0])
 
 	fakeHandler := util.FakeHandler{
@@ -855,6 +855,46 @@ func TestExtractFromHttp(t *testing.T) {
 
 	if len(read) != 1 {
 		t.Errorf("Unexpected list: %#v", read)
+		return
+	}
+	if !reflect.DeepEqual(manifests, read[0]) {
+		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", manifests, read[0])
+	}
+}
+
+func TestExtractFromHttpMultiple(t *testing.T) {
+	kubelet := Kubelet{}
+	updateChannel := make(chan manifestUpdate)
+	reader := startReading(updateChannel)
+
+	manifests := []api.ContainerManifest{
+		{Version: "v1beta1", Id: "foo"},
+		{Version: "v1beta1", Id: "bar"},
+	}
+	data, err := json.Marshal(manifests)
+	if err != nil {
+		t.Fatalf("Some weird json problem: %v", err)
+	}
+
+	t.Logf("Serving: %v", string(data))
+
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(data),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+
+	err = kubelet.extractFromHTTP(testServer.URL, updateChannel)
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	close(updateChannel)
+
+	read := reader.GetList()
+
+	if len(read) != 1 {
+		t.Errorf("Unexpected list: %#v", read)
+		return
 	}
 	if !reflect.DeepEqual(manifests, read[0]) {
 		t.Errorf("Unexpected difference.  Expected: %#v, Saw: %#v", manifests, read[0])

@@ -493,12 +493,41 @@ func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpda
 		return err
 	}
 	defer response.Body.Close()
-	manifest, err := kl.extractSingleFromReader(response.Body)
+	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
-	updateChannel <- manifestUpdate{httpClientSource, []api.ContainerManifest{manifest}}
-	return nil
+	if len(data) == 0 {
+		return fmt.Errorf("zero-length data received from %v", url)
+	}
+
+	// First try as if it's a single manifest
+	var manifest api.ContainerManifest
+	singleErr := yaml.Unmarshal(data, &manifest)
+	if singleErr == nil && manifest.Version == "" {
+		singleErr = fmt.Errorf("got blank version field")
+	}
+	if singleErr == nil {
+		updateChannel <- manifestUpdate{httpClientSource, []api.ContainerManifest{manifest}}
+		return nil
+	}
+
+	// That didn't work, so try an array of manifests.
+	var manifests []api.ContainerManifest
+	multiErr := yaml.Unmarshal(data, &manifests)
+	if multiErr == nil && len(manifests) == 0 {
+		multiErr = fmt.Errorf("no elements in ContainerManifest array")
+	}
+	if multiErr == nil && manifests[0].Version == "" {
+		multiErr = fmt.Errorf("got blank version field")
+	}
+	if multiErr == nil {
+		updateChannel <- manifestUpdate{httpClientSource, manifests}
+		return nil
+	}
+	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
+		"single manifest (%v: %#v) or as multiple manifests (%v: %#v).\n",
+		url, string(data), singleErr, manifest, multiErr, manifests)
 }
 
 // Take an etcd Response object, and turn it into a structured list of containers
