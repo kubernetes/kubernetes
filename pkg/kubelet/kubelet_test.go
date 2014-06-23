@@ -835,7 +835,9 @@ func TestExtractFromHttp(t *testing.T) {
 	manifests := []api.ContainerManifest{
 		{Id: "foo"},
 	}
-	data, err := json.Marshal(manifests)
+	// TODO: provide a mechanism for taking arrays of
+	// manifests or a single manifest.
+	data, err := json.Marshal(manifests[0])
 
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
