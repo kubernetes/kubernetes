@@ -44,7 +44,7 @@ func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 }
 
 func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
-	data, err := api.EncodeIndent(obj)
+	data, err := api.Encode(obj)
 	if err != nil {
 		return err
 	}
