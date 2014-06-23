@@ -174,3 +174,21 @@ type Endpoints struct {
 	Name      string
 	Endpoints []string
 }
+
+// Status is a return value for calls that don't return other objects.
+// Arguably, this could go in apiserver, but I'm including it here so clients needn't
+// import both.
+type Status struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	// One of: "success", "failure", "working" (for operations not yet completed)
+	// TODO: if "working", include an operation identifier so final status can be
+	// checked.
+	Status string `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// Values of Status.Status
+const (
+	StatusSuccess = "success"
+	StatusFailure = "failure"
+	StatusWorking = "working"
+)

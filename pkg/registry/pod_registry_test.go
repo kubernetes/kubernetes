@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -103,12 +102,10 @@ func TestExtractJson(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := json.Marshal(pod)
+	body, err := api.Encode(&pod)
 	expectNoError(t, err)
-	podOut, err := storage.Extract(string(body))
+	podOut, err := storage.Extract(body)
 	expectNoError(t, err)
-	// Extract adds in a kind
-	pod.Kind = "cluster#pod"
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)
 	}

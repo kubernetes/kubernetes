@@ -169,7 +169,7 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		printer = &cloudcfg.HumanReadablePrinter{}
 	}
 
-	var body string
+	var body []byte
 	if body, err = cloudcfg.DoRequest(request, auth); err == nil {
 		if err = printer.Print(body, os.Stdout); err != nil {
 			log.Fatalf("Failed to print: %#v\nRaw received text:\n%v\n", err, string(body))

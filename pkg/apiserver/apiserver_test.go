@@ -27,8 +27,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
+
+func init() {
+	api.AddKnownTypes(Simple{}, SimpleList{})
+}
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
 func expectNoError(t *testing.T, err error) {
@@ -38,11 +43,13 @@ func expectNoError(t *testing.T, err error) {
 }
 
 type Simple struct {
-	Name string
+	api.JSONBase `yaml:",inline" json:",inline"`
+	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
 }
 
 type SimpleList struct {
-	Items []Simple
+	api.JSONBase `yaml:",inline" json:",inline"`
+	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
 type SimpleRESTStorage struct {
@@ -55,7 +62,7 @@ type SimpleRESTStorage struct {
 }
 
 func (storage *SimpleRESTStorage) List(labels.Selector) (interface{}, error) {
-	result := SimpleList{
+	result := &SimpleList{
 		Items: storage.list,
 	}
 	return result, storage.err
@@ -70,9 +77,9 @@ func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) 
 	return storage.channel, storage.err
 }
 
-func (storage *SimpleRESTStorage) Extract(body string) (interface{}, error) {
+func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
 	var item Simple
-	json.Unmarshal([]byte(body), &item)
+	api.DecodeInto(body, &item)
 	return item, storage.err
 }
 
@@ -91,7 +98,7 @@ func extractBody(response *http.Response, object interface{}) (string, error) {
 	if err != nil {
 		return string(body), err
 	}
-	err = json.Unmarshal(body, object)
+	err = api.DecodeInto(body, object)
 	return string(body), err
 }
 
@@ -149,8 +156,10 @@ func TestNonEmptyList(t *testing.T) {
 
 	var listOut SimpleList
 	body, err := extractBody(resp, &listOut)
+	expectNoError(t, err)
 	if len(listOut.Items) != 1 {
 		t.Errorf("Unexpected response: %#v", listOut)
+		return
 	}
 	if listOut.Items[0].Name != simpleStorage.list[0].Name {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))

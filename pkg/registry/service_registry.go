@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -64,7 +63,6 @@ func (sr *ServiceRegistryStorage) List(selector labels.Selector) (interface{}, e
 	if err != nil {
 		return nil, err
 	}
-	list.Kind = "cluster#serviceList"
 	var filtered []api.Service
 	for _, service := range list.Items {
 		if selector.Matches(labels.Set(service.Labels)) {
@@ -80,7 +78,6 @@ func (sr *ServiceRegistryStorage) Get(id string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	service.Kind = "cluster#service"
 	return service, err
 }
 
@@ -102,13 +99,12 @@ func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) 
 			}
 		}
 	}
-	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), sr.registry.DeleteService(id)
+	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), sr.registry.DeleteService(id)
 }
 
-func (sr *ServiceRegistryStorage) Extract(body string) (interface{}, error) {
+func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
 	var svc api.Service
-	err := json.Unmarshal([]byte(body), &svc)
-	svc.Kind = "cluster#service"
+	err := api.DecodeInto(body, &svc)
 	return svc, err
 }
 

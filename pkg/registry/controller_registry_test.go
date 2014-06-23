@@ -122,12 +122,10 @@ func TestExtractControllerJson(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := json.Marshal(controller)
+	body, err := api.Encode(&controller)
 	expectNoError(t, err)
-	controllerOut, err := storage.Extract(string(body))
+	controllerOut, err := storage.Extract(body)
 	expectNoError(t, err)
-	// Extract adds a Kind
-	controller.Kind = "cluster#replicationController"
 	if !reflect.DeepEqual(controller, controllerOut) {
 		t.Errorf("Expected %#v, found %#v", controller, controllerOut)
 	}

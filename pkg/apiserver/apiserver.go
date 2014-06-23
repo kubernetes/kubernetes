@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -27,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -36,7 +36,7 @@ type RESTStorage interface {
 	List(labels.Selector) (interface{}, error)
 	Get(id string) (interface{}, error)
 	Delete(id string) (<-chan interface{}, error)
-	Extract(body string) (interface{}, error)
+	Extract(body []byte) (interface{}, error)
 	Create(interface{}) (<-chan interface{}, error)
 	Update(interface{}) (<-chan interface{}, error)
 }
@@ -48,11 +48,6 @@ func MakeAsync(fn func() interface{}) <-chan interface{} {
 		channel <- fn()
 	}()
 	return channel
-}
-
-// Status is a return value for calls that don't return other objects
-type Status struct {
-	Success bool
 }
 
 // ApiServer is an HTTPHandler that delegates to RESTStorage objects.
@@ -130,7 +125,7 @@ func (server *ApiServer) notFound(req *http.Request, w http.ResponseWriter) {
 
 func (server *ApiServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.WriteHeader(statusCode)
-	output, err := json.MarshalIndent(object, "", "    ")
+	output, err := api.Encode(object)
 	if err != nil {
 		server.error(err, w)
 		return
@@ -143,10 +138,10 @@ func (server *ApiServer) error(err error, w http.ResponseWriter) {
 	fmt.Fprintf(w, "Internal Error: %#v", err)
 }
 
-func (server *ApiServer) readBody(req *http.Request) (string, error) {
+func (server *ApiServer) readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
 	body, err := ioutil.ReadAll(req.Body)
-	return string(body), err
+	return body, err
 }
 
 func (server *ApiServer) waitForObject(out <-chan interface{}, timeout time.Duration) (interface{}, error) {
@@ -248,7 +243,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 		}
 		out, err := storage.Delete(parts[1])
 		var obj interface{}
-		obj = Status{Success: true}
+		obj = api.Status{Status: api.StatusSuccess}
 		if err == nil && sync {
 			obj, err = server.waitForObject(out, timeout)
 		}

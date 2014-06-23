@@ -17,12 +17,10 @@ limitations under the License.
 package cloudcfg
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"gopkg.in/v1/yaml"
 )
 
 var storageToType = map[string]reflect.Type{
@@ -41,9 +39,9 @@ func ToWireFormat(data []byte, storage string) ([]byte, error) {
 	}
 
 	obj := reflect.New(prototypeType).Interface()
-	err := yaml.Unmarshal(data, obj)
+	err := api.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(obj)
+	return api.Encode(obj)
 }

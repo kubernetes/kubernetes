@@ -17,8 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -36,7 +34,7 @@ func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTSt
 }
 
 func (storage *ControllerRegistryStorage) List(selector labels.Selector) (interface{}, error) {
-	result := api.ReplicationControllerList{JSONBase: api.JSONBase{Kind: "cluster#replicationControllerList"}}
+	result := api.ReplicationControllerList{}
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
 		for _, controller := range controllers {
@@ -53,18 +51,16 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	controller.Kind = "cluster#replicationController"
 	return controller, err
 }
 
 func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return apiserver.Status{Success: true} }), storage.registry.DeleteController(id)
+	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), storage.registry.DeleteController(id)
 }
 
-func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, error) {
+func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, error) {
 	result := api.ReplicationController{}
-	err := json.Unmarshal([]byte(body), &result)
-	result.Kind = "cluster#replicationController"
+	err := api.DecodeInto(body, &result)
 	return result, err
 }
 

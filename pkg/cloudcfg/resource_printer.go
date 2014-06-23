@@ -31,23 +31,23 @@ import (
 // ResourcePrinter is an interface that knows how to print API resources
 type ResourcePrinter interface {
 	// Print receives an arbitrary JSON body, formats it and prints it to a writer
-	Print(string, io.Writer) error
+	Print([]byte, io.Writer) error
 }
 
 // Identity printer simply copies the body out to the output stream
 type IdentityPrinter struct{}
 
-func (i *IdentityPrinter) Print(data string, w io.Writer) error {
-	_, err := fmt.Fprint(w, data)
+func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
+	_, err := w.Write(data)
 	return err
 }
 
 // YAMLPrinter parses JSON, and re-formats as YAML
 type YAMLPrinter struct{}
 
-func (y *YAMLPrinter) Print(data string, w io.Writer) error {
+func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
 	var obj interface{}
-	if err := json.Unmarshal([]byte(data), &obj); err != nil {
+	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
 	output, err := yaml.Marshal(obj)
@@ -64,9 +64,10 @@ type HumanReadablePrinter struct{}
 var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
 var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Replicas"}
 var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
+var statusColumns = []string{"Status"}
 
-func (h *HumanReadablePrinter) unknown(data string, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "Unknown object: %s", data)
+func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
 	return err
 }
 
@@ -90,97 +91,62 @@ func (h *HumanReadablePrinter) makeImageList(manifest api.ContainerManifest) str
 	return strings.Join(images, ",")
 }
 
-func (h *HumanReadablePrinter) printPod(pod api.Pod, w io.Writer) error {
+func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, labels.Set(pod.Labels))
 	return err
 }
 
-func (h *HumanReadablePrinter) printPodList(podList api.PodList, w io.Writer) error {
+func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer) error {
 	for _, pod := range podList.Items {
-		if err := h.printPod(pod, w); err != nil {
+		if err := h.printPod(&pod, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *HumanReadablePrinter) printReplicationController(ctrl api.ReplicationController, w io.Writer) error {
+func (h *HumanReadablePrinter) printReplicationController(ctrl *api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
 		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), labels.Set(ctrl.DesiredState.ReplicaSelector), ctrl.DesiredState.Replicas)
 	return err
 }
 
-func (h *HumanReadablePrinter) printReplicationControllerList(list api.ReplicationControllerList, w io.Writer) error {
+func (h *HumanReadablePrinter) printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer) error {
 	for _, ctrl := range list.Items {
-		if err := h.printReplicationController(ctrl, w); err != nil {
+		if err := h.printReplicationController(&ctrl, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *HumanReadablePrinter) printService(svc api.Service, w io.Writer) error {
+func (h *HumanReadablePrinter) printService(svc *api.Service, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.ID, labels.Set(svc.Labels), labels.Set(svc.Selector), svc.Port)
 	return err
 }
 
-func (h *HumanReadablePrinter) printServiceList(list api.ServiceList, w io.Writer) error {
+func (h *HumanReadablePrinter) printServiceList(list *api.ServiceList, w io.Writer) error {
 	for _, svc := range list.Items {
-		if err := h.printService(svc, w); err != nil {
+		if err := h.printService(&svc, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// TODO replace this with something that returns a concrete printer object, rather than
-//  having the secondary switch below.
-func (h *HumanReadablePrinter) extractObject(data, kind string) (interface{}, error) {
-	// TODO: I think this can be replaced with some reflection and a map[string]type
-	switch kind {
-	case "cluster#pod":
-		var obj api.Pod
-		if err := json.Unmarshal([]byte(data), &obj); err != nil {
-			return nil, err
-		}
-		return obj, nil
-	case "cluster#podList":
-		var list api.PodList
-		if err := json.Unmarshal([]byte(data), &list); err != nil {
-			return nil, err
-		}
-		return list, nil
-	case "cluster#replicationController":
-		var ctrl api.ReplicationController
-		if err := json.Unmarshal([]byte(data), &ctrl); err != nil {
-			return nil, err
-		}
-		return ctrl, nil
-	case "cluster#replicationControllerList":
-		var list api.ReplicationControllerList
-		if err := json.Unmarshal([]byte(data), &list); err != nil {
-			return nil, err
-		}
-		return list, nil
-	case "cluster#service":
-		var ctrl api.Service
-		if err := json.Unmarshal([]byte(data), &ctrl); err != nil {
-			return nil, err
-		}
-		return ctrl, nil
-	case "cluster#serviceList":
-		var list api.ServiceList
-		if err := json.Unmarshal([]byte(data), &list); err != nil {
-			return nil, err
-		}
-		return list, nil
-	default:
-		return nil, fmt.Errorf("unknown kind: %s", kind)
+func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) error {
+	err := h.printHeader(statusColumns, w)
+	if err != nil {
+		return err
 	}
+	_, err = fmt.Fprintf(w, "%v\n", status.Status)
+	return err
 }
 
-func (h *HumanReadablePrinter) Print(data string, output io.Writer) error {
+// TODO replace this with something that returns a concrete printer object, rather than
+//  having the secondary switch below.
+func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()
 	var mapObj map[string]interface{}
@@ -198,30 +164,31 @@ func (h *HumanReadablePrinter) Print(data string, output io.Writer) error {
 		return fmt.Errorf("unexpected object with no 'kind' field: %s", data)
 	}
 
-	kind := (mapObj["kind"]).(string)
-	obj, err := h.extractObject(data, kind)
+	obj, err := api.Decode(data)
 	if err != nil {
 		return err
 	}
-	switch obj.(type) {
-	case api.Pod:
+	switch o := obj.(type) {
+	case *api.Pod:
 		h.printHeader(podColumns, w)
-		return h.printPod(obj.(api.Pod), w)
-	case api.PodList:
+		return h.printPod(o, w)
+	case *api.PodList:
 		h.printHeader(podColumns, w)
-		return h.printPodList(obj.(api.PodList), w)
-	case api.ReplicationController:
+		return h.printPodList(o, w)
+	case *api.ReplicationController:
 		h.printHeader(replicationControllerColumns, w)
-		return h.printReplicationController(obj.(api.ReplicationController), w)
-	case api.ReplicationControllerList:
+		return h.printReplicationController(o, w)
+	case *api.ReplicationControllerList:
 		h.printHeader(replicationControllerColumns, w)
-		return h.printReplicationControllerList(obj.(api.ReplicationControllerList), w)
-	case api.Service:
+		return h.printReplicationControllerList(o, w)
+	case *api.Service:
 		h.printHeader(serviceColumns, w)
-		return h.printService(obj.(api.Service), w)
-	case api.ServiceList:
+		return h.printService(o, w)
+	case *api.ServiceList:
 		h.printHeader(serviceColumns, w)
-		return h.printServiceList(obj.(api.ServiceList), w)
+		return h.printServiceList(o, w)
+	case *api.Status:
+		return h.printStatus(o, w)
 	default:
 		return h.unknown(data, w)
 	}
