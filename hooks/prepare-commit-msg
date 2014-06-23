@@ -1,10 +1,17 @@
 #!/bin/bash
 
+KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+
 errors=0
 for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v "third_party"); do
   diff="$(git show ":${file}" | gofmt -s -d)"
   if [[ -n "$diff" ]]; then
     echo "# *** ERROR: *** File ${file} has not been gofmt'd." >> $1
+    errors=1
+  fi
+  boilerplate="$(${KUBE_HOOKS_DIR}/boilerplate.sh ${file})"
+  if [[ "$boilerplate" -eq "0" ]]; then
+    echo "# *** ERROR: *** File ${file} needs the boilerplate header in hooks/boilerplate.txt." >> $1
     errors=1
   fi
 done
