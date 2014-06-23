@@ -427,3 +427,37 @@ func TestDoRequest(t *testing.T) {
 	}
 	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
 }
+
+func TestDoRequestAccepted(t *testing.T) {
+	status := api.Status{Status: api.StatusWorking}
+	expectedBody, _ := api.Encode(status)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   202,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
+	auth := AuthInfo{User: "user", Password: "pass"}
+	c := New(testServer.URL, &auth)
+	body, err := c.doRequest(request)
+	if request.Header["Authorization"] == nil {
+		t.Errorf("Request is missing authorization header: %#v", *request)
+	}
+	if err == nil {
+		t.Error("Unexpected non-error")
+		return
+	}
+	se, ok := err.(*StatusErr)
+	if !ok {
+		t.Errorf("Unexpected kind of error: %#v", err)
+		return
+	}
+	if !reflect.DeepEqual(se.Status, status) {
+		t.Errorf("Unexpected status: %#v", se.Status)
+	}
+	if body != nil {
+		t.Errorf("Expected nil body, but saw: '%s'", body)
+	}
+	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
+}

@@ -47,6 +47,16 @@ type ClientInterface interface {
 	DeleteService(string) error
 }
 
+// StatusErr might get returned from an api call if your request is still being processed
+// and hence the expected return data is not available yet.
+type StatusErr struct {
+	Status api.Status
+}
+
+func (s *StatusErr) Error() string {
+	return fmt.Sprintf("Status: %v (%#v)", s.Status.Status, s)
+}
+
 // AuthInfo is used to store authorization information
 type AuthInfo struct {
 	User     string
@@ -92,6 +102,13 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent {
 		return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
+	}
+	if response.StatusCode == http.StatusAccepted {
+		var status api.Status
+		if err := api.DecodeInto(body, &status); err == nil {
+			return nil, &StatusErr{status}
+		}
+		// Sometimes the server returns 202 even though it completely handled the request.
 	}
 	return body, err
 }

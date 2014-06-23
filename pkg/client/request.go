@@ -166,6 +166,14 @@ func (r *Request) Do() Result {
 		return Result{err: err}
 	}
 	respBody, err := r.c.doRequest(req)
+	if err != nil {
+		if statusErr, ok := err.(*StatusErr); ok {
+			// TODO: using the information in statusErr,
+			// loop querying the server to wait and retrieve
+			// the actual result.
+			_ = statusErr
+		}
+	}
 	return Result{respBody, err}
 }
 
