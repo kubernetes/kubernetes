@@ -32,6 +32,7 @@ import (
 type ResourcePrinter interface {
 	// Print receives an arbitrary JSON body, formats it and prints it to a writer
 	Print([]byte, io.Writer) error
+	PrintObj(interface{}, io.Writer) error
 }
 
 // Identity printer simply copies the body out to the output stream
@@ -42,6 +43,14 @@ func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 	return err
 }
 
+func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
+	data, err := api.Encode(obj)
+	if err != nil {
+		return err
+	}
+	return i.Print(data, output)
+}
+
 // YAMLPrinter parses JSON, and re-formats as YAML
 type YAMLPrinter struct{}
 
@@ -50,6 +59,15 @@ func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
+	output, err := yaml.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(w, string(output))
+	return err
+}
+
+func (y *YAMLPrinter) PrintObj(obj interface{}, w io.Writer) error {
 	output, err := yaml.Marshal(obj)
 	if err != nil {
 		return err
@@ -147,17 +165,9 @@ func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) erro
 // TODO replace this with something that returns a concrete printer object, rather than
 //  having the secondary switch below.
 func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
-	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
-	defer w.Flush()
 	var mapObj map[string]interface{}
 	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {
 		return err
-	}
-
-	// Don't complain about empty objects returned by DELETE commands.
-	if len(mapObj) == 0 {
-		fmt.Fprint(w, "<empty>")
-		return nil
 	}
 
 	if _, contains := mapObj["kind"]; !contains {
@@ -168,6 +178,12 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	if err != nil {
 		return err
 	}
+	return h.PrintObj(obj, output)
+}
+
+func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error {
+	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
+	defer w.Flush()
 	switch o := obj.(type) {
 	case *api.Pod:
 		h.printHeader(podColumns, w)
@@ -190,6 +206,7 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	case *api.Status:
 		return h.printStatus(o, w)
 	default:
-		return h.unknown(data, w)
+		_, err := fmt.Fprintf(w, "Error: unknown type %#v", obj)
+		return err
 	}
 }

@@ -92,8 +92,7 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 
 // RequestWithBody is a helper method that creates an HTTP request with the specified url, method
 // and a body read from 'configFile'
-// FIXME: need to be public API?
-func RequestWithBody(configFile, url, method string) (*http.Request, error) {
+func requestWithBody(configFile, url, method string) (*http.Request, error) {
 	if len(configFile) == 0 {
 		return nil, fmt.Errorf("empty config file.")
 	}
@@ -101,19 +100,19 @@ func RequestWithBody(configFile, url, method string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return RequestWithBodyData(data, url, method)
+	return requestWithBodyData(data, url, method)
 }
 
 // RequestWithBodyData is a helper method that creates an HTTP request with the specified url, method
 // and body data
-func RequestWithBodyData(data []byte, url, method string) (*http.Request, error) {
+func requestWithBodyData(data []byte, url, method string) (*http.Request, error) {
 	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	request.ContentLength = int64(len(data))
 	return request, err
 }
 
 // Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
-func DoRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
+func doRequest(request *http.Request, auth *client.AuthInfo) ([]byte, error) {
 	if auth != nil {
 		request.SetBasicAuth(auth.User, auth.Password)
 	}

@@ -157,7 +157,7 @@ func TestDoRequest(t *testing.T) {
 	testServer := httptest.NewTLSServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := client.AuthInfo{User: "user", Password: "pass"}
-	body, err := DoRequest(request, &auth)
+	body, err := doRequest(request, &auth)
 	if request.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *request)
 	}
@@ -284,7 +284,7 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 }
 
 func TestRequestWithBodyNoSuchFile(t *testing.T) {
-	request, err := RequestWithBody("non/existent/file.json", "http://www.google.com", "GET")
+	request, err := requestWithBody("non/existent/file.json", "http://www.google.com", "GET")
 	if request != nil {
 		t.Error("Unexpected non-nil result")
 	}
@@ -333,7 +333,7 @@ func TestRequestWithBody(t *testing.T) {
 	expectNoError(t, err)
 	_, err = file.Write(data)
 	expectNoError(t, err)
-	request, err := RequestWithBody(file.Name(), "http://www.google.com", "GET")
+	request, err := requestWithBody(file.Name(), "http://www.google.com", "GET")
 	if request == nil {
 		t.Error("Unexpected nil result")
 	}

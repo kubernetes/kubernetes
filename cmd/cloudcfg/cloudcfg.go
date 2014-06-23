@@ -21,10 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -135,28 +133,31 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		return strings.Trim(flag.Arg(1), "/")
 	}
 
-	readUrl := func(storage string) string {
-		return *httpServer + path.Join("/api/v1beta1", storage)
-	}
-
-	var request *http.Request
-	var err error
+	verb := ""
 	switch method {
 	case "get", "list":
-		url := readUrl(parseStorage())
-		if len(*selector) > 0 && method == "list" {
-			url = url + "?labels=" + *selector
-		}
-		request, err = http.NewRequest("GET", url, nil)
+		verb = "GET"
 	case "delete":
-		request, err = http.NewRequest("DELETE", readUrl(parseStorage()), nil)
+		verb = "DELETE"
 	case "create":
-		storage := parseStorage()
-		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), readUrl(storage), "POST")
+		verb = "POST"
 	case "update":
-		storage := parseStorage()
-		request, err = cloudcfg.RequestWithBodyData(readConfig(storage), readUrl(storage), "PUT")
+		verb = "PUT"
 	default:
+		return false
+	}
+
+	s := cloudcfg.New(*httpServer, auth)
+	r := s.Verb(verb).
+		Path("api/v1beta1").
+		Path(parseStorage()).
+		Selector(*selector)
+	if method == "create" || method == "update" {
+		r.Body(readConfig(parseStorage()))
+	}
+	obj, err := r.Do()
+	if err != nil {
+		log.Fatalf("Got request error: %v\n", err)
 		return false
 	}
 
@@ -169,15 +170,10 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		printer = &cloudcfg.HumanReadablePrinter{}
 	}
 
-	var body []byte
-	if body, err = cloudcfg.DoRequest(request, auth); err == nil {
-		if err = printer.Print(body, os.Stdout); err != nil {
-			log.Fatalf("Failed to print: %#v\nRaw received text:\n%v\n", err, string(body))
-		}
-		fmt.Print("\n")
-	} else {
-		log.Fatalf("Error: %#v %s", err, body)
+	if err = printer.PrintObj(obj, os.Stdout); err != nil {
+		log.Fatalf("Failed to print: %#v\nRaw received object:\n%#v\n", err, obj)
 	}
+	fmt.Print("\n")
 
 	return true
 }
