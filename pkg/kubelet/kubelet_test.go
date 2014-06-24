@@ -400,7 +400,7 @@ func (cr *channelReader) GetList() [][]api.ContainerManifest {
 func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
 	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
-		Client: fakeClient,
+		EtcdClient: fakeClient,
 	}
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
@@ -422,7 +422,7 @@ func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
 func TestGetKubeletStateFromEtcd(t *testing.T) {
 	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
-		Client: fakeClient,
+		EtcdClient: fakeClient,
 	}
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
@@ -446,7 +446,7 @@ func TestGetKubeletStateFromEtcd(t *testing.T) {
 func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
-		Client: fakeClient,
+		EtcdClient: fakeClient,
 	}
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
@@ -468,7 +468,7 @@ func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 func TestGetKubeletStateFromEtcdError(t *testing.T) {
 	fakeClient := util.MakeFakeEtcdClient(t)
 	kubelet := Kubelet{
-		Client: fakeClient,
+		EtcdClient: fakeClient,
 	}
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
@@ -570,7 +570,7 @@ func TestSyncManifestsDeletes(t *testing.T) {
 func TestEventWriting(t *testing.T) {
 	fakeEtcd := util.MakeFakeEtcdClient(t)
 	kubelet := &Kubelet{
-		Client: fakeEtcd,
+		EtcdClient: fakeEtcd,
 	}
 	expectedEvent := api.Event{
 		Event: "test",
@@ -597,7 +597,7 @@ func TestEventWriting(t *testing.T) {
 func TestEventWritingError(t *testing.T) {
 	fakeEtcd := util.MakeFakeEtcdClient(t)
 	kubelet := &Kubelet{
-		Client: fakeEtcd,
+		EtcdClient: fakeEtcd,
 	}
 	fakeEtcd.Err = fmt.Errorf("test error")
 	err := kubelet.LogEvent(&api.Event{
