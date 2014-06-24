@@ -86,48 +86,6 @@ func TestExtractJSON(t *testing.T) {
 	verifyIntEquals(t, obj.Data.Number, 10)
 }
 
-type FakeDockerClient struct {
-	containerList []docker.APIContainers
-	container     *docker.Container
-	err           error
-	called        []string
-	stopped       []string
-}
-
-func (f *FakeDockerClient) clearCalls() {
-	f.called = []string{}
-}
-
-func (f *FakeDockerClient) appendCall(call string) {
-	f.called = append(f.called, call)
-}
-
-func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	f.appendCall("list")
-	return f.containerList, f.err
-}
-
-func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
-	f.appendCall("inspect")
-	return f.container, f.err
-}
-
-func (f *FakeDockerClient) CreateContainer(docker.CreateContainerOptions) (*docker.Container, error) {
-	f.appendCall("create")
-	return nil, nil
-}
-
-func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
-	f.appendCall("start")
-	return nil
-}
-
-func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
-	f.appendCall("stop")
-	f.stopped = append(f.stopped, id)
-	return nil
-}
-
 func verifyCalls(t *testing.T, fakeDocker FakeDockerClient, calls []string) {
 	verifyStringArrayEquals(t, fakeDocker.called, calls)
 }

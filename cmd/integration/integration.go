@@ -26,39 +26,55 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/coreos/go-etcd/etcd"
 )
 
 func main() {
-
 	// Setup
 	servers := []string{"http://localhost:4001"}
 	log.Printf("Creating etcd client pointing to %v", servers)
-	etcdClient := etcd.NewClient(servers)
-	machineList := registry.MakeMinionRegistry([]string{"machine"})
+	machineList := []string{"localhost", "machine"}
 
-	reg := registry.MakeEtcdRegistry(etcdClient, machineList)
+	// Master
+	m := master.New(servers, machineList, nil)
+	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
-	apiserver := apiserver.New(map[string]apiserver.RESTStorage{
-		"pods": registry.MakePodRegistryStorage(reg, &client.FakeContainerInfo{}, registry.MakeRoundRobinScheduler(machineList), nil, nil),
-		"replicationControllers": registry.MakeControllerRegistryStorage(reg),
-	}, "/api/v1beta1")
-	server := httptest.NewServer(apiserver)
-
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(server.URL, nil))
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(apiserver.URL, nil))
 
 	controllerManager.Run(10 * time.Second)
 
+	// Kublet
+	fakeDocker := &kubelet.FakeDockerClient{}
+	my_kubelet := kubelet.Kubelet{
+		Hostname:           machineList[0],
+		DockerClient:       fakeDocker,
+		FileCheckFrequency: 5 * time.Second,
+		SyncFrequency:      5 * time.Second,
+		HTTPCheckFrequency: 5 * time.Second,
+	}
+	go my_kubelet.RunKubelet("", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml", servers[0], "localhost", 0)
+
+	// Create a second kublet so that the guestbook example's two redis slaves both
+	// have a place they can schedule.
+	other_kubelet := kubelet.Kubelet{
+		Hostname:           machineList[1],
+		DockerClient:       &kubelet.FakeDockerClient{},
+		FileCheckFrequency: 5 * time.Second,
+		SyncFrequency:      5 * time.Second,
+		HTTPCheckFrequency: 5 * time.Second,
+	}
+	go other_kubelet.RunKubelet("", "", servers[0], "localhost", 0)
+
 	// Ok. we're good to go.
-	log.Printf("API Server started on %s", server.URL)
+	log.Printf("API Server started on %s", apiserver.URL)
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.New(server.URL, nil)
+	kubeClient := client.New(apiserver.URL, nil)
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		log.Fatalf("Unexpected error: %#v", err)
@@ -78,6 +94,22 @@ func main() {
 	pods, err := kubeClient.ListPods(nil)
 	if err != nil || len(pods.Items) != 2 {
 		log.Fatal("FAILED")
+	}
+
+	// Check that kubelet tried to make the pods.
+	// Using a set to list unique creation attempts. Our fake is
+	// really stupid, so kubelet tries to create these multiple times.
+	createdPods := map[string]struct{}{}
+	for _, p := range fakeDocker.Created {
+		// The last 8 characters are random, so slice them off.
+		n := len(p)
+		if n > 8 {
+			createdPods[p[:n-8]] = struct{}{}
+		}
+	}
+	// We expect 3: 1 net container + 1 pod from the replication controller + 1 pod from the URL.
+	if len(createdPods) != 3 {
+		log.Fatalf("Unexpected list of created pods: %#v\n", createdPods)
 	}
 	log.Printf("OK")
 }
