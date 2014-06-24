@@ -8,6 +8,7 @@ install:
   - go get code.google.com/p/go.tools/cmd/cover
   - go get github.com/coreos/etcd
   - bad=$(gofmt -s -l pkg/ cmd/) bash -x -c '[[ -z "$bad" ]]'
+  - ./hack/verify-boilerplate.sh
   - ./hack/build-go.sh
 
 script:
