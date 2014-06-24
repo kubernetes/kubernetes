@@ -71,7 +71,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		f.t.Errorf("Unexpected get for %s", key)
-		return &etcd.Response{}, &etcd.EtcdError{ErrorCode: 100}
+		return &etcd.Response{}, &etcd.EtcdError{ErrorCode: 100} // Key not found
 	}
 	return result.R, result.E
 }
