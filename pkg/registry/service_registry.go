@@ -30,14 +30,14 @@ import (
 type ServiceRegistryStorage struct {
 	registry ServiceRegistry
 	cloud    cloudprovider.Interface
-	hosts    []string
+	machines MinionRegistry
 }
 
-func MakeServiceRegistryStorage(registry ServiceRegistry, cloud cloudprovider.Interface, hosts []string) apiserver.RESTStorage {
+func MakeServiceRegistryStorage(registry ServiceRegistry, cloud cloudprovider.Interface, machines MinionRegistry) apiserver.RESTStorage {
 	return &ServiceRegistryStorage{
 		registry: registry,
 		cloud:    cloud,
-		hosts:    hosts,
+		machines: machines,
 	}
 }
 
@@ -117,7 +117,11 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, e
 			balancer, ok = sr.cloud.TCPLoadBalancer()
 		}
 		if ok && balancer != nil {
-			err := balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, sr.hosts)
+			hosts, err := sr.machines.List()
+			if err != nil {
+				return nil, err
+			}
+			err = balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, hosts)
 			if err != nil {
 				return nil, err
 			}

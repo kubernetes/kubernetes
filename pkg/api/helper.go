@@ -34,6 +34,8 @@ func init() {
 		ReplicationController{},
 		ServiceList{},
 		Service{},
+		MinionList{},
+		Minion{},
 		Status{},
 	)
 }

@@ -31,11 +31,11 @@ type Scheduler interface {
 
 // RandomScheduler choses machines uniformly at random.
 type RandomScheduler struct {
-	machines []string
+	machines MinionRegistry
 	random   rand.Rand
 }
 
-func MakeRandomScheduler(machines []string, random rand.Rand) Scheduler {
+func MakeRandomScheduler(machines MinionRegistry, random rand.Rand) Scheduler {
 	return &RandomScheduler{
 		machines: machines,
 		random:   random,
@@ -43,35 +43,43 @@ func MakeRandomScheduler(machines []string, random rand.Rand) Scheduler {
 }
 
 func (s *RandomScheduler) Schedule(pod api.Pod) (string, error) {
-	return s.machines[s.random.Int()%len(s.machines)], nil
+	machines, err := s.machines.List()
+	if err != nil {
+		return "", err
+	}
+	return machines[s.random.Int()%len(machines)], nil
 }
 
 // RoundRobinScheduler chooses machines in order.
 type RoundRobinScheduler struct {
-	machines     []string
+	machines     MinionRegistry
 	currentIndex int
 }
 
-func MakeRoundRobinScheduler(machines []string) Scheduler {
+func MakeRoundRobinScheduler(machines MinionRegistry) Scheduler {
 	return &RoundRobinScheduler{
 		machines:     machines,
-		currentIndex: 0,
+		currentIndex: -1,
 	}
 }
 
 func (s *RoundRobinScheduler) Schedule(pod api.Pod) (string, error) {
-	result := s.machines[s.currentIndex]
-	s.currentIndex = (s.currentIndex + 1) % len(s.machines)
+	machines, err := s.machines.List()
+	if err != nil {
+		return "", err
+	}
+	s.currentIndex = (s.currentIndex + 1) % len(machines)
+	result := machines[s.currentIndex]
 	return result, nil
 }
 
 type FirstFitScheduler struct {
-	machines []string
+	machines MinionRegistry
 	registry PodRegistry
 	random   *rand.Rand
 }
 
-func MakeFirstFitScheduler(machines []string, registry PodRegistry, random *rand.Rand) Scheduler {
+func MakeFirstFitScheduler(machines MinionRegistry, registry PodRegistry, random *rand.Rand) Scheduler {
 	return &FirstFitScheduler{
 		machines: machines,
 		registry: registry,
@@ -91,6 +99,10 @@ func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 }
 
 func (s *FirstFitScheduler) Schedule(pod api.Pod) (string, error) {
+	machines, err := s.machines.List()
+	if err != nil {
+		return "", err
+	}
 	machineToPods := map[string][]api.Pod{}
 	pods, err := s.registry.ListPods(labels.Everything())
 	if err != nil {
@@ -101,7 +113,7 @@ func (s *FirstFitScheduler) Schedule(pod api.Pod) (string, error) {
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	var machineOptions []string
-	for _, machine := range s.machines {
+	for _, machine := range machines {
 		podFits := true
 		for _, scheduledPod := range machineToPods[machine] {
 			for _, container := range pod.DesiredState.Manifest.Containers {

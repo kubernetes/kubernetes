@@ -28,7 +28,7 @@ import (
 )
 
 func MakeTestEtcdRegistry(client util.EtcdClient, machines []string) *EtcdRegistry {
-	registry := MakeEtcdRegistry(client, machines)
+	registry := MakeEtcdRegistry(client, MakeMinionRegistry(machines))
 	registry.manifestFactory = &BasicManifestFactory{
 		serviceRegistry: &MockServiceRegistry{},
 	}

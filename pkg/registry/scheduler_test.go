@@ -32,7 +32,7 @@ func expectSchedule(scheduler Scheduler, pod api.Pod, expected string, t *testin
 }
 
 func TestRoundRobinScheduler(t *testing.T) {
-	scheduler := MakeRoundRobinScheduler([]string{"m1", "m2", "m3", "m4"})
+	scheduler := MakeRoundRobinScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3", "m4"}))
 	expectSchedule(scheduler, api.Pod{}, "m1", t)
 	expectSchedule(scheduler, api.Pod{}, "m2", t)
 	expectSchedule(scheduler, api.Pod{}, "m3", t)
@@ -41,7 +41,7 @@ func TestRoundRobinScheduler(t *testing.T) {
 
 func TestRandomScheduler(t *testing.T) {
 	random := rand.New(rand.NewSource(0))
-	scheduler := MakeRandomScheduler([]string{"m1", "m2", "m3", "m4"}, *random)
+	scheduler := MakeRandomScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3", "m4"}), *random)
 	_, err := scheduler.Schedule(api.Pod{})
 	expectNoError(t, err)
 }
@@ -49,7 +49,7 @@ func TestRandomScheduler(t *testing.T) {
 func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
 	mockRegistry := MockPodRegistry{}
 	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
+	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
 	expectSchedule(scheduler, api.Pod{}, "m3", t)
 }
 
@@ -81,7 +81,7 @@ func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
 		},
 	}
 	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
+	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
 	expectSchedule(scheduler, makePod("", 8080), "m3", t)
 }
 
@@ -94,7 +94,7 @@ func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 		},
 	}
 	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
+	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
 	expectSchedule(scheduler, makePod("", 8080, 8081), "m3", t)
 }
 
@@ -107,7 +107,7 @@ func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
 		},
 	}
 	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler([]string{"m1", "m2", "m3"}, &mockRegistry, r)
+	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
 	_, err := scheduler.Schedule(makePod("", 8080, 8081))
 	if err == nil {
 		t.Error("Unexpected non-error.")
