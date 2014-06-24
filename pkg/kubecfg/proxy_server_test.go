@@ -29,13 +29,11 @@ func TestFileServing(t *testing.T) {
 	expectNoError(t, err)
 	err = ioutil.WriteFile(dir+"/test.txt", []byte(data), 0755)
 	expectNoError(t, err)
-	handler := fileServer{
-		prefix: "/foo/",
-		base:   dir,
-	}
-	server := httptest.NewServer(&handler)
+	prefix := "/foo/"
+	handler := makeFileHandler(prefix, dir)
+	server := httptest.NewServer(handler)
 	client := http.Client{}
-	req, err := http.NewRequest("GET", server.URL+handler.prefix+"/test.txt", nil)
+	req, err := http.NewRequest("GET", server.URL+prefix+"test.txt", nil)
 	expectNoError(t, err)
 	res, err := client.Do(req)
 	expectNoError(t, err)

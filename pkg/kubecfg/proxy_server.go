@@ -18,7 +18,6 @@ package kubecfg
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,18 +30,18 @@ type ProxyServer struct {
 	Client *client.Client
 }
 
+func makeFileHandler(prefix, base string) http.Handler {
+	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
+}
+
 func NewProxyServer(filebase, host string, auth *client.AuthInfo) *ProxyServer {
 	server := &ProxyServer{
 		Host:   host,
 		Auth:   auth,
 		Client: client.New(host, auth),
 	}
-	fileServer := &fileServer{
-		prefix: "/static/",
-		base:   filebase,
-	}
 	http.Handle("/api/", server)
-	http.Handle("/static/", fileServer)
+	http.Handle("/static/", makeFileHandler("/static/", filebase))
 	return server
 }
 
@@ -73,16 +72,4 @@ func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(data)
-}
-
-type fileServer struct {
-	prefix string
-	base   string
-}
-
-func (f *fileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	filename := r.URL.Path[len(f.prefix):]
-	bytes, _ := ioutil.ReadFile(f.base + filename)
-	w.WriteHeader(http.StatusOK)
-	w.Write(bytes)
 }
