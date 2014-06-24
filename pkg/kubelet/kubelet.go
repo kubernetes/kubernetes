@@ -458,7 +458,9 @@ func (kl *Kubelet) WatchFile(file string, updateChannel chan<- manifestUpdate) {
 
 	fileInfo, err := os.Stat(file)
 	if err != nil {
-		log.Printf("Error polling file: %#v", err)
+		if !os.IsNotExist(err) {
+			log.Printf("Error polling file: %#v", err)
+		}
 		return
 	}
 	if fileInfo.IsDir() {
@@ -510,14 +512,10 @@ func (kl *Kubelet) ResponseToManifests(response *etcd.Response) ([]api.Container
 func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- manifestUpdate) error {
 	response, err := kl.Client.Get(key+"/kubelet", true, false)
 	if err != nil {
-		log.Printf("Error on get on %s: %#v", key, err)
-		switch err.(type) {
-		case *etcd.EtcdError:
-			etcdError := err.(*etcd.EtcdError)
-			if etcdError.ErrorCode == 100 {
-				return nil
-			}
+		if util.IsEtcdNotFound(err) {
+			return nil
 		}
+		log.Printf("Error on etcd get of %s: %#v", key, err)
 		return err
 	}
 	manifests, err := kl.ResponseToManifests(response)
