@@ -526,7 +526,7 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- mani
 		log.Printf("Error parsing response (%#v): %s", response, err)
 		return err
 	}
-	log.Printf("Got initial state from etcd: %+v", manifests)
+	log.Printf("Got state from etcd: %+v", manifests)
 	updateChannel <- manifestUpdate{etcdSource, manifests}
 	return nil
 }
@@ -595,11 +595,11 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, updateChannel c
 	defer util.HandleCrash()
 	for {
 		watchResponse := <-watchChannel
-		log.Printf("Got change: %#v", watchResponse)
 		// This means the channel has been closed.
 		if watchResponse == nil {
 			return
 		}
+		log.Printf("Got etcd change: %#v", watchResponse)
 		manifests, err := kl.extractFromEtcd(watchResponse)
 		if err != nil {
 			log.Printf("Error handling response from etcd: %#v", err)
@@ -646,7 +646,7 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (stri
 
 // Sync the configured list of containers (desired state) with the host current state
 func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
-	log.Printf("Desired:%#v", config)
+	log.Printf("Desired: %#v", config)
 	var err error
 	desired := map[string]bool{}
 	for _, manifest := range config {
@@ -656,7 +656,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			continue
 		}
 		if !exists {
-			log.Printf("Network container doesn't exit, creating")
+			log.Printf("Network container doesn't exist, creating")
 			netName, err = kl.createNetworkContainer(&manifest)
 			if err != nil {
 				log.Printf("Failed to create network container: %#v", err)
@@ -698,7 +698,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 		}
 	}
 	existingContainers, _ := kl.ListContainers()
-	log.Printf("Existing:\n%#v Desired: %#v", existingContainers, desired)
+	log.Printf("Existing: %#v Desired: %#v", existingContainers, desired)
 	for _, container := range existingContainers {
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
