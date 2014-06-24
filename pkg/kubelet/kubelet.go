@@ -620,7 +620,7 @@ func (kl *Kubelet) networkContainerExists(manifest *api.ContainerManifest) (stri
 		return "", false, err
 	}
 	for _, name := range pods {
-		if strings.Contains(name, containerNamePrefix+"--"+networkContainerName+"--"+manifest.Id+"--") {
+		if strings.Contains(name, containerNamePrefix+"--"+networkContainerName+"--"+escapeDash(manifest.Id)+"--") {
 			return name, true, nil
 		}
 	}
