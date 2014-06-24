@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -48,6 +47,7 @@ var (
 	yaml         = flag.Bool("yaml", false, "If true, print raw YAML for responses")
 	verbose      = flag.Bool("verbose", false, "If true, print extra information")
 	proxy        = flag.Bool("proxy", false, "If true, run a proxy to the api server")
+	www          = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
 )
 
 func usage() {
@@ -98,11 +98,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(flag.Args()) < 1 {
-		usage()
-		os.Exit(1)
-	}
-	method := flag.Arg(0)
 	secure := true
 	parsedUrl, err := url.Parse(*httpServer)
 	if err != nil {
@@ -121,13 +116,16 @@ func main() {
 	}
 
 	if *proxy {
-		server := cloudcfg.ProxyServer{
-			Host:   *httpServer,
-			Client: &http.Client{},
-		}
-		http.Handle("/api/", &server)
-		log.Fatal(http.ListenAndServe(":8001", nil))
+		log.Println("Starting to serve on localhost:8001")
+		server := cloudcfg.NewProxyServer(*www, *httpServer, auth)
+		log.Fatal(server.Serve())
 	}
+
+	if len(flag.Args()) < 1 {
+		usage()
+		os.Exit(1)
+	}
+	method := flag.Arg(0)
 
 	matchFound := executeAPIRequest(method, auth) || executeControllerRequest(method, auth)
 	if matchFound == false {
