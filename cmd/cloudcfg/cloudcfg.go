@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -46,6 +47,7 @@ var (
 	json         = flag.Bool("json", false, "If true, print raw JSON for responses")
 	yaml         = flag.Bool("yaml", false, "If true, print raw YAML for responses")
 	verbose      = flag.Bool("verbose", false, "If true, print extra information")
+	proxy        = flag.Bool("proxy", false, "If true, run a proxy to the api server")
 )
 
 func usage() {
@@ -116,6 +118,15 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error loading auth: %#v", err)
 		}
+	}
+
+	if *proxy {
+		server := cloudcfg.ProxyServer{
+			Host:   *httpServer,
+			Client: &http.Client{},
+		}
+		http.Handle("/api/", &server)
+		log.Fatal(http.ListenAndServe(":8001", nil))
 	}
 
 	matchFound := executeAPIRequest(method, auth) || executeControllerRequest(method, auth)
