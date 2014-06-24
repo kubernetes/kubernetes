@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"bytes"
 	"io/ioutil"
 	"net/http/httptest"
 	"reflect"
@@ -57,6 +58,45 @@ func TestDoRequestNewWay(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &reqBody)
+	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
+		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
+	}
+	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
+		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
+	}
+}
+
+func TestDoRequestNewWayReader(t *testing.T) {
+	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	reqBodyExpected, _ := api.Encode(reqObj)
+	expectedObj := &api.Service{Port: 12345}
+	expectedBody, _ := api.Encode(expectedObj)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	auth := AuthInfo{User: "user", Password: "pass"}
+	s := New(testServer.URL, &auth)
+	obj, err := s.Verb("POST").
+		Path("foo/bar").
+		Path("baz").
+		Selector(labels.Set{"name": "foo"}.AsSelector()).
+		Timeout(time.Second).
+		Body(bytes.NewBuffer(reqBodyExpected)).
+		Do().Get()
+	if err != nil {
+		t.Errorf("Unexpected error: %v %#v", err, err)
+		return
+	}
+	if obj == nil {
+		t.Error("nil obj")
+	} else if !reflect.DeepEqual(obj, expectedObj) {
+		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
+	}
+	tmpStr := string(reqBodyExpected)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
@@ -162,5 +202,14 @@ func TestVerbs(t *testing.T) {
 	}
 	if r := c.Delete(); r.verb != "DELETE" {
 		t.Errorf("Delete verb is wrong")
+	}
+}
+
+func TestAbsPath(t *testing.T) {
+	expectedPath := "/bar/foo"
+	c := New("", nil)
+	r := c.Post().Path("/foo").AbsPath(expectedPath)
+	if r.path != expectedPath {
+		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
 	}
 }

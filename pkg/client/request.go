@@ -91,6 +91,15 @@ func (r *Request) Path(item string) *Request {
 	return r
 }
 
+// Overwrite an existing path with the path parameter.
+func (r *Request) AbsPath(path string) *Request {
+	if r.err != nil {
+		return r
+	}
+	r.path = path
+	return r
+}
+
 // Parse the given string as a resource label selector. Optional.
 func (r *Request) ParseSelector(item string) *Request {
 	if r.err != nil {
@@ -136,6 +145,8 @@ func (r *Request) Body(obj interface{}) *Request {
 		r.body = bytes.NewBuffer(data)
 	case []byte:
 		r.body = bytes.NewBuffer(t)
+	case io.Reader:
+		r.body = obj.(io.Reader)
 	default:
 		data, err := api.Encode(obj)
 		if err != nil {

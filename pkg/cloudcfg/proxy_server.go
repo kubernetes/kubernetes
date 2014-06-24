@@ -62,13 +62,11 @@ func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
 }
 
 func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	result := s.Client.Verb(r.Method).Path(r.URL.Path).Do()
+	result := s.Client.Verb(r.Method).AbsPath(r.URL.Path).Body(r.Body).Do()
 	if result.Error() != nil {
 		s.doError(w, result.Error())
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Header().Add("Content-type", "application/json")
 	data, err := result.Raw()
 	if err != nil {
 		s.doError(w, err)
