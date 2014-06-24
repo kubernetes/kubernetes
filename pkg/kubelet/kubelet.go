@@ -68,7 +68,7 @@ type CadvisorInterface interface {
 // The main kubelet implementation
 type Kubelet struct {
 	Hostname           string
-	Client             util.EtcdClient
+	EtcdClient         util.EtcdClient
 	DockerClient       DockerInterface
 	CadvisorClient     CadvisorInterface
 	FileCheckFrequency time.Duration
@@ -106,7 +106,7 @@ func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address s
 	if etcd_servers != "" {
 		servers := []string{etcd_servers}
 		log.Printf("Creating etcd client pointing to %v", servers)
-		kl.Client = etcd.NewClient(servers)
+		kl.EtcdClient = etcd.NewClient(servers)
 		go util.Forever(func() { kl.SyncAndSetupEtcdWatch(updateChannel) }, 20*time.Second)
 	}
 	if address != "" {
@@ -135,7 +135,7 @@ type SyncHandler interface {
 
 // Log an event to the etcd backend.
 func (kl *Kubelet) LogEvent(event *api.Event) error {
-	if kl.Client == nil {
+	if kl.EtcdClient == nil {
 		return fmt.Errorf("no etcd client connection.")
 	}
 	event.Timestamp = time.Now().Unix()
@@ -145,7 +145,7 @@ func (kl *Kubelet) LogEvent(event *api.Event) error {
 	}
 
 	var response *etcd.Response
-	response, err = kl.Client.AddChild(fmt.Sprintf("/events/%s", event.Container.Name), string(data), 60*60*48 /* 2 days */)
+	response, err = kl.EtcdClient.AddChild(fmt.Sprintf("/events/%s", event.Container.Name), string(data), 60*60*48 /* 2 days */)
 	// TODO(bburns) : examine response here.
 	if err != nil {
 		log.Printf("Error writing event: %s\n", err)
@@ -513,7 +513,7 @@ func (kl *Kubelet) ResponseToManifests(response *etcd.Response) ([]api.Container
 }
 
 func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- manifestUpdate) error {
-	response, err := kl.Client.Get(key+"/kubelet", true, false)
+	response, err := kl.EtcdClient.Get(key+"/kubelet", true, false)
 	if err != nil {
 		if util.IsEtcdNotFound(err) {
 			return nil
@@ -558,7 +558,7 @@ func (kl *Kubelet) SyncAndSetupEtcdWatch(updateChannel chan<- manifestUpdate) {
 
 		kl.getKubeletStateFromEtcd(key, updateChannel)
 		log.Printf("Setting up a watch for configuration changes in etcd for %s", key)
-		kl.Client.Watch(key, 0, true, watchChannel, done)
+		kl.EtcdClient.Watch(key, 0, true, watchChannel, done)
 	}
 }
 
