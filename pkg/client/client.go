@@ -106,7 +106,11 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 	if response.StatusCode == http.StatusAccepted {
 		var status api.Status
 		if err := api.DecodeInto(body, &status); err == nil {
-			return nil, &StatusErr{status}
+			if status.Status == api.StatusSuccess {
+				return body, nil
+			} else {
+				return nil, &StatusErr{status}
+			}
 		}
 		// Sometimes the server returns 202 even though it completely handled the request.
 	}
