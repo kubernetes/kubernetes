@@ -407,7 +407,7 @@ func (kl *Kubelet) extractFromFile(name string) (api.ContainerManifest, error) {
 func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) {
 	var manifests []api.ContainerManifest
 
-	files, err := filepath.Glob(filepath.Join(name, "*"))
+	files, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return manifests, err
 	}
