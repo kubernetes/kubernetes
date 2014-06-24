@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ "$(grep -c "# then delete this line" $1)" == "1" ]]; then
-  echo "Unresolved gofmt errors. Aborting commit."
+if [[ "$(grep -c "COMMIT_BLOCKED" $1)" -gt 0 ]]; then
+  echo "FAILED: Unresolved errors - aborting the commit."
   echo "The message of your attempted commit was:"
   cat $1
   exit 1
