@@ -94,9 +94,13 @@ const (
 func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address string, port uint) {
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
-		go util.Forever(func() { kl.WatchFiles(config_path, updateChannel) }, kl.FileCheckFrequency)
+		log.Printf("Watching for file configs at %s", config_path)
+		go util.Forever(func() {
+			kl.WatchFiles(config_path, updateChannel)
+		}, kl.FileCheckFrequency)
 	}
 	if manifest_url != "" {
+		log.Printf("Watching for HTTP configs at %s", manifest_url)
 		go util.Forever(func() {
 			if err := kl.extractFromHTTP(manifest_url, updateChannel); err != nil {
 				log.Printf("Error syncing http: %#v", err)
@@ -105,7 +109,7 @@ func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address s
 	}
 	if etcd_servers != "" {
 		servers := []string{etcd_servers}
-		log.Printf("Creating etcd client pointing to %v", servers)
+		log.Printf("Watching for etcd configs at %v", servers)
 		kl.EtcdClient = etcd.NewClient(servers)
 		go util.Forever(func() { kl.SyncAndSetupEtcdWatch(updateChannel) }, 20*time.Second)
 	}
