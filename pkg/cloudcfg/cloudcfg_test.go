@@ -131,8 +131,9 @@ func TestUpdateWithPods(t *testing.T) {
 	}
 	validateAction(Action{action: "get-controller", value: "foo"}, client.actions[0], t)
 	validateAction(Action{action: "list-pods"}, client.actions[1], t)
-	validateAction(Action{action: "update-pod", value: "pod-1"}, client.actions[2], t)
-	validateAction(Action{action: "update-pod", value: "pod-2"}, client.actions[3], t)
+	// Update deletes the pods, it relies on the replication controller to replace them.
+	validateAction(Action{action: "delete-pod", value: "pod-1"}, client.actions[2], t)
+	validateAction(Action{action: "delete-pod", value: "pod-2"}, client.actions[3], t)
 }
 
 func TestUpdateNoPods(t *testing.T) {

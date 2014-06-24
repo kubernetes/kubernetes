@@ -147,7 +147,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// Format and execute the request.
+// Format and xecute the request. Returns the API object received, or an error.
 func (r *Request) Do() Result {
 	if r.err != nil {
 		return Result{err: r.err}

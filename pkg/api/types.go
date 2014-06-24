@@ -197,7 +197,8 @@ type Status struct {
 	// One of: "success", "failure", "working" (for operations not yet completed)
 	// TODO: if "working", include an operation identifier so final status can be
 	// checked.
-	Status string `json:"status,omitempty" yaml:"status,omitempty"`
+	Status  string `json:"status,omitempty" yaml:"status,omitempty"`
+	Details string `json:"details,omitempty" yaml:"details,omitempty"`
 }
 
 // Values of Status.Status
