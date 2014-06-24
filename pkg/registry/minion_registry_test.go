@@ -101,7 +101,7 @@ func TestMinionRegistryStorage(t *testing.T) {
 			JSONBase: api.JSONBase{ID: "foo"},
 		},
 	}
-	if !reflect.DeepEqual(list.(api.MinionList).Minions, expect) {
+	if !reflect.DeepEqual(list.(api.MinionList).Items, expect) {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
 }

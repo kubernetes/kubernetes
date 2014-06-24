@@ -186,7 +186,7 @@ type Minion struct {
 // A list of minions.
 type MinionList struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	Minions  []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
+	Items    []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
 }
 
 // Status is a return value for calls that don't return other objects.

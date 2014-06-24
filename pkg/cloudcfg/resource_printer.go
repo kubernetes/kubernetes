@@ -64,6 +64,7 @@ type HumanReadablePrinter struct{}
 var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
 var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Replicas"}
 var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
+var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -135,6 +136,20 @@ func (h *HumanReadablePrinter) printServiceList(list *api.ServiceList, w io.Writ
 	return nil
 }
 
+func (h *HumanReadablePrinter) printMinion(minion *api.Minion, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\n", minion.ID)
+	return err
+}
+
+func (h *HumanReadablePrinter) printMinionList(list *api.MinionList, w io.Writer) error {
+	for _, minion := range list.Items {
+		if err := h.printMinion(&minion, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) error {
 	err := h.printHeader(statusColumns, w)
 	if err != nil {
@@ -187,6 +202,12 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	case *api.ServiceList:
 		h.printHeader(serviceColumns, w)
 		return h.printServiceList(o, w)
+	case *api.Minion:
+		h.printHeader(minionColumns, w)
+		return h.printMinion(o, w)
+	case *api.MinionList:
+		h.printHeader(minionColumns, w)
+		return h.printMinionList(o, w)
 	case *api.Status:
 		return h.printStatus(o, w)
 	default:

@@ -121,7 +121,7 @@ func (storage *MinionRegistryStorage) List(selector labels.Selector) (interface{
 	}
 	var list api.MinionList
 	for _, name := range nameList {
-		list.Minions = append(list.Minions, storage.toApiMinion(name))
+		list.Items = append(list.Items, storage.toApiMinion(name))
 	}
 	return list, nil
 }
