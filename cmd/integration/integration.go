@@ -49,25 +49,25 @@ func main() {
 
 	// Kublet
 	fakeDocker := &kubelet.FakeDockerClient{}
-	my_kubelet := kubelet.Kubelet{
+	myKubelet := kubelet.Kubelet{
 		Hostname:           machineList[0],
 		DockerClient:       fakeDocker,
 		FileCheckFrequency: 5 * time.Second,
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go my_kubelet.RunKubelet("", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml", servers[0], "localhost", 0)
+	go myKubelet.RunKubelet("", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml", servers[0], "localhost", 0)
 
 	// Create a second kublet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	other_kubelet := kubelet.Kubelet{
+	otherKubelet := kubelet.Kubelet{
 		Hostname:           machineList[1],
 		DockerClient:       &kubelet.FakeDockerClient{},
 		FileCheckFrequency: 5 * time.Second,
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go other_kubelet.RunKubelet("", "", servers[0], "localhost", 0)
+	go otherKubelet.RunKubelet("", "", servers[0], "localhost", 0)
 
 	// Ok. we're good to go.
 	log.Printf("API Server started on %s", apiserver.URL)
@@ -102,8 +102,7 @@ func main() {
 	createdPods := map[string]struct{}{}
 	for _, p := range fakeDocker.Created {
 		// The last 8 characters are random, so slice them off.
-		n := len(p)
-		if n > 8 {
+		if n := len(p); n > 8 {
 			createdPods[p[:n-8]] = struct{}{}
 		}
 	}

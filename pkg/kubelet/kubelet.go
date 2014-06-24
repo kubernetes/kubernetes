@@ -505,6 +505,10 @@ func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpda
 	var manifest api.ContainerManifest
 	singleErr := yaml.Unmarshal(data, &manifest)
 	if singleErr == nil && manifest.Version == "" {
+		// If data is a []ContainerManifest, trying to put it into a ContainerManifest
+		// will not give an error but also won't set any of the fields.
+		// Our docs say that the version field is mandatory, so using that to judge wether
+		// this was actually successful.
 		singleErr = fmt.Errorf("got blank version field")
 	}
 	if singleErr == nil {
@@ -515,6 +519,9 @@ func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpda
 	// That didn't work, so try an array of manifests.
 	var manifests []api.ContainerManifest
 	multiErr := yaml.Unmarshal(data, &manifests)
+	// We're not sure if the person reading the logs is going to care about the single or
+	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
+	// done at the end. Hence not returning early here.
 	if multiErr == nil && len(manifests) == 0 {
 		multiErr = fmt.Errorf("no elements in ContainerManifest array")
 	}
