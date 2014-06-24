@@ -89,12 +89,12 @@ const (
 	httpServerSource = "http_server"
 )
 
-// Starts background goroutines. If file, manifest_url, or address are empty,
+// Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(file, manifest_url, etcd_servers, address string, port uint) {
+func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address string, port uint) {
 	updateChannel := make(chan manifestUpdate)
-	if file != "" {
-		go util.Forever(func() { kl.WatchFile(file, updateChannel) }, kl.FileCheckFrequency)
+	if config_path != "" {
+		go util.Forever(func() { kl.WatchFiles(config_path, updateChannel) }, kl.FileCheckFrequency)
 	}
 	if manifest_url != "" {
 		go util.Forever(func() {
@@ -451,32 +451,35 @@ func (kl *Kubelet) extractSingleFromReader(reader io.Reader) (api.ContainerManif
 	return manifest, nil
 }
 
-// Watch a file for changes to the set of pods that should run on this Kubelet
-// This function loops forever and is intended to be run as a goroutine
-func (kl *Kubelet) WatchFile(file string, updateChannel chan<- manifestUpdate) {
+// Watch a file or direcory of files for changes to the set of pods that
+// should run on this Kubelet.
+func (kl *Kubelet) WatchFiles(config_path string, updateChannel chan<- manifestUpdate) {
 	var err error
 
-	fileInfo, err := os.Stat(file)
+	statInfo, err := os.Stat(config_path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Printf("Error polling file: %#v", err)
+			log.Printf("Error accessing path: %#v", err)
 		}
 		return
 	}
-	if fileInfo.IsDir() {
-		manifests, err := kl.extractFromDir(file)
+	if statInfo.Mode().IsDir() {
+		manifests, err := kl.extractFromDir(config_path)
 		if err != nil {
 			log.Printf("Error polling dir: %#v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, manifests}
-	} else {
-		manifest, err := kl.extractFromFile(file)
+	} else if statInfo.Mode().IsRegular() {
+		manifest, err := kl.extractFromFile(config_path)
 		if err != nil {
 			log.Printf("Error polling file: %#v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, []api.ContainerManifest{manifest}}
+	} else {
+		log.Printf("Error accessing config - not a directory or file")
+		return
 	}
 }
 
