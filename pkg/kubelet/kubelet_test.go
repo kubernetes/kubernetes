@@ -75,9 +75,15 @@ func verifyError(t *testing.T, e error) {
 	}
 }
 
+func makeTestKubelet() *Kubelet {
+	return &Kubelet{
+		DockerPuller: &FakeDockerPuller{},
+	}
+}
+
 func TestExtractJSON(t *testing.T) {
 	obj := TestObject{}
-	kubelet := Kubelet{}
+	kubelet := makeTestKubelet()
 	data := `{ "name": "foo", "data": { "value": "bar", "number": 10 } }`
 	kubelet.ExtractYAMLData([]byte(data), &obj)
 
@@ -133,6 +139,7 @@ func TestContainerExists(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	manifest := api.ContainerManifest{
 		Id: "qux",
@@ -176,6 +183,7 @@ func TestGetContainerID(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
@@ -214,6 +222,7 @@ func TestGetContainerByName(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
@@ -242,6 +251,7 @@ func TestListContainers(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
@@ -272,6 +282,7 @@ func TestKillContainerWithError(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	err := kubelet.KillContainer("foo")
 	verifyError(t, err)
@@ -284,6 +295,7 @@ func TestKillContainer(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
@@ -303,7 +315,7 @@ func TestKillContainer(t *testing.T) {
 }
 
 func TestResponseToContainersNil(t *testing.T) {
-	kubelet := Kubelet{}
+	kubelet := makeTestKubelet()
 	list, err := kubelet.ResponseToManifests(&etcd.Response{Node: nil})
 	if len(list) != 0 {
 		t.Errorf("Unexpected non-zero list: %#v", list)
@@ -314,7 +326,7 @@ func TestResponseToContainersNil(t *testing.T) {
 }
 
 func TestResponseToManifests(t *testing.T) {
-	kubelet := Kubelet{}
+	kubelet := makeTestKubelet()
 	list, err := kubelet.ResponseToManifests(&etcd.Response{
 		Node: &etcd.Node{
 			Value: util.MakeJSONString([]api.ContainerManifest{
@@ -468,6 +480,7 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{
 		{
@@ -510,6 +523,7 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	}
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{})
 	expectNoError(t, err)
@@ -962,6 +976,7 @@ func TestGetContainerStats(t *testing.T) {
 
 	kubelet := Kubelet{
 		DockerClient:   &fakeDocker,
+		DockerPuller:   &FakeDockerPuller{},
 		CadvisorClient: mockCadvisor,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
@@ -990,6 +1005,7 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 
 	kubelet := Kubelet{
 		DockerClient: &fakeDocker,
+		DockerPuller: &FakeDockerPuller{},
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
@@ -1027,6 +1043,7 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 
 	kubelet := Kubelet{
 		DockerClient:   &fakeDocker,
+		DockerPuller:   &FakeDockerPuller{},
 		CadvisorClient: mockCadvisor,
 	}
 	fakeDocker.containerList = []docker.APIContainers{
@@ -1059,6 +1076,7 @@ func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
 
 	kubelet := Kubelet{
 		DockerClient:   &fakeDocker,
+		DockerPuller:   &FakeDockerPuller{},
 		CadvisorClient: mockCadvisor,
 	}
 	fakeDocker.containerList = []docker.APIContainers{}

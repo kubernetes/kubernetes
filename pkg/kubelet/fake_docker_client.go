@@ -67,3 +67,23 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.stopped = append(f.stopped, id)
 	return nil
 }
+
+type FakeDockerPuller struct {
+	ImagesPulled []string
+
+	// Every pull will return the first error here, and then reslice
+	// to remove it. Will give nil errors if this slice is empty.
+	ErrorsToInject []error
+}
+
+// Records the image pull attempt, and optionally injects an error.
+func (f *FakeDockerPuller) Pull(image string) error {
+	f.ImagesPulled = append(f.ImagesPulled, image)
+
+	if n := len(f.ErrorsToInject); n > 0 {
+		err := f.ErrorsToInject[0]
+		f.ErrorsToInject = f.ErrorsToInject[:n-1]
+		return err
+	}
+	return nil
+}

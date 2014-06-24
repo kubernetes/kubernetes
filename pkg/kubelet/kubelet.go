@@ -60,6 +60,11 @@ type DockerInterface interface {
 	StopContainer(id string, timeout uint) error
 }
 
+//Interface for testability
+type DockerPuller interface {
+	Pull(image string) error
+}
+
 type CadvisorInterface interface {
 	ContainerInfo(name string) (*info.ContainerInfo, error)
 	MachineInfo() (*info.MachineInfo, error)
@@ -70,6 +75,7 @@ type Kubelet struct {
 	Hostname           string
 	EtcdClient         util.EtcdClient
 	DockerClient       DockerInterface
+	DockerPuller       DockerPuller
 	CadvisorClient     CadvisorInterface
 	FileCheckFrequency time.Duration
 	SyncFrequency      time.Duration
@@ -92,6 +98,9 @@ const (
 // Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
 func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address string, port uint) {
+	if kl.DockerPuller == nil {
+		kl.DockerPuller = MakeDockerPuller()
+	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
 		go util.Forever(func() { kl.WatchFiles(config_path, updateChannel) }, kl.FileCheckFrequency)
@@ -216,9 +225,13 @@ func (kl *Kubelet) ListContainers() ([]string, error) {
 	return result, err
 }
 
-func (kl *Kubelet) pullImage(image string) error {
-	kl.pullLock.Lock()
-	defer kl.pullLock.Unlock()
+type dockerPuller struct{}
+
+func MakeDockerPuller() DockerPuller {
+	return dockerPuller{}
+}
+
+func (dockerPuller) Pull(image string) error {
 	cmd := exec.Command("docker", "pull", image)
 	err := cmd.Start()
 	if err != nil {
@@ -676,7 +689,7 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (stri
 		Command: []string{"sh", "-c", "rm -f nap && mkfifo nap && exec cat nap"},
 		Ports:   ports,
 	}
-	kl.pullImage("busybox")
+	kl.DockerPuller.Pull("busybox")
 	return kl.RunContainer(manifest, container, "")
 }
 
@@ -710,7 +723,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			}
 			if !exists {
 				log.Printf("%#v doesn't exist, creating", element)
-				err = kl.pullImage(element.Image)
+				kl.DockerPuller.Pull(element.Image)
 				if err != nil {
 					log.Printf("Error pulling container: %#v", err)
 					continue

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 )
 
 func main() {
+	manifestUrl := ServeCachedManifestFile()
 	// Setup
 	servers := []string{"http://localhost:4001"}
 	log.Printf("Creating etcd client pointing to %v", servers)
@@ -48,21 +50,24 @@ func main() {
 	controllerManager.Run(10 * time.Second)
 
 	// Kublet
-	fakeDocker := &kubelet.FakeDockerClient{}
+	fakeDocker1 := &kubelet.FakeDockerClient{}
 	myKubelet := kubelet.Kubelet{
 		Hostname:           machineList[0],
-		DockerClient:       fakeDocker,
+		DockerClient:       fakeDocker1,
+		DockerPuller:       &kubelet.FakeDockerPuller{},
 		FileCheckFrequency: 5 * time.Second,
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go myKubelet.RunKubelet("", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml", servers[0], "localhost", 0)
+	go myKubelet.RunKubelet("", manifestUrl, servers[0], "localhost", 0)
 
 	// Create a second kublet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
+	fakeDocker2 := &kubelet.FakeDockerClient{}
 	otherKubelet := kubelet.Kubelet{
 		Hostname:           machineList[1],
-		DockerClient:       &kubelet.FakeDockerClient{},
+		DockerClient:       fakeDocker2,
+		DockerPuller:       &kubelet.FakeDockerPuller{},
 		FileCheckFrequency: 5 * time.Second,
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
@@ -100,15 +105,57 @@ func main() {
 	// Using a set to list unique creation attempts. Our fake is
 	// really stupid, so kubelet tries to create these multiple times.
 	createdPods := map[string]struct{}{}
-	for _, p := range fakeDocker.Created {
+	for _, p := range fakeDocker1.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {
 			createdPods[p[:n-8]] = struct{}{}
 		}
 	}
-	// We expect 3: 1 net container + 1 pod from the replication controller + 1 pod from the URL.
-	if len(createdPods) != 3 {
+	for _, p := range fakeDocker2.Created {
+		// The last 8 characters are random, so slice them off.
+		if n := len(p); n > 8 {
+			createdPods[p[:n-8]] = struct{}{}
+		}
+	}
+	// We expect 5: 2 net containers + 2 pods from the replication controller +
+	//              1 net container + 2 pods from the URL.
+	if len(createdPods) != 7 {
 		log.Fatalf("Unexpected list of created pods: %#v\n", createdPods)
 	}
 	log.Printf("OK")
 }
+
+// Serve a file for kubelet to read.
+func ServeCachedManifestFile() (servingAddress string) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/manifest" {
+			w.Write([]byte(testManifestFile))
+			return
+		}
+		log.Fatalf("Got request: %#v\n", r)
+		http.NotFound(w, r)
+	}))
+	return server.URL + "/manifest"
+}
+
+const (
+	// This is copied from, and should be kept in sync with:
+	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
+	testManifestFile = `version: v1beta1
+containers:
+  - name: redis
+    image: dockerfile/redis
+    volumeMounts:
+      - name: redis-data
+        path: /data
+
+  - name: guestbook
+    image: google/guestbook-python-redis
+    ports:
+      - name: www
+        hostPort: 80
+        containerPort: 80
+
+volumes:
+  - name: redis-data`
+)
