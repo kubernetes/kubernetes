@@ -149,7 +149,6 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 
 	s := kube_client.New(*httpServer, auth)
 	r := s.Verb(verb).
-		Path("api/v1beta1").
 		Path(parseStorage()).
 		ParseSelector(*selector)
 	if method == "create" || method == "update" {
