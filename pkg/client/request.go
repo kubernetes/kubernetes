@@ -234,4 +234,3 @@ func (r Result) Into(obj interface{}) error {
 func (r Result) Error() error {
 	return r.err
 }
-

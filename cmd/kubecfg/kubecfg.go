@@ -130,12 +130,6 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	if len(flag.Args()) < 1 {
-		usage()
-		os.Exit(1)
-	}
-	method := flag.Arg(0)
-
 	matchFound := executeAPIRequest(method, auth) || executeControllerRequest(method, auth)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
