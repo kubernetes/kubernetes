@@ -71,5 +71,7 @@ func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.doError(w, err)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 }
