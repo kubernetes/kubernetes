@@ -93,7 +93,7 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 	}
 	response, err := c.httpClient.Do(request)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
@@ -121,7 +121,7 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 func (c *Client) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
 	request, err := http.NewRequest(method, c.makeURL(path), requestBody)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	body, err := c.doRequest(request)
 	if err != nil {

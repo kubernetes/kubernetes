@@ -36,7 +36,7 @@ func makeUrl(suffix string) string {
 }
 
 func TestListEmptyPods(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200, Body: api.PodList{}},
 	}
@@ -45,7 +45,7 @@ func TestListEmptyPods(t *testing.T) {
 }
 
 func TestListPods(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200,
 			Body: api.PodList{
@@ -74,7 +74,7 @@ func validateLabels(a, b string) bool {
 }
 
 func TestListPodsLabels(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
 		Response: Response{
 			StatusCode: 200,
@@ -101,7 +101,7 @@ func TestListPodsLabels(t *testing.T) {
 }
 
 func TestGetPod(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods/foo"},
 		Response: Response{
 			StatusCode: 200,
@@ -121,7 +121,7 @@ func TestGetPod(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: "/pods/foo"},
 		Response: Response{StatusCode: 200},
 	}
@@ -139,7 +139,7 @@ func TestCreatePod(t *testing.T) {
 			"name": "baz",
 		},
 	}
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "POST", Path: "/pods", Body: requestPod},
 		Response: Response{
 			StatusCode: 200,
@@ -161,7 +161,7 @@ func TestUpdatePod(t *testing.T) {
 			"name": "baz",
 		},
 	}
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: "/pods/foo"},
 		Response: Response{StatusCode: 200, Body: requestPod},
 	}
@@ -170,7 +170,7 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestGetController(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/replicationControllers/foo"},
 		Response: Response{
 			StatusCode: 200,
@@ -198,7 +198,7 @@ func TestUpdateController(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: "/replicationControllers/foo"},
 		Response: Response{
 			StatusCode: 200,
@@ -221,7 +221,7 @@ func TestUpdateController(t *testing.T) {
 }
 
 func TestDeleteController(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: "/replicationControllers/foo"},
 		Response: Response{StatusCode: 200},
 	}
@@ -235,7 +235,7 @@ func TestCreateController(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	c := &TestClient{
+	c := &testClient{
 		Request: testRequest{Method: "POST", Path: "/replicationControllers", Body: requestController},
 		Response: Response{
 			StatusCode: 200,
@@ -281,7 +281,7 @@ type Response struct {
 	RawBody    *string
 }
 
-type TestClient struct {
+type testClient struct {
 	*Client
 	Request  testRequest
 	Response Response
@@ -296,7 +296,7 @@ type TestClient struct {
 	QueryValidator map[string]func(string, string) bool
 }
 
-func (c *TestClient) Setup() *TestClient {
+func (c *testClient) Setup() *testClient {
 	c.handler = &util.FakeHandler{
 		StatusCode: c.Response.StatusCode,
 	}
@@ -312,7 +312,7 @@ func (c *TestClient) Setup() *TestClient {
 	return c
 }
 
-func (c *TestClient) Validate(t *testing.T, received interface{}, err error) {
+func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	defer c.server.Close()
 
 	if c.Error {
@@ -353,7 +353,7 @@ func (c *TestClient) Validate(t *testing.T, received interface{}, err error) {
 }
 
 func TestGetService(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/services/1"},
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}
@@ -362,7 +362,7 @@ func TestGetService(t *testing.T) {
 }
 
 func TestCreateService(t *testing.T) {
-	c := (&TestClient{
+	c := (&testClient{
 		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}).Setup()
@@ -371,7 +371,7 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestUpdateService(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}
@@ -380,7 +380,7 @@ func TestUpdateService(t *testing.T) {
 }
 
 func TestDeleteService(t *testing.T) {
-	c := &TestClient{
+	c := &testClient{
 		Request:  testRequest{Method: "DELETE", Path: "/services/1"},
 		Response: Response{StatusCode: 200},
 	}
@@ -389,7 +389,7 @@ func TestDeleteService(t *testing.T) {
 }
 
 func TestMakeRequest(t *testing.T) {
-	testClients := []TestClient{
+	testClients := []testClient{
 		{Request: testRequest{Method: "GET", Path: "/good"}, Response: Response{StatusCode: 200}},
 		{Request: testRequest{Method: "GET", Path: "/bad%ZZ"}, Error: true},
 		{Client: New("", &AuthInfo{"foo", "bar"}), Request: testRequest{Method: "GET", Path: "/auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
@@ -402,30 +402,6 @@ func TestMakeRequest(t *testing.T) {
 		response, err := c.Setup().rawRequest(c.Request.Method, c.Request.Path[1:], nil, c.Target)
 		c.Validate(t, response, err)
 	}
-}
-
-func TestDoRequest(t *testing.T) {
-	expectedBody := `{ "items": []}`
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: expectedBody,
-		T:            t,
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
-	auth := AuthInfo{User: "user", Password: "pass"}
-	c := New(testServer.URL, &auth)
-	body, err := c.doRequest(request)
-	if request.Header["Authorization"] == nil {
-		t.Errorf("Request is missing authorization header: %#v", *request)
-	}
-	if err != nil {
-		t.Error("Unexpected error")
-	}
-	if string(body) != expectedBody {
-		t.Errorf("Expected body: '%s', saw: '%s'", expectedBody, body)
-	}
-	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
 }
 
 func TestDoRequestAccepted(t *testing.T) {
