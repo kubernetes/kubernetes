@@ -111,13 +111,11 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(2)
@@ -133,13 +131,11 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(1)
@@ -155,13 +151,11 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(2)
@@ -177,9 +171,7 @@ func TestCreateReplica(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	podControl := RealPodControl{
 		kubeClient: client,
@@ -222,13 +214,11 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "update",
@@ -243,13 +233,11 @@ func TestHandleWatchResponseNoNode(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
@@ -266,13 +254,11 @@ func TestHandleWatchResponseBadData(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
@@ -292,13 +278,11 @@ func TestHandleWatchResponse(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 
 	controller := makeReplicationController(2)
@@ -326,13 +310,11 @@ func TestHandleWatchResponseDelete(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, client)
 	manager.podControl = &fakePodControl
 
 	controller := makeReplicationController(2)
@@ -417,9 +399,7 @@ func TestSyncronize(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.Client{
-		Host: testServer.URL,
-	}
+	client := client.New(testServer.URL, nil)
 	manager := MakeReplicationManager(fakeEtcd, client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl

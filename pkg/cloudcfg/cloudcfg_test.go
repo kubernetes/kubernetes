@@ -19,14 +19,12 @@ package cloudcfg
 import (
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -47,7 +45,7 @@ type FakeKubeClient struct {
 	ctrl    api.ReplicationController
 }
 
-func (client *FakeKubeClient) ListPods(selector map[string]string) (api.PodList, error) {
+func (client *FakeKubeClient) ListPods(selector labels.Selector) (api.PodList, error) {
 	client.actions = append(client.actions, Action{action: "list-pods"})
 	return client.pods, nil
 }
@@ -145,29 +143,6 @@ func TestUpdateNoPods(t *testing.T) {
 	}
 	validateAction(Action{action: "get-controller", value: "foo"}, client.actions[0], t)
 	validateAction(Action{action: "list-pods"}, client.actions[1], t)
-}
-
-func TestDoRequest(t *testing.T) {
-	expectedBody := `{ "items": []}`
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: expectedBody,
-		T:            t,
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
-	auth := client.AuthInfo{User: "user", Password: "pass"}
-	body, err := doRequest(request, &auth)
-	if request.Header["Authorization"] == nil {
-		t.Errorf("Request is missing authorization header: %#v", *request)
-	}
-	if err != nil {
-		t.Error("Unexpected error")
-	}
-	if string(body) != expectedBody {
-		t.Errorf("Expected body: '%s', saw: '%s'", expectedBody, body)
-	}
-	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
 }
 
 func TestRunController(t *testing.T) {
@@ -283,16 +258,6 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 	}
 }
 
-func TestRequestWithBodyNoSuchFile(t *testing.T) {
-	request, err := requestWithBody("non/existent/file.json", "http://www.google.com", "GET")
-	if request != nil {
-		t.Error("Unexpected non-nil result")
-	}
-	if err == nil {
-		t.Error("Unexpected non-error")
-	}
-}
-
 func TestLoadAuthInfo(t *testing.T) {
 	testAuthInfo := &client.AuthInfo{
 		User:     "TestUser",
@@ -323,27 +288,6 @@ func TestLoadAuthInfo(t *testing.T) {
 	}
 	if *testAuthInfo != *ai {
 		t.Error("Test data and loaded data are not equal")
-	}
-}
-
-func TestRequestWithBody(t *testing.T) {
-	file, err := ioutil.TempFile("", "foo")
-	expectNoError(t, err)
-	data, err := json.Marshal(api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
-	expectNoError(t, err)
-	_, err = file.Write(data)
-	expectNoError(t, err)
-	request, err := requestWithBody(file.Name(), "http://www.google.com", "GET")
-	if request == nil {
-		t.Error("Unexpected nil result")
-	}
-	if err != nil {
-		t.Errorf("Unexpected error: %#v")
-	}
-	dataOut, err := ioutil.ReadAll(request.Body)
-	expectNoError(t, err)
-	if string(data) != string(dataOut) {
-		t.Errorf("Mismatched data. Expected %s, got %s", data, dataOut)
 	}
 }
 

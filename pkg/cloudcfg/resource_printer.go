@@ -162,8 +162,6 @@ func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) erro
 	return err
 }
 
-// TODO replace this with something that returns a concrete printer object, rather than
-//  having the secondary switch below.
 func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	var mapObj map[string]interface{}
 	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {

@@ -86,10 +86,9 @@ func api_server() {
 
 // Starts up a controller manager. Never returns.
 func controller_manager() {
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient([]string{*etcd_server}),
-		client.Client{
-			Host: fmt.Sprintf("http://%s:%d", *master_address, *master_port),
-		})
+	controllerManager := controller.MakeReplicationManager(
+		etcd.NewClient([]string{*etcd_server}),
+		client.New(fmt.Sprintf("http://%s:%d", *master_address, *master_port), nil))
 
 	controllerManager.Run(20 * time.Second)
 	select {}

@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -177,7 +178,8 @@ func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 }
 
 func (rm *ReplicationManager) syncReplicationController(controllerSpec api.ReplicationController) error {
-	podList, err := rm.kubeClient.ListPods(controllerSpec.DesiredState.ReplicaSelector)
+	s := labels.Set(controllerSpec.DesiredState.ReplicaSelector).AsSelector()
+	podList, err := rm.kubeClient.ListPods(s)
 	if err != nil {
 		return err
 	}

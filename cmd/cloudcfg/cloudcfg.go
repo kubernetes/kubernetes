@@ -147,15 +147,15 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		return false
 	}
 
-	s := cloudcfg.New(*httpServer, auth)
+	s := kube_client.New(*httpServer, auth)
 	r := s.Verb(verb).
 		Path("api/v1beta1").
 		Path(parseStorage()).
-		Selector(*selector)
+		ParseSelector(*selector)
 	if method == "create" || method == "update" {
 		r.Body(readConfig(parseStorage()))
 	}
-	obj, err := r.Do()
+	obj, err := r.Do().Get()
 	if err != nil {
 		log.Fatalf("Got request error: %v\n", err)
 		return false
@@ -187,18 +187,16 @@ func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 		return flag.Arg(1)
 	}
 
+	c := kube_client.New(*httpServer, auth)
+
 	var err error
 	switch method {
 	case "stop":
-		err = cloudcfg.StopController(parseController(), kube_client.Client{Host: *httpServer, Auth: auth})
+		err = cloudcfg.StopController(parseController(), c)
 	case "rm":
-		err = cloudcfg.DeleteController(parseController(), kube_client.Client{Host: *httpServer, Auth: auth})
+		err = cloudcfg.DeleteController(parseController(), c)
 	case "rollingupdate":
-		client := &kube_client.Client{
-			Host: *httpServer,
-			Auth: auth,
-		}
-		err = cloudcfg.Update(parseController(), client, *updatePeriod)
+		err = cloudcfg.Update(parseController(), c, *updatePeriod)
 	case "run":
 		if len(flag.Args()) != 4 {
 			log.Fatal("usage: cloudcfg [OPTIONS] run <image> <replicas> <controller>")
@@ -209,7 +207,7 @@ func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 		if err != nil {
 			log.Fatalf("Error parsing replicas: %#v", err)
 		}
-		err = cloudcfg.RunController(image, name, replicas, kube_client.Client{Host: *httpServer, Auth: auth}, *portSpec, *servicePort)
+		err = cloudcfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
 		args := flag.Args()
 		if len(args) < 3 {
@@ -220,7 +218,7 @@ func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 		if err != nil {
 			log.Fatalf("Error parsing replicas: %#v", err)
 		}
-		err = cloudcfg.ResizeController(name, replicas, kube_client.Client{Host: *httpServer, Auth: auth})
+		err = cloudcfg.ResizeController(name, replicas, c)
 	default:
 		return false
 	}
