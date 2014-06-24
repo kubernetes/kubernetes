@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // The kubelet binary is responsible for maintaining a set of containers on a particular host VM.
-// It sync's data from both configuration file as well as from a quorum of etcd servers.
+// It syncs data from both configuration file(s) as well as from a quorum of etcd servers.
 // It then queries Docker to see what is currently running.  It synchronizes the configuration data,
 // with the running set of containers by starting or stopping Docker containers.
 package main
@@ -34,10 +34,10 @@ import (
 )
 
 var (
-	file               = flag.String("config", "", "Path to the config file/dir")
+	config             = flag.String("config", "", "Path to the config file or directory of files")
 	etcdServers        = flag.String("etcd_servers", "", "Url of etcd servers in the cluster")
 	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
-	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking file for new data")
+	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking config files for new data")
 	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
 	manifestUrl        = flag.String("manifest_url", "", "URL for accessing the container manifest")
 	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on")
@@ -62,6 +62,8 @@ func main() {
 
 	hostname := []byte(*hostnameOverride)
 	if string(hostname) == "" {
+		// Note: We use exec here instead of os.Hostname() because we
+		// want the FQDN, and this is the easiest way to get it.
 		hostname, err = exec.Command("hostname", "-f").Output()
 		if err != nil {
 			log.Fatalf("Couldn't determine hostname: %v", err)
@@ -75,5 +77,5 @@ func main() {
 		SyncFrequency:      *syncFrequency,
 		HTTPCheckFrequency: *httpCheckFrequency,
 	}
-	my_kubelet.RunKubelet(*file, *manifestUrl, *etcdServers, *address, *port)
+	my_kubelet.RunKubelet(*config, *manifestUrl, *etcdServers, *address, *port)
 }
