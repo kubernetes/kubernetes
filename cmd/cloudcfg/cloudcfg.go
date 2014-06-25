@@ -36,7 +36,7 @@ const APP_VERSION = "0.1"
 
 // The flag package provides a default help printer via -h switch
 var (
-	versionFlag  = flag.Bool("v", false, "Print the version number.")
+	versionFlag  = flag.Bool("V", false, "Print the version number.")
 	httpServer   = flag.String("h", "", "The host to connect to.")
 	config       = flag.String("c", "", "Path to the config file.")
 	selector     = flag.String("l", "", "Selector (label query) to use for listing")
