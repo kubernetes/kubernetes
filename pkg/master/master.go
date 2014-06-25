@@ -98,3 +98,12 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 	}
 	return s.ListenAndServe()
 }
+
+// Instead of calling Run, call ConstructHandler to get a handler for your own
+// server. Intended for testing. Only call once.
+func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
+	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.podRegistry)
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+
+	return apiserver.New(m.storage, apiPrefix)
+}

@@ -22,7 +22,7 @@ fi
 # Stop right away if the build fails
 set -e
 
-$(dirname $0)/build-go.sh
+$(dirname $0)/build-go.sh integration
 
 ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
 trap "rm -rf ${ETCD_DIR}" EXIT

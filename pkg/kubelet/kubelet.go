@@ -60,6 +60,11 @@ type DockerInterface interface {
 	StopContainer(id string, timeout uint) error
 }
 
+//Interface for testability
+type DockerPuller interface {
+	Pull(image string) error
+}
+
 type CadvisorInterface interface {
 	ContainerInfo(name string) (*info.ContainerInfo, error)
 	MachineInfo() (*info.MachineInfo, error)
@@ -70,6 +75,7 @@ type Kubelet struct {
 	Hostname           string
 	EtcdClient         util.EtcdClient
 	DockerClient       DockerInterface
+	DockerPuller       DockerPuller
 	CadvisorClient     CadvisorInterface
 	FileCheckFrequency time.Duration
 	SyncFrequency      time.Duration
@@ -92,6 +98,9 @@ const (
 // Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
 func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address string, port uint) {
+	if kl.DockerPuller == nil {
+		kl.DockerPuller = MakeDockerPuller()
+	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
 		log.Printf("Watching for file configs at %s", config_path)
@@ -220,9 +229,13 @@ func (kl *Kubelet) ListContainers() ([]string, error) {
 	return result, err
 }
 
-func (kl *Kubelet) pullImage(image string) error {
-	kl.pullLock.Lock()
-	defer kl.pullLock.Unlock()
+type dockerPuller struct{}
+
+func MakeDockerPuller() DockerPuller {
+	return dockerPuller{}
+}
+
+func (dockerPuller) Pull(image string) error {
 	cmd := exec.Command("docker", "pull", image)
 	err := cmd.Start()
 	if err != nil {
@@ -497,12 +510,48 @@ func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpda
 		return err
 	}
 	defer response.Body.Close()
-	manifest, err := kl.extractSingleFromReader(response.Body)
+	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
-	updateChannel <- manifestUpdate{httpClientSource, []api.ContainerManifest{manifest}}
-	return nil
+	if len(data) == 0 {
+		return fmt.Errorf("zero-length data received from %v", url)
+	}
+
+	// First try as if it's a single manifest
+	var manifest api.ContainerManifest
+	singleErr := yaml.Unmarshal(data, &manifest)
+	if singleErr == nil && manifest.Version == "" {
+		// If data is a []ContainerManifest, trying to put it into a ContainerManifest
+		// will not give an error but also won't set any of the fields.
+		// Our docs say that the version field is mandatory, so using that to judge wether
+		// this was actually successful.
+		singleErr = fmt.Errorf("got blank version field")
+	}
+	if singleErr == nil {
+		updateChannel <- manifestUpdate{httpClientSource, []api.ContainerManifest{manifest}}
+		return nil
+	}
+
+	// That didn't work, so try an array of manifests.
+	var manifests []api.ContainerManifest
+	multiErr := yaml.Unmarshal(data, &manifests)
+	// We're not sure if the person reading the logs is going to care about the single or
+	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
+	// done at the end. Hence not returning early here.
+	if multiErr == nil && len(manifests) == 0 {
+		multiErr = fmt.Errorf("no elements in ContainerManifest array")
+	}
+	if multiErr == nil && manifests[0].Version == "" {
+		multiErr = fmt.Errorf("got blank version field")
+	}
+	if multiErr == nil {
+		updateChannel <- manifestUpdate{httpClientSource, manifests}
+		return nil
+	}
+	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
+		"single manifest (%v: %#v) or as multiple manifests (%v: %#v).\n",
+		url, string(data), singleErr, manifest, multiErr, manifests)
 }
 
 // Take an etcd Response object, and turn it into a structured list of containers
@@ -644,7 +693,7 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (stri
 		Command: []string{"sh", "-c", "rm -f nap && mkfifo nap && exec cat nap"},
 		Ports:   ports,
 	}
-	kl.pullImage("busybox")
+	kl.DockerPuller.Pull("busybox")
 	return kl.RunContainer(manifest, container, "")
 }
 
@@ -678,7 +727,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			}
 			if !exists {
 				log.Printf("%#v doesn't exist, creating", element)
-				err = kl.pullImage(element.Image)
+				kl.DockerPuller.Pull(element.Image)
 				if err != nil {
 					log.Printf("Error pulling container: %#v", err)
 					continue
