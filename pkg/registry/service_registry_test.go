@@ -34,7 +34,8 @@ func TestServiceRegistry(t *testing.T) {
 	svc := api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 	}
-	storage.Create(svc)
+	c, _ := storage.Create(svc)
+	<-c
 
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -57,7 +58,8 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		JSONBase:                   api.JSONBase{ID: "foo"},
 		CreateExternalLoadBalancer: true,
 	}
-	storage.Create(svc)
+	c, _ := storage.Create(svc)
+	<-c
 
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -82,7 +84,8 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		JSONBase:                   api.JSONBase{ID: "foo"},
 		CreateExternalLoadBalancer: true,
 	}
-	storage.Create(svc)
+	c, _ := storage.Create(svc)
+	<-c
 
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -106,7 +109,8 @@ func TestServiceRegistryDelete(t *testing.T) {
 	}
 	memory.CreateService(svc)
 
-	storage.Delete(svc.ID)
+	c, _ := storage.Delete(svc.ID)
+	<-c
 
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -131,7 +135,8 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	}
 	memory.CreateService(svc)
 
-	storage.Delete(svc.ID)
+	c, _ := storage.Delete(svc.ID)
+	<-c
 
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)

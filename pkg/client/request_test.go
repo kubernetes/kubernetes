@@ -58,7 +58,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &reqBody)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
+	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&sync=true&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
@@ -83,6 +83,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Path("foo/bar").
 		Path("baz").
 		Selector(labels.Set{"name": "foo"}.AsSelector()).
+		Sync(false).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
 		Do().Get()
@@ -97,7 +98,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
+	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
@@ -136,7 +137,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
+	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&sync=true&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
@@ -181,7 +182,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	tmpStr := string(reqBodyExpected)
 	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&timeout=1s" {
+	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo&sync=true&timeout=1s" {
 		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
 	}
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
@@ -211,5 +212,21 @@ func TestAbsPath(t *testing.T) {
 	r := c.Post().Path("/foo").AbsPath(expectedPath)
 	if r.path != expectedPath {
 		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
+	}
+}
+
+func TestSync(t *testing.T) {
+	c := New("", nil)
+	r := c.Get()
+	if !r.sync {
+		t.Errorf("sync has wrong default")
+	}
+	r.Sync(false)
+	if r.sync {
+		t.Errorf("'Sync' doesn't work")
+	}
+	r.Sync(true)
+	if !r.sync {
+		t.Errorf("'Sync' doesn't work")
 	}
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -55,7 +57,9 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 }
 
 func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), storage.registry.DeleteController(id)
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		return api.Status{Status: api.StatusSuccess}, storage.registry.DeleteController(id)
+	}), nil
 }
 
 func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, error) {
@@ -64,10 +68,36 @@ func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, err
 	return result, err
 }
 
-func (storage *ControllerRegistryStorage) Create(controller interface{}) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return controller }), storage.registry.CreateController(controller.(api.ReplicationController))
+func (storage *ControllerRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+	controller, ok := obj.(api.ReplicationController)
+	if !ok {
+		return nil, fmt.Errorf("not a replication controller: %#v", obj)
+	}
+	if controller.ID == "" {
+		return nil, fmt.Errorf("ID should not be empty: %#v", controller)
+	}
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		err := storage.registry.CreateController(controller)
+		if err != nil {
+			return nil, err
+		}
+		return storage.registry.GetController(controller.ID)
+	}), nil
 }
 
-func (storage *ControllerRegistryStorage) Update(controller interface{}) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return controller }), storage.registry.UpdateController(controller.(api.ReplicationController))
+func (storage *ControllerRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
+	controller, ok := obj.(api.ReplicationController)
+	if !ok {
+		return nil, fmt.Errorf("not a replication controller: %#v", obj)
+	}
+	if controller.ID == "" {
+		return nil, fmt.Errorf("ID should not be empty: %#v", controller)
+	}
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		err := storage.registry.UpdateController(controller)
+		if err != nil {
+			return nil, err
+		}
+		return storage.registry.GetController(controller.ID)
+	}), nil
 }

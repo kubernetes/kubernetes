@@ -131,7 +131,9 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 }
 
 func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), storage.registry.DeletePod(id)
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		return api.Status{Status: api.StatusSuccess}, storage.registry.DeletePod(id)
+	}), nil
 }
 
 func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
@@ -140,19 +142,37 @@ func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
 	return pod, err
 }
 
-func (storage *PodRegistryStorage) Create(pod interface{}) (<-chan interface{}, error) {
-	podObj := pod.(api.Pod)
-	if len(podObj.ID) == 0 {
+func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+	pod := obj.(api.Pod)
+	if len(pod.ID) == 0 {
 		return nil, fmt.Errorf("id is unspecified: %#v", pod)
 	}
-	machine, err := storage.scheduler.Schedule(podObj)
-	if err != nil {
-		return nil, err
-	}
 
-	return apiserver.MakeAsync(func() interface{} { return pod }), storage.registry.CreatePod(machine, podObj)
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		// TODO(lavalamp): Separate scheduler more cleanly.
+		machine, err := storage.scheduler.Schedule(pod)
+		if err != nil {
+			return nil, err
+		}
+		err = storage.registry.CreatePod(machine, pod)
+		if err != nil {
+			return nil, err
+		}
+		return storage.registry.GetPod(pod.ID)
+	}), nil
 }
 
-func (storage *PodRegistryStorage) Update(pod interface{}) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return pod }), storage.registry.UpdatePod(pod.(api.Pod))
+func (storage *PodRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
+	pod := obj.(api.Pod)
+	if len(pod.ID) == 0 {
+		return nil, fmt.Errorf("id is unspecified: %#v", pod)
+	}
+
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		err := storage.registry.UpdatePod(pod)
+		if err != nil {
+			return nil, err
+		}
+		return storage.registry.GetPod(pod.ID)
+	}), nil
 }

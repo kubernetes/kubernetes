@@ -82,24 +82,26 @@ func (sr *ServiceRegistryStorage) Get(id string) (interface{}, error) {
 }
 
 func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	svc, err := sr.Get(id)
+	service, err := sr.registry.GetService(id)
 	if err != nil {
 		return nil, err
 	}
-	if svc.(*api.Service).CreateExternalLoadBalancer {
-		var balancer cloudprovider.TCPLoadBalancer
-		var ok bool
-		if sr.cloud != nil {
-			balancer, ok = sr.cloud.TCPLoadBalancer()
-		}
-		if ok && balancer != nil {
-			err = balancer.DeleteTCPLoadBalancer(id, "us-central1")
-			if err != nil {
-				return nil, err
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		if service.CreateExternalLoadBalancer {
+			var balancer cloudprovider.TCPLoadBalancer
+			var ok bool
+			if sr.cloud != nil {
+				balancer, ok = sr.cloud.TCPLoadBalancer()
+			}
+			if ok && balancer != nil {
+				err = balancer.DeleteTCPLoadBalancer(id, "us-central1")
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
-	}
-	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), sr.registry.DeleteService(id)
+		return api.Status{Status: api.StatusSuccess}, sr.registry.DeleteService(id)
+	}), nil
 }
 
 func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
@@ -110,29 +112,51 @@ func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
 
 func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(api.Service)
-	if srv.CreateExternalLoadBalancer {
-		var balancer cloudprovider.TCPLoadBalancer
-		var ok bool
-		if sr.cloud != nil {
-			balancer, ok = sr.cloud.TCPLoadBalancer()
-		}
-		if ok && balancer != nil {
-			hosts, err := sr.machines.List()
-			if err != nil {
-				return nil, err
-			}
-			err = balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, hosts)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
-		}
+	if srv.ID == "" {
+		return nil, fmt.Errorf("ID should not be empty: %#v", srv)
 	}
-	// TODO actually wait for the object to be fully created here.
-	return apiserver.MakeAsync(func() interface{} { return obj }), sr.registry.CreateService(srv)
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
+		// correctly no matter what http operations happen.
+		if srv.CreateExternalLoadBalancer {
+			var balancer cloudprovider.TCPLoadBalancer
+			var ok bool
+			if sr.cloud != nil {
+				balancer, ok = sr.cloud.TCPLoadBalancer()
+			}
+			if ok && balancer != nil {
+				hosts, err := sr.machines.List()
+				if err != nil {
+					return nil, err
+				}
+				err = balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, hosts)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
+			}
+		}
+		// TODO actually wait for the object to be fully created here.
+		err := sr.registry.CreateService(srv)
+		if err != nil {
+			return nil, err
+		}
+		return sr.registry.GetService(srv.ID)
+	}), nil
 }
 
 func (sr *ServiceRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return obj }), sr.registry.UpdateService(obj.(api.Service))
+	srv := obj.(api.Service)
+	if srv.ID == "" {
+		return nil, fmt.Errorf("ID should not be empty: %#v", srv)
+	}
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		// TODO: check to see if external load balancer status changed
+		err := sr.registry.UpdateService(srv)
+		if err != nil {
+			return nil, err
+		}
+		return sr.registry.GetService(srv.ID)
+	}), nil
 }

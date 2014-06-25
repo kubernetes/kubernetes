@@ -27,7 +27,7 @@ func TestOperation(t *testing.T) {
 	c := make(chan interface{})
 	op := ops.NewOperation(c)
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		c <- "All done"
 	}()
 
@@ -39,26 +39,26 @@ func TestOperation(t *testing.T) {
 		t.Errorf("expire incorrectly removed the operation %#v", ops)
 	}
 
-	op.WaitFor(time.Second)
+	op.WaitFor(10 * time.Millisecond)
 	if _, completed := op.Describe(); completed {
 		t.Errorf("Unexpectedly fast completion")
 	}
 
-	op.WaitFor(5 * time.Second)
+	op.WaitFor(time.Second)
 	if _, completed := op.Describe(); !completed {
 		t.Errorf("Unexpectedly slow completion")
 	}
 
-	time.Sleep(900 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	if op.expired(time.Now().Add(-time.Second)) {
 		t.Errorf("Should not be expired: %#v", op)
 	}
-	if !op.expired(time.Now().Add(-800 * time.Millisecond)) {
+	if !op.expired(time.Now().Add(-80 * time.Millisecond)) {
 		t.Errorf("Should be expired: %#v", op)
 	}
 
-	ops.expire(800 * time.Millisecond)
+	ops.expire(80 * time.Millisecond)
 	if tmp := ops.Get(op.ID); tmp != nil {
 		t.Errorf("expire failed to remove the operation %#v", ops)
 	}

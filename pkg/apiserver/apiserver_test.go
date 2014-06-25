@@ -338,7 +338,7 @@ func TestParseTimeout(t *testing.T) {
 func TestSyncCreate(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			time.Sleep(2 * time.Second)
+			time.Sleep(200 * time.Millisecond)
 			return obj, nil
 		},
 	}
@@ -375,7 +375,7 @@ func TestSyncCreate(t *testing.T) {
 func TestSyncCreateTimeout(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			time.Sleep(10 * time.Second)
+			time.Sleep(400 * time.Millisecond)
 			return obj, nil
 		},
 	}
@@ -387,7 +387,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 
 	simple := Simple{Name: "foo"}
 	data, _ := api.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true&timeout=2s", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true&timeout=200ms", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
