@@ -26,6 +26,11 @@ import (
 
 var logFlushFreq = flag.Duration("log_flush_frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 
+// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
+func init() {
+	flag.Set("logtostderr", "true")
+}
+
 // This serves as a bridge between the standard log package and the glog package.
 type GlogWriter struct{}
 
