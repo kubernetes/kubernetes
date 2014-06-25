@@ -31,7 +31,6 @@ $(dirname $0)/build-go.sh
 echo "Starting etcd"
 
 ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
-trap "rm -rf ${ETCD_DIR}" EXIT
 
 (etcd -name test -data-dir ${ETCD_DIR} &> /tmp/etcd.log) &
 ETCD_PID=$!
@@ -44,30 +43,49 @@ set +e
 API_PORT=8080
 KUBELET_PORT=10250
 
+GO_OUT=$(dirname $0)/../output/go
 
-$(dirname $0)/../output/go/apiserver \
+APISERVER_LOG=/tmp/apiserver.log
+${GO_OUT}/apiserver \
   --address="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
-  --machines="127.0.0.1" &> /tmp/apiserver.log &
+  --machines="127.0.0.1" &> ${APISERVER_LOG} &
 APISERVER_PID=$!
 
-$(dirname $0)/../output/go/controller-manager \
+CTLRMGR_LOG=/tmp/controller-manager.log
+${GO_OUT}/controller-manager \
   --etcd_servers="http://127.0.0.1:4001" \
-  --master="127.0.0.1:${API_PORT}" &> /tmp/controller-manager.log &
+  --master="127.0.0.1:${API_PORT}" &> ${CTLRMGR_LOG} &
 CTLRMGR_PID=$!
 
-$(dirname $0)/../output/go/kubelet \
+KUBELET_LOG=/tmp/kubelet.log
+${GO_OUT}/kubelet \
   --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
-  --port="$KUBELET_PORT" &> /tmp/kubelet.log &
+  --port="$KUBELET_PORT" &> ${KUBELET_LOG} &
 KUBELET_PID=$!
 
-echo "Local Kubernetes cluster is running. Press enter to shut it down."
-read unused
 
-kill ${APISERVER_PID}
-kill ${CTLRMGR_PID}
-kill ${KUBELET_PID}
-kill ${ETCD_PID}
+echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
+echo "Logs: "
+echo "  ${APISERVER_LOG}"
+echo "  ${CTLRMGR_LOG}"
+echo "  ${KUBELET_LOG}"
+
+cleanup()
+{
+    echo "Cleaning up..."
+    kill ${APISERVER_PID}
+    kill ${CTLRMGR_PID}
+    kill ${KUBELET_PID}
+
+    kill ${ETCD_PID}
+    rm -rf ${ETCD_DIR}
+    exit 0
+}
+ 
+trap cleanup EXIT
+
+while true; do read x; done
