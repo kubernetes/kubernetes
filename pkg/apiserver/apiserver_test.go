@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +25,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -58,7 +58,10 @@ type SimpleRESTStorage struct {
 	item    Simple
 	deleted string
 	updated Simple
-	channel <-chan interface{}
+	created Simple
+
+	// called when answering update, delete, create
+	injectedFunction func(obj interface{}) (returnObj interface{}, err error)
 }
 
 func (storage *SimpleRESTStorage) List(labels.Selector) (interface{}, error) {
@@ -74,7 +77,15 @@ func (storage *SimpleRESTStorage) Get(id string) (interface{}, error) {
 
 func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) {
 	storage.deleted = id
-	return storage.channel, storage.err
+	if storage.err != nil {
+		return nil, storage.err
+	}
+	return MakeAsync(func() (interface{}, error) {
+		if storage.injectedFunction != nil {
+			return storage.injectedFunction(id)
+		}
+		return api.Status{Status: api.StatusSuccess}, nil
+	}), nil
 }
 
 func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
@@ -83,13 +94,30 @@ func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
 	return item, storage.err
 }
 
-func (storage *SimpleRESTStorage) Create(interface{}) (<-chan interface{}, error) {
-	return storage.channel, storage.err
+func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, error) {
+	storage.created = obj.(Simple)
+	if storage.err != nil {
+		return nil, storage.err
+	}
+	return MakeAsync(func() (interface{}, error) {
+		if storage.injectedFunction != nil {
+			return storage.injectedFunction(obj)
+		}
+		return obj, nil
+	}), nil
 }
 
-func (storage *SimpleRESTStorage) Update(object interface{}) (<-chan interface{}, error) {
-	storage.updated = object.(Simple)
-	return storage.channel, storage.err
+func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, error) {
+	storage.updated = obj.(Simple)
+	if storage.err != nil {
+		return nil, storage.err
+	}
+	return MakeAsync(func() (interface{}, error) {
+		if storage.injectedFunction != nil {
+			return storage.injectedFunction(obj)
+		}
+		return obj, nil
+	}), nil
 }
 
 func extractBody(response *http.Response, object interface{}) (string, error) {
@@ -214,7 +242,7 @@ func TestUpdate(t *testing.T) {
 	item := Simple{
 		Name: "bar",
 	}
-	body, err := json.Marshal(item)
+	body, err := api.Encode(item)
 	expectNoError(t, err)
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
@@ -270,14 +298,15 @@ func TestMissingStorage(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
-		"foo": &SimpleRESTStorage{},
+		"foo": simpleStorage,
 	}, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
 	simple := Simple{Name: "foo"}
-	data, _ := json.Marshal(simple)
+	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	response, err := client.Do(request)
@@ -286,18 +315,32 @@ func TestCreate(t *testing.T) {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
-	var itemOut Simple
+	var itemOut api.Status
 	body, err := extractBody(response, &itemOut)
 	expectNoError(t, err)
-	if !reflect.DeepEqual(itemOut, simple) {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
+	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
+		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
+	}
+}
+
+func TestParseTimeout(t *testing.T) {
+	if d := parseTimeout(""); d != 30*time.Second {
+		t.Errorf("blank timeout produces %v", d)
+	}
+	if d := parseTimeout("not a timeout"); d != 30*time.Second {
+		t.Errorf("bad timeout produces %v", d)
+	}
+	if d := parseTimeout("10s"); d != 10*time.Second {
+		t.Errorf("10s timeout produced: %v", d)
 	}
 }
 
 func TestSyncCreate(t *testing.T) {
-	channel := make(chan interface{}, 1)
 	storage := SimpleRESTStorage{
-		channel: channel,
+		injectedFunction: func(obj interface{}) (interface{}, error) {
+			time.Sleep(2 * time.Second)
+			return obj, nil
+		},
 	}
 	handler := New(map[string]RESTStorage{
 		"foo": &storage,
@@ -306,7 +349,7 @@ func TestSyncCreate(t *testing.T) {
 	client := http.Client{}
 
 	simple := Simple{Name: "foo"}
-	data, _ := json.Marshal(simple)
+	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	wg := sync.WaitGroup{}
@@ -314,37 +357,54 @@ func TestSyncCreate(t *testing.T) {
 	var response *http.Response
 	go func() {
 		response, err = client.Do(request)
-		expectNoError(t, err)
-		if response.StatusCode != 200 {
-			t.Errorf("Unexpected response %#v", response)
-		}
 		wg.Done()
 	}()
-	output := Simple{Name: "bar"}
-	channel <- output
 	wg.Wait()
+	expectNoError(t, err)
 	var itemOut Simple
 	body, err := extractBody(response, &itemOut)
 	expectNoError(t, err)
-	if !reflect.DeepEqual(itemOut, output) {
+	if !reflect.DeepEqual(itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
+	}
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
 	}
 }
 
 func TestSyncCreateTimeout(t *testing.T) {
+	storage := SimpleRESTStorage{
+		injectedFunction: func(obj interface{}) (interface{}, error) {
+			time.Sleep(10 * time.Second)
+			return obj, nil
+		},
+	}
 	handler := New(map[string]RESTStorage{
-		"foo": &SimpleRESTStorage{},
+		"foo": &storage,
 	}, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
 	simple := Simple{Name: "foo"}
-	data, _ := json.Marshal(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true&timeout=1us", bytes.NewBuffer(data))
+	data, _ := api.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true&timeout=2s", bytes.NewBuffer(data))
 	expectNoError(t, err)
-	response, err := client.Do(request)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		wg.Done()
+	}()
+	wg.Wait()
 	expectNoError(t, err)
-	if response.StatusCode != 500 {
-		t.Errorf("Unexpected response %#v", response)
+	var itemOut api.Status
+	_, err = extractBody(response, &itemOut)
+	expectNoError(t, err)
+	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
+		t.Errorf("Unexpected status %#v", itemOut)
+	}
+	if response.StatusCode != http.StatusAccepted {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, 202, response)
 	}
 }
