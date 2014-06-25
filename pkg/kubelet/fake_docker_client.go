@@ -59,13 +59,13 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 
 func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
 	f.appendCall("start")
-	return nil
+	return f.err
 }
 
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.appendCall("stop")
 	f.stopped = append(f.stopped, id)
-	return nil
+	return f.err
 }
 
 type FakeDockerPuller struct {

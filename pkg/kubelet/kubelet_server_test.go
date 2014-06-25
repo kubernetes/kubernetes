@@ -32,16 +32,11 @@ import (
 
 type fakeKubelet struct {
 	infoFunc  func(name string) (string, error)
-	idFunc    func(name string) (string, bool, error)
 	statsFunc func(name string) (*api.ContainerStats, error)
 }
 
 func (fk *fakeKubelet) GetContainerInfo(name string) (string, error) {
 	return fk.infoFunc(name)
-}
-
-func (fk *fakeKubelet) GetContainerID(name string) (string, bool, error) {
-	return fk.idFunc(name)
 }
 
 func (fk *fakeKubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
@@ -122,12 +117,6 @@ func TestContainers(t *testing.T) {
 func TestContainerInfo(t *testing.T) {
 	fw := makeServerTest()
 	expected := "good container info string"
-	fw.fakeKubelet.idFunc = func(name string) (string, bool, error) {
-		if name == "goodcontainer" {
-			return name, true, nil
-		}
-		return "", false, fmt.Errorf("bad container")
-	}
 	fw.fakeKubelet.infoFunc = func(name string) (string, error) {
 		if name == "goodcontainer" {
 			return expected, nil
