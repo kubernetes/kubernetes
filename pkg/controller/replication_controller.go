@@ -19,7 +19,6 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -29,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored in etcd
@@ -69,7 +69,7 @@ func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) 
 	}
 	_, err := r.kubeClient.CreatePod(pod)
 	if err != nil {
-		log.Printf("%#v\n", err)
+		glog.Errorf("%#v\n", err)
 	}
 }
 
@@ -111,7 +111,7 @@ func (rm *ReplicationManager) watchControllers() {
 		}()
 		_, err := rm.etcdClient.Watch("/registry/controllers", 0, true, watchChannel, stop)
 		if err != etcd.ErrWatchStoppedByUser {
-			log.Printf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
+			glog.Errorf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
 		}
 	}()
 
@@ -126,10 +126,10 @@ func (rm *ReplicationManager) watchControllers() {
 				// that called us call us again.
 				return
 			}
-			log.Printf("Got watch: %#v", watchResponse)
+			glog.Infof("Got watch: %#v", watchResponse)
 			controller, err := rm.handleWatchResponse(watchResponse)
 			if err != nil {
-				log.Printf("Error handling data: %#v, %#v", err, watchResponse)
+				glog.Errorf("Error handling data: %#v, %#v", err, watchResponse)
 				continue
 			}
 			rm.syncHandler(*controller)
@@ -185,15 +185,15 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 	}
 	filteredList := rm.filterActivePods(podList.Items)
 	diff := len(filteredList) - controllerSpec.DesiredState.Replicas
-	log.Printf("%#v", filteredList)
+	glog.Infof("%#v", filteredList)
 	if diff < 0 {
 		diff *= -1
-		log.Printf("Too few replicas, creating %d\n", diff)
+		glog.Infof("Too few replicas, creating %d\n", diff)
 		for i := 0; i < diff; i++ {
 			rm.podControl.createReplica(controllerSpec)
 		}
 	} else if diff > 0 {
-		log.Print("Too many replicas, deleting")
+		glog.Info("Too many replicas, deleting")
 		for i := 0; i < diff; i++ {
 			rm.podControl.deletePod(filteredList[i].ID)
 		}
@@ -206,13 +206,13 @@ func (rm *ReplicationManager) synchronize() {
 	helper := util.EtcdHelper{rm.etcdClient}
 	err := helper.ExtractList("/registry/controllers", &controllerSpecs)
 	if err != nil {
-		log.Printf("Synchronization error: %v (%#v)", err, err)
+		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 		return
 	}
 	for _, controllerSpec := range controllerSpecs {
 		err = rm.syncHandler(controllerSpec)
 		if err != nil {
-			log.Printf("Error synchronizing: %#v", err)
+			glog.Errorf("Error synchronizing: %#v", err)
 		}
 	}
 }

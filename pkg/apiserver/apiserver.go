@@ -19,7 +19,6 @@ package apiserver
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"runtime/debug"
@@ -29,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 // RESTStorage is a generic interface for RESTful storage services
@@ -84,7 +84,7 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "apiserver panic. Look in log for details.")
-			log.Printf("ApiServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
+			glog.Infof("ApiServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 		}
 	}()
 	logger := MakeLogged(req, w)
@@ -172,7 +172,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 	sync := requestUrl.Query().Get("sync") == "true"
 	timeout, err := time.ParseDuration(requestUrl.Query().Get("timeout"))
 	if err != nil && len(requestUrl.Query().Get("timeout")) > 0 {
-		log.Printf("Failed to parse: %#v '%s'", err, requestUrl.Query().Get("timeout"))
+		glog.Errorf("Failed to parse: %#v '%s'", err, requestUrl.Query().Get("timeout"))
 		timeout = time.Second * 30
 	}
 	switch req.Method {

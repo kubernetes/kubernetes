@@ -18,12 +18,12 @@ package main
 
 import (
 	"flag"
-	"log"
-	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 )
 
 var (
@@ -33,11 +33,13 @@ var (
 
 func main() {
 	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
 
 	// Set up logger for etcd client
-	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
+	etcd.SetLogger(util.NewLogger("etcd "))
 
-	log.Printf("Using configuration file %s and etcd_servers %s", *config_file, *etcd_servers)
+	glog.Infof("Using configuration file %s and etcd_servers %s", *config_file, *etcd_servers)
 
 	proxyConfig := config.NewServiceConfig()
 

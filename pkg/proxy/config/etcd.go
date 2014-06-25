@@ -36,12 +36,12 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 )
 
 const RegistryRoot = "registry/services"
@@ -72,7 +72,7 @@ func (impl ConfigSourceEtcd) Run() {
 		if err == nil {
 			break
 		}
-		log.Printf("Failed to get any services: %v", err)
+		glog.Errorf("Failed to get any services: %v", err)
 		time.Sleep(2 * time.Second)
 	}
 
@@ -92,7 +92,7 @@ func (impl ConfigSourceEtcd) Run() {
 	for {
 		services, endpoints, err = impl.GetServices()
 		if err != nil {
-			log.Printf("ConfigSourceEtcd: Failed to get services: %v", err)
+			glog.Errorf("ConfigSourceEtcd: Failed to get services: %v", err)
 		} else {
 			if len(services) > 0 {
 				serviceUpdate := ServiceUpdate{Op: SET, Services: services}
@@ -112,7 +112,7 @@ func (impl ConfigSourceEtcd) Run() {
 func (impl ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) {
 	response, err := impl.client.Get(RegistryRoot+"/specs", true, false)
 	if err != nil {
-		log.Printf("Failed to get the key %s: %v", RegistryRoot, err)
+		glog.Errorf("Failed to get the key %s: %v", RegistryRoot, err)
 		return make([]api.Service, 0), make([]api.Endpoints, 0), err
 	}
 	if response.Node.Dir == true {
@@ -125,15 +125,15 @@ func (impl ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, erro
 			var svc api.Service
 			err = json.Unmarshal([]byte(node.Value), &svc)
 			if err != nil {
-				log.Printf("Failed to load Service: %s (%#v)", node.Value, err)
+				glog.Errorf("Failed to load Service: %s (%#v)", node.Value, err)
 				continue
 			}
 			retServices[i] = svc
 			endpoints, err := impl.GetEndpoints(svc.ID)
 			if err != nil {
-				log.Printf("Couldn't get endpoints for %s : %v skipping", svc.ID, err)
+				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.ID, err)
 			}
-			log.Printf("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
+			glog.Infof("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
 			retEndpoints[i] = endpoints
 		}
 		return retServices, retEndpoints, err
@@ -145,7 +145,7 @@ func (impl ConfigSourceEtcd) GetEndpoints(service string) (api.Endpoints, error)
 	key := fmt.Sprintf(RegistryRoot + "/endpoints/" + service)
 	response, err := impl.client.Get(key, true, false)
 	if err != nil {
-		log.Printf("Failed to get the key: %s %v", key, err)
+		glog.Errorf("Failed to get the key: %s %v", key, err)
 		return api.Endpoints{}, err
 	}
 	// Parse all the endpoint specifications in this value.
@@ -173,7 +173,7 @@ func ParseEndpoints(jsonString string) (api.Endpoints, error) {
 }
 
 func (impl ConfigSourceEtcd) WatchForChanges() {
-	log.Print("Setting up a watch for new services")
+	glog.Info("Setting up a watch for new services")
 	watchChannel := make(chan *etcd.Response)
 	go impl.client.Watch("/registry/services/", 0, true, watchChannel, nil)
 	for {
@@ -183,7 +183,7 @@ func (impl ConfigSourceEtcd) WatchForChanges() {
 }
 
 func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
-	log.Printf("Processing a change in service configuration... %s", *response)
+	glog.Infof("Processing a change in service configuration... %s", *response)
 
 	// If it's a new service being added (signified by a localport being added)
 	// then process it as such
@@ -192,11 +192,11 @@ func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	} else if response.Action == "set" {
 		service, err := EtcdResponseToService(response)
 		if err != nil {
-			log.Printf("Failed to parse %s Port: %s", response, err)
+			glog.Errorf("Failed to parse %s Port: %s", response, err)
 			return
 		}
 
-		log.Printf("New service added/updated: %#v", service)
+		glog.Infof("New service added/updated: %#v", service)
 		serviceUpdate := ServiceUpdate{Op: ADD, Services: []api.Service{*service}}
 		impl.serviceChannel <- serviceUpdate
 		return
@@ -204,22 +204,22 @@ func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	if response.Action == "delete" {
 		parts := strings.Split(response.Node.Key[1:], "/")
 		if len(parts) == 4 {
-			log.Printf("Deleting service: %s", parts[3])
+			glog.Infof("Deleting service: %s", parts[3])
 			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{JSONBase: api.JSONBase{ID: parts[3]}}}}
 			impl.serviceChannel <- serviceUpdate
 			return
 		} else {
-			log.Printf("Unknown service delete: %#v", parts)
+			glog.Infof("Unknown service delete: %#v", parts)
 		}
 	}
 }
 
 func (impl ConfigSourceEtcd) ProcessEndpointResponse(response *etcd.Response) {
-	log.Printf("Processing a change in endpoint configuration... %s", *response)
+	glog.Infof("Processing a change in endpoint configuration... %s", *response)
 	var endpoints api.Endpoints
 	err := json.Unmarshal([]byte(response.Node.Value), &endpoints)
 	if err != nil {
-		log.Printf("Failed to parse service out of etcd key: %v : %+v", response.Node.Value, err)
+		glog.Errorf("Failed to parse service out of etcd key: %v : %+v", response.Node.Value, err)
 		return
 	}
 	endpointsUpdate := EndpointsUpdate{Op: ADD, Endpoints: []api.Endpoints{endpoints}}

@@ -21,7 +21,6 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -31,14 +30,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 )
 
 func main() {
+	util.InitLogs()
+	defer util.FlushLogs()
+
 	manifestUrl := ServeCachedManifestFile()
 	// Setup
 	servers := []string{"http://localhost:4001"}
-	log.Printf("Creating etcd client pointing to %v", servers)
+	glog.Infof("Creating etcd client pointing to %v", servers)
 	machineList := []string{"localhost", "machine"}
 
 	// Master
@@ -75,22 +79,22 @@ func main() {
 	go otherKubelet.RunKubelet("", "", servers[0], "localhost", 0)
 
 	// Ok. we're good to go.
-	log.Printf("API Server started on %s", apiserver.URL)
+	glog.Infof("API Server started on %s", apiserver.URL)
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
 	kubeClient := client.New(apiserver.URL, nil)
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
-		log.Fatalf("Unexpected error: %#v", err)
+		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	var controllerRequest api.ReplicationController
 	if err = json.Unmarshal(data, &controllerRequest); err != nil {
-		log.Fatalf("Unexpected error: %#v", err)
+		glog.Fatalf("Unexpected error: %#v", err)
 	}
 
 	if _, err = kubeClient.CreateReplicationController(controllerRequest); err != nil {
-		log.Fatalf("Unexpected error: %#v", err)
+		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	// Give the controllers some time to actually create the pods
 	time.Sleep(time.Second * 10)
@@ -98,7 +102,7 @@ func main() {
 	// Validate that they're truly up.
 	pods, err := kubeClient.ListPods(nil)
 	if err != nil || len(pods.Items) != 2 {
-		log.Fatal("FAILED")
+		glog.Fatal("FAILED")
 	}
 
 	// Check that kubelet tried to make the pods.
@@ -120,9 +124,9 @@ func main() {
 	// We expect 5: 2 net containers + 2 pods from the replication controller +
 	//              1 net container + 2 pods from the URL.
 	if len(createdPods) != 7 {
-		log.Fatalf("Unexpected list of created pods: %#v\n", createdPods)
+		glog.Fatalf("Unexpected list of created pods: %#v\n", createdPods)
 	}
-	log.Printf("OK")
+	glog.Infof("OK")
 }
 
 // Serve a file for kubelet to read.
@@ -132,7 +136,7 @@ func ServeCachedManifestFile() (servingAddress string) {
 			w.Write([]byte(testManifestFile))
 			return
 		}
-		log.Fatalf("Got request: %#v\n", r)
+		glog.Fatalf("Got request: %#v\n", r)
 		http.NotFound(w, r)
 	}))
 	return server.URL + "/manifest"

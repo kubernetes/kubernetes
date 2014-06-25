@@ -19,11 +19,11 @@ package proxy
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 // Proxier is a simple proxy for tcp connections between a localhost:lport and services that provide
@@ -38,11 +38,11 @@ func NewProxier(loadBalancer LoadBalancer) *Proxier {
 }
 
 func CopyBytes(in, out *net.TCPConn) {
-	log.Printf("Copying from %v <-> %v <-> %v <-> %v",
+	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	_, err := io.Copy(in, out)
 	if err != nil && err != io.EOF {
-		log.Printf("I/O error: %v", err)
+		glog.Errorf("I/O error: %v", err)
 	}
 
 	in.CloseRead()
@@ -51,7 +51,7 @@ func CopyBytes(in, out *net.TCPConn) {
 
 // Create a bidirectional byte shuffler. Copies bytes to/from each connection.
 func ProxyConnection(in, out *net.TCPConn) {
-	log.Printf("Creating proxy between %v <-> %v <-> %v <-> %v",
+	glog.Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	go CopyBytes(in, out)
 	go CopyBytes(out, in)
@@ -61,25 +61,25 @@ func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 	for {
 		inConn, err := listener.Accept()
 		if err != nil {
-			log.Printf("Accept failed: %v", err)
+			glog.Errorf("Accept failed: %v", err)
 			continue
 		}
-		log.Printf("Accepted connection from: %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
+		glog.Infof("Accepted connection from: %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
 
 		// Figure out where this request should go.
 		endpoint, err := proxier.loadBalancer.LoadBalance(service, inConn.RemoteAddr())
 		if err != nil {
-			log.Printf("Couldn't find an endpoint for %s %v", service, err)
+			glog.Errorf("Couldn't find an endpoint for %s %v", service, err)
 			inConn.Close()
 			continue
 		}
 
-		log.Printf("Mapped service %s to endpoint %s", service, endpoint)
+		glog.Infof("Mapped service %s to endpoint %s", service, endpoint)
 		outConn, err := net.DialTimeout("tcp", endpoint, time.Duration(5)*time.Second)
 		// We basically need to take everything from inConn and send to outConn
 		// and anything coming from outConn needs to be sent to inConn.
 		if err != nil {
-			log.Printf("Dial failed: %v", err)
+			glog.Errorf("Dial failed: %v", err)
 			inConn.Close()
 			continue
 		}
@@ -112,22 +112,22 @@ func (proxier Proxier) addServiceOnUnusedPort(service string) (string, error) {
 }
 
 func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
-	log.Printf("Listening for %s on %s", service, l.Addr().String())
+	glog.Infof("Listening for %s on %s", service, l.Addr().String())
 	// If that succeeds, start the accepting loop.
 	go proxier.AcceptHandler(service, l)
 }
 
 func (proxier Proxier) OnUpdate(services []api.Service) {
-	log.Printf("Received update notice: %+v", services)
+	glog.Infof("Received update notice: %+v", services)
 	for _, service := range services {
 		port, exists := proxier.serviceMap[service.ID]
 		if !exists || port != service.Port {
-			log.Printf("Adding a new service %s on port %d", service.ID, service.Port)
+			glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
 			err := proxier.AddService(service.ID, service.Port)
 			if err == nil {
 				proxier.serviceMap[service.ID] = service.Port
 			} else {
-				log.Printf("Failed to start listening for %s on %d", service.ID, service.Port)
+				glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
 			}
 		}
 	}

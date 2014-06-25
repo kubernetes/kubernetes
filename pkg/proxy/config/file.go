@@ -34,11 +34,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 // TODO: kill this struct.
@@ -68,7 +68,7 @@ func NewConfigSourceFile(filename string, serviceChannel chan ServiceUpdate, end
 }
 
 func (impl ConfigSourceFile) Run() {
-	log.Printf("Watching file %s", impl.filename)
+	glog.Infof("Watching file %s", impl.filename)
 	var lastData []byte
 	var lastServices []api.Service
 	var lastEndpoints []api.Endpoints
@@ -76,12 +76,12 @@ func (impl ConfigSourceFile) Run() {
 	for {
 		data, err := ioutil.ReadFile(impl.filename)
 		if err != nil {
-			log.Printf("Couldn't read file: %s : %v", impl.filename, err)
+			glog.Errorf("Couldn't read file: %s : %v", impl.filename, err)
 		} else {
 			var config ConfigFile
 			err = json.Unmarshal(data, &config)
 			if err != nil {
-				log.Printf("Couldn't unmarshal configuration from file : %s %v", data, err)
+				glog.Errorf("Couldn't unmarshal configuration from file : %s %v", data, err)
 			} else {
 				if !bytes.Equal(lastData, data) {
 					lastData = data

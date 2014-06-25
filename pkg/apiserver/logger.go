@@ -18,10 +18,11 @@ package apiserver
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
@@ -56,7 +57,7 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	log.Printf("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo)
+	glog.Infof("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo)
 }
 
 // Implement http.ResponseWriter

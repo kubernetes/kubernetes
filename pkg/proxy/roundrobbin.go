@@ -20,7 +20,6 @@ package proxy
 
 import (
 	"errors"
-	"log"
 	"net"
 	"reflect"
 	"strconv"
@@ -28,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 type LoadBalancerRR struct {
@@ -86,7 +86,7 @@ func (impl LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	for _, value := range endpoints {
 		existingEndpoints, exists := impl.endpointsMap[value.Name]
 		if !exists || !reflect.DeepEqual(value.Endpoints, existingEndpoints) {
-			log.Printf("LoadBalancerRR: Setting endpoints for %s to %+v", value.Name, value.Endpoints)
+			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", value.Name, value.Endpoints)
 			impl.endpointsMap[value.Name] = impl.FilterValidEndpoints(value.Endpoints)
 			// Start RR from the beginning if added or updated.
 			impl.rrIndex[value.Name] = 0
@@ -97,7 +97,7 @@ func (impl LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	for key, value := range impl.endpointsMap {
 		_, exists := tmp[key]
 		if !exists {
-			log.Printf("LoadBalancerRR: Removing endpoints for %s -> %+v", key, value)
+			glog.Infof("LoadBalancerRR: Removing endpoints for %s -> %+v", key, value)
 			delete(impl.endpointsMap, key)
 		}
 	}

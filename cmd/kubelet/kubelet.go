@@ -22,15 +22,15 @@ package main
 
 import (
 	"flag"
-	"log"
 	"math/rand"
-	"os"
 	"os/exec"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
 )
 
 var (
@@ -49,15 +49,17 @@ const dockerBinary = "/usr/bin/docker"
 
 func main() {
 	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	// Set up logger for etcd client
-	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
+	etcd.SetLogger(util.NewLogger("etcd "))
 
 	endpoint := "unix:///var/run/docker.sock"
 	dockerClient, err := docker.NewClient(endpoint)
 	if err != nil {
-		log.Fatal("Couldn't connnect to docker.")
+		glog.Fatal("Couldn't connnect to docker.")
 	}
 
 	hostname := []byte(*hostnameOverride)
@@ -66,7 +68,7 @@ func main() {
 		// want the FQDN, and this is the easiest way to get it.
 		hostname, err = exec.Command("hostname", "-f").Output()
 		if err != nil {
-			log.Fatalf("Couldn't determine hostname: %v", err)
+			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
 	}
 

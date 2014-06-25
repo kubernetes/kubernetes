@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -36,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
@@ -102,27 +102,27 @@ func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address s
 	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
-		log.Printf("Watching for file configs at %s", config_path)
+		glog.Infof("Watching for file configs at %s", config_path)
 		go util.Forever(func() {
 			kl.WatchFiles(config_path, updateChannel)
 		}, kl.FileCheckFrequency)
 	}
 	if manifest_url != "" {
-		log.Printf("Watching for HTTP configs at %s", manifest_url)
+		glog.Infof("Watching for HTTP configs at %s", manifest_url)
 		go util.Forever(func() {
 			if err := kl.extractFromHTTP(manifest_url, updateChannel); err != nil {
-				log.Printf("Error syncing http: %#v", err)
+				glog.Errorf("Error syncing http: %#v", err)
 			}
 		}, kl.HTTPCheckFrequency)
 	}
 	if etcd_servers != "" {
 		servers := []string{etcd_servers}
-		log.Printf("Watching for etcd configs at %v", servers)
+		glog.Infof("Watching for etcd configs at %v", servers)
 		kl.EtcdClient = etcd.NewClient(servers)
 		go util.Forever(func() { kl.SyncAndSetupEtcdWatch(updateChannel) }, 20*time.Second)
 	}
 	if address != "" {
-		log.Printf("Starting to listen on %s:%d", address, port)
+		glog.Infof("Starting to listen on %s:%d", address, port)
 		handler := KubeletServer{
 			Kubelet:       kl,
 			UpdateChannel: updateChannel,
@@ -160,9 +160,9 @@ func (kl *Kubelet) LogEvent(event *api.Event) error {
 	response, err = kl.EtcdClient.AddChild(fmt.Sprintf("/events/%s", event.Container.Name), string(data), 60*60*48 /* 2 days */)
 	// TODO(bburns) : examine response here.
 	if err != nil {
-		log.Printf("Error writing event: %s\n", err)
+		glog.Errorf("Error writing event: %s\n", err)
 		if response != nil {
-			log.Printf("Response was: %#v\n", *response)
+			glog.Infof("Response was: %#v\n", *response)
 		}
 	}
 	return err
@@ -330,7 +330,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 			protocol = "/tcp"
 		default:
 			if len(port.Protocol) != 0 {
-				log.Printf("Unknown protocol: %s, defaulting to tcp.", port.Protocol)
+				glog.Infof("Unknown protocol: %s, defaulting to tcp.", port.Protocol)
 			}
 			protocol = "/tcp"
 		}
@@ -381,7 +381,7 @@ func (kl *Kubelet) KillContainer(name string) error {
 	}
 	if !found {
 		// This is weird, but not an error, so yell and then return nil
-		log.Printf("Couldn't find container: %s", name)
+		glog.Infof("Couldn't find container: %s", name)
 		return nil
 	}
 	err = kl.DockerClient.StopContainer(id, 10)
@@ -411,7 +411,7 @@ func (kl *Kubelet) extractFromFile(name string) (api.ContainerManifest, error) {
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Printf("Couldn't read from file: %v", err)
+		glog.Errorf("Couldn't read from file: %v", err)
 		return manifest, err
 	}
 	if err = kl.ExtractYAMLData(data, &manifest); err != nil {
@@ -433,7 +433,7 @@ func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) 
 	for _, file := range files {
 		manifest, err := kl.extractFromFile(file)
 		if err != nil {
-			log.Printf("Couldn't read from file %s: %v", file, err)
+			glog.Errorf("Couldn't read from file %s: %v", file, err)
 			return manifests, err
 		}
 		manifests = append(manifests, manifest)
@@ -449,26 +449,26 @@ func (kl *Kubelet) WatchFiles(config_path string, updateChannel chan<- manifestU
 	statInfo, err := os.Stat(config_path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			log.Printf("Error accessing path: %#v", err)
+			glog.Errorf("Error accessing path: %#v", err)
 		}
 		return
 	}
 	if statInfo.Mode().IsDir() {
 		manifests, err := kl.extractFromDir(config_path)
 		if err != nil {
-			log.Printf("Error polling dir: %#v", err)
+			glog.Errorf("Error polling dir: %#v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, manifests}
 	} else if statInfo.Mode().IsRegular() {
 		manifest, err := kl.extractFromFile(config_path)
 		if err != nil {
-			log.Printf("Error polling file: %#v", err)
+			glog.Errorf("Error polling file: %#v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, []api.ContainerManifest{manifest}}
 	} else {
-		log.Printf("Error accessing config - not a directory or file")
+		glog.Errorf("Error accessing config - not a directory or file")
 		return
 	}
 }
@@ -544,15 +544,15 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- mani
 		if util.IsEtcdNotFound(err) {
 			return nil
 		}
-		log.Printf("Error on etcd get of %s: %#v", key, err)
+		glog.Errorf("Error on etcd get of %s: %#v", key, err)
 		return err
 	}
 	manifests, err := kl.ResponseToManifests(response)
 	if err != nil {
-		log.Printf("Error parsing response (%#v): %s", response, err)
+		glog.Errorf("Error parsing response (%#v): %s", response, err)
 		return err
 	}
-	log.Printf("Got state from etcd: %+v", manifests)
+	glog.Infof("Got state from etcd: %+v", manifests)
 	updateChannel <- manifestUpdate{etcdSource, manifests}
 	return nil
 }
@@ -583,7 +583,7 @@ func (kl *Kubelet) SyncAndSetupEtcdWatch(updateChannel chan<- manifestUpdate) {
 		go kl.WatchEtcd(watchChannel, updateChannel)
 
 		kl.getKubeletStateFromEtcd(key, updateChannel)
-		log.Printf("Setting up a watch for configuration changes in etcd for %s", key)
+		glog.Infof("Setting up a watch for configuration changes in etcd for %s", key)
 		kl.EtcdClient.Watch(key, 0, true, watchChannel, done)
 	}
 }
@@ -600,7 +600,7 @@ func (kl *Kubelet) TimeoutWatch(done chan bool) {
 func (kl *Kubelet) ExtractYAMLData(buf []byte, output interface{}) error {
 	err := yaml.Unmarshal(buf, output)
 	if err != nil {
-		log.Printf("Couldn't unmarshal configuration: %v", err)
+		glog.Errorf("Couldn't unmarshal configuration: %v", err)
 		return err
 	}
 	return nil
@@ -625,13 +625,13 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, updateChannel c
 		if watchResponse == nil {
 			return
 		}
-		log.Printf("Got etcd change: %#v", watchResponse)
+		glog.Infof("Got etcd change: %#v", watchResponse)
 		manifests, err := kl.extractFromEtcd(watchResponse)
 		if err != nil {
-			log.Printf("Error handling response from etcd: %#v", err)
+			glog.Errorf("Error handling response from etcd: %#v", err)
 			continue
 		}
-		log.Printf("manifests: %#v", manifests)
+		glog.Infof("manifests: %#v", manifests)
 		// Ok, we have a valid configuration, send to channel for
 		// rejiggering.
 		updateChannel <- manifestUpdate{etcdSource, manifests}
@@ -672,20 +672,20 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (stri
 
 // Sync the configured list of containers (desired state) with the host current state
 func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
-	log.Printf("Desired: %#v", config)
+	glog.Infof("Desired: %#v", config)
 	var err error
 	desired := map[string]bool{}
 	for _, manifest := range config {
 		netName, exists, err := kl.networkContainerExists(&manifest)
 		if err != nil {
-			log.Printf("Failed to introspect network container. (%#v)  Skipping container %s", err, manifest.Id)
+			glog.Errorf("Failed to introspect network container. (%#v)  Skipping container %s", err, manifest.Id)
 			continue
 		}
 		if !exists {
-			log.Printf("Network container doesn't exist, creating")
+			glog.Infof("Network container doesn't exist, creating")
 			netName, err = kl.createNetworkContainer(&manifest)
 			if err != nil {
-				log.Printf("Failed to create network container: %#v", err)
+				glog.Errorf("Failed to create network container: %#v", err)
 			}
 			// Docker list prefixes '/' for some reason, so let's do that...
 			netName = "/" + netName
@@ -695,14 +695,14 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			var exists bool
 			exists, actualName, err := kl.ContainerExists(&manifest, &element)
 			if err != nil {
-				log.Printf("Error detecting container: %#v skipping.", err)
+				glog.Errorf("Error detecting container: %#v skipping.", err)
 				continue
 			}
 			if !exists {
-				log.Printf("%#v doesn't exist, creating", element)
+				glog.Infof("%#v doesn't exist, creating", element)
 				kl.DockerPuller.Pull(element.Image)
 				if err != nil {
-					log.Printf("Error pulling container: %#v", err)
+					glog.Errorf("Error pulling container: %#v", err)
 					continue
 				}
 				// netName has the '/' prefix, so slice it off
@@ -713,18 +713,18 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 
 				if err != nil {
 					// TODO(bburns) : Perhaps blacklist a container after N failures?
-					log.Printf("Error creating container: %#v", err)
+					glog.Errorf("Error creating container: %#v", err)
 					desired[actualName] = true
 					continue
 				}
 			} else {
-				log.Printf("%#v exists as %v", element.Name, actualName)
+				glog.Infof("%#v exists as %v", element.Name, actualName)
 			}
 			desired[actualName] = true
 		}
 	}
 	existingContainers, _ := kl.ListContainers()
-	log.Printf("Existing: %#v Desired: %#v", existingContainers, desired)
+	glog.Infof("Existing: %#v Desired: %#v", existingContainers, desired)
 	for _, container := range existingContainers {
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
@@ -732,10 +732,10 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			continue
 		}
 		if !desired[container] {
-			log.Printf("Killing: %s", container)
+			glog.Infof("Killing: %s", container)
 			err = kl.KillContainer(container)
 			if err != nil {
-				log.Printf("Error killing container: %#v", err)
+				glog.Errorf("Error killing container: %#v", err)
 			}
 		}
 	}
@@ -753,7 +753,7 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 	for {
 		select {
 		case u := <-updateChannel:
-			log.Printf("Got configuration from %s: %#v", u.source, u.manifests)
+			glog.Infof("Got configuration from %s: %#v", u.source, u.manifests)
 			last[u.source] = u.manifests
 		case <-time.After(kl.SyncFrequency):
 		}
@@ -765,7 +765,7 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 
 		err := handler.SyncManifests(manifests)
 		if err != nil {
-			log.Printf("Couldn't sync containers : %#v", err)
+			glog.Errorf("Couldn't sync containers : %#v", err)
 		}
 	}
 }

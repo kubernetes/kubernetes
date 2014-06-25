@@ -23,13 +23,13 @@ package main
 
 import (
 	"flag"
-	"log"
-	"os"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 )
 
 var (
@@ -39,13 +39,15 @@ var (
 
 func main() {
 	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
 
 	if len(*etcd_servers) == 0 || len(*master) == 0 {
-		log.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
+		glog.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
 	}
 
 	// Set up logger for etcd client
-	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
+	etcd.SetLogger(util.NewLogger("etcd "))
 
 	controllerManager := controller.MakeReplicationManager(
 		etcd.NewClient([]string{*etcd_servers}),

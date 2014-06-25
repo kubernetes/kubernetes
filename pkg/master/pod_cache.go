@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 // PodCache contains both a cache of container information, as well as the mechanism for keeping
@@ -74,13 +74,13 @@ func (p *PodCache) updateContainerInfo(host, id string) error {
 func (p *PodCache) UpdateAllContainers() {
 	pods, err := p.pods.ListPods(labels.Everything())
 	if err != nil {
-		log.Printf("Error synchronizing container: %#v", err)
+		glog.Errorf("Error synchronizing container: %#v", err)
 		return
 	}
 	for _, pod := range pods {
 		err := p.updateContainerInfo(pod.CurrentState.Host, pod.ID)
 		if err != nil {
-			log.Printf("Error synchronizing container: %#v", err)
+			glog.Errorf("Error synchronizing container: %#v", err)
 		}
 	}
 }
