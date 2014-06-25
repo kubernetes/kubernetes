@@ -583,7 +583,7 @@ func (kl *Kubelet) SyncAndSetupEtcdWatch(updateChannel chan<- manifestUpdate) {
 		go kl.WatchEtcd(watchChannel, updateChannel)
 
 		kl.getKubeletStateFromEtcd(key, updateChannel)
-		glog.Infof("Setting up a watch for configuration changes in etcd for %s", key)
+		glog.V(1).Infof("Setting up a watch for configuration changes in etcd for %s", key)
 		kl.EtcdClient.Watch(key, 0, true, watchChannel, done)
 	}
 }
@@ -718,7 +718,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 					continue
 				}
 			} else {
-				glog.Infof("%#v exists as %v", element.Name, actualName)
+				glog.V(1).Infof("%#v exists as %v", element.Name, actualName)
 			}
 			desired[actualName] = true
 		}
