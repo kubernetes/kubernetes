@@ -38,4 +38,6 @@ type TCPLoadBalancer interface {
 
 type Instances interface {
 	IPAddress(name string) (net.IP, error)
+	// Lists instances that match 'filter' which is a regular expression which must match the entire instance name
+	List(filter string) ([]string, error)
 }

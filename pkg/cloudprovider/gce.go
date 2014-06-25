@@ -30,9 +30,10 @@ import (
 )
 
 type GCECloud struct {
-	service   *compute.Service
-	projectID string
-	zone      string
+	service    *compute.Service
+	projectID  string
+	zone       string
+	instanceRE string
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -178,4 +179,20 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 		return nil, fmt.Errorf("Invalid network IP: %s", res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
 	return ip, nil
+}
+
+func (gce *GCECloud) List(filter string) ([]string, error) {
+	listCall := gce.service.Instances.List(gce.projectID, gce.zone)
+	if len(filter) > 0 {
+		listCall = listCall.Filter("name eq " + filter)
+	}
+	res, err := listCall.Do()
+	if err != nil {
+		return nil, err
+	}
+	var instances []string
+	for _, instance := range res.Items {
+		instances = append(instances, instance.Name)
+	}
+	return instances, nil
 }
