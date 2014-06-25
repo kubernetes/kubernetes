@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"gopkg.in/v1/yaml"
 )
 
@@ -60,6 +61,43 @@ func TestYAMLPrinterPrint(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, poutput) {
-		t.Error("Test data and unmarshaled data are not equal")
+		t.Errorf("Test data and unmarshaled data are not equal: %#v vs %#v", poutput, testData)
+	}
+
+	obj := api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
+	}
+	buf.Reset()
+	printer.PrintObj(obj, buf)
+	var objOut api.Pod
+	err = yaml.Unmarshal([]byte(buf.String()), &objOut)
+	if err != nil {
+		t.Errorf("Unexpeted error: %#v", err)
+	}
+	if !reflect.DeepEqual(obj, objOut) {
+		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)
+	}
+}
+
+func TestIdentityPrinter(t *testing.T) {
+	printer := &IdentityPrinter{}
+	buff := bytes.NewBuffer([]byte{})
+	str := "this is a test string"
+	printer.Print([]byte(str), buff)
+	if buff.String() != str {
+		t.Errorf("Bytes are not equal: %s vs %s", str, buff.String())
+	}
+
+	obj := api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
+	}
+	buff.Reset()
+	printer.PrintObj(obj, buff)
+	objOut, err := api.Decode([]byte(buff.String()))
+	if err != nil {
+		t.Errorf("Unexpeted error: %#v", err)
+	}
+	if !reflect.DeepEqual(&obj, objOut) {
+		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)
 	}
 }
