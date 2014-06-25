@@ -22,10 +22,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -33,8 +31,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/golang/glog"
 )
 
 // kubelet flags
@@ -65,7 +65,7 @@ func fakeKubelet() {
 	endpoint := "unix:///var/run/docker.sock"
 	dockerClient, err := docker.NewClient(endpoint)
 	if err != nil {
-		log.Fatal("Couldn't connnect to docker.")
+		glog.Fatal("Couldn't connnect to docker.")
 	}
 
 	myKubelet := kubelet.Kubelet{
@@ -81,7 +81,7 @@ func fakeKubelet() {
 // Starts api services (the master). Never returns.
 func apiServer() {
 	m := master.New([]string{*etcdServer}, []string{*kubeletAddress}, nil)
-	log.Fatal(m.Run(net.JoinHostPort(*masterAddress, strconv.Itoa(int(*masterPort))), *apiPrefix))
+	glog.Fatal(m.Run(net.JoinHostPort(*masterAddress, strconv.Itoa(int(*masterPort))), *apiPrefix))
 }
 
 // Starts up a controller manager. Never returns.
@@ -96,16 +96,18 @@ func controllerManager() {
 
 func main() {
 	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	// Set up logger for etcd client
-	etcd.SetLogger(log.New(os.Stderr, "etcd ", log.LstdFlags))
+	etcd.SetLogger(util.NewLogger("etcd "))
 
 	go apiServer()
 	go fakeKubelet()
 	go controllerManager()
 
-	log.Printf("All components started.\nMaster running at: http://%s:%d\nKubelet running at: http://%s:%d\n",
+	glog.Infof("All components started.\nMaster running at: http://%s:%d\nKubelet running at: http://%s:%d\n",
 		*masterAddress, *masterPort,
 		*kubeletAddress, *kubeletPort)
 	select {}

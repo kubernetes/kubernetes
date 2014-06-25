@@ -19,11 +19,11 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -158,7 +158,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 		// This really shouldn't happen, it indicates something is broken, and likely
 		// there is a lost pod somewhere.
 		// However it is "deleted" so log it and move on
-		log.Printf("Couldn't find: %s in %#v", podID, manifests)
+		glog.Infof("Couldn't find: %s in %#v", podID, manifests)
 	}
 	if err = registry.updateManifests(machine, newManifests); err != nil {
 		return err

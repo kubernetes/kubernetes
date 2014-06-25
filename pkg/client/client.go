@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 )
 
 // ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
@@ -135,7 +135,7 @@ func (c *Client) rawRequest(method, path string, requestBody io.Reader, target i
 		err = api.DecodeInto(body, target)
 	}
 	if err != nil {
-		log.Printf("Failed to parse: %s\n", string(body))
+		glog.Infof("Failed to parse: %s\n", string(body))
 		// FIXME: no need to return err here?
 	}
 	return body, err

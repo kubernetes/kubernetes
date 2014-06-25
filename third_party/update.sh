@@ -13,6 +13,10 @@ cd $THIRD_PARTY_DIR
 
 . ./deps.sh
 
+if [ $# -gt 0 ]; then
+  PACKAGES="$@"
+fi
+
 # Create a temp GOPATH root.  It must be an absolute path
 mkdir -p ../output/go_dep_update
 cd ../output/go_dep_update

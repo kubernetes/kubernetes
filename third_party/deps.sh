@@ -1,6 +1,7 @@
 TOP_PACKAGES="
   github.com/coreos/go-etcd/etcd
   github.com/fsouza/go-dockerclient
+  github.com/golang/glog
   code.google.com/p/goauth2/compute/serviceaccount
   code.google.com/p/goauth2/oauth
   code.google.com/p/google-api-go-client/compute/v1

@@ -20,13 +20,13 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 var (
@@ -44,9 +44,11 @@ func init() {
 
 func main() {
 	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
 
 	if len(machineList) == 0 {
-		log.Fatal("No machines specified!")
+		glog.Fatal("No machines specified!")
 	}
 
 	var cloud cloudprovider.Interface
@@ -55,13 +57,13 @@ func main() {
 		var err error
 		cloud, err = cloudprovider.NewGCECloud()
 		if err != nil {
-			log.Fatal("Couldn't connect to GCE cloud: %#v", err)
+			glog.Fatal("Couldn't connect to GCE cloud: %#v", err)
 		}
 	default:
 		if len(*cloudProvider) > 0 {
-			log.Printf("Unknown cloud provider: %s", *cloudProvider)
+			glog.Infof("Unknown cloud provider: %s", *cloudProvider)
 		} else {
-			log.Print("No cloud provider specified.")
+			glog.Info("No cloud provider specified.")
 		}
 	}
 
@@ -72,5 +74,5 @@ func main() {
 		m = master.NewMemoryServer(machineList, cloud)
 	}
 
-	log.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))
+	glog.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))
 }

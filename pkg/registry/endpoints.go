@@ -18,10 +18,10 @@ package registry
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 )
 
 func MakeEndpointController(serviceRegistry ServiceRegistry, podRegistry PodRegistry) *EndpointController {
@@ -45,7 +45,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	for _, service := range services.Items {
 		pods, err := e.podRegistry.ListPods(labels.Set(service.Selector).AsSelector())
 		if err != nil {
-			log.Printf("Error syncing service: %#v, skipping.", service)
+			glog.Errorf("Error syncing service: %#v, skipping.", service)
 			resultErr = err
 			continue
 		}
@@ -59,7 +59,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			Endpoints: endpoints,
 		})
 		if err != nil {
-			log.Printf("Error updating endpoints: %#v", err)
+			glog.Errorf("Error updating endpoints: %#v", err)
 			continue
 		}
 	}

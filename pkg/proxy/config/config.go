@@ -17,11 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"log"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 type Operation int
@@ -110,14 +110,14 @@ func NewServiceConfig() ServiceConfig {
 }
 
 func (impl *ServiceConfig) Run() {
-	log.Printf("Starting the config Run loop")
+	glog.Infof("Starting the config Run loop")
 	for {
 		select {
 		case source := <-impl.serviceNotifyChannel:
-			log.Printf("Got new service configuration from source %s", source)
+			glog.Infof("Got new service configuration from source %s", source)
 			impl.NotifyServiceUpdate()
 		case source := <-impl.endpointsNotifyChannel:
-			log.Printf("Got new endpoint configuration from source %s", source)
+			glog.Infof("Got new endpoint configuration from source %s", source)
 			impl.NotifyEndpointsUpdate()
 		case <-time.After(1 * time.Second):
 		}
@@ -132,24 +132,24 @@ func (impl *ServiceConfig) ServiceChannelListener(source string, listenChannel c
 		case update := <-listenChannel:
 			switch update.Op {
 			case ADD:
-				log.Printf("Adding new service from source %s : %v", source, update.Services)
+				glog.Infof("Adding new service from source %s : %v", source, update.Services)
 				for _, value := range update.Services {
 					serviceMap[value.ID] = value
 				}
 			case REMOVE:
-				log.Printf("Removing a service %v", update)
+				glog.Infof("Removing a service %v", update)
 				for _, value := range update.Services {
 					delete(serviceMap, value.ID)
 				}
 			case SET:
-				log.Printf("Setting services %v", update)
+				glog.Infof("Setting services %v", update)
 				// Clear the old map entries by just creating a new map
 				serviceMap = make(map[string]api.Service)
 				for _, value := range update.Services {
 					serviceMap[value.ID] = value
 				}
 			default:
-				log.Printf("Received invalid update type: %v", update)
+				glog.Infof("Received invalid update type: %v", update)
 				continue
 			}
 			impl.configLock.Lock()
@@ -167,25 +167,25 @@ func (impl *ServiceConfig) EndpointsChannelListener(source string, listenChannel
 		case update := <-listenChannel:
 			switch update.Op {
 			case ADD:
-				log.Printf("Adding a new endpoint %v", update)
+				glog.Infof("Adding a new endpoint %v", update)
 				for _, value := range update.Endpoints {
 					endpointMap[value.Name] = value
 				}
 			case REMOVE:
-				log.Printf("Removing an endpoint %v", update)
+				glog.Infof("Removing an endpoint %v", update)
 				for _, value := range update.Endpoints {
 					delete(endpointMap, value.Name)
 				}
 
 			case SET:
-				log.Printf("Setting services %v", update)
+				glog.Infof("Setting services %v", update)
 				// Clear the old map entries by just creating a new map
 				endpointMap = make(map[string]api.Endpoints)
 				for _, value := range update.Endpoints {
 					endpointMap[value.Name] = value
 				}
 			default:
-				log.Printf("Received invalid update type: %v", update)
+				glog.Infof("Received invalid update type: %v", update)
 				continue
 			}
 			impl.configLock.Lock()
@@ -280,7 +280,7 @@ func (impl *ServiceConfig) NotifyServiceUpdate() {
 		}
 	}
 	impl.configLock.RUnlock()
-	log.Printf("Unified configuration %+v", services)
+	glog.Infof("Unified configuration %+v", services)
 	impl.handlerLock.RLock()
 	handlers := impl.serviceHandlers
 	impl.handlerLock.RUnlock()
@@ -300,7 +300,7 @@ func (impl *ServiceConfig) NotifyEndpointsUpdate() {
 		}
 	}
 	impl.configLock.RUnlock()
-	log.Printf("Unified configuration %+v", endpoints)
+	glog.Infof("Unified configuration %+v", endpoints)
 	impl.handlerLock.RLock()
 	handlers := impl.endpointHandlers
 	impl.handlerLock.RUnlock()

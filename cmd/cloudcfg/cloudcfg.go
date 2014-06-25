@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -29,6 +28,8 @@ import (
 
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudcfg"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 const APP_VERSION = "0.1"
@@ -66,21 +67,21 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-// Reads & parses config file. On error, calls log.Fatal().
+// Reads & parses config file. On error, calls glog.Fatal().
 func readConfig(storage string) []byte {
 	if len(*config) == 0 {
-		log.Fatal("Need config file (-c)")
+		glog.Fatal("Need config file (-c)")
 	}
 	data, err := ioutil.ReadFile(*config)
 	if err != nil {
-		log.Fatalf("Unable to read %v: %#v\n", *config, err)
+		glog.Fatalf("Unable to read %v: %#v\n", *config, err)
 	}
 	data, err = cloudcfg.ToWireFormat(data, storage)
 	if err != nil {
-		log.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
+		glog.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
 	}
 	if *verbose {
-		log.Printf("Parsed config file successfully; sending:\n%v\n", string(data))
+		glog.Infof("Parsed config file successfully; sending:\n%v\n", string(data))
 	}
 	return data
 }
@@ -92,6 +93,8 @@ func main() {
 	}
 
 	flag.Parse() // Scan the arguments list
+	util.InitLogs()
+	defer util.FlushLogs()
 
 	if *versionFlag {
 		fmt.Println("Version:", APP_VERSION)
@@ -101,7 +104,7 @@ func main() {
 	secure := true
 	parsedUrl, err := url.Parse(*httpServer)
 	if err != nil {
-		log.Fatalf("Unable to parse %v as a URL\n", err)
+		glog.Fatalf("Unable to parse %v as a URL\n", err)
 	}
 	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
 		secure = false
@@ -111,14 +114,14 @@ func main() {
 	if secure {
 		auth, err = cloudcfg.LoadAuthInfo(*authConfig)
 		if err != nil {
-			log.Fatalf("Error loading auth: %#v", err)
+			glog.Fatalf("Error loading auth: %#v", err)
 		}
 	}
 
 	if *proxy {
-		log.Println("Starting to serve on localhost:8001")
+		glog.Info("Starting to serve on localhost:8001")
 		server := cloudcfg.NewProxyServer(*www, *httpServer, auth)
-		log.Fatal(server.Serve())
+		glog.Fatal(server.Serve())
 	}
 
 	if len(flag.Args()) < 1 {
@@ -129,7 +132,7 @@ func main() {
 
 	matchFound := executeAPIRequest(method, auth) || executeControllerRequest(method, auth)
 	if matchFound == false {
-		log.Fatalf("Unknown command %s", method)
+		glog.Fatalf("Unknown command %s", method)
 	}
 }
 
@@ -137,7 +140,7 @@ func main() {
 func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	parseStorage := func() string {
 		if len(flag.Args()) != 2 {
-			log.Fatal("usage: cloudcfg [OPTIONS] get|list|create|update|delete <url>")
+			glog.Fatal("usage: cloudcfg [OPTIONS] get|list|create|update|delete <url>")
 		}
 		return strings.Trim(flag.Arg(1), "/")
 	}
@@ -165,7 +168,7 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	}
 	obj, err := r.Do().Get()
 	if err != nil {
-		log.Fatalf("Got request error: %v\n", err)
+		glog.Fatalf("Got request error: %v\n", err)
 		return false
 	}
 
@@ -179,7 +182,7 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	}
 
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
-		log.Fatalf("Failed to print: %#v\nRaw received object:\n%#v\n", err, obj)
+		glog.Fatalf("Failed to print: %#v\nRaw received object:\n%#v\n", err, obj)
 	}
 	fmt.Print("\n")
 
@@ -190,7 +193,7 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
-			log.Fatal("usage: cloudcfg [OPTIONS] stop|rm|rollingupdate <controller>")
+			glog.Fatal("usage: cloudcfg [OPTIONS] stop|rm|rollingupdate <controller>")
 		}
 		return flag.Arg(1)
 	}
@@ -207,31 +210,31 @@ func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 		err = cloudcfg.Update(parseController(), c, *updatePeriod)
 	case "run":
 		if len(flag.Args()) != 4 {
-			log.Fatal("usage: cloudcfg [OPTIONS] run <image> <replicas> <controller>")
+			glog.Fatal("usage: cloudcfg [OPTIONS] run <image> <replicas> <controller>")
 		}
 		image := flag.Arg(1)
 		replicas, err := strconv.Atoi(flag.Arg(2))
 		name := flag.Arg(3)
 		if err != nil {
-			log.Fatalf("Error parsing replicas: %#v", err)
+			glog.Fatalf("Error parsing replicas: %#v", err)
 		}
 		err = cloudcfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
 		args := flag.Args()
 		if len(args) < 3 {
-			log.Fatal("usage: cloudcfg resize <controller> <replicas>")
+			glog.Fatal("usage: cloudcfg resize <controller> <replicas>")
 		}
 		name := args[1]
 		replicas, err := strconv.Atoi(args[2])
 		if err != nil {
-			log.Fatalf("Error parsing replicas: %#v", err)
+			glog.Fatalf("Error parsing replicas: %#v", err)
 		}
 		err = cloudcfg.ResizeController(name, replicas, c)
 	default:
 		return false
 	}
 	if err != nil {
-		log.Fatalf("Error: %#v", err)
+		glog.Fatalf("Error: %#v", err)
 	}
 	return true
 }

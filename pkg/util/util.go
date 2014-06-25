@@ -19,9 +19,10 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"runtime"
 	"time"
+
+	"github.com/golang/glog"
 )
 
 // Simply catches a crash and logs an error. Meant to be called via defer.
@@ -36,7 +37,7 @@ func HandleCrash() {
 			}
 			callers = callers + fmt.Sprintf("%v:%v\n", file, line)
 		}
-		log.Printf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
+		glog.Infof("Recovered from panic: %#v (%v)\n%v", r, r, callers)
 	}
 }
 

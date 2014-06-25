@@ -18,7 +18,6 @@ package registry
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -26,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 )
 
 // PodRegistryStorage implements the RESTStorage interface in terms of a PodRegistry
@@ -65,7 +65,7 @@ func (storage *PodRegistryStorage) List(selector labels.Selector) (interface{}, 
 			for ix, pod := range pods {
 				info, err := storage.podCache.GetContainerInfo(pod.CurrentState.Host, pod.ID)
 				if err != nil {
-					log.Printf("Error getting container info: %#v", err)
+					glog.Errorf("Error getting container info: %#v", err)
 					continue
 				}
 				result.Items[ix].CurrentState.Info = info
@@ -103,7 +103,7 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 	}
 	addr, err := instances.IPAddress(host)
 	if err != nil {
-		log.Printf("Error getting instance IP: %#v", err)
+		glog.Errorf("Error getting instance IP: %#v", err)
 		return ""
 	}
 	return addr.String()

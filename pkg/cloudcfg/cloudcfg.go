@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
 
@@ -134,17 +134,17 @@ func makePorts(spec string) []api.Port {
 	for _, part := range parts {
 		pieces := strings.Split(part, ":")
 		if len(pieces) != 2 {
-			log.Printf("Bad port spec: %s", part)
+			glog.Infof("Bad port spec: %s", part)
 			continue
 		}
 		host, err := strconv.Atoi(pieces[0])
 		if err != nil {
-			log.Printf("Host part is not integer: %s %v", pieces[0], err)
+			glog.Errorf("Host part is not integer: %s %v", pieces[0], err)
 			continue
 		}
 		container, err := strconv.Atoi(pieces[1])
 		if err != nil {
-			log.Printf("Container part is not integer: %s %v", pieces[1], err)
+			glog.Errorf("Container part is not integer: %s %v", pieces[1], err)
 			continue
 		}
 		result = append(result, api.Port{ContainerPort: container, HostPort: host})
