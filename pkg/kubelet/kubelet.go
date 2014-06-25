@@ -19,7 +19,6 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -440,32 +439,6 @@ func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) 
 		manifests = append(manifests, manifest)
 	}
 	return manifests, nil
-}
-
-func (kl *Kubelet) extractMultipleFromReader(reader io.Reader) ([]api.ContainerManifest, error) {
-	var manifests []api.ContainerManifest
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		log.Printf("Couldn't read from reader: %v", err)
-		return manifests, err
-	}
-	if err = kl.ExtractYAMLData(data, &manifests); err != nil {
-		return manifests, err
-	}
-	return manifests, nil
-}
-
-func (kl *Kubelet) extractSingleFromReader(reader io.Reader) (api.ContainerManifest, error) {
-	var manifest api.ContainerManifest
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		log.Printf("Couldn't read from reader: %v", err)
-		return manifest, err
-	}
-	if err = kl.ExtractYAMLData(data, &manifest); err != nil {
-		return manifest, err
-	}
-	return manifest, nil
 }
 
 // Watch a file or direcory of files for changes to the set of pods that
