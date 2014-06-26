@@ -60,7 +60,8 @@ type SimpleRESTStorage struct {
 	updated Simple
 	created Simple
 
-	// called when answering update, delete, create
+	// If non-nil, called inside the WorkFunc when answering update, delete, create.
+	// obj recieves the original input to the update, delete, or create call.
 	injectedFunction func(obj interface{}) (returnObj interface{}, err error)
 }
 

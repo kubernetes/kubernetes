@@ -17,29 +17,15 @@ limitations under the License.
 package apiserver
 
 import (
-	"fmt"
 	"sort"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
-
-func init() {
-	api.AddKnownTypes(ServerOp{}, ServerOpList{})
-}
-
-// Operation information, as delivered to API clients.
-type ServerOp struct {
-	api.JSONBase `yaml:",inline" json:",inline"`
-}
-
-// Operation list, as delivered to API clients.
-type ServerOpList struct {
-	api.JSONBase `yaml:",inline" json:",inline"`
-	Items        []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
-}
 
 // Operation represents an ongoing action which the server is performing.
 type Operation struct {
@@ -53,9 +39,12 @@ type Operation struct {
 
 // Operations tracks all the ongoing operations.
 type Operations struct {
-	lock   sync.Mutex
-	ops    map[string]*Operation
-	nextID int
+	// Access only using functions from atomic.
+	lastID int64
+
+	// 'lock' guards the ops map.
+	lock sync.Mutex
+	ops  map[string]*Operation
 }
 
 // Returns a new Operations repository.
@@ -67,25 +56,28 @@ func NewOperations() *Operations {
 	return ops
 }
 
-// Add a new operation.
+// Add a new operation. Lock-free.
 func (ops *Operations) NewOperation(from <-chan interface{}) *Operation {
-	ops.lock.Lock()
-	defer ops.lock.Unlock()
-	id := fmt.Sprintf("%v", ops.nextID)
-	ops.nextID++
-
+	id := atomic.AddInt64(&ops.lastID, 1)
 	op := &Operation{
-		ID:       id,
+		ID:       strconv.FormatInt(id, 10),
 		awaiting: from,
 		notify:   make(chan bool, 1),
 	}
 	go op.wait()
-	ops.ops[id] = op
+	go ops.insert(op)
 	return op
 }
 
+// Inserts op into the ops map.
+func (ops *Operations) insert(op *Operation) {
+	ops.lock.Lock()
+	defer ops.lock.Unlock()
+	ops.ops[op.ID] = op
+}
+
 // List operations for an API client.
-func (ops *Operations) List() ServerOpList {
+func (ops *Operations) List() api.ServerOpList {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 
@@ -94,9 +86,9 @@ func (ops *Operations) List() ServerOpList {
 		ids = append(ids, id)
 	}
 	sort.StringSlice(ids).Sort()
-	ol := ServerOpList{}
+	ol := api.ServerOpList{}
 	for _, id := range ids {
-		ol.Items = append(ol.Items, ServerOp{JSONBase: api.JSONBase{ID: id}})
+		ol.Items = append(ol.Items, api.ServerOp{JSONBase: api.JSONBase{ID: id}})
 	}
 	return ol
 }
@@ -124,7 +116,9 @@ func (ops *Operations) expire(maxAge time.Duration) {
 
 // Waits forever for the operation to complete; call via go when
 // the operation is created. Sets op.finished when the operation
-// does complete. Does not keep op locked while waiting.
+// does complete, and sends on the notify channel, in case there
+// are any WaitFor() calls in progress.
+// Does not keep op locked while waiting.
 func (op *Operation) wait() {
 	defer util.HandleCrash()
 	result := <-op.awaiting
@@ -161,7 +155,7 @@ func (op *Operation) expired(limitTime time.Time) bool {
 
 // Return status information or the result of the operation if it is complete,
 // with a bool indicating true in the latter case.
-func (op *Operation) Describe() (description interface{}, finished bool) {
+func (op *Operation) StatusOrResult() (description interface{}, finished bool) {
 	op.lock.Lock()
 	defer op.lock.Unlock()
 

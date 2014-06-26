@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -26,6 +27,10 @@ func TestOperation(t *testing.T) {
 
 	c := make(chan interface{})
 	op := ops.NewOperation(c)
+	// Allow context switch, so that op's ID can get added to the map and Get will work.
+	// This is just so we can test Get. Ordinary users have no need to call Get immediately
+	// after calling NewOperation, because it returns the operation directly.
+	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		c <- "All done"
@@ -40,16 +45,28 @@ func TestOperation(t *testing.T) {
 	}
 
 	op.WaitFor(10 * time.Millisecond)
-	if _, completed := op.Describe(); completed {
+	if _, completed := op.StatusOrResult(); completed {
 		t.Errorf("Unexpectedly fast completion")
 	}
 
-	op.WaitFor(time.Second)
-	if _, completed := op.Describe(); !completed {
+	const waiters = 10
+	var waited int32
+	for i := 0; i < waiters; i++ {
+		go func() {
+			op.WaitFor(time.Hour)
+			atomic.AddInt32(&waited, 1)
+		}()
+	}
+
+	op.WaitFor(time.Minute)
+	if _, completed := op.StatusOrResult(); !completed {
 		t.Errorf("Unexpectedly slow completion")
 	}
 
 	time.Sleep(100 * time.Millisecond)
+	if waited != waiters {
+		t.Errorf("Multiple waiters doesn't work, only %v finished", waited)
+	}
 
 	if op.expired(time.Now().Add(-time.Second)) {
 		t.Errorf("Should not be expired: %#v", op)

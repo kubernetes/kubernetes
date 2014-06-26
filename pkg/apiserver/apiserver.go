@@ -41,9 +41,14 @@ type RESTStorage interface {
 	Update(interface{}) (<-chan interface{}, error)
 }
 
+// WorkFunc is used to perform any time consuming work for an api call, after
+// the input has been validated. Pass one of these to MakeAsync to create an
+// appropriate return value for the Update, Delete, and Create methods.
+type WorkFunc func() (result interface{}, err error)
+
 // MakeAsync takes a function and executes it, delivering the result in the way required
 // by RESTStorage's Update, Delete, and Create methods.
-func MakeAsync(fn func() (interface{}, error)) <-chan interface{} {
+func MakeAsync(fn WorkFunc) <-chan interface{} {
 	channel := make(chan interface{})
 	go func() {
 		defer util.HandleCrash()
@@ -171,7 +176,7 @@ func (server *ApiServer) finishReq(out <-chan interface{}, sync bool, timeout ti
 	if sync {
 		op.WaitFor(timeout)
 	}
-	obj, complete := op.Describe()
+	obj, complete := op.StatusOrResult()
 	if complete {
 		server.write(http.StatusOK, obj, w)
 	} else {
@@ -308,7 +313,7 @@ func (server *ApiServer) handleOperationRequest(parts []string, w http.ResponseW
 		server.notFound(req, w)
 	}
 
-	obj, complete := op.Describe()
+	obj, complete := op.StatusOrResult()
 	if complete {
 		server.write(http.StatusOK, obj, w)
 	} else {
