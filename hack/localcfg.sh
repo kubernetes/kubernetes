@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This file is exactly like kubecfg.sh, but it talks to a local master
-# (which you're assumed to be running with localkube.sh).
+# (which you're assumed to be running with local-up-cluster.sh).
 
 CLOUDCFG=$(dirname $0)/../output/go/kubecfg
 if [ ! -x $CLOUDCFG ]; then
