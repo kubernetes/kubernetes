@@ -18,6 +18,7 @@ package registry
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -26,12 +27,17 @@ import (
 
 // Implementation of RESTStorage for the api server.
 type ControllerRegistryStorage struct {
-	registry ControllerRegistry
+	registry    ControllerRegistry
+	podRegistry PodRegistry
+	// Period in between polls when waiting for a controller to complete
+	pollPeriod time.Duration
 }
 
-func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTStorage {
+func MakeControllerRegistryStorage(registry ControllerRegistry, podRegistry PodRegistry) apiserver.RESTStorage {
 	return &ControllerRegistryStorage{
-		registry: registry,
+		registry:    registry,
+		podRegistry: podRegistry,
+		pollPeriod:  time.Second * 10,
 	}
 }
 
@@ -81,7 +87,7 @@ func (storage *ControllerRegistryStorage) Create(obj interface{}) (<-chan interf
 		if err != nil {
 			return nil, err
 		}
-		return storage.registry.GetController(controller.ID)
+		return storage.waitForController(controller)
 	}), nil
 }
 
@@ -98,6 +104,20 @@ func (storage *ControllerRegistryStorage) Update(obj interface{}) (<-chan interf
 		if err != nil {
 			return nil, err
 		}
-		return storage.registry.GetController(controller.ID)
+		return storage.waitForController(controller)
 	}), nil
+}
+
+func (storage *ControllerRegistryStorage) waitForController(ctrl api.ReplicationController) (interface{}, error) {
+	for {
+		pods, err := storage.podRegistry.ListPods(labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+		if err != nil {
+			return ctrl, err
+		}
+		if len(pods) == ctrl.DesiredState.Replicas {
+			break
+		}
+		time.Sleep(storage.pollPeriod)
+	}
+	return ctrl, nil
 }

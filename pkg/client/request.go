@@ -47,7 +47,7 @@ func (c *Client) Verb(verb string) *Request {
 		c:          c,
 		path:       "/api/v1beta1",
 		sync:       true,
-		timeout:    10 * time.Second,
+		timeout:    20 * time.Second,
 		pollPeriod: 20 * time.Second,
 	}
 }
