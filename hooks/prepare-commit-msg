@@ -18,6 +18,15 @@ for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | gr
   fi
 done
 
+# Check sh files for boilerplate
+for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v "third_party"); do
+  # Check for files without the required boilerplate.
+  boilerplate="$(${KUBE_HOOKS_DIR}/boilerplate.sh ${file})"
+  if [[ "$boilerplate" -eq "0" ]]; then
+    files_need_boilerplate="${files_need_boilerplate} ${file}"
+  fi
+done
+
 if [[ -n "${files_need_gofmt}" ]]; then
   (
     echo
