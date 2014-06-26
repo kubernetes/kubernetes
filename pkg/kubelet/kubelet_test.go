@@ -898,8 +898,9 @@ func TestWatchEtcd(t *testing.T) {
 	close(updateChannel)
 
 	read := reader.GetList()
-	if len(read) != 1 ||
-		!reflect.DeepEqual(read[0], manifest) {
+	if len(read) != 1 {
+		t.Errorf("Expected number of results: %v", len(read))
+	} else if !reflect.DeepEqual(read[0], manifest) {
 		t.Errorf("Unexpected manifest(s) %#v %#v", read[0], manifest)
 	}
 }
