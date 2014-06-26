@@ -14,23 +14,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Print 1 if the file in $1 has the correct boilerplate header, 0 otherwise.
-FILE=$1
-EXT=${FILE#*.}
-
-REF_FILE="$(dirname $0)/boilerplate.${EXT}.txt"
-
-if [[ ! -e "${REF_FILE}" ]]; then
-  echo "1"
-  exit 0
-fi
-
-LINES=$(cat "${REF_FILE}" | wc -l | tr -d ' ')
-DIFFER=$(head "-${LINES}" "${FILE}" | diff -q - "${REF_FILE}")
-
-if [[ -z "${DIFFER}" ]]; then
-  echo "1"
-  exit 0
-fi
-
-echo "0"
