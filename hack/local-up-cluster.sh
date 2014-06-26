@@ -67,12 +67,17 @@ ${GO_OUT}/kubelet \
   --port="$KUBELET_PORT" &> ${KUBELET_LOG} &
 KUBELET_PID=$!
 
+PROXY_LOG=/tmp/kube-proxy.log
+${GO_OUT}/proxy \
+  --etcd_servers="http://127.0.0.1:4001" &> ${PROXY_LOG} &
+PROXY_PID=$!
 
 echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
 echo "Logs: "
 echo "  ${APISERVER_LOG}"
 echo "  ${CTLRMGR_LOG}"
 echo "  ${KUBELET_LOG}"
+echo "  ${PROXY_LOG}"
 
 cleanup()
 {
@@ -80,6 +85,7 @@ cleanup()
     kill ${APISERVER_PID}
     kill ${CTLRMGR_PID}
     kill ${KUBELET_PID}
+    kill ${PROXY_PID}
 
     kill ${ETCD_PID}
     rm -rf ${ETCD_DIR}
