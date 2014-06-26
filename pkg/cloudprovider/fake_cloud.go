@@ -18,13 +18,15 @@ package cloudprovider
 
 import (
 	"net"
+	"regexp"
 )
 
 type FakeCloud struct {
-	Exists bool
-	Err    error
-	Calls  []string
-	IP     net.IP
+	Exists   bool
+	Err      error
+	Calls    []string
+	IP       net.IP
+	Machines []string
 }
 
 func (f *FakeCloud) addCall(desc string) {
@@ -65,4 +67,15 @@ func (f *FakeCloud) DeleteTCPLoadBalancer(name, region string) error {
 func (f *FakeCloud) IPAddress(instance string) (net.IP, error) {
 	f.addCall("ip-address")
 	return f.IP, f.Err
+}
+
+func (f *FakeCloud) List(filter string) ([]string, error) {
+	f.addCall("list")
+	result := []string{}
+	for _, machine := range f.Machines {
+		if match, _ := regexp.MatchString(filter, machine); match {
+			result = append(result, machine)
+		}
+	}
+	return result, f.Err
 }
