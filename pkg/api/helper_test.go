@@ -113,4 +113,17 @@ func TestPtr(t *testing.T) {
 	}
 }
 
-// TODO: test rejection of bad JSON.
+func TestBadJSONRejection(t *testing.T) {
+	badJSONMissingKind := []byte(`{ }`)
+	if _, err := Decode(badJSONMissingKind); err == nil {
+		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
+	}
+	badJSONUnknownType := []byte(`{"kind": "bar"}`)
+	if _, err1 := Decode(badJSONUnknownType); err1 == nil {
+		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
+	}
+	badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
+	if err2 := DecodeInto(badJSONKindMismatch, &Minion{}); err2 == nil {
+		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
+	}
+}
