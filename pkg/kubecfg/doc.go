@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cloudcfg is a set of libraries that are used by the cloudcfg command line tool.
+// Package kubecfg is a set of libraries that are used by the kubecfg command line tool.
 // They are separated out into a library to support unit testing.  Most functionality should
-// be included in this package, and the main cloudcfg should really just be an entry point.
-package cloudcfg
+// be included in this package, and the main kubecfg should really just be an entry point.
+package kubecfg

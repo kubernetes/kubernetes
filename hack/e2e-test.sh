@@ -35,7 +35,7 @@ set -e
 # Use testing config
 export KUBE_CONFIG_FILE="config-test.sh"
 export KUBE_REPO_ROOT="$(dirname $0)/.."
-export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/cloudcfg.sh"
+export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh"
 
 source "${KUBE_REPO_ROOT}/cluster/util.sh"
 ${KUBE_REPO_ROOT}/hack/build-go.sh

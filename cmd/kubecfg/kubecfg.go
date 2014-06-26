@@ -27,7 +27,7 @@ import (
 	"time"
 
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudcfg"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -52,15 +52,15 @@ var (
 )
 
 func usage() {
-	fmt.Fprint(os.Stderr, `usage: cloudcfg -h [-c config/file.json] [-p :,..., :] <method>
+	fmt.Fprint(os.Stderr, `usage: kubecfg -h [-c config/file.json] [-p :,..., :] <method>
 
   Kubernetes REST API:
-  cloudcfg [OPTIONS] get|list|create|delete|update <url>
+  kubecfg [OPTIONS] get|list|create|delete|update <url>
 
   Manage replication controllers:
-  cloudcfg [OPTIONS] stop|rm|rollingupdate <controller>
-  cloudcfg [OPTIONS] run <image> <replicas> <controller>
-  cloudcfg [OPTIONS] resize <controller> <replicas>
+  kubecfg [OPTIONS] stop|rm|rollingupdate <controller>
+  kubecfg [OPTIONS] run <image> <replicas> <controller>
+  kubecfg [OPTIONS] resize <controller> <replicas>
 
   Options:
 `)
@@ -76,7 +76,7 @@ func readConfig(storage string) []byte {
 	if err != nil {
 		glog.Fatalf("Unable to read %v: %#v\n", *config, err)
 	}
-	data, err = cloudcfg.ToWireFormat(data, storage)
+	data, err = kubecfg.ToWireFormat(data, storage)
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
 	}
@@ -112,7 +112,7 @@ func main() {
 
 	var auth *kube_client.AuthInfo
 	if secure {
-		auth, err = cloudcfg.LoadAuthInfo(*authConfig)
+		auth, err = kubecfg.LoadAuthInfo(*authConfig)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %#v", err)
 		}
@@ -120,7 +120,7 @@ func main() {
 
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
-		server := cloudcfg.NewProxyServer(*www, *httpServer, auth)
+		server := kubecfg.NewProxyServer(*www, *httpServer, auth)
 		glog.Fatal(server.Serve())
 	}
 
@@ -140,7 +140,7 @@ func main() {
 func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 	parseStorage := func() string {
 		if len(flag.Args()) != 2 {
-			glog.Fatal("usage: cloudcfg [OPTIONS] get|list|create|update|delete <url>")
+			glog.Fatal("usage: kubecfg [OPTIONS] get|list|create|update|delete <url>")
 		}
 		return strings.Trim(flag.Arg(1), "/")
 	}
@@ -172,13 +172,13 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		return false
 	}
 
-	var printer cloudcfg.ResourcePrinter
+	var printer kubecfg.ResourcePrinter
 	if *json {
-		printer = &cloudcfg.IdentityPrinter{}
+		printer = &kubecfg.IdentityPrinter{}
 	} else if *yaml {
-		printer = &cloudcfg.YAMLPrinter{}
+		printer = &kubecfg.YAMLPrinter{}
 	} else {
-		printer = &cloudcfg.HumanReadablePrinter{}
+		printer = &kubecfg.HumanReadablePrinter{}
 	}
 
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
@@ -193,7 +193,7 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
-			glog.Fatal("usage: cloudcfg [OPTIONS] stop|rm|rollingupdate <controller>")
+			glog.Fatal("usage: kubecfg [OPTIONS] stop|rm|rollingupdate <controller>")
 		}
 		return flag.Arg(1)
 	}
@@ -203,14 +203,14 @@ func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 	var err error
 	switch method {
 	case "stop":
-		err = cloudcfg.StopController(parseController(), c)
+		err = kubecfg.StopController(parseController(), c)
 	case "rm":
-		err = cloudcfg.DeleteController(parseController(), c)
+		err = kubecfg.DeleteController(parseController(), c)
 	case "rollingupdate":
-		err = cloudcfg.Update(parseController(), c, *updatePeriod)
+		err = kubecfg.Update(parseController(), c, *updatePeriod)
 	case "run":
 		if len(flag.Args()) != 4 {
-			glog.Fatal("usage: cloudcfg [OPTIONS] run <image> <replicas> <controller>")
+			glog.Fatal("usage: kubecfg [OPTIONS] run <image> <replicas> <controller>")
 		}
 		image := flag.Arg(1)
 		replicas, err := strconv.Atoi(flag.Arg(2))
@@ -218,18 +218,18 @@ func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
 		if err != nil {
 			glog.Fatalf("Error parsing replicas: %#v", err)
 		}
-		err = cloudcfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
+		err = kubecfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
 		args := flag.Args()
 		if len(args) < 3 {
-			glog.Fatal("usage: cloudcfg resize <controller> <replicas>")
+			glog.Fatal("usage: kubecfg resize <controller> <replicas>")
 		}
 		name := args[1]
 		replicas, err := strconv.Atoi(args[2])
 		if err != nil {
 			glog.Fatalf("Error parsing replicas: %#v", err)
 		}
-		err = cloudcfg.ResizeController(name, replicas, c)
+		err = kubecfg.ResizeController(name, replicas, c)
 	default:
 		return false
 	}

@@ -28,7 +28,7 @@ set -e
 (
   source $(dirname $0)/config-go.sh
   cd "${KUBE_TARGET}"
-  BINARIES="cloudcfg localkube"
+  BINARIES="kubecfg localkube"
   for b in $BINARIES; do
     echo "+++ Building ${b}"
     go build "${KUBE_GO_PACKAGE}"/cmd/${b}

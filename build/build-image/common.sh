@@ -33,7 +33,7 @@ function make-binaries() {
     apiserver
     controller-manager
     kubelet
-    cloudcfg
+    kubecfg
     localkube"
 
   ARCH_TARGET="${KUBE_TARGET}/${GOOS}/${GOARCH}"

@@ -49,22 +49,22 @@ hack/dev-build-and-up.sh
 Once you have your instances up and running, the `build-go.sh` script sets up
 your Go workspace and builds the Go components.
 
-The `cloudcfg.sh` script spins up two containers, running [Nginx](http://nginx.org/en/) and with port 80 mapped to 8080:
+The `kubecfg.sh` script spins up two containers, running [Nginx](http://nginx.org/en/) and with port 80 mapped to 8080:
 
 ```
 cd kubernetes
 hack/build-go.sh
-cluster/cloudcfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
 ```
 
 To stop the containers:
 ```
-cluster/cloudcfg.sh stop myNginx
+cluster/kubecfg.sh stop myNginx
 ```
 
 To delete the containers:
 ```
-cluster/cloudcfg.sh rm myNginx
+cluster/kubecfg.sh rm myNginx
 ```
 
 ### Running a container (more complete version)
@@ -75,7 +75,7 @@ Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`:
 
 ```
 cd kubernetes
-cluster/cloudcfg.sh -c api/examples/pod.json create /pods
+cluster/kubecfg.sh -c api/examples/pod.json create /pods
 ```
 
 Where pod.json contains something like:
@@ -112,7 +112,7 @@ cd kubernetes
 hack/local-up.sh
 ```
 
-This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down. While it's running, you can use `hack/localcfg.sh` in place of `cluster/cloudcfg.sh` to talk to it.
+This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down. While it's running, you can use `hack/localcfg.sh` in place of `cluster/kubecfg.sh` to talk to it.
 
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)

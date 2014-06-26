@@ -92,7 +92,7 @@ set_tag $RELEASE_FULL_TAG_PATH $RELEASE_FULL_PATH
 
 echo "Release pushed ($RELEASE_PREFIX$RELEASE_NAME)."
 
-# This isn't quite working right now. Need to figure out packaging the cloudcfg tool.
+# This isn't quite working right now. Need to figure out packaging the kubecfg tool.
 # echo "  Launch with:"
 # echo
 # echo "  curl -s -L ${RELEASE_FULL_PATH/gs:\/\//http://storage.googleapis.com/}/launch-kubernetes.sh | bash"

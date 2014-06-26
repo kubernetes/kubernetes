@@ -15,7 +15,7 @@ To build Kubernetes you need to have access to a Docker installation through eit
 * `make-binaries.sh`: This will compile all of the Kubernetes binaries in a Docker container
 * `run-tests.sh`: This will run the Kubernetes unit tests in a Docker container
 * `run-integration.sh`: This will build and run the integration test in a Docker container
-* `make-cross.sh`: This will make all cross-compiled binaries (currently just cloudcfg).
+* `make-cross.sh`: This will make all cross-compiled binaries (currently just kubecfg).
 * `copy-output.sh`: This will copy the contents of `output/build` from any remote Docker container to the local `output/build`.  Right now this is only necessary on Mac OS X with `boot2docker`.
 * `make-clean.sh`: Clean out the contents of `output/build`.
 * `shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
