@@ -19,6 +19,7 @@ package registry
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -29,6 +30,55 @@ import (
 func expectNoError(t *testing.T, err error) {
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
+	}
+}
+
+func TestCreatePodIdError(t *testing.T) {
+	storage := PodRegistryStorage{
+		registry: &MockPodRegistry{},
+	}
+	pod := api.Pod{}
+	_, err := storage.Create(pod)
+	if !strings.HasPrefix(err.Error(), "id is unspecified: ") {
+		t.Errorf("Expected id is unspecified error, Got %#v", err)
+	}
+}
+
+type MockScheduler struct {
+	err error
+	pod api.Pod
+}
+
+func (m *MockScheduler) Schedule(pod api.Pod) (string, error) {
+	m.pod = pod
+	return "", m.err
+}
+
+func TestCreatePodContainerIdError(t *testing.T) {
+	mockScheduler := MockScheduler{
+		err: fmt.Errorf("test error"),
+	}
+	storage := PodRegistryStorage{
+		scheduler: &mockScheduler,
+	}
+	pod := api.Pod{
+		JSONBase: api.JSONBase{
+			ID: "test",
+		},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
+					api.Container{},
+				},
+			},
+		},
+	}
+	_, err := storage.Create(pod)
+	if err != mockScheduler.err {
+		t.Errorf("Expected %#v, Got %#v", mockScheduler.err, err)
+	}
+	if len(mockScheduler.pod.DesiredState.Manifest.Containers[0].ID) == 0 {
+		t.Errorf("Expected container[0] to have ID set, Got %#v", mockScheduler.pod)
 	}
 }
 

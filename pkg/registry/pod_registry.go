@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -143,7 +144,12 @@ func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
 func (storage *PodRegistryStorage) Create(pod interface{}) (<-chan interface{}, error) {
 	podObj := pod.(api.Pod)
 	if len(podObj.ID) == 0 {
-		return nil, fmt.Errorf("id is unspecified: %#v", pod)
+		return nil, fmt.Errorf("id is unspecified: %#v", podObj)
+	}
+	for i := range podObj.DesiredState.Manifest.Containers {
+		if len(podObj.DesiredState.Manifest.Containers[i].ID) == 0 {
+			podObj.DesiredState.Manifest.Containers[i].ID = uuid.NewUUID().String()
+		}
 	}
 	machine, err := storage.scheduler.Schedule(podObj)
 	if err != nil {

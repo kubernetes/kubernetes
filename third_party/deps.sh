@@ -4,6 +4,7 @@ TOP_PACKAGES="
   github.com/golang/glog
   code.google.com/p/goauth2/compute/serviceaccount
   code.google.com/p/goauth2/oauth
+  code.google.com/p/go-uuid/uuid
   code.google.com/p/google-api-go-client/compute/v1
 "
 

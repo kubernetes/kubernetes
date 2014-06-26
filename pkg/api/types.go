@@ -57,6 +57,7 @@ type EnvVar struct {
 
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
+	ID           string        `yaml:"id,omitempty" json:"id,omitempty"`
 	Name         string        `yaml:"name,omitempty" json:"name,omitempty"`
 	Image        string        `yaml:"image,omitempty" json:"image,omitempty"`
 	Command      []string      `yaml:"command,omitempty" json:"command,omitempty"`
