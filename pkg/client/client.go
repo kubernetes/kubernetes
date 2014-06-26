@@ -54,7 +54,7 @@ type StatusErr struct {
 }
 
 func (s *StatusErr) Error() string {
-	return fmt.Sprintf("Status: %v (%#v)", s.Status.Status, s)
+	return fmt.Sprintf("Status: %v (%#v)", s.Status.Status, s.Status)
 }
 
 // AuthInfo is used to store authorization information
@@ -103,16 +103,16 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 	if response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent {
 		return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
 	}
-	if response.StatusCode == http.StatusAccepted {
-		var status api.Status
-		if err := api.DecodeInto(body, &status); err == nil {
-			if status.Status == api.StatusSuccess {
-				return body, nil
-			} else {
-				return nil, &StatusErr{status}
-			}
+
+	// If the server gave us a status back, look at what it was.
+	var status api.Status
+	if err := api.DecodeInto(body, &status); err == nil && status.Status != "" {
+		if status.Status == api.StatusSuccess {
+			return body, nil
 		}
-		// Sometimes the server returns 202 even though it completely handled the request.
+		// "Working" requests need to be handled specially.
+		// "Failed" requests are clearly just an error and it makes sense to return them as such.
+		return nil, &StatusErr{status}
 	}
 	return body, err
 }

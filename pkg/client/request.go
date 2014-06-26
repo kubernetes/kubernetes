@@ -43,11 +43,12 @@ import (
 // Begin a request with a verb (GET, POST, PUT, DELETE)
 func (c *Client) Verb(verb string) *Request {
 	return &Request{
-		verb:    verb,
-		c:       c,
-		path:    "/api/v1beta1",
-		sync:    true,
-		timeout: 10 * time.Second,
+		verb:       verb,
+		c:          c,
+		path:       "/api/v1beta1",
+		sync:       true,
+		timeout:    10 * time.Second,
+		pollPeriod: 20 * time.Second,
 	}
 }
 
@@ -71,18 +72,24 @@ func (c *Client) Delete() *Request {
 	return c.Verb("DELETE")
 }
 
+// Make a request to do a single poll of the completion of the given operation.
+func (c *Client) PollFor(operationId string) *Request {
+	return c.Get().Path("operations").Path(operationId).Sync(false).PollPeriod(0)
+}
+
 // Request allows for building up a request to a server in a chained fashion.
 // Any errors are stored until the end of your call, so you only have to
 // check once.
 type Request struct {
-	c        *Client
-	err      error
-	verb     string
-	path     string
-	body     io.Reader
-	selector labels.Selector
-	timeout  time.Duration
-	sync     bool
+	c          *Client
+	err        error
+	verb       string
+	path       string
+	body       io.Reader
+	selector   labels.Selector
+	timeout    time.Duration
+	sync       bool
+	pollPeriod time.Duration
 }
 
 // Append an item to the request path. You must call Path at least once.
@@ -170,37 +177,56 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// Format and xecute the request. Returns the API object received, or an error.
-func (r *Request) Do() Result {
+// PollPeriod sets the poll period.
+// If the server sends back a "working" status message, then repeatedly poll the server
+// to see if the operation has completed yet, waiting 'd' between each poll.
+// If you want to handle the "working" status yourself (it'll be delivered as StatusErr),
+// set d to 0 to turn off this behavior.
+func (r *Request) PollPeriod(d time.Duration) *Request {
 	if r.err != nil {
-		return Result{err: r.err}
+		return r
 	}
-	finalUrl := r.c.host + r.path
-	query := url.Values{}
-	if r.selector != nil {
-		query.Add("labels", r.selector.String())
-	}
-	if r.sync {
-		query.Add("sync", "true")
-		if r.timeout != 0 {
-			query.Add("timeout", r.timeout.String())
+	r.pollPeriod = d
+	return r
+}
+
+// Format and execute the request. Returns the API object received, or an error.
+func (r *Request) Do() Result {
+	for {
+		if r.err != nil {
+			return Result{err: r.err}
 		}
-	}
-	finalUrl += "?" + query.Encode()
-	req, err := http.NewRequest(r.verb, finalUrl, r.body)
-	if err != nil {
-		return Result{err: err}
-	}
-	respBody, err := r.c.doRequest(req)
-	if err != nil {
-		if statusErr, ok := err.(*StatusErr); ok {
-			// TODO: using the information in statusErr,
-			// loop querying the server to wait and retrieve
-			// the actual result.
-			_ = statusErr
+		finalUrl := r.c.host + r.path
+		query := url.Values{}
+		if r.selector != nil {
+			query.Add("labels", r.selector.String())
 		}
+		if r.sync {
+			query.Add("sync", "true")
+			if r.timeout != 0 {
+				query.Add("timeout", r.timeout.String())
+			}
+		}
+		finalUrl += "?" + query.Encode()
+		req, err := http.NewRequest(r.verb, finalUrl, r.body)
+		if err != nil {
+			return Result{err: err}
+		}
+		respBody, err := r.c.doRequest(req)
+		if err != nil {
+			if statusErr, ok := err.(*StatusErr); ok {
+				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != 0 {
+					time.Sleep(r.pollPeriod)
+					// Make a poll request
+					pollOp := r.c.PollFor(statusErr.Status.Details).PollPeriod(r.pollPeriod)
+					// Could also say "return r.Do()" but this way doesn't grow the callstack.
+					r = pollOp
+					continue
+				}
+			}
+		}
+		return Result{respBody, err}
 	}
-	return Result{respBody, err}
 }
 
 // Result contains the result of calling Request.Do().
