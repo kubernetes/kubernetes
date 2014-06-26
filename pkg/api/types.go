@@ -207,3 +207,14 @@ const (
 	StatusFailure = "failure"
 	StatusWorking = "working"
 )
+
+// Operation information, as delivered to API clients.
+type ServerOp struct {
+	JSONBase `yaml:",inline" json:",inline"`
+}
+
+// Operation list, as delivered to API clients.
+type ServerOpList struct {
+	JSONBase `yaml:",inline" json:",inline"`
+	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
+}

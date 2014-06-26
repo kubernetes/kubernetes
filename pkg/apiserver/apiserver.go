@@ -41,11 +41,30 @@ type RESTStorage interface {
 	Update(interface{}) (<-chan interface{}, error)
 }
 
-func MakeAsync(fn func() interface{}) <-chan interface{} {
-	channel := make(chan interface{}, 1)
+// WorkFunc is used to perform any time consuming work for an api call, after
+// the input has been validated. Pass one of these to MakeAsync to create an
+// appropriate return value for the Update, Delete, and Create methods.
+type WorkFunc func() (result interface{}, err error)
+
+// MakeAsync takes a function and executes it, delivering the result in the way required
+// by RESTStorage's Update, Delete, and Create methods.
+func MakeAsync(fn WorkFunc) <-chan interface{} {
+	channel := make(chan interface{})
 	go func() {
 		defer util.HandleCrash()
-		channel <- fn()
+		obj, err := fn()
+		if err != nil {
+			channel <- &api.Status{
+				Status:  api.StatusFailure,
+				Details: err.Error(),
+			}
+		} else {
+			channel <- obj
+		}
+		// 'close' is used to signal that no further values will
+		// be written to the channel. Not strictly necessary, but
+		// also won't hurt.
+		close(channel)
 	}()
 	return channel
 }
@@ -59,6 +78,7 @@ func MakeAsync(fn func() interface{}) <-chan interface{} {
 type ApiServer struct {
 	prefix  string
 	storage map[string]RESTStorage
+	ops     *Operations
 }
 
 // New creates a new ApiServer object.
@@ -68,6 +88,7 @@ func New(storage map[string]RESTStorage, prefix string) *ApiServer {
 	return &ApiServer{
 		storage: storage,
 		prefix:  prefix,
+		ops:     NewOperations(),
 	}
 }
 
@@ -108,6 +129,10 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		server.notFound(req, w)
 		return
 	}
+	if requestParts[0] == "operations" {
+		server.handleOperationRequest(requestParts[1:], w, req)
+		return
+	}
 	storage := server.storage[requestParts[0]]
 	if storage == nil {
 		logger.Addf("'%v' has no storage object", requestParts[0])
@@ -144,15 +169,30 @@ func (server *ApiServer) readBody(req *http.Request) ([]byte, error) {
 	return body, err
 }
 
-func (server *ApiServer) waitForObject(out <-chan interface{}, timeout time.Duration) (interface{}, error) {
-	tick := time.After(timeout)
-	var obj interface{}
-	select {
-	case obj = <-out:
-		return obj, nil
-	case <-tick:
-		return nil, fmt.Errorf("Timed out waiting for synchronization.")
+// finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
+// Operation to recieve the result and returning its ID down the writer.
+func (server *ApiServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
+	op := server.ops.NewOperation(out)
+	if sync {
+		op.WaitFor(timeout)
 	}
+	obj, complete := op.StatusOrResult()
+	if complete {
+		server.write(http.StatusOK, obj, w)
+	} else {
+		server.write(http.StatusAccepted, obj, w)
+	}
+}
+
+func parseTimeout(str string) time.Duration {
+	if str != "" {
+		timeout, err := time.ParseDuration(str)
+		if err == nil {
+			return timeout
+		}
+		glog.Errorf("Failed to parse: %#v '%s'", err, str)
+	}
+	return 30 * time.Second
 }
 
 // handleREST is the main dispatcher for the server.  It switches on the HTTP method, and then
@@ -170,11 +210,7 @@ func (server *ApiServer) waitForObject(out <-chan interface{}, timeout time.Dura
 //    labels=<label-selector> Used for filtering list operations
 func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
 	sync := requestUrl.Query().Get("sync") == "true"
-	timeout, err := time.ParseDuration(requestUrl.Query().Get("timeout"))
-	if err != nil && len(requestUrl.Query().Get("timeout")) > 0 {
-		glog.Errorf("Failed to parse: %#v '%s'", err, requestUrl.Query().Get("timeout"))
-		timeout = time.Second * 30
-	}
+	timeout := parseTimeout(requestUrl.Query().Get("timeout"))
 	switch req.Method {
 	case "GET":
 		switch len(parts) {
@@ -184,12 +220,12 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 				server.error(err, w)
 				return
 			}
-			controllers, err := storage.List(selector)
+			list, err := storage.List(selector)
 			if err != nil {
 				server.error(err, w)
 				return
 			}
-			server.write(http.StatusOK, controllers, w)
+			server.write(http.StatusOK, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
 			if err != nil {
@@ -204,7 +240,6 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 		default:
 			server.notFound(req, w)
 		}
-		return
 	case "POST":
 		if len(parts) != 1 {
 			server.notFound(req, w)
@@ -221,44 +256,22 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 			return
 		}
 		out, err := storage.Create(obj)
-		if err == nil && sync {
-			obj, err = server.waitForObject(out, timeout)
-		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
-		var statusCode int
-		if sync {
-			statusCode = http.StatusOK
-		} else {
-			statusCode = http.StatusAccepted
-		}
-		server.write(statusCode, obj, w)
-		return
+		server.finishReq(out, sync, timeout, w)
 	case "DELETE":
 		if len(parts) != 2 {
 			server.notFound(req, w)
 			return
 		}
 		out, err := storage.Delete(parts[1])
-		var obj interface{}
-		obj = api.Status{Status: api.StatusSuccess}
-		if err == nil && sync {
-			obj, err = server.waitForObject(out, timeout)
-		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
-		var statusCode int
-		if sync {
-			statusCode = http.StatusOK
-		} else {
-			statusCode = http.StatusAccepted
-		}
-		server.write(statusCode, obj, w)
-		return
+		server.finishReq(out, sync, timeout, w)
 	case "PUT":
 		if len(parts) != 2 {
 			server.notFound(req, w)
@@ -274,22 +287,36 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 			return
 		}
 		out, err := storage.Update(obj)
-		if err == nil && sync {
-			obj, err = server.waitForObject(out, timeout)
-		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
-		var statusCode int
-		if sync {
-			statusCode = http.StatusOK
-		} else {
-			statusCode = http.StatusAccepted
-		}
-		server.write(statusCode, obj, w)
-		return
+		server.finishReq(out, sync, timeout, w)
 	default:
 		server.notFound(req, w)
+	}
+}
+
+func (server *ApiServer) handleOperationRequest(parts []string, w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		server.notFound(req, w)
+	}
+	if len(parts) == 0 {
+		// List outstanding operations.
+		list := server.ops.List()
+		server.write(http.StatusOK, list, w)
+		return
+	}
+
+	op := server.ops.Get(parts[0])
+	if op == nil {
+		server.notFound(req, w)
+	}
+
+	obj, complete := op.StatusOrResult()
+	if complete {
+		server.write(http.StatusOK, obj, w)
+	} else {
+		server.write(http.StatusAccepted, obj, w)
 	}
 }

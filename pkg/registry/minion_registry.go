@@ -140,8 +140,28 @@ func (storage *MinionRegistryStorage) Extract(body []byte) (interface{}, error) 
 	return minion, err
 }
 
-func (storage *MinionRegistryStorage) Create(minion interface{}) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() interface{} { return minion }), storage.registry.Insert(minion.(api.Minion).ID)
+func (storage *MinionRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+	minion, ok := obj.(api.Minion)
+	if !ok {
+		return nil, fmt.Errorf("not a minion: %#v", obj)
+	}
+	if minion.ID == "" {
+		return nil, fmt.Errorf("ID should not be empty: %#v", minion)
+	}
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		err := storage.registry.Insert(minion.ID)
+		if err != nil {
+			return nil, err
+		}
+		contains, err := storage.registry.Contains(minion.ID)
+		if err != nil {
+			return nil, err
+		}
+		if contains {
+			return storage.toApiMinion(minion.ID), nil
+		}
+		return nil, fmt.Errorf("unable to add minion %#v", minion)
+	}), nil
 }
 
 func (storage *MinionRegistryStorage) Update(minion interface{}) (<-chan interface{}, error) {
@@ -156,5 +176,7 @@ func (storage *MinionRegistryStorage) Delete(id string) (<-chan interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	return apiserver.MakeAsync(func() interface{} { return api.Status{Status: api.StatusSuccess} }), storage.registry.Delete(id)
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		return api.Status{Status: api.StatusSuccess}, storage.registry.Delete(id)
+	}), nil
 }

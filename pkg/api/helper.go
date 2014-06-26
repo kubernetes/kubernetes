@@ -37,6 +37,8 @@ func init() {
 		MinionList{},
 		Minion{},
 		Status{},
+		ServerOpList{},
+		ServerOp{},
 	)
 }
 

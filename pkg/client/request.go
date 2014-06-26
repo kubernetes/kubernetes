@@ -43,9 +43,11 @@ import (
 // Begin a request with a verb (GET, POST, PUT, DELETE)
 func (c *Client) Verb(verb string) *Request {
 	return &Request{
-		verb: verb,
-		c:    c,
-		path: "/api/v1beta1",
+		verb:    verb,
+		c:       c,
+		path:    "/api/v1beta1",
+		sync:    true,
+		timeout: 10 * time.Second,
 	}
 }
 
@@ -80,6 +82,7 @@ type Request struct {
 	body     io.Reader
 	selector labels.Selector
 	timeout  time.Duration
+	sync     bool
 }
 
 // Append an item to the request path. You must call Path at least once.
@@ -88,6 +91,15 @@ func (r *Request) Path(item string) *Request {
 		return r
 	}
 	r.path = path.Join(r.path, item)
+	return r
+}
+
+// Set sync/async call status.
+func (r *Request) Sync(sync bool) *Request {
+	if r.err != nil {
+		return r
+	}
+	r.sync = sync
 	return r
 }
 
@@ -168,8 +180,11 @@ func (r *Request) Do() Result {
 	if r.selector != nil {
 		query.Add("labels", r.selector.String())
 	}
-	if r.timeout != 0 {
-		query.Add("timeout", r.timeout.String())
+	if r.sync {
+		query.Add("sync", "true")
+		if r.timeout != 0 {
+			query.Add("timeout", r.timeout.String())
+		}
 	}
 	finalUrl += "?" + query.Encode()
 	req, err := http.NewRequest(r.verb, finalUrl, r.body)
