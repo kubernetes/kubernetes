@@ -21,7 +21,7 @@ set -e
 source $(dirname $0)/common.sh
 
 readonly CROSS_BINARIES="
-  cloudcfg
+  kubecfg
 "
 
 for platform in ${KUBE_CROSSPLATFORMS}; do

@@ -37,16 +37,16 @@ Create a file named `redis-master.json` describing a single pod, which runs a re
 }
 ```
 
-Once you have that pod file, you can create the redis pod in your Kubernetes cluster using the `cloudcfg` CLI:
+Once you have that pod file, you can create the redis pod in your Kubernetes cluster using the `kubecfg` CLI:
 
 ```shell
-$ cluster/cloudcfg.sh -c examples/guestbook/redis-master.json create /pods
+$ cluster/kubecfg.sh -c examples/guestbook/redis-master.json create /pods
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master is running:
 
 ```shell
-cluster/cloudcfg.sh list /pods
+cluster/kubecfg.sh list /pods
 ```
 
 You'll see a single redis master pod. It will also display the machine that the pod is running on.
@@ -87,10 +87,10 @@ The pod that you created in Step One has the label `name=redis-master`. The sele
 
 This will cause all pods to see the redis master apparently running on localhost:10000.
 
-Once you have that service description, you can create the service with the `cloudcfg` cli:
+Once you have that service description, you can create the service with the `kubecfg` cli:
 
 ```shell
-$ cluster/cloudcfg.sh -c examples/guestbook/redis-master-service.json create /services
+$ cluster/kubecfg.sh -c examples/guestbook/redis-master-service.json create /services
 Name                Label Query         Port
 ----------          ----------          ----------
 redismaster         name=redis-master   10000
@@ -127,7 +127,7 @@ Create a file named `redis-slave-controller.json` that contains:
 Then you can create the service by running:
 
 ```shell
-$ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-controller.json create /replicationControllers
+$ cluster/kubecfg.sh -c examples/guestbook/redis-slave-controller.json create /replicationControllers
 Name                   Image(s)                   Selector            Replicas
 ----------             ----------                 ----------          ----------
 redisSlaveController   brendanburns/redis-slave   name=redisslave     2
@@ -142,7 +142,7 @@ redis-server --slaveof $SERVICE_HOST $REDISMASTER_SERVICE_PORT
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
 ```shell
-$ cluster/cloudcfg.sh list /pods
+$ cluster/kubecfg.sh list /pods
 Name                Image(s)                   Host                                          Labels
 ----------          ----------                 ----------                                    ----------
 redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
@@ -169,12 +169,12 @@ Just like the master, we want to have a service to proxy connections to the read
 }
 ```
 
-This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself--as we've done here--to make it easy to locate them with the `cloudcfg -l "label=value" list sevices` command.
+This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself--as we've done here--to make it easy to locate them with the `kubecfg -l "label=value" list sevices` command.
 
-Now that you have created the service specification, create it in your cluster with the `cloudcfg` CLI:
+Now that you have created the service specification, create it in your cluster with the `kubecfg` CLI:
 
 ```shell
-$ cluster/cloudcfg.sh -c examples/guestbook/redis-slave-service.json create /services
+$ cluster/kubecfg.sh -c examples/guestbook/redis-slave-service.json create /services
 Name                Label Query         Port
 ----------          ----------          ----------
 redisslave          name=redisslave     10001
@@ -210,7 +210,7 @@ Create a file named `frontend-controller.json`:
 With this file, you can turn up your frontend with:
 
 ```shell
-$ cluster/cloudcfg.sh -c examples/guestbook/frontend-controller.json create /replicationControllers
+$ cluster/kubecfg.sh -c examples/guestbook/frontend-controller.json create /replicationControllers
 Name                 Image(s)                 Selector            Replicas
 ----------           ----------               ----------          ----------
 frontendController   brendanburns/php-redis   name=frontend       3
@@ -219,7 +219,7 @@ frontendController   brendanburns/php-redis   name=frontend       3
 Once that's up you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
 ```shell
-$ cluster/cloudcfg.sh list /pods
+$ cluster/kubecfg.sh list /pods
 Name                Image(s)                   Host                                          Labels
 ----------          ----------                 ----------                                    ----------
 redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master

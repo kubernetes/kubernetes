@@ -295,7 +295,7 @@ function push-images-to-gcs() {
 function package-tarballs() {
   mkdir -p "${RELEASE_DIR}"
 
-  # Find all of the built cloudcfg binaries
+  # Find all of the built kubecfg binaries
   for platform in output/build/*/* ; do
     echo $platform
     local PLATFORM_TAG=$(echo $platform | awk -F / '{ printf "%s-%s", $3, $4 }')

@@ -18,9 +18,9 @@
 
 source $(dirname $0)/util.sh
 
-CLOUDCFG=$(dirname $0)/../output/go/cloudcfg
+CLOUDCFG=$(dirname $0)/../output/go/kubecfg
 if [ ! -x $CLOUDCFG ]; then
-  echo "Could not find cloudcfg binary. Run hack/build-go.sh to build it."
+  echo "Could not find kubecfg binary. Run hack/build-go.sh to build it."
   exit 1
 fi
 

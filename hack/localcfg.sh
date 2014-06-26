@@ -14,12 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file is exactly like cloudcfg.sh, but it talks to a local master
+# This file is exactly like kubecfg.sh, but it talks to a local master
 # (which you're assumed to be running with localkube.sh).
 
-CLOUDCFG=$(dirname $0)/../output/go/cloudcfg
+CLOUDCFG=$(dirname $0)/../output/go/kubecfg
 if [ ! -x $CLOUDCFG ]; then
-  echo "Could not find cloudcfg binary. Run hack/build-go.sh to build it."
+  echo "Could not find kubecfg binary. Run hack/build-go.sh to build it."
   exit 1
 fi
 
