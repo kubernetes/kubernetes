@@ -47,7 +47,7 @@ trap "rm -rf ${KUBE_TEMP}" EXIT
 
 get-password
 echo "Using password: $user:$passwd"
-htpasswd -b -c ${KUBE_TEMP}/htpasswd $user $passwd
+python $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $user $passwd
 HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
 (
