@@ -17,7 +17,8 @@ limitations under the License.
 package registry
 
 import (
-	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -52,7 +53,10 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		endpoints := make([]string, len(pods))
 		for ix, pod := range pods {
 			// TODO: Use port names in the service object, don't just use port #0
-			endpoints[ix] = fmt.Sprintf("%s:%d", pod.CurrentState.Host, pod.DesiredState.Manifest.Containers[0].Ports[0].HostPort)
+			endpoints[ix] = net.JoinHostPort(
+				pod.CurrentState.Host,
+				strconv.Itoa(pod.DesiredState.Manifest.Containers[0].Ports[0].HostPort),
+			)
 		}
 		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
 			Name:      service.ID,

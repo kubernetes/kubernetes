@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -128,8 +129,7 @@ func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address s
 			UpdateChannel: updateChannel,
 		}
 		s := &http.Server{
-			// TODO: This is broken if address is an ipv6 address.
-			Addr:           fmt.Sprintf("%s:%d", address, port),
+			Addr:           net.JoinHostPort(address, strconv.FormatUint(uint64(port), 10)),
 			Handler:        &handler,
 			ReadTimeout:    10 * time.Second,
 			WriteTimeout:   10 * time.Second,
