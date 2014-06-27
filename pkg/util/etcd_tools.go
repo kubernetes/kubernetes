@@ -116,27 +116,10 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 // Unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
-func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (modifiedIndex uint64, err error) {
-	_, modifiedIndex, err = h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
-	return modifiedIndex, err
-}
-
-// CompareAndSwapObj marshals obj via json, and stores under key so long as index matches
-// the previous modified index.
-func (h *EtcdHelper) CompareAndSwapObj(key string, obj interface{}, index uint64) error {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return err
-	}
-	_, err = h.Client.CompareAndSwap(key, string(data), 0, "", index)
-	return err
-}
-
-/*
 func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
 	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
 	return err
-}*/
+}
 
 func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
 	response, err := h.Client.Get(key, false, false)
@@ -202,11 +185,19 @@ func (h *EtcdHelper) AtomicUpdate(key string, objPtr interface{}, tryUpdate Etcd
 			return err
 		}
 
+		// First time this key has been used, just set.
+		if index == 0 {
+			//return h.SetObj(key, ret)
+		}
+
 		data, err := json.Marshal(ret)
 		if err != nil {
 			return err
 		}
 		_, err = h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
+		if IsEtcdConflict(err) {
+			continue
+		}
 		return err
 	}
 }
