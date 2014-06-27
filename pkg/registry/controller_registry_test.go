@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -183,5 +184,54 @@ func TestControllerParsing(t *testing.T) {
 
 	if !reflect.DeepEqual(controller, expectedController) {
 		t.Errorf("Parsing failed: %s %#v %#v", string(data), controller, expectedController)
+	}
+}
+
+func TestCreateController(t *testing.T) {
+	mockRegistry := MockControllerRegistry{}
+	mockPodRegistry := MockPodRegistry{
+		pods: []api.Pod{
+			{
+				JSONBase: api.JSONBase{ID: "foo"},
+			},
+		},
+	}
+	storage := ControllerRegistryStorage{
+		registry:    &mockRegistry,
+		podRegistry: &mockPodRegistry,
+		pollPeriod:  time.Millisecond * 1,
+	}
+	controller := api.ReplicationController{
+		JSONBase: api.JSONBase{ID: "test"},
+		DesiredState: api.ReplicationControllerState{
+			Replicas: 2,
+		},
+	}
+	channel, err := storage.Create(controller)
+	expectNoError(t, err)
+
+	select {
+	case <-time.After(time.Second * 1):
+		// Do nothing, this is expected.
+	case <-channel:
+		t.Error("Unexpected read from async channel")
+	}
+
+	mockPodRegistry.pods = []api.Pod{
+		{
+			JSONBase: api.JSONBase{ID: "foo"},
+		},
+		{
+			JSONBase: api.JSONBase{ID: "bar"},
+		},
+	}
+
+	time.Sleep(time.Millisecond * 30)
+
+	select {
+	case <-time.After(time.Second * 1):
+		t.Error("Unexpected timeout")
+	case <-channel:
+		// Do nothing, this is expected
 	}
 }

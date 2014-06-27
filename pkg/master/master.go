@@ -77,7 +77,7 @@ func (m *Master) init(cloud cloudprovider.Interface) {
 	go podCache.Loop()
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(m.podRegistry, containerInfo, registry.MakeFirstFitScheduler(m.minionRegistry, m.podRegistry, m.random), cloud, podCache),
-		"replicationControllers": registry.MakeControllerRegistryStorage(m.controllerRegistry),
+		"replicationControllers": registry.MakeControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
 	}
