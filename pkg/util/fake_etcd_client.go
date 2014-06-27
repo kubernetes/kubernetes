@@ -23,18 +23,6 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-// EtcdClient is an injectable interface for testing.
-type EtcdClient interface {
-	AddChild(key, data string, ttl uint64) (*etcd.Response, error)
-	Get(key string, sort, recursive bool) (*etcd.Response, error)
-	Set(key, value string, ttl uint64) (*etcd.Response, error)
-	Create(key, value string, ttl uint64) (*etcd.Response, error)
-	Delete(key string, recursive bool) (*etcd.Response, error)
-	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
-	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
-	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
-}
-
 type EtcdResponseWithError struct {
 	R *etcd.Response
 	E error
@@ -87,6 +75,12 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 	f.Data[key] = result
 	return result.R, f.Err
 }
+
+func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
+	// TODO: Maybe actually implement compare and swap here?
+	return f.Set(key, value, ttl)
+}
+
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
 	return f.Set(key, value, ttl)
 }

@@ -90,13 +90,17 @@ func makeContainerKey(machine string) string {
 	return "/registry/hosts/" + machine + "/kubelet"
 }
 
-func (registry *EtcdRegistry) loadManifests(machine string) (manifests []api.ContainerManifest, err error) {
-	err = registry.helper().ExtractObj(makeContainerKey(machine), &manifests, true)
-	return
+func (registry *EtcdRegistry) loadManifests(machine string) (manifests []api.ContainerManifest, index uint64, err error) {
+	err, index = registry.helper().ExtractObj(makeContainerKey(machine), &manifests, true)
+	return manifests, index, err
 }
 
-func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest) error {
-	return registry.helper().SetObj(makeContainerKey(machine), manifests)
+func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest, index uint64) error {
+	if index != 0 {
+		return registry.helper().CompareAndSwapObj(makeContainerKey(machine), manifests, index)
+	} else {
+		return registry.helper().SetObj(makeContainerKey(machine), manifests)
+	}
 }
 
 func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
@@ -108,7 +112,7 @@ func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
 }
 
 func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
-	manifests, err := registry.loadManifests(machine)
+	manifests, index, err := registry.loadManifests(machine)
 	if err != nil {
 		return err
 	}
@@ -124,8 +128,18 @@ func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	if err != nil {
 		return err
 	}
-	manifests = append(manifests, manifest)
-	return registry.updateManifests(machine, manifests)
+	for {
+		manifests = append(manifests, manifest)
+		err = registry.updateManifests(machine, manifests, index)
+		if util.IsEtcdConflict(err) {
+			manifests, index, err = registry.loadManifests(machine)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		return err
+	}
 }
 
 func (registry *EtcdRegistry) UpdatePod(pod api.Pod) error {
@@ -141,36 +155,42 @@ func (registry *EtcdRegistry) DeletePod(podID string) error {
 }
 
 func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error {
-	manifests, err := registry.loadManifests(machine)
-	if err != nil {
-		return err
-	}
-	newManifests := make([]api.ContainerManifest, 0)
-	found := false
-	for _, manifest := range manifests {
-		if manifest.Id != podID {
-			newManifests = append(newManifests, manifest)
-		} else {
-			found = true
+	for {
+		manifests, index, err := registry.loadManifests(machine)
+		if err != nil {
+			return err
 		}
-	}
-	if !found {
-		// This really shouldn't happen, it indicates something is broken, and likely
-		// there is a lost pod somewhere.
-		// However it is "deleted" so log it and move on
-		glog.Infof("Couldn't find: %s in %#v", podID, manifests)
-	}
-	if err = registry.updateManifests(machine, newManifests); err != nil {
-		return err
+		newManifests := make([]api.ContainerManifest, 0)
+		found := false
+		for _, manifest := range manifests {
+			if manifest.Id != podID {
+				newManifests = append(newManifests, manifest)
+			} else {
+				found = true
+			}
+		}
+		if !found {
+			// This really shouldn't happen, it indicates something is broken, and likely
+			// there is a lost pod somewhere.
+			// However it is "deleted" so log it and move on
+			glog.Infof("Couldn't find: %s in %#v", podID, manifests)
+		}
+		if err = registry.updateManifests(machine, newManifests, index); err != nil {
+			if util.IsEtcdConflict(err) {
+				continue
+			}
+			return err
+		}
+		break
 	}
 	key := makePodKey(machine, podID)
-	_, err = registry.etcdClient.Delete(key, true)
+	_, err := registry.etcdClient.Delete(key, true)
 	return err
 }
 
 func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (pod api.Pod, err error) {
 	key := makePodKey(machine, podID)
-	err = registry.helper().ExtractObj(key, &pod, false)
+	err, _ = registry.helper().ExtractObj(key, &pod, false)
 	if err != nil {
 		return
 	}
@@ -205,7 +225,7 @@ func makeControllerKey(id string) string {
 func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
-	err := registry.helper().ExtractObj(key, &controller, false)
+	err, _ := registry.helper().ExtractObj(key, &controller, false)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +264,7 @@ func (registry *EtcdRegistry) CreateService(svc api.Service) error {
 func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
-	err := registry.helper().ExtractObj(key, &svc, false)
+	err, _ := registry.helper().ExtractObj(key, &svc, false)
 	if err != nil {
 		return nil, err
 	}

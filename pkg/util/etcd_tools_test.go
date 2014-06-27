@@ -86,7 +86,7 @@ func TestExtractObj(t *testing.T) {
 	fakeClient.Set("/some/key", MakeJSONString(expect), 0)
 	helper := EtcdHelper{fakeClient}
 	var got testMarshalType
-	err := helper.ExtractObj("/some/key", &got, false)
+	err, _ := helper.ExtractObj("/some/key", &got, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -120,11 +120,11 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	helper := EtcdHelper{fakeClient}
 	try := func(key string) {
 		var got testMarshalType
-		err := helper.ExtractObj(key, &got, false)
+		err, _ := helper.ExtractObj(key, &got, false)
 		if err == nil {
 			t.Errorf("%s: wanted error but didn't get one", key)
 		}
-		err = helper.ExtractObj(key, &got, true)
+		err, _ = helper.ExtractObj(key, &got, true)
 		if err != nil {
 			t.Errorf("%s: didn't want error but got %#v", key, err)
 		}

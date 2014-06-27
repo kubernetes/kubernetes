@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -36,6 +37,7 @@ import (
 )
 
 func main() {
+	runtime.GOMAXPROCS(4)
 	util.InitLogs()
 	defer util.FlushLogs()
 
@@ -51,7 +53,7 @@ func main() {
 
 	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(apiserver.URL, nil))
 
-	controllerManager.Run(10 * time.Second)
+	controllerManager.Run(1 * time.Second)
 
 	// Kublet
 	fakeDocker1 := &kubelet.FakeDockerClient{}
@@ -102,7 +104,7 @@ func main() {
 	// Validate that they're truly up.
 	pods, err := kubeClient.ListPods(nil)
 	if err != nil || len(pods.Items) != 2 {
-		glog.Fatal("FAILED")
+		glog.Fatal("FAILED: %#v", pods.Items)
 	}
 
 	// Check that kubelet tried to make the pods.
@@ -124,7 +126,7 @@ func main() {
 	// We expect 5: 2 net containers + 2 pods from the replication controller +
 	//              1 net container + 2 pods from the URL.
 	if len(createdPods) != 7 {
-		glog.Fatalf("Unexpected list of created pods: %#v\n", createdPods)
+		glog.Fatalf("Unexpected list of created pods: %#v %#v %#v\n", createdPods, fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK")
 }
@@ -146,6 +148,7 @@ const (
 	// This is copied from, and should be kept in sync with:
 	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
 	testManifestFile = `version: v1beta1
+id: web-test
 containers:
   - name: redis
     image: dockerfile/redis
