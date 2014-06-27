@@ -35,7 +35,6 @@ type KubeletServer struct {
 // kubeletInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type kubeletInterface interface {
-	GetContainerID(name string) (string, bool, error)
 	GetContainerStats(name string) (*api.ContainerStats, error)
 	GetContainerInfo(name string) (string, error)
 }
@@ -78,6 +77,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			s.UpdateChannel <- manifestUpdate{httpServerSource, manifests}
 		}
 	case u.Path == "/containerStats":
+		// NOTE: The master appears to pass a Pod.ID
 		container := u.Query().Get("container")
 		if len(container) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
@@ -105,27 +105,23 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Content-type", "application/json")
 		w.Write(data)
 	case u.Path == "/containerInfo":
+		// NOTE: The master appears to pass a Pod.ID
+		// The server appears to pass a Pod.ID
 		container := u.Query().Get("container")
 		if len(container) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprint(w, "Missing container selector arg.")
 			return
 		}
-		id, found, err := s.Kubelet.GetContainerID(container)
-		if !found {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, "{}")
-			return
-		}
-		body, err := s.Kubelet.GetContainerInfo(id)
+		data, err := s.Kubelet.GetContainerInfo(container)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Internal Error: %#v", err)
 			return
 		}
-		w.Header().Add("Content-type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, body)
+		w.Header().Add("Content-type", "application/json")
+		fmt.Fprint(w, data)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, "Not found.")

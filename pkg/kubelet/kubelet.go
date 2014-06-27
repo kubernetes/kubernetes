@@ -61,6 +61,9 @@ type DockerInterface interface {
 	StopContainer(id string, timeout uint) error
 }
 
+// Type to make it clear when we're working with docker container Ids
+type DockerId string
+
 //Interface for testability
 type DockerPuller interface {
 	Pull(image string) error
@@ -169,64 +172,37 @@ func (kl *Kubelet) LogEvent(event *api.Event) error {
 	return err
 }
 
-// Does this container exist on this host? Returns true if so, and the name under which the container is running.
-// Returns an error if one occurs.
-func (kl *Kubelet) ContainerExists(manifest *api.ContainerManifest, container *api.Container) (exists bool, foundName string, err error) {
-	containers, err := kl.ListContainers()
-	if err != nil {
-		return false, "", err
-	}
-	for _, name := range containers {
-		manifestId, containerName := dockerNameToManifestAndContainer(name)
-		if manifestId == manifest.Id && containerName == container.Name {
-			// TODO(bburns) : This leads to an extra list.  Convert this to use the returned ID and a straight call
-			// to inspect
-			data, err := kl.GetContainerByName(name)
-			return data != nil, name, err
-		}
-	}
-	return false, "", nil
-}
-
-// GetContainerID looks at the list of containers on the machine and returns the ID of the container whose name
-// matches 'name'.  It returns the name of the container, or empty string, if the container isn't found.
-// it returns true if the container is found, false otherwise, and any error that occurs.
-func (kl *Kubelet) GetContainerID(name string) (string, bool, error) {
-	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
-	if err != nil {
-		return "", false, err
-	}
-	for _, value := range containerList {
-		if strings.Contains(value.Names[0], name) {
-			return value.ID, true, nil
-		}
-	}
-	return "", false, nil
-}
-
-// Get a container by name.
-// returns the container data from Docker, or an error if one exists.
-func (kl *Kubelet) GetContainerByName(name string) (*docker.Container, error) {
-	id, found, err := kl.GetContainerID(name)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-	return kl.DockerClient.InspectContainer(id)
-}
-
-func (kl *Kubelet) ListContainers() ([]string, error) {
-	result := []string{}
+// Return a map of docker containers that we manage. The map key is the docker container ID
+func (kl *Kubelet) getDockerContainers() (map[DockerId]docker.APIContainers, error) {
+	result := map[DockerId]docker.APIContainers{}
 	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
 		return result, err
 	}
 	for _, value := range containerList {
-		result = append(result, value.Names[0])
+		// Skip containers that we didn't create to allow users to manually
+		// spin up their own containers if they want.
+		if !strings.HasPrefix(value.Names[0], "/"+containerNamePrefix+"--") {
+			continue
+		}
+		result[DockerId(value.ID)] = value
 	}
 	return result, err
+}
+
+// Return Docker's container ID for a manifest's container. Returns an empty string if it doesn't exist.
+func (kl *Kubelet) getContainerId(manifest *api.ContainerManifest, container *api.Container) (DockerId, error) {
+	dockerContainers, err := kl.getDockerContainers()
+	if err != nil {
+		return "", err
+	}
+	for id, dockerContainer := range dockerContainers {
+		manifestId, containerName := parseDockerName(dockerContainer.Names[0])
+		if manifestId == manifest.Id && containerName == container.Name {
+			return DockerId(id), nil
+		}
+	}
+	return "", nil
 }
 
 type dockerPuller struct{}
@@ -261,14 +237,14 @@ func unescapeDash(in string) (out string) {
 const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both manifest id and container name.
-func manifestAndContainerToDockerName(manifest *api.ContainerManifest, container *api.Container) string {
+func buildDockerName(manifest *api.ContainerManifest, container *api.Container) string {
 	// Note, manifest.Id could be blank.
 	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.Id), rand.Uint32())
 }
 
 // Upacks a container name, returning the manifest id and container name we would have used to
 // construct the docker name. If the docker name isn't one we created, we may return empty strings.
-func dockerNameToManifestAndContainer(name string) (manifestId, containerName string) {
+func parseDockerName(name string) (manifestId, containerName string) {
 	// For some reason docker appears to be appending '/' to names.
 	// If its there, strip it.
 	if name[0] == '/' {
@@ -346,15 +322,14 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
-func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.Container, netMode string) (name string, err error) {
-	name = manifestAndContainerToDockerName(manifest, container)
-
+// Run a single container from a manifest. Returns the docker container ID
+func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.Container, netMode string) (id DockerId, err error) {
 	envVariables := makeEnvironmentVariables(container)
 	volumes, binds := makeVolumesAndBinds(container)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
 	opts := docker.CreateContainerOptions{
-		Name: name,
+		Name: buildDockerName(manifest, container),
 		Config: &docker.Config{
 			Image:        container.Image,
 			ExposedPorts: exposedPorts,
@@ -368,25 +343,18 @@ func (kl *Kubelet) RunContainer(manifest *api.ContainerManifest, container *api.
 	if err != nil {
 		return "", err
 	}
-	return name, kl.DockerClient.StartContainer(dockerContainer.ID, &docker.HostConfig{
+	err = kl.DockerClient.StartContainer(dockerContainer.ID, &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
 	})
+	return DockerId(dockerContainer.ID), err
 }
 
-func (kl *Kubelet) KillContainer(name string) error {
-	id, found, err := kl.GetContainerID(name)
-	if err != nil {
-		return err
-	}
-	if !found {
-		// This is weird, but not an error, so yell and then return nil
-		glog.Infof("Couldn't find container: %s", name)
-		return nil
-	}
-	err = kl.DockerClient.StopContainer(id, 10)
-	manifestId, containerName := dockerNameToManifestAndContainer(name)
+// Kill a docker container
+func (kl *Kubelet) killContainer(container docker.APIContainers) error {
+	err := kl.DockerClient.StopContainer(container.ID, 10)
+	manifestId, containerName := parseDockerName(container.Names[0])
 	kl.LogEvent(&api.Event{
 		Event: "STOP",
 		Manifest: &api.ContainerManifest{
@@ -642,20 +610,13 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, updateChannel c
 
 const networkContainerName = "net"
 
-func (kl *Kubelet) networkContainerExists(manifest *api.ContainerManifest) (string, bool, error) {
-	pods, err := kl.ListContainers()
-	if err != nil {
-		return "", false, err
-	}
-	for _, name := range pods {
-		if strings.Contains(name, containerNamePrefix+"--"+networkContainerName+"--"+escapeDash(manifest.Id)+"--") {
-			return name, true, nil
-		}
-	}
-	return "", false, nil
+// Return the docker ID for a manifest's network container. Returns an empty string if it doesn't exist.
+func (kl *Kubelet) getNetworkContainerId(manifest *api.ContainerManifest) (DockerId, error) {
+	return kl.getContainerId(manifest, &api.Container{Name: networkContainerName})
 }
 
-func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (string, error) {
+// Create a network container for a manifest. Returns the docker container ID of the newly created container.
+func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (DockerId, error) {
 	var ports []api.Port
 	// Docker only exports ports from the network container.  Let's
 	// collect all of the relevant ports and export them.
@@ -669,73 +630,69 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (stri
 		Ports:   ports,
 	}
 	kl.DockerPuller.Pull("busybox")
-	return kl.RunContainer(manifest, container, "")
+	return kl.runContainer(manifest, container, "")
 }
 
 // Sync the configured list of containers (desired state) with the host current state
 func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	glog.Infof("Desired: %#v", config)
 	var err error
-	desired := map[string]bool{}
+	dockerIdsToKeep := map[DockerId]bool{}
+
+	// Check for any containers that need starting
 	for _, manifest := range config {
-		netName, exists, err := kl.networkContainerExists(&manifest)
+		// Make sure we have a network container
+		netId, err := kl.getNetworkContainerId(&manifest)
 		if err != nil {
 			glog.Errorf("Failed to introspect network container. (%#v)  Skipping container %s", err, manifest.Id)
 			continue
 		}
-		if !exists {
+		if netId == "" {
 			glog.Infof("Network container doesn't exist, creating")
-			netName, err = kl.createNetworkContainer(&manifest)
+			netId, err = kl.createNetworkContainer(&manifest)
 			if err != nil {
-				glog.Errorf("Failed to create network container: %#v", err)
+				glog.Errorf("Failed to create network container: %#v Skipping container %s", err, manifest.Id)
+				continue
 			}
-			// Docker list prefixes '/' for some reason, so let's do that...
-			netName = "/" + netName
 		}
-		desired[netName] = true
-		for _, element := range manifest.Containers {
-			var exists bool
-			exists, actualName, err := kl.ContainerExists(&manifest, &element)
+		dockerIdsToKeep[netId] = true
+
+		for _, container := range manifest.Containers {
+			containerId, err := kl.getContainerId(&manifest, &container)
 			if err != nil {
 				glog.Errorf("Error detecting container: %#v skipping.", err)
 				continue
 			}
-			if !exists {
-				glog.Infof("%#v doesn't exist, creating", element)
-				kl.DockerPuller.Pull(element.Image)
+			if containerId == "" {
+				glog.Infof("%#v doesn't exist, creating", container)
+				kl.DockerPuller.Pull(container.Image)
 				if err != nil {
 					glog.Errorf("Error pulling container: %#v", err)
 					continue
 				}
-				// netName has the '/' prefix, so slice it off
-				networkContainer := netName[1:]
-				actualName, err = kl.RunContainer(&manifest, &element, "container:"+networkContainer)
-				// For some reason, list gives back names that start with '/'
-				actualName = "/" + actualName
-
+				containerId, err = kl.runContainer(&manifest, &container, "container:"+string(netId))
 				if err != nil {
 					// TODO(bburns) : Perhaps blacklist a container after N failures?
 					glog.Errorf("Error creating container: %#v", err)
-					desired[actualName] = true
 					continue
 				}
 			} else {
-				glog.V(1).Infof("%#v exists as %v", element.Name, actualName)
+				glog.V(1).Infof("%#v exists as %v", container.Name, containerId)
 			}
-			desired[actualName] = true
+			dockerIdsToKeep[containerId] = true
 		}
 	}
-	existingContainers, _ := kl.ListContainers()
-	glog.Infof("Existing: %#v Desired: %#v", existingContainers, desired)
-	for _, container := range existingContainers {
-		// Skip containers that we didn't create to allow users to manually
-		// spin up their own containers if they want.
-		if !strings.HasPrefix(container, "/"+containerNamePrefix+"--") {
-			continue
-		}
-		if !desired[container] {
-			glog.Infof("Killing: %s", container)
-			err = kl.KillContainer(container)
+
+	// Kill any containers we don't need
+	existingContainers, err := kl.getDockerContainers()
+	if err != nil {
+		glog.Errorf("Error listing containers: %#v", err)
+		return err
+	}
+	for id, container := range existingContainers {
+		if !dockerIdsToKeep[id] {
+			glog.Infof("Killing: %s", id)
+			err = kl.killContainer(container)
 			if err != nil {
 				glog.Errorf("Error killing container: %#v", err)
 			}
@@ -772,8 +729,31 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 	}
 }
 
+// getContainerIdFromName looks at the list of containers on the machine and returns the ID of the container whose name
+// matches 'name'.  It returns the name of the container, or empty string, if the container isn't found.
+// it returns true if the container is found, false otherwise, and any error that occurs.
+// TODO: This functions exists to support GetContainerInfo and GetContainerStats
+//       It should be removed once those two functions start taking proper pod.IDs
+func (kl *Kubelet) getContainerIdFromName(name string) (DockerId, bool, error) {
+	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
+	if err != nil {
+		return "", false, err
+	}
+	for _, value := range containerList {
+		if strings.Contains(value.Names[0], name) {
+			return DockerId(value.ID), true, nil
+		}
+	}
+	return "", false, nil
+}
+
+// Returns docker info for a container
 func (kl *Kubelet) GetContainerInfo(name string) (string, error) {
-	info, err := kl.DockerClient.InspectContainer(name)
+	dockerId, found, err := kl.getContainerIdFromName(name)
+	if err != nil || !found {
+		return "{}", err
+	}
+	info, err := kl.DockerClient.InspectContainer(string(dockerId))
 	if err != nil {
 		return "{}", err
 	}
@@ -781,16 +761,17 @@ func (kl *Kubelet) GetContainerInfo(name string) (string, error) {
 	return string(data), err
 }
 
+//Returns stats (from Cadvisor) for a container
 func (kl *Kubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
 	if kl.CadvisorClient == nil {
 		return nil, nil
 	}
-	id, found, err := kl.GetContainerID(name)
+	dockerId, found, err := kl.getContainerIdFromName(name)
 	if err != nil || !found {
 		return nil, err
 	}
 
-	info, err := kl.CadvisorClient.ContainerInfo(fmt.Sprintf("/docker/%v", id))
+	info, err := kl.CadvisorClient.ContainerInfo(fmt.Sprintf("/docker/%s", string(dockerId)))
 
 	if err != nil {
 		return nil, err

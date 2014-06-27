@@ -109,11 +109,11 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyPackUnpack(t *testing.T, manifestId, containerName string) {
-	name := manifestAndContainerToDockerName(
+	name := buildDockerName(
 		&api.ContainerManifest{Id: manifestId},
 		&api.Container{Name: containerName},
 	)
-	returnedManifestId, returnedContainerName := dockerNameToManifestAndContainer(name)
+	returnedManifestId, returnedContainerName := parseDockerName(name)
 	if manifestId != returnedManifestId || containerName != returnedContainerName {
 		t.Errorf("For (%s, %s), unpacked (%s, %s)", manifestId, containerName, returnedManifestId, returnedContainerName)
 	}
@@ -133,7 +133,7 @@ func TestContainerManifestNaming(t *testing.T) {
 	verifyPackUnpack(t, "_m___anifest", "-_-container")
 }
 
-func TestContainerExists(t *testing.T) {
+func TestGetContainerId(t *testing.T) {
 	fakeDocker := FakeDockerClient{
 		err: nil,
 	}
@@ -149,19 +149,21 @@ func TestContainerExists(t *testing.T) {
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
+			ID:    "foobar",
 			Names: []string{"/k8s--foo--qux--1234"},
 		},
 		{
-			Names: []string{"/k8s--bar--qux--1234"},
+			ID:    "barbar",
+			Names: []string{"/k8s--bar--qux--2565"},
 		},
 	}
 	fakeDocker.container = &docker.Container{
 		ID: "foobar",
 	}
 
-	exists, _, err := kubelet.ContainerExists(&manifest, &container)
-	verifyCalls(t, fakeDocker, []string{"list", "list", "inspect"})
-	if !exists {
+	id, err := kubelet.getContainerId(&manifest, &container)
+	verifyCalls(t, fakeDocker, []string{"list"})
+	if id == "" {
 		t.Errorf("Failed to find container %#v", container)
 	}
 	if err != nil {
@@ -170,102 +172,11 @@ func TestContainerExists(t *testing.T) {
 
 	fakeDocker.clearCalls()
 	missingManifest := api.ContainerManifest{Id: "foobar"}
-	exists, _, err = kubelet.ContainerExists(&missingManifest, &container)
+	id, err = kubelet.getContainerId(&missingManifest, &container)
 	verifyCalls(t, fakeDocker, []string{"list"})
-	if exists {
-		t.Errorf("Failed to not find container %#v, missingManifest")
+	if id != "" {
+		t.Errorf("Failed to not find container %#v", missingManifest)
 	}
-}
-
-func TestGetContainerID(t *testing.T) {
-	fakeDocker := FakeDockerClient{
-		err: nil,
-	}
-	kubelet := Kubelet{
-		DockerClient: &fakeDocker,
-		DockerPuller: &FakeDockerPuller{},
-	}
-	fakeDocker.containerList = []docker.APIContainers{
-		{
-			Names: []string{"foo"},
-			ID:    "1234",
-		},
-		{
-			Names: []string{"bar"},
-			ID:    "4567",
-		},
-	}
-
-	id, found, err := kubelet.GetContainerID("foo")
-	verifyBoolean(t, true, found)
-	verifyStringEquals(t, id, "1234")
-	verifyNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list"})
-	fakeDocker.clearCalls()
-
-	id, found, err = kubelet.GetContainerID("bar")
-	verifyBoolean(t, true, found)
-	verifyStringEquals(t, id, "4567")
-	verifyNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list"})
-	fakeDocker.clearCalls()
-
-	id, found, err = kubelet.GetContainerID("NotFound")
-	verifyBoolean(t, false, found)
-	verifyNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list"})
-}
-
-func TestGetContainerByName(t *testing.T) {
-	fakeDocker := FakeDockerClient{
-		err: nil,
-	}
-	kubelet := Kubelet{
-		DockerClient: &fakeDocker,
-		DockerPuller: &FakeDockerPuller{},
-	}
-	fakeDocker.containerList = []docker.APIContainers{
-		{
-			Names: []string{"foo"},
-		},
-		{
-			Names: []string{"bar"},
-		},
-	}
-	fakeDocker.container = &docker.Container{
-		ID: "foobar",
-	}
-
-	container, err := kubelet.GetContainerByName("foo")
-	verifyCalls(t, fakeDocker, []string{"list", "inspect"})
-	if container == nil {
-		t.Errorf("Unexpected nil container")
-	}
-	verifyStringEquals(t, container.ID, "foobar")
-	verifyNoError(t, err)
-}
-
-func TestListContainers(t *testing.T) {
-	fakeDocker := FakeDockerClient{
-		err: nil,
-	}
-	kubelet := Kubelet{
-		DockerClient: &fakeDocker,
-		DockerPuller: &FakeDockerPuller{},
-	}
-	fakeDocker.containerList = []docker.APIContainers{
-		{
-			Names: []string{"foo"},
-		},
-		{
-			Names: []string{"bar"},
-		},
-	}
-
-	containers, err := kubelet.ListContainers()
-	verifyStringArrayEquals(t, containers, []string{"foo", "bar"})
-	verifyNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list"})
 }
 
 func TestKillContainerWithError(t *testing.T) {
@@ -273,10 +184,12 @@ func TestKillContainerWithError(t *testing.T) {
 		err: fmt.Errorf("sample error"),
 		containerList: []docker.APIContainers{
 			{
-				Names: []string{"foo"},
+				ID:    "1234",
+				Names: []string{"/k8s--foo--qux--1234"},
 			},
 			{
-				Names: []string{"bar"},
+				ID:    "5678",
+				Names: []string{"/k8s--bar--qux--5678"},
 			},
 		},
 	}
@@ -284,9 +197,9 @@ func TestKillContainerWithError(t *testing.T) {
 		DockerClient: &fakeDocker,
 		DockerPuller: &FakeDockerPuller{},
 	}
-	err := kubelet.KillContainer("foo")
+	err := kubelet.killContainer(fakeDocker.containerList[0])
 	verifyError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list"})
+	verifyCalls(t, fakeDocker, []string{"stop"})
 }
 
 func TestKillContainer(t *testing.T) {
@@ -299,19 +212,21 @@ func TestKillContainer(t *testing.T) {
 	}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			Names: []string{"foo"},
+			ID:    "1234",
+			Names: []string{"/k8s--foo--qux--1234"},
 		},
 		{
-			Names: []string{"bar"},
+			ID:    "5678",
+			Names: []string{"/k8s--bar--qux--5678"},
 		},
 	}
 	fakeDocker.container = &docker.Container{
 		ID: "foobar",
 	}
 
-	err := kubelet.KillContainer("foo")
+	err := kubelet.killContainer(fakeDocker.containerList[0])
 	verifyNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list", "stop"})
+	verifyCalls(t, fakeDocker, []string{"stop"})
 }
 
 func TestResponseToContainersNil(t *testing.T) {
@@ -491,14 +406,7 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	if len(fakeDocker.called) != 5 ||
-		fakeDocker.called[0] != "list" ||
-		fakeDocker.called[1] != "list" ||
-		fakeDocker.called[2] != "list" ||
-		fakeDocker.called[3] != "inspect" ||
-		fakeDocker.called[4] != "list" {
-		t.Errorf("Unexpected call sequence: %#v", fakeDocker.called)
-	}
+	verifyCalls(t, fakeDocker, []string{"list", "list", "list"})
 }
 
 func TestSyncManifestsDeletes(t *testing.T) {
@@ -527,15 +435,11 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{})
 	expectNoError(t, err)
-	if len(fakeDocker.called) != 5 ||
-		fakeDocker.called[0] != "list" ||
-		fakeDocker.called[1] != "list" ||
-		fakeDocker.called[2] != "stop" ||
-		fakeDocker.called[3] != "list" ||
-		fakeDocker.called[4] != "stop" ||
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+	if len(fakeDocker.stopped) != 2 ||
 		fakeDocker.stopped[0] != "1234" ||
 		fakeDocker.stopped[1] != "9876" {
-		t.Errorf("Unexpected call sequence: %#v %s", fakeDocker.called, fakeDocker.stopped)
+		t.Errorf("Unexpected sequence of stopped containers: %s", fakeDocker.stopped)
 	}
 }
 
