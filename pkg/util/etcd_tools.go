@@ -24,10 +24,24 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+// EtcdClient is an injectable interface for testing.
+type EtcdClient interface {
+	AddChild(key, data string, ttl uint64) (*etcd.Response, error)
+	Get(key string, sort, recursive bool) (*etcd.Response, error)
+	Set(key, value string, ttl uint64) (*etcd.Response, error)
+	Create(key, value string, ttl uint64) (*etcd.Response, error)
+	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
+	Delete(key string, recursive bool) (*etcd.Response, error)
+	// I'd like to use directional channels here (e.g. <-chan) but this interface mimics
+	// the etcd client interface which doesn't, and it doesn't seem worth it to wrap the api.
+	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
+}
+
 // Interface exposing only the etcd operations needed by EtcdHelper.
 type EtcdGetSet interface {
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
+	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
 }
 
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
@@ -37,6 +51,16 @@ type EtcdHelper struct {
 
 // Returns true iff err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
+	return isEtcdErrorNum(err, 100)
+}
+
+// Returns true iff err is an etcd write conflict.
+func IsEtcdConflict(err error) bool {
+	return isEtcdErrorNum(err, 101)
+}
+
+// Returns true iff err is an etcd error, whose errorCode matches errorCode
+func isEtcdErrorNum(err error, errorCode int) bool {
 	if err == nil {
 		return false
 	}
@@ -46,7 +70,7 @@ func IsEtcdNotFound(err error) bool {
 		if etcdError == nil {
 			return false
 		}
-		if etcdError.ErrorCode == 100 {
+		if etcdError.ErrorCode == errorCode {
 			return true
 		}
 	}
@@ -92,23 +116,33 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 // Unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
-func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
+func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (error, uint64) {
 	response, err := h.Client.Get(key, false, false)
 
 	if err != nil && !IsEtcdNotFound(err) {
-		return err
+		return err, 0
 	}
 	if err != nil || response.Node == nil || len(response.Node.Value) == 0 {
 		if ignoreNotFound {
 			pv := reflect.ValueOf(objPtr)
 			pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
-			return nil
+			return nil, 0
 		} else if err != nil {
-			return err
+			return err, 0
 		}
-		return fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
+		return fmt.Errorf("key '%v' found no nodes field: %#v", key, response), 0
 	}
-	return json.Unmarshal([]byte(response.Node.Value), objPtr)
+	return json.Unmarshal([]byte(response.Node.Value), objPtr), response.Node.ModifiedIndex
+}
+
+// CompareAndSwapObj marshals obj via json, and stores under key so long as index matches the previous modified index
+func (h *EtcdHelper) CompareAndSwapObj(key string, obj interface{}, index uint64) error {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	_, err = h.Client.CompareAndSwap(key, string(data), 0, "", index)
+	return err
 }
 
 // SetObj marshals obj via json, and stores under key.

@@ -640,3 +640,18 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", endpointsOut, endpoints)
 	}
 }
+
+// TODO We need a test for the compare and swap behavior.  This basically requires two things:
+//   1) Add a per-operation synchronization channel to the fake etcd client, such that any operation waits on that
+//      channel, this will enable us to orchestrate the flow of etcd requests in the test.
+//   2) We need to make the map from key to (response, error) actually be a [](response, error) and pop
+//      our way through the responses.  That will enable us to hand back multiple different responses for
+//      the same key.
+//   Once that infrastructure is in place, the test looks something like:
+//      Routine #1                               Routine #2
+//         Read
+//         Wait for sync on update               Read
+//                                               Update
+//         Update
+//   In the buggy case, this will result in lost data.  In the correct case, the second update should fail
+//   and be retried.
