@@ -19,6 +19,7 @@ package client
 import (
 	"bytes"
 	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
@@ -228,5 +229,77 @@ func TestSync(t *testing.T) {
 	r.Sync(true)
 	if !r.sync {
 		t.Errorf("'Sync' doesn't work")
+	}
+}
+
+func TestSetPollPeriod(t *testing.T) {
+	c := New("", nil)
+	r := c.Get()
+	if r.pollPeriod == 0 {
+		t.Errorf("polling should be on by default")
+	}
+	r.PollPeriod(time.Hour)
+	if r.pollPeriod != time.Hour {
+		t.Errorf("'PollPeriod' doesn't work")
+	}
+}
+
+func TestPolling(t *testing.T) {
+	objects := []interface{}{
+		&api.Status{Status: api.StatusWorking, Details: "1234"},
+		&api.Status{Status: api.StatusWorking, Details: "1234"},
+		&api.Status{Status: api.StatusWorking, Details: "1234"},
+		&api.Status{Status: api.StatusWorking, Details: "1234"},
+		&api.Status{Status: api.StatusSuccess},
+	}
+
+	callNumber := 0
+	testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, err := api.Encode(objects[callNumber])
+		if err != nil {
+			t.Errorf("Unexpected encode error")
+		}
+		callNumber++
+		w.Write(data)
+	}))
+
+	auth := AuthInfo{User: "user", Password: "pass"}
+	s := New(testServer.URL, &auth)
+
+	trials := []func(){
+		func() {
+			// Check that we do indeed poll when asked to.
+			obj, err := s.Get().PollPeriod(5 * time.Millisecond).Do().Get()
+			if err != nil {
+				t.Errorf("Unexpected error: %v %#v", err, err)
+				return
+			}
+			if s, ok := obj.(*api.Status); !ok || s.Status != api.StatusSuccess {
+				t.Errorf("Unexpected return object: %#v", obj)
+				return
+			}
+			if callNumber != len(objects) {
+				t.Errorf("Unexpected number of calls: %v", callNumber)
+			}
+		},
+		func() {
+			// Check that we don't poll when asked not to.
+			obj, err := s.Get().PollPeriod(0).Do().Get()
+			if err == nil {
+				t.Errorf("Unexpected non error: %v", obj)
+				return
+			}
+			if se, ok := err.(*StatusErr); !ok || se.Status.Status != api.StatusWorking {
+				t.Errorf("Unexpected kind of error: %#v", err)
+				return
+			}
+			if callNumber != 1 {
+				t.Errorf("Unexpected number of calls: %v", callNumber)
+			}
+		},
+	}
+	for _, f := range trials {
+		callNumber = 0
+		f()
 	}
 }
