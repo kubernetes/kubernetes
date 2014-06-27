@@ -116,26 +116,13 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 // Unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
-func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (error, uint64) {
-	response, err := h.Client.Get(key, false, false)
-
-	if err != nil && !IsEtcdNotFound(err) {
-		return err, 0
-	}
-	if err != nil || response.Node == nil || len(response.Node.Value) == 0 {
-		if ignoreNotFound {
-			pv := reflect.ValueOf(objPtr)
-			pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
-			return nil, 0
-		} else if err != nil {
-			return err, 0
-		}
-		return fmt.Errorf("key '%v' found no nodes field: %#v", key, response), 0
-	}
-	return json.Unmarshal([]byte(response.Node.Value), objPtr), response.Node.ModifiedIndex
+func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (modifiedIndex uint64, err error) {
+	_, modifiedIndex, err = h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	return modifiedIndex, err
 }
 
-// CompareAndSwapObj marshals obj via json, and stores under key so long as index matches the previous modified index
+// CompareAndSwapObj marshals obj via json, and stores under key so long as index matches
+// the previous modified index.
 func (h *EtcdHelper) CompareAndSwapObj(key string, obj interface{}, index uint64) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
@@ -143,6 +130,32 @@ func (h *EtcdHelper) CompareAndSwapObj(key string, obj interface{}, index uint64
 	}
 	_, err = h.Client.CompareAndSwap(key, string(data), 0, "", index)
 	return err
+}
+
+/*
+func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
+	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	return err
+}*/
+
+func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
+	response, err := h.Client.Get(key, false, false)
+
+	if err != nil && !IsEtcdNotFound(err) {
+		return "", 0, err
+	}
+	if err != nil || response.Node == nil || len(response.Node.Value) == 0 {
+		if ignoreNotFound {
+			pv := reflect.ValueOf(objPtr)
+			pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
+			return "", 0, nil
+		} else if err != nil {
+			return "", 0, err
+		}
+		return "", 0, fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
+	}
+	body = response.Node.Value
+	return body, response.Node.ModifiedIndex, json.Unmarshal([]byte(body), objPtr)
 }
 
 // SetObj marshals obj via json, and stores under key.
@@ -153,4 +166,47 @@ func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 	}
 	_, err = h.Client.Set(key, string(data), 0)
 	return err
+}
+
+// Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
+// See the comment for AtomicUpdate for more detail.
+type EtcdUpdateFunc func() (interface{}, error)
+
+// AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
+// Note, tryUpdate may be called more than once.
+//
+// Example:
+//
+// h := &util.EtcdHelper{client}
+// var currentObj MyType
+// err := h.AtomicUpdate("myKey", &currentObj, func() (interface{}, error) {
+//	// Before this function is called, currentObj has been reset to etcd's current
+//	// contents for "myKey".
+//
+//	// Make a *modification*.
+//	currentObj.Counter++
+//
+//	// Return the modified object. Return an error to stop iterating.
+//	return currentObj, nil
+// })
+//
+func (h *EtcdHelper) AtomicUpdate(key string, objPtr interface{}, tryUpdate EtcdUpdateFunc) error {
+	for {
+		origBody, index, err := h.bodyAndExtractObj(key, objPtr, true)
+		if err != nil {
+			return err
+		}
+
+		ret, err := tryUpdate()
+		if err != nil {
+			return err
+		}
+
+		data, err := json.Marshal(ret)
+		if err != nil {
+			return err
+		}
+		_, err = h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
+		return err
+	}
 }

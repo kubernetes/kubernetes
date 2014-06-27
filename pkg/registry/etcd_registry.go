@@ -91,7 +91,7 @@ func makeContainerKey(machine string) string {
 }
 
 func (registry *EtcdRegistry) loadManifests(machine string) (manifests []api.ContainerManifest, index uint64, err error) {
-	err, index = registry.helper().ExtractObj(makeContainerKey(machine), &manifests, true)
+	index, err = registry.helper().ExtractObj(makeContainerKey(machine), &manifests, true)
 	return manifests, index, err
 }
 
@@ -190,7 +190,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 
 func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (pod api.Pod, err error) {
 	key := makePodKey(machine, podID)
-	err, _ = registry.helper().ExtractObj(key, &pod, false)
+	_, err = registry.helper().ExtractObj(key, &pod, false)
 	if err != nil {
 		return
 	}
@@ -225,7 +225,7 @@ func makeControllerKey(id string) string {
 func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
-	err, _ := registry.helper().ExtractObj(key, &controller, false)
+	_, err := registry.helper().ExtractObj(key, &controller, false)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func (registry *EtcdRegistry) CreateService(svc api.Service) error {
 func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
-	err, _ := registry.helper().ExtractObj(key, &svc, false)
+	_, err := registry.helper().ExtractObj(key, &svc, false)
 	if err != nil {
 		return nil, err
 	}
