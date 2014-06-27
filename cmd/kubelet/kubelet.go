@@ -43,6 +43,7 @@ var (
 	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on")
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
+	dockerAddr         = flag.String("docker", "unix:///var/run/docker.sock", "Address of docker daemon")
 )
 
 const dockerBinary = "/usr/bin/docker"
@@ -56,8 +57,7 @@ func main() {
 	// Set up logger for etcd client
 	etcd.SetLogger(util.NewLogger("etcd "))
 
-	endpoint := "unix:///var/run/docker.sock"
-	dockerClient, err := docker.NewClient(endpoint)
+	dockerClient, err := docker.NewClient(*dockerAddr)
 	if err != nil {
 		glog.Fatal("Couldn't connnect to docker.")
 	}
