@@ -378,7 +378,7 @@ func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
 		R: &etcd.Response{},
 		E: nil,
 	}
-	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine", channel)
+	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine/kubelet", channel)
 	if err == nil {
 		t.Error("Unexpected no err.")
 	}
@@ -404,7 +404,7 @@ func TestGetKubeletStateFromEtcd(t *testing.T) {
 		},
 		E: nil,
 	}
-	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine", channel)
+	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine/kubelet", channel)
 	expectNoError(t, err)
 	close(channel)
 	list := reader.GetList()
@@ -426,7 +426,7 @@ func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 			ErrorCode: 100,
 		},
 	}
-	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine", channel)
+	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine/kubelet", channel)
 	expectNoError(t, err)
 	close(channel)
 	list := reader.GetList()
@@ -448,7 +448,7 @@ func TestGetKubeletStateFromEtcdError(t *testing.T) {
 			ErrorCode: 200, // non not found error
 		},
 	}
-	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine", channel)
+	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine/kubelet", channel)
 	if err == nil {
 		t.Error("Unexpected non-error")
 	}
