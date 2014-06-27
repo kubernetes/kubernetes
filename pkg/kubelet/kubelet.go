@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -539,7 +540,7 @@ func (kl *Kubelet) ResponseToManifests(response *etcd.Response) ([]api.Container
 }
 
 func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- manifestUpdate) error {
-	response, err := kl.EtcdClient.Get(key+"/kubelet", true, false)
+	response, err := kl.EtcdClient.Get(key, true, false)
 	if err != nil {
 		if util.IsEtcdNotFound(err) {
 			return nil
@@ -561,7 +562,8 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- mani
 // The channel to send new configurations across
 // This function loops forever and is intended to be run in a go routine.
 func (kl *Kubelet) SyncAndSetupEtcdWatch(updateChannel chan<- manifestUpdate) {
-	key := "/registry/hosts/" + strings.TrimSpace(kl.Hostname)
+	key := path.Join("registry", "hosts", strings.TrimSpace(kl.Hostname), "kubelet")
+
 	// First fetch the initial configuration (watch only gives changes...)
 	for {
 		err := kl.getKubeletStateFromEtcd(key, updateChannel)
