@@ -117,6 +117,8 @@ This will build and start a lightweight local cluster, consisting of a master an
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)
 
+[Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
+
 Or fork and start hacking!
 
 ## Community, discussion and support
