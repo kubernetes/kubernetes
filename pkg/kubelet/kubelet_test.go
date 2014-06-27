@@ -109,11 +109,11 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyPackUnpack(t *testing.T, manifestId, containerName string) {
-	name := manifestAndContainerToDockerName(
+	name := buildDockerName(
 		&api.ContainerManifest{Id: manifestId},
 		&api.Container{Name: containerName},
 	)
-	returnedManifestId, returnedContainerName := dockerNameToManifestAndContainer(name)
+	returnedManifestId, returnedContainerName := parseDockerName(name)
 	if manifestId != returnedManifestId || containerName != returnedContainerName {
 		t.Errorf("For (%s, %s), unpacked (%s, %s)", manifestId, containerName, returnedManifestId, returnedContainerName)
 	}
