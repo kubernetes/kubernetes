@@ -34,6 +34,7 @@ var (
 	address                     = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
 	apiPrefix                   = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
 	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	minionRegexp                = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
 	etcdServerList, machineList util.StringList
 )
 
@@ -69,7 +70,7 @@ func main() {
 
 	var m *master.Master
 	if len(etcdServerList) > 0 {
-		m = master.New(etcdServerList, machineList, cloud)
+		m = master.New(etcdServerList, machineList, cloud, *minionRegexp)
 	} else {
 		m = master.NewMemoryServer(machineList, cloud)
 	}
