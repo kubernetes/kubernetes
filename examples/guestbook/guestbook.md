@@ -197,7 +197,7 @@ Create a file named `frontend-controller.json`:
          "manifest": {
            "containers": [{
              "image": "brendanburns/php-redis",
-             "ports": [{"containerPort": 80, "hostPort": 8080}]
+             "ports": [{"containerPort": 80, "hostPort": 8000}]
            }]
          }
        },
@@ -274,17 +274,19 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:8080`. 
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:8000`. 
 
 ```shell
 $ gcutil listinstances
 ```
 
-You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+You may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
 ```shell
-$ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
+$ gcutil addfirewall --allowed=tcp:8000 --target_tags=kubernetes-minion kubernetes-minion-8000
 ```
+
+If you are running Kubernetes locally, you can just visit http://localhost:8000
 For details about limiting traffic to specific sources, see the [gcutil documentation][gcutil-docs]
 
 [cloud-console]: https://console.developer.google.com
