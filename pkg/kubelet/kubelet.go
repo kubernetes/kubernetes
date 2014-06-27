@@ -263,7 +263,7 @@ const containerNamePrefix = "k8s"
 // Creates a name which can be reversed to identify both manifest id and container name.
 func manifestAndContainerToDockerName(manifest *api.ContainerManifest, container *api.Container) string {
 	// Note, manifest.Id could be blank.
-	return fmt.Sprintf("%s--%s--%s--%x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.Id), rand.Uint32())
+	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.Id), rand.Uint32())
 }
 
 // Upacks a container name, returning the manifest id and container name we would have used to
