@@ -108,16 +108,18 @@ func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	}
 
 	contKey := makeContainerKey(machine)
-	var manifests []api.ContainerManifest
-	err = registry.helper().AtomicUpdate(contKey, &manifests, func() (interface{}, error) {
+	err = registry.helper().AtomicUpdate(contKey, &[]api.ContainerManifest{}, func(in interface{}) (interface{}, error) {
+		manifests := *in.(*[]api.ContainerManifest)
 		return append(manifests, manifest), nil
 	})
 	if err != nil {
 		// Don't strand stuff.
-		registry.etcdClient.Delete(podKey, false)
-		return err
+		_, err2 := registry.etcdClient.Delete(podKey, false)
+		if err2 != nil {
+			glog.Errorf("Probably stranding a pod, couldn't delete %v: %#v", podKey, err2)
+		}
 	}
-	return nil
+	return err
 }
 
 func (registry *EtcdRegistry) UpdatePod(pod api.Pod) error {
@@ -143,8 +145,8 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 
 	// Next, remove the pod from the machine atomically.
 	contKey := makeContainerKey(machine)
-	var manifests []api.ContainerManifest
-	return registry.helper().AtomicUpdate(contKey, &manifests, func() (interface{}, error) {
+	return registry.helper().AtomicUpdate(contKey, &[]api.ContainerManifest{}, func(in interface{}) (interface{}, error) {
+		manifests := *in.(*[]api.ContainerManifest)
 		newManifests := make([]api.ContainerManifest, 0, len(manifests))
 		found := false
 		for _, manifest := range manifests {

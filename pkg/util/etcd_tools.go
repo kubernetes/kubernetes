@@ -153,7 +153,7 @@ func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 
 // Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
 // See the comment for AtomicUpdate for more detail.
-type EtcdUpdateFunc func() (interface{}, error)
+type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
 
 // AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
 // Note, tryUpdate may be called more than once.
@@ -161,33 +161,42 @@ type EtcdUpdateFunc func() (interface{}, error)
 // Example:
 //
 // h := &util.EtcdHelper{client}
-// var currentObj MyType
-// err := h.AtomicUpdate("myKey", &currentObj, func() (interface{}, error) {
+// err := h.AtomicUpdate("myKey", &MyType{}, func(input interface{}) (interface{}, error) {
 //	// Before this function is called, currentObj has been reset to etcd's current
 //	// contents for "myKey".
 //
+//	cur := input.(*MyType) // Gauranteed to work.
+//
 //	// Make a *modification*.
-//	currentObj.Counter++
+//	cur.Counter++
 //
 //	// Return the modified object. Return an error to stop iterating.
-//	return currentObj, nil
+//	return cur, nil
 // })
 //
-func (h *EtcdHelper) AtomicUpdate(key string, objPtr interface{}, tryUpdate EtcdUpdateFunc) error {
+func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate EtcdUpdateFunc) error {
+	pt := reflect.TypeOf(ptrToType)
+	if pt.Kind() != reflect.Ptr {
+		// Panic is appropriate, because this is a programming error.
+		panic("need ptr to type")
+	}
 	for {
-		origBody, index, err := h.bodyAndExtractObj(key, objPtr, true)
+		obj := reflect.New(pt.Elem()).Interface()
+		origBody, index, err := h.bodyAndExtractObj(key, obj, true)
 		if err != nil {
 			return err
 		}
 
-		ret, err := tryUpdate()
+		ret, err := tryUpdate(obj)
 		if err != nil {
 			return err
 		}
 
 		// First time this key has been used, just set.
+		// TODO: This is racy. Fix when our client supports prevExist. See:
+		// https://github.com/coreos/etcd/blob/master/Documentation/api.md#atomic-compare-and-swap
 		if index == 0 {
-			//return h.SetObj(key, ret)
+			return h.SetObj(key, ret)
 		}
 
 		data, err := json.Marshal(ret)
