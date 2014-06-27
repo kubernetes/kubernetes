@@ -62,7 +62,7 @@ func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) 
 	}
 	pod := api.Pod{
 		JSONBase: api.JSONBase{
-			ID: fmt.Sprintf("%x", rand.Int()),
+			ID: fmt.Sprintf("%08x", rand.Uint32()),
 		},
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
