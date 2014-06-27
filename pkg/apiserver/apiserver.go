@@ -76,9 +76,10 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type ApiServer struct {
-	prefix  string
-	storage map[string]RESTStorage
-	ops     *Operations
+	prefix    string
+	storage   map[string]RESTStorage
+	ops       *Operations
+	logserver http.Handler
 }
 
 // New creates a new ApiServer object.
@@ -86,9 +87,10 @@ type ApiServer struct {
 // 'prefix' is the hosting path prefix.
 func New(storage map[string]RESTStorage, prefix string) *ApiServer {
 	return &ApiServer{
-		storage: storage,
-		prefix:  prefix,
-		ops:     NewOperations(),
+		storage:   storage,
+		prefix:    prefix,
+		ops:       NewOperations(),
+		logserver: http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))),
 	}
 }
 
@@ -118,6 +120,10 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	if url.Path == "/index.html" || url.Path == "/" || url.Path == "" {
 		server.handleIndex(w)
+		return
+	}
+	if strings.HasPrefix(url.Path, "/logs/") {
+		server.logserver.ServeHTTP(w, req)
 		return
 	}
 	if !strings.HasPrefix(url.Path, server.prefix) {
