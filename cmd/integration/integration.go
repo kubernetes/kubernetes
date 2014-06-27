@@ -41,6 +41,12 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
+	go func() {
+		defer util.FlushLogs()
+		time.Sleep(3 * time.Minute)
+		glog.Fatalf("This test has timed out.")
+	}()
+
 	manifestUrl := ServeCachedManifestFile()
 	// Setup
 	servers := []string{"http://localhost:4001"}

@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -90,56 +89,37 @@ func makeContainerKey(machine string) string {
 	return "/registry/hosts/" + machine + "/kubelet"
 }
 
-func (registry *EtcdRegistry) loadManifests(machine string) (manifests []api.ContainerManifest, index uint64, err error) {
-	err, index = registry.helper().ExtractObj(makeContainerKey(machine), &manifests, true)
-	return manifests, index, err
-}
-
-func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest, index uint64) error {
-	if index != 0 {
-		return registry.helper().CompareAndSwapObj(makeContainerKey(machine), manifests, index)
-	} else {
-		return registry.helper().SetObj(makeContainerKey(machine), manifests)
-	}
-}
-
 func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
 	podOut, machine, err := registry.findPod(pod.ID)
 	if err == nil {
+		// TODO: this error message looks racy.
 		return fmt.Errorf("a pod named %s already exists on %s (%#v)", pod.ID, machine, podOut)
 	}
 	return registry.runPod(pod, machineIn)
 }
 
 func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
-	manifests, index, err := registry.loadManifests(machine)
-	if err != nil {
-		return err
-	}
-
-	key := makePodKey(machine, pod.ID)
-	data, err := json.Marshal(pod)
-	if err != nil {
-		return err
-	}
-	_, err = registry.etcdClient.Create(key, string(data), 0)
+	podKey := makePodKey(machine, pod.ID)
+	err := registry.helper().SetObj(podKey, pod)
 
 	manifest, err := registry.manifestFactory.MakeManifest(machine, pod)
 	if err != nil {
 		return err
 	}
-	for {
-		manifests = append(manifests, manifest)
-		err = registry.updateManifests(machine, manifests, index)
-		if util.IsEtcdConflict(err) {
-			manifests, index, err = registry.loadManifests(machine)
-			if err != nil {
-				return err
-			}
-			continue
+
+	contKey := makeContainerKey(machine)
+	err = registry.helper().AtomicUpdate(contKey, &[]api.ContainerManifest{}, func(in interface{}) (interface{}, error) {
+		manifests := *in.(*[]api.ContainerManifest)
+		return append(manifests, manifest), nil
+	})
+	if err != nil {
+		// Don't strand stuff.
+		_, err2 := registry.etcdClient.Delete(podKey, false)
+		if err2 != nil {
+			glog.Errorf("Probably stranding a pod, couldn't delete %v: %#v", podKey, err2)
 		}
-		return err
 	}
+	return err
 }
 
 func (registry *EtcdRegistry) UpdatePod(pod api.Pod) error {
@@ -155,12 +135,19 @@ func (registry *EtcdRegistry) DeletePod(podID string) error {
 }
 
 func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error {
-	for {
-		manifests, index, err := registry.loadManifests(machine)
-		if err != nil {
-			return err
-		}
-		newManifests := make([]api.ContainerManifest, 0)
+	// First delete the pod, so a scheduler doesn't notice it getting removed from the
+	// machine and attempt to put it somewhere.
+	podKey := makePodKey(machine, podID)
+	_, err := registry.etcdClient.Delete(podKey, true)
+	if err != nil {
+		return err
+	}
+
+	// Next, remove the pod from the machine atomically.
+	contKey := makeContainerKey(machine)
+	return registry.helper().AtomicUpdate(contKey, &[]api.ContainerManifest{}, func(in interface{}) (interface{}, error) {
+		manifests := *in.(*[]api.ContainerManifest)
+		newManifests := make([]api.ContainerManifest, 0, len(manifests))
 		found := false
 		for _, manifest := range manifests {
 			if manifest.Id != podID {
@@ -175,22 +162,13 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 			// However it is "deleted" so log it and move on
 			glog.Infof("Couldn't find: %s in %#v", podID, manifests)
 		}
-		if err = registry.updateManifests(machine, newManifests, index); err != nil {
-			if util.IsEtcdConflict(err) {
-				continue
-			}
-			return err
-		}
-		break
-	}
-	key := makePodKey(machine, podID)
-	_, err := registry.etcdClient.Delete(key, true)
-	return err
+		return newManifests, nil
+	})
 }
 
 func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (pod api.Pod, err error) {
 	key := makePodKey(machine, podID)
-	err, _ = registry.helper().ExtractObj(key, &pod, false)
+	err = registry.helper().ExtractObj(key, &pod, false)
 	if err != nil {
 		return
 	}
@@ -225,7 +203,7 @@ func makeControllerKey(id string) string {
 func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
-	err, _ := registry.helper().ExtractObj(key, &controller, false)
+	err := registry.helper().ExtractObj(key, &controller, false)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +242,7 @@ func (registry *EtcdRegistry) CreateService(svc api.Service) error {
 func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
-	err, _ := registry.helper().ExtractObj(key, &svc, false)
+	err := registry.helper().ExtractObj(key, &svc, false)
 	if err != nil {
 		return nil, err
 	}

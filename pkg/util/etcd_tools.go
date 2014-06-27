@@ -116,33 +116,29 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 // Unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
-func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (error, uint64) {
+func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
+	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	return err
+}
+
+func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
 	response, err := h.Client.Get(key, false, false)
 
 	if err != nil && !IsEtcdNotFound(err) {
-		return err, 0
+		return "", 0, err
 	}
 	if err != nil || response.Node == nil || len(response.Node.Value) == 0 {
 		if ignoreNotFound {
 			pv := reflect.ValueOf(objPtr)
 			pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
-			return nil, 0
+			return "", 0, nil
 		} else if err != nil {
-			return err, 0
+			return "", 0, err
 		}
-		return fmt.Errorf("key '%v' found no nodes field: %#v", key, response), 0
+		return "", 0, fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
 	}
-	return json.Unmarshal([]byte(response.Node.Value), objPtr), response.Node.ModifiedIndex
-}
-
-// CompareAndSwapObj marshals obj via json, and stores under key so long as index matches the previous modified index
-func (h *EtcdHelper) CompareAndSwapObj(key string, obj interface{}, index uint64) error {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return err
-	}
-	_, err = h.Client.CompareAndSwap(key, string(data), 0, "", index)
-	return err
+	body = response.Node.Value
+	return body, response.Node.ModifiedIndex, json.Unmarshal([]byte(body), objPtr)
 }
 
 // SetObj marshals obj via json, and stores under key.
@@ -153,4 +149,64 @@ func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 	}
 	_, err = h.Client.Set(key, string(data), 0)
 	return err
+}
+
+// Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
+// See the comment for AtomicUpdate for more detail.
+type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
+
+// AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
+// Note, tryUpdate may be called more than once.
+//
+// Example:
+//
+// h := &util.EtcdHelper{client}
+// err := h.AtomicUpdate("myKey", &MyType{}, func(input interface{}) (interface{}, error) {
+//	// Before this function is called, currentObj has been reset to etcd's current
+//	// contents for "myKey".
+//
+//	cur := input.(*MyType) // Gauranteed to work.
+//
+//	// Make a *modification*.
+//	cur.Counter++
+//
+//	// Return the modified object. Return an error to stop iterating.
+//	return cur, nil
+// })
+//
+func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate EtcdUpdateFunc) error {
+	pt := reflect.TypeOf(ptrToType)
+	if pt.Kind() != reflect.Ptr {
+		// Panic is appropriate, because this is a programming error.
+		panic("need ptr to type")
+	}
+	for {
+		obj := reflect.New(pt.Elem()).Interface()
+		origBody, index, err := h.bodyAndExtractObj(key, obj, true)
+		if err != nil {
+			return err
+		}
+
+		ret, err := tryUpdate(obj)
+		if err != nil {
+			return err
+		}
+
+		// First time this key has been used, just set.
+		// TODO: This is racy. Fix when our client supports prevExist. See:
+		// https://github.com/coreos/etcd/blob/master/Documentation/api.md#atomic-compare-and-swap
+		if index == 0 {
+			return h.SetObj(key, ret)
+		}
+
+		data, err := json.Marshal(ret)
+		if err != nil {
+			return err
+		}
+		_, err = h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
+		if IsEtcdConflict(err) {
+			continue
+		}
+		return err
+	}
 }

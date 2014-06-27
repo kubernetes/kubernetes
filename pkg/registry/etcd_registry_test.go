@@ -267,8 +267,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	expectNoError(t, err)
 	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
-	}
-	if fakeClient.DeletedKeys[0] != key {
+	} else if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 	response, _ := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)

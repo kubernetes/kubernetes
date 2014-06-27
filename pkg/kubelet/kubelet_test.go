@@ -436,10 +436,17 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	err := kubelet.SyncManifests([]api.ContainerManifest{})
 	expectNoError(t, err)
 	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+
+	// A map interation is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+		"9876": true,
+	}
 	if len(fakeDocker.stopped) != 2 ||
-		fakeDocker.stopped[0] != "1234" ||
-		fakeDocker.stopped[1] != "9876" {
-		t.Errorf("Unexpected sequence of stopped containers: %s", fakeDocker.stopped)
+		!expectedToStop[fakeDocker.stopped[0]] ||
+		!expectedToStop[fakeDocker.stopped[1]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
 	}
 }
 
