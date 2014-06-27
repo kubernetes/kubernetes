@@ -109,7 +109,7 @@ In a separate tab of your terminal, run:
 
 ```
 cd kubernetes
-hack/local-up.sh
+hack/local-up-cluster.sh
 ```
 
 This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down. While it's running, you can use `hack/localcfg.sh` in place of `cluster/kubecfg.sh` to talk to it.
