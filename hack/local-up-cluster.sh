@@ -23,6 +23,12 @@ if [ "$(which etcd)" == "" ]; then
 	exit 1
 fi
 
+docker ps 2> /dev/null 1> /dev/null
+if [ "$?" != "0" ]; then
+  echo "Failed to successfully run 'docker ps', please verify that docker is installed and \$DOCKER_HOST is set correctly."
+  exit 1
+fi
+
 # Stop right away if the build fails
 set -e
 
