@@ -723,12 +723,18 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 		case <-time.After(kl.SyncFrequency):
 		}
 
-		manifests := []api.ContainerManifest{}
-		for _, m := range last {
-			manifests = append(manifests, m...)
+		allManifests := []api.ContainerManifest{}
+		for src, manifests := range last {
+			for _, m := range manifests {
+				if err := api.ValidateManifest(&m); err != nil {
+					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
+					continue
+				}
+				allManifests = append(allManifests, m)
+			}
 		}
 
-		err := handler.SyncManifests(manifests)
+		err := handler.SyncManifests(allManifests)
 		if err != nil {
 			glog.Errorf("Couldn't sync containers : %v", err)
 		}
