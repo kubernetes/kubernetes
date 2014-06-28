@@ -14,43 +14,49 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package registry
+package scheduler
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func expectSchedule(scheduler Scheduler, pod api.Pod, expected string, t *testing.T) {
-	actual, err := scheduler.Schedule(pod)
-	expectNoError(t, err)
+// Some functions used by multiple scheduler tests.
+
+type schedulerTester struct {
+	t            *testing.T
+	scheduler    Scheduler
+	minionLister MinionLister
+}
+
+// Call if you know exactly where pod should get scheduled.
+func (st *schedulerTester) expectSchedule(pod api.Pod, expected string) {
+	actual, err := st.scheduler.Schedule(pod, st.minionLister)
+	if err != nil {
+		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		return
+	}
 	if actual != expected {
-		t.Errorf("Unexpected scheduling value: %v, expected %v", actual, expected)
+		st.t.Errorf("Unexpected scheduling value: %v, expected %v", actual, expected)
 	}
 }
 
-func TestRoundRobinScheduler(t *testing.T) {
-	scheduler := MakeRoundRobinScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3", "m4"}))
-	expectSchedule(scheduler, api.Pod{}, "m1", t)
-	expectSchedule(scheduler, api.Pod{}, "m2", t)
-	expectSchedule(scheduler, api.Pod{}, "m3", t)
-	expectSchedule(scheduler, api.Pod{}, "m4", t)
+// Call if you can't predict where pod will be scheduled.
+func (st *schedulerTester) expectSuccess(pod api.Pod) {
+	_, err := st.scheduler.Schedule(pod, st.minionLister)
+	if err != nil {
+		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		return
+	}
 }
 
-func TestRandomScheduler(t *testing.T) {
-	random := rand.New(rand.NewSource(0))
-	scheduler := MakeRandomScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3", "m4"}), *random)
-	_, err := scheduler.Schedule(api.Pod{})
-	expectNoError(t, err)
-}
-
-func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
-	mockRegistry := MockPodRegistry{}
-	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
-	expectSchedule(scheduler, api.Pod{}, "m3", t)
+// Call if pod should *not* schedule.
+func (st *schedulerTester) expectFailure(pod api.Pod) {
+	_, err := st.scheduler.Schedule(pod, st.minionLister)
+	if err == nil {
+		st.t.Error("Unexpected non-error")
+	}
 }
 
 func makePod(host string, hostPorts ...int) api.Pod {
@@ -71,45 +77,5 @@ func makePod(host string, hostPorts ...int) api.Pod {
 				},
 			},
 		},
-	}
-}
-
-func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
-	mockRegistry := MockPodRegistry{
-		pods: []api.Pod{
-			makePod("m1", 8080),
-		},
-	}
-	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
-	expectSchedule(scheduler, makePod("", 8080), "m3", t)
-}
-
-func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
-	mockRegistry := MockPodRegistry{
-		pods: []api.Pod{
-			makePod("m1", 80, 8080),
-			makePod("m2", 8081, 8082, 8083),
-			makePod("m3", 80, 443, 8085),
-		},
-	}
-	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
-	expectSchedule(scheduler, makePod("", 8080, 8081), "m3", t)
-}
-
-func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
-	mockRegistry := MockPodRegistry{
-		pods: []api.Pod{
-			makePod("m1", 8080),
-			makePod("m2", 8081),
-			makePod("m3", 8080),
-		},
-	}
-	r := rand.New(rand.NewSource(0))
-	scheduler := MakeFirstFitScheduler(MakeMinionRegistry([]string{"m1", "m2", "m3"}), &mockRegistry, r)
-	_, err := scheduler.Schedule(makePod("", 8080, 8081))
-	if err == nil {
-		t.Error("Unexpected non-error.")
 	}
 }

@@ -17,11 +17,27 @@ limitations under the License.
 package scheduler
 
 import (
+	"math/rand"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// Scheduler is an interface implemented by things that know how to schedule pods
-// onto machines.
-type Scheduler interface {
-	Schedule(api.Pod, MinionLister) (selectedMachine string, err error)
+// RandomScheduler choses machines uniformly at random.
+type RandomScheduler struct {
+	// TODO: rand.Rand is *NOT* thread safe.
+	random *rand.Rand
+}
+
+func MakeRandomScheduler(random *rand.Rand) Scheduler {
+	return &RandomScheduler{
+		random: random,
+	}
+}
+
+func (s *RandomScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+	machines, err := minionLister.List()
+	if err != nil {
+		return "", err
+	}
+	return machines[s.random.Int()%len(machines)], nil
 }

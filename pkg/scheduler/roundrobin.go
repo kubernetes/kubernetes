@@ -20,8 +20,23 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// Scheduler is an interface implemented by things that know how to schedule pods
-// onto machines.
-type Scheduler interface {
-	Schedule(api.Pod, MinionLister) (selectedMachine string, err error)
+// RoundRobinScheduler chooses machines in order.
+type RoundRobinScheduler struct {
+	currentIndex int
+}
+
+func MakeRoundRobinScheduler() Scheduler {
+	return &RoundRobinScheduler{
+		currentIndex: -1,
+	}
+}
+
+func (s *RoundRobinScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+	machines, err := minionLister.List()
+	if err != nil {
+		return "", err
+	}
+	s.currentIndex = (s.currentIndex + 1) % len(machines)
+	result := machines[s.currentIndex]
+	return result, nil
 }
