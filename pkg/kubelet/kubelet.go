@@ -490,10 +490,7 @@ func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpda
 	// We're not sure if the person reading the logs is going to care about the single or
 	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
 	// done at the end. Hence not returning early here.
-	if multiErr == nil && len(manifests) == 0 {
-		multiErr = fmt.Errorf("no elements in ContainerManifest array")
-	}
-	if multiErr == nil && manifests[0].Version == "" {
+	if multiErr == nil && len(manifests) > 0 && manifests[0].Version == "" {
 		multiErr = fmt.Errorf("got blank version field")
 	}
 	if multiErr == nil {
