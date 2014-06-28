@@ -784,6 +784,42 @@ func TestExtractFromHttpMultiple(t *testing.T) {
 	}
 }
 
+func TestExtractFromHttpEmptyArray(t *testing.T) {
+	kubelet := Kubelet{}
+	updateChannel := make(chan manifestUpdate)
+	reader := startReading(updateChannel)
+
+	manifests := []api.ContainerManifest{}
+	data, err := json.Marshal(manifests)
+	if err != nil {
+		t.Fatalf("Some weird json problem: %v", err)
+	}
+
+	t.Logf("Serving: %v", string(data))
+
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(data),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+
+	err = kubelet.extractFromHTTP(testServer.URL, updateChannel)
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	close(updateChannel)
+
+	read := reader.GetList()
+
+	if len(read) != 1 {
+		t.Errorf("Unexpected list: %#v", read)
+		return
+	}
+	if len(read[0]) != 0 {
+		t.Errorf("Unexpected manifests: %#v", read[0])
+	}
+}
+
 func TestWatchEtcd(t *testing.T) {
 	watchChannel := make(chan *etcd.Response)
 	updateChannel := make(chan manifestUpdate)
