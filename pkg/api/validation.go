@@ -31,6 +31,14 @@ func isSupportedManifestVersion(value string) bool {
 	return false
 }
 
+func isValidProtocol(proto string) bool {
+	switch proto {
+	case "TCP", "UDP":
+		return true
+	}
+	return false
+}
+
 func errInvalid(field string, value interface{}) error {
 	return fmt.Errorf("%s is invalid: '%v'", field, value)
 }
@@ -58,6 +66,58 @@ func validateVolumes(volumes []Volume) (util.StringSet, error) {
 	return allNames, nil
 }
 
+func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
+	for i := range mounts {
+		mnt := &mounts[i] // so we can set default values
+		if len(mnt.Name) == 0 {
+			return fmt.Errorf("VolumeMount.Name is missing")
+		}
+		if !volumes.Has(mnt.Name) {
+			return fmt.Errorf("VolumeMount.Name does not name a Volume: '%s'", mnt.Name)
+		}
+		if len(mnt.MountPath) == 0 {
+			// Backwards compat.
+			if len(mnt.Path) == 0 {
+				return fmt.Errorf("VolumeMount.MountPath is missing")
+			}
+			glog.Warning("DEPRECATED: VolumeMount.Path has been replaced by VolumeMount.MountPath")
+			mnt.MountPath = mnt.Path
+			mnt.Path = ""
+		}
+	}
+	return nil
+}
+
+func validatePorts(ports []Port) error {
+	allNames := util.StringSet{}
+	for i := range ports {
+		port := &ports[i] // so we can set default values
+		if port.Name != "" {
+			if len(port.Name) > 63 || !util.IsDNSLabel(port.Name) {
+				return fmt.Errorf("Port.Name is missing or malformed: '%s'", port.Name)
+			}
+			if allNames.Has(port.Name) {
+				return fmt.Errorf("Port.Name is not unique: '%s'", port.Name)
+			}
+			allNames.Insert(port.Name)
+		}
+		if !util.IsValidPortNum(port.ContainerPort) {
+			return fmt.Errorf("Port.ContainerPort is missing or invalid: %d", port.ContainerPort)
+		}
+		if port.HostPort == 0 {
+			port.HostPort = port.ContainerPort
+		} else if !util.IsValidPortNum(port.HostPort) {
+			return fmt.Errorf("Port.HostPort is invalid: %d", port.HostPort)
+		}
+		if port.Protocol == "" {
+			port.Protocol = "TCP"
+		} else if !isValidProtocol(port.Protocol) {
+			return fmt.Errorf("Port.Protocol is invalid: '%s'", port.Protocol)
+		}
+	}
+	return nil
+}
+
 func validateEnv(vars []EnvVar) error {
 	for i := range vars {
 		ev := &vars[i] // so we can set default values
@@ -77,6 +137,28 @@ func validateEnv(vars []EnvVar) error {
 	return nil
 }
 
+// Runs an extraction function on each Port of each Container, accumulating the
+// results and returning an error if any ports conflict.
+func AccumulateUniquePorts(containers []Container, all map[int]bool, extract func(*Port) int) error {
+	for ci := range containers {
+		ctr := &containers[ci]
+		for pi := range ctr.Ports {
+			port := extract(&ctr.Ports[pi])
+			if all[port] {
+				return fmt.Errorf("port %d is already in use", port)
+			}
+			all[port] = true
+		}
+	}
+	return nil
+}
+
+// Checks for colliding Port.HostPort values across a slice of containers.
+func checkHostPortConflicts(containers []Container) error {
+	allPorts := map[int]bool{}
+	return AccumulateUniquePorts(containers, allPorts, func(p *Port) int { return p.HostPort })
+}
+
 func validateContainers(containers []Container, volumes util.StringSet) error {
 	allNames := util.StringSet{}
 	for i := range containers {
@@ -91,13 +173,22 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 		if len(ctr.Image) == 0 {
 			return errInvalid("Container.Image", ctr.Name)
 		}
+		if err := validatePorts(ctr.Ports); err != nil {
+			return err
+		}
 		if err := validateEnv(ctr.Env); err != nil {
 			return err
 		}
-
-		// TODO(thockin): finish validation.
+		if err := validateVolumeMounts(ctr.VolumeMounts, volumes); err != nil {
+			return err
+		}
 	}
-	return nil
+	// Check for colliding ports across all containers.
+	// TODO(thockin): This really is dependent on the network config of the host (IP per pod?)
+	// and the config of the new manifest.  But we have not specced that out yet, so we'll just
+	// make some assumptions for now.  As of now, pods share a network namespace, which means that
+	// every Port.HostPort across the whole pod must be unique.
+	return checkHostPortConflicts(containers)
 }
 
 // ValidateManifest tests that the specified ContainerManifest has valid data.

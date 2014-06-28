@@ -50,6 +50,87 @@ func TestValidateVolumes(t *testing.T) {
 	}
 }
 
+func TestValidateVolumeMounts(t *testing.T) {
+	volumes := util.NewStringSet("abc", "123", "abc-123")
+
+	successCase := []VolumeMount{
+		{Name: "abc", MountPath: "/foo"},
+		{Name: "123", MountPath: "/foo"},
+		{Name: "abc-123", MountPath: "/bar"},
+	}
+	if err := validateVolumeMounts(successCase, volumes); err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+
+	nonCanonicalCase := []VolumeMount{
+		{Name: "abc", Path: "/foo"},
+	}
+	err := validateVolumeMounts(nonCanonicalCase, volumes)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if nonCanonicalCase[0].MountPath != "/foo" {
+		t.Errorf("expected canonicalized values: %+v", nonCanonicalCase[0])
+	}
+
+	errorCases := map[string][]VolumeMount{
+		"empty name":      {{Name: "", MountPath: "/foo"}},
+		"name not found":  {{Name: "", MountPath: "/foo"}},
+		"empty mountpath": {{Name: "abc", MountPath: ""}},
+	}
+	for k, v := range errorCases {
+		err := validateVolumeMounts(v, volumes)
+		if err == nil {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestValidatePorts(t *testing.T) {
+	successCase := []Port{
+		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
+		{Name: "123", ContainerPort: 81, HostPort: 81},
+		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
+		{Name: "as", ContainerPort: 83, Protocol: "UDP"},
+		{Name: "do-re-me", ContainerPort: 84},
+		{ContainerPort: 85},
+	}
+	err := validatePorts(successCase)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+
+	nonCanonicalCase := []Port{
+		{ContainerPort: 80},
+	}
+	err = validatePorts(nonCanonicalCase)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if nonCanonicalCase[0].HostPort != 80 || nonCanonicalCase[0].Protocol != "TCP" {
+		t.Errorf("expected default values: %+v", nonCanonicalCase[0])
+	}
+
+	errorCases := map[string][]Port{
+		"name > 63 characters": {{Name: strings.Repeat("a", 64), ContainerPort: 80}},
+		"name not a DNS label": {{Name: "a.b.c", ContainerPort: 80}},
+		"name not unique": {
+			{Name: "abc", ContainerPort: 80},
+			{Name: "abc", ContainerPort: 81},
+		},
+		"zero container port":    {{ContainerPort: 0}},
+		"invalid container port": {{ContainerPort: 65536}},
+		"invalid host port":      {{ContainerPort: 80, HostPort: 65536}},
+		"invalid protocol":       {{ContainerPort: 80, Protocol: "ICMP"}},
+	}
+	for k, v := range errorCases {
+		err := validatePorts(v)
+		if err == nil {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
 func TestValidateEnv(t *testing.T) {
 	successCase := []EnvVar{
 		{Name: "abc", Value: "value"},
@@ -106,6 +187,14 @@ func TestValidateContainers(t *testing.T) {
 		"invalid env var name": {
 			{Name: "abc", Image: "image", Env: []EnvVar{{Name: "ev.1"}}},
 		},
+		"host port not unique": {
+			{Name: "abc", Image: "image", Ports: []Port{{ContainerPort: 80, HostPort: 80}}},
+			{Name: "def", Image: "image", Ports: []Port{{ContainerPort: 81, HostPort: 80}}},
+		},
+		"defaulted host port not unique in pod": {
+			{Name: "abc", Image: "image", Ports: []Port{{ContainerPort: 80}}},
+			{Name: "def", Image: "image", Ports: []Port{{ContainerPort: 81, HostPort: 80}}},
+		},
 	}
 	for k, v := range errorCases {
 		if err := validateContainers(v, volumes); err == nil {
@@ -131,10 +220,18 @@ func TestValidateManifest(t *testing.T) {
 					WorkingDir: "/tmp",
 					Memory:     1,
 					CPU:        1,
+					Ports: []Port{
+						{ContainerPort: 80},
+						{ContainerPort: 81},
+					},
 					Env: []EnvVar{
 						{Name: "ev1", Value: "val1"},
 						{Name: "ev2", Value: "val2"},
 						{Key: "EV3", Value: "val3"},
+					},
+					VolumeMounts: []VolumeMount{
+						{Name: "vol1", MountPath: "/tmp"},
+						{Name: "vol2", MountPath: "/tmp"},
 					},
 				},
 			},
