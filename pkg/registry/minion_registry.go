@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 var ErrDoesNotExist = fmt.Errorf("The requested resource does not exist.")
@@ -39,32 +40,16 @@ type MinionRegistry interface {
 // Initialize a minion registry with a list of minions.
 func MakeMinionRegistry(minions []string) MinionRegistry {
 	m := &minionList{
-		minions: stringSet{},
+		minions: util.StringSet{},
 	}
 	for _, minion := range minions {
-		m.minions.insert(minion)
+		m.minions.Insert(minion)
 	}
 	return m
 }
 
-type empty struct{}
-type stringSet map[string]empty
-
-func (s stringSet) insert(item string) {
-	s[item] = empty{}
-}
-
-func (s stringSet) delete(item string) {
-	delete(s, item)
-}
-
-func (s stringSet) has(item string) bool {
-	_, contained := s[item]
-	return contained
-}
-
 type minionList struct {
-	minions stringSet
+	minions util.StringSet
 	lock    sync.Mutex
 }
 
@@ -82,21 +67,21 @@ func (m *minionList) List() (currentMinions []string, err error) {
 func (m *minionList) Insert(newMinion string) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	m.minions.insert(newMinion)
+	m.minions.Insert(newMinion)
 	return nil
 }
 
 func (m *minionList) Delete(minion string) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	m.minions.delete(minion)
+	m.minions.Delete(minion)
 	return nil
 }
 
 func (m *minionList) Contains(minion string) (bool, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	return m.minions.has(minion), nil
+	return m.minions.Has(minion), nil
 }
 
 // MinionRegistryStorage implements the RESTStorage interface, backed by a MinionRegistry.
