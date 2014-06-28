@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/golang/glog"
 )
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -53,9 +54,19 @@ func NewMemoryServer(minions []string, cloud cloudprovider.Interface) *Master {
 }
 
 // Returns a new apiserver.
-func New(etcdServers, minions []string, cloud cloudprovider.Interface) *Master {
+func New(etcdServers, minions []string, cloud cloudprovider.Interface, minionRegexp string) *Master {
 	etcdClient := etcd.NewClient(etcdServers)
-	minionRegistry := registry.MakeMinionRegistry(minions)
+	var minionRegistry registry.MinionRegistry
+	if cloud != nil && len(minionRegexp) > 0 {
+		var err error
+		minionRegistry, err = registry.MakeCloudMinionRegistry(cloud, minionRegexp)
+		if err != nil {
+			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
+			minionRegistry = registry.MakeMinionRegistry(minions)
+		}
+	} else {
+		minionRegistry = registry.MakeMinionRegistry(minions)
+	}
 	m := &Master{
 		podRegistry:        registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),

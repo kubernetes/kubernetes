@@ -54,7 +54,7 @@ func main() {
 	machineList := []string{"localhost", "machine"}
 
 	// Master
-	m := master.New(servers, machineList, nil)
+	m := master.New(servers, machineList, nil, "")
 	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
 	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(apiserver.URL, nil))
