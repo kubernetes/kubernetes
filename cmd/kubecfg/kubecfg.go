@@ -102,7 +102,15 @@ func main() {
 	}
 
 	secure := true
-	parsedUrl, err := url.Parse(*httpServer)
+	var masterServer string
+	if len(*httpServer) > 0 {
+		masterServer = *httpServer
+	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
+		masterServer = os.Getenv("KUBERNETES_MASTER")
+	} else {
+		masterServer = "http://localhost:8080"
+	}
+	parsedUrl, err := url.Parse(masterServer)
 	if err != nil {
 		glog.Fatalf("Unable to parse %v as a URL\n", err)
 	}
@@ -120,7 +128,7 @@ func main() {
 
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
-		server := kubecfg.NewProxyServer(*www, *httpServer, auth)
+		server := kubecfg.NewProxyServer(*www, masterServer, auth)
 		glog.Fatal(server.Serve())
 	}
 
@@ -130,14 +138,16 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(method, auth) || executeControllerRequest(method, auth)
+	client := kube_client.New(masterServer, auth)
+
+	matchFound := executeAPIRequest(method, client) || executeControllerRequest(method, client)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
 }
 
 // Attempts to execute an API request
-func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
+func executeAPIRequest(method string, s *kube_client.Client) bool {
 	parseStorage := func() string {
 		if len(flag.Args()) != 2 {
 			glog.Fatal("usage: kubecfg [OPTIONS] get|list|create|update|delete <url>")
@@ -159,7 +169,6 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 		return false
 	}
 
-	s := kube_client.New(*httpServer, auth)
 	r := s.Verb(verb).
 		Path(parseStorage()).
 		ParseSelector(*selector)
@@ -190,15 +199,13 @@ func executeAPIRequest(method string, auth *kube_client.AuthInfo) bool {
 }
 
 // Attempts to execute a replicationController request
-func executeControllerRequest(method string, auth *kube_client.AuthInfo) bool {
+func executeControllerRequest(method string, c *kube_client.Client) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
 			glog.Fatal("usage: kubecfg [OPTIONS] stop|rm|rollingupdate <controller>")
 		}
 		return flag.Arg(1)
 	}
-
-	c := kube_client.New(*httpServer, auth)
 
 	var err error
 	switch method {

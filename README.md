@@ -112,7 +112,10 @@ cd kubernetes
 hack/local-up-cluster.sh
 ```
 
-This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down. While it's running, you can use `hack/localcfg.sh` in place of `cluster/kubecfg.sh` to talk to it.
+This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down.
+
+If you are running both a remote kubernetes cluster and the local cluster, you can determine which you talk to using the ```KUBERNETES_MASTER``` environment variable.
+
 
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)
