@@ -24,26 +24,36 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
+// Anything that can list minions for a scheduler.
+type MinionLister interface {
+	List() (machines []string, err error)
+}
+
+// Make a MinionLister from a []string
+type StringMinionLister []string
+
+func (s StringMinionLister) List() ([]string, error) {
+	return []string(s), nil
+}
+
 // Scheduler is an interface implemented by things that know how to schedule pods onto machines.
 type Scheduler interface {
-	Schedule(api.Pod) (string, error)
+	Schedule(api.Pod, MinionLister) (string, error)
 }
 
 // RandomScheduler choses machines uniformly at random.
 type RandomScheduler struct {
-	machines MinionRegistry
-	random   rand.Rand
+	random rand.Rand
 }
 
-func MakeRandomScheduler(machines MinionRegistry, random rand.Rand) Scheduler {
+func MakeRandomScheduler(random rand.Rand) Scheduler {
 	return &RandomScheduler{
-		machines: machines,
-		random:   random,
+		random: random,
 	}
 }
 
-func (s *RandomScheduler) Schedule(pod api.Pod) (string, error) {
-	machines, err := s.machines.List()
+func (s *RandomScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+	machines, err := minionLister.List()
 	if err != nil {
 		return "", err
 	}
@@ -52,19 +62,17 @@ func (s *RandomScheduler) Schedule(pod api.Pod) (string, error) {
 
 // RoundRobinScheduler chooses machines in order.
 type RoundRobinScheduler struct {
-	machines     MinionRegistry
 	currentIndex int
 }
 
-func MakeRoundRobinScheduler(machines MinionRegistry) Scheduler {
+func MakeRoundRobinScheduler() Scheduler {
 	return &RoundRobinScheduler{
-		machines:     machines,
 		currentIndex: -1,
 	}
 }
 
-func (s *RoundRobinScheduler) Schedule(pod api.Pod) (string, error) {
-	machines, err := s.machines.List()
+func (s *RoundRobinScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+	machines, err := minionLister.List()
 	if err != nil {
 		return "", err
 	}
@@ -74,14 +82,12 @@ func (s *RoundRobinScheduler) Schedule(pod api.Pod) (string, error) {
 }
 
 type FirstFitScheduler struct {
-	machines MinionRegistry
 	registry PodRegistry
 	random   *rand.Rand
 }
 
-func MakeFirstFitScheduler(machines MinionRegistry, registry PodRegistry, random *rand.Rand) Scheduler {
+func MakeFirstFitScheduler(registry PodRegistry, random *rand.Rand) Scheduler {
 	return &FirstFitScheduler{
-		machines: machines,
 		registry: registry,
 		random:   random,
 	}
@@ -98,8 +104,8 @@ func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 	return false
 }
 
-func (s *FirstFitScheduler) Schedule(pod api.Pod) (string, error) {
-	machines, err := s.machines.List()
+func (s *FirstFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+	machines, err := minionLister.List()
 	if err != nil {
 		return "", err
 	}
