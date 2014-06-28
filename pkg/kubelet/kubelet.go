@@ -101,9 +101,9 @@ const (
 
 // Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address string, port uint) {
+func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address, endpoint string, port uint) {
 	if kl.DockerPuller == nil {
-		kl.DockerPuller = MakeDockerPuller()
+		kl.DockerPuller = MakeDockerPuller(endpoint)
 	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
@@ -205,14 +205,23 @@ func (kl *Kubelet) getContainerId(manifest *api.ContainerManifest, container *ap
 	return "", nil
 }
 
-type dockerPuller struct{}
-
-func MakeDockerPuller() DockerPuller {
-	return dockerPuller{}
+type dockerPuller struct {
+	endpoint string
 }
 
-func (dockerPuller) Pull(image string) error {
-	cmd := exec.Command("docker", "pull", image)
+func MakeDockerPuller(endpoint string) DockerPuller {
+	return dockerPuller{
+		endpoint: endpoint,
+	}
+}
+
+func (p dockerPuller) Pull(image string) error {
+	var cmd *exec.Cmd
+	if len(p.endpoint) == 0 {
+		cmd = exec.Command("docker", "pull", image)
+	} else {
+		cmd = exec.Command("docker", "-H", p.endpoint, "pull", image)
+	}
 	err := cmd.Start()
 	if err != nil {
 		return err

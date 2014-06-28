@@ -71,7 +71,7 @@ func main() {
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go myKubelet.RunKubelet("", manifestUrl, servers[0], "localhost", 0)
+	go myKubelet.RunKubelet("", manifestUrl, servers[0], "localhost", "", 0)
 
 	// Create a second kublet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
@@ -84,7 +84,7 @@ func main() {
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go otherKubelet.RunKubelet("", "", servers[0], "localhost", 0)
+	go otherKubelet.RunKubelet("", "", servers[0], "localhost", "", 0)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiserver.URL)
