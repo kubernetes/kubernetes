@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 )
 
 func expectNoError(t *testing.T, err error) {
@@ -152,7 +154,7 @@ func TestGetPodCloud(t *testing.T) {
 
 func TestMakePodStatus(t *testing.T) {
 	status := makePodStatus(map[string]interface{}{})
-	if status != "Pending" {
+	if status != api.PodPending {
 		t.Errorf("Expected 'Pending', got '%s'", status)
 	}
 
@@ -162,7 +164,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 	})
 
-	if status != "Stopped" {
+	if status != api.PodStopped {
 		t.Errorf("Expected 'Stopped', got '%s'", status)
 	}
 
@@ -172,7 +174,47 @@ func TestMakePodStatus(t *testing.T) {
 		},
 	})
 
-	if status != "Running" {
+	if status != api.PodRunning {
 		t.Errorf("Expected 'Running', got '%s'", status)
+	}
+}
+
+func TestCreatePod(t *testing.T) {
+	mockRegistry := MockPodRegistry{
+		pod: &api.Pod{
+			JSONBase: api.JSONBase{ID: "foo"},
+			CurrentState: api.PodState{
+				Status: api.PodPending,
+			},
+		},
+	}
+	storage := PodRegistryStorage{
+		registry:      &mockRegistry,
+		podPollPeriod: time.Millisecond * 100,
+		scheduler:     scheduler.MakeRoundRobinScheduler(),
+		minionLister:  MakeMinionRegistry([]string{"machine"}),
+	}
+	pod := api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
+	}
+	channel, err := storage.Create(pod)
+	expectNoError(t, err)
+	select {
+	case <-time.After(time.Millisecond * 100):
+		// Do nothing, this is expected.
+	case <-channel:
+		t.Error("Unexpected read from async channel")
+	}
+	mockRegistry.UpdatePod(api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
+		CurrentState: api.PodState{
+			Status: api.PodRunning,
+		},
+	})
+	select {
+	case <-time.After(time.Second * 1):
+		t.Error("Unexpected timeout")
+	case <-channel:
+		// Do nothing, this is expected.
 	}
 }

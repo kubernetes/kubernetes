@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -170,7 +169,7 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api
 func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
-		if strings.Index(value.CurrentState.Status, "Exit") == -1 {
+		if api.PodStopped != value.CurrentState.Status {
 			result = append(result, value)
 		}
 	}

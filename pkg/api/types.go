@@ -100,10 +100,18 @@ type JSONBase struct {
 	SelfLink          string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 }
 
+type PodStatus string
+
+const (
+	PodRunning PodStatus = "Running"
+	PodPending PodStatus = "Pending"
+	PodStopped PodStatus = "Stopped"
+)
+
 // PodState is the state of a pod, used as either input (desired state) or output (current state)
 type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
-	Status   string            `json:"status,omitempty" yaml:"status,omitempty"`
+	Status   PodStatus         `json:"status,omitempty" yaml:"status,omitempty"`
 	Host     string            `json:"host,omitempty" yaml:"host,omitempty"`
 	HostIP   string            `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 	Info     interface{}       `json:"info,omitempty" yaml:"info,omitempty"`

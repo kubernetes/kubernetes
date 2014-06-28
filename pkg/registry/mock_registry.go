@@ -66,8 +66,10 @@ func (registry *MockPodRegistry) CreatePod(machine string, pod api.Pod) error {
 func (registry *MockPodRegistry) UpdatePod(pod api.Pod) error {
 	registry.Lock()
 	defer registry.Unlock()
+	registry.pod = &pod
 	return registry.err
 }
+
 func (registry *MockPodRegistry) DeletePod(podId string) error {
 	registry.Lock()
 	defer registry.Unlock()

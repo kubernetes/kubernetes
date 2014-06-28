@@ -19,6 +19,7 @@ package registry
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -37,6 +38,7 @@ type PodRegistryStorage struct {
 	scheduler     scheduler.Scheduler
 	minionLister  scheduler.MinionLister
 	cloud         cloudprovider.Interface
+	podPollPeriod time.Duration
 }
 
 // MakePodRegistryStorage makes a RESTStorage object for a pod registry.
@@ -60,6 +62,7 @@ func MakePodRegistryStorage(registry PodRegistry,
 		minionLister:  minionLister,
 		cloud:         cloud,
 		podCache:      podCache,
+		podPollPeriod: time.Second * 10,
 	}
 }
 
@@ -85,17 +88,17 @@ func (storage *PodRegistryStorage) List(selector labels.Selector) (interface{}, 
 	return result, err
 }
 
-func makePodStatus(info interface{}) string {
+func makePodStatus(info interface{}) api.PodStatus {
 	if state, ok := info.(map[string]interface{})["State"]; ok {
 		if running, ok := state.(map[string]interface{})["Running"]; ok {
 			if running.(bool) {
-				return "Running"
+				return api.PodRunning
 			} else {
-				return "Stopped"
+				return api.PodStopped
 			}
 		}
 	}
-	return "Pending"
+	return api.PodPending
 }
 
 func getInstanceIP(cloud cloudprovider.Interface, host string) string {
@@ -167,7 +170,7 @@ func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 		if err != nil {
 			return nil, err
 		}
-		return storage.registry.GetPod(pod.ID)
+		return storage.waitForPodRunning(pod)
 	}), nil
 }
 
@@ -182,6 +185,28 @@ func (storage *PodRegistryStorage) Update(obj interface{}) (<-chan interface{}, 
 		if err != nil {
 			return nil, err
 		}
-		return storage.registry.GetPod(pod.ID)
+		return storage.waitForPodRunning(pod)
 	}), nil
+}
+
+func (storage *PodRegistryStorage) waitForPodRunning(pod api.Pod) (interface{}, error) {
+	for {
+		podObj, err := storage.Get(pod.ID)
+
+		if err != nil || podObj == nil {
+			return nil, err
+		}
+		podPtr, ok := podObj.(*api.Pod)
+		if !ok {
+			// This should really never happen.
+			return nil, fmt.Errorf("Error %#v is not an api.Pod!", podObj)
+		}
+		switch podPtr.CurrentState.Status {
+		case api.PodRunning, api.PodStopped:
+			return pod, nil
+		default:
+			time.Sleep(storage.podPollPeriod)
+		}
+	}
+	return pod, nil
 }
