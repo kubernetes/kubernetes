@@ -21,6 +21,13 @@ type empty struct{}
 // A set of strings, implemented via map[string]struct{} for minimal memory consumption.
 type StringSet map[string]empty
 
+// NewStringSet creates a StringSet from a list of values.
+func NewStringSet(items ...string) StringSet {
+	ss := StringSet{}
+	ss.Insert(items...)
+	return ss
+}
+
 // Insert adds items to the set.
 func (s StringSet) Insert(items ...string) {
 	for _, item := range items {

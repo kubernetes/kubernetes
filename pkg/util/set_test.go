@@ -22,7 +22,13 @@ import (
 
 func TestStringSet(t *testing.T) {
 	s := StringSet{}
+	if len(s) != 0 {
+		t.Errorf("Expected len=0: %d", len(s))
+	}
 	s.Insert("a", "b")
+	if len(s) != 2 {
+		t.Errorf("Expected len=2: %d", len(s))
+	}
 	s.Insert("c")
 	if s.Has("d") {
 		t.Errorf("Unexpected contents: %#v", s)
@@ -32,6 +38,16 @@ func TestStringSet(t *testing.T) {
 	}
 	s.Delete("a")
 	if s.Has("a") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+}
+
+func TestNewStringSet(t *testing.T) {
+	s := NewStringSet("a", "b", "c")
+	if len(s) != 3 {
+		t.Errorf("Expected len=3: %d", len(s))
+	}
+	if !s.Has("a") || !s.Has("b") || !s.Has("c") {
 		t.Errorf("Unexpected contents: %#v", s)
 	}
 }
