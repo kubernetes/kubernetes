@@ -724,13 +724,21 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 		}
 
 		allManifests := []api.ContainerManifest{}
+		allIds := util.StringSet{}
 		for src, manifests := range last {
-			for _, m := range manifests {
-				if err := api.ValidateManifest(&m); err != nil {
+			for i := range manifests {
+				m := &manifests[i]
+				if allIds.Has(m.Id) {
+					glog.Warningf("Manifest from %s has duplicate ID, ignoring: %v", src, m.Id)
+					continue
+				}
+				allIds.Insert(m.Id)
+				if err := api.ValidateManifest(m); err != nil {
 					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
 					continue
 				}
-				allManifests = append(allManifests, m)
+				// TODO(thockin): There's no reason to collect manifests by value.  Don't pessimize.
+				allManifests = append(allManifests, *m)
 			}
 		}
 

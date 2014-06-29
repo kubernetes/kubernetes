@@ -45,13 +45,12 @@ package api
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
 // This is used as the representation of Kubernetes workloads.
 type ContainerManifest struct {
-	//FIXME: should these comments be here or just in the manifest doc?  Id is not in that doc.
 	// Required: This must be a supported version string, such as "v1beta1".
 	Version    string      `yaml:"version" json:"version"`
 	Volumes    []Volume    `yaml:"volumes,omitempty" json:"volumes,omitempty"`
 	Containers []Container `yaml:"containers,omitempty" json:"containers,omitempty"`
 	// Required: This must be a DNS_SUBDOMAIN, 255 characters or less.
-	Id         string      `yaml:"id" json:"id"`
+	Id string `yaml:"id" json:"id"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
@@ -65,21 +64,21 @@ type Volume struct {
 type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL, 63 characters or less.  Each
 	// container in a pod must have a unique name.
-	Name          string `yaml:"name,omitempty" json:"name,omitempty"`
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
 	// Optional: Defaults to ContainerPort.
-	HostPort      int    `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
+	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
-	ContainerPort int    `yaml:"containerPort" json:"containerPort"`
+	ContainerPort int `yaml:"containerPort" json:"containerPort"`
 	// Optional: Defaults to "TCP".
-	Protocol      string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 }
 
 // VolumeMount describes a mounting of a Volume within a container
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
-	Name      string `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name"`
 	// Optional: Defaults to false (read-write).
-	ReadOnly  bool   `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
 	// Required.
 	MountPath string `yaml:"mountPath" json:"mountPath"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
@@ -89,7 +88,7 @@ type VolumeMount struct {
 // EnvVar represents an environment variable present in a Container
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
-	Name  string `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name"`
 	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
@@ -98,17 +97,17 @@ type EnvVar struct {
 type Container struct {
 	// Required: This must be a DNS_LABEL, 63 characters or less.  Each container in a
 	// pod must have a unique name.
-	Name         string        `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name"`
 	// Required.
-	Image        string        `yaml:"image" json:"image"`
+	Image string `yaml:"image" json:"image"`
 	// Optional: Defaults to whatever is defined in the image.
-	Command      []string      `yaml:"command,omitempty" json:"command,omitempty"`
+	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir   string        `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
-	Ports        []Port        `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Env          []EnvVar      `yaml:"env,omitempty" json:"env,omitempty"`
+	WorkingDir string   `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
+	Ports      []Port   `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Env        []EnvVar `yaml:"env,omitempty" json:"env,omitempty"`
 	// Optional: Defaults to unlimited.
-	Memory       int           `yaml:"memory,omitempty" json:"memory,omitempty"`
+	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
 	// Optional: Defaults to unlimited.
 	CPU          int           `yaml:"cpu,omitempty" json:"cpu,omitempty"`
 	VolumeMounts []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`

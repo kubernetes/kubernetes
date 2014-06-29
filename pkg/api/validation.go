@@ -41,7 +41,8 @@ func isSupportedManifestVersion(value string) bool {
 // includes checking formatting and uniqueness.
 func ValidateVolumes(volumes []Volume) (util.StringSet, error) {
 	allNames := util.StringSet{}
-	for _, vol := range volumes {
+	for i := range volumes {
+		vol := &volumes[i] // so we can set default values
 		if len(vol.Name) > 63 || !util.IsDNSLabel(vol.Name) {
 			return util.StringSet{}, fmt.Errorf("Volume.Name is missing or malformed: '%s'", vol.Name)
 		}
@@ -56,7 +57,8 @@ func ValidateVolumes(volumes []Volume) (util.StringSet, error) {
 // ValidateVolumeMounts tests that the specified VolumeMounts have valid data.
 // This includes checking formatting and uniqueness.
 func ValidateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
-	for _, mnt := range mounts {
+	for i := range mounts {
+		mnt := &mounts[i] // so we can set default values
 		if len(mnt.Name) == 0 {
 			return fmt.Errorf("VolumeMount.Name is missing")
 		}
@@ -75,7 +77,8 @@ func ValidateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
 func ValidatePorts(ports []Port) error {
 	allNames := util.StringSet{}
 	allHostPorts := make(map[int]bool)
-	for _, port := range ports {
+	for i := range ports {
+		port := &ports[i] // so we can set default values
 		if port.Name != "" {
 			if len(port.Name) > 63 || !util.IsDNSLabel(port.Name) {
 				return fmt.Errorf("Port.Name is missing or malformed: '%s'", port.Name)
@@ -88,24 +91,20 @@ func ValidatePorts(ports []Port) error {
 		if !util.IsValidPortNum(port.ContainerPort) {
 			return fmt.Errorf("Port.ContainerPort is missing or invalid: %d", port.ContainerPort)
 		}
-		hostPort := port.ContainerPort // default
-		if port.HostPort > 0 {
-			hostPort = port.HostPort
-			if !util.IsValidPortNum(port.HostPort) {
-				return fmt.Errorf("Port.HostPort is invalid: %d", port.HostPort)
-			}
+		if port.HostPort == 0 {
+			port.HostPort = port.ContainerPort
+		} else if !util.IsValidPortNum(port.HostPort) {
+			return fmt.Errorf("Port.HostPort is invalid: %d", port.HostPort)
 		}
-		//FIXME: should we set defaults (e.g. for host port) here?  Or let it stay 0 and default it later?
-		if allHostPorts[hostPort] {
-			return fmt.Errorf("Port.HostPort is not unique: %d", hostPort)
+		if allHostPorts[port.HostPort] {
+			return fmt.Errorf("Port.HostPort is not unique: %d", port.HostPort)
 		}
-		allHostPorts[hostPort] = true
-		if port.Protocol != "" {
-			if !isValidProtocol(port.Protocol) {
-				return fmt.Errorf("Port.Protocol is invalid: '%s'", port.Protocol)
-			}
+		allHostPorts[port.HostPort] = true
+		if port.Protocol == "" {
+			port.Protocol = "TCP"
+		} else if !isValidProtocol(port.Protocol) {
+			return fmt.Errorf("Port.Protocol is invalid: '%s'", port.Protocol)
 		}
-		//FIXME: set default protocol here?
 	}
 	return nil
 }
@@ -113,7 +112,8 @@ func ValidatePorts(ports []Port) error {
 // ValidateEnv tests that the specified EnvVars have valid data.  This includes
 // checking formatting and uniqueness.
 func ValidateEnv(vars []EnvVar) error {
-	for _, ev := range vars {
+	for i := range vars {
+		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 || !util.IsCIdentifier(ev.Name) {
 			return fmt.Errorf("EnvVar.Name is missing or malformed: '%s'", ev.Name)
 		}
@@ -125,7 +125,8 @@ func ValidateEnv(vars []EnvVar) error {
 // This includes checking formatting and uniqueness.
 func ValidateContainers(containers []Container, volumes util.StringSet) error {
 	allNames := util.StringSet{}
-	for _, ctr := range containers {
+	for i := range containers {
+		ctr := &containers[i] // so we can set default values
 		if len(ctr.Name) > 63 || !util.IsDNSLabel(ctr.Name) {
 			return fmt.Errorf("Container.Name is missing or malformed: '%s'", ctr.Name)
 		}
@@ -152,14 +153,12 @@ func ValidateContainers(containers []Container, volumes util.StringSet) error {
 // ValidateContainers tests that the specified ContainerManifest has valid
 // data.  This includes checking formatting and uniqueness.
 func ValidateManifest(manifest *ContainerManifest) error {
-	//FIXME: Maybe check for missing, too long, and malformed individually with distinct error messages?
 	if len(manifest.Version) == 0 || !isSupportedManifestVersion(manifest.Version) {
 		return fmt.Errorf("ContainerManifest.Version is missing not supported: '%s'", manifest.Version)
 	}
 	if len(manifest.Id) > 255 || !util.IsDNSSubdomain(manifest.Id) {
 		return fmt.Errorf("ContainerManifest.Id is missing or malformed: '%s'", manifest.Id)
 	}
-	//FIXME: does manifest.Id have uniqueness rules?  Callers problem.
 	allVolumes, err := ValidateVolumes(manifest.Volumes)
 	if err != nil {
 		return err

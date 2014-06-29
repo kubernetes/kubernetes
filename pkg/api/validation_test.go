@@ -90,6 +90,17 @@ func TestValidatePorts(t *testing.T) {
 		t.Errorf("expected success: %v", err)
 	}
 
+	minimalCase := []Port{
+		{ContainerPort: 80},
+	}
+	err = ValidatePorts(minimalCase)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if minimalCase[0].HostPort != 80 || minimalCase[0].Protocol != "TCP" {
+		t.Errorf("expected default values: %v", minimalCase[0])
+	}
+
 	errorCases := map[string][]Port{
 		"name > 63 characters": {{Name: strings.Repeat("a", 64), ContainerPort: 80}},
 		"name not a DNS label": {{Name: "a.b.c", ContainerPort: 80}},
