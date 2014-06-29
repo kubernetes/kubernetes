@@ -41,7 +41,7 @@ type kubeletInterface interface {
 
 func (s *KubeletServer) error(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Error: %#v", err)
+	fmt.Fprintf(w, "Internal Error: %v", err)
 }
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -87,7 +87,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		stats, err := s.Kubelet.GetContainerStats(container)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %#v", err)
+			fmt.Fprintf(w, "Internal Error: %v", err)
 			return
 		}
 		if stats == nil {
@@ -98,7 +98,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		data, err := json.Marshal(stats)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %#v", err)
+			fmt.Fprintf(w, "Internal Error: %v", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -116,7 +116,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		data, err := s.Kubelet.GetContainerInfo(container)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %#v", err)
+			fmt.Fprintf(w, "Internal Error: %v", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)

@@ -61,7 +61,7 @@ func main() {
 
 	controllerManager.Run(1 * time.Second)
 
-	// Kublet
+	// Kubelet
 	fakeDocker1 := &kubelet.FakeDockerClient{}
 	myKubelet := kubelet.Kubelet{
 		Hostname:           machineList[0],
@@ -73,7 +73,7 @@ func main() {
 	}
 	go myKubelet.RunKubelet("", manifestUrl, servers[0], "localhost", "", 0)
 
-	// Create a second kublet so that the guestbook example's two redis slaves both
+	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	fakeDocker2 := &kubelet.FakeDockerClient{}
 	otherKubelet := kubelet.Kubelet{
