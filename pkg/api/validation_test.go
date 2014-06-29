@@ -29,7 +29,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "123"},
 		{Name: "abc-123"},
 	}
-	names, err := ValidateVolumes(successCase)
+	names, err := validateVolumes(successCase)
 	if err != nil {
 		t.Errorf("expected success: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestValidateVolumes(t *testing.T) {
 		"name not unique":      {{Name: "abc"}, {Name: "abc"}},
 	}
 	for k, v := range errorCases {
-		_, err := ValidateVolumes(v)
+		_, err := validateVolumes(v)
 		if err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -59,8 +59,19 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "123", MountPath: "/foo"},
 		{Name: "abc-123", MountPath: "/bar"},
 	}
-	if err := ValidateVolumeMounts(successCase, volumes); err != nil {
+	if err := validateVolumeMounts(successCase, volumes); err != nil {
 		t.Errorf("expected success: %v", err)
+	}
+
+	nonCanonicalCase := []VolumeMount{
+		{Name: "abc", Path: "/foo"},
+	}
+	err := validateVolumeMounts(nonCanonicalCase, volumes)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if nonCanonicalCase[0].MountPath != "/foo" {
+		t.Errorf("expected canonicalized values: %+v", nonCanonicalCase[0])
 	}
 
 	errorCases := map[string][]VolumeMount{
@@ -69,7 +80,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"empty mountpath": {{Name: "abc", MountPath: ""}},
 	}
 	for k, v := range errorCases {
-		err := ValidateVolumeMounts(v, volumes)
+		err := validateVolumeMounts(v, volumes)
 		if err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -85,20 +96,20 @@ func TestValidatePorts(t *testing.T) {
 		{Name: "do-re-me", ContainerPort: 84},
 		{ContainerPort: 85},
 	}
-	err := ValidatePorts(successCase)
+	err := validatePorts(successCase)
 	if err != nil {
 		t.Errorf("expected success: %v", err)
 	}
 
-	minimalCase := []Port{
+	nonCanonicalCase := []Port{
 		{ContainerPort: 80},
 	}
-	err = ValidatePorts(minimalCase)
+	err = validatePorts(nonCanonicalCase)
 	if err != nil {
 		t.Errorf("expected success: %v", err)
 	}
-	if minimalCase[0].HostPort != 80 || minimalCase[0].Protocol != "TCP" {
-		t.Errorf("expected default values: %v", minimalCase[0])
+	if nonCanonicalCase[0].HostPort != 80 || nonCanonicalCase[0].Protocol != "TCP" {
+		t.Errorf("expected default values: %+v", nonCanonicalCase[0])
 	}
 
 	errorCases := map[string][]Port{
@@ -122,7 +133,7 @@ func TestValidatePorts(t *testing.T) {
 		"invalid protocol": {{ContainerPort: 80, Protocol: "ICMP"}},
 	}
 	for k, v := range errorCases {
-		err := ValidatePorts(v)
+		err := validatePorts(v)
 		if err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -136,7 +147,7 @@ func TestValidateEnv(t *testing.T) {
 		{Name: "AbC_123", Value: "value"},
 		{Name: "abc", Value: ""},
 	}
-	err := ValidateEnv(successCase)
+	err := validateEnv(successCase)
 	if err != nil {
 		t.Errorf("expected success: %v", err)
 	}
@@ -147,7 +158,7 @@ func TestValidateEnv(t *testing.T) {
 		"name not a C identifier": {{Name: "a.b.c"}},
 	}
 	for k, v := range errorCases {
-		err := ValidateEnv(v)
+		err := validateEnv(v)
 		if err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -162,7 +173,7 @@ func TestValidateContainers(t *testing.T) {
 		{Name: "123", Image: "image"},
 		{Name: "abc-123", Image: "image"},
 	}
-	err := ValidateContainers(successCase, volumes)
+	err := validateContainers(successCase, volumes)
 	if err != nil {
 		t.Errorf("expected success: %v", err)
 	}
@@ -178,7 +189,7 @@ func TestValidateContainers(t *testing.T) {
 		"zero-length image": {{Name: "abc", Image: ""}},
 	}
 	for k, v := range errorCases {
-		err := ValidateContainers(v, volumes)
+		err := validateContainers(v, volumes)
 		if err == nil {
 			t.Errorf("expected failure for %s", k)
 		}

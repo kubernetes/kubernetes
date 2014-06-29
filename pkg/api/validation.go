@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 func isValidProtocol(proto string) bool {
@@ -37,9 +38,7 @@ func isSupportedManifestVersion(value string) bool {
 	return false
 }
 
-// ValidateVolumes tests that the specified Volumes have valid data.  This
-// includes checking formatting and uniqueness.
-func ValidateVolumes(volumes []Volume) (util.StringSet, error) {
+func validateVolumes(volumes []Volume) (util.StringSet, error) {
 	allNames := util.StringSet{}
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
@@ -54,9 +53,7 @@ func ValidateVolumes(volumes []Volume) (util.StringSet, error) {
 	return allNames, nil
 }
 
-// ValidateVolumeMounts tests that the specified VolumeMounts have valid data.
-// This includes checking formatting and uniqueness.
-func ValidateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
+func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
 	for i := range mounts {
 		mnt := &mounts[i] // so we can set default values
 		if len(mnt.Name) == 0 {
@@ -66,15 +63,19 @@ func ValidateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
 			return fmt.Errorf("VolumeMount.Name does not name a Volume: '%s'", mnt.Name)
 		}
 		if len(mnt.MountPath) == 0 {
-			return fmt.Errorf("VolumeMount.MountPath is missing")
+			// Backwards compat.
+			if len(mnt.Path) == 0 {
+				return fmt.Errorf("VolumeMount.MountPath is missing")
+			}
+			glog.Warning("DEPRECATED: VolumeMount.Path has been replaced by VolumeMount.MountPath")
+			mnt.MountPath = mnt.Path
+			mnt.Path = ""
 		}
 	}
 	return nil
 }
 
-// ValidatePorts tests that the specified Ports have valid data.  This includes
-// checking formatting and uniqueness.
-func ValidatePorts(ports []Port) error {
+func validatePorts(ports []Port) error {
 	allNames := util.StringSet{}
 	allHostPorts := make(map[int]bool)
 	for i := range ports {
@@ -109,9 +110,7 @@ func ValidatePorts(ports []Port) error {
 	return nil
 }
 
-// ValidateEnv tests that the specified EnvVars have valid data.  This includes
-// checking formatting and uniqueness.
-func ValidateEnv(vars []EnvVar) error {
+func validateEnv(vars []EnvVar) error {
 	for i := range vars {
 		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 || !util.IsCIdentifier(ev.Name) {
@@ -121,9 +120,7 @@ func ValidateEnv(vars []EnvVar) error {
 	return nil
 }
 
-// ValidateContainers tests that the specified Containers have valid data.
-// This includes checking formatting and uniqueness.
-func ValidateContainers(containers []Container, volumes util.StringSet) error {
+func validateContainers(containers []Container, volumes util.StringSet) error {
 	allNames := util.StringSet{}
 	for i := range containers {
 		ctr := &containers[i] // so we can set default values
@@ -137,21 +134,23 @@ func ValidateContainers(containers []Container, volumes util.StringSet) error {
 		if len(ctr.Image) == 0 {
 			return fmt.Errorf("Container.Image is missing")
 		}
-		if err := ValidatePorts(ctr.Ports); err != nil {
+		if err := validatePorts(ctr.Ports); err != nil {
 			return err
 		}
-		if err := ValidateEnv(ctr.Env); err != nil {
+		if err := validateEnv(ctr.Env); err != nil {
 			return err
 		}
-		if err := ValidateVolumeMounts(ctr.VolumeMounts, volumes); err != nil {
+		if err := validateVolumeMounts(ctr.VolumeMounts, volumes); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// ValidateContainers tests that the specified ContainerManifest has valid
-// data.  This includes checking formatting and uniqueness.
+// ValidateManifest tests that the specified ContainerManifest has valid data.
+// This includes checking formatting and uniqueness.  It also canonicalizes the
+// structure by setting default values and implementing any backwards-compatibility
+// tricks.
 func ValidateManifest(manifest *ContainerManifest) error {
 	if len(manifest.Version) == 0 || !isSupportedManifestVersion(manifest.Version) {
 		return fmt.Errorf("ContainerManifest.Version is missing not supported: '%s'", manifest.Version)
@@ -159,11 +158,11 @@ func ValidateManifest(manifest *ContainerManifest) error {
 	if len(manifest.Id) > 255 || !util.IsDNSSubdomain(manifest.Id) {
 		return fmt.Errorf("ContainerManifest.Id is missing or malformed: '%s'", manifest.Id)
 	}
-	allVolumes, err := ValidateVolumes(manifest.Volumes)
+	allVolumes, err := validateVolumes(manifest.Volumes)
 	if err != nil {
 		return err
 	}
-	if err := ValidateContainers(manifest.Containers, allVolumes); err != nil {
+	if err := validateContainers(manifest.Containers, allVolumes); err != nil {
 		return err
 	}
 	return nil
