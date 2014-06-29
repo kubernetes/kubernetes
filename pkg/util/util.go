@@ -25,8 +25,15 @@ import (
 	"github.com/golang/glog"
 )
 
+// For testing, bypass HandleCrash.
+var ReallyCrash bool
+
 // Simply catches a crash and logs an error. Meant to be called via defer.
 func HandleCrash() {
+	if ReallyCrash {
+		return
+	}
+
 	r := recover()
 	if r != nil {
 		callers := ""

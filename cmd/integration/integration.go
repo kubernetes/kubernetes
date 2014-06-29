@@ -38,6 +38,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(4)
+	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
 
