@@ -12,9 +12,9 @@ For the time being, most of the people working on this project are in the US and
 
 ## Code reviews
 
-All changes must be code reviewed.  For non-maintainers this is obvious, since you can't commit anyway.  But even for maintainers, we want all changes to get at least one review, preferably from someone who knows the areas the change touches.  For non-trivial changes (read: more than 100 LoC, more than 4 edited files, or significant risk (as determined by common sense)) we want two reviewers.
+All changes must be code reviewed.  For non-maintainers this is obvious, since you can't commit anyway.  But even for maintainers, we want all changes to get at least one review, preferably from someone who knows the areas the change touches.  For non-trivial changes (read: more than 100 LoC, more than 4 edited files, or significant risk (as determined by common sense)) we may want two reviewers.  The primary reviewer will make this decision and nominate a second reviewer, if needed.
 
-Most PRs will find reviewers organically.  If a maintainer intends to be the primary reviewer of a PR they should set themselves as the assignee on GitHub and say so in a reply to the PR.
+Most PRs will find reviewers organically.  If a maintainer intends to be the primary reviewer of a PR they should set themselves as the assignee on GitHub and say so in a reply to the PR.  Only the primary reviewer of a change should actually do the merge, except in rare cases (e.g. they are unavailable in a reasonable timeframe).
 
 If a PR has gone 2 work days without an owner emerging, please poke the PR thread and ask for a reviewer to be assigned.
 
