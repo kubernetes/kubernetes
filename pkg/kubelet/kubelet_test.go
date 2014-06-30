@@ -110,7 +110,7 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 
 func verifyPackUnpack(t *testing.T, manifestId, containerName string) {
 	name := buildDockerName(
-		&api.ContainerManifest{Id: manifestId},
+		&api.ContainerManifest{ID: manifestId},
 		&api.Container{Name: containerName},
 	)
 	returnedManifestId, returnedContainerName := parseDockerName(name)
@@ -142,7 +142,7 @@ func TestGetContainerId(t *testing.T) {
 		DockerPuller: &FakeDockerPuller{},
 	}
 	manifest := api.ContainerManifest{
-		Id: "qux",
+		ID: "qux",
 	}
 	container := api.Container{
 		Name: "foo",
@@ -171,7 +171,7 @@ func TestGetContainerId(t *testing.T) {
 	}
 
 	fakeDocker.clearCalls()
-	missingManifest := api.ContainerManifest{Id: "foobar"}
+	missingManifest := api.ContainerManifest{ID: "foobar"}
 	id, err = kubelet.getContainerId(&missingManifest, &container)
 	verifyCalls(t, fakeDocker, []string{"list"})
 	if id != "" {
@@ -245,12 +245,12 @@ func TestResponseToManifests(t *testing.T) {
 	list, err := kubelet.ResponseToManifests(&etcd.Response{
 		Node: &etcd.Node{
 			Value: util.MakeJSONString([]api.ContainerManifest{
-				{Id: "foo"},
-				{Id: "bar"},
+				{ID: "foo"},
+				{ID: "bar"},
 			}),
 		},
 	})
-	if len(list) != 2 || list[0].Id != "foo" || list[1].Id != "bar" {
+	if len(list) != 2 || list[0].ID != "foo" || list[1].ID != "bar" {
 		t.Errorf("Unexpected list: %#v", list)
 	}
 	expectNoError(t, err)
@@ -399,7 +399,7 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{
 		{
-			Id: "foo",
+			ID: "foo",
 			Containers: []api.Container{
 				{Name: "bar"},
 			},
@@ -639,7 +639,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 func TestExtractFromValidDataFile(t *testing.T) {
 	kubelet := Kubelet{}
 
-	manifest := api.ContainerManifest{Id: "bar"}
+	manifest := api.ContainerManifest{ID: "bar"}
 	data, err := json.Marshal(manifest)
 	expectNoError(t, err)
 	file, err := ioutil.TempFile("", "foo")
@@ -669,8 +669,8 @@ func TestExtractFromDir(t *testing.T) {
 	kubelet := Kubelet{}
 
 	manifests := []api.ContainerManifest{
-		{Id: "aaaa"},
-		{Id: "bbbb"},
+		{ID: "aaaa"},
+		{ID: "bbbb"},
 	}
 
 	dirName, err := ioutil.TempDir("", "foo")
@@ -679,7 +679,7 @@ func TestExtractFromDir(t *testing.T) {
 	for _, manifest := range manifests {
 		data, err := json.Marshal(manifest)
 		expectNoError(t, err)
-		file, err := ioutil.TempFile(dirName, manifest.Id)
+		file, err := ioutil.TempFile(dirName, manifest.ID)
 		expectNoError(t, err)
 		name := file.Name()
 		expectNoError(t, file.Close())
@@ -716,7 +716,7 @@ func TestExtractFromHttpSingle(t *testing.T) {
 	reader := startReading(updateChannel)
 
 	manifests := []api.ContainerManifest{
-		{Version: "v1beta1", Id: "foo"},
+		{Version: "v1beta1", ID: "foo"},
 	}
 	// Taking a single-manifest from a URL allows kubelet to be used
 	// in the implementation of google's container VM image.
@@ -751,8 +751,8 @@ func TestExtractFromHttpMultiple(t *testing.T) {
 	reader := startReading(updateChannel)
 
 	manifests := []api.ContainerManifest{
-		{Version: "v1beta1", Id: "foo"},
-		{Version: "v1beta1", Id: "bar"},
+		{Version: "v1beta1", ID: "foo"},
+		{Version: "v1beta1", ID: "bar"},
 	}
 	data, err := json.Marshal(manifests)
 	if err != nil {
@@ -828,7 +828,7 @@ func TestWatchEtcd(t *testing.T) {
 
 	manifest := []api.ContainerManifest{
 		{
-			Id: "foo",
+			ID: "foo",
 		},
 	}
 	data, err := json.Marshal(manifest)

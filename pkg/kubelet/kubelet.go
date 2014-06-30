@@ -198,7 +198,7 @@ func (kl *Kubelet) getContainerId(manifest *api.ContainerManifest, container *ap
 	}
 	for id, dockerContainer := range dockerContainers {
 		manifestId, containerName := parseDockerName(dockerContainer.Names[0])
-		if manifestId == manifest.Id && containerName == container.Name {
+		if manifestId == manifest.ID && containerName == container.Name {
 			return DockerId(id), nil
 		}
 	}
@@ -247,8 +247,8 @@ const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both manifest id and container name.
 func buildDockerName(manifest *api.ContainerManifest, container *api.Container) string {
-	// Note, manifest.Id could be blank.
-	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.Id), rand.Uint32())
+	// Note, manifest.ID could be blank.
+	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.ID), rand.Uint32())
 }
 
 // Upacks a container name, returning the manifest id and container name we would have used to
@@ -367,7 +367,7 @@ func (kl *Kubelet) killContainer(container docker.APIContainers) error {
 	kl.LogEvent(&api.Event{
 		Event: "STOP",
 		Manifest: &api.ContainerManifest{
-			Id: manifestId,
+			ID: manifestId,
 		},
 		Container: &api.Container{
 			Name: containerName,
@@ -650,14 +650,14 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 		// Make sure we have a network container
 		netId, err := kl.getNetworkContainerId(&manifest)
 		if err != nil {
-			glog.Errorf("Failed to introspect network container. (%v)  Skipping container %s", err, manifest.Id)
+			glog.Errorf("Failed to introspect network container. (%v)  Skipping container %s", err, manifest.ID)
 			continue
 		}
 		if netId == "" {
 			glog.Infof("Network container doesn't exist, creating")
 			netId, err = kl.createNetworkContainer(&manifest)
 			if err != nil {
-				glog.Errorf("Failed to create network container: %v Skipping container %s", err, manifest.Id)
+				glog.Errorf("Failed to create network container: %v Skipping container %s", err, manifest.ID)
 				continue
 			}
 		}

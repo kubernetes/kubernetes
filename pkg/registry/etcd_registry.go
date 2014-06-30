@@ -150,7 +150,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 		newManifests := make([]api.ContainerManifest, 0, len(manifests))
 		found := false
 		for _, manifest := range manifests {
-			if manifest.Id != podID {
+			if manifest.ID != podID {
 				newManifests = append(newManifests, manifest)
 			} else {
 				found = true

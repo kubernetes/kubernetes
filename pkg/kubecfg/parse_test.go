@@ -59,7 +59,7 @@ func TestParsePod(t *testing.T) {
 		JSONBase: api.JSONBase{ID: "test pod"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
-				Id: "My manifest",
+				ID: "My manifest",
 				Containers: []api.Container{
 					{Name: "my container"},
 				},
@@ -91,7 +91,7 @@ func TestParseController(t *testing.T) {
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
 					Manifest: api.ContainerManifest{
-						Id: "My manifest",
+						ID: "My manifest",
 						Containers: []api.Container{
 							{Name: "my container"},
 						},
