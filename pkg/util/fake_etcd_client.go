@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -29,6 +30,11 @@ type EtcdResponseWithError struct {
 }
 
 type FakeEtcdClient struct {
+	// chanLock guards watchChanReady.
+	chanLock sync.Mutex
+	// watchChanReady is readable when all public channels are ready
+	watchChanReady chan bool
+
 	Data        map[string]EtcdResponseWithError
 	DeletedKeys []string
 	Err         error
@@ -45,8 +51,9 @@ type FakeEtcdClient struct {
 
 func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
 	return &FakeEtcdClient{
-		t:    t,
-		Data: map[string]EtcdResponseWithError{},
+		t:              t,
+		Data:           map[string]EtcdResponseWithError{},
+		watchChanReady: make(chan bool),
 	}
 }
 
@@ -97,16 +104,37 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 	return &etcd.Response{}, f.Err
 }
 
+func (f *FakeEtcdClient) WaitToWatch() {
+	f.chanLock.Lock()
+	defer f.chanLock.Unlock()
+	<-f.watchChanReady
+}
+
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
 	f.WatchResponse = receiver
 	f.WatchStop = stop
 	injectedError := make(chan error)
+
 	defer close(injectedError)
 	f.WatchInjectError = injectedError
+
+	// close the channel indicating all channels of the fake client are
+	// ready.
+	close(f.watchChanReady)
+
+	defer func() {
+		f.chanLock.Lock()
+		defer f.chanLock.Unlock()
+		// A stop will make f.WatchStop close, which in turn makes it un-write-able.
+		// Need to have another call on Watch() to make it ready.
+		f.watchChanReady = make(chan bool)
+	}()
+
 	select {
 	case <-stop:
 		return nil, etcd.ErrWatchStoppedByUser
 	case err := <-injectedError:
+		f.watchChanReady = make(chan bool)
 		return nil, err
 	}
 	// Never get here.
