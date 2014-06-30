@@ -2,6 +2,8 @@
   "id": "php",
   "desiredState": {
     "manifest": {
+      "version": "v1beta1",
+      "id": "php",
       "containers": [{
         "image": "dockerfile/nginx",
         "ports": [{

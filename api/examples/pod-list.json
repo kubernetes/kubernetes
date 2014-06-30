@@ -8,6 +8,8 @@
             },
             "desiredState": {
               "manifest": {
+                "version": "v1beta1",
+                "id": "my-pod-1",
                 "containers": [{
                   "image": "dockerfile/nginx",
                   "ports": [{
@@ -29,6 +31,8 @@
             },
             "desiredState": {
               "manifest": {
+                "version": "v1beta1",
+                "id": "my-pod-2",
                 "containers": [{
                   "image": "dockerfile/nginx",
                   "ports": [{

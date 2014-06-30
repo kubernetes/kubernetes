@@ -6,6 +6,8 @@
       "podTemplate": {
         "desiredState": {
            "manifest": {
+             "version": "v1beta1",
+             "id": "redisSlaveController",
              "containers": [{
                "image": "brendanburns/redis-slave",
                "ports": [{"containerPort": 6379, "hostPort": 6380}]

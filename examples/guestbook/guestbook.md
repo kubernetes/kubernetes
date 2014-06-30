@@ -21,6 +21,8 @@ Create a file named `redis-master.json` describing a single pod, which runs a re
   "id": "redis-master-2",
   "desiredState": {
     "manifest": {
+      "version": "v1beta1",
+      "id": "redis-master-2",
       "containers": [{
         "name": "master",
         "image": "dockerfile/redis",
@@ -112,6 +114,8 @@ Create a file named `redis-slave-controller.json` that contains:
       "podTemplate": {
         "desiredState": {
            "manifest": {
+             "version": "v1beta1",
+             "id": "redisSlaveController",
              "containers": [{
                "image": "brendanburns/redis-slave",
                "ports": [{"containerPort": 6379, "hostPort": 6380}]
@@ -195,6 +199,8 @@ Create a file named `frontend-controller.json`:
     "podTemplate": {
       "desiredState": {
          "manifest": {
+           "version": "v1beta1",
+           "id": "frontendController",
            "containers": [{
              "image": "brendanburns/php-redis",
              "ports": [{"containerPort": 80, "hostPort": 8000}]
