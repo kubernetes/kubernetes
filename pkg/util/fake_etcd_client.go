@@ -122,10 +122,8 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	f.WatchInjectError = injectedError
 	f.nrUnreadyChannels.Done()
 
-	defer func() {
-		// After calling this function, the WatchStop channel will not be ready
-		f.nrUnreadyChannels.Add(3)
-	}()
+	// After calling this function, the WatchStop channel will not be ready
+	defer f.nrUnreadyChannels.Add(3)
 
 	select {
 	case <-stop:
