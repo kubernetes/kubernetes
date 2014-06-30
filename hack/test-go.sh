@@ -39,10 +39,10 @@ find_test_dirs() {
 cd "${KUBE_TARGET}"
 
 if [ "$1" != "" ]; then
-  go test -cover -coverprofile="tmp.out" "$KUBE_GO_PACKAGE/$1"
+  go test -race -cover -coverprofile="tmp.out" "$KUBE_GO_PACKAGE/$1"
   exit 0
 fi
 
 for package in $(find_test_dirs); do
-  go test -cover -coverprofile="tmp.out" "${KUBE_GO_PACKAGE}/${package}"
+  go test -race -cover -coverprofile="tmp.out" "${KUBE_GO_PACKAGE}/${package}"
 done
