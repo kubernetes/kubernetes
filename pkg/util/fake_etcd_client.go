@@ -30,10 +30,7 @@ type EtcdResponseWithError struct {
 }
 
 type FakeEtcdClient struct {
-	// chanLock guards watchChanReady.
-	chanLock sync.Mutex
-	// watchChanReady is readable when all public channels are ready
-	watchChanReady chan bool
+	nrUnreadyChannels sync.WaitGroup
 
 	Data        map[string]EtcdResponseWithError
 	DeletedKeys []string
@@ -50,11 +47,17 @@ type FakeEtcdClient struct {
 }
 
 func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
-	return &FakeEtcdClient{
-		t:              t,
-		Data:           map[string]EtcdResponseWithError{},
-		watchChanReady: make(chan bool),
+	ret := &FakeEtcdClient{
+		t:    t,
+		Data: map[string]EtcdResponseWithError{},
+		// watchChanReady: make(chan bool),
 	}
+	// There are 3 channels that are not ready:
+	// - WatchResponse chan *etcd.Response
+	// - WatchInjectError chan<- error
+	// - WatchStop        chan<- bool
+	ret.nrUnreadyChannels.Add(3)
+	return ret
 }
 
 func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
@@ -105,36 +108,29 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 }
 
 func (f *FakeEtcdClient) WaitToWatch() {
-	f.chanLock.Lock()
-	defer f.chanLock.Unlock()
-	<-f.watchChanReady
+	f.nrUnreadyChannels.Wait()
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
 	f.WatchResponse = receiver
+	f.nrUnreadyChannels.Done()
 	f.WatchStop = stop
+	f.nrUnreadyChannels.Done()
 	injectedError := make(chan error)
 
 	defer close(injectedError)
 	f.WatchInjectError = injectedError
-
-	// close the channel indicating all channels of the fake client are
-	// ready.
-	close(f.watchChanReady)
+	f.nrUnreadyChannels.Done()
 
 	defer func() {
-		f.chanLock.Lock()
-		defer f.chanLock.Unlock()
-		// A stop will make f.WatchStop close, which in turn makes it un-write-able.
-		// Need to have another call on Watch() to make it ready.
-		f.watchChanReady = make(chan bool)
+		// After calling this function, the WatchStop channel will not be ready
+		f.nrUnreadyChannels.Add(3)
 	}()
 
 	select {
 	case <-stop:
 		return nil, etcd.ErrWatchStoppedByUser
 	case err := <-injectedError:
-		f.watchChanReady = make(chan bool)
 		return nil, err
 	}
 	// Never get here.
