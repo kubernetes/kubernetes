@@ -105,7 +105,7 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 	return &etcd.Response{}, f.Err
 }
 
-func (f *FakeEtcdClient) WaitToWatch() {
+func (f *FakeEtcdClient) WaitForWatchCompletion() {
 	f.condLock.Lock()
 	defer f.condLock.Unlock()
 	f.condChannelsReady.Wait()

@@ -446,7 +446,7 @@ func TestWatchControllers(t *testing.T) {
 
 	go manager.watchControllers()
 
-	fakeEtcd.WaitToWatch()
+	fakeEtcd.WaitForWatchCompletion()
 
 	// Test normal case
 	testControllerSpec.ID = "foo"
@@ -473,7 +473,7 @@ func TestWatchControllers(t *testing.T) {
 
 	// Test purposeful shutdown
 	go manager.watchControllers()
-	fakeEtcd.WaitToWatch()
+	fakeEtcd.WaitForWatchCompletion()
 	fakeEtcd.WatchStop <- true
 
 	// Did everything shut down?
