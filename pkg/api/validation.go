@@ -77,7 +77,6 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
 
 func validatePorts(ports []Port) error {
 	allNames := util.StringSet{}
-	allHostPorts := make(map[int]bool)
 	for i := range ports {
 		port := &ports[i] // so we can set default values
 		if port.Name != "" {
@@ -97,10 +96,6 @@ func validatePorts(ports []Port) error {
 		} else if !util.IsValidPortNum(port.HostPort) {
 			return fmt.Errorf("Port.HostPort is invalid: %d", port.HostPort)
 		}
-		if allHostPorts[port.HostPort] {
-			return fmt.Errorf("Port.HostPort is not unique: %d", port.HostPort)
-		}
-		allHostPorts[port.HostPort] = true
 		if port.Protocol == "" {
 			port.Protocol = "TCP"
 		} else if !isValidProtocol(port.Protocol) {
@@ -118,6 +113,28 @@ func validateEnv(vars []EnvVar) error {
 		}
 	}
 	return nil
+}
+
+// Runs an extraction function on each Port of each Container, accumulating the
+// results and returning an error if any ports conflict.
+func AccumulateUniquePorts(containers []Container, all map[int]bool, extract func(*Port) int) error {
+	for ci := range containers {
+		ctr := &containers[ci]
+		for pi := range ctr.Ports {
+			port := extract(&ctr.Ports[pi])
+			if all[port] {
+				return fmt.Errorf("port %d is already in use", port)
+			}
+			all[port] = true
+		}
+	}
+	return nil
+}
+
+// Checks for colliding Port.HostPort values across a slice of containers.
+func checkHostPortConflicts(containers []Container) error {
+	allPorts := map[int]bool{}
+	return AccumulateUniquePorts(containers, allPorts, func(p *Port) int { return p.HostPort })
 }
 
 func validateContainers(containers []Container, volumes util.StringSet) error {
@@ -144,7 +161,12 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 			return err
 		}
 	}
-	return nil
+	// Check for colliding ports across all containers.
+	// TODO(thockin): This really is dependent on the network config of the host (IP per pod?)
+	// and the config of the new manifest.  But we have not specced that out yet, so we'll just
+	// make some assumptions for now.  As of now, pods share a network namespace, which means that
+	// every Port.HostPort across the whole pod must be unique.
+	return checkHostPortConflicts(containers)
 }
 
 // ValidateManifest tests that the specified ContainerManifest has valid data.

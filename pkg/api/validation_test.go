@@ -122,15 +122,7 @@ func TestValidatePorts(t *testing.T) {
 		"zero container port":    {{ContainerPort: 0}},
 		"invalid container port": {{ContainerPort: 65536}},
 		"invalid host port":      {{ContainerPort: 80, HostPort: 65536}},
-		"host port not unique": {
-			{ContainerPort: 80, HostPort: 80},
-			{ContainerPort: 81, HostPort: 80},
-		},
-		"defaulted host port not unique": {
-			{ContainerPort: 80},
-			{ContainerPort: 81, HostPort: 80},
-		},
-		"invalid protocol": {{ContainerPort: 80, Protocol: "ICMP"}},
+		"invalid protocol":       {{ContainerPort: 80, Protocol: "ICMP"}},
 	}
 	for k, v := range errorCases {
 		err := validatePorts(v)
@@ -187,6 +179,14 @@ func TestValidateContainers(t *testing.T) {
 			{Name: "abc", Image: "image"},
 		},
 		"zero-length image": {{Name: "abc", Image: ""}},
+		"host port not unique": {
+			{Name: "abc", Image: "image", Ports: []Port{{ContainerPort: 80, HostPort: 80}}},
+			{Name: "def", Image: "image", Ports: []Port{{ContainerPort: 81, HostPort: 80}}},
+		},
+		"defaulted host port not unique in pod": {
+			{Name: "abc", Image: "image", Ports: []Port{{ContainerPort: 80}}},
+			{Name: "def", Image: "image", Ports: []Port{{ContainerPort: 81, HostPort: 80}}},
+		},
 	}
 	for k, v := range errorCases {
 		err := validateContainers(v, volumes)

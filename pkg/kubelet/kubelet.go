@@ -705,7 +705,21 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	return err
 }
 
-// runSyncLoop is the main loop for processing changes. It watches for changes from
+// Check that all Port.HostPort values are unique across all manifests.
+func checkHostPortConflicts(allManifests []api.ContainerManifest, newManifest *api.ContainerManifest) error {
+	allPorts := map[int]bool{}
+	extract := func(p *api.Port) int { return p.HostPort }
+	for i := range allManifests {
+		manifest := &allManifests[i]
+		err := api.AccumulateUniquePorts(manifest.Containers, allPorts, extract)
+		if err != nil {
+			return err
+		}
+	}
+	return api.AccumulateUniquePorts(newManifest.Containers, allPorts, extract)
+}
+
+// RunSyncLoop is the main loop for processing changes. It watches for changes from
 // four channels (file, etcd, server, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
@@ -732,6 +746,11 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 				}
 				allIds.Insert(m.Id)
 				if err := api.ValidateManifest(m); err != nil {
+					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
+					continue
+				}
+				// We have to check for host-wide port conflicts.
+				if err := checkHostPortConflicts(allManifests, m); err != nil {
 					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
 					continue
 				}
