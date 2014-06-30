@@ -17,6 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"sync"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -25,6 +27,7 @@ type MockPodRegistry struct {
 	err  error
 	pod  *api.Pod
 	pods []api.Pod
+	sync.Mutex
 }
 
 func MakeMockPodRegistry(pods []api.Pod) *MockPodRegistry {
@@ -34,6 +37,8 @@ func MakeMockPodRegistry(pods []api.Pod) *MockPodRegistry {
 }
 
 func (registry *MockPodRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
+	registry.Lock()
+	defer registry.Unlock()
 	if registry.err != nil {
 		return registry.pods, registry.err
 	}
@@ -47,16 +52,24 @@ func (registry *MockPodRegistry) ListPods(selector labels.Selector) ([]api.Pod, 
 }
 
 func (registry *MockPodRegistry) GetPod(podId string) (*api.Pod, error) {
+	registry.Lock()
+	defer registry.Unlock()
 	return registry.pod, registry.err
 }
 
 func (registry *MockPodRegistry) CreatePod(machine string, pod api.Pod) error {
+	registry.Lock()
+	defer registry.Unlock()
 	return registry.err
 }
 
 func (registry *MockPodRegistry) UpdatePod(pod api.Pod) error {
+	registry.Lock()
+	defer registry.Unlock()
 	return registry.err
 }
 func (registry *MockPodRegistry) DeletePod(podId string) error {
+	registry.Lock()
+	defer registry.Unlock()
 	return registry.err
 }

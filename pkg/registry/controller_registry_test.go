@@ -217,6 +217,7 @@ func TestCreateController(t *testing.T) {
 		t.Error("Unexpected read from async channel")
 	}
 
+	mockPodRegistry.Lock()
 	mockPodRegistry.pods = []api.Pod{
 		{
 			JSONBase: api.JSONBase{ID: "foo"},
@@ -225,8 +226,7 @@ func TestCreateController(t *testing.T) {
 			JSONBase: api.JSONBase{ID: "bar"},
 		},
 	}
-
-	time.Sleep(time.Millisecond * 30)
+	mockPodRegistry.Unlock()
 
 	select {
 	case <-time.After(time.Second * 1):
