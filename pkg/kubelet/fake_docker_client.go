@@ -20,7 +20,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-// A simple fake docker client, so that kublet can be run for testing without requiring a real docker setup.
+// A simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
 	containerList []docker.APIContainers
 	container     *docker.Container
