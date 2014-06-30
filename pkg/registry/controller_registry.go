@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -79,9 +80,12 @@ func (storage *ControllerRegistryStorage) Create(obj interface{}) (<-chan interf
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if controller.ID == "" {
-		return nil, fmt.Errorf("ID should not be empty: %#v", controller)
+	if len(controller.ID) == 0 {
+		controller.ID = uuid.NewUUID().String()
 	}
+	// Pod Manifest ID should be assigned by the pod API
+	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
+
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		err := storage.registry.CreateController(controller)
 		if err != nil {
@@ -96,7 +100,7 @@ func (storage *ControllerRegistryStorage) Update(obj interface{}) (<-chan interf
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if controller.ID == "" {
+	if len(controller.ID) == 0 {
 		return nil, fmt.Errorf("ID should not be empty: %#v", controller)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {

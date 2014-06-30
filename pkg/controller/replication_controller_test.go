@@ -200,12 +200,22 @@ func TestCreateReplica(t *testing.T) {
 
 	podControl.createReplica(controllerSpec)
 
-	//expectedPod := Pod{
-	//	Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
-	//	DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
-	//}
-	// TODO: fix this so that it validates the body.
+	expectedPod := api.Pod{
+		JSONBase: api.JSONBase{
+			Kind: "Pod",
+		},
+		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
+		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
+	}
 	fakeHandler.ValidateRequest(t, makeURL("/pods"), "POST", nil)
+	actualPod := api.Pod{}
+	if err := json.Unmarshal([]byte(fakeHandler.RequestBody), &actualPod); err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if !reflect.DeepEqual(expectedPod, actualPod) {
+		t.Logf("Body: %s", fakeHandler.RequestBody)
+		t.Errorf("Unexpected mismatch.  Expected %#v, Got: %#v", expectedPod, actualPod)
+	}
 }
 
 func TestHandleWatchResponseNotSet(t *testing.T) {
