@@ -49,6 +49,13 @@ func AddKnownTypes(types ...interface{}) {
 	}
 }
 
+// Takes an arbitary api type, returns pointer to its JSONBase field.
+// obj must be a pointer to an api type.
+func FindJSONBase(obj interface{}) (*JSONBase, error) {
+	_, jsonBase, err := nameAndJSONBase(obj)
+	return jsonBase, err
+}
+
 // Encode turns the given api object into an appropriate JSON string.
 // Will return an error if the object doesn't have an embedded JSONBase.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy

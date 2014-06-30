@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package tools
 
 import (
 	"encoding/json"
 	"fmt"
 	"reflect"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -117,8 +118,14 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
 func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
-	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
-	return err
+	_, index, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
+	if err != nil {
+		return err
+	}
+	if jsonBase, err := api.FindJSONBase(objPtr); err == nil {
+		jsonBase.ResourceVersion = index
+	}
+	return nil
 }
 
 func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
@@ -147,7 +154,11 @@ func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	_, err = h.Client.Set(key, string(data), 0)
+	if jsonBase, err := api.FindJSONBase(obj); err == nil && jsonBase.ResourceVersion != 0 {
+		_, err = h.Client.CompareAndSwap(key, string(data), 0, "", jsonBase.ResourceVersion)
+	} else {
+		_, err = h.Client.Set(key, string(data), 0)
+	}
 	return err
 }
 

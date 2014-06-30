@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -34,7 +35,7 @@ import (
 // with actual running pods.
 // TODO: Remove the etcd dependency and re-factor in terms of a generic watch interface
 type ReplicationManager struct {
-	etcdClient util.EtcdClient
+	etcdClient tools.EtcdClient
 	kubeClient client.ClientInterface
 	podControl PodControlInterface
 	syncTime   <-chan time.Time
@@ -76,7 +77,7 @@ func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
 }
 
-func MakeReplicationManager(etcdClient util.EtcdClient, kubeClient client.ClientInterface) *ReplicationManager {
+func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.ClientInterface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
 		etcdClient: etcdClient,
@@ -201,7 +202,7 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 
 func (rm *ReplicationManager) synchronize() {
 	var controllerSpecs []api.ReplicationController
-	helper := util.EtcdHelper{rm.etcdClient}
+	helper := tools.EtcdHelper{rm.etcdClient}
 	err := helper.ExtractList("/registry/controllers", &controllerSpecs)
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)

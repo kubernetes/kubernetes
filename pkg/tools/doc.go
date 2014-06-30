@@ -14,7 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package util implements various utility functions used in both testing and implementation
-// of Kubernetes. Package util may not depend on any other package in the Kubernetes
-// package tree.
-package util
+// Package tools implements general tools which depend on the api package.
+package tools

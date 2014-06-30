@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -377,8 +378,8 @@ func TestSyncronize(t *testing.T) {
 		},
 	}
 
-	fakeEtcd := util.MakeFakeEtcdClient(t)
-	fakeEtcd.Data["/registry/controllers"] = util.EtcdResponseWithError{
+	fakeEtcd := tools.MakeFakeEtcdClient(t)
+	fakeEtcd.Data["/registry/controllers"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
@@ -432,7 +433,7 @@ func (a *asyncTimeout) done() {
 
 func TestWatchControllers(t *testing.T) {
 	defer beginTimeout(20 * time.Second).done()
-	fakeEtcd := util.MakeFakeEtcdClient(t)
+	fakeEtcd := tools.MakeFakeEtcdClient(t)
 	manager := MakeReplicationManager(fakeEtcd, nil)
 	var testControllerSpec api.ReplicationController
 	received := make(chan bool)

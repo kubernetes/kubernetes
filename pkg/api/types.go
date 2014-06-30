@@ -150,6 +150,7 @@ type JSONBase struct {
 	ID                string `json:"id,omitempty" yaml:"id,omitempty"`
 	CreationTimestamp string `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+	ResourceVersion   uint64 `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 }
 
 type PodStatus string

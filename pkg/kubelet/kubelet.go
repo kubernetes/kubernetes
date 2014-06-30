@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
@@ -81,7 +82,7 @@ func New() *Kubelet {
 // The main kubelet implementation
 type Kubelet struct {
 	Hostname           string
-	EtcdClient         util.EtcdClient
+	EtcdClient         tools.EtcdClient
 	DockerClient       DockerInterface
 	DockerPuller       DockerPuller
 	CadvisorClient     CadvisorInterface
@@ -520,7 +521,7 @@ func (kl *Kubelet) ResponseToManifests(response *etcd.Response) ([]api.Container
 func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- manifestUpdate) error {
 	response, err := kl.EtcdClient.Get(key, true, false)
 	if err != nil {
-		if util.IsEtcdNotFound(err) {
+		if tools.IsEtcdNotFound(err) {
 			return nil
 		}
 		glog.Errorf("Error on etcd get of %s: %v", key, err)
