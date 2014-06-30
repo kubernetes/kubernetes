@@ -1,5 +1,5 @@
 {%- set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() %}
-DAEMON_ARGS="$DAEMON_ARGS -etcd_servers=http://{{ ips[0][0] }}:4001"
+DAEMON_ARGS="$DAEMON_ARGS -etcd_servers=http://{{ ips[0][0] }}:4001 -minion_regexp '{{ pillar['instance_prefix'] }}.*'"
 
 MACHINES="{{ ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) }}"
 DAEMON_ARGS="$DAEMON_ARGS --machines $MACHINES"
