@@ -19,17 +19,27 @@ package util
 import (
 	"encoding/json"
 	"testing"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
+type FakeJSONBase struct {
+	ID string
+}
+type FakePod struct {
+	FakeJSONBase `json:",inline" yaml:",inline"`
+	Labels       map[string]string
+	Int          int
+	Str          string
+}
+
 func TestMakeJSONString(t *testing.T) {
-	pod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+	pod := FakePod{
+		FakeJSONBase: FakeJSONBase{ID: "foo"},
 		Labels: map[string]string{
 			"foo": "bar",
 			"baz": "blah",
 		},
+		Int: -6,
+		Str: "a string",
 	}
 
 	body := MakeJSONString(pod)
