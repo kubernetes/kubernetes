@@ -8,6 +8,7 @@ base:
     - docker
     - kubelet
     - kube-proxy
+    - cadvisor
 
   'roles:kubernetes-master':
     - match: grain
