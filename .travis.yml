@@ -2,7 +2,7 @@ language: go
 
 go:
   - 1.2
-  - tip
+  - 1.3
 
 install: 
   - go get code.google.com/p/go.tools/cmd/cover
