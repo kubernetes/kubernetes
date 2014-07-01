@@ -101,9 +101,9 @@ const (
 
 // Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address, endpoint string, port uint) {
+func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_servers, address string, port uint) {
 	if kl.DockerPuller == nil {
-		kl.DockerPuller = MakeDockerPuller(endpoint)
+		kl.DockerPuller = MakeDockerPuller(dockerEndpoint)
 	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
