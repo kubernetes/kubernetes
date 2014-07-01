@@ -102,6 +102,7 @@ func runReplicationControllerTest(kubeClient *client.Client) {
 	if err != nil || len(pods.Items) != controllerRequest.DesiredState.Replicas {
 		glog.Fatalf("FAILED: %#v", pods.Items)
 	}
+	glog.Infof("Replication controller produced:\n\n%#v\n\n", pods)
 }
 
 func main() {

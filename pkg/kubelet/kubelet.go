@@ -643,14 +643,14 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 	// Make sure we have a network container
 	netId, err := kl.getNetworkContainerId(manifest)
 	if err != nil {
-		glog.Errorf("Failed to introspect network container. (%v)  Skipping container %s", err, manifest.ID)
+		glog.Errorf("Failed to introspect network container. (%v)  Skipping manifest %s", err, manifest.ID)
 		return err
 	}
 	if netId == "" {
 		glog.Infof("Network container doesn't exist, creating")
 		netId, err = kl.createNetworkContainer(manifest)
 		if err != nil {
-			glog.Errorf("Failed to introspect network container. (%v)  Skipping container %s", err, manifest.ID)
+			glog.Errorf("Failed to introspect network container. (%v)  Skipping manifest %s", err, manifest.ID)
 			return err
 		}
 	}
@@ -658,24 +658,24 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 	for _, container := range manifest.Containers {
 		containerId, err := kl.getContainerId(manifest, &container)
 		if err != nil {
-			glog.Errorf("Error finding container: %v skipping id %s.", err, manifest.ID)
+			glog.Errorf("Error finding container: %v skipping manifest %s container %s.", err, manifest.ID, container.Name)
 			continue
 		}
 		if containerId == "" {
 			glog.Infof("%+v doesn't exist, creating", container)
 			kl.DockerPuller.Pull(container.Image)
 			if err != nil {
-				glog.Errorf("Failed to create container: %v Skipping container %s", err, manifest.ID)
+				glog.Errorf("Failed to create container: %v skipping manifest %s container %s.", err, manifest.ID, container.Name)
 				continue
 			}
 			containerId, err = kl.runContainer(manifest, &container, "container:"+string(netId))
 			if err != nil {
 				// TODO(bburns) : Perhaps blacklist a container after N failures?
-				glog.Errorf("Error running container: %v skipping.", err)
+				glog.Errorf("Error running manifest %s container %s: %v", manifest.ID, container.Name, err)
 				continue
 			}
 		} else {
-			glog.V(1).Infof("%s exists as %v", container.Name, containerId)
+			glog.V(1).Infof("manifest %s container %s exists as %v", manifest.ID, container.Name, containerId)
 		}
 		keepChannel <- containerId
 	}
