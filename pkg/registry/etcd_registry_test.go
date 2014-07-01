@@ -100,7 +100,7 @@ func TestEtcdCreatePod(t *testing.T) {
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
 	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
-	if len(manifests) != 1 || manifests[0].Id != "foo" {
+	if len(manifests) != 1 || manifests[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
 }
@@ -179,7 +179,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
-				Id: "foo",
+				ID: "foo",
 				Containers: []api.Container{
 					{
 						Name: "foo",
@@ -201,7 +201,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
 	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
-	if len(manifests) != 1 || manifests[0].Id != "foo" {
+	if len(manifests) != 1 || manifests[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
 }
@@ -216,7 +216,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
 		{
-			Id: "bar",
+			ID: "bar",
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
@@ -226,7 +226,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
-				Id: "foo",
+				ID: "foo",
 				Containers: []api.Container{
 					{
 						Name: "foo",
@@ -248,7 +248,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
 	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
-	if len(manifests) != 2 || manifests[1].Id != "foo" {
+	if len(manifests) != 2 || manifests[1].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
 }
@@ -259,7 +259,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
 		{
-			Id: "foo",
+			ID: "foo",
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
@@ -281,8 +281,8 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
-		{Id: "foo"},
-		{Id: "bar"},
+		{ID: "foo"},
+		{ID: "bar"},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
@@ -299,7 +299,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	if len(manifests) != 1 {
 		t.Errorf("Unexpected manifest set: %#v, expected empty", manifests)
 	}
-	if manifests[0].Id != "bar" {
+	if manifests[0].ID != "bar" {
 		t.Errorf("Deleted wrong manifest: %#v", manifests)
 	}
 }

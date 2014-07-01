@@ -47,7 +47,7 @@ func TestMakeManifestNoServices(t *testing.T) {
 		container.Env[0].Value != "machine" {
 		t.Errorf("Expected one env vars, got: %#v", manifest)
 	}
-	if manifest.Id != "foobar" {
+	if manifest.ID != "foobar" {
 		t.Errorf("Failed to assign id to manifest: %#v")
 	}
 }

@@ -23,7 +23,7 @@ type ContainerManifest struct {
 	Version    string      `yaml:"version" json:"version"`
 	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
 	Containers []Container `yaml:"containers" json:"containers"`
-	Id         string      `yaml:"id,omitempty" json:"id,omitempty"`
+	ID         string      `yaml:"id,omitempty" json:"id,omitempty"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.

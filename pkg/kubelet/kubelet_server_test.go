@@ -74,7 +74,7 @@ func readResp(resp *http.Response) (string, error) {
 func TestContainer(t *testing.T) {
 	fw := makeServerTest()
 	expected := []api.ContainerManifest{
-		{Id: "test_manifest"},
+		{ID: "test_manifest"},
 	}
 	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected[0]))) // Only send a single ContainerManifest
 	resp, err := http.Post(fw.testHttpServer.URL+"/container", "application/json", body)
@@ -95,8 +95,8 @@ func TestContainer(t *testing.T) {
 func TestContainers(t *testing.T) {
 	fw := makeServerTest()
 	expected := []api.ContainerManifest{
-		{Id: "test_manifest_1"},
-		{Id: "test_manifest_2"},
+		{ID: "test_manifest_1"},
+		{ID: "test_manifest_2"},
 	}
 	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected)))
 	resp, err := http.Post(fw.testHttpServer.URL+"/containers", "application/json", body)
