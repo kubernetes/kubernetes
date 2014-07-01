@@ -30,27 +30,51 @@ func isSupportedManifestVersion(value string) bool {
 	return false
 }
 
-func isInvalid(field string, value interface{}) error {
+func errInvalid(field string, value interface{}) error {
 	return fmt.Errorf("%s is invalid: '%v'", field, value)
 }
 
-func isNotSupported(field string, value interface{}) error {
+func errNotSupported(field string, value interface{}) error {
 	return fmt.Errorf("%s is not supported: '%v'", field, value)
+}
+
+func errNotUnique(field string, value interface{}) error {
+	return fmt.Errorf("%s is not unique: '%v'", field, value)
+}
+
+func validateVolumes(volumes []Volume) (util.StringSet, error) {
+	allNames := util.StringSet{}
+	for i := range volumes {
+		vol := &volumes[i] // so we can set default values
+		if len(vol.Name) > 63 || !util.IsDNSLabel(vol.Name) {
+			return util.StringSet{}, errInvalid("Volume.Name", vol.Name)
+		}
+		if allNames.Has(vol.Name) {
+			return util.StringSet{}, errNotUnique("Volume.Name", vol.Name)
+		}
+		allNames.Insert(vol.Name)
+	}
+	return allNames, nil
 }
 
 // ValidateManifest tests that the specified ContainerManifest has valid data.
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
+// TODO(thockin): We should probably collect all errors rather than aborting the validation.
 func ValidateManifest(manifest *ContainerManifest) error {
 	if len(manifest.Version) == 0 {
-		return isInvalid("ContainerManifest.Version", manifest.Version)
+		return errInvalid("ContainerManifest.Version", manifest.Version)
 	}
 	if !isSupportedManifestVersion(manifest.Version) {
-		return isNotSupported("ContainerManifest.Version", manifest.Version)
+		return errNotSupported("ContainerManifest.Version", manifest.Version)
 	}
 	if len(manifest.ID) > 255 || !util.IsDNSSubdomain(manifest.ID) {
-		return isInvalid("ContainerManifest.ID", manifest.ID)
+		return errInvalid("ContainerManifest.ID", manifest.ID)
+	}
+	_, err := validateVolumes(manifest.Volumes)
+	if err != nil {
+		return err
 	}
 	// TODO(thockin): finish validation.
 	return nil
