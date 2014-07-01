@@ -135,6 +135,8 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	case <-stop:
 		return nil, etcd.ErrWatchStoppedByUser
 	case err := <-injectedError:
+		// Emulate etcd's behavior.
+		close(receiver)
 		return nil, err
 	}
 	// Never get here.
