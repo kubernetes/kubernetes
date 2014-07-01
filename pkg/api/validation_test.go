@@ -21,11 +21,44 @@ import (
 	"testing"
 )
 
+func TestValidateVolumes(t *testing.T) {
+	successCase := []Volume{
+		{Name: "abc"},
+		{Name: "123"},
+		{Name: "abc-123"},
+	}
+	names, err := validateVolumes(successCase)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if len(names) != 3 || !names.Has("abc") || !names.Has("123") || !names.Has("abc-123") {
+		t.Errorf("wrong names result: %v", names)
+	}
+
+	errorCases := map[string][]Volume{
+		"zero-length name":     {{Name: ""}},
+		"name > 63 characters": {{Name: strings.Repeat("a", 64)}},
+		"name not a DNS label": {{Name: "a.b.c"}},
+		"name not unique":      {{Name: "abc"}, {Name: "abc"}},
+	}
+	for k, v := range errorCases {
+		_, err := validateVolumes(v)
+		if err == nil {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
 func TestValidateManifest(t *testing.T) {
 	successCases := []ContainerManifest{
 		{Version: "v1beta1", ID: "abc"},
 		{Version: "v1beta1", ID: "123"},
 		{Version: "v1beta1", ID: "abc.123.do-re-mi"},
+		{
+			Version: "v1beta1",
+			ID:      "abc",
+			Volumes: []Volume{{Name: "vol1"}, {Name: "vol2"}},
+		},
 	}
 	for _, manifest := range successCases {
 		err := ValidateManifest(&manifest)
@@ -40,6 +73,11 @@ func TestValidateManifest(t *testing.T) {
 		"zero-length id":         {Version: "v1beta1", ID: ""},
 		"id > 255 characters":    {Version: "v1beta1", ID: strings.Repeat("a", 256)},
 		"id not a DNS subdomain": {Version: "v1beta1", ID: "a.b.c."},
+		"invalid volume name": {
+			Version: "v1beta1",
+			ID:      "abc",
+			Volumes: []Volume{{Name: "vol.1"}},
+		},
 	}
 	for k, v := range errorCases {
 		err := ValidateManifest(&v)
