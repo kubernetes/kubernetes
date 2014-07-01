@@ -834,7 +834,12 @@ func TestWatchEtcd(t *testing.T) {
 	data, err := json.Marshal(manifest)
 	expectNoError(t, err)
 
-	go kubelet.WatchEtcd(watchChannel, updateChannel)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		kubelet.WatchEtcd(watchChannel, updateChannel)
+		wg.Done()
+	}()
 
 	watchChannel <- &etcd.Response{
 		Node: &etcd.Node{
@@ -842,6 +847,7 @@ func TestWatchEtcd(t *testing.T) {
 		},
 	}
 	close(watchChannel)
+	wg.Wait()
 	close(updateChannel)
 
 	read := reader.GetList()
