@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -181,7 +182,31 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
+// This is hacky, compute the delta between hostame and hostname -f
+func fqdnSuffix() (string, error) {
+	fullHostname, err := exec.Command("hostname", "-f").Output()
+	if err != nil {
+		return "", err
+	}
+	hostname, err := exec.Command("hostname").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(fullHostname)[len(string(hostname)):]), nil
+}
+
 func (gce *GCECloud) List(filter string) ([]string, error) {
+	// GCE gives names without their fqdn suffix, so get that here for appending.
+	// This is needed because the kubelet looks for its jobs in /registry/hosts/<fqdn>/pods
+	// We should really just replace this convention, with a negotiated naming protocol for kubelet's
+	// to register with the master.
+	suffix, err := fqdnSuffix()
+	if err != nil {
+		return []string{}, err
+	}
+	if len(suffix) > 0 {
+		suffix = "." + suffix
+	}
 	listCall := gce.service.Instances.List(gce.projectID, gce.zone)
 	if len(filter) > 0 {
 		listCall = listCall.Filter("name eq " + filter)
@@ -192,7 +217,7 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	}
 	var instances []string
 	for _, instance := range res.Items {
-		instances = append(instances, instance.Name)
+		instances = append(instances, instance.Name+suffix)
 	}
 	return instances, nil
 }

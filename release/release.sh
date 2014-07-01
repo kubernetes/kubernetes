@@ -25,6 +25,8 @@ set -e
 
 source $(dirname $0)/config.sh
 
+source $(dirname ${BASH_SOURCE})/../cluster/${KUBE_CONFIG_FILE-"config-default.sh"}
+
 cd $(dirname $0)/..
 
 # First build the release tar.  This gets copied on to the master and installed
@@ -40,6 +42,11 @@ mkdir -p $MASTER_RELEASE_DIR/third_party/go
 echo "Building release tree"
 cp release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
 cp -r cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
+
+cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
+instance_prefix: $INSTANCE_PREFIX-minion
+EOF
+
 cp -r third_party/src $MASTER_RELEASE_DIR/third_party/go/src
 
 function find_go_files() {
