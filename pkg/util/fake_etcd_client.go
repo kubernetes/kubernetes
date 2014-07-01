@@ -30,8 +30,8 @@ type EtcdResponseWithError struct {
 }
 
 type FakeEtcdClient struct {
-	condChannelsReady *sync.Cond
-	condLock          sync.Mutex
+	condWatchCompleted *sync.Cond
+	condLock           sync.Mutex
 
 	Data        map[string]EtcdResponseWithError
 	DeletedKeys []string
@@ -54,7 +54,7 @@ func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
 		// watchChanReady: make(chan bool),
 	}
 	// The channels are not ready yet
-	ret.condChannelsReady = sync.NewCond(&ret.condLock)
+	ret.condWatchCompleted = sync.NewCond(&ret.condLock)
 	return ret
 }
 
@@ -108,7 +108,7 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 func (f *FakeEtcdClient) WaitForWatchCompletion() {
 	f.condLock.Lock()
 	defer f.condLock.Unlock()
-	f.condChannelsReady.Wait()
+	f.condWatchCompleted.Wait()
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
@@ -120,13 +120,13 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	f.WatchInjectError = injectedError
 
 	f.condLock.Lock()
-	f.condChannelsReady.Broadcast()
+	f.condWatchCompleted.Broadcast()
 	f.condLock.Unlock()
 
 	// After calling this function, the WatchStop channel will not be ready
 	defer func() {
 		f.condLock.Lock()
-		f.condChannelsReady = sync.NewCond(&f.condLock)
+		f.condWatchCompleted = sync.NewCond(&f.condLock)
 		f.condLock.Unlock()
 	}()
 
