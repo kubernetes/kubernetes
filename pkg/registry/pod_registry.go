@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/golang/glog"
 )
 
@@ -33,22 +34,30 @@ type PodRegistryStorage struct {
 	registry      PodRegistry
 	containerInfo client.ContainerInfo
 	podCache      client.ContainerInfo
-	scheduler     Scheduler
+	scheduler     scheduler.Scheduler
+	minionLister  scheduler.MinionLister
 	cloud         cloudprovider.Interface
 }
 
 // MakePodRegistryStorage makes a RESTStorage object for a pod registry.
 // Parameters:
-//   registry The pod registry
-//   containerInfo Source of fresh container info
-//   scheduler The scheduler for assigning pods to machines
-//   cloud Interface to a cloud provider (may be null)
-//   podCache Source of cached container info
-func MakePodRegistryStorage(registry PodRegistry, containerInfo client.ContainerInfo, scheduler Scheduler, cloud cloudprovider.Interface, podCache client.ContainerInfo) apiserver.RESTStorage {
+//   registry:      The pod registry
+//   containerInfo: Source of fresh container info
+//   scheduler:     The scheduler for assigning pods to machines
+//   minionLister:  Object which can list available minions for the scheduler
+//   cloud:         Interface to a cloud provider (may be null)
+//   podCache:      Source of cached container info
+func MakePodRegistryStorage(registry PodRegistry,
+	containerInfo client.ContainerInfo,
+	scheduler scheduler.Scheduler,
+	minionLister scheduler.MinionLister,
+	cloud cloudprovider.Interface,
+	podCache client.ContainerInfo) apiserver.RESTStorage {
 	return &PodRegistryStorage{
 		registry:      registry,
 		containerInfo: containerInfo,
 		scheduler:     scheduler,
+		minionLister:  minionLister,
 		cloud:         cloud,
 		podCache:      podCache,
 	}
@@ -150,7 +159,7 @@ func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO(lavalamp): Separate scheduler more cleanly.
-		machine, err := storage.scheduler.Schedule(pod)
+		machine, err := storage.scheduler.Schedule(pod, storage.minionLister)
 		if err != nil {
 			return nil, err
 		}

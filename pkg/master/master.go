@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -37,6 +38,7 @@ type Master struct {
 	serviceRegistry    registry.ServiceRegistry
 	minionRegistry     registry.MinionRegistry
 
+	// TODO: don't reuse non-threadsafe objects.
 	random  *rand.Rand
 	storage map[string]apiserver.RESTStorage
 }
@@ -86,8 +88,9 @@ func (m *Master) init(cloud cloudprovider.Interface) {
 	m.random = rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	podCache := NewPodCache(containerInfo, m.podRegistry, time.Second*30)
 	go podCache.Loop()
+	s := scheduler.MakeFirstFitScheduler(m.podRegistry, m.random)
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods": registry.MakePodRegistryStorage(m.podRegistry, containerInfo, registry.MakeFirstFitScheduler(m.minionRegistry, m.podRegistry, m.random), cloud, podCache),
+		"pods": registry.MakePodRegistryStorage(m.podRegistry, containerInfo, s, m.minionRegistry, cloud, podCache),
 		"replicationControllers": registry.MakeControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
