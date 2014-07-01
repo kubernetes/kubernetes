@@ -211,7 +211,7 @@ func TestCreateController(t *testing.T) {
 	expectNoError(t, err)
 
 	select {
-	case <-time.After(time.Second * 1):
+	case <-time.After(time.Millisecond * 100):
 		// Do nothing, this is expected.
 	case <-channel:
 		t.Error("Unexpected read from async channel")
