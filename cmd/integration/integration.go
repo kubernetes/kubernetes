@@ -30,25 +30,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
-func main() {
-	runtime.GOMAXPROCS(4)
-	util.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
+var (
+	fakeDocker1, fakeDocker2 kubelet.FakeDockerClient
+)
 
-	go func() {
-		defer util.FlushLogs()
-		time.Sleep(3 * time.Minute)
-		glog.Fatalf("This test has timed out.")
-	}()
-
-	manifestUrl := ServeCachedManifestFile()
+func startComponents(manifestURL string) (apiServerURL string) {
 	// Setup
 	servers := []string{"http://localhost:4001"}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -63,23 +56,21 @@ func main() {
 	controllerManager.Run(1 * time.Second)
 
 	// Kubelet
-	fakeDocker1 := &kubelet.FakeDockerClient{}
 	myKubelet := kubelet.Kubelet{
 		Hostname:           machineList[0],
-		DockerClient:       fakeDocker1,
+		DockerClient:       &fakeDocker1,
 		DockerPuller:       &kubelet.FakeDockerPuller{},
 		FileCheckFrequency: 5 * time.Second,
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go myKubelet.RunKubelet("", manifestUrl, servers[0], "localhost", "", 0)
+	go myKubelet.RunKubelet("", manifestURL, servers[0], "localhost", "", 0)
 
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	fakeDocker2 := &kubelet.FakeDockerClient{}
 	otherKubelet := kubelet.Kubelet{
 		Hostname:           machineList[1],
-		DockerClient:       fakeDocker2,
+		DockerClient:       &fakeDocker2,
 		DockerPuller:       &kubelet.FakeDockerPuller{},
 		FileCheckFrequency: 5 * time.Second,
 		SyncFrequency:      5 * time.Second,
@@ -87,12 +78,10 @@ func main() {
 	}
 	go otherKubelet.RunKubelet("", "", servers[0], "localhost", "", 0)
 
-	// Ok. we're good to go.
-	glog.Infof("API Server started on %s", apiserver.URL)
-	// Wait for the synchronization threads to come up.
-	time.Sleep(time.Second * 10)
+	return apiserver.URL
+}
 
-	kubeClient := client.New(apiserver.URL, nil)
+func runReplicationControllerTest(kubeClient *client.Client) {
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
@@ -109,31 +98,57 @@ func main() {
 	time.Sleep(time.Second * 10)
 
 	// Validate that they're truly up.
-	pods, err := kubeClient.ListPods(nil)
-	if err != nil || len(pods.Items) != 2 {
-		glog.Fatal("FAILED: %#v", pods.Items)
+	pods, err := kubeClient.ListPods(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	if err != nil || len(pods.Items) != controllerRequest.DesiredState.Replicas {
+		glog.Fatalf("FAILED: %#v", pods.Items)
 	}
+	glog.Infof("Replication controller produced:\n\n%#v\n\n", pods)
+}
+
+func main() {
+	runtime.GOMAXPROCS(4)
+	util.ReallyCrash = true
+	util.InitLogs()
+	defer util.FlushLogs()
+
+	go func() {
+		defer util.FlushLogs()
+		time.Sleep(3 * time.Minute)
+		glog.Fatalf("This test has timed out.")
+	}()
+
+	manifestURL := ServeCachedManifestFile()
+
+	apiServerURL := startComponents(manifestURL)
+
+	// Ok. we're good to go.
+	glog.Infof("API Server started on %s", apiServerURL)
+	// Wait for the synchronization threads to come up.
+	time.Sleep(time.Second * 10)
+
+	kubeClient := client.New(apiServerURL, nil)
+	runReplicationControllerTest(kubeClient)
 
 	// Check that kubelet tried to make the pods.
 	// Using a set to list unique creation attempts. Our fake is
 	// really stupid, so kubelet tries to create these multiple times.
-	createdPods := map[string]struct{}{}
+	createdPods := util.StringSet{}
 	for _, p := range fakeDocker1.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {
-			createdPods[p[:n-8]] = struct{}{}
+			createdPods.Insert(p[:n-8])
 		}
 	}
 	for _, p := range fakeDocker2.Created {
 		// The last 8 characters are random, so slice them off.
 		if n := len(p); n > 8 {
-			createdPods[p[:n-8]] = struct{}{}
+			createdPods.Insert(p[:n-8])
 		}
 	}
 	// We expect 5: 2 net containers + 2 pods from the replication controller +
 	//              1 net container + 2 pods from the URL.
 	if len(createdPods) != 7 {
-		glog.Fatalf("Unexpected list of created pods: %#v %#v %#v\n", createdPods, fakeDocker1.Created, fakeDocker2.Created)
+		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK")
 }

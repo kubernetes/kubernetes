@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -49,5 +50,12 @@ func TestNewStringSet(t *testing.T) {
 	}
 	if !s.Has("a") || !s.Has("b") || !s.Has("c") {
 		t.Errorf("Unexpected contents: %#v", s)
+	}
+}
+
+func TestStringSetList(t *testing.T) {
+	s := NewStringSet("z", "y", "x", "a")
+	if !reflect.DeepEqual(s.List(), []string{"a", "x", "y", "z"}) {
+		t.Errorf("List gave unexpected result: %#v", s.List())
 	}
 }

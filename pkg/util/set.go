@@ -16,6 +16,10 @@ limitations under the License.
 
 package util
 
+import (
+	"sort"
+)
+
 type empty struct{}
 
 // A set of strings, implemented via map[string]struct{} for minimal memory consumption.
@@ -44,4 +48,14 @@ func (s StringSet) Delete(item string) {
 func (s StringSet) Has(item string) bool {
 	_, contained := s[item]
 	return contained
+}
+
+// Return the contents as a sorted string slice.
+func (s StringSet) List() []string {
+	res := make([]string, 0, len(s))
+	for key := range s {
+		res = append(res, key)
+	}
+	sort.StringSlice(res).Sort()
+	return res
 }
