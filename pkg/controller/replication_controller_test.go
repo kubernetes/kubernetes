@@ -435,17 +435,18 @@ func TestWatchControllers(t *testing.T) {
 	fakeEtcd := util.MakeFakeEtcdClient(t)
 	manager := MakeReplicationManager(fakeEtcd, nil)
 	var testControllerSpec api.ReplicationController
-	receivedCount := 0
+	received := make(chan bool)
 	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
 		if !reflect.DeepEqual(controllerSpec, testControllerSpec) {
 			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
 		}
-		receivedCount++
+		close(received)
 		return nil
 	}
 
 	go manager.watchControllers()
-	time.Sleep(10 * time.Millisecond)
+
+	fakeEtcd.WaitForWatchCompletion()
 
 	// Test normal case
 	testControllerSpec.ID = "foo"
@@ -456,14 +457,14 @@ func TestWatchControllers(t *testing.T) {
 		},
 	}
 
-	time.Sleep(10 * time.Millisecond)
-	if receivedCount != 1 {
-		t.Errorf("Expected 1 call but got %v", receivedCount)
+	select {
+	case <-received:
+	case <-time.After(10 * time.Millisecond):
+		t.Errorf("Expected 1 call but got 0")
 	}
 
 	// Test error case
 	fakeEtcd.WatchInjectError <- fmt.Errorf("Injected error")
-	time.Sleep(10 * time.Millisecond)
 
 	// Did everything shut down?
 	if _, open := <-fakeEtcd.WatchResponse; open {
@@ -472,9 +473,8 @@ func TestWatchControllers(t *testing.T) {
 
 	// Test purposeful shutdown
 	go manager.watchControllers()
-	time.Sleep(10 * time.Millisecond)
+	fakeEtcd.WaitForWatchCompletion()
 	fakeEtcd.WatchStop <- true
-	time.Sleep(10 * time.Millisecond)
 
 	// Did everything shut down?
 	if _, open := <-fakeEtcd.WatchResponse; open {
