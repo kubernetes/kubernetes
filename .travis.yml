@@ -3,11 +3,12 @@ language: go
 go:
   - 1.2
   - 1.3
+  - tip
 
 install: 
   - go get code.google.com/p/go.tools/cmd/cover
   - go get github.com/coreos/etcd
-  - bad=$(gofmt -s -l pkg/ cmd/) bash -x -c '[[ -z "$bad" ]]'
+  - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/build-go.sh
 
