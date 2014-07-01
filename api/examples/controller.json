@@ -6,6 +6,8 @@
       "podTemplate": {
         "desiredState": {
            "manifest": {
+             "version": "v1beta1",
+             "id": "nginxController",
              "containers": [{
                "name": "nginx",
                "image": "dockerfile/nginx",

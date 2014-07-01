@@ -2,6 +2,8 @@
   "id": "redis-master-2",
   "desiredState": {
     "manifest": {
+      "version": "v1beta1",
+      "id": "redis-master-2",
       "containers": [{
         "name": "master",
         "image": "dockerfile/redis",

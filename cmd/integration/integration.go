@@ -161,7 +161,7 @@ containers:
     image: dockerfile/redis
     volumeMounts:
       - name: redis-data
-        path: /data
+        mountPath: /data
 
   - name: guestbook
     image: google/guestbook-python-redis
