@@ -39,13 +39,13 @@ It also assumes that ```$DOCKER_USER``` is set to your docker user id.
 Now we will turn up two replicas of that image.  They all serve on port 8080, mapped to internal port 80
 
     $ cd kubernetes
-    $ cluster/cloudcfg.sh -p 8080:80 run $DOCKER_USER/data 2 dataController
+    $ cluster/kubecfg.sh -p 8080:80 run $DOCKER_USER/data 2 dataController
 
 ### Step Three: Turn up the UX for the demo
 In a different terminal:
 
     $ cd kubernetes
-    $ cluster/cloudcfg.sh -proxy -www examples/update-demo/local/
+    $ cluster/kubecfg.sh -proxy -www examples/update-demo/local/
 
 Now visit the the [demo website](http://localhost:8001/static/index.html).  You should see two light blue squares with pod IDs and ip addresses.
 
@@ -53,7 +53,7 @@ Now visit the the [demo website](http://localhost:8001/static/index.html).  You 
 Now we will increase the number of replicas from two to four:
 
     $ cd kubernetes
-    $ cluster/cloudcfg.sh resize dataController 4
+    $ cluster/kubecfg.sh resize dataController 4
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
 
@@ -80,6 +80,6 @@ Once you are happy with the color, build a new image:
 We will now update the servers that are running out in your cluster.
 
     $ cd kubernetes
-    $ cluster/cloudcfg.sh -u=30s rollingupdate dataController
+    $ cluster/kubecfg.sh -u=30s rollingupdate dataController
 
 Watch the UX, it will update one pod every 30 seconds until all of the pods have the new color.
