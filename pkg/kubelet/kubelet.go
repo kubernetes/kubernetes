@@ -141,7 +141,7 @@ func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address, 
 		}
 		go util.Forever(func() { s.ListenAndServe() }, 0)
 	}
-	kl.RunSyncLoop(updateChannel, kl)
+	kl.syncLoop(updateChannel, kl)
 }
 
 // Interface implemented by Kubelet, for testability
@@ -730,13 +730,13 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	return err
 }
 
-// runSyncLoop is the main loop for processing changes. It watches for changes from
+// syncLoop is the main loop for processing changes. It watches for changes from
 // four channels (file, etcd, server, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync_frequency seconds.
 // Never returns.
-func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler SyncHandler) {
+func (kl *Kubelet) syncLoop(updateChannel <-chan manifestUpdate, handler SyncHandler) {
 	last := make(map[string][]api.ContainerManifest)
 	for {
 		select {
@@ -746,12 +746,19 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 		case <-time.After(kl.SyncFrequency):
 		}
 
-		manifests := []api.ContainerManifest{}
-		for _, m := range last {
-			manifests = append(manifests, m...)
+		allManifests := []api.ContainerManifest{}
+		for src, srcManifests := range last {
+			for i := range srcManifests {
+				m := &srcManifests[i]
+				if err := api.ValidateManifest(m); err != nil {
+					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
+					continue
+				}
+			}
+			allManifests = append(allManifests, srcManifests...)
 		}
 
-		err := handler.SyncManifests(manifests)
+		err := handler.SyncManifests(allManifests)
 		if err != nil {
 			glog.Errorf("Couldn't sync containers : %v", err)
 		}
