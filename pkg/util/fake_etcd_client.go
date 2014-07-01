@@ -52,7 +52,18 @@ func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
 		t:    t,
 		Data: map[string]EtcdResponseWithError{},
 	}
-	// Watch() method has not been called.
+	// There are three publicly accessible channels in FakeEtcdClient:
+	//  - WatchResponse
+	//  - WatchInjectError
+	//  - WatchStop
+	// They are only available when Watch() is called.  If users of
+	// FakeEtcdClient want to use any of these channels, they have to call
+	// WaitForWatchCompletion before any operation on these channels.
+	// Internally, FakeEtcdClient use condWatchCompleted to indicate if the
+	// Watch() method has been called. WaitForWatchCompletion() will wait
+	// on condWatchCompleted. By the end of the Watch() method, it will
+	// call Broadcast() on condWatchCompleted, which will awake any
+	// goroutine waiting on this condition.
 	ret.condWatchCompleted = sync.NewCond(&ret.condLock)
 	return ret
 }
