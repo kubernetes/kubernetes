@@ -92,7 +92,10 @@ type VolumeMount struct {
 // EnvVar represents an environment variable present in a Container
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
+	// Exactly one of the following must be set.  If both are set, prefer Name.
+	// DEPRECATED: EnvVar.Key will be removed in a future version of the API.
 	Name string `yaml:"name" json:"name"`
+	Key  string `yaml:"key,omitempty" json:"name,omitempty"`
 	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }

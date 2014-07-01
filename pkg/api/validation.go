@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 func isSupportedManifestVersion(value string) bool {
@@ -57,6 +58,25 @@ func validateVolumes(volumes []Volume) (util.StringSet, error) {
 	return allNames, nil
 }
 
+func validateEnv(vars []EnvVar) error {
+	for i := range vars {
+		ev := &vars[i] // so we can set default values
+		if len(ev.Name) == 0 {
+			// Backwards compat.
+			if len(ev.Key) == 0 {
+				return errInvalid("EnvVar.Name", ev.Name)
+			}
+			glog.Warning("DEPRECATED: EnvVar.Key has been replaced by EnvVar.Name")
+			ev.Name = ev.Key
+			ev.Key = ""
+		}
+		if !util.IsCIdentifier(ev.Name) {
+			return errInvalid("EnvVar.Name", ev.Name)
+		}
+	}
+	return nil
+}
+
 func validateContainers(containers []Container, volumes util.StringSet) error {
 	allNames := util.StringSet{}
 	for i := range containers {
@@ -70,6 +90,9 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 		allNames.Insert(ctr.Name)
 		if len(ctr.Image) == 0 {
 			return errInvalid("Container.Image", ctr.Name)
+		}
+		if err := validateEnv(ctr.Env); err != nil {
+			return err
 		}
 
 		// TODO(thockin): finish validation.
