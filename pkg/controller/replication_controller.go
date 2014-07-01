@@ -105,11 +105,10 @@ func (rm *ReplicationManager) watchControllers() {
 	}()
 	go func() {
 		defer util.HandleCrash()
-		defer func() {
-			close(watchChannel)
-		}()
 		_, err := rm.etcdClient.Watch("/registry/controllers", 0, true, watchChannel, stop)
-		if err != etcd.ErrWatchStoppedByUser {
+		if err == etcd.ErrWatchStoppedByUser {
+			close(watchChannel)
+		} else {
 			glog.Errorf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
 		}
 	}()
