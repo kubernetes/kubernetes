@@ -309,15 +309,13 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string
-		switch port.Protocol {
-		case "udp":
+		switch strings.ToUpper(port.Protocol) {
+		case "UDP":
 			protocol = "/udp"
-		case "tcp":
+		case "TCP":
 			protocol = "/tcp"
 		default:
-			if len(port.Protocol) != 0 {
-				glog.Infof("Unknown protocol: %s, defaulting to tcp.", port.Protocol)
-			}
+			glog.Infof("Unknown protocol: %s, defaulting to tcp.", port.Protocol)
 			protocol = "/tcp"
 		}
 		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
@@ -707,7 +705,21 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	return err
 }
 
-// runSyncLoop is the main loop for processing changes. It watches for changes from
+// Check that all Port.HostPort values are unique across all manifests.
+func checkHostPortConflicts(allManifests []api.ContainerManifest, newManifest *api.ContainerManifest) error {
+	allPorts := map[int]bool{}
+	extract := func(p *api.Port) int { return p.HostPort }
+	for i := range allManifests {
+		manifest := &allManifests[i]
+		err := api.AccumulateUniquePorts(manifest.Containers, allPorts, extract)
+		if err != nil {
+			return err
+		}
+	}
+	return api.AccumulateUniquePorts(newManifest.Containers, allPorts, extract)
+}
+
+// RunSyncLoop is the main loop for processing changes. It watches for changes from
 // four channels (file, etcd, server, and http) and creates a union of them. For
 // any new change seen, will run a sync against desired state and running state. If
 // no changes are seen to the configuration, will synchronize the last known desired
@@ -723,12 +735,31 @@ func (kl *Kubelet) RunSyncLoop(updateChannel <-chan manifestUpdate, handler Sync
 		case <-time.After(kl.SyncFrequency):
 		}
 
-		manifests := []api.ContainerManifest{}
-		for _, m := range last {
-			manifests = append(manifests, m...)
+		allManifests := []api.ContainerManifest{}
+		allIds := util.StringSet{}
+		for src, manifests := range last {
+			for i := range manifests {
+				m := &manifests[i]
+				if allIds.Has(m.Id) {
+					glog.Warningf("Manifest from %s has duplicate ID, ignoring: %v", src, m.Id)
+					continue
+				}
+				allIds.Insert(m.Id)
+				if err := api.ValidateManifest(m); err != nil {
+					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
+					continue
+				}
+				// We have to check for host-wide port conflicts.
+				if err := checkHostPortConflicts(allManifests, m); err != nil {
+					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
+					continue
+				}
+				// TODO(thockin): There's no reason to collect manifests by value.  Don't pessimize.
+				allManifests = append(allManifests, *m)
+			}
 		}
 
-		err := handler.SyncManifests(manifests)
+		err := handler.SyncManifests(allManifests)
 		if err != nil {
 			glog.Errorf("Couldn't sync containers : %v", err)
 		}
