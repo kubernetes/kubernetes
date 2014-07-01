@@ -16,34 +16,70 @@ limitations under the License.
 
 package api
 
+// Common string formats
+// ---------------------
+// Many fields in this API have formatting requirements.  The commonly used
+// formats are defined here.
+//
+// C_IDENTIFIER:  This is a string that conforms the definition of an "identifier"
+//     in the C language.  This is captured by the following regex:
+//         [A-Za-z_][A-Za-z0-9_]*
+//     This defines the format, but not the length restriction, which should be
+//     specified at the definition of any field of this type.
+//
+// DNS_LABEL:  This is a string that conforms to the definition of a "label"
+//     in RFCs 1035 and 1123.  This is captured by the following regex:
+//         [a-z0-9]([-a-z0-9]*[a-z0-9])?
+//     This defines the format, but not the length restriction, which should be
+//     specified at the definition of any field of this type.
+//
+//  DNS_SUBDOMAIN:  This is a string that conforms to the definition of a
+//      "subdomain" in RFCs 1035 and 1123.  This is captured by the following regex:
+//         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
+//     or more simply:
+//         DNS_LABEL(\.DNS_LABEL)*
+//     This defines the format, but not the length restriction, which should be
+//     specified at the definition of any field of this type.
+
 // ContainerManifest corresponds to the Container Manifest format, documented at:
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernete's workloads.
+// This is used as the representation of Kubernetes workloads.
 type ContainerManifest struct {
-	Version    string      `yaml:"version" json:"version"`
+	// Required: This must be a supported version string, such as "v1beta1".
+	Version string `yaml:"version" json:"version"`
+	// Required: This must be a DNS_SUBDOMAIN, 255 characters or less.
+	ID         string      `yaml:"id" json:"id"`
 	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
 	Containers []Container `yaml:"containers" json:"containers"`
-	ID         string      `yaml:"id,omitempty" json:"id,omitempty"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
+	// Required: This must be a DNS_LABEL, 63 characters or less.  Each volume in a pod
+	// must have a unique name.
 	Name string `yaml:"name" json:"name"`
 }
 
 // Port represents a network port in a single container
 type Port struct {
-	Name          string `yaml:"name,omitempty" json:"name,omitempty"`
-	HostPort      int    `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
-	ContainerPort int    `yaml:"containerPort,omitempty" json:"containerPort,omitempty"`
-	Protocol      string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Optional: If specified, this must be a DNS_LABEL, 63 characters or less.  Each
+	// container in a pod must have a unique name.
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
+	// Optional: Defaults to ContainerPort.
+	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
+	// Required: This must be a valid port number, 0 < x < 65536.
+	ContainerPort int `yaml:"containerPort" json:"containerPort"`
+	// Optional: Defaults to "TCP".
+	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 }
 
 // VolumeMount describes a mounting of a Volume within a container
 type VolumeMount struct {
-	// Name must match the Name of a volume [above]
-	Name      string `yaml:"name,omitempty" json:"name,omitempty"`
-	ReadOnly  bool   `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+	// Required: This must match the Name of a Volume [above].
+	Name string `yaml:"name" json:"name"`
+	// Optional: Defaults to false (read-write).
+	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+	// Required.
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
 	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
@@ -51,19 +87,28 @@ type VolumeMount struct {
 
 // EnvVar represents an environment variable present in a Container
 type EnvVar struct {
-	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
+	// Required: This must be a C_IDENTIFIER.
+	Name string `yaml:"name" json:"name"`
+	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
 
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
-	Name         string        `yaml:"name,omitempty" json:"name,omitempty"`
-	Image        string        `yaml:"image,omitempty" json:"image,omitempty"`
-	Command      []string      `yaml:"command,omitempty" json:"command,omitempty"`
-	WorkingDir   string        `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
-	Ports        []Port        `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Env          []EnvVar      `yaml:"env,omitempty" json:"env,omitempty"`
-	Memory       int           `yaml:"memory,omitempty" json:"memory,omitempty"`
+	// Required: This must be a DNS_LABEL, 63 characters or less.  Each container in a
+	// pod must have a unique name.
+	Name string `yaml:"name" json:"name"`
+	// Required.
+	Image string `yaml:"image" json:"image"`
+	// Optional: Defaults to whatever is defined in the image.
+	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
+	// Optional: Defaults to Docker's default.
+	WorkingDir string   `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
+	Ports      []Port   `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Env        []EnvVar `yaml:"env,omitempty" json:"env,omitempty"`
+	// Optional: Defaults to unlimited.
+	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
+	// Optional: Defaults to unlimited.
 	CPU          int           `yaml:"cpu,omitempty" json:"cpu,omitempty"`
 	VolumeMounts []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 }
