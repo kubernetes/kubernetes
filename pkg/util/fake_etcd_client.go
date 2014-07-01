@@ -118,9 +118,7 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	defer close(injectedError)
 	f.WatchInjectError = injectedError
 
-	f.condLock.Lock()
 	f.condWatchCompleted.Broadcast()
-	f.condLock.Unlock()
 
 	select {
 	case <-stop:
