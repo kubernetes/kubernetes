@@ -24,31 +24,30 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/fsouza/go-dockerclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// ContainerInfo is an interface for things that can get information about a container.
+// PodInfoGetter is an interface for things that can get information about a pod's containers.
 // Injectable for easy testing.
-type ContainerInfo interface {
-	// GetContainerInfo returns information about container 'name' on 'host'
-	// Returns a json-formatted []byte (which can be unmarshalled into a
-	// map[string]interface{}) or an error if one occurs.
-	GetContainerInfo(host, name string) (*docker.Container, error)
+type PodInfoGetter interface {
+	// GetPodInfo returns information about all containers which are part
+	// Returns an api.PodInfo, or an error if one occurs.
+	GetPodInfo(host, podID string) (api.PodInfo, error)
 }
 
 // The default implementation, accesses the kubelet over HTTP
-type HTTPContainerInfo struct {
+type HTTPPodInfoGetter struct {
 	Client *http.Client
 	Port   uint
 }
 
-func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (*docker.Container, error) {
+func (c *HTTPPodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	request, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf(
-			"http://%s/containerInfo?container=%s",
+			"http://%s/podInfo?podID=%s",
 			net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
-			name),
+			podID),
 		nil)
 	if err != nil {
 		return nil, err
@@ -63,20 +62,20 @@ func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (*docker.Contain
 		return nil, err
 	}
 	// Check that this data can be unmarshalled
-	var container docker.Container
-	err = json.Unmarshal(body, &container)
+	info := api.PodInfo{}
+	err = json.Unmarshal(body, &info)
 	if err != nil {
 		return nil, err
 	}
-	return &container, nil
+	return info, nil
 }
 
 // Useful for testing.
-type FakeContainerInfo struct {
-	data *docker.Container
+type FakePodInfoGetter struct {
+	data api.PodInfo
 	err  error
 }
 
-func (c *FakeContainerInfo) GetContainerInfo(host, name string) (*docker.Container, error) {
+func (c *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	return c.data, c.err
 }

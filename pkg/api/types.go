@@ -157,6 +157,9 @@ const (
 	PodStopped PodStatus = "Stopped"
 )
 
+// PodInfo contains one entry for every container with available info.
+type PodInfo map[string]docker.Container
+
 // PodState is the state of a pod, used as either input (desired state) or output (current state)
 type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
@@ -169,7 +172,7 @@ type PodState struct {
 	// of `docker inspect`. This output format is *not* final and should not be relied
 	// upon.
 	// TODO: Make real decisions about what our info should look like.
-	Info map[string]docker.Container `json:"info,omitempty" yaml:"info,omitempty"`
+	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
 type PodList struct {

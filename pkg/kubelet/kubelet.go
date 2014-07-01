@@ -783,15 +783,25 @@ func (kl *Kubelet) getContainerIdFromName(name string) (DockerId, bool, error) {
 	return "", false, nil
 }
 
-// Returns docker info for a container
-func (kl *Kubelet) GetContainerInfo(name string) (*docker.Container, error) {
-	dockerId, found, err := kl.getContainerIdFromName(name)
-	if err != nil || !found {
-		return nil, err
-	}
-	info, err := kl.DockerClient.InspectContainer(string(dockerId))
+// Returns docker info for all containers in the pod/manifest
+func (kl *Kubelet) GetPodInfo(podID string) (api.PodInfo, error) {
+	info := api.PodInfo{}
+
+	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
 		return nil, err
+	}
+
+	for _, value := range containerList {
+		manifestID, containerName := parseDockerName(value.Names[0])
+		if manifestID != podID {
+			continue
+		}
+		inspectResult, err := kl.DockerClient.InspectContainer(value.ID)
+		if err != nil {
+			return nil, err
+		}
+		info[containerName] = *inspectResult
 	}
 	return info, nil
 }

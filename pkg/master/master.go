@@ -80,7 +80,7 @@ func New(etcdServers, minions []string, cloud cloudprovider.Interface, minionReg
 }
 
 func (m *Master) init(cloud cloudprovider.Interface) {
-	containerInfo := &client.HTTPContainerInfo{
+	containerInfo := &client.HTTPPodInfoGetter{
 		Client: http.DefaultClient,
 		Port:   10250,
 	}

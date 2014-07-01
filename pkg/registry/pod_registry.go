@@ -27,15 +27,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
 // PodRegistryStorage implements the RESTStorage interface in terms of a PodRegistry
 type PodRegistryStorage struct {
 	registry      PodRegistry
-	containerInfo client.ContainerInfo
-	podCache      client.ContainerInfo
+	podInfoGetter client.PodInfoGetter
+	podCache      client.PodInfoGetter
 	scheduler     scheduler.Scheduler
 	minionLister  scheduler.MinionLister
 	cloud         cloudprovider.Interface
@@ -45,20 +44,20 @@ type PodRegistryStorage struct {
 // MakePodRegistryStorage makes a RESTStorage object for a pod registry.
 // Parameters:
 //   registry:      The pod registry
-//   containerInfo: Source of fresh container info
+//   podInfoGetter: Source of fresh container info
 //   scheduler:     The scheduler for assigning pods to machines
 //   minionLister:  Object which can list available minions for the scheduler
 //   cloud:         Interface to a cloud provider (may be null)
 //   podCache:      Source of cached container info
 func MakePodRegistryStorage(registry PodRegistry,
-	containerInfo client.ContainerInfo,
+	podInfoGetter client.PodInfoGetter,
 	scheduler scheduler.Scheduler,
 	minionLister scheduler.MinionLister,
 	cloud cloudprovider.Interface,
-	podCache client.ContainerInfo) apiserver.RESTStorage {
+	podCache client.PodInfoGetter) apiserver.RESTStorage {
 	return &PodRegistryStorage{
 		registry:      registry,
-		containerInfo: containerInfo,
+		podInfoGetter: podInfoGetter,
 		scheduler:     scheduler,
 		minionLister:  minionLister,
 		cloud:         cloud,
@@ -84,18 +83,12 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 	// Get cached info for the list currently.
 	// TODO: Optionally use fresh info
 	if storage.podCache != nil {
-		pod.CurrentState.Info = map[string]docker.Container{}
-		infoMap := pod.CurrentState.Info
-
-		for _, container := range pod.DesiredState.Manifest.Containers {
-			// TODO: clearly need to pass both pod ID and container name here.
-			info, err := storage.podCache.GetContainerInfo(pod.CurrentState.Host, pod.ID)
-			if err != nil {
-				glog.Errorf("Error getting container info: %#v", err)
-				continue
-			}
-			infoMap[container.Name] = *info
+		info, err := storage.podCache.GetPodInfo(pod.CurrentState.Host, pod.ID)
+		if err != nil {
+			glog.Errorf("Error getting container info: %#v", err)
+			return
 		}
+		pod.CurrentState.Info = info
 	}
 }
 
@@ -158,7 +151,7 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	if pod == nil {
 		return pod, nil
 	}
-	if storage.containerInfo != nil {
+	if storage.podCache != nil || storage.podInfoGetter != nil {
 		storage.fillPodInfo(pod)
 		pod.CurrentState.Status = makePodStatus(pod)
 	}

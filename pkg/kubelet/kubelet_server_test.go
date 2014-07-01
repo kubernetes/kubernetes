@@ -32,11 +32,11 @@ import (
 )
 
 type fakeKubelet struct {
-	infoFunc  func(name string) (*docker.Container, error)
+	infoFunc  func(name string) (api.PodInfo, error)
 	statsFunc func(name string) (*api.ContainerStats, error)
 }
 
-func (fk *fakeKubelet) GetContainerInfo(name string) (*docker.Container, error) {
+func (fk *fakeKubelet) GetPodInfo(name string) (api.PodInfo, error) {
 	return fk.infoFunc(name)
 }
 
@@ -115,16 +115,16 @@ func TestContainers(t *testing.T) {
 	}
 }
 
-func TestContainerInfo(t *testing.T) {
+func TestPodInfo(t *testing.T) {
 	fw := makeServerTest()
-	expected := &docker.Container{ID: "myContainerID"}
-	fw.fakeKubelet.infoFunc = func(name string) (*docker.Container, error) {
-		if name == "goodcontainer" {
+	expected := api.PodInfo{"goodpod": docker.Container{ID: "myContainerID"}}
+	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
+		if name == "goodpod" {
 			return expected, nil
 		}
-		return nil, fmt.Errorf("bad container")
+		return nil, fmt.Errorf("bad pod")
 	}
-	resp, err := http.Get(fw.testHttpServer.URL + "/containerInfo?container=goodcontainer")
+	resp, err := http.Get(fw.testHttpServer.URL + "/podInfo?podID=goodpod")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
 	}
