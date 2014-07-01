@@ -28,14 +28,15 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/fsouza/go-dockerclient"
 )
 
 type fakeKubelet struct {
-	infoFunc  func(name string) (string, error)
+	infoFunc  func(name string) (*docker.Container, error)
 	statsFunc func(name string) (*api.ContainerStats, error)
 }
 
-func (fk *fakeKubelet) GetContainerInfo(name string) (string, error) {
+func (fk *fakeKubelet) GetContainerInfo(name string) (*docker.Container, error) {
 	return fk.infoFunc(name)
 }
 
@@ -116,12 +117,12 @@ func TestContainers(t *testing.T) {
 
 func TestContainerInfo(t *testing.T) {
 	fw := makeServerTest()
-	expected := "good container info string"
-	fw.fakeKubelet.infoFunc = func(name string) (string, error) {
+	expected := &docker.Container{ID: "myContainerID"}
+	fw.fakeKubelet.infoFunc = func(name string) (*docker.Container, error) {
 		if name == "goodcontainer" {
 			return expected, nil
 		}
-		return "", fmt.Errorf("bad container")
+		return nil, fmt.Errorf("bad container")
 	}
 	resp, err := http.Get(fw.testHttpServer.URL + "/containerInfo?container=goodcontainer")
 	if err != nil {
@@ -131,7 +132,11 @@ func TestContainerInfo(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error reading body: %v", err)
 	}
-	if got != expected {
+	expectedBytes, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatalf("Unexpected marshal error %v", err)
+	}
+	if got != string(expectedBytes) {
 		t.Errorf("Expected: '%v', got: '%v'", expected, got)
 	}
 }

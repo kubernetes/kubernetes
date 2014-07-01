@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -32,7 +34,7 @@ import (
 type PodCache struct {
 	containerInfo client.ContainerInfo
 	pods          registry.PodRegistry
-	podInfo       map[string]interface{}
+	podInfo       map[string]docker.Container
 	period        time.Duration
 	podLock       sync.Mutex
 }
@@ -41,21 +43,20 @@ func NewPodCache(info client.ContainerInfo, pods registry.PodRegistry, period ti
 	return &PodCache{
 		containerInfo: info,
 		pods:          pods,
-		podInfo:       map[string]interface{}{},
+		podInfo:       map[string]docker.Container{},
 		period:        period,
 	}
 }
 
-// Implements the ContainerInfo interface
-// The returned value should be treated as read-only
-func (p *PodCache) GetContainerInfo(host, id string) (interface{}, error) {
+// Implements the ContainerInfo interface.
+func (p *PodCache) GetContainerInfo(host, id string) (*docker.Container, error) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	value, ok := p.podInfo[id]
 	if !ok {
-		return nil, nil
+		return nil, errors.New("No cached pod info")
 	} else {
-		return value, nil
+		return &value, nil
 	}
 }
 
@@ -66,7 +67,7 @@ func (p *PodCache) updateContainerInfo(host, id string) error {
 	}
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	p.podInfo[id] = info
+	p.podInfo[id] = *info
 	return nil
 }
 

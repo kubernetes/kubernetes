@@ -784,17 +784,16 @@ func (kl *Kubelet) getContainerIdFromName(name string) (DockerId, bool, error) {
 }
 
 // Returns docker info for a container
-func (kl *Kubelet) GetContainerInfo(name string) (string, error) {
+func (kl *Kubelet) GetContainerInfo(name string) (*docker.Container, error) {
 	dockerId, found, err := kl.getContainerIdFromName(name)
 	if err != nil || !found {
-		return "{}", err
+		return nil, err
 	}
 	info, err := kl.DockerClient.InspectContainer(string(dockerId))
 	if err != nil {
-		return "{}", err
+		return nil, err
 	}
-	data, err := json.Marshal(info)
-	return string(data), err
+	return info, nil
 }
 
 //Returns stats (from Cadvisor) for a container

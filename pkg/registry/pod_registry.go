@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
 
@@ -71,34 +72,62 @@ func (storage *PodRegistryStorage) List(selector labels.Selector) (interface{}, 
 	pods, err := storage.registry.ListPods(selector)
 	if err == nil {
 		result.Items = pods
-		// Get cached info for the list currently.
-		// TODO: Optionally use fresh info
-		if storage.podCache != nil {
-			for ix, pod := range pods {
-				info, err := storage.podCache.GetContainerInfo(pod.CurrentState.Host, pod.ID)
-				if err != nil {
-					glog.Errorf("Error getting container info: %#v", err)
-					continue
-				}
-				result.Items[ix].CurrentState.Info = info
-			}
+		for i := range result.Items {
+			storage.fillPodInfo(&result.Items[i])
 		}
 	}
 
 	return result, err
 }
 
-func makePodStatus(info interface{}) api.PodStatus {
-	if state, ok := info.(map[string]interface{})["State"]; ok {
-		if running, ok := state.(map[string]interface{})["Running"]; ok {
-			if running.(bool) {
-				return api.PodRunning
-			} else {
-				return api.PodStopped
+func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
+	// Get cached info for the list currently.
+	// TODO: Optionally use fresh info
+	if storage.podCache != nil {
+		pod.CurrentState.Info = map[string]docker.Container{}
+		infoMap := pod.CurrentState.Info
+
+		for _, container := range pod.DesiredState.Manifest.Containers {
+			// TODO: clearly need to pass both pod ID and container name here.
+			info, err := storage.podCache.GetContainerInfo(pod.CurrentState.Host, pod.ID)
+			if err != nil {
+				glog.Errorf("Error getting container info: %#v", err)
+				continue
 			}
+			infoMap[container.Name] = *info
 		}
 	}
-	return api.PodPending
+}
+
+func makePodStatus(pod *api.Pod) api.PodStatus {
+	if pod.CurrentState.Info == nil {
+		return api.PodPending
+	}
+	running := 0
+	stopped := 0
+	unknown := 0
+	for _, container := range pod.DesiredState.Manifest.Containers {
+		if info, ok := pod.CurrentState.Info[container.Name]; ok {
+			if info.State.Running {
+				running++
+			} else {
+				stopped++
+			}
+		} else {
+			unknown++
+		}
+	}
+
+	switch {
+	case running > 0 && stopped == 0 && unknown == 0:
+		return api.PodRunning
+	case running == 0 && stopped > 0 && unknown == 0:
+		return api.PodStopped
+	case running == 0 && stopped == 0 && unknown > 0:
+		return api.PodPending
+	default:
+		return api.PodPending
+	}
 }
 
 func getInstanceIP(cloud cloudprovider.Interface, host string) string {
@@ -130,12 +159,8 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 		return pod, nil
 	}
 	if storage.containerInfo != nil {
-		info, err := storage.containerInfo.GetContainerInfo(pod.CurrentState.Host, id)
-		if err != nil {
-			return pod, err
-		}
-		pod.CurrentState.Info = info
-		pod.CurrentState.Status = makePodStatus(info)
+		storage.fillPodInfo(pod)
+		pod.CurrentState.Status = makePodStatus(pod)
 	}
 	pod.CurrentState.HostIP = getInstanceIP(storage.cloud, pod.CurrentState.Host)
 

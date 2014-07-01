@@ -20,15 +20,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"strconv"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 // ContainerInfo is an interface for things that can get information about a container.
 // Injectable for easy testing.
 type ContainerInfo interface {
 	// GetContainerInfo returns information about container 'name' on 'host'
-	// Returns an untyped interface, and an error, if one occurs
-	GetContainerInfo(host, name string) (interface{}, error)
+	// Returns a json-formatted []byte (which can be unmarshalled into a
+	// map[string]interface{}) or an error if one occurs.
+	GetContainerInfo(host, name string) (*docker.Container, error)
 }
 
 // The default implementation, accesses the kubelet over HTTP
@@ -37,8 +42,14 @@ type HTTPContainerInfo struct {
 	Port   uint
 }
 
-func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (interface{}, error) {
-	request, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/containerInfo?container=%s", host, c.Port, name), nil)
+func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (*docker.Container, error) {
+	request, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf(
+			"http://%s/containerInfo?container=%s",
+			net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
+			name),
+		nil)
 	if err != nil {
 		return nil, err
 	}
@@ -51,17 +62,21 @@ func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (interface{}, er
 	if err != nil {
 		return nil, err
 	}
-	var data interface{}
-	err = json.Unmarshal(body, &data)
-	return data, err
+	// Check that this data can be unmarshalled
+	var container docker.Container
+	err = json.Unmarshal(body, &container)
+	if err != nil {
+		return nil, err
+	}
+	return &container, nil
 }
 
 // Useful for testing.
 type FakeContainerInfo struct {
-	data interface{}
+	data *docker.Container
 	err  error
 }
 
-func (c *FakeContainerInfo) GetContainerInfo(host, name string) (interface{}, error) {
+func (c *FakeContainerInfo) GetContainerInfo(host, name string) (*docker.Container, error) {
 	return c.data, c.err
 }

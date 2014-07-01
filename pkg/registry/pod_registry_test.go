@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/fsouza/go-dockerclient"
 )
 
 func expectNoError(t *testing.T, err error) {
@@ -153,29 +154,88 @@ func TestGetPodCloud(t *testing.T) {
 }
 
 func TestMakePodStatus(t *testing.T) {
-	status := makePodStatus(map[string]interface{}{})
+	desiredState := api.PodState{
+		Manifest: api.ContainerManifest{
+			Containers: []api.Container{
+				{Name: "containerA"},
+				{Name: "containerB"},
+			},
+		},
+	}
+	pod := &api.Pod{DesiredState: desiredState}
+	status := makePodStatus(pod)
 	if status != api.PodPending {
 		t.Errorf("Expected 'Pending', got '%s'", status)
 	}
 
-	status = makePodStatus(map[string]interface{}{
-		"State": map[string]interface{}{
-			"Running": false,
+	runningState := docker.Container{
+		State: docker.State{
+			Running: true,
 		},
-	})
+	}
+	stoppedState := docker.Container{
+		State: docker.State{
+			Running: false,
+		},
+	}
 
+	// All running.
+	pod = &api.Pod{
+		DesiredState: desiredState,
+		CurrentState: api.PodState{
+			Info: map[string]docker.Container{
+				"containerA": runningState,
+				"containerB": runningState,
+			},
+		},
+	}
+	status = makePodStatus(pod)
+	if status != api.PodRunning {
+		t.Errorf("Expected 'Running', got '%s'", status)
+	}
+
+	// All stopped.
+	pod = &api.Pod{
+		DesiredState: desiredState,
+		CurrentState: api.PodState{
+			Info: map[string]docker.Container{
+				"containerA": stoppedState,
+				"containerB": stoppedState,
+			},
+		},
+	}
+	status = makePodStatus(pod)
 	if status != api.PodStopped {
 		t.Errorf("Expected 'Stopped', got '%s'", status)
 	}
 
-	status = makePodStatus(map[string]interface{}{
-		"State": map[string]interface{}{
-			"Running": true,
+	// Mixed state.
+	pod = &api.Pod{
+		DesiredState: desiredState,
+		CurrentState: api.PodState{
+			Info: map[string]docker.Container{
+				"containerA": runningState,
+				"containerB": stoppedState,
+			},
 		},
-	})
+	}
+	status = makePodStatus(pod)
+	if status != api.PodPending {
+		t.Errorf("Expected 'Pending', got '%s'", status)
+	}
 
-	if status != api.PodRunning {
-		t.Errorf("Expected 'Running', got '%s'", status)
+	// Mixed state.
+	pod = &api.Pod{
+		DesiredState: desiredState,
+		CurrentState: api.PodState{
+			Info: map[string]docker.Container{
+				"containerA": runningState,
+			},
+		},
+	}
+	status = makePodStatus(pod)
+	if status != api.PodPending {
+		t.Errorf("Expected 'Pending', got '%s'", status)
 	}
 }
 

@@ -23,16 +23,17 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/fsouza/go-dockerclient"
 )
 
 type FakeContainerInfo struct {
 	host string
 	id   string
-	data interface{}
+	data *docker.Container
 	err  error
 }
 
-func (f *FakeContainerInfo) GetContainerInfo(host, id string) (interface{}, error) {
+func (f *FakeContainerInfo) GetContainerInfo(host, id string) (*docker.Container, error) {
 	f.host = host
 	f.id = id
 	return f.data, f.err
@@ -41,17 +42,15 @@ func (f *FakeContainerInfo) GetContainerInfo(host, id string) (interface{}, erro
 func TestPodCacheGet(t *testing.T) {
 	cache := NewPodCache(nil, nil, time.Second*1)
 
-	pod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
-	}
-	cache.podInfo["foo"] = pod
+	expected := docker.Container{ID: "foo"}
+	cache.podInfo["foo"] = expected
 
 	info, err := cache.GetContainerInfo("host", "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(info, pod) {
-		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", pod, info)
+	if !reflect.DeepEqual(info, &expected) {
+		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", &expected, info)
 	}
 }
 
@@ -59,8 +58,8 @@ func TestPodCacheGetMissing(t *testing.T) {
 	cache := NewPodCache(nil, nil, time.Second*1)
 
 	info, err := cache.GetContainerInfo("host", "foo")
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+	if err == nil {
+		t.Errorf("Unexpected non-error: %#v", err)
 	}
 	if info != nil {
 		t.Errorf("Unexpected info: %#v", info)
@@ -68,11 +67,9 @@ func TestPodCacheGetMissing(t *testing.T) {
 }
 
 func TestPodGetContainerInfo(t *testing.T) {
-	pod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
-	}
+	expected := docker.Container{ID: "foo"}
 	fake := FakeContainerInfo{
-		data: pod,
+		data: &expected,
 	}
 	cache := NewPodCache(&fake, nil, time.Second*1)
 
@@ -86,8 +83,8 @@ func TestPodGetContainerInfo(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(info, pod) {
-		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", pod, info)
+	if !reflect.DeepEqual(info, &expected) {
+		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", &expected, info)
 	}
 }
 
@@ -98,10 +95,13 @@ func TestPodUpdateAllContainers(t *testing.T) {
 			Host: "machine",
 		},
 	}
+
 	pods := []api.Pod{pod}
 	mockRegistry := registry.MakeMockPodRegistry(pods)
+
+	expected := docker.Container{ID: "foo"}
 	fake := FakeContainerInfo{
-		data: pod,
+		data: &expected,
 	}
 	cache := NewPodCache(&fake, mockRegistry, time.Second*1)
 
@@ -115,7 +115,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(info, pod) {
-		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", pod, info)
+	if !reflect.DeepEqual(info, &expected) {
+		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", &expected, info)
 	}
 }

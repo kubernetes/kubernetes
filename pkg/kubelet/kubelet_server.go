@@ -24,6 +24,7 @@ import (
 	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/v1/yaml"
 )
 
@@ -36,7 +37,7 @@ type KubeletServer struct {
 // For testablitiy.
 type kubeletInterface interface {
 	GetContainerStats(name string) (*api.ContainerStats, error)
-	GetContainerInfo(name string) (string, error)
+	GetContainerInfo(name string) (*docker.Container, error)
 }
 
 func (s *KubeletServer) error(w http.ResponseWriter, err error) {
@@ -113,7 +114,13 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(w, "Missing container selector arg.")
 			return
 		}
-		data, err := s.Kubelet.GetContainerInfo(container)
+		info, err := s.Kubelet.GetContainerInfo(container)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Internal Error: %v", err)
+			return
+		}
+		data, err := json.Marshal(info)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Internal Error: %v", err)
@@ -121,7 +128,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-type", "application/json")
-		fmt.Fprint(w, data)
+		w.Write(data)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, "Not found.")
