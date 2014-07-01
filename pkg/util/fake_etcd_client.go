@@ -123,13 +123,6 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	f.condWatchCompleted.Broadcast()
 	f.condLock.Unlock()
 
-	// After calling this function, the WatchStop channel will not be ready
-	defer func() {
-		f.condLock.Lock()
-		f.condWatchCompleted = sync.NewCond(&f.condLock)
-		f.condLock.Unlock()
-	}()
-
 	select {
 	case <-stop:
 		return nil, etcd.ErrWatchStoppedByUser
