@@ -57,6 +57,26 @@ func validateVolumes(volumes []Volume) (util.StringSet, error) {
 	return allNames, nil
 }
 
+func validateContainers(containers []Container, volumes util.StringSet) error {
+	allNames := util.StringSet{}
+	for i := range containers {
+		ctr := &containers[i] // so we can set default values
+		if len(ctr.Name) > 63 || !util.IsDNSLabel(ctr.Name) {
+			return errInvalid("Container.Name", ctr.Name)
+		}
+		if allNames.Has(ctr.Name) {
+			return errNotUnique("Container.Name", ctr.Name)
+		}
+		allNames.Insert(ctr.Name)
+		if len(ctr.Image) == 0 {
+			return errInvalid("Container.Image", ctr.Name)
+		}
+
+		// TODO(thockin): finish validation.
+	}
+	return nil
+}
+
 // ValidateManifest tests that the specified ContainerManifest has valid data.
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
@@ -72,10 +92,12 @@ func ValidateManifest(manifest *ContainerManifest) error {
 	if len(manifest.ID) > 255 || !util.IsDNSSubdomain(manifest.ID) {
 		return errInvalid("ContainerManifest.ID", manifest.ID)
 	}
-	_, err := validateVolumes(manifest.Volumes)
+	allVolumes, err := validateVolumes(manifest.Volumes)
 	if err != nil {
 		return err
 	}
-	// TODO(thockin): finish validation.
+	if err := validateContainers(manifest.Containers, allVolumes); err != nil {
+		return err
+	}
 	return nil
 }
