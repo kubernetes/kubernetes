@@ -51,9 +51,8 @@ func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
 	ret := &FakeEtcdClient{
 		t:    t,
 		Data: map[string]EtcdResponseWithError{},
-		// watchChanReady: make(chan bool),
 	}
-	// The channels are not ready yet
+	// Watch() method has not been called.
 	ret.condWatchCompleted = sync.NewCond(&ret.condLock)
 	return ret
 }
