@@ -23,13 +23,9 @@ import (
 	"github.com/golang/glog"
 )
 
-func isSupportedManifestVersion(value string) bool {
-	switch value {
-	case "v1beta1", "v1beta2":
-		return true
-	}
-	return false
-}
+var (
+	supportedManifestVersions util.StringSet = util.NewStringSet("v1beta1", "v1beta2")
+)
 
 func errInvalid(field string, value interface{}) error {
 	return fmt.Errorf("%s is invalid: '%v'", field, value)
@@ -109,7 +105,7 @@ func ValidateManifest(manifest *ContainerManifest) error {
 	if len(manifest.Version) == 0 {
 		return errInvalid("ContainerManifest.Version", manifest.Version)
 	}
-	if !isSupportedManifestVersion(manifest.Version) {
+	if !supportedManifestVersions.Has(manifest.Version) {
 		return errNotSupported("ContainerManifest.Version", manifest.Version)
 	}
 	if len(manifest.ID) > 255 || !util.IsDNSSubdomain(manifest.ID) {
