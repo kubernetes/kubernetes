@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package tools
 
 import (
 	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -83,7 +84,7 @@ func TestExtractList(t *testing.T) {
 func TestExtractObj(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	expect := testMarshalType{ID: "foo"}
-	fakeClient.Set("/some/key", MakeJSONString(expect), 0)
+	fakeClient.Set("/some/key", util.MakeJSONString(expect), 0)
 	helper := EtcdHelper{fakeClient}
 	var got testMarshalType
 	err := helper.ExtractObj("/some/key", &got, false)
@@ -143,7 +144,7 @@ func TestSetObj(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	expect := MakeJSONString(obj)
+	expect := util.MakeJSONString(obj)
 	got := fakeClient.Data["/some/key"].R.Node.Value
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)

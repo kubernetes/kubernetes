@@ -21,7 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/golang/glog"
 )
 
@@ -30,7 +30,7 @@ import (
 
 // EtcdRegistry is an implementation of both ControllerRegistry and PodRegistry which is backed with etcd.
 type EtcdRegistry struct {
-	etcdClient      util.EtcdClient
+	etcdClient      tools.EtcdClient
 	machines        MinionRegistry
 	manifestFactory ManifestFactory
 }
@@ -39,7 +39,7 @@ type EtcdRegistry struct {
 // 'client' is the connection to etcd
 // 'machines' is the list of machines
 // 'scheduler' is the scheduling algorithm to use.
-func MakeEtcdRegistry(client util.EtcdClient, machines MinionRegistry) *EtcdRegistry {
+func MakeEtcdRegistry(client tools.EtcdClient, machines MinionRegistry) *EtcdRegistry {
 	registry := &EtcdRegistry{
 		etcdClient: client,
 		machines:   machines,
@@ -54,8 +54,8 @@ func makePodKey(machine, podID string) string {
 	return "/registry/hosts/" + machine + "/pods/" + podID
 }
 
-func (registry *EtcdRegistry) helper() *util.EtcdHelper {
-	return &util.EtcdHelper{registry.etcdClient}
+func (registry *EtcdRegistry) helper() *tools.EtcdHelper {
+	return &tools.EtcdHelper{registry.etcdClient}
 }
 
 func (registry *EtcdRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {

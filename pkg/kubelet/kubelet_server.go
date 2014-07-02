@@ -46,9 +46,7 @@ func (s *KubeletServer) error(w http.ResponseWriter, err error) {
 }
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	logger := apiserver.MakeLogged(req, w)
-	w = logger
-	defer logger.Log()
+	defer apiserver.MakeLogged(req, &w).Log()
 
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {

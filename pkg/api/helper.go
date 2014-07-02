@@ -49,6 +49,30 @@ func AddKnownTypes(types ...interface{}) {
 	}
 }
 
+// Takes an arbitary api type, returns pointer to its JSONBase field.
+// obj must be a pointer to an api type.
+func FindJSONBase(obj interface{}) (*JSONBase, error) {
+	_, jsonBase, err := nameAndJSONBase(obj)
+	return jsonBase, err
+}
+
+// Takes an arbitary api type, return a copy of its JSONBase field.
+// obj may be a pointer to an api type, or a non-pointer struct api type.
+func FindJSONBaseRO(obj interface{}) (JSONBase, error) {
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return JSONBase{}, fmt.Errorf("expected struct, but got %v", v.Type().Name())
+	}
+	jsonBase := v.FieldByName("JSONBase")
+	if !jsonBase.IsValid() {
+		return JSONBase{}, fmt.Errorf("struct %v lacks embedded JSON type", v.Type().Name())
+	}
+	return jsonBase.Interface().(JSONBase), nil
+}
+
 // Encode turns the given api object into an appropriate JSON string.
 // Will return an error if the object doesn't have an embedded JSONBase.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy

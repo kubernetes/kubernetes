@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
@@ -75,8 +76,8 @@ func verifyError(t *testing.T, e error) {
 	}
 }
 
-func makeTestKubelet(t *testing.T) (*Kubelet, *util.FakeEtcdClient, *FakeDockerClient) {
-	fakeEtcdClient := util.MakeFakeEtcdClient(t)
+func makeTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *FakeDockerClient) {
+	fakeEtcdClient := tools.MakeFakeEtcdClient(t)
 	fakeDocker := &FakeDockerClient{
 		err: nil,
 	}
@@ -279,7 +280,7 @@ func TestGetKubeletStateFromEtcdNoData(t *testing.T) {
 	kubelet, fakeClient, _ := makeTestKubelet(t)
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: nil,
 	}
@@ -298,7 +299,7 @@ func TestGetKubeletStateFromEtcd(t *testing.T) {
 	kubelet, fakeClient, _ := makeTestKubelet(t)
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value: util.MakeJSONString([]api.Container{}),
@@ -319,7 +320,7 @@ func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 	kubelet, fakeClient, _ := makeTestKubelet(t)
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{
 			ErrorCode: 100,
@@ -338,7 +339,7 @@ func TestGetKubeletStateFromEtcdError(t *testing.T) {
 	kubelet, fakeClient, _ := makeTestKubelet(t)
 	channel := make(chan manifestUpdate)
 	reader := startReading(channel)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = util.EtcdResponseWithError{
+	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: &etcd.EtcdError{
 			ErrorCode: 200, // non not found error

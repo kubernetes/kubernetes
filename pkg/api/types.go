@@ -150,6 +150,7 @@ type JSONBase struct {
 	ID                string `json:"id,omitempty" yaml:"id,omitempty"`
 	CreationTimestamp string `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+	ResourceVersion   uint64 `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 }
 
 type PodStatus string
@@ -266,8 +267,12 @@ type Status struct {
 	// One of: "success", "failure", "working" (for operations not yet completed)
 	// TODO: if "working", include an operation identifier so final status can be
 	// checked.
-	Status  string `json:"status,omitempty" yaml:"status,omitempty"`
+	Status string `json:"status,omitempty" yaml:"status,omitempty"`
+	// Details about the status. May be an error description or an
+	// operation number for later polling.
 	Details string `json:"details,omitempty" yaml:"details,omitempty"`
+	// Suggested HTTP return code for this status, 0 if not set.
+	Code int `json:"code,omitempty" yaml:"code,omitempty"`
 }
 
 // Values of Status.Status

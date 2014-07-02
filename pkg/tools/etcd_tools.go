@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package tools
 
 import (
 	"encoding/json"
 	"fmt"
 	"reflect"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -138,15 +139,29 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 		return "", 0, fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
 	}
 	body = response.Node.Value
-	return body, response.Node.ModifiedIndex, json.Unmarshal([]byte(body), objPtr)
+	err = json.Unmarshal([]byte(body), objPtr)
+	if jsonBase, err := api.FindJSONBase(objPtr); err == nil {
+		jsonBase.ResourceVersion = response.Node.ModifiedIndex
+		// Note that err shadows the err returned below, so we won't
+		// return an error just because we failed to find a JSONBase.
+		// This is intentional.
+	}
+	return body, response.Node.ModifiedIndex, err
 }
 
-// SetObj marshals obj via json, and stores under key.
+// SetObj marshals obj via json, and stores under key. Will do an
+// atomic update if obj's ResourceVersion field is set.
 func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 	data, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
+	if jsonBase, err := api.FindJSONBaseRO(obj); err == nil && jsonBase.ResourceVersion != 0 {
+		_, err = h.Client.CompareAndSwap(key, string(data), 0, "", jsonBase.ResourceVersion)
+		return err // err is shadowed!
+	}
+
+	// TODO: when client supports atomic creation, integrate this with the above.
 	_, err = h.Client.Set(key, string(data), 0)
 	return err
 }
