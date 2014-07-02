@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -54,9 +55,15 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 		defer util.HandleCrash()
 		obj, err := fn()
 		if err != nil {
+			status := http.StatusInternalServerError
+			switch {
+			case tools.IsEtcdConflict(err):
+				status = http.StatusConflict
+			}
 			channel <- &api.Status{
 				Status:  api.StatusFailure,
 				Details: err.Error(),
+				Code:    status,
 			}
 		} else {
 			channel <- obj
@@ -110,9 +117,13 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			glog.Infof("ApiServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 		}
 	}()
-	logger := MakeLogged(req, w)
-	w = logger
-	defer logger.Log()
+	defer MakeLogged(req, &w).StacktraceWhen(
+		StatusIsNot(
+			http.StatusOK,
+			http.StatusAccepted,
+			http.StatusConflict,
+		),
+	).Log()
 	url, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		server.error(err, w)
@@ -141,7 +152,7 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	storage := server.storage[requestParts[0]]
 	if storage == nil {
-		logger.Addf("'%v' has no storage object", requestParts[0])
+		LogOf(w).Addf("'%v' has no storage object", requestParts[0])
 		server.notFound(req, w)
 		return
 	} else {
@@ -171,8 +182,7 @@ func (server *ApiServer) error(err error, w http.ResponseWriter) {
 
 func (server *ApiServer) readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
-	body, err := ioutil.ReadAll(req.Body)
-	return body, err
+	return ioutil.ReadAll(req.Body)
 }
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
@@ -184,7 +194,19 @@ func (server *ApiServer) finishReq(out <-chan interface{}, sync bool, timeout ti
 	}
 	obj, complete := op.StatusOrResult()
 	if complete {
-		server.write(http.StatusOK, obj, w)
+		status := http.StatusOK
+		switch stat := obj.(type) {
+		case api.Status:
+			LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
+			if stat.Code != 0 {
+				status = stat.Code
+			}
+		case *api.Status:
+			if stat.Code != 0 {
+				status = stat.Code
+			}
+		}
+		server.write(status, obj, w)
 	} else {
 		server.write(http.StatusAccepted, obj, w)
 	}

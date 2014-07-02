@@ -23,7 +23,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -128,8 +130,73 @@ func runReplicationControllerTest(kubeClient *client.Client) {
 	glog.Infof("Replication controller produced:\n\n%#v\n\n", pods)
 }
 
+func runAtomicPutTest(c *client.Client) {
+	var svc api.Service
+	err := c.Post().Path("services").Body(
+		api.Service{
+			JSONBase: api.JSONBase{ID: "atomicService"},
+			Port:     12345,
+			Labels: map[string]string{
+				"name": "atomicService",
+			},
+		},
+	).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed creating atomicService: %v", err)
+	}
+
+	testLabels := labels.Set{}
+	for i := 0; i < 26; i++ {
+		// a: z, b: y, etc...
+		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(testLabels))
+	for label, value := range testLabels {
+		go func(l, v string) {
+			for {
+				var tmpSvc api.Service
+				err := c.Get().Path("services").Path(svc.ID).Do().Into(&tmpSvc)
+				if err != nil {
+					glog.Errorf("Error getting atomicService: %v", err)
+					continue
+				}
+				if tmpSvc.Selector == nil {
+					tmpSvc.Selector = map[string]string{l: v}
+				} else {
+					tmpSvc.Selector[l] = v
+				}
+				err = c.Put().Path("services").Path(svc.ID).Body(&tmpSvc).Do().Error()
+				if err != nil {
+					if se, ok := err.(*client.StatusErr); ok {
+						if se.Status.Code == http.StatusConflict {
+							// This is what we expect.
+							continue
+						}
+					}
+					glog.Errorf("Unexpected error putting atomicService: %v", err)
+					continue
+				}
+				break
+			}
+			wg.Done()
+		}(label, value)
+	}
+	wg.Wait()
+	err = c.Get().Path("services").Path(svc.ID).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
+	}
+	if !reflect.DeepEqual(testLabels, labels.Set(svc.Selector)) {
+		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Selector)
+	}
+	glog.Info("Atomic PUTs work.")
+}
+
+type testFunc func(*client.Client)
+
 func main() {
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -150,7 +217,22 @@ func main() {
 	time.Sleep(time.Second * 10)
 
 	kubeClient := client.New(apiServerURL, nil)
-	runReplicationControllerTest(kubeClient)
+
+	// Run tests in parallel
+	testFuncs := []testFunc{
+		runReplicationControllerTest,
+		runAtomicPutTest,
+	}
+	var wg sync.WaitGroup
+	wg.Add(len(testFuncs))
+	for i := range testFuncs {
+		f := testFuncs[i]
+		go func() {
+			f(kubeClient)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 
 	// Check that kubelet tried to make the pods.
 	// Using a set to list unique creation attempts. Our fake is

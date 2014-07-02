@@ -25,6 +25,9 @@ import (
 	"github.com/golang/glog"
 )
 
+// Return true if a stacktrace should be logged for this status
+type StacktracePred func(httpStatus int) (logStacktrace bool)
+
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
 type respLogger struct {
@@ -35,17 +38,64 @@ type respLogger struct {
 
 	req *http.Request
 	w   http.ResponseWriter
+
+	logStacktracePred StacktracePred
 }
 
+func DefaultStacktracePred(status int) bool {
+	return status != http.StatusOK && status != http.StatusAccepted
+}
+
+// MakeLogged turns a normal response writer into a logged response writer.
+//
 // Usage:
-// logger := MakeLogged(req, w)
-// w = logger // Route response writing actions through w
-// defer logger.Log()
-func MakeLogged(req *http.Request, w http.ResponseWriter) *respLogger {
-	return &respLogger{
-		startTime: time.Now(),
-		req:       req,
-		w:         w,
+//
+// defer MakeLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
+//
+// (Only the call to Log() is defered, so you can set everything up in one line!)
+//
+// Note that this *changes* your writer, to route response writing actions
+// through the logger.
+//
+// Use LogOf(w).Addf(...) to log something along with the response result.
+func MakeLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
+	rl := &respLogger{
+		startTime:         time.Now(),
+		req:               req,
+		w:                 *w,
+		logStacktracePred: DefaultStacktracePred,
+	}
+	*w = rl // hijack caller's writer!
+	return rl
+}
+
+// LogOf returns the logger hiding in w. Panics if there isn't such a logger,
+// because MakeLogged() must have been previously called for the log to work.
+func LogOf(w http.ResponseWriter) *respLogger {
+	if rl, ok := w.(*respLogger); ok {
+		return rl
+	}
+	panic("Logger not installed yet!")
+	return nil
+}
+
+// Sets the stacktrace logging predicate, which decides when to log a stacktrace.
+// There's a default, so you don't need to call this unless you don't like the default.
+func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
+	rl.logStacktracePred = pred
+	return rl
+}
+
+// StatusIsNot returns a StacktracePred which will cause stacktraces to be logged
+// for any status *not* in the given list.
+func StatusIsNot(statuses ...int) StacktracePred {
+	return func(status int) bool {
+		for _, s := range statuses {
+			if status == s {
+				return false
+			}
+		}
+		return true
 	}
 }
 
@@ -73,7 +123,7 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 // Implement http.ResponseWriter
 func (rl *respLogger) WriteHeader(status int) {
 	rl.status = status
-	if status != http.StatusOK && status != http.StatusAccepted {
+	if rl.logStacktracePred(status) {
 		// Only log stacks for errors
 		stack := make([]byte, 2048)
 		stack = stack[:runtime.Stack(stack, false)]
