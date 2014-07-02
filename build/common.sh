@@ -229,7 +229,7 @@ function copy-output() {
 
 # Create a unique bucket name for releasing Kube and make sure it exists.
 function ensure-gcs-release-bucket() {
-  if which md5 > /dev/null; then
+  if which md5 > /dev/null 2>&1; then
     HASH=$(md5 -q -s "$GCLOUD_PROJECT")
   else
     HASH=$(echo -n "$GCLOUD_PROJECT" | md5sum)
