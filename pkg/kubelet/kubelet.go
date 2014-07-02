@@ -74,6 +74,10 @@ type CadvisorInterface interface {
 	MachineInfo() (*info.MachineInfo, error)
 }
 
+func New() *Kubelet {
+	return &Kubelet{}
+}
+
 // The main kubelet implementation
 type Kubelet struct {
 	Hostname           string
