@@ -76,7 +76,10 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "")
 	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(apiserver.URL, nil))
+	kClient := client.New(apiserver.URL, nil)
+	kClient.PollPeriod = time.Second * 1
+	kClient.Sync = true
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), kClient)
 
 	controllerManager.Run(1 * time.Second)
 

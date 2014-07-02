@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"runtime/debug"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"github.com/kr/pretty"
 )
 
 // RESTStorage is a generic interface for RESTful storage services
@@ -108,6 +110,25 @@ func (server *ApiServer) handleIndex(w http.ResponseWriter) {
 	fmt.Fprint(w, data)
 }
 
+func (server *ApiServer) handleMinionReq(minion_info string, req *http.Request, w http.ResponseWriter) {
+	glog.Infof("???? handleMinionReq: %#v", req)
+	queryParts := strings.Split(minion_info, "=")
+	queryUrl := "http://" + queryParts[1] + ":10250"
+	glog.Infof("????query_url: %s", queryUrl)
+	remote, err := url.Parse(queryUrl)
+	if err != nil {
+		glog.Errorf("????? Failed to parse %p as url: %s", queryUrl, err)
+	}
+	newReq, err := http.NewRequest("GET", "/stats", nil)
+	glog.Infof("???? newReq: %v", pretty.Sprintf("%# v", newReq))
+	if err != nil {
+		glog.Errorf("????? Failed to create request: %s", err)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+	proxy.ServeHTTP(w, newReq)
+}
+
 // HTTP Handler interface
 func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
@@ -124,13 +145,20 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusConflict,
 		),
 	).Log()
+	req.ParseForm()
+	glog.Infof("????? req.form:%#v", req.Form)
 	url, err := url.ParseRequestURI(req.RequestURI)
+	glog.Infof("????? after parse, url:%#v", url)
 	if err != nil {
 		server.error(err, w)
 		return
 	}
 	if url.Path == "/index.html" || url.Path == "/" || url.Path == "" {
 		server.handleIndex(w)
+		return
+	}
+	if url.Path == "/minion" {
+		server.handleMinionReq(url.RawQuery, req, w)
 		return
 	}
 	if strings.HasPrefix(url.Path, "/logs/") {

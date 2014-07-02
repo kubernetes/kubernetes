@@ -14,7 +14,7 @@
 
 # This file creates a minimal container for running Kubernetes binaries
 
-FROM  busybox
+FROM google/debian:wheezy 
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 WORKDIR /kubernetes

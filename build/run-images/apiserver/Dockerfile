@@ -22,4 +22,4 @@ ENV KUBE_MINIONS ""
 
 ADD . /kubernetes
 
-CMD ['./run.sh']
+CMD ["/kubernetes/run.sh"]
