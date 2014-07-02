@@ -41,6 +41,29 @@ var (
 	fakeDocker1, fakeDocker2 kubelet.FakeDockerClient
 )
 
+type fakePodInfoGetter struct{}
+
+func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+	// This is a horrible hack to get around the fact that we can't provide
+	// different port numbers per kubelet...
+	var c client.PodInfoGetter
+	switch host {
+	case "localhost":
+		c = &client.HTTPPodInfoGetter{
+			Client: http.DefaultClient,
+			Port:   10250,
+		}
+	case "machine":
+		c = &client.HTTPPodInfoGetter{
+			Client: http.DefaultClient,
+			Port:   10251,
+		}
+	default:
+		glog.Fatalf("Can't get info for: %v, %v", host, podID)
+	}
+	return c.GetPodInfo("localhost", podID)
+}
+
 func startComponents(manifestURL string) (apiServerURL string) {
 	// Setup
 	servers := []string{"http://localhost:4001"}
@@ -48,7 +71,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	machineList := []string{"localhost", "machine"}
 
 	// Master
-	m := master.New(servers, machineList, nil, "")
+	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "")
 	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
 	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(apiserver.URL, nil))
