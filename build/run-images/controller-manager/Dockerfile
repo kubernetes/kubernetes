@@ -22,4 +22,4 @@ ENV API_SERVER   127.0.0.1:8080
 
 ADD . /kubernetes
 
-CMD ['./run.sh']
+CMD ["/kubernetes/run.sh"]

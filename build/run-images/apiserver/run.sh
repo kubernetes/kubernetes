@@ -18,4 +18,4 @@
 # configuration and that we have a local minion.
 KUBE_MINIONS=${KUBE_MINIONS:$(hostname -f)}
 
-./apiserver -master=127.0.0.1:8080 -etcd_servers="${ETCD_SERVERS}" --machines="${KUBE_MINIONS}"
+./apiserver -address=0.0.0.0 -etcd_servers="${ETCD_SERVERS}" --machines="${KUBE_MINIONS}"
