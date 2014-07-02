@@ -115,14 +115,14 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	}
 }
 
-func verifyPackUnpack(t *testing.T, manifestId, containerName string) {
+func verifyPackUnpack(t *testing.T, manifestID, containerName string) {
 	name := buildDockerName(
-		&api.ContainerManifest{ID: manifestId},
+		&api.ContainerManifest{ID: manifestID},
 		&api.Container{Name: containerName},
 	)
-	returnedManifestId, returnedContainerName := parseDockerName(name)
-	if manifestId != returnedManifestId || containerName != returnedContainerName {
-		t.Errorf("For (%s, %s), unpacked (%s, %s)", manifestId, containerName, returnedManifestId, returnedContainerName)
+	returnedManifestID, returnedContainerName := parseDockerName(name)
+	if manifestID != returnedManifestID || containerName != returnedContainerName {
+		t.Errorf("For (%s, %s), unpacked (%s, %s)", manifestID, containerName, returnedManifestID, returnedContainerName)
 	}
 }
 
@@ -140,7 +140,7 @@ func TestContainerManifestNaming(t *testing.T) {
 	verifyPackUnpack(t, "_m___anifest", "-_-container")
 }
 
-func TestGetContainerId(t *testing.T) {
+func TestGetContainerID(t *testing.T) {
 	kubelet, _, fakeDocker := makeTestKubelet(t)
 	manifest := api.ContainerManifest{
 		ID: "qux",
@@ -162,7 +162,7 @@ func TestGetContainerId(t *testing.T) {
 		ID: "foobar",
 	}
 
-	id, err := kubelet.getContainerId(&manifest, &container)
+	id, err := kubelet.getContainerID(&manifest, &container)
 	verifyCalls(t, fakeDocker, []string{"list"})
 	if id == "" {
 		t.Errorf("Failed to find container %#v", container)
@@ -173,7 +173,7 @@ func TestGetContainerId(t *testing.T) {
 
 	fakeDocker.clearCalls()
 	missingManifest := api.ContainerManifest{ID: "foobar"}
-	id, err = kubelet.getContainerId(&missingManifest, &container)
+	id, err = kubelet.getContainerID(&missingManifest, &container)
 	verifyCalls(t, fakeDocker, []string{"list"})
 	if id != "" {
 		t.Errorf("Failed to not find container %#v", missingManifest)
@@ -864,8 +864,8 @@ func areSamePercentiles(
 }
 
 func TestGetContainerStats(t *testing.T) {
-	containerId := "ab2cdf"
-	containerPath := fmt.Sprintf("/docker/%v", containerId)
+	containerID := "ab2cdf"
+	containerPath := fmt.Sprintf("/docker/%v", containerID)
 	containerInfo := &info.ContainerInfo{
 		ContainerReference: info.ContainerReference{
 			Name: containerPath,
@@ -893,7 +893,7 @@ func TestGetContainerStats(t *testing.T) {
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			Names: []string{"foo"},
-			ID:    containerId,
+			ID:    containerID,
 		},
 	}
 
@@ -934,8 +934,8 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 }
 
 func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
-	containerId := "ab2cdf"
-	containerPath := fmt.Sprintf("/docker/%v", containerId)
+	containerID := "ab2cdf"
+	containerPath := fmt.Sprintf("/docker/%v", containerID)
 
 	containerInfo := &info.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
@@ -947,7 +947,7 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			Names: []string{"foo"},
-			ID:    containerId,
+			ID:    containerID,
 		},
 	}
 
