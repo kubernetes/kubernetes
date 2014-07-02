@@ -44,8 +44,39 @@ func TestValidateVolumes(t *testing.T) {
 		"name not unique":      {{Name: "abc"}, {Name: "abc"}},
 	}
 	for k, v := range errorCases {
-		_, err := validateVolumes(v)
-		if err == nil {
+		if _, err := validateVolumes(v); err == nil {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestValidateEnv(t *testing.T) {
+	successCase := []EnvVar{
+		{Name: "abc", Value: "value"},
+		{Name: "ABC", Value: "value"},
+		{Name: "AbC_123", Value: "value"},
+		{Name: "abc", Value: ""},
+	}
+	if err := validateEnv(successCase); err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+
+	nonCanonicalCase := []EnvVar{
+		{Key: "EV"},
+	}
+	if err := validateEnv(nonCanonicalCase); err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if nonCanonicalCase[0].Name != "EV" || nonCanonicalCase[0].Value != "" {
+		t.Errorf("expected default values: %+v", nonCanonicalCase[0])
+	}
+
+	errorCases := map[string][]EnvVar{
+		"zero-length name":        {{Name: ""}},
+		"name not a C identifier": {{Name: "a.b.c"}},
+	}
+	for k, v := range errorCases {
+		if err := validateEnv(v); err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -59,8 +90,7 @@ func TestValidateContainers(t *testing.T) {
 		{Name: "123", Image: "image"},
 		{Name: "abc-123", Image: "image"},
 	}
-	err := validateContainers(successCase, volumes)
-	if err != nil {
+	if err := validateContainers(successCase, volumes); err != nil {
 		t.Errorf("expected success: %v", err)
 	}
 
@@ -73,10 +103,12 @@ func TestValidateContainers(t *testing.T) {
 			{Name: "abc", Image: "image"},
 		},
 		"zero-length image": {{Name: "abc", Image: ""}},
+		"invalid env var name": {
+			{Name: "abc", Image: "image", Env: []EnvVar{{Name: "ev.1"}}},
+		},
 	}
 	for k, v := range errorCases {
-		err := validateContainers(v, volumes)
-		if err == nil {
+		if err := validateContainers(v, volumes); err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -99,13 +131,17 @@ func TestValidateManifest(t *testing.T) {
 					WorkingDir: "/tmp",
 					Memory:     1,
 					CPU:        1,
+					Env: []EnvVar{
+						{Name: "ev1", Value: "val1"},
+						{Name: "ev2", Value: "val2"},
+						{Key: "EV3", Value: "val3"},
+					},
 				},
 			},
 		},
 	}
 	for _, manifest := range successCases {
-		err := ValidateManifest(&manifest)
-		if err != nil {
+		if err := ValidateManifest(&manifest); err != nil {
 			t.Errorf("expected success: %v", err)
 		}
 	}
@@ -128,8 +164,7 @@ func TestValidateManifest(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		err := ValidateManifest(&v)
-		if err == nil {
+		if err := ValidateManifest(&v); err == nil {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
