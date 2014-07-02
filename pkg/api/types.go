@@ -16,6 +16,10 @@ limitations under the License.
 
 package api
 
+import (
+	"github.com/fsouza/go-dockerclient"
+)
+
 // Common string formats
 // ---------------------
 // Many fields in this API have formatting requirements.  The commonly used
@@ -153,13 +157,22 @@ const (
 	PodStopped PodStatus = "Stopped"
 )
 
+// PodInfo contains one entry for every container with available info.
+type PodInfo map[string]docker.Container
+
 // PodState is the state of a pod, used as either input (desired state) or output (current state)
 type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
 	Status   PodStatus         `json:"status,omitempty" yaml:"status,omitempty"`
 	Host     string            `json:"host,omitempty" yaml:"host,omitempty"`
 	HostIP   string            `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
-	Info     interface{}       `json:"info,omitempty" yaml:"info,omitempty"`
+
+	// The key of this map is the *name* of the container within the manifest; it has one
+	// entry per container in the manifest. The value of this map is currently the output
+	// of `docker inspect`. This output format is *not* final and should not be relied
+	// upon.
+	// TODO: Make real decisions about what our info should look like.
+	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
 type PodList struct {

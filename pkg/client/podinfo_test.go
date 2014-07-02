@@ -25,7 +25,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/fsouza/go-dockerclient"
 )
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -35,11 +37,15 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
-func TestHTTPContainerInfo(t *testing.T) {
-	body := `{"items":[]}`
+func TestHTTPPodInfoGetter(t *testing.T) {
+	expectObj := api.PodInfo{
+		"myID": docker.Container{ID: "myID"},
+	}
+	body, err := json.Marshal(expectObj)
+	expectNoError(t, err)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: body,
+		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 
@@ -49,14 +55,15 @@ func TestHTTPContainerInfo(t *testing.T) {
 
 	port, err := strconv.Atoi(parts[1])
 	expectNoError(t, err)
-	containerInfo := &HTTPContainerInfo{
+	podInfoGetter := &HTTPPodInfoGetter{
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	data, err := containerInfo.GetContainerInfo(parts[0], "foo")
+	gotObj, err := podInfoGetter.GetPodInfo(parts[0], "foo")
 	expectNoError(t, err)
-	dataString, _ := json.Marshal(data)
-	if string(dataString) != body {
-		t.Errorf("Unexpected response.  Expected: %s, received %s", body, string(dataString))
+
+	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
+	if len(gotObj) != len(expectObj) || expectObj["myID"].ID != gotObj["myID"].ID {
+		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }

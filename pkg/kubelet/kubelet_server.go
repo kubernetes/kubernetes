@@ -24,6 +24,7 @@ import (
 	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"gopkg.in/v1/yaml"
 )
 
@@ -36,7 +37,7 @@ type KubeletServer struct {
 // For testablitiy.
 type kubeletInterface interface {
 	GetContainerStats(name string) (*api.ContainerStats, error)
-	GetContainerInfo(name string) (string, error)
+	GetPodInfo(name string) (api.PodInfo, error)
 }
 
 func (s *KubeletServer) error(w http.ResponseWriter, err error) {
@@ -45,6 +46,10 @@ func (s *KubeletServer) error(w http.ResponseWriter, err error) {
 }
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	logger := apiserver.MakeLogged(req, w)
+	w = logger
+	defer logger.Log()
+
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		s.error(w, err)
@@ -104,16 +109,20 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-type", "application/json")
 		w.Write(data)
-	case u.Path == "/containerInfo":
-		// NOTE: The master appears to pass a Pod.ID
-		// The server appears to pass a Pod.ID
-		container := u.Query().Get("container")
-		if len(container) == 0 {
+	case u.Path == "/podInfo":
+		podID := u.Query().Get("podID")
+		if len(podID) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "Missing container selector arg.")
+			fmt.Fprint(w, "Missing 'podID=' query entry.")
 			return
 		}
-		data, err := s.Kubelet.GetContainerInfo(container)
+		info, err := s.Kubelet.GetPodInfo(podID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Internal Error: %v", err)
+			return
+		}
+		data, err := json.Marshal(info)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Internal Error: %v", err)
@@ -121,7 +130,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-type", "application/json")
-		fmt.Fprint(w, data)
+		w.Write(data)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, "Not found.")

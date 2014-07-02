@@ -21,8 +21,10 @@ package main
 import (
 	"flag"
 	"net"
+	"net/http"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -35,6 +37,7 @@ var (
 	apiPrefix                   = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
 	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	minionRegexp                = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
+	minionPort                  = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
 	etcdServerList, machineList util.StringList
 )
 
@@ -68,11 +71,16 @@ func main() {
 		}
 	}
 
+	podInfoGetter := &client.HTTPPodInfoGetter{
+		Client: http.DefaultClient,
+		Port:   *minionPort,
+	}
+
 	var m *master.Master
 	if len(etcdServerList) > 0 {
-		m = master.New(etcdServerList, machineList, cloud, *minionRegexp)
+		m = master.New(etcdServerList, machineList, podInfoGetter, cloud, *minionRegexp)
 	} else {
-		m = master.NewMemoryServer(machineList, cloud)
+		m = master.NewMemoryServer(machineList, podInfoGetter, cloud)
 	}
 
 	glog.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))

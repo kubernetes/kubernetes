@@ -20,25 +20,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"strconv"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// ContainerInfo is an interface for things that can get information about a container.
+// PodInfoGetter is an interface for things that can get information about a pod's containers.
 // Injectable for easy testing.
-type ContainerInfo interface {
-	// GetContainerInfo returns information about container 'name' on 'host'
-	// Returns an untyped interface, and an error, if one occurs
-	GetContainerInfo(host, name string) (interface{}, error)
+type PodInfoGetter interface {
+	// GetPodInfo returns information about all containers which are part
+	// Returns an api.PodInfo, or an error if one occurs.
+	GetPodInfo(host, podID string) (api.PodInfo, error)
 }
 
 // The default implementation, accesses the kubelet over HTTP
-type HTTPContainerInfo struct {
+type HTTPPodInfoGetter struct {
 	Client *http.Client
 	Port   uint
 }
 
-func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (interface{}, error) {
-	request, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/containerInfo?container=%s", host, c.Port, name), nil)
+func (c *HTTPPodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+	request, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf(
+			"http://%s/podInfo?podID=%s",
+			net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
+			podID),
+		nil)
 	if err != nil {
 		return nil, err
 	}
@@ -51,17 +61,21 @@ func (c *HTTPContainerInfo) GetContainerInfo(host, name string) (interface{}, er
 	if err != nil {
 		return nil, err
 	}
-	var data interface{}
-	err = json.Unmarshal(body, &data)
-	return data, err
+	// Check that this data can be unmarshalled
+	info := api.PodInfo{}
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 // Useful for testing.
-type FakeContainerInfo struct {
-	data interface{}
+type FakePodInfoGetter struct {
+	data api.PodInfo
 	err  error
 }
 
-func (c *FakeContainerInfo) GetContainerInfo(host, name string) (interface{}, error) {
+func (c *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	return c.data, c.err
 }

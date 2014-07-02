@@ -33,8 +33,8 @@ import (
 // PodRegistryStorage implements the RESTStorage interface in terms of a PodRegistry
 type PodRegistryStorage struct {
 	registry      PodRegistry
-	containerInfo client.ContainerInfo
-	podCache      client.ContainerInfo
+	podInfoGetter client.PodInfoGetter
+	podCache      client.PodInfoGetter
 	scheduler     scheduler.Scheduler
 	minionLister  scheduler.MinionLister
 	cloud         cloudprovider.Interface
@@ -44,20 +44,20 @@ type PodRegistryStorage struct {
 // MakePodRegistryStorage makes a RESTStorage object for a pod registry.
 // Parameters:
 //   registry:      The pod registry
-//   containerInfo: Source of fresh container info
+//   podInfoGetter: Source of fresh container info
 //   scheduler:     The scheduler for assigning pods to machines
 //   minionLister:  Object which can list available minions for the scheduler
 //   cloud:         Interface to a cloud provider (may be null)
 //   podCache:      Source of cached container info
 func MakePodRegistryStorage(registry PodRegistry,
-	containerInfo client.ContainerInfo,
+	podInfoGetter client.PodInfoGetter,
 	scheduler scheduler.Scheduler,
 	minionLister scheduler.MinionLister,
 	cloud cloudprovider.Interface,
-	podCache client.ContainerInfo) apiserver.RESTStorage {
+	podCache client.PodInfoGetter) apiserver.RESTStorage {
 	return &PodRegistryStorage{
 		registry:      registry,
-		containerInfo: containerInfo,
+		podInfoGetter: podInfoGetter,
 		scheduler:     scheduler,
 		minionLister:  minionLister,
 		cloud:         cloud,
@@ -71,34 +71,56 @@ func (storage *PodRegistryStorage) List(selector labels.Selector) (interface{}, 
 	pods, err := storage.registry.ListPods(selector)
 	if err == nil {
 		result.Items = pods
-		// Get cached info for the list currently.
-		// TODO: Optionally use fresh info
-		if storage.podCache != nil {
-			for ix, pod := range pods {
-				info, err := storage.podCache.GetContainerInfo(pod.CurrentState.Host, pod.ID)
-				if err != nil {
-					glog.Errorf("Error getting container info: %#v", err)
-					continue
-				}
-				result.Items[ix].CurrentState.Info = info
-			}
+		for i := range result.Items {
+			storage.fillPodInfo(&result.Items[i])
 		}
 	}
 
 	return result, err
 }
 
-func makePodStatus(info interface{}) api.PodStatus {
-	if state, ok := info.(map[string]interface{})["State"]; ok {
-		if running, ok := state.(map[string]interface{})["Running"]; ok {
-			if running.(bool) {
-				return api.PodRunning
+func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
+	// Get cached info for the list currently.
+	// TODO: Optionally use fresh info
+	if storage.podCache != nil {
+		info, err := storage.podCache.GetPodInfo(pod.CurrentState.Host, pod.ID)
+		if err != nil {
+			glog.Errorf("Error getting container info: %#v", err)
+			return
+		}
+		pod.CurrentState.Info = info
+	}
+}
+
+func makePodStatus(pod *api.Pod) api.PodStatus {
+	if pod.CurrentState.Info == nil {
+		return api.PodPending
+	}
+	running := 0
+	stopped := 0
+	unknown := 0
+	for _, container := range pod.DesiredState.Manifest.Containers {
+		if info, ok := pod.CurrentState.Info[container.Name]; ok {
+			if info.State.Running {
+				running++
 			} else {
-				return api.PodStopped
+				stopped++
 			}
+		} else {
+			unknown++
 		}
 	}
-	return api.PodPending
+
+	switch {
+	case running > 0 && stopped == 0 && unknown == 0:
+		return api.PodRunning
+	case running == 0 && stopped > 0 && unknown == 0:
+		return api.PodStopped
+	case running == 0 && stopped == 0 && unknown > 0:
+		return api.PodPending
+	default:
+		return api.PodPending
+	}
 }
 
 func getInstanceIP(cloud cloudprovider.Interface, host string) string {
@@ -129,13 +151,9 @@ func (storage *PodRegistryStorage) Get(id string) (interface{}, error) {
 	if pod == nil {
 		return pod, nil
 	}
-	if storage.containerInfo != nil {
-		info, err := storage.containerInfo.GetContainerInfo(pod.CurrentState.Host, id)
-		if err != nil {
-			return pod, err
-		}
-		pod.CurrentState.Info = info
-		pod.CurrentState.Status = makePodStatus(info)
+	if storage.podCache != nil || storage.podInfoGetter != nil {
+		storage.fillPodInfo(pod)
+		pod.CurrentState.Status = makePodStatus(pod)
 	}
 	pod.CurrentState.HostIP = getInstanceIP(storage.cloud, pod.CurrentState.Host)
 

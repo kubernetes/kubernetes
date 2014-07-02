@@ -17,9 +17,11 @@ limitations under the License.
 package master
 
 import (
+	"errors"
 	"sync"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
@@ -30,37 +32,38 @@ import (
 // PodCache contains both a cache of container information, as well as the mechanism for keeping
 // that cache up to date.
 type PodCache struct {
-	containerInfo client.ContainerInfo
+	containerInfo client.PodInfoGetter
 	pods          registry.PodRegistry
-	podInfo       map[string]interface{}
-	period        time.Duration
-	podLock       sync.Mutex
+	// This is a map of pod id to a map of container name to the
+	podInfo map[string]api.PodInfo
+	period  time.Duration
+	podLock sync.Mutex
 }
 
-func NewPodCache(info client.ContainerInfo, pods registry.PodRegistry, period time.Duration) *PodCache {
+func NewPodCache(info client.PodInfoGetter, pods registry.PodRegistry, period time.Duration) *PodCache {
 	return &PodCache{
 		containerInfo: info,
 		pods:          pods,
-		podInfo:       map[string]interface{}{},
+		podInfo:       map[string]api.PodInfo{},
 		period:        period,
 	}
 }
 
-// Implements the ContainerInfo interface
-// The returned value should be treated as read-only
-func (p *PodCache) GetContainerInfo(host, id string) (interface{}, error) {
+// Implements the PodInfoGetter interface.
+// The returned value should be treated as read-only.
+func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	value, ok := p.podInfo[id]
+	value, ok := p.podInfo[podID]
 	if !ok {
-		return nil, nil
+		return nil, errors.New("No cached pod info")
 	} else {
 		return value, nil
 	}
 }
 
-func (p *PodCache) updateContainerInfo(host, id string) error {
-	info, err := p.containerInfo.GetContainerInfo(host, id)
+func (p *PodCache) updatePodInfo(host, id string) error {
+	info, err := p.containerInfo.GetPodInfo(host, id)
 	if err != nil {
 		return err
 	}
@@ -78,7 +81,7 @@ func (p *PodCache) UpdateAllContainers() {
 		return
 	}
 	for _, pod := range pods {
-		err := p.updateContainerInfo(pod.CurrentState.Host, pod.ID)
+		err := p.updatePodInfo(pod.CurrentState.Host, pod.ID)
 		if err != nil {
 			glog.Errorf("Error synchronizing container: %#v", err)
 		}

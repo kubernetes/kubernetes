@@ -101,9 +101,9 @@ const (
 
 // Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(config_path, manifest_url, etcd_servers, address, endpoint string, port uint) {
+func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_servers, address string, port uint) {
 	if kl.DockerPuller == nil {
-		kl.DockerPuller = MakeDockerPuller(endpoint)
+		kl.DockerPuller = MakeDockerPuller(dockerEndpoint)
 	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
@@ -783,18 +783,32 @@ func (kl *Kubelet) getContainerIdFromName(name string) (DockerId, bool, error) {
 	return "", false, nil
 }
 
-// Returns docker info for a container
-func (kl *Kubelet) GetContainerInfo(name string) (string, error) {
-	dockerId, found, err := kl.getContainerIdFromName(name)
-	if err != nil || !found {
-		return "{}", err
-	}
-	info, err := kl.DockerClient.InspectContainer(string(dockerId))
+// Returns docker info for all containers in the pod/manifest
+func (kl *Kubelet) GetPodInfo(podID string) (api.PodInfo, error) {
+	info := api.PodInfo{}
+
+	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
-		return "{}", err
+		return nil, err
 	}
-	data, err := json.Marshal(info)
-	return string(data), err
+
+	for _, value := range containerList {
+		manifestID, containerName := parseDockerName(value.Names[0])
+		if manifestID != podID {
+			continue
+		}
+		inspectResult, err := kl.DockerClient.InspectContainer(value.ID)
+		if err != nil {
+			return nil, err
+		}
+		if inspectResult == nil {
+			// Why did we not get an error?
+			info[containerName] = docker.Container{}
+		} else {
+			info[containerName] = *inspectResult
+		}
+	}
+	return info, nil
 }
 
 //Returns stats (from Cadvisor) for a container

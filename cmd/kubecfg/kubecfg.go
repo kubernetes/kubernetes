@@ -74,11 +74,11 @@ func readConfig(storage string) []byte {
 	}
 	data, err := ioutil.ReadFile(*config)
 	if err != nil {
-		glog.Fatalf("Unable to read %v: %#v\n", *config, err)
+		glog.Fatalf("Unable to read %v: %v\n", *config, err)
 	}
 	data, err = kubecfg.ToWireFormat(data, storage)
 	if err != nil {
-		glog.Fatalf("Error parsing %v as an object for %v: %#v\n", *config, storage, err)
+		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
 	}
 	if *verbose {
 		glog.Infof("Parsed config file successfully; sending:\n%v\n", string(data))
@@ -122,7 +122,7 @@ func main() {
 	if secure {
 		auth, err = kubecfg.LoadAuthInfo(*authConfig)
 		if err != nil {
-			glog.Fatalf("Error loading auth: %#v", err)
+			glog.Fatalf("Error loading auth: %v", err)
 		}
 	}
 
@@ -175,7 +175,8 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	if method == "create" || method == "update" {
 		r.Body(readConfig(parseStorage()))
 	}
-	obj, err := r.Do().Get()
+	result := r.Do()
+	obj, err := result.Get()
 	if err != nil {
 		glog.Fatalf("Got request error: %v\n", err)
 		return false
@@ -191,7 +192,8 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	}
 
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
-		glog.Fatalf("Failed to print: %#v\nRaw received object:\n%#v\n", err, obj)
+		body, _ := result.Raw()
+		glog.Fatalf("Failed to print: %v\nRaw received object:\n%#v\n\nBody received: %v", err, obj, string(body))
 	}
 	fmt.Print("\n")
 
@@ -223,7 +225,7 @@ func executeControllerRequest(method string, c *kube_client.Client) bool {
 		replicas, err := strconv.Atoi(flag.Arg(2))
 		name := flag.Arg(3)
 		if err != nil {
-			glog.Fatalf("Error parsing replicas: %#v", err)
+			glog.Fatalf("Error parsing replicas: %v", err)
 		}
 		err = kubecfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
@@ -234,14 +236,14 @@ func executeControllerRequest(method string, c *kube_client.Client) bool {
 		name := args[1]
 		replicas, err := strconv.Atoi(args[2])
 		if err != nil {
-			glog.Fatalf("Error parsing replicas: %#v", err)
+			glog.Fatalf("Error parsing replicas: %v", err)
 		}
 		err = kubecfg.ResizeController(name, replicas, c)
 	default:
 		return false
 	}
 	if err != nil {
-		glog.Fatalf("Error: %#v", err)
+		glog.Fatalf("Error: %v", err)
 	}
 	return true
 }

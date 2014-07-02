@@ -41,6 +41,29 @@ var (
 	fakeDocker1, fakeDocker2 kubelet.FakeDockerClient
 )
 
+type fakePodInfoGetter struct{}
+
+func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+	// This is a horrible hack to get around the fact that we can't provide
+	// different port numbers per kubelet...
+	var c client.PodInfoGetter
+	switch host {
+	case "localhost":
+		c = &client.HTTPPodInfoGetter{
+			Client: http.DefaultClient,
+			Port:   10250,
+		}
+	case "machine":
+		c = &client.HTTPPodInfoGetter{
+			Client: http.DefaultClient,
+			Port:   10251,
+		}
+	default:
+		glog.Fatalf("Can't get info for: %v, %v", host, podID)
+	}
+	return c.GetPodInfo("localhost", podID)
+}
+
 func startComponents(manifestURL string) (apiServerURL string) {
 	// Setup
 	servers := []string{"http://localhost:4001"}
@@ -48,7 +71,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	machineList := []string{"localhost", "machine"}
 
 	// Master
-	m := master.New(servers, machineList, nil, "")
+	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "")
 	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
 	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), client.New(apiserver.URL, nil))
@@ -64,7 +87,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go myKubelet.RunKubelet("", manifestURL, servers[0], "localhost", "", 0)
+	go myKubelet.RunKubelet("", "", manifestURL, servers[0], "localhost", 10250)
 
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
@@ -76,7 +99,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go otherKubelet.RunKubelet("", "", servers[0], "localhost", "", 0)
+	go otherKubelet.RunKubelet("", "", "", servers[0], "localhost", 10251)
 
 	return apiserver.URL
 }
@@ -150,7 +173,7 @@ func main() {
 	if len(createdPods) != 7 {
 		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
-	glog.Infof("OK")
+	glog.Infof("OK - found created pods: %#v", createdPods.List())
 }
 
 // Serve a file for kubelet to read.

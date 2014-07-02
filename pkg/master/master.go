@@ -44,53 +44,49 @@ type Master struct {
 }
 
 // Returns a memory (not etcd) backed apiserver.
-func NewMemoryServer(minions []string, cloud cloudprovider.Interface) *Master {
+func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface) *Master {
 	m := &Master{
 		podRegistry:        registry.MakeMemoryRegistry(),
 		controllerRegistry: registry.MakeMemoryRegistry(),
 		serviceRegistry:    registry.MakeMemoryRegistry(),
 		minionRegistry:     registry.MakeMinionRegistry(minions),
 	}
-	m.init(cloud)
+	m.init(cloud, podInfoGetter)
 	return m
 }
 
 // Returns a new apiserver.
-func New(etcdServers, minions []string, cloud cloudprovider.Interface, minionRegexp string) *Master {
+func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string) *Master {
 	etcdClient := etcd.NewClient(etcdServers)
-	var minionRegistry registry.MinionRegistry
-	if cloud != nil && len(minionRegexp) > 0 {
-		var err error
-		minionRegistry, err = registry.MakeCloudMinionRegistry(cloud, minionRegexp)
-		if err != nil {
-			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
-			minionRegistry = registry.MakeMinionRegistry(minions)
-		}
-	} else {
-		minionRegistry = registry.MakeMinionRegistry(minions)
-	}
+	minionRegistry := minionRegistryMaker(minions, cloud, minionRegexp)
 	m := &Master{
 		podRegistry:        registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		serviceRegistry:    registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
 	}
-	m.init(cloud)
+	m.init(cloud, podInfoGetter)
 	return m
 }
 
-func (m *Master) init(cloud cloudprovider.Interface) {
-	containerInfo := &client.HTTPContainerInfo{
-		Client: http.DefaultClient,
-		Port:   10250,
+func minionRegistryMaker(minions []string, cloud cloudprovider.Interface, minionRegexp string) registry.MinionRegistry {
+	if cloud != nil && len(minionRegexp) > 0 {
+		minionRegistry, err := registry.MakeCloudMinionRegistry(cloud, minionRegexp)
+		if err != nil {
+			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
+		}
+		return minionRegistry
 	}
+	return registry.MakeMinionRegistry(minions)
+}
 
+func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
 	m.random = rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
-	podCache := NewPodCache(containerInfo, m.podRegistry, time.Second*30)
+	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
 	go podCache.Loop()
 	s := scheduler.MakeFirstFitScheduler(m.podRegistry, m.random)
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods": registry.MakePodRegistryStorage(m.podRegistry, containerInfo, s, m.minionRegistry, cloud, podCache),
+		"pods": registry.MakePodRegistryStorage(m.podRegistry, podInfoGetter, s, m.minionRegistry, cloud, podCache),
 		"replicationControllers": registry.MakeControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),

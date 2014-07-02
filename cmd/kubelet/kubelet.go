@@ -89,5 +89,5 @@ func main() {
 		SyncFrequency:      *syncFrequency,
 		HTTPCheckFrequency: *httpCheckFrequency,
 	}
-	my_kubelet.RunKubelet(*config, *manifestUrl, *etcdServers, *address, *dockerEndpoint, *port)
+	my_kubelet.RunKubelet(*dockerEndpoint, *config, *manifestUrl, *etcdServers, *address, *port)
 }
