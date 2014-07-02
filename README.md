@@ -30,11 +30,6 @@ However, initial development was done on GCE and so our instructions and scripts
 
         git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 
-6. Setting up a cluster requires the `htpasswd` tool in order to hash a randomly generated password for accessing the API server.  This is already installed on recent version of Mac OS X but on Linux you need to install it yourself.  On Debian/Ubuntu you can do this with:
-
-        sudo apt-get update
-        sudo apt-get install apache2-utils
-
 ### Setup
 
 The setup script builds Kubernetes, then creates Google Compute Engine instances, firewall rules, and routes:
