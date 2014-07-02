@@ -24,6 +24,7 @@ import (
 	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"gopkg.in/v1/yaml"
 )
 
@@ -45,6 +46,10 @@ func (s *KubeletServer) error(w http.ResponseWriter, err error) {
 }
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	logger := apiserver.MakeLogged(req, w)
+	w = logger
+	defer logger.Log()
+
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		s.error(w, err)

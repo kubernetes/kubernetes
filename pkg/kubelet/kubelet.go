@@ -801,7 +801,12 @@ func (kl *Kubelet) GetPodInfo(podID string) (api.PodInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		info[containerName] = *inspectResult
+		if inspectResult == nil {
+			// Why did we not get an error?
+			info[containerName] = docker.Container{}
+		} else {
+			info[containerName] = *inspectResult
+		}
 	}
 	return info, nil
 }

@@ -173,7 +173,7 @@ func main() {
 	if len(createdPods) != 7 {
 		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
-	glog.Infof("OK")
+	glog.Infof("OK - found created pods: %#v", createdPods.List())
 }
 
 // Serve a file for kubelet to read.
