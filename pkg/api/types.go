@@ -95,7 +95,7 @@ type EnvVar struct {
 	// Exactly one of the following must be set.  If both are set, prefer Name.
 	// DEPRECATED: EnvVar.Key will be removed in a future version of the API.
 	Name string `yaml:"name" json:"name"`
-	Key  string `yaml:"key,omitempty" json:"name,omitempty"`
+	Key  string `yaml:"key,omitempty" json:"key,omitempty"`
 	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
