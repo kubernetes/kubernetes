@@ -27,16 +27,37 @@ var (
 	supportedManifestVersions util.StringSet = util.NewStringSet("v1beta1", "v1beta2")
 )
 
-func errInvalid(field string, value interface{}) error {
-	return fmt.Errorf("%s is invalid: '%v'", field, value)
+// Validation errors.
+type ValidationErrorEnum string
+
+const (
+	ErrTypeInvalid      ValidationErrorEnum = "invalid value"
+	ErrTypeNotSupported ValidationErrorEnum = "unsupported value"
+	ErrTypeDuplicate    ValidationErrorEnum = "duplicate value"
+)
+
+// Implements the 'error' interface.
+type ValidationError struct {
+	ErrorType  ValidationErrorEnum
+	ErrorField string
+	BadValue   interface{}
 }
 
-func errNotSupported(field string, value interface{}) error {
-	return fmt.Errorf("%s is not supported: '%v'", field, value)
+func (v ValidationError) Error() string {
+	return fmt.Sprintf("%s: %v '%v'", v.ErrorField, v.ErrorType, v.BadValue)
 }
 
-func errNotUnique(field string, value interface{}) error {
-	return fmt.Errorf("%s is not unique: '%v'", field, value)
+// Factory functions for errors.
+func makeInvalidError(field string, value interface{}) ValidationError {
+	return ValidationError{ErrTypeInvalid, field, value}
+}
+
+func makeNotSupportedError(field string, value interface{}) ValidationError {
+	return ValidationError{ErrTypeNotSupported, field, value}
+}
+
+func makeDuplicateError(field string, value interface{}) ValidationError {
+	return ValidationError{ErrTypeDuplicate, field, value}
 }
 
 func validateVolumes(volumes []Volume) (util.StringSet, error) {
@@ -44,10 +65,10 @@ func validateVolumes(volumes []Volume) (util.StringSet, error) {
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
 		if len(vol.Name) > 63 || !util.IsDNSLabel(vol.Name) {
-			return util.StringSet{}, errInvalid("Volume.Name", vol.Name)
+			return util.StringSet{}, makeInvalidError("Volume.Name", vol.Name)
 		}
 		if allNames.Has(vol.Name) {
-			return util.StringSet{}, errNotUnique("Volume.Name", vol.Name)
+			return util.StringSet{}, makeDuplicateError("Volume.Name", vol.Name)
 		}
 		allNames.Insert(vol.Name)
 	}
@@ -60,14 +81,14 @@ func validateEnv(vars []EnvVar) error {
 		if len(ev.Name) == 0 {
 			// Backwards compat.
 			if len(ev.Key) == 0 {
-				return errInvalid("EnvVar.Name", ev.Name)
+				return makeInvalidError("EnvVar.Name", ev.Name)
 			}
 			glog.Warning("DEPRECATED: EnvVar.Key has been replaced by EnvVar.Name")
 			ev.Name = ev.Key
 			ev.Key = ""
 		}
 		if !util.IsCIdentifier(ev.Name) {
-			return errInvalid("EnvVar.Name", ev.Name)
+			return makeInvalidError("EnvVar.Name", ev.Name)
 		}
 	}
 	return nil
@@ -78,14 +99,14 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 	for i := range containers {
 		ctr := &containers[i] // so we can set default values
 		if len(ctr.Name) > 63 || !util.IsDNSLabel(ctr.Name) {
-			return errInvalid("Container.Name", ctr.Name)
+			return makeInvalidError("Container.Name", ctr.Name)
 		}
 		if allNames.Has(ctr.Name) {
-			return errNotUnique("Container.Name", ctr.Name)
+			return makeDuplicateError("Container.Name", ctr.Name)
 		}
 		allNames.Insert(ctr.Name)
 		if len(ctr.Image) == 0 {
-			return errInvalid("Container.Image", ctr.Name)
+			return makeInvalidError("Container.Image", ctr.Name)
 		}
 		if err := validateEnv(ctr.Env); err != nil {
 			return err
@@ -103,13 +124,13 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 // TODO(thockin): We should probably collect all errors rather than aborting the validation.
 func ValidateManifest(manifest *ContainerManifest) error {
 	if len(manifest.Version) == 0 {
-		return errInvalid("ContainerManifest.Version", manifest.Version)
+		return makeInvalidError("ContainerManifest.Version", manifest.Version)
 	}
 	if !supportedManifestVersions.Has(manifest.Version) {
-		return errNotSupported("ContainerManifest.Version", manifest.Version)
+		return makeNotSupportedError("ContainerManifest.Version", manifest.Version)
 	}
 	if len(manifest.ID) > 255 || !util.IsDNSSubdomain(manifest.ID) {
-		return errInvalid("ContainerManifest.ID", manifest.ID)
+		return makeInvalidError("ContainerManifest.ID", manifest.ID)
 	}
 	allVolumes, err := validateVolumes(manifest.Volumes)
 	if err != nil {
