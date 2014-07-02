@@ -19,6 +19,8 @@ package api
 import (
 	"strings"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestValidateVolumes(t *testing.T) {
@@ -49,6 +51,37 @@ func TestValidateVolumes(t *testing.T) {
 	}
 }
 
+func TestValidateContainers(t *testing.T) {
+	volumes := util.StringSet{}
+
+	successCase := []Container{
+		{Name: "abc", Image: "image"},
+		{Name: "123", Image: "image"},
+		{Name: "abc-123", Image: "image"},
+	}
+	err := validateContainers(successCase, volumes)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+
+	errorCases := map[string][]Container{
+		"zero-length name":     {{Name: "", Image: "image"}},
+		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image"}},
+		"name not a DNS label": {{Name: "a.b.c", Image: "image"}},
+		"name not unique": {
+			{Name: "abc", Image: "image"},
+			{Name: "abc", Image: "image"},
+		},
+		"zero-length image": {{Name: "abc", Image: ""}},
+	}
+	for k, v := range errorCases {
+		err := validateContainers(v, volumes)
+		if err == nil {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
 func TestValidateManifest(t *testing.T) {
 	successCases := []ContainerManifest{
 		{Version: "v1beta1", ID: "abc"},
@@ -58,6 +91,16 @@ func TestValidateManifest(t *testing.T) {
 			Version: "v1beta1",
 			ID:      "abc",
 			Volumes: []Volume{{Name: "vol1"}, {Name: "vol2"}},
+			Containers: []Container{
+				{
+					Name:       "abc",
+					Image:      "image",
+					Command:    []string{"foo", "bar"},
+					WorkingDir: "/tmp",
+					Memory:     1,
+					CPU:        1,
+				},
+			},
 		},
 	}
 	for _, manifest := range successCases {
@@ -77,6 +120,11 @@ func TestValidateManifest(t *testing.T) {
 			Version: "v1beta1",
 			ID:      "abc",
 			Volumes: []Volume{{Name: "vol.1"}},
+		},
+		"invalid container name": {
+			Version:    "v1beta1",
+			ID:         "abc",
+			Containers: []Container{{Name: "ctr.1", Image: "image"}},
 		},
 	}
 	for k, v := range errorCases {
