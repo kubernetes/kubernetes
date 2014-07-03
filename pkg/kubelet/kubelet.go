@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -816,17 +817,27 @@ func (kl *Kubelet) GetPodInfo(podID string) (api.PodInfo, error) {
 	return info, nil
 }
 
-//Returns stats (from Cadvisor) for a container
-func (kl *Kubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
-	if kl.CadvisorClient == nil {
-		return nil, nil
+// Returns the docker id corresponding to pod-id-container-name pair.
+func (kl *Kubelet) getDockerIDFromPodIDAndContainerName(podID, containerName string) (DockerID, error) {
+	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
+	if err != nil {
+		return "", err
 	}
-	dockerID, found, err := kl.getContainerIdFromName(name)
-	if err != nil || !found {
-		return nil, err
+	for _, value := range containerList {
+		manifestID, cName := parseDockerName(value.Names[0])
+		if manifestID == podID && cName == containerName {
+			return DockerID(value.ID), nil
+		}
 	}
+	return "", errors.New("couldn't find container")
+}
 
-	info, err := kl.CadvisorClient.ContainerInfo(fmt.Sprintf("/docker/%s", string(dockerID)))
+// This method takes a container's absolute path and returns the stats for the
+// container.  The container's absolute path refers to its hierarchy in the
+// cgroup file system. e.g. The root container, which represents the whole
+// machine, has path "/"; all docker containers have path "/docker/<docker id>"
+func (kl *Kubelet) statsFromContainerPath(containerPath string) (*api.ContainerStats, error) {
+	info, err := kl.CadvisorClient.ContainerInfo(containerPath)
 
 	if err != nil {
 		return nil, err
@@ -855,4 +866,21 @@ func (kl *Kubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
 		ret.MemoryUsagePercentiles = percentiles
 	}
 	return ret, nil
+}
+
+// Returns stats (from Cadvisor) for a container.
+func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.ContainerStats, error) {
+	if kl.CadvisorClient == nil {
+		return nil, nil
+	}
+	dockerID, err := kl.getDockerIDFromPodIDAndContainerName(podID, containerName)
+	if err != nil || len(dockerID) == 0 {
+		return nil, err
+	}
+	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", string(dockerID)))
+}
+
+// Returns stats (from Cadvisor) of current machine.
+func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
+	return kl.statsFromContainerPath("/")
 }

@@ -893,12 +893,55 @@ func TestGetContainerStats(t *testing.T) {
 	kubelet.CadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			Names: []string{"foo"},
-			ID:    containerID,
+			ID: containerID,
+			// pod id: qux
+			// container id: foo
+			Names: []string{"/k8s--foo--qux--1234"},
 		},
 	}
 
-	stats, err := kubelet.GetContainerStats("foo")
+	stats, err := kubelet.GetContainerStats("qux", "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if stats.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
+		t.Errorf("wrong max memory usage")
+	}
+	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CpuUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
+	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetMachineStats(t *testing.T) {
+	containerPath := "/"
+	containerInfo := &info.ContainerInfo{
+		ContainerReference: info.ContainerReference{
+			Name: containerPath,
+		}, StatsPercentiles: &info.ContainerStatsPercentiles{MaxMemoryUsage: 1024000, MemoryUsagePercentiles: []info.Percentile{{50, 100}, {80, 180},
+			{90, 190},
+		},
+			CpuUsagePercentiles: []info.Percentile{
+				{51, 101},
+				{81, 181},
+				{91, 191},
+			},
+		},
+	}
+	fakeDocker := FakeDockerClient{
+		err: nil,
+	}
+
+	mockCadvisor := &mockCadvisorClient{}
+	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, nil)
+
+	kubelet := Kubelet{
+		DockerClient:   &fakeDocker,
+		DockerPuller:   &FakeDockerPuller{},
+		CadvisorClient: mockCadvisor,
+	}
+
+	// If the container name is an empty string, then it means the root container.
+	stats, err := kubelet.GetMachineStats()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -914,11 +957,14 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 	kubelet, _, fakeDocker := makeTestKubelet(t)
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			Names: []string{"foo"},
+			ID: "foobar",
+			// pod id: qux
+			// container id: foo
+			Names: []string{"/k8s--foo--qux--1234"},
 		},
 	}
 
-	stats, _ := kubelet.GetContainerStats("foo")
+	stats, _ := kubelet.GetContainerStats("qux", "foo")
 	// When there's no cAdvisor, the stats should be either nil or empty
 	if stats == nil {
 		return
@@ -947,12 +993,14 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 	kubelet.CadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{
 		{
-			Names: []string{"foo"},
-			ID:    containerID,
+			ID: containerID,
+			// pod id: qux
+			// container id: foo
+			Names: []string{"/k8s--foo--qux--1234"},
 		},
 	}
 
-	stats, err := kubelet.GetContainerStats("foo")
+	stats, err := kubelet.GetContainerStats("qux", "foo")
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
@@ -973,7 +1021,7 @@ func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
 	kubelet.CadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{}
 
-	stats, _ := kubelet.GetContainerStats("foo")
+	stats, _ := kubelet.GetContainerStats("qux", "foo")
 	if stats != nil {
 		t.Errorf("non-nil stats on non exist container")
 	}

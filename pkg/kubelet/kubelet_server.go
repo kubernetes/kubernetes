@@ -18,10 +18,13 @@ package kubelet
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -36,7 +39,8 @@ type KubeletServer struct {
 // kubeletInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type kubeletInterface interface {
-	GetContainerStats(name string) (*api.ContainerStats, error)
+	GetContainerStats(podID, containerName string) (*api.ContainerStats, error)
+	GetMachineStats() (*api.ContainerStats, error)
 	GetPodInfo(name string) (api.PodInfo, error)
 }
 
@@ -79,34 +83,6 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			s.UpdateChannel <- manifestUpdate{httpServerSource, manifests}
 		}
-	case u.Path == "/containerStats":
-		// NOTE: The master appears to pass a Pod.ID
-		container := u.Query().Get("container")
-		if len(container) == 0 {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "Missing container query arg.")
-			return
-		}
-		stats, err := s.Kubelet.GetContainerStats(container)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %v", err)
-			return
-		}
-		if stats == nil {
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, "{}")
-			return
-		}
-		data, err := json.Marshal(stats)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %v", err)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Header().Add("Content-type", "application/json")
-		w.Write(data)
 	case u.Path == "/podInfo":
 		podID := u.Query().Get("podID")
 		if len(podID) == 0 {
@@ -129,8 +105,52 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-type", "application/json")
 		w.Write(data)
+	case strings.HasPrefix(u.Path, "/stats"):
+		s.serveStats(w, req)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, "Not found.")
 	}
+}
+
+func (s *KubeletServer) serveStats(w http.ResponseWriter, req *http.Request) {
+	// /stats/<podid>/<containerName>
+	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
+	var stats *api.ContainerStats
+	var err error
+	switch len(components) {
+	case 1:
+		// Machine stats
+		stats, err = s.Kubelet.GetMachineStats()
+	case 2:
+		// pod stats
+		// TODO(monnand) Implement this
+		errors.New("pod level status currently unimplemented")
+	case 3:
+		stats, err = s.Kubelet.GetContainerStats(components[1], components[2])
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "unknown resource.")
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Internal Error: %v", err)
+		return
+	}
+	if stats == nil {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "{}")
+		return
+	}
+	data, err := json.Marshal(stats)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Internal Error: %v", err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-type", "application/json")
+	w.Write(data)
+	return
 }

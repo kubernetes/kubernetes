@@ -32,16 +32,21 @@ import (
 )
 
 type fakeKubelet struct {
-	infoFunc  func(name string) (api.PodInfo, error)
-	statsFunc func(name string) (*api.ContainerStats, error)
+	infoFunc           func(name string) (api.PodInfo, error)
+	containerStatsFunc func(podID, containerName string) (*api.ContainerStats, error)
+	machineStatsFunc   func() (*api.ContainerStats, error)
 }
 
 func (fk *fakeKubelet) GetPodInfo(name string) (api.PodInfo, error) {
 	return fk.infoFunc(name)
 }
 
-func (fk *fakeKubelet) GetContainerStats(name string) (*api.ContainerStats, error) {
-	return fk.statsFunc(name)
+func (fk *fakeKubelet) GetContainerStats(podID, containerName string) (*api.ContainerStats, error) {
+	return fk.containerStatsFunc(podID, containerName)
+}
+
+func (fk *fakeKubelet) GetMachineStats() (*api.ContainerStats, error) {
+	return fk.machineStatsFunc()
 }
 
 type serverTestFramework struct {
@@ -156,15 +161,51 @@ func TestContainerStats(t *testing.T) {
 			{90, 190},
 		},
 	}
+	expectedPodID := "somepod"
 	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.statsFunc = func(name string) (*api.ContainerStats, error) {
-		if name != expectedContainerName {
-			return nil, fmt.Errorf("bad container name: %v", name)
+	fw.fakeKubelet.containerStatsFunc = func(podID, containerName string) (*api.ContainerStats, error) {
+		if podID != expectedPodID || containerName != expectedContainerName {
+			return nil, fmt.Errorf("bad podID or containerName: podID=%v; containerName=%v", podID, containerName)
 		}
 		return expectedStats, nil
 	}
 
-	resp, err := http.Get(fw.testHttpServer.URL + fmt.Sprintf("/containerStats?container=%v", expectedContainerName))
+	resp, err := http.Get(fw.testHttpServer.URL + fmt.Sprintf("/stats/%v/%v", expectedPodID, expectedContainerName))
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	var receivedStats api.ContainerStats
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&receivedStats)
+	if err != nil {
+		t.Fatalf("received invalid json data: %v", err)
+	}
+	if !reflect.DeepEqual(&receivedStats, expectedStats) {
+		t.Errorf("received wrong data: %#v", receivedStats)
+	}
+}
+
+func TestMachineStats(t *testing.T) {
+	fw := makeServerTest()
+	expectedStats := &api.ContainerStats{
+		MaxMemoryUsage: 1024001,
+		CpuUsagePercentiles: []api.Percentile{
+			{50, 150},
+			{80, 180},
+			{90, 190},
+		},
+		MemoryUsagePercentiles: []api.Percentile{
+			{50, 150},
+			{80, 180},
+			{90, 190},
+		},
+	}
+	fw.fakeKubelet.machineStatsFunc = func() (*api.ContainerStats, error) {
+		return expectedStats, nil
+	}
+
+	resp, err := http.Get(fw.testHttpServer.URL + "/stats")
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
 	}
