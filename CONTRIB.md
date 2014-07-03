@@ -22,3 +22,7 @@ Follow either of the two links above to access the appropriate CLA and instructi
 ## Protocols for Collaborative Development
 
 Please read [this doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/collab.md) for information on how we're runnig development for the project.
+
+## Adding dependencies
+
+If your patch depends on new packages, add them to `third_party/deps.sh` and run `third_party/update.sh [package]` to fetch and commit the dependency.
