@@ -662,6 +662,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 	}
 	keepChannel <- netID
 	for _, container := range manifest.Containers {
+		glog.Infof("Syncing container: %v", container)
 		containerID, err := kl.getContainerID(manifest, &container)
 		if err != nil {
 			glog.Errorf("Error finding container: %v skipping manifest %s container %s.", err, manifest.ID, container.Name)
@@ -697,16 +698,18 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	waitGroup := sync.WaitGroup{}
 
 	// Check for any containers that need starting
-	for _, manifest := range config {
+	for ix := range config {
 		waitGroup.Add(1)
-		go func() {
+		go func(index int) {
 			defer util.HandleCrash()
 			defer waitGroup.Done()
-			err := kl.syncManifest(&manifest, keepChannel)
+			// necessary to dereference by index here b/c otherwise the shared value
+			// in the for each is re-used.
+			err := kl.syncManifest(&config[index], keepChannel)
 			if err != nil {
 				glog.Errorf("Error syncing manifest: %v skipping.", err)
 			}
-		}()
+		}(ix)
 	}
 	go func() {
 		for id := range keepChannel {
