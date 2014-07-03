@@ -106,9 +106,11 @@ func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
 
 func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	invalid := len(actual) != len(expected)
-	for ix, value := range actual {
-		if expected[ix] != value {
-			invalid = true
+	if !invalid {
+		for ix, value := range actual {
+			if expected[ix] != value {
+				invalid = true
+			}
 		}
 	}
 	if invalid {
@@ -382,7 +384,7 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list", "list", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "list", "list", "list"})
 }
 
 func TestSyncManifestsDeletes(t *testing.T) {
@@ -416,6 +418,54 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	if len(fakeDocker.stopped) != 2 ||
 		!expectedToStop[fakeDocker.stopped[0]] ||
 		!expectedToStop[fakeDocker.stopped[1]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
+	}
+}
+
+type FalseHealthChecker struct{}
+
+func (f *FalseHealthChecker) IsHealthy(container api.Container) (bool, error) {
+	return false, nil
+}
+
+func TestSyncManifestsUnhealthy(t *testing.T) {
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	kubelet.HealthChecker = &FalseHealthChecker{}
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s--bar--foo"},
+			ID:    "1234",
+		},
+		{
+			// network container
+			Names: []string{"/k8s--net--foo--"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.SyncManifests([]api.ContainerManifest{
+		{
+			ID: "foo",
+			Containers: []api.Container{
+				{Name: "bar",
+					LivenessProbe: api.LivenessProbe{
+						Enabled: true,
+						// Always returns healthy == false
+						Type: "false",
+					},
+				},
+			},
+		}})
+	expectNoError(t, err)
+	verifyCalls(t, fakeDocker, []string{"list", "list", "list", "stop", "create", "start", "list"})
+
+	// A map interation is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+	}
+	if len(fakeDocker.stopped) != 1 ||
+		!expectedToStop[fakeDocker.stopped[0]] {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
 	}
 }
