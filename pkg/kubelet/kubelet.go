@@ -689,11 +689,13 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 	return nil
 }
 
+type empty struct{}
+
 // Sync the configured list of containers (desired state) with the host current state
 func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	glog.Infof("Desired: %+v", config)
 	var err error
-	dockerIdsToKeep := map[DockerID]bool{}
+	dockerIdsToKeep := map[DockerID]empty{}
 	keepChannel := make(chan DockerID)
 	waitGroup := sync.WaitGroup{}
 
@@ -711,15 +713,18 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 			}
 		}(ix)
 	}
+	ch := make(chan bool)
 	go func() {
 		for id := range keepChannel {
-			dockerIdsToKeep[id] = true
+			dockerIdsToKeep[id] = empty{}
 		}
+		ch <- true
 	}()
 	if len(config) > 0 {
 		waitGroup.Wait()
-		close(keepChannel)
 	}
+	close(keepChannel)
+	<-ch
 
 	// Kill any containers we don't need
 	existingContainers, err := kl.getDockerContainers()
@@ -728,7 +733,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 		return err
 	}
 	for id, container := range existingContainers {
-		if !dockerIdsToKeep[id] {
+		if _, ok := dockerIdsToKeep[id]; !ok {
 			glog.Infof("Killing: %s", id)
 			err = kl.killContainer(container)
 			if err != nil {

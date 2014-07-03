@@ -94,8 +94,8 @@ type ServiceConfig struct {
 	endpointsNotifyChannel chan string
 }
 
-func NewServiceConfig() ServiceConfig {
-	config := ServiceConfig{
+func NewServiceConfig() *ServiceConfig {
+	config := &ServiceConfig{
 		serviceConfigSources:   make(map[string]chan ServiceUpdate),
 		endpointsConfigSources: make(map[string]chan EndpointsUpdate),
 		serviceHandlers:        make([]ServiceConfigHandler, 10),
@@ -130,6 +130,7 @@ func (impl *ServiceConfig) ServiceChannelListener(source string, listenChannel c
 	for {
 		select {
 		case update := <-listenChannel:
+			impl.configLock.Lock()
 			switch update.Op {
 			case ADD:
 				glog.Infof("Adding new service from source %s : %v", source, update.Services)
@@ -152,7 +153,6 @@ func (impl *ServiceConfig) ServiceChannelListener(source string, listenChannel c
 				glog.Infof("Received invalid update type: %v", update)
 				continue
 			}
-			impl.configLock.Lock()
 			impl.serviceConfig[source] = serviceMap
 			impl.configLock.Unlock()
 			impl.serviceNotifyChannel <- source
@@ -165,6 +165,7 @@ func (impl *ServiceConfig) EndpointsChannelListener(source string, listenChannel
 	for {
 		select {
 		case update := <-listenChannel:
+			impl.configLock.Lock()
 			switch update.Op {
 			case ADD:
 				glog.Infof("Adding a new endpoint %v", update)
@@ -188,7 +189,6 @@ func (impl *ServiceConfig) EndpointsChannelListener(source string, listenChannel
 				glog.Infof("Received invalid update type: %v", update)
 				continue
 			}
-			impl.configLock.Lock()
 			impl.endpointConfig[source] = endpointMap
 			impl.configLock.Unlock()
 			impl.endpointsNotifyChannel <- source
