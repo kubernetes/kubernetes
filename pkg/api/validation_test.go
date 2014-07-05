@@ -82,6 +82,42 @@ func TestValidateEnv(t *testing.T) {
 	}
 }
 
+func TestValidateVolumeMounts(t *testing.T) {
+	volumes := util.NewStringSet("abc", "123", "abc-123")
+
+	successCase := []VolumeMount{
+		{Name: "abc", MountPath: "/foo"},
+		{Name: "123", MountPath: "/foo"},
+		{Name: "abc-123", MountPath: "/bar"},
+	}
+	if err := validateVolumeMounts(successCase, volumes); err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+
+	nonCanonicalCase := []VolumeMount{
+		{Name: "abc", Path: "/foo"},
+	}
+	err := validateVolumeMounts(nonCanonicalCase, volumes)
+	if err != nil {
+		t.Errorf("expected success: %v", err)
+	}
+	if nonCanonicalCase[0].MountPath != "/foo" {
+		t.Errorf("expected canonicalized values: %+v", nonCanonicalCase[0])
+	}
+
+	errorCases := map[string][]VolumeMount{
+		"empty name":      {{Name: "", MountPath: "/foo"}},
+		"name not found":  {{Name: "", MountPath: "/foo"}},
+		"empty mountpath": {{Name: "abc", MountPath: ""}},
+	}
+	for k, v := range errorCases {
+		err := validateVolumeMounts(v, volumes)
+		if err == nil {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
 func TestValidateContainers(t *testing.T) {
 	volumes := util.StringSet{}
 
@@ -105,6 +141,9 @@ func TestValidateContainers(t *testing.T) {
 		"zero-length image": {{Name: "abc", Image: ""}},
 		"invalid env var name": {
 			{Name: "abc", Image: "image", Env: []EnvVar{{Name: "ev.1"}}},
+		},
+		"unknown volume name": {
+			{Name: "abc", Image: "image", VolumeMounts: []VolumeMount{{Name: "anything", MountPath: "/foo"}}},
 		},
 	}
 	for k, v := range errorCases {
@@ -135,6 +174,10 @@ func TestValidateManifest(t *testing.T) {
 						{Name: "ev1", Value: "val1"},
 						{Name: "ev2", Value: "val2"},
 						{Key: "EV3", Value: "val3"},
+					},
+					VolumeMounts: []VolumeMount{
+						{Name: "vol1", MountPath: "/foo"},
+						{Name: "vol1", Path: "/bar"},
 					},
 				},
 			},

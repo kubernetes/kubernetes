@@ -35,6 +35,7 @@ const (
 	ErrTypeInvalid      ValidationErrorEnum = "invalid value"
 	ErrTypeNotSupported ValidationErrorEnum = "unsupported value"
 	ErrTypeDuplicate    ValidationErrorEnum = "duplicate value"
+	ErrTypeNotFound     ValidationErrorEnum = "not found"
 )
 
 // ValidationError is an implementation of the 'error' interface, which represents an error of validation.
@@ -59,6 +60,10 @@ func makeNotSupportedError(field string, value interface{}) ValidationError {
 
 func makeDuplicateError(field string, value interface{}) ValidationError {
 	return ValidationError{ErrTypeDuplicate, field, value}
+}
+
+func makeNotFoundError(field string, value interface{}) ValidationError {
+	return ValidationError{ErrTypeNotFound, field, value}
 }
 
 func validateVolumes(volumes []Volume) (util.StringSet, error) {
@@ -95,6 +100,28 @@ func validateEnv(vars []EnvVar) error {
 	return nil
 }
 
+func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) error {
+	for i := range mounts {
+		mnt := &mounts[i] // so we can set default values
+		if len(mnt.Name) == 0 {
+			return makeInvalidError("VolumeMount.Name", mnt.Name)
+		}
+		if !volumes.Has(mnt.Name) {
+			return makeNotFoundError("VolumeMount.Name", mnt.Name)
+		}
+		if len(mnt.MountPath) == 0 {
+			// Backwards compat.
+			if len(mnt.Path) == 0 {
+				return makeInvalidError("VolumeMount.MountPath", mnt.MountPath)
+			}
+			glog.Warning("DEPRECATED: VolumeMount.Path has been replaced by VolumeMount.MountPath")
+			mnt.MountPath = mnt.Path
+			mnt.Path = ""
+		}
+	}
+	return nil
+}
+
 func validateContainers(containers []Container, volumes util.StringSet) error {
 	allNames := util.StringSet{}
 	for i := range containers {
@@ -112,7 +139,9 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 		if err := validateEnv(ctr.Env); err != nil {
 			return err
 		}
-
+		if err := validateVolumeMounts(ctr.VolumeMounts, volumes); err != nil {
+			return err
+		}
 		// TODO(thockin): finish validation.
 	}
 	return nil
