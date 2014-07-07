@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -69,6 +70,9 @@ type Client struct {
 	host       string
 	auth       *AuthInfo
 	httpClient *http.Client
+	Sync       bool
+	PollPeriod time.Duration
+	Timeout    time.Duration
 }
 
 // Create a new client object.
@@ -83,6 +87,9 @@ func New(host string, auth *AuthInfo) *Client {
 				},
 			},
 		},
+		Sync:       false,
+		PollPeriod: time.Second * 20,
+		Timeout:    time.Second * 20,
 	}
 }
 
