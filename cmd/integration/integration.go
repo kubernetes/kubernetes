@@ -119,9 +119,12 @@ func runReplicationControllerTest(kubeClient *client.Client) {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 
+	glog.Infof("Creating replication controllers")
 	if _, err = kubeClient.CreateReplicationController(controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
+	glog.Infof("Done creating replication controllers")
+
 	// Give the controllers some time to actually create the pods
 	time.Sleep(time.Second * 10)
 
@@ -147,9 +150,9 @@ func runAtomicPutTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed creating atomicService: %v", err)
 	}
-
+	glog.Info("Created atomicService")
 	testLabels := labels.Set{}
-	for i := 0; i < 26; i++ {
+	for i := 0; i < 5; i++ {
 		// a: z, b: y, etc...
 		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
 	}
@@ -158,6 +161,7 @@ func runAtomicPutTest(c *client.Client) {
 	for label, value := range testLabels {
 		go func(l, v string) {
 			for {
+				glog.Infof("Starting to update (%s, %s)", l, v)
 				var tmpSvc api.Service
 				err := c.Get().Path("services").Path(svc.ID).Do().Into(&tmpSvc)
 				if err != nil {
@@ -169,10 +173,12 @@ func runAtomicPutTest(c *client.Client) {
 				} else {
 					tmpSvc.Selector[l] = v
 				}
+				glog.Infof("Posting update (%s, %s)", l, v)
 				err = c.Put().Path("services").Path(svc.ID).Body(&tmpSvc).Do().Error()
 				if err != nil {
 					if se, ok := err.(*client.StatusErr); ok {
 						if se.Status.Code == http.StatusConflict {
+							glog.Infof("Conflict: (%s, %s)", l, v)
 							// This is what we expect.
 							continue
 						}
@@ -182,6 +188,7 @@ func runAtomicPutTest(c *client.Client) {
 				}
 				break
 			}
+			glog.Infof("Done update (%s, %s)", l, v)
 			wg.Done()
 		}(label, value)
 	}
