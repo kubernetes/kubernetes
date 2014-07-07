@@ -34,6 +34,9 @@ However, initial development was done on GCE and so our instructions and scripts
 
         sudo apt-get update
         sudo apt-get install apache2-utils
+... and on RedHat/CentOS you can do this with:
+
+        sudo yum install httpd-tools
 
 ### Setup
 
