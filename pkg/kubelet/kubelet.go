@@ -310,15 +310,13 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string
-		switch port.Protocol {
-		case "udp":
+		switch strings.ToUpper(port.Protocol) {
+		case "UDP":
 			protocol = "/udp"
-		case "tcp":
+		case "TCP":
 			protocol = "/tcp"
 		default:
-			if len(port.Protocol) != 0 {
-				glog.Infof("Unknown protocol: %s, defaulting to tcp.", port.Protocol)
-			}
+			glog.Infof("Unknown protocol '%s': defaulting to TCP", port.Protocol)
 			protocol = "/tcp"
 		}
 		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
