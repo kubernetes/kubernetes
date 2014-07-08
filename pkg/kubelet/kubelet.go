@@ -39,6 +39,7 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/client"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
@@ -108,6 +109,13 @@ const (
 // Starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
 func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_servers, address string, port uint) {
+	if kl.CadvisorClient == nil {
+		var err error
+		kl.CadvisorClient, err = cadvisor.NewClient("http://127.0.0.1:5000")
+		if err != nil {
+			glog.Errorf("Error on creating cadvisor client: %v", err)
+		}
+	}
 	if kl.DockerPuller == nil {
 		kl.DockerPuller = kl.MakeDockerPuller()
 	}
