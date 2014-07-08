@@ -75,7 +75,7 @@ type Client struct {
 	Timeout    time.Duration
 }
 
-// Create a new client object.
+// New creates a new client object.
 func New(host string, auth *AuthInfo) *Client {
 	return &Client{
 		auth: auth,
@@ -159,79 +159,81 @@ func (c *Client) rawRequest(method, path string, requestBody io.Reader, target i
 	return body, err
 }
 
-func (client *Client) makeURL(path string) string {
-	return client.host + "/api/v1beta1/" + path
+func (c *Client) makeURL(path string) string {
+	return c.host + "/api/v1beta1/" + path
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector
-func (client *Client) ListPods(selector labels.Selector) (result api.PodList, err error) {
-	err = client.Get().Path("pods").Selector(selector).Do().Into(&result)
+func (c *Client) ListPods(selector labels.Selector) (result api.PodList, err error) {
+	err = c.Get().Path("pods").Selector(selector).Do().Into(&result)
 	return
 }
 
 // GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (client *Client) GetPod(name string) (result api.Pod, err error) {
-	err = client.Get().Path("pods").Path(name).Do().Into(&result)
+func (c *Client) GetPod(name string) (result api.Pod, err error) {
+	err = c.Get().Path("pods").Path(name).Do().Into(&result)
 	return
 }
 
 // DeletePod takes the name of the pod, and returns an error if one occurs
-func (client *Client) DeletePod(name string) error {
-	return client.Delete().Path("pods").Path(name).Do().Error()
+func (c *Client) DeletePod(name string) error {
+	return c.Delete().Path("pods").Path(name).Do().Error()
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs
-func (client *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
-	err = client.Post().Path("pods").Body(pod).Do().Into(&result)
+func (c *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
+	err = c.Post().Path("pods").Body(pod).Do().Into(&result)
 	return
 }
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs
-func (client *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
-	err = client.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(&result)
+func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
+	err = c.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(&result)
 	return
 }
 
 // GetReplicationController returns information about a particular replication controller
-func (client *Client) GetReplicationController(name string) (result api.ReplicationController, err error) {
-	err = client.Get().Path("replicationControllers").Path(name).Do().Into(&result)
+func (c *Client) GetReplicationController(name string) (result api.ReplicationController, err error) {
+	err = c.Get().Path("replicationControllers").Path(name).Do().Into(&result)
 	return
 }
 
 // CreateReplicationController creates a new replication controller
-func (client *Client) CreateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
-	err = client.Post().Path("replicationControllers").Body(controller).Do().Into(&result)
+func (c *Client) CreateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
+	err = c.Post().Path("replicationControllers").Body(controller).Do().Into(&result)
 	return
 }
 
 // UpdateReplicationController updates an existing replication controller
-func (client *Client) UpdateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
-	err = client.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(&result)
+func (c *Client) UpdateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
+	err = c.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(&result)
 	return
 }
 
-func (client *Client) DeleteReplicationController(name string) error {
-	return client.Delete().Path("replicationControllers").Path(name).Do().Error()
+// DeleteReplicationController deletes an existing replication controller.
+func (c *Client) DeleteReplicationController(name string) error {
+	return c.Delete().Path("replicationControllers").Path(name).Do().Error()
 }
 
-// GetReplicationController returns information about a particular replication controller
-func (client *Client) GetService(name string) (result api.Service, err error) {
-	err = client.Get().Path("services").Path(name).Do().Into(&result)
+// GetService returns information about a particular service.
+func (c *Client) GetService(name string) (result api.Service, err error) {
+	err = c.Get().Path("services").Path(name).Do().Into(&result)
 	return
 }
 
-// CreateReplicationController creates a new replication controller
-func (client *Client) CreateService(svc api.Service) (result api.Service, err error) {
-	err = client.Post().Path("services").Body(svc).Do().Into(&result)
+// CreateService creates a new service.
+func (c *Client) CreateService(svc api.Service) (result api.Service, err error) {
+	err = c.Post().Path("services").Body(svc).Do().Into(&result)
 	return
 }
 
-// UpdateReplicationController updates an existing replication controller
-func (client *Client) UpdateService(svc api.Service) (result api.Service, err error) {
-	err = client.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(&result)
+// UpdateService updates an existing service.
+func (c *Client) UpdateService(svc api.Service) (result api.Service, err error) {
+	err = c.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(&result)
 	return
 }
 
-func (client *Client) DeleteService(name string) error {
-	return client.Delete().Path("services").Path(name).Do().Error()
+// DeleteService deletes an existing service.
+func (c *Client) DeleteService(name string) error {
+	return c.Delete().Path("services").Path(name).Do().Error()
 }

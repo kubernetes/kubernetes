@@ -40,7 +40,7 @@ import (
 //	Do()
 // list, ok := resp.(api.PodList)
 
-// Begin a request with a verb (GET, POST, PUT, DELETE)
+// Verb begins a request with a verb (GET, POST, PUT, DELETE)
 func (c *Client) Verb(verb string) *Request {
 	return &Request{
 		verb:       verb,
@@ -52,29 +52,29 @@ func (c *Client) Verb(verb string) *Request {
 	}
 }
 
-// Begin a POST request.
+// Post begins a POST request.
 func (c *Client) Post() *Request {
 	return c.Verb("POST")
 }
 
-// Begin a PUT request.
+// Put begins a PUT request.
 func (c *Client) Put() *Request {
 	return c.Verb("PUT")
 }
 
-// Begin a GET request.
+// Get begins a GET request.
 func (c *Client) Get() *Request {
 	return c.Verb("GET")
 }
 
-// Begin a DELETE request.
+// Delete begins a DELETE request.
 func (c *Client) Delete() *Request {
 	return c.Verb("DELETE")
 }
 
-// Make a request to do a single poll of the completion of the given operation.
-func (c *Client) PollFor(operationId string) *Request {
-	return c.Get().Path("operations").Path(operationId).Sync(false).PollPeriod(0)
+// PollFor makes a request to do a single poll of the completion of the given operation.
+func (c *Client) PollFor(operationID string) *Request {
+	return c.Get().Path("operations").Path(operationID).Sync(false).PollPeriod(0)
 }
 
 // Request allows for building up a request to a server in a chained fashion.
@@ -92,7 +92,7 @@ type Request struct {
 	pollPeriod time.Duration
 }
 
-// Append an item to the request path. You must call Path at least once.
+// Path appends an item to the request path. You must call Path at least once.
 func (r *Request) Path(item string) *Request {
 	if r.err != nil {
 		return r
@@ -101,7 +101,7 @@ func (r *Request) Path(item string) *Request {
 	return r
 }
 
-// Set sync/async call status.
+// Sync sets sync/async call status.
 func (r *Request) Sync(sync bool) *Request {
 	if r.err != nil {
 		return r
@@ -110,7 +110,7 @@ func (r *Request) Sync(sync bool) *Request {
 	return r
 }
 
-// Overwrite an existing path with the path parameter.
+// AbsPath overwrites an existing path with the path parameter.
 func (r *Request) AbsPath(path string) *Request {
 	if r.err != nil {
 		return r
@@ -119,7 +119,7 @@ func (r *Request) AbsPath(path string) *Request {
 	return r
 }
 
-// Parse the given string as a resource label selector. Optional.
+// ParseSelector parses the given string as a resource label selector. Optional.
 func (r *Request) ParseSelector(item string) *Request {
 	if r.err != nil {
 		return r
@@ -128,7 +128,7 @@ func (r *Request) ParseSelector(item string) *Request {
 	return r
 }
 
-// Use the given selector.
+// Selector makes the request use the given selector.
 func (r *Request) Selector(s labels.Selector) *Request {
 	if r.err != nil {
 		return r
@@ -137,7 +137,7 @@ func (r *Request) Selector(s labels.Selector) *Request {
 	return r
 }
 
-// Use the given duration as a timeout. Optional.
+// Timeout makes the request use the given duration as a timeout. Optional.
 func (r *Request) Timeout(d time.Duration) *Request {
 	if r.err != nil {
 		return r
@@ -146,7 +146,7 @@ func (r *Request) Timeout(d time.Duration) *Request {
 	return r
 }
 
-// Use obj as the body of the request. Optional.
+// Body makes the request use obj as the body. Optional.
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.
 // Otherwise, assume obj is an api type and marshall it correctly.
@@ -190,13 +190,13 @@ func (r *Request) PollPeriod(d time.Duration) *Request {
 	return r
 }
 
-// Format and execute the request. Returns the API object received, or an error.
+// Do formats and executes the request. Returns the API object received, or an error.
 func (r *Request) Do() Result {
 	for {
 		if r.err != nil {
 			return Result{err: r.err}
 		}
-		finalUrl := r.c.host + r.path
+		finalURL := r.c.host + r.path
 		query := url.Values{}
 		if r.selector != nil {
 			query.Add("labels", r.selector.String())
@@ -207,8 +207,8 @@ func (r *Request) Do() Result {
 				query.Add("timeout", r.timeout.String())
 			}
 		}
-		finalUrl += "?" + query.Encode()
-		req, err := http.NewRequest(r.verb, finalUrl, r.body)
+		finalURL += "?" + query.Encode()
+		req, err := http.NewRequest(r.verb, finalURL, r.body)
 		if err != nil {
 			return Result{err: err}
 		}

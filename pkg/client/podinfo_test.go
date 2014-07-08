@@ -49,9 +49,9 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 
-	hostUrl, err := url.Parse(testServer.URL)
+	hostURL, err := url.Parse(testServer.URL)
 	expectNoError(t, err)
-	parts := strings.Split(hostUrl.Host, ":")
+	parts := strings.Split(hostURL.Host, ":")
 
 	port, err := strconv.Atoi(parts[1])
 	expectNoError(t, err)
