@@ -76,24 +76,24 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 	return channel
 }
 
-// ApiServer is an HTTPHandler that delegates to RESTStorage objects.
+// APIServer is an HTTPHandler that delegates to RESTStorage objects.
 // It handles URLs of the form:
 // ${prefix}/${storage_key}[/${object_name}]
 // Where 'prefix' is an arbitrary string, and 'storage_key' points to a RESTStorage object stored in storage.
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
-type ApiServer struct {
+type APIServer struct {
 	prefix    string
 	storage   map[string]RESTStorage
 	ops       *Operations
 	logserver http.Handler
 }
 
-// New creates a new ApiServer object.
+// New creates a new APIServer object.
 // 'storage' contains a map of handlers.
 // 'prefix' is the hosting path prefix.
-func New(storage map[string]RESTStorage, prefix string) *ApiServer {
-	return &ApiServer{
+func New(storage map[string]RESTStorage, prefix string) *APIServer {
+	return &APIServer{
 		storage:   storage,
 		prefix:    prefix,
 		ops:       NewOperations(),
@@ -101,7 +101,7 @@ func New(storage map[string]RESTStorage, prefix string) *ApiServer {
 	}
 }
 
-func (server *ApiServer) handleIndex(w http.ResponseWriter) {
+func (server *APIServer) handleIndex(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusOK)
 	// TODO: serve this out of a file?
 	data := "<html><body>Welcome to Kubernetes</body></html>"
@@ -109,12 +109,12 @@ func (server *ApiServer) handleIndex(w http.ResponseWriter) {
 }
 
 // HTTP Handler interface
-func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "apiserver panic. Look in log for details.")
-			glog.Infof("ApiServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
+			glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 		}
 	}()
 	defer MakeLogged(req, &w).StacktraceWhen(
@@ -155,17 +155,17 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		LogOf(w).Addf("'%v' has no storage object", requestParts[0])
 		server.notFound(req, w)
 		return
-	} else {
-		server.handleREST(requestParts, url, req, w, storage)
 	}
+
+	server.handleREST(requestParts, url, req, w, storage)
 }
 
-func (server *ApiServer) notFound(req *http.Request, w http.ResponseWriter) {
+func (server *APIServer) notFound(req *http.Request, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, "Not Found: %#v", req)
 }
 
-func (server *ApiServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
+func (server *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
 	w.WriteHeader(statusCode)
 	output, err := api.Encode(object)
 	if err != nil {
@@ -175,19 +175,19 @@ func (server *ApiServer) write(statusCode int, object interface{}, w http.Respon
 	w.Write(output)
 }
 
-func (server *ApiServer) error(err error, w http.ResponseWriter) {
+func (server *APIServer) error(err error, w http.ResponseWriter) {
 	w.WriteHeader(500)
 	fmt.Fprintf(w, "Internal Error: %#v", err)
 }
 
-func (server *ApiServer) readBody(req *http.Request) ([]byte, error) {
+func (server *APIServer) readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
 	return ioutil.ReadAll(req.Body)
 }
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to recieve the result and returning its ID down the writer.
-func (server *ApiServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
+func (server *APIServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
 	op := server.ops.NewOperation(out)
 	if sync {
 		op.WaitFor(timeout)
@@ -236,14 +236,14 @@ func parseTimeout(str string) time.Duration {
 //    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
-func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	sync := requestUrl.Query().Get("sync") == "true"
-	timeout := parseTimeout(requestUrl.Query().Get("timeout"))
+func (server *APIServer) handleREST(parts []string, requestURL *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+	sync := requestURL.Query().Get("sync") == "true"
+	timeout := parseTimeout(requestURL.Query().Get("timeout"))
 	switch req.Method {
 	case "GET":
 		switch len(parts) {
 		case 1:
-			selector, err := labels.ParseSelector(requestUrl.Query().Get("labels"))
+			selector, err := labels.ParseSelector(requestURL.Query().Get("labels"))
 			if err != nil {
 				server.error(err, w)
 				return
@@ -325,7 +325,7 @@ func (server *ApiServer) handleREST(parts []string, requestUrl *url.URL, req *ht
 	}
 }
 
-func (server *ApiServer) handleOperationRequest(parts []string, w http.ResponseWriter, req *http.Request) {
+func (server *APIServer) handleOperationRequest(parts []string, w http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" {
 		server.notFound(req, w)
 	}
