@@ -41,27 +41,27 @@ func main() {
 
 	glog.Infof("Using configuration file %s and etcd_servers %s", *configFile, *etcdServers)
 
-	proxyConfig := config.NewServiceConfig()
+	serviceConfig := config.NewServiceConfig()
+	endpointsConfig := config.NewEndpointsConfig()
 
 	// Create a configuration source that handles configuration from etcd.
 	etcdClient := etcd.NewClient([]string{*etcdServers})
 	config.NewConfigSourceEtcd(etcdClient,
-		proxyConfig.GetServiceConfigurationChannel("etcd"),
-		proxyConfig.GetEndpointsConfigurationChannel("etcd"))
+		serviceConfig.Channel("etcd"),
+		endpointsConfig.Channel("etcd"))
 
 	// And create a configuration source that reads from a local file
 	config.NewConfigSourceFile(*configFile,
-		proxyConfig.GetServiceConfigurationChannel("file"),
-		proxyConfig.GetEndpointsConfigurationChannel("file"))
+		serviceConfig.Channel("file"),
+		endpointsConfig.Channel("file"))
 
 	loadBalancer := proxy.NewLoadBalancerRR()
 	proxier := proxy.NewProxier(loadBalancer)
 	// Wire proxier to handle changes to services
-	proxyConfig.RegisterServiceHandler(proxier)
+	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services
-	proxyConfig.RegisterEndpointsHandler(loadBalancer)
+	endpointsConfig.RegisterHandler(loadBalancer)
 
 	// Just loop forever for now...
 	select {}
-
 }
