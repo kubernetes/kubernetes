@@ -20,25 +20,32 @@ import (
 	"regexp"
 )
 
-var dnsLabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+const dnsLabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+
 var dnsLabelRegexp *regexp.Regexp = regexp.MustCompile("^" + dnsLabelFmt + "$")
 
+const dnsLabelMaxLength int = 63
+
 // IsDNSLabel tests for a string that conforms to the definition of a label in
-// DNS (RFC 1035/1123).  This checks the format, but not the length.
+// DNS (RFC 1035/1123).
 func IsDNSLabel(value string) bool {
-	return dnsLabelRegexp.MatchString(value)
+	return len(value) <= dnsLabelMaxLength && dnsLabelRegexp.MatchString(value)
 }
 
-var dnsSubdomainFmt string = dnsLabelFmt + "(\\." + dnsLabelFmt + ")*"
+const dnsSubdomainFmt string = dnsLabelFmt + "(\\." + dnsLabelFmt + ")*"
+
 var dnsSubdomainRegexp *regexp.Regexp = regexp.MustCompile("^" + dnsSubdomainFmt + "$")
 
+const dnsSubdomainMaxLength int = 253
+
 // IsDNSSubdomain tests for a string that conforms to the definition of a
-// subdomain in DNS (RFC 1035/1123).  This checks the format, but not the length.
+// subdomain in DNS (RFC 1035/1123).
 func IsDNSSubdomain(value string) bool {
-	return dnsSubdomainRegexp.MatchString(value)
+	return len(value) <= dnsSubdomainMaxLength && dnsSubdomainRegexp.MatchString(value)
 }
 
-var cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
+const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
+
 var cIdentifierRegexp *regexp.Regexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
 
 // IsCIdentifier tests for a string that conforms the definition of an identifier
