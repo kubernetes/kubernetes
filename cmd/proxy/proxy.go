@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	config_file  = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
-	etcd_servers = flag.String("etcd_servers", "http://10.240.10.57:4001", "Servers for the etcd cluster (http://ip:port).")
+	configFile  = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
+	etcdServers = flag.String("etcd_servers", "http://10.240.10.57:4001", "Servers for the etcd cluster (http://ip:port).")
 )
 
 func main() {
@@ -39,18 +39,18 @@ func main() {
 	// Set up logger for etcd client
 	etcd.SetLogger(util.NewLogger("etcd "))
 
-	glog.Infof("Using configuration file %s and etcd_servers %s", *config_file, *etcd_servers)
+	glog.Infof("Using configuration file %s and etcd_servers %s", *configFile, *etcdServers)
 
 	proxyConfig := config.NewServiceConfig()
 
 	// Create a configuration source that handles configuration from etcd.
-	etcdClient := etcd.NewClient([]string{*etcd_servers})
+	etcdClient := etcd.NewClient([]string{*etcdServers})
 	config.NewConfigSourceEtcd(etcdClient,
 		proxyConfig.GetServiceConfigurationChannel("etcd"),
 		proxyConfig.GetEndpointsConfigurationChannel("etcd"))
 
 	// And create a configuration source that reads from a local file
-	config.NewConfigSourceFile(*config_file,
+	config.NewConfigSourceFile(*configFile,
 		proxyConfig.GetServiceConfigurationChannel("file"),
 		proxyConfig.GetEndpointsConfigurationChannel("file"))
 

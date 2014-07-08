@@ -76,10 +76,10 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "")
 	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
-	kClient := client.New(apiserver.URL, nil)
-	kClient.PollPeriod = time.Second * 1
-	kClient.Sync = true
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), kClient)
+	cl := client.New(apiserver.URL, nil)
+	cl.PollPeriod = time.Second * 1
+	cl.Sync = true
+	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), cl)
 
 	controllerManager.Run(1 * time.Second)
 
@@ -268,7 +268,7 @@ func main() {
 	glog.Infof("OK - found created pods: %#v", createdPods.List())
 }
 
-// Serve a file for kubelet to read.
+// ServeCachedManifestFile serves a file for kubelet to read.
 func ServeCachedManifestFile() (servingAddress string) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/manifest" {
