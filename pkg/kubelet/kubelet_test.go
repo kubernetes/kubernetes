@@ -572,7 +572,32 @@ func TestMakePortsAndBindings(t *testing.T) {
 			}
 		}
 	}
+}
 
+func TestCheckHostPortConflicts(t *testing.T) {
+	successCaseAll := []api.ContainerManifest{
+		{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}},
+		{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}},
+		{Containers: []api.Container{{Ports: []api.Port{{HostPort: 82}}}}},
+	}
+	successCaseNew := api.ContainerManifest{
+		Containers: []api.Container{{Ports: []api.Port{{HostPort: 83}}}},
+	}
+	if err := checkHostPortConflicts(successCaseAll, &successCaseNew); err != nil {
+		t.Errorf("Expected success: %v", err)
+	}
+
+	failureCaseAll := []api.ContainerManifest{
+		{Containers: []api.Container{{Ports: []api.Port{{HostPort: 80}}}}},
+		{Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}}},
+		{Containers: []api.Container{{Ports: []api.Port{{HostPort: 82}}}}},
+	}
+	failureCaseNew := api.ContainerManifest{
+		Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}},
+	}
+	if err := checkHostPortConflicts(failureCaseAll, &failureCaseNew); err == nil {
+		t.Errorf("Expected failure")
+	}
 }
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -597,7 +622,6 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	if err == nil {
 		t.Error("Unexpected non-error.")
 	}
-
 }
 
 func TestExtractFromValidDataFile(t *testing.T) {
