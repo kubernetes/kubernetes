@@ -1027,3 +1027,30 @@ func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
 	}
 	mockCadvisor.AssertExpectations(t)
 }
+
+func TestParseImageName(t *testing.T) {
+	name, tag := parseImageName("ubuntu")
+	if name != "ubuntu" || tag != "" {
+		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+	}
+
+	name, tag = parseImageName("ubuntu:2342")
+	if name != "ubuntu" || tag != "2342" {
+		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+	}
+
+	name, tag = parseImageName("foo/bar:445566")
+	if name != "foo/bar" || tag != "445566" {
+		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+	}
+
+	name, tag = parseImageName("registry.example.com:5000/foobar")
+	if name != "registry.example.com:5000/foobar" || tag != "" {
+		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+	}
+
+	name, tag = parseImageName("registry.example.com:5000/foobar:5342")
+	if name != "registry.example.com:5000/foobar" || tag != "5342" {
+		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+	}
+}

@@ -47,8 +47,6 @@ var (
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 )
 
-const dockerBinary = "/usr/bin/docker"
-
 func main() {
 	flag.Parse()
 	util.InitLogs()

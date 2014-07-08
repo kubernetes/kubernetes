@@ -17,6 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
+
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -27,6 +29,7 @@ type FakeDockerClient struct {
 	err           error
 	called        []string
 	stopped       []string
+	pulled        []string
 	Created       []string
 }
 
@@ -65,6 +68,12 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.appendCall("stop")
 	f.stopped = append(f.stopped, id)
+	return f.err
+}
+
+func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+	f.appendCall("pull")
+	f.pulled = append(f.pulled, fmt.Sprintf("%s/%s:%s", opts.Repository, opts.Registry, opts.Tag))
 	return f.err
 }
 

@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -61,6 +60,7 @@ type DockerInterface interface {
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
+	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 }
 
 // Type to make it clear when we're working with docker container Ids
@@ -109,7 +109,7 @@ const (
 // they are not watched. Never returns.
 func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_servers, address string, port uint) {
 	if kl.DockerPuller == nil {
-		kl.DockerPuller = MakeDockerPuller(dockerEndpoint)
+		kl.DockerPuller = kl.MakeDockerPuller()
 	}
 	updateChannel := make(chan manifestUpdate)
 	if config_path != "" {
@@ -211,28 +211,23 @@ func (kl *Kubelet) getContainerID(manifest *api.ContainerManifest, container *ap
 	return "", nil
 }
 
-type dockerPuller struct {
-	endpoint string
+func (kl *Kubelet) MakeDockerPuller() DockerPuller {
+	return dockerPuller{
+		client: kl.DockerClient,
+	}
 }
 
-func MakeDockerPuller(endpoint string) DockerPuller {
-	return dockerPuller{
-		endpoint: endpoint,
-	}
+type dockerPuller struct {
+	client DockerInterface
 }
 
 func (p dockerPuller) Pull(image string) error {
-	var cmd *exec.Cmd
-	if len(p.endpoint) == 0 {
-		cmd = exec.Command("docker", "pull", image)
-	} else {
-		cmd = exec.Command("docker", "-H", p.endpoint, "pull", image)
+	image, tag := parseImageName(image)
+	opts := docker.PullImageOptions{
+		Repository: image,
+		Tag:        tag,
 	}
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
+	return p.client.PullImage(opts, docker.AuthConfiguration{})
 }
 
 // Converts "-" to "_-_" and "_" to "___" so that we can use "--" to meaningfully separate parts of a docker name.
@@ -335,6 +330,29 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		}
 	}
 	return exposedPorts, portBindings
+}
+
+// Parses image name including an tag and returns image name and tag
+// TODO: Future Docker versions can parse the tag on daemon side, see:
+// https://github.com/dotcloud/docker/issues/6876
+// So this can be deprecated at some point.
+func parseImageName(image string) (string, string) {
+	tag := ""
+	parts := strings.SplitN(image, "/", 2)
+	repo := ""
+	if len(parts) == 2 {
+		repo = parts[0]
+		image = parts[1]
+	}
+	parts = strings.SplitN(image, ":", 2)
+	if len(parts) == 2 {
+		image = parts[0]
+		tag = parts[1]
+	}
+	if repo != "" {
+		image = fmt.Sprintf("%s/%s", repo, image)
+	}
+	return image, tag
 }
 
 // Run a single container from a manifest. Returns the docker container ID
