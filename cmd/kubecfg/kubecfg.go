@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -49,6 +50,10 @@ var (
 	verbose      = flag.Bool("verbose", false, "If true, print extra information")
 	proxy        = flag.Bool("proxy", false, "If true, run a proxy to the api server")
 	www          = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
+)
+
+var (
+	pollPeriod = 20 * time.Second
 )
 
 func usage() {
@@ -146,6 +151,24 @@ func main() {
 	}
 }
 
+func doVerb(s *kube_client.Client, r *kube_client.Request) kube_client.Result {
+	for {
+		r = r.PollPeriod(0)
+		result := r.Do()
+		if result.Error() == nil {
+			return result
+		}
+		if statusErr, ok := result.Error().(*kube_client.StatusErr); ok && statusErr.Status.Status == api.StatusWorking {
+			fmt.Fprintf(os.Stderr, "Waiting for completion of /operations/%s\n", statusErr.Status.Details)
+			time.Sleep(pollPeriod)
+			pollOp := s.PollFor(statusErr.Status.Details)
+			r = pollOp
+			continue
+		}
+		return result
+	}
+}
+
 // Attempts to execute an API request
 func executeAPIRequest(method string, s *kube_client.Client) bool {
 	parseStorage := func() string {
@@ -175,7 +198,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	if method == "create" || method == "update" {
 		r.Body(readConfig(parseStorage()))
 	}
-	result := r.Do()
+	result := doVerb(s, r)
 	obj, err := result.Get()
 	if err != nil {
 		glog.Fatalf("Got request error: %v\n", err)
