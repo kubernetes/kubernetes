@@ -31,7 +31,7 @@ import (
 // TODO: Move this to a common place, it's needed in multiple tests.
 var apiPath = "/api/v1beta1"
 
-func makeUrl(suffix string) string {
+func makeURL(suffix string) string {
 	return apiPath + suffix
 }
 
@@ -326,7 +326,7 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	}
 
 	requestBody := body(c.Request.Body, c.Request.RawBody)
-	c.handler.ValidateRequest(t, makeUrl(c.Request.Path), c.Request.Method, requestBody)
+	c.handler.ValidateRequest(t, makeURL(c.Request.Path), c.Request.Method, requestBody)
 	for key, values := range c.Request.Query {
 		validator, ok := c.QueryValidator[key]
 		if !ok {

@@ -153,8 +153,10 @@ type JSONBase struct {
 	ResourceVersion   uint64 `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 }
 
+// PodStatus represents a status of a pod.
 type PodStatus string
 
+// These are the valid statuses of pods.
 const (
 	PodRunning PodStatus = "Running"
 	PodPending PodStatus = "Pending"
@@ -179,6 +181,7 @@ type PodState struct {
 	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
+// PodList is a list of Pods.
 type PodList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Pod `json:"items" yaml:"items,omitempty"`
@@ -199,6 +202,7 @@ type ReplicationControllerState struct {
 	PodTemplate     PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty"`
 }
 
+// ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
@@ -223,7 +227,7 @@ type ServiceList struct {
 	Items    []Service `json:"items" yaml:"items"`
 }
 
-// Defines a service abstraction by a name (for example, mysql) consisting of local port
+// Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
@@ -238,22 +242,22 @@ type Service struct {
 	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
 }
 
-// Defines the endpoints that implement the actual service, for example:
+// Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
 	Name      string
 	Endpoints []string
 }
 
-// Information about a single Minion; the name of the minion according to etcd
-// is in JSONBase.ID.
+// Minion is a worker node in Kubernetenes.
+// The name of the minion according to etcd is in JSONBase.ID.
 type Minion struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	// Queried from cloud provider, if available.
 	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 }
 
-// A list of minions.
+// MinionList is a list of minions.
 type MinionList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
@@ -282,12 +286,12 @@ const (
 	StatusWorking = "working"
 )
 
-// Operation information, as delivered to API clients.
+// ServerOp is an operation delivered to API clients.
 type ServerOp struct {
 	JSONBase `yaml:",inline" json:",inline"`
 }
 
-// Operation list, as delivered to API clients.
+// ServerOpList is a list of operations, as delivered to API clients.
 type ServerOpList struct {
 	JSONBase `yaml:",inline" json:",inline"`
 	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`

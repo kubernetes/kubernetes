@@ -24,19 +24,20 @@ import (
 )
 
 var (
-	supportedManifestVersions util.StringSet = util.NewStringSet("v1beta1", "v1beta2")
+	supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
 )
 
-// Validation errors.
+// ValidationErrorEnum is a type of validation error.
 type ValidationErrorEnum string
 
+// These are known errors of validation.
 const (
 	ErrTypeInvalid      ValidationErrorEnum = "invalid value"
 	ErrTypeNotSupported ValidationErrorEnum = "unsupported value"
 	ErrTypeDuplicate    ValidationErrorEnum = "duplicate value"
 )
 
-// Implements the 'error' interface.
+// ValidationError is an implementation of the 'error' interface, which represents an error of validation.
 type ValidationError struct {
 	ErrorType  ValidationErrorEnum
 	ErrorField string

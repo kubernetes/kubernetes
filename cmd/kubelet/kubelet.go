@@ -40,7 +40,7 @@ var (
 	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
 	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking config files for new data")
 	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
-	manifestUrl        = flag.String("manifest_url", "", "URL for accessing the container manifest")
+	manifestURL        = flag.String("manifest_url", "", "URL for accessing the container manifest")
 	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on")
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
@@ -80,12 +80,12 @@ func main() {
 		}
 	}
 
-	my_kubelet := kubelet.Kubelet{
+	k := kubelet.Kubelet{
 		Hostname:           string(hostname),
 		DockerClient:       dockerClient,
 		FileCheckFrequency: *fileCheckFrequency,
 		SyncFrequency:      *syncFrequency,
 		HTTPCheckFrequency: *httpCheckFrequency,
 	}
-	my_kubelet.RunKubelet(*dockerEndpoint, *config, *manifestUrl, *etcdServers, *address, *port)
+	k.RunKubelet(*dockerEndpoint, *config, *manifestURL, *etcdServers, *address, *port)
 }

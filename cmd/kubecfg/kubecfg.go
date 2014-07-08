@@ -32,7 +32,8 @@ import (
 	"github.com/golang/glog"
 )
 
-const APP_VERSION = "0.1"
+// AppVersion is the current version of kubecfg.
+const AppVersion = "0.1"
 
 // The flag package provides a default help printer via -h switch
 var (
@@ -97,7 +98,7 @@ func main() {
 	defer util.FlushLogs()
 
 	if *versionFlag {
-		fmt.Println("Version:", APP_VERSION)
+		fmt.Println("Version:", AppVersion)
 		os.Exit(0)
 	}
 
@@ -110,11 +111,11 @@ func main() {
 	} else {
 		masterServer = "http://localhost:8080"
 	}
-	parsedUrl, err := url.Parse(masterServer)
+	parsedURL, err := url.Parse(masterServer)
 	if err != nil {
 		glog.Fatalf("Unable to parse %v as a URL\n", err)
 	}
-	if parsedUrl.Scheme != "" && parsedUrl.Scheme != "https" {
+	if parsedURL.Scheme != "" && parsedURL.Scheme != "https" {
 		secure = false
 	}
 

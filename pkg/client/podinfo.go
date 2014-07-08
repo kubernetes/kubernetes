@@ -35,12 +35,13 @@ type PodInfoGetter interface {
 	GetPodInfo(host, podID string) (api.PodInfo, error)
 }
 
-// The default implementation, accesses the kubelet over HTTP
+// HTTPPodInfoGetter is the default implementation of PodInfoGetter, accesses the kubelet over HTTP
 type HTTPPodInfoGetter struct {
 	Client *http.Client
 	Port   uint
 }
 
+// GetPodInfo gets information about the specified pod.
 func (c *HTTPPodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	request, err := http.NewRequest(
 		"GET",
@@ -70,12 +71,13 @@ func (c *HTTPPodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) 
 	return info, nil
 }
 
-// Useful for testing.
+// FakePodInfoGetter is a fake implementation of PodInfoGetter. It is useful for testing.
 type FakePodInfoGetter struct {
 	data api.PodInfo
 	err  error
 }
 
+// GetPodInfo is a fake implementation of PodInfoGetter.GetPodInfo.
 func (c *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	return c.data, c.err
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Return true if a stacktrace should be logged for this status
+// StacktracePred returns true if a stacktrace should be logged for this status
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
@@ -42,6 +42,7 @@ type respLogger struct {
 	logStacktracePred StacktracePred
 }
 
+// DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
 	return status != http.StatusOK && status != http.StatusAccepted
 }

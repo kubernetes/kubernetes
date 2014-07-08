@@ -47,7 +47,7 @@ type Operations struct {
 	ops  map[string]*Operation
 }
 
-// Returns a new Operations repository.
+// NewOperations returns a new Operations repository.
 func NewOperations() *Operations {
 	ops := &Operations{
 		ops: map[string]*Operation{},
@@ -56,7 +56,7 @@ func NewOperations() *Operations {
 	return ops
 }
 
-// Add a new operation. Lock-free.
+// NewOperation adds a new operation. It is lock-free.
 func (ops *Operations) NewOperation(from <-chan interface{}) *Operation {
 	id := atomic.AddInt64(&ops.lastID, 1)
 	op := &Operation{
@@ -93,7 +93,7 @@ func (ops *Operations) List() api.ServerOpList {
 	return ol
 }
 
-// Returns the operation with the given ID, or nil
+// Get returns the operation with the given ID, or nil
 func (ops *Operations) Get(id string) *Operation {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
@@ -131,7 +131,7 @@ func (op *Operation) wait() {
 	op.notify <- true
 }
 
-// Wait for the specified duration, or until the operation finishes,
+// WaitFor waits for the specified duration, or until the operation finishes,
 // whichever happens first.
 func (op *Operation) WaitFor(timeout time.Duration) {
 	select {
@@ -153,7 +153,7 @@ func (op *Operation) expired(limitTime time.Time) bool {
 	return op.finished.Before(limitTime)
 }
 
-// Return status information or the result of the operation if it is complete,
+// StatusOrResult returns status information or the result of the operation if it is complete,
 // with a bool indicating true in the latter case.
 func (op *Operation) StatusOrResult() (description interface{}, finished bool) {
 	op.lock.Lock()

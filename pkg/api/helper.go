@@ -42,6 +42,8 @@ func init() {
 	)
 }
 
+// AddKnownTypes registers the types of the arguments to the marshaller of the package api.
+// Encode() refuses the object unless its type is registered with AddKnownTypes.
 func AddKnownTypes(types ...interface{}) {
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
@@ -49,14 +51,14 @@ func AddKnownTypes(types ...interface{}) {
 	}
 }
 
-// Takes an arbitary api type, returns pointer to its JSONBase field.
+// FindJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
 // obj must be a pointer to an api type.
 func FindJSONBase(obj interface{}) (*JSONBase, error) {
 	_, jsonBase, err := nameAndJSONBase(obj)
 	return jsonBase, err
 }
 
-// Takes an arbitary api type, return a copy of its JSONBase field.
+// FindJSONBaseRO takes an arbitary api type, return a copy of its JSONBase field.
 // obj may be a pointer to an api type, or a non-pointer struct api type.
 func FindJSONBaseRO(obj interface{}) (JSONBase, error) {
 	v := reflect.ValueOf(obj)
@@ -141,7 +143,7 @@ func Decode(data []byte) (interface{}, error) {
 	// yaml is a superset of json, so we use it to decode here. That way, we understand both.
 	err := yaml.Unmarshal(data, &findKind)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't get kind: %#v", err)
+		return nil, fmt.Errorf("couldn't get kind: %#v", err)
 	}
 	objType, found := knownTypes[findKind.Kind]
 	if !found {
