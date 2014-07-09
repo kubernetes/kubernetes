@@ -95,7 +95,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     --image ${IMAGE} \
     --tags ${MINION_TAG} \
     --network ${NETWORK} \
-    --service_account_scopes="" \
+    --service_account_scopes=${MINION_SCOPES} \
     --automatic_restart \
     --can_ip_forward \
     --metadata_from_file startup-script:${KUBE_TEMP}/minion-start-${i}.sh &
