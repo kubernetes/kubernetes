@@ -289,7 +289,7 @@ func makeEnvironmentVariables(container *api.Container) []string {
 	return result
 }
 
-func makeVolumesAndBinds(container *api.Container) (map[string]struct{}, []string) {
+func makeVolumesAndBinds(manifestId string, container *api.Container) (map[string]struct{}, []string) {
 	volumes := map[string]struct{}{}
 	binds := []string{}
 	for _, volume := range container.VolumeMounts {
@@ -299,7 +299,7 @@ func makeVolumesAndBinds(container *api.Container) (map[string]struct{}, []strin
 			basePath = fmt.Sprintf("%s:%s", volume.MountPath, volume.MountPath)
 		} else {
 			volumes[volume.MountPath] = struct{}{}
-			basePath = fmt.Sprintf("/exports/%s:%s", volume.Name, volume.MountPath)
+			basePath = fmt.Sprintf("/exports/%s/%s:%s", manifestId, volume.Name, volume.MountPath)
 		}
 		if volume.ReadOnly {
 			basePath += ":ro"
@@ -364,7 +364,7 @@ func parseImageName(image string) (string, string) {
 // Run a single container from a manifest. Returns the docker container ID
 func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.Container, netMode string) (id DockerID, err error) {
 	envVariables := makeEnvironmentVariables(container)
-	volumes, binds := makeVolumesAndBinds(container)
+	volumes, binds := makeVolumesAndBinds(manifest.ID, container)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
 	opts := docker.CreateContainerOptions{
