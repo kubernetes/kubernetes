@@ -79,6 +79,9 @@ func (h *HTTPHealthChecker) findPort(container api.Container, portName string) i
 // IsHealthy checks if the container is healthy by trying sending HTTP Get requests to the container.
 func (h *HTTPHealthChecker) IsHealthy(container api.Container) (bool, error) {
 	params := container.LivenessProbe.HTTPGet
+	if params == nil {
+		return true, fmt.Errorf("Error, no HTTP parameters specified: %v", container)
+	}
 	port := h.findPort(container, params.Port)
 	if port == -1 {
 		var err error

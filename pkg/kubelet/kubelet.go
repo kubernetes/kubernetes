@@ -991,7 +991,7 @@ func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
 
 func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (bool, error) {
 	// Give the container 60 seconds to start up.
-	if !container.LivenessProbe.Enabled {
+	if container.LivenessProbe == nil {
 		return true, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {

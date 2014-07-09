@@ -448,8 +448,7 @@ func TestSyncManifestsUnhealthy(t *testing.T) {
 			ID: "foo",
 			Containers: []api.Container{
 				{Name: "bar",
-					LivenessProbe: api.LivenessProbe{
-						Enabled: true,
+					LivenessProbe: &api.LivenessProbe{
 						// Always returns healthy == false
 						Type: "false",
 					},

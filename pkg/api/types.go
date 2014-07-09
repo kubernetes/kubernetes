@@ -116,11 +116,10 @@ type HTTPGetProbe struct {
 
 // LivenessProbe describes a liveness probe to be examined to the container.
 type LivenessProbe struct {
-	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	// Type of liveness probe.  Current legal values "http"
 	Type string `yaml:"type,omitempty" json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'http'
-	HTTPGet HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+	HTTPGet *HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
 }
@@ -141,9 +140,9 @@ type Container struct {
 	// Optional: Defaults to unlimited.
 	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
 	// Optional: Defaults to unlimited.
-	CPU           int           `yaml:"cpu,omitempty" json:"cpu,omitempty"`
-	VolumeMounts  []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
-	LivenessProbe LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
+	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty"`
+	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
+	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 }
 
 // Percentile represents a pair which contains a percentage from 0 to 100 and

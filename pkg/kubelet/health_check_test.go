@@ -46,8 +46,8 @@ func TestHttpHealth(t *testing.T) {
 	}
 
 	container := api.Container{
-		LivenessProbe: api.LivenessProbe{
-			HTTPGet: api.HTTPGetProbe{
+		LivenessProbe: &api.LivenessProbe{
+			HTTPGet: &api.HTTPGetProbe{
 				Port: "8080",
 				Path: "/foo/bar",
 			},
