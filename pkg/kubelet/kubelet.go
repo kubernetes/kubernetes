@@ -332,6 +332,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		portBindings[dockerPort] = []docker.PortBinding{
 			{
 				HostPort: strconv.Itoa(exteriorPort),
+				HostIp:   port.HostIP,
 			},
 		}
 	}
