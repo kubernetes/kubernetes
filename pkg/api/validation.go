@@ -63,16 +63,23 @@ func makeNotFoundError(field string, value interface{}) ValidationError {
 	return ValidationError{ErrTypeNotFound, field, value}
 }
 
-func validateVolumes(volumes []Volume) (util.StringSet, []error) {
-	allErrs := []error{}
+// A helper for accumulating errors.  This could be moved to util if anyone else needs it.
+type errorList []error;
+
+func (list *errorList) Append(errs ...error) {
+	*list = append(*list, errs...)
+}
+
+func validateVolumes(volumes []Volume) (util.StringSet, errorList) {
+	allErrs := errorList{}
 
 	allNames := util.StringSet{}
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
 		if !util.IsDNSLabel(vol.Name) {
-			allErrs = append(allErrs, makeInvalidError("Volume.Name", vol.Name))
+			allErrs.Append(makeInvalidError("Volume.Name", vol.Name))
 		} else if allNames.Has(vol.Name) {
-			allErrs = append(allErrs, makeDuplicateError("Volume.Name", vol.Name))
+			allErrs.Append(makeDuplicateError("Volume.Name", vol.Name))
 		} else {
 			allNames.Insert(vol.Name)
 		}
@@ -82,47 +89,47 @@ func validateVolumes(volumes []Volume) (util.StringSet, []error) {
 
 var supportedPortProtocols util.StringSet = util.NewStringSet("TCP", "UDP")
 
-func validatePorts(ports []Port) []error {
-	allErrs := []error{}
+func validatePorts(ports []Port) errorList {
+	allErrs := errorList{}
 
 	allNames := util.StringSet{}
 	for i := range ports {
 		port := &ports[i] // so we can set default values
 		if len(port.Name) > 0 {
 			if len(port.Name) > 63 || !util.IsDNSLabel(port.Name) {
-				allErrs = append(allErrs, makeInvalidError("Port.Name", port.Name))
+				allErrs.Append(makeInvalidError("Port.Name", port.Name))
 			} else if allNames.Has(port.Name) {
-				allErrs = append(allErrs, makeDuplicateError("Port.name", port.Name))
+				allErrs.Append(makeDuplicateError("Port.name", port.Name))
 			} else {
 				allNames.Insert(port.Name)
 			}
 		}
 		if !util.IsValidPortNum(port.ContainerPort) {
-			allErrs = append(allErrs, makeInvalidError("Port.ContainerPort", port.ContainerPort))
+			allErrs.Append(makeInvalidError("Port.ContainerPort", port.ContainerPort))
 		}
 		if port.HostPort == 0 {
 			port.HostPort = port.ContainerPort
 		} else if !util.IsValidPortNum(port.HostPort) {
-			allErrs = append(allErrs, makeInvalidError("Port.HostPort", port.HostPort))
+			allErrs.Append(makeInvalidError("Port.HostPort", port.HostPort))
 		}
 		if len(port.Protocol) == 0 {
 			port.Protocol = "TCP"
 		} else if !supportedPortProtocols.Has(strings.ToUpper(port.Protocol)) {
-			allErrs = append(allErrs, makeNotSupportedError("Port.Protocol", port.Protocol))
+			allErrs.Append(makeNotSupportedError("Port.Protocol", port.Protocol))
 		}
 	}
 	return allErrs
 }
 
-func validateEnv(vars []EnvVar) []error {
-	allErrs := []error{}
+func validateEnv(vars []EnvVar) errorList {
+	allErrs := errorList{}
 
 	for i := range vars {
 		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 {
 			// Backwards compat.
 			if len(ev.Key) == 0 {
-				allErrs = append(allErrs, makeInvalidError("EnvVar.Name", ev.Name))
+				allErrs.Append(makeInvalidError("EnvVar.Name", ev.Name))
 			} else {
 				glog.Warning("DEPRECATED: EnvVar.Key has been replaced by EnvVar.Name")
 				ev.Name = ev.Key
@@ -130,26 +137,26 @@ func validateEnv(vars []EnvVar) []error {
 			}
 		}
 		if !util.IsCIdentifier(ev.Name) {
-			allErrs = append(allErrs, makeInvalidError("EnvVar.Name", ev.Name))
+			allErrs.Append(makeInvalidError("EnvVar.Name", ev.Name))
 		}
 	}
 	return allErrs
 }
 
-func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) []error {
-	allErrs := []error{}
+func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errorList {
+	allErrs := errorList{}
 
 	for i := range mounts {
 		mnt := &mounts[i] // so we can set default values
 		if len(mnt.Name) == 0 {
-			allErrs = append(allErrs, makeInvalidError("VolumeMount.Name", mnt.Name))
+			allErrs.Append(makeInvalidError("VolumeMount.Name", mnt.Name))
 		} else if !volumes.Has(mnt.Name) {
-			allErrs = append(allErrs, makeNotFoundError("VolumeMount.Name", mnt.Name))
+			allErrs.Append(makeNotFoundError("VolumeMount.Name", mnt.Name))
 		}
 		if len(mnt.MountPath) == 0 {
 			// Backwards compat.
 			if len(mnt.Path) == 0 {
-				allErrs = append(allErrs, makeInvalidError("VolumeMount.MountPath", mnt.MountPath))
+				allErrs.Append(makeInvalidError("VolumeMount.MountPath", mnt.MountPath))
 			} else {
 				glog.Warning("DEPRECATED: VolumeMount.Path has been replaced by VolumeMount.MountPath")
 				mnt.MountPath = mnt.Path
@@ -162,15 +169,15 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) []error 
 
 // AccumulateUniquePorts runs an extraction function on each Port of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, extract func(*Port) int) []error {
-	allErrs := []error{}
+func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, extract func(*Port) int) errorList {
+	allErrs := errorList{}
 
 	for ci := range containers {
 		ctr := &containers[ci]
 		for pi := range ctr.Ports {
 			port := extract(&ctr.Ports[pi])
 			if accumulator[port] {
-				allErrs = append(allErrs, makeDuplicateError("Port", port))
+				allErrs.Append(makeDuplicateError("Port", port))
 			} else {
 				accumulator[port] = true
 			}
@@ -180,46 +187,39 @@ func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, ext
 }
 
 // Checks for colliding Port.HostPort values across a slice of containers.
-func checkHostPortConflicts(containers []Container) []error {
+func checkHostPortConflicts(containers []Container) errorList {
 	allPorts := map[int]bool{}
 	return AccumulateUniquePorts(containers, allPorts, func(p *Port) int { return p.HostPort })
 }
 
-func validateContainers(containers []Container, volumes util.StringSet) []error {
-	allErrs := []error{}
+func validateContainers(containers []Container, volumes util.StringSet) errorList {
+	allErrs := errorList{}
 
 	allNames := util.StringSet{}
 	for i := range containers {
 		ctr := &containers[i] // so we can set default values
 		if !util.IsDNSLabel(ctr.Name) {
-			allErrs = append(allErrs, makeInvalidError("Container.Name", ctr.Name))
+			allErrs.Append(makeInvalidError("Container.Name", ctr.Name))
 		} else if allNames.Has(ctr.Name) {
-			allErrs = append(allErrs, makeDuplicateError("Container.Name", ctr.Name))
+			allErrs.Append(makeDuplicateError("Container.Name", ctr.Name))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
 		if len(ctr.Image) == 0 {
-			allErrs = append(allErrs, makeInvalidError("Container.Image", ctr.Name))
+			allErrs.Append(makeInvalidError("Container.Image", ctr.Name))
 		}
-		if errs := validatePorts(ctr.Ports); len(errs) != 0 {
-			allErrs = append(allErrs, errs...)
-		}
-		if errs := validateEnv(ctr.Env); len(errs) != 0 {
-			allErrs = append(allErrs, errs...)
-		}
-		if errs := validateVolumeMounts(ctr.VolumeMounts, volumes); len(errs) != 0 {
-			allErrs = append(allErrs, errs...)
-		}
+		allErrs.Append(validatePorts(ctr.Ports)...)
+		allErrs.Append(validateEnv(ctr.Env)...)
+		allErrs.Append(validateVolumeMounts(ctr.VolumeMounts, volumes)...)
 	}
 	// Check for colliding ports across all containers.
 	// TODO(thockin): This really is dependent on the network config of the host (IP per pod?)
 	// and the config of the new manifest.  But we have not specced that out yet, so we'll just
 	// make some assumptions for now.  As of now, pods share a network namespace, which means that
 	// every Port.HostPort across the whole pod must be unique.
-	if errs := checkHostPortConflicts(containers); len(errs) != 0 {
-		allErrs = append(allErrs, errs...)
-	}
-	return allErrs
+	allErrs.Append(checkHostPortConflicts(containers)...)
+
+	return allErrs;
 }
 
 var supportedManifestVersions util.StringSet = util.NewStringSet("v1beta1", "v1beta2")
@@ -229,22 +229,20 @@ var supportedManifestVersions util.StringSet = util.NewStringSet("v1beta1", "v1b
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
 func ValidateManifest(manifest *ContainerManifest) []error {
-	allErrs := []error{}
+	allErrs := errorList{}
 
 	if len(manifest.Version) == 0 {
-		allErrs = append(allErrs, makeInvalidError("ContainerManifest.Version", manifest.Version))
+		allErrs.Append(makeInvalidError("ContainerManifest.Version", manifest.Version))
 	} else if !supportedManifestVersions.Has(strings.ToLower(manifest.Version)) {
-		allErrs = append(allErrs, makeNotSupportedError("ContainerManifest.Version", manifest.Version))
+		allErrs.Append(makeNotSupportedError("ContainerManifest.Version", manifest.Version))
 	}
 	if !util.IsDNSSubdomain(manifest.ID) {
-		allErrs = append(allErrs, makeInvalidError("ContainerManifest.ID", manifest.ID))
+		allErrs.Append(makeInvalidError("ContainerManifest.ID", manifest.ID))
 	}
 	allVolumes, errs := validateVolumes(manifest.Volumes)
 	if len(errs) != 0 {
-		allErrs = append(allErrs, errs...)
+		allErrs.Append(errs...)
 	}
-	if errs := validateContainers(manifest.Containers, allVolumes); len(errs) != 0 {
-		allErrs = append(allErrs, errs...)
-	}
-	return allErrs
+	allErrs.Append(validateContainers(manifest.Containers, allVolumes)...)
+	return []error(allErrs)
 }
