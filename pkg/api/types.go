@@ -104,6 +104,25 @@ type EnvVar struct {
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
 
+type HTTPGetProbe struct {
+	// Path to access on the http server
+	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+	// Name or number of the port to access on the container
+	Port string `yaml:"port,omitempty" json:"port,omitempty"`
+	// Host name to connect to.  Optional, default: "localhost"
+	Host string `yaml:"host,omitempty" json:"host,omitempty"`
+}
+
+type LivenessProbe struct {
+	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
+	// Type of liveness probe.  Current legal values "http"
+	Type string `yaml:"type,omitempty" json:"type,omitempty"`
+	// HTTPGetProbe parameters, required if Type == 'http'
+	HTTPGet HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+	// Length of time before health checking is activated.  In seconds.
+	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
+}
+
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
@@ -120,8 +139,9 @@ type Container struct {
 	// Optional: Defaults to unlimited.
 	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
 	// Optional: Defaults to unlimited.
-	CPU          int           `yaml:"cpu,omitempty" json:"cpu,omitempty"`
-	VolumeMounts []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
+	CPU           int           `yaml:"cpu,omitempty" json:"cpu,omitempty"`
+	VolumeMounts  []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
+	LivenessProbe LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 }
 
 // Percentile represents a pair which contains a percentage from 0 to 100 and

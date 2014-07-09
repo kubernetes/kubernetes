@@ -55,6 +55,8 @@ server {
           proxy_buffers     16 32k;
           proxy_busy_buffers_size 64k;
           proxy_temp_file_write_size 64k;
+          # Disable retry
+          proxy_next_upstream off;
         }
         location /etcd/ {
           auth_basic            "Restricted";

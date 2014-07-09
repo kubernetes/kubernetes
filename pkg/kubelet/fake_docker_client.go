@@ -56,8 +56,9 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	f.Created = append(f.Created, c.Name)
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
-	f.containerList = append(f.containerList, docker.APIContainers{ID: c.Name, Names: []string{"/" + c.Name}})
-	return &docker.Container{ID: "/" + c.Name}, nil
+	name := "/" + c.Name
+	f.containerList = append(f.containerList, docker.APIContainers{ID: name, Names: []string{name}})
+	return &docker.Container{ID: name}, nil
 }
 
 func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
@@ -68,6 +69,13 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.appendCall("stop")
 	f.stopped = append(f.stopped, id)
+	var newList []docker.APIContainers
+	for _, container := range f.containerList {
+		if container.ID != id {
+			newList = append(newList, container)
+		}
+	}
+	f.containerList = newList
 	return f.err
 }
 

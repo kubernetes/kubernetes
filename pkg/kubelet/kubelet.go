@@ -92,6 +92,7 @@ type Kubelet struct {
 	SyncFrequency      time.Duration
 	HTTPCheckFrequency time.Duration
 	pullLock           sync.Mutex
+	HealthChecker      HealthChecker
 }
 
 type manifestUpdate struct {
@@ -155,6 +156,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_se
 		}
 		go util.Forever(func() { s.ListenAndServe() }, 0)
 	}
+	kl.HealthChecker = MakeHealthChecker()
 	kl.syncLoop(updateChannel, kl)
 }
 
@@ -217,6 +219,19 @@ func (kl *Kubelet) getContainerID(manifest *api.ContainerManifest, container *ap
 		}
 	}
 	return "", nil
+}
+
+func (kl *Kubelet) getContainer(ID DockerID) (*docker.APIContainers, error) {
+	dockerContainers, err := kl.getDockerContainers()
+	if err != nil {
+		return nil, err
+	}
+	for dockerID, dockerContainer := range dockerContainers {
+		if dockerID == ID {
+			return &dockerContainer, nil
+		}
+	}
+	return nil, nil
 }
 
 func (kl *Kubelet) MakeDockerPuller() DockerPuller {
@@ -687,7 +702,6 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 	}
 	keepChannel <- netID
 	for _, container := range manifest.Containers {
-		glog.Infof("Syncing container: %v", container)
 		containerID, err := kl.getContainerID(manifest, &container)
 		if err != nil {
 			glog.Errorf("Error finding container: %v skipping manifest %s container %s.", err, manifest.ID, container.Name)
@@ -707,7 +721,28 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 				continue
 			}
 		} else {
+			glog.Infof("manifest %s container %s exists as %v", manifest.ID, container.Name, containerID)
 			glog.V(1).Infof("manifest %s container %s exists as %v", manifest.ID, container.Name, containerID)
+			dockerContainer, err := kl.getContainer(containerID)
+			// TODO: This should probably be separated out into a separate goroutine.
+			healthy, err := kl.healthy(container, dockerContainer)
+			if err != nil {
+				glog.V(1).Infof("health check errored: %v", err)
+				continue
+			}
+			if !healthy {
+				glog.V(1).Infof("manifest %s container %s is unhealthy.", manifest.ID, container.Name)
+				if err != nil {
+					glog.V(1).Infof("Failed to get container info %v, for %s", err, containerID)
+					continue
+				}
+				err = kl.killContainer(*dockerContainer)
+				if err != nil {
+					glog.V(1).Infof("Failed to kill container %s: %v", containerID, err)
+					continue
+				}
+				containerID, err = kl.runContainer(manifest, &container, "container:"+string(netID))
+			}
 		}
 		keepChannel <- containerID
 	}
@@ -950,4 +985,18 @@ func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.Containe
 // Returns stats (from Cadvisor) of current machine.
 func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
 	return kl.statsFromContainerPath("/")
+}
+
+func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (bool, error) {
+	// Give the container 60 seconds to start up.
+	if !container.LivenessProbe.Enabled {
+		return true, nil
+	}
+	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
+		return true, nil
+	}
+	if kl.HealthChecker == nil {
+		return true, nil
+	}
+	return kl.HealthChecker.IsHealthy(container)
 }
