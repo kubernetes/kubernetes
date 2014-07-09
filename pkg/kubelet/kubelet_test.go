@@ -505,10 +505,10 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 			},
 		},
 	}
-	volumes, binds := makeVolumesAndBinds(&container)
+	volumes, binds := makeVolumesAndBinds("pod", &container)
 
 	expectedVolumes := []string{"/mnt/path", "/mnt/path2"}
-	expectedBinds := []string{"/exports/disk:/mnt/path", "/exports/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3"}
+	expectedBinds := []string{"/exports/pod/disk:/mnt/path", "/exports/pod/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3"}
 	if len(volumes) != len(expectedVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Container was: %#v", expectedVolumes, volumes, container)
 	}
