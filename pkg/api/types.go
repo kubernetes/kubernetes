@@ -74,6 +74,8 @@ type Port struct {
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`
 	// Optional: Defaults to "TCP".
 	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Optional: What host IP to bind the external port to.
+	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
 }
 
 // VolumeMount describes a mounting of a Volume within a container
@@ -86,7 +88,7 @@ type VolumeMount struct {
 	// Exactly one of the following must be set.  If both are set, prefer MountPath.
 	// DEPRECATED: Path will be removed in a future version of the API.
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
 	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
