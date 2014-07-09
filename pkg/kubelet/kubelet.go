@@ -770,17 +770,22 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 }
 
 // Check that all Port.HostPort values are unique across all manifests.
-func checkHostPortConflicts(allManifests []api.ContainerManifest, newManifest *api.ContainerManifest) error {
+func checkHostPortConflicts(allManifests []api.ContainerManifest, newManifest *api.ContainerManifest) []error {
+	allErrs := []error{}
+
 	allPorts := map[int]bool{}
 	extract := func(p *api.Port) int { return p.HostPort }
 	for i := range allManifests {
 		manifest := &allManifests[i]
-		err := api.AccumulateUniquePorts(manifest.Containers, allPorts, extract)
-		if err != nil {
-			return err
+		errs := api.AccumulateUniquePorts(manifest.Containers, allPorts, extract)
+		if len(errs) != 0 {
+			allErrs = append(allErrs, errs...)
 		}
 	}
-	return api.AccumulateUniquePorts(newManifest.Containers, allPorts, extract)
+	if errs := api.AccumulateUniquePorts(newManifest.Containers, allPorts, extract); len(errs) != 0 {
+		allErrs = append(allErrs, errs...)
+	}
+	return allErrs
 }
 
 // syncLoop is the main loop for processing changes. It watches for changes from
@@ -803,20 +808,23 @@ func (kl *Kubelet) syncLoop(updateChannel <-chan manifestUpdate, handler SyncHan
 		allIds := util.StringSet{}
 		for src, srcManifests := range last {
 			for i := range srcManifests {
+				allErrs := []error{}
+
 				m := &srcManifests[i]
 				if allIds.Has(m.ID) {
-					glog.Warningf("Manifest from %s has duplicate ID, ignoring: %v", src, m.ID)
-					continue
+					allErrs = append(allErrs, api.ValidationError{api.ErrTypeDuplicate, "ContainerManifest.ID", m.ID})
+				} else {
+					allIds.Insert(m.ID)
 				}
-				allIds.Insert(m.ID)
-				if err := api.ValidateManifest(m); err != nil {
-					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
-					continue
+				if errs := api.ValidateManifest(m); len(errs) != 0 {
+					allErrs = append(allErrs, errs...)
 				}
 				// Check for host-wide HostPort conflicts.
-				if err := checkHostPortConflicts(allManifests, m); err != nil {
-					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, err)
-					continue
+				if errs := checkHostPortConflicts(allManifests, m); len(errs) != 0 {
+					allErrs = append(allErrs, errs...)
+				}
+				if len(allErrs) > 0 {
+					glog.Warningf("Manifest from %s failed validation, ignoring: %v", src, allErrs)
 				}
 			}
 			// TODO(thockin): There's no reason to collect manifests by value.  Don't pessimize.

@@ -596,8 +596,8 @@ func TestCheckHostPortConflicts(t *testing.T) {
 	successCaseNew := api.ContainerManifest{
 		Containers: []api.Container{{Ports: []api.Port{{HostPort: 83}}}},
 	}
-	if err := checkHostPortConflicts(successCaseAll, &successCaseNew); err != nil {
-		t.Errorf("Expected success: %v", err)
+	if errs := checkHostPortConflicts(successCaseAll, &successCaseNew); len(errs) != 0 {
+		t.Errorf("Expected success: %v", errs)
 	}
 
 	failureCaseAll := []api.ContainerManifest{
@@ -608,7 +608,7 @@ func TestCheckHostPortConflicts(t *testing.T) {
 	failureCaseNew := api.ContainerManifest{
 		Containers: []api.Container{{Ports: []api.Port{{HostPort: 81}}}},
 	}
-	if err := checkHostPortConflicts(failureCaseAll, &failureCaseNew); err == nil {
+	if errs := checkHostPortConflicts(failureCaseAll, &failureCaseNew); len(errs) == 0 {
 		t.Errorf("Expected failure")
 	}
 }
