@@ -43,9 +43,13 @@ Each pod can have a set of key/value labels set on it, with at most one label wi
 
 Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `environment` (e.g., with values `dev`, `qa`, or `production`), `service`, `tier` (e.g., with values `frontend` or `backend`), `partition`, and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
 
-Via a "label selector" the user can identify a set of `pods`.  
+Via a "label selector" the user can identify a set of `pods`. The label selector is the core grouping primitive in Kubernetes. It could be used to identify service replicas or shards, worker pool members, or peers in a distributed application.
 
-This simple mechanism is a key part of how Kubernetes's mechanisms supporting horizontal scaling, `services` and `replicationControllers`, keep track of their members.  The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. Sets supported by future versions of Kubernetes, such as worker pools, will use the same mechanism.
+Kubernetes currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
+- `service`: A service is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more Pods.
+- `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
+
+The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. 
 
 Pods may be removed from these sets by changing their labels. This flexibility may be used to remove pods from service for debugging, data recovery, etc.
 
@@ -97,11 +101,7 @@ All persistent master state is stored in an instance of `etcd`.  This provides a
 
 This server serves up the main [Kubernetes API](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/api).
 
-It validates and configures data for 3 types of objects:
-
-* `pod`: Each `pod` has a representation at the Kubernetes API level.
-* `service`: A service is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more Pods.
-* `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
+It validates and configures data for 3 types of objects: `pod`s, `service`s, and `replicationController`s.
 
 Beyond just servicing REST operations, validating them and storing them in `etcd`, the API Server does two other things:
 
