@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 )
 
 // Server contains info locating a kubernetes api server.
@@ -216,6 +217,7 @@ func (r *Request) Do() Result {
 		if err != nil {
 			if statusErr, ok := err.(*StatusErr); ok {
 				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != 0 {
+					glog.Infof("Waiting for completion of /operations/%s", statusErr.Status.Details)
 					time.Sleep(r.pollPeriod)
 					// Make a poll request
 					pollOp := r.c.PollFor(statusErr.Status.Details).PollPeriod(r.pollPeriod)
