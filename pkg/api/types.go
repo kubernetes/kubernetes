@@ -31,19 +31,17 @@ import (
 //     This defines the format, but not the length restriction, which should be
 //     specified at the definition of any field of this type.
 //
-// DNS_LABEL:  This is a string that conforms to the definition of a "label"
-//     in RFCs 1035 and 1123.  This is captured by the following regex:
+// DNS_LABEL:  This is a string, no more than 63 characters long, that conforms
+//     to the definition of a "label" in RFCs 1035 and 1123.  This is captured
+//     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?
-//     This defines the format, but not the length restriction, which should be
-//     specified at the definition of any field of this type.
 //
-//  DNS_SUBDOMAIN:  This is a string that conforms to the definition of a
-//      "subdomain" in RFCs 1035 and 1123.  This is captured by the following regex:
+//  DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
+//      to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
+//      by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
-//     This defines the format, but not the length restriction, which should be
-//     specified at the definition of any field of this type.
 
 // ContainerManifest corresponds to the Container Manifest format, documented at:
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
@@ -51,7 +49,7 @@ import (
 type ContainerManifest struct {
 	// Required: This must be a supported version string, such as "v1beta1".
 	Version string `yaml:"version" json:"version"`
-	// Required: This must be a DNS_SUBDOMAIN, 255 characters or less.
+	// Required: This must be a DNS_SUBDOMAIN.
 	ID         string      `yaml:"id" json:"id"`
 	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
 	Containers []Container `yaml:"containers" json:"containers"`
@@ -59,17 +57,18 @@ type ContainerManifest struct {
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
-	// Required: This must be a DNS_LABEL, 63 characters or less.  Each volume in a pod
-	// must have a unique name.
+	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
+	// a unique name.
 	Name string `yaml:"name" json:"name"`
 }
 
 // Port represents a network port in a single container
 type Port struct {
-	// Optional: If specified, this must be a DNS_LABEL, 63 characters or less.  Each
-	// container in a pod must have a unique name.
+	// Optional: If specified, this must be a DNS_LABEL.  Each named port
+	// in a pod must have a unique name.
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	// Optional: Defaults to ContainerPort.
+	// Optional: Defaults to ContainerPort.  If specified, this must be a
+	// valid port number, 0 < x < 65536.
 	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`
@@ -102,8 +101,8 @@ type EnvVar struct {
 
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
-	// Required: This must be a DNS_LABEL, 63 characters or less.  Each container in a
-	// pod must have a unique name.
+	// Required: This must be a DNS_LABEL.  Each container in a pod must
+	// have a unique name.
 	Name string `yaml:"name" json:"name"`
 	// Required.
 	Image string `yaml:"image" json:"image"`

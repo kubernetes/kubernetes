@@ -65,7 +65,7 @@ func validateVolumes(volumes []Volume) (util.StringSet, error) {
 	allNames := util.StringSet{}
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
-		if len(vol.Name) > 63 || !util.IsDNSLabel(vol.Name) {
+		if !util.IsDNSLabel(vol.Name) {
 			return util.StringSet{}, makeInvalidError("Volume.Name", vol.Name)
 		}
 		if allNames.Has(vol.Name) {
@@ -99,7 +99,7 @@ func validateContainers(containers []Container, volumes util.StringSet) error {
 	allNames := util.StringSet{}
 	for i := range containers {
 		ctr := &containers[i] // so we can set default values
-		if len(ctr.Name) > 63 || !util.IsDNSLabel(ctr.Name) {
+		if !util.IsDNSLabel(ctr.Name) {
 			return makeInvalidError("Container.Name", ctr.Name)
 		}
 		if allNames.Has(ctr.Name) {
@@ -130,7 +130,7 @@ func ValidateManifest(manifest *ContainerManifest) error {
 	if !supportedManifestVersions.Has(manifest.Version) {
 		return makeNotSupportedError("ContainerManifest.Version", manifest.Version)
 	}
-	if len(manifest.ID) > 255 || !util.IsDNSSubdomain(manifest.ID) {
+	if !util.IsDNSSubdomain(manifest.ID) {
 		return makeInvalidError("ContainerManifest.ID", manifest.ID)
 	}
 	allVolumes, err := validateVolumes(manifest.Volumes)

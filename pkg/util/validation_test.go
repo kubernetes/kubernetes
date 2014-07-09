@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -37,6 +38,7 @@ func TestIsDNSLabel(t *testing.T) {
 		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
 		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
 		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
+		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
 		if IsDNSLabel(val) {
@@ -73,6 +75,7 @@ func TestIsDNSSubdomain(t *testing.T) {
 		"A.B.C.D.E", "AA.BB.CC.DD.EE", "a.B.c.d.e", "aa.bB.cc.dd.ee",
 		"a@b", "a,b", "a_b", "a;b",
 		"a:b", "a%b", "a?b", "a$b",
+		strings.Repeat("a", 254),
 	}
 	for _, val := range badValues {
 		if IsDNSSubdomain(val) {
