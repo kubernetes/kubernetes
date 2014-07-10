@@ -387,6 +387,7 @@ func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.
 	opts := docker.CreateContainerOptions{
 		Name: buildDockerName(manifest, container),
 		Config: &docker.Config{
+			Hostname:     container.Name,
 			Image:        container.Image,
 			ExposedPorts: exposedPorts,
 			Env:          envVariables,
