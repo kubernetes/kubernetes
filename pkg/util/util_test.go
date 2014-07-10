@@ -19,6 +19,8 @@ package util
 import (
 	"encoding/json"
 	"testing"
+
+	"gopkg.in/v1/yaml"
 )
 
 type FakeJSONBase struct {
@@ -63,5 +65,129 @@ func TestHandleCrash(t *testing.T) {
 	}
 	if count != expect {
 		t.Errorf("Expected %d iterations, found %d", expect, count)
+	}
+}
+
+type IntOrStringHolder struct {
+	IOrS IntOrString `json:"val" yaml:"val"`
+}
+
+func TestIntOrStringUnmarshalYAML(t *testing.T) {
+	{
+		yaml_code_int := "val: 123\n"
+
+		var result IntOrStringHolder
+		if err := yaml.Unmarshal([]byte(yaml_code_int), &result); err != nil {
+			t.Errorf("Failed to unmarshal: %v", err)
+		}
+		if result.IOrS.Kind != IntstrInt || result.IOrS.IntVal != 123 {
+			t.Errorf("Failed to unmarshal int-typed IntOrString: %v", result)
+		}
+	}
+
+	{
+		yaml_code_str := "val: \"123\"\n"
+
+		var result IntOrStringHolder
+		if err := yaml.Unmarshal([]byte(yaml_code_str), &result); err != nil {
+			t.Errorf("Failed to unmarshal: %v", err)
+		}
+		if result.IOrS.Kind != IntstrString || result.IOrS.StrVal != "123" {
+			t.Errorf("Failed to unmarshal string-typed IntOrString: %v", result)
+		}
+	}
+}
+
+func TestIntOrStringMarshalYAML(t *testing.T) {
+	{
+		input := IntOrStringHolder{
+			IOrS: IntOrString{
+				Kind:   IntstrInt,
+				IntVal: 123,
+			},
+		}
+		result, err := yaml.Marshal(&input)
+		if err != nil {
+			t.Errorf("Failed to marshal: %v", err)
+		}
+		if string(result) != "val: 123\n" {
+			t.Errorf("Failed to marshal int-typed IntOrString: %q", string(result))
+		}
+	}
+
+	{
+		input := IntOrStringHolder{
+			IOrS: IntOrString{
+				Kind:   IntstrString,
+				StrVal: "123",
+			},
+		}
+		result, err := yaml.Marshal(&input)
+		if err != nil {
+			t.Errorf("Failed to marshal: %v", err)
+		}
+		if string(result) != "val: \"123\"\n" {
+			t.Errorf("Failed to marshal string-typed IntOrString: %q", string(result))
+		}
+	}
+}
+
+func TestIntOrStringUnmarshalJSON(t *testing.T) {
+	{
+		json_code_int := "{\"val\": 123}"
+
+		var result IntOrStringHolder
+		if err := json.Unmarshal([]byte(json_code_int), &result); err != nil {
+			t.Errorf("Failed to unmarshal: %v", err)
+		}
+		if result.IOrS.Kind != IntstrInt || result.IOrS.IntVal != 123 {
+			t.Errorf("Failed to unmarshal int-typed IntOrString: %v", result)
+		}
+	}
+
+	{
+		json_code_str := "{\"val\": \"123\"}"
+
+		var result IntOrStringHolder
+		if err := json.Unmarshal([]byte(json_code_str), &result); err != nil {
+			t.Errorf("Failed to unmarshal: %v", err)
+		}
+		if result.IOrS.Kind != IntstrString || result.IOrS.StrVal != "123" {
+			t.Errorf("Failed to unmarshal string-typed IntOrString: %v", result)
+		}
+	}
+}
+
+func TestIntOrStringMarshalJSON(t *testing.T) {
+	{
+		input := IntOrStringHolder{
+			IOrS: IntOrString{
+				Kind:   IntstrInt,
+				IntVal: 123,
+			},
+		}
+		result, err := json.Marshal(&input)
+		if err != nil {
+			t.Errorf("Failed to marshal: %v", err)
+		}
+		if string(result) != "{\"val\":123}" {
+			t.Errorf("Failed to marshal int-typed IntOrString: %q", string(result))
+		}
+	}
+
+	{
+		input := IntOrStringHolder{
+			IOrS: IntOrString{
+				Kind:   IntstrString,
+				StrVal: "123",
+			},
+		}
+		result, err := json.Marshal(&input)
+		if err != nil {
+			t.Errorf("Failed to marshal: %v", err)
+		}
+		if string(result) != "{\"val\":\"123\"}" {
+			t.Errorf("Failed to marshal string-typed IntOrString: %q", string(result))
+		}
 	}
 }
