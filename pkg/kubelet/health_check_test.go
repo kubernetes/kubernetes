@@ -23,19 +23,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-type fakeHttpClient struct {
+type fakeHTTPClient struct {
 	req string
 	res http.Response
 	err error
 }
 
-func (f *fakeHttpClient) Get(url string) (*http.Response, error) {
+func (f *fakeHTTPClient) Get(url string) (*http.Response, error) {
 	f.req = url
 	return &f.res, f.err
 }
 
 func TestHttpHealth(t *testing.T) {
-	fakeClient := fakeHttpClient{
+	fakeClient := fakeHTTPClient{
 		res: http.Response{
 			StatusCode: http.StatusOK,
 		},

@@ -20,7 +20,7 @@ import (
 	"net"
 )
 
-// CloudInterface is an abstract, pluggable interface for cloud providers
+// Interface is an abstract, pluggable interface for cloud providers
 type Interface interface {
 	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	TCPLoadBalancer() (TCPLoadBalancer, bool)
@@ -28,16 +28,23 @@ type Interface interface {
 	Instances() (Instances, bool)
 }
 
+// TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
 type TCPLoadBalancer interface {
+	// TCPLoadBalancerExists returns whether the specified load balancer exists.
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	TCPLoadBalancerExists(name, region string) (bool, error)
+	// CreateTCPLoadBalancer creates a new tcp load balancer.
 	CreateTCPLoadBalancer(name, region string, port int, hosts []string) error
+	// UpdateTCPLoadBalancer updates hosts under the specified load balancer.
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
+	// DeleteTCPLoadBalancer deletes a specified load balancer.
 	DeleteTCPLoadBalancer(name, region string) error
 }
 
+// Instances is an abstract, pluggable interface for sets of instances.
 type Instances interface {
+	// IPAddress returns an IP address of the specified instance.
 	IPAddress(name string) (net.IP, error)
-	// Lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
+	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
 }

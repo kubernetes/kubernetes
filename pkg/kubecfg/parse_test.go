@@ -31,26 +31,26 @@ func TestParseBadStorage(t *testing.T) {
 }
 
 func DoParseTest(t *testing.T, storage string, obj interface{}) {
-	json_data, _ := api.Encode(obj)
-	yaml_data, _ := yaml.Marshal(obj)
-	t.Logf("Intermediate yaml:\n%v\n", string(yaml_data))
+	jsonData, _ := api.Encode(obj)
+	yamlData, _ := yaml.Marshal(obj)
+	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 
-	json_got, json_err := ToWireFormat(json_data, storage)
-	yaml_got, yaml_err := ToWireFormat(yaml_data, storage)
+	jsonGot, jsonErr := ToWireFormat(jsonData, storage)
+	yamlGot, yamlErr := ToWireFormat(yamlData, storage)
 
-	if json_err != nil {
-		t.Errorf("json err: %#v", json_err)
+	if jsonErr != nil {
+		t.Errorf("json err: %#v", jsonErr)
 	}
-	if yaml_err != nil {
-		t.Errorf("yaml err: %#v", yaml_err)
+	if yamlErr != nil {
+		t.Errorf("yaml err: %#v", yamlErr)
 	}
-	if string(json_got) != string(json_data) {
+	if string(jsonGot) != string(jsonData) {
 		t.Errorf("json output didn't match:\nGot:\n%v\n\nWanted:\n%v\n",
-			string(json_got), string(json_data))
+			string(jsonGot), string(jsonData))
 	}
-	if string(yaml_got) != string(json_data) {
+	if string(yamlGot) != string(jsonData) {
 		t.Errorf("yaml parsed output didn't match:\nGot:\n%v\n\nWanted:\n%v\n",
-			string(yaml_got), string(json_data))
+			string(yamlGot), string(jsonData))
 	}
 }
 

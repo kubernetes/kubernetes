@@ -30,6 +30,7 @@ import (
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 )
 
+// GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service    *compute.Service
 	projectID  string
@@ -61,6 +62,7 @@ func getProjectAndZone() (string, string, error) {
 	return parts[1], parts[3], nil
 }
 
+// NewGCECloud creates a new instance of GCECloud.
 func NewGCECloud() (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
@@ -81,10 +83,12 @@ func NewGCECloud() (*GCECloud, error) {
 	}, nil
 }
 
+// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
 func (gce *GCECloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
 	return gce, true
 }
 
+// Instances returns an implementation of Instances for Google Compute Engine.
 func (gce *GCECloud) Instances() (Instances, bool) {
 	return gce, true
 }
@@ -128,11 +132,13 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 	return nil
 }
 
+// TCPLoadBalancerExists is an implementation of TCPLoadBalancer.TCPLoadBalancerExists.
 func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	_, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	return false, err
 }
 
+// CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, port int, hosts []string) error {
 	pool, err := gce.makeTargetPool(name, region, hosts)
 	if err != nil {
@@ -148,6 +154,7 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, port int, hosts 
 	return err
 }
 
+// UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
 func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
 	var refs []*compute.InstanceReference
 	for _, host := range hosts {
@@ -161,6 +168,7 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 	return err
 }
 
+// DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
 func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	_, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
 	if err != nil {
@@ -170,6 +178,7 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	return err
 }
 
+// IPAddress is an implementation of Instances.IPAddress.
 func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, instance).Do()
 	if err != nil {
@@ -195,6 +204,7 @@ func fqdnSuffix() (string, error) {
 	return strings.TrimSpace(string(fullHostname)[len(string(hostname)):]), nil
 }
 
+// List is an implementation of Instances.List.
 func (gce *GCECloud) List(filter string) ([]string, error) {
 	// GCE gives names without their fqdn suffix, so get that here for appending.
 	// This is needed because the kubelet looks for its jobs in /registry/hosts/<fqdn>/pods

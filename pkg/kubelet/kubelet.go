@@ -44,17 +44,14 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-// State, sub object of the Docker JSON data
-type State struct {
-	Running bool
-}
-
-// The structured representation of the JSON object returned by Docker inspect
+// DockerContainerData is the structured representation of the JSON object returned by Docker inspect
 type DockerContainerData struct {
-	state State
+	state struct {
+		Running bool
+	}
 }
 
-// Interface for testability
+// DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
 	InspectContainer(id string) (*docker.Container, error)
@@ -64,24 +61,26 @@ type DockerInterface interface {
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 }
 
-// Type to make it clear when we're working with docker container Ids
+// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
 
-//Interface for testability
+// DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string) error
 }
 
+// CadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type CadvisorInterface interface {
 	ContainerInfo(name string) (*info.ContainerInfo, error)
 	MachineInfo() (*info.MachineInfo, error)
 }
 
+// New creates a new Kubelet.
 func New() *Kubelet {
 	return &Kubelet{}
 }
 
-// The main kubelet implementation
+// Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	Hostname           string
 	EtcdClient         tools.EtcdClient
@@ -107,9 +106,9 @@ const (
 	httpServerSource = "http_server"
 )
 
-// Starts background goroutines. If config_path, manifest_url, or address are empty,
+// RunKubelet starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_servers, address string, port uint) {
+func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServers, address string, port uint) {
 	if kl.CadvisorClient == nil {
 		var err error
 		kl.CadvisorClient, err = cadvisor.NewClient("http://127.0.0.1:5000")
@@ -121,22 +120,22 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_se
 		kl.DockerPuller = kl.MakeDockerPuller()
 	}
 	updateChannel := make(chan manifestUpdate)
-	if config_path != "" {
-		glog.Infof("Watching for file configs at %s", config_path)
+	if configPath != "" {
+		glog.Infof("Watching for file configs at %s", configPath)
 		go util.Forever(func() {
-			kl.WatchFiles(config_path, updateChannel)
+			kl.WatchFiles(configPath, updateChannel)
 		}, kl.FileCheckFrequency)
 	}
-	if manifest_url != "" {
-		glog.Infof("Watching for HTTP configs at %s", manifest_url)
+	if manifestURL != "" {
+		glog.Infof("Watching for HTTP configs at %s", manifestURL)
 		go util.Forever(func() {
-			if err := kl.extractFromHTTP(manifest_url, updateChannel); err != nil {
+			if err := kl.extractFromHTTP(manifestURL, updateChannel); err != nil {
 				glog.Errorf("Error syncing http: %v", err)
 			}
 		}, kl.HTTPCheckFrequency)
 	}
-	if etcd_servers != "" {
-		servers := []string{etcd_servers}
+	if etcdServers != "" {
+		servers := []string{etcdServers}
 		glog.Infof("Watching for etcd configs at %v", servers)
 		kl.EtcdClient = etcd.NewClient(servers)
 		go util.Forever(func() { kl.SyncAndSetupEtcdWatch(updateChannel) }, 20*time.Second)
@@ -160,15 +159,15 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, config_path, manifest_url, etcd_se
 	kl.syncLoop(updateChannel, kl)
 }
 
-// Interface implemented by Kubelet, for testability
+// SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
 	SyncManifests([]api.ContainerManifest) error
 }
 
-// Log an event to the etcd backend.
+// LogEvent logs an event to the etcd backend.
 func (kl *Kubelet) LogEvent(event *api.Event) error {
 	if kl.EtcdClient == nil {
-		return fmt.Errorf("no etcd client connection.")
+		return fmt.Errorf("no etcd client connection")
 	}
 	event.Timestamp = time.Now().Unix()
 	data, err := json.Marshal(event)
@@ -234,12 +233,14 @@ func (kl *Kubelet) getContainer(ID DockerID) (*docker.APIContainers, error) {
 	return nil, nil
 }
 
+// MakeDockerPuller creates a new instance of the default implementation of DockerPuller.
 func (kl *Kubelet) MakeDockerPuller() DockerPuller {
 	return dockerPuller{
 		client: kl.DockerClient,
 	}
 }
 
+// dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
 	client DockerInterface
 }
@@ -304,7 +305,7 @@ func makeEnvironmentVariables(container *api.Container) []string {
 	return result
 }
 
-func makeVolumesAndBinds(manifestId string, container *api.Container) (map[string]struct{}, []string) {
+func makeVolumesAndBinds(manifestID string, container *api.Container) (map[string]struct{}, []string) {
 	volumes := map[string]struct{}{}
 	binds := []string{}
 	for _, volume := range container.VolumeMounts {
@@ -314,7 +315,7 @@ func makeVolumesAndBinds(manifestId string, container *api.Container) (map[strin
 			basePath = fmt.Sprintf("%s:%s", volume.MountPath, volume.MountPath)
 		} else {
 			volumes[volume.MountPath] = struct{}{}
-			basePath = fmt.Sprintf("/exports/%s/%s:%s", manifestId, volume.Name, volume.MountPath)
+			basePath = fmt.Sprintf("/exports/%s/%s:%s", manifestID, volume.Name, volume.MountPath)
 		}
 		if volume.ReadOnly {
 			basePath += ":ro"
@@ -465,12 +466,12 @@ func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) 
 	return manifests, nil
 }
 
-// Watch a file or direcory of files for changes to the set of pods that
+// WatchFiles watches a file or direcory of files for changes to the set of pods that
 // should run on this Kubelet.
-func (kl *Kubelet) WatchFiles(config_path string, updateChannel chan<- manifestUpdate) {
+func (kl *Kubelet) WatchFiles(configPath string, updateChannel chan<- manifestUpdate) {
 	var err error
 
-	statInfo, err := os.Stat(config_path)
+	statInfo, err := os.Stat(configPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			glog.Errorf("Error accessing path: %v", err)
@@ -478,14 +479,14 @@ func (kl *Kubelet) WatchFiles(config_path string, updateChannel chan<- manifestU
 		return
 	}
 	if statInfo.Mode().IsDir() {
-		manifests, err := kl.extractFromDir(config_path)
+		manifests, err := kl.extractFromDir(configPath)
 		if err != nil {
 			glog.Errorf("Error polling dir: %v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, manifests}
 	} else if statInfo.Mode().IsRegular() {
-		manifest, err := kl.extractFromFile(config_path)
+		manifest, err := kl.extractFromFile(configPath)
 		if err != nil {
 			glog.Errorf("Error polling file: %v", err)
 			return
@@ -548,8 +549,8 @@ func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpda
 		url, string(data), singleErr, manifest, multiErr, manifests)
 }
 
-// Take an etcd Response object, and turn it into a structured list of containers
-// Return a list of containers, or an error if one occurs.
+// ResponseToManifests takes an etcd Response object, and turns it into a structured list of containers.
+// It returns a list of containers, or an error if one occurs.
 func (kl *Kubelet) ResponseToManifests(response *etcd.Response) ([]api.ContainerManifest, error) {
 	if response.Node == nil || len(response.Node.Value) == 0 {
 		return nil, fmt.Errorf("no nodes field: %v", response)
@@ -578,7 +579,7 @@ func (kl *Kubelet) getKubeletStateFromEtcd(key string, updateChannel chan<- mani
 	return nil
 }
 
-// Sync with etcd, and set up an etcd watch for new configurations
+// SyncAndSetupEtcdWatch synchronizes with etcd, and sets up an etcd watch for new configurations.
 // The channel to send new configurations across
 // This function loops forever and is intended to be run in a go routine.
 func (kl *Kubelet) SyncAndSetupEtcdWatch(updateChannel chan<- manifestUpdate) {
@@ -610,7 +611,7 @@ func (kl *Kubelet) SyncAndSetupEtcdWatch(updateChannel chan<- manifestUpdate) {
 	}
 }
 
-// Timeout the watch after 30 seconds
+// TimeoutWatch timeout the watch after 30 seconds.
 func (kl *Kubelet) TimeoutWatch(done chan bool) {
 	t := time.Tick(30 * time.Second)
 	for _ = range t {
@@ -618,7 +619,7 @@ func (kl *Kubelet) TimeoutWatch(done chan bool) {
 	}
 }
 
-// Extract data from YAML file into a list of containers.
+// ExtractYAMLData extracts data from YAML file into a list of containers.
 func (kl *Kubelet) ExtractYAMLData(buf []byte, output interface{}) error {
 	err := yaml.Unmarshal(buf, output)
 	if err != nil {
@@ -637,7 +638,7 @@ func (kl *Kubelet) extractFromEtcd(response *etcd.Response) ([]api.ContainerMani
 	return manifests, err
 }
 
-// Watch etcd for changes, receives config objects from the etcd client watch.
+// WatchEtcd watches etcd for changes, receives config objects from the etcd client watch.
 // This function loops until the watchChannel is closed, and is intended to be run as a goroutine.
 func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, updateChannel chan<- manifestUpdate) {
 	defer util.HandleCrash()
@@ -751,7 +752,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 
 type empty struct{}
 
-// Sync the configured list of containers (desired state) with the host current state
+// SyncManifests synchronizes the configured list of containers (desired state) with the host current state.
 func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	glog.Infof("Desired: %+v", config)
 	var err error
@@ -873,12 +874,12 @@ func (kl *Kubelet) syncLoop(updateChannel <-chan manifestUpdate, handler SyncHan
 	}
 }
 
-// getContainerIdFromName looks at the list of containers on the machine and returns the ID of the container whose name
+// getContainerIDFromName looks at the list of containers on the machine and returns the ID of the container whose name
 // matches 'name'.  It returns the name of the container, or empty string, if the container isn't found.
 // it returns true if the container is found, false otherwise, and any error that occurs.
 // TODO: This functions exists to support GetContainerInfo and GetContainerStats
 //       It should be removed once those two functions start taking proper pod.IDs
-func (kl *Kubelet) getContainerIdFromName(name string) (DockerID, bool, error) {
+func (kl *Kubelet) getContainerIDFromName(name string) (DockerID, bool, error) {
 	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
 		return "", false, err
@@ -891,7 +892,7 @@ func (kl *Kubelet) getContainerIdFromName(name string) (DockerID, bool, error) {
 	return "", false, nil
 }
 
-// Returns docker info for all containers in the pod/manifest
+// GetPodInfo returns docker info for all containers in the pod/manifest.
 func (kl *Kubelet) GetPodInfo(podID string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
@@ -970,7 +971,7 @@ func (kl *Kubelet) statsFromContainerPath(containerPath string) (*api.ContainerS
 	return ret, nil
 }
 
-// Returns stats (from Cadvisor) for a container.
+// GetContainerStats returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.ContainerStats, error) {
 	if kl.CadvisorClient == nil {
 		return nil, nil
@@ -982,7 +983,7 @@ func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.Containe
 	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", string(dockerID)))
 }
 
-// Returns stats (from Cadvisor) of current machine.
+// GetMachineStats returns stats (from Cadvisor) of current machine.
 func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
 	return kl.statsFromContainerPath("/")
 }

@@ -64,7 +64,7 @@ func makeNotFoundError(field string, value interface{}) ValidationError {
 }
 
 // A helper for accumulating errors.  This could be moved to util if anyone else needs it.
-type errorList []error;
+type errorList []error
 
 func (list *errorList) Append(errs ...error) {
 	*list = append(*list, errs...)
@@ -87,7 +87,7 @@ func validateVolumes(volumes []Volume) (util.StringSet, errorList) {
 	return allNames, allErrs
 }
 
-var supportedPortProtocols util.StringSet = util.NewStringSet("TCP", "UDP")
+var supportedPortProtocols = util.NewStringSet("TCP", "UDP")
 
 func validatePorts(ports []Port) errorList {
 	allErrs := errorList{}
@@ -219,10 +219,10 @@ func validateContainers(containers []Container, volumes util.StringSet) errorLis
 	// every Port.HostPort across the whole pod must be unique.
 	allErrs.Append(checkHostPortConflicts(containers)...)
 
-	return allErrs;
+	return allErrs
 }
 
-var supportedManifestVersions util.StringSet = util.NewStringSet("v1beta1", "v1beta2")
+var supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
 
 // ValidateManifest tests that the specified ContainerManifest has valid data.
 // This includes checking formatting and uniqueness.  It also canonicalizes the

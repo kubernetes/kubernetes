@@ -22,7 +22,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-// A simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
+// FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
 	containerList []docker.APIContainers
 	container     *docker.Container
@@ -41,16 +41,22 @@ func (f *FakeDockerClient) appendCall(call string) {
 	f.called = append(f.called, call)
 }
 
+// ListContainers is a test-spy implementation of DockerInterface.ListContainers.
+// It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
 	f.appendCall("list")
 	return f.containerList, f.err
 }
 
+// InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
+// It adds an entry "inspect" to the internal method call record.
 func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
 	f.appendCall("inspect")
 	return f.container, f.err
 }
 
+// CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
+// It adds an entry "create" to the internal method call record.
 func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*docker.Container, error) {
 	f.appendCall("create")
 	f.Created = append(f.Created, c.Name)
@@ -61,11 +67,15 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	return &docker.Container{ID: name}, nil
 }
 
+// StartContainer is a test-spy implementation of DockerInterface.StartContainer.
+// It adds an entry "start" to the internal method call record.
 func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
 	f.appendCall("start")
 	return f.err
 }
 
+// StopContainer is a test-spy implementation of DockerInterface.StopContainer.
+// It adds an entry "stop" to the internal method call record.
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.appendCall("stop")
 	f.stopped = append(f.stopped, id)
@@ -79,12 +89,15 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	return f.err
 }
 
+// PullImage is a test-spy implementation of DockerInterface.StopContainer.
+// It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
 	f.appendCall("pull")
 	f.pulled = append(f.pulled, fmt.Sprintf("%s/%s:%s", opts.Repository, opts.Registry, opts.Tag))
 	return f.err
 }
 
+// FakeDockerPuller is a stub implementation of DockerPuller.
 type FakeDockerPuller struct {
 	ImagesPulled []string
 
@@ -93,7 +106,7 @@ type FakeDockerPuller struct {
 	ErrorsToInject []error
 }
 
-// Records the image pull attempt, and optionally injects an error.
+// Pull records the image pull attempt, and optionally injects an error.
 func (f *FakeDockerPuller) Pull(image string) error {
 	f.ImagesPulled = append(f.ImagesPulled, image)
 
