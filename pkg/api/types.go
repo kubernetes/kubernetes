@@ -104,6 +104,7 @@ type EnvVar struct {
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
 
+// HTTPGetProbe describes a liveness probe based on HTTP Get requests.
 type HTTPGetProbe struct {
 	// Path to access on the http server
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
@@ -113,6 +114,7 @@ type HTTPGetProbe struct {
 	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 }
 
+// LivenessProbe describes a liveness probe to be examined to the container.
 type LivenessProbe struct {
 	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	// Type of liveness probe.  Current legal values "http"
