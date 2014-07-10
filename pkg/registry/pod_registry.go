@@ -89,6 +89,16 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 			return
 		}
 		pod.CurrentState.Info = info
+		netContainerInfo, ok := info["net"]
+		if ok {
+			if netContainerInfo.NetworkSettings != nil {
+				pod.CurrentState.PodIP = netContainerInfo.NetworkSettings.IPAddress
+			} else {
+				glog.Warningf("No network settings: %#v", netContainerInfo)
+			}
+		} else {
+			glog.Warningf("Couldn't find network container in %v", info)
+		}
 	}
 }
 

@@ -278,3 +278,69 @@ func TestCreatePod(t *testing.T) {
 		// Do nothing, this is expected.
 	}
 }
+
+type FakePodInfoGetter struct {
+	info api.PodInfo
+	err  error
+}
+
+func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+	return f.info, f.err
+}
+
+func TestFillPodInfo(t *testing.T) {
+	expectedIP := "1.2.3.4"
+	fakeGetter := FakePodInfoGetter{
+		info: map[string]docker.Container{
+			"net": {
+				ID:   "foobar",
+				Path: "bin/run.sh",
+				NetworkSettings: &docker.NetworkSettings{
+					IPAddress: expectedIP,
+				},
+			},
+		},
+	}
+	storage := PodRegistryStorage{
+		podCache: &fakeGetter,
+	}
+
+	pod := api.Pod{}
+
+	storage.fillPodInfo(&pod)
+
+	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
+		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
+	}
+
+	if pod.CurrentState.PodIP != expectedIP {
+		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
+	}
+}
+
+func TestFillPodInfoNoData(t *testing.T) {
+	expectedIP := ""
+	fakeGetter := FakePodInfoGetter{
+		info: map[string]docker.Container{
+			"net": {
+				ID:   "foobar",
+				Path: "bin/run.sh",
+			},
+		},
+	}
+	storage := PodRegistryStorage{
+		podCache: &fakeGetter,
+	}
+
+	pod := api.Pod{}
+
+	storage.fillPodInfo(&pod)
+
+	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
+		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
+	}
+
+	if pod.CurrentState.PodIP != expectedIP {
+		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
+	}
+}
