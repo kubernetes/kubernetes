@@ -16,6 +16,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 ### Contents
 * [Getting started on Google Compute Engine](#getting-started-on-google-compute-engine)
 * [Running a local cluster](#running-locally)
+* [Running on CoreOS](#running-on-coreos)
 * [Discussion and Community Support](#community-discussion-and-support)
 * [Hacking on Kubernetes](#development)
 
@@ -122,6 +123,9 @@ This will build and start a lightweight local cluster, consisting of a master an
 
 If you are running both a remote kubernetes cluster and the local cluster, you can determine which you talk to using the ```KUBERNETES_MASTER``` environment variable.
 
+
+## Running on [CoreOS](http://coreos.com)
+The folks at [CoreOS](http://coreos.com) have [instructions for running Kubernetes on CoreOS](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-1/)
 
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/guestbook.md)
