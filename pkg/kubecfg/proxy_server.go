@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
+// ProxyServer is a http.Handler which proxies Kubenetes APIs to remote API server.
 type ProxyServer struct {
 	Host   string
 	Auth   *client.AuthInfo
@@ -34,6 +35,8 @@ func makeFileHandler(prefix, base string) http.Handler {
 	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
 }
 
+// NewProxyServer creates and installs a new ProxyServer.
+// It automatically registers the created ProxyServer to http.DefaultServeMux.
 func NewProxyServer(filebase, host string, auth *client.AuthInfo) *ProxyServer {
 	server := &ProxyServer{
 		Host:   host,
@@ -45,7 +48,7 @@ func NewProxyServer(filebase, host string, auth *client.AuthInfo) *ProxyServer {
 	return server
 }
 
-// Starts the server, loops forever.
+// Serve starts the server (http.DefaultServeMux) on TCP port 8001, loops forever.
 func (s *ProxyServer) Serve() error {
 	return http.ListenAndServe(":8001", nil)
 }

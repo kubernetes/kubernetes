@@ -35,14 +35,16 @@ type ResourcePrinter interface {
 	PrintObj(interface{}, io.Writer) error
 }
 
-// Identity printer simply copies the body out to the output stream
+// IdentityPrinter is an implementation of ResourcePrinter which simply copies the body out to the output stream
 type IdentityPrinter struct{}
 
+// Print is an implementation of ResourcePrinter.Print which simply writes the data to the Writer.
 func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 	_, err := w.Write(data)
 	return err
 }
 
+// PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
 	data, err := api.Encode(obj)
 	if err != nil {
@@ -51,9 +53,10 @@ func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
 	return i.Print(data, output)
 }
 
-// YAMLPrinter parses JSON, and re-formats as YAML
+// YAMLPrinter is an implementation of ResourcePrinter which parsess JSON, and re-formats as YAML
 type YAMLPrinter struct{}
 
+// Print parses the data as JSON, re-formats as YAML and prints the YAML.
 func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
 	var obj interface{}
 	if err := json.Unmarshal(data, &obj); err != nil {
@@ -67,6 +70,7 @@ func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
 	return err
 }
 
+// PrintObj prints the data as YAML.
 func (y *YAMLPrinter) PrintObj(obj interface{}, w io.Writer) error {
 	output, err := yaml.Marshal(obj)
 	if err != nil {
@@ -76,7 +80,7 @@ func (y *YAMLPrinter) PrintObj(obj interface{}, w io.Writer) error {
 	return err
 }
 
-// HumanReadablePrinter attempts to provide more elegant output
+// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide more elegant output.
 type HumanReadablePrinter struct{}
 
 var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
@@ -177,6 +181,7 @@ func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) erro
 	return err
 }
 
+// Print parses the data as JSON, then prints the parsed data in a human-friendly format according to the type of the data.
 func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	var mapObj map[string]interface{}
 	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {
@@ -194,6 +199,7 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	return h.PrintObj(obj, output)
 }
 
+// PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error {
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()

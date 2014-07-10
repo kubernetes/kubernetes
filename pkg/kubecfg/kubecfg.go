@@ -39,7 +39,7 @@ func promptForString(field string) string {
 	return result
 }
 
-// Parse an AuthInfo object from a file path. Prompt user and create file if it doesn't exist.
+// LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
 func LoadAuthInfo(path string) (*client.AuthInfo, error) {
 	var auth client.AuthInfo
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -63,7 +63,7 @@ func LoadAuthInfo(path string) (*client.AuthInfo, error) {
 	return &auth, err
 }
 
-// Perform a rolling update of a collection of pods.
+// Update performs a rolling update of a collection of pods.
 // 'name' points to a replication controller.
 // 'client' is used for updating pods.
 // 'updatePeriod' is the time between pod updates.
