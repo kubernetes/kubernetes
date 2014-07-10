@@ -43,6 +43,13 @@ cd kubernetes
 hack/dev-build-and-up.sh
 ```
 
+The script above relies on Google Storage to deploy the software to instances running in GCE. It uses the Google Storage APIs so the "Google Cloud Storage JSON API" setting must be enabled for the project in the Google Developers Console (https://cloud.google.com/console#/project).
+
+The instances must also be able to connect to each other using their private IP. The script uses the "default" network which should have a firewall rule called "default-allow-internal" which allows traffic on any port on the private IPs.
+If this rule is missing from the default network or if you change the network being used in `cluster/config-default.sh` create a new rule with the following field values:
+* Source Ranges: 10.0.0.0/8
+* Allowed Protocols or Port: tcp:1-65535;udp:1-65535;icmp
+
 ### Running a container (simple version)
 
 Once you have your instances up and running, the `build-go.sh` script sets up
