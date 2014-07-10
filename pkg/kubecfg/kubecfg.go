@@ -67,7 +67,7 @@ func LoadAuthInfo(path string) (*client.AuthInfo, error) {
 // 'name' points to a replication controller.
 // 'client' is used for updating pods.
 // 'updatePeriod' is the time between pod updates.
-func Update(name string, client client.ClientInterface, updatePeriod time.Duration) error {
+func Update(name string, client client.Interface, updatePeriod time.Duration) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func Update(name string, client client.ClientInterface, updatePeriod time.Durati
 }
 
 // StopController stops a controller named 'name' by setting replicas to zero
-func StopController(name string, client client.ClientInterface) error {
+func StopController(name string, client client.Interface) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func StopController(name string, client client.ClientInterface) error {
 }
 
 // ResizeController resizes a controller named 'name' by setting replicas to 'replicas'
-func ResizeController(name string, replicas int, client client.ClientInterface) error {
+func ResizeController(name string, replicas int, client client.Interface) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func makePorts(spec string) []api.Port {
 }
 
 // RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'
-func RunController(image, name string, replicas int, client client.ClientInterface, portSpec string, servicePort int) error {
+func RunController(image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
 	controller := api.ReplicationController{
 		JSONBase: api.JSONBase{
 			ID: name,
@@ -208,7 +208,7 @@ func RunController(image, name string, replicas int, client client.ClientInterfa
 	return nil
 }
 
-func createService(name string, port int, client client.ClientInterface) (api.Service, error) {
+func createService(name string, port int, client client.Interface) (api.Service, error) {
 	svc := api.Service{
 		JSONBase: api.JSONBase{ID: name},
 		Port:     port,
@@ -225,7 +225,7 @@ func createService(name string, port int, client client.ClientInterface) (api.Se
 
 // DeleteController deletes a replication controller named 'name', requires that the controller
 // already be stopped
-func DeleteController(name string, client client.ClientInterface) error {
+func DeleteController(name string, client client.Interface) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
 		return err
