@@ -913,13 +913,15 @@ type mockCadvisorClient struct {
 	mock.Mock
 }
 
-func (self *mockCadvisorClient) ContainerInfo(name string) (*info.ContainerInfo, error) {
-	args := self.Called(name)
+// ContainerInfo is a mock implementation of CadvisorInterface.ContainerInfo.
+func (c *mockCadvisorClient) ContainerInfo(name string) (*info.ContainerInfo, error) {
+	args := c.Called(name)
 	return args.Get(0).(*info.ContainerInfo), args.Error(1)
 }
 
-func (self *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
-	args := self.Called()
+// MachineInfo is a mock implementation of CadvisorInterface.MachineInfo.
+func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
+	args := c.Called()
 	return args.Get(0).(*info.MachineInfo), args.Error(1)
 }
 

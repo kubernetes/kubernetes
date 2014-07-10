@@ -54,7 +54,7 @@ type serverTestFramework struct {
 	updateReader    *channelReader
 	serverUnderTest *KubeletServer
 	fakeKubelet     *fakeKubelet
-	testHttpServer  *httptest.Server
+	testHTTPServer  *httptest.Server
 }
 
 func makeServerTest() *serverTestFramework {
@@ -67,7 +67,7 @@ func makeServerTest() *serverTestFramework {
 		Kubelet:       fw.fakeKubelet,
 		UpdateChannel: fw.updateChan,
 	}
-	fw.testHttpServer = httptest.NewServer(fw.serverUnderTest)
+	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
 }
 
@@ -83,7 +83,7 @@ func TestContainer(t *testing.T) {
 		{ID: "test_manifest"},
 	}
 	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected[0]))) // Only send a single ContainerManifest
-	resp, err := http.Post(fw.testHttpServer.URL+"/container", "application/json", body)
+	resp, err := http.Post(fw.testHTTPServer.URL+"/container", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestContainers(t *testing.T) {
 		{ID: "test_manifest_2"},
 	}
 	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected)))
-	resp, err := http.Post(fw.testHttpServer.URL+"/containers", "application/json", body)
+	resp, err := http.Post(fw.testHTTPServer.URL+"/containers", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestPodInfo(t *testing.T) {
 		}
 		return nil, fmt.Errorf("bad pod")
 	}
-	resp, err := http.Get(fw.testHttpServer.URL + "/podInfo?podID=goodpod")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/podInfo?podID=goodpod")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestContainerStats(t *testing.T) {
 		return expectedStats, nil
 	}
 
-	resp, err := http.Get(fw.testHttpServer.URL + fmt.Sprintf("/stats/%v/%v", expectedPodID, expectedContainerName))
+	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v", expectedPodID, expectedContainerName))
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestMachineStats(t *testing.T) {
 		return expectedStats, nil
 	}
 
-	resp, err := http.Get(fw.testHttpServer.URL + "/stats")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
 	}

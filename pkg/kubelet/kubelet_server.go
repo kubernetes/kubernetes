@@ -31,6 +31,7 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
+// KubeletServer is a http.Handler which exposes kubelet functionality over HTTP.
 type KubeletServer struct {
 	Kubelet       kubeletInterface
 	UpdateChannel chan<- manifestUpdate
