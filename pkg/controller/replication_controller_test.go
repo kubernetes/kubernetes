@@ -41,7 +41,7 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
-func makeUrl(suffix string) string {
+func makeURL(suffix string) string {
 	return apiPath + suffix
 }
 
@@ -205,7 +205,7 @@ func TestCreateReplica(t *testing.T) {
 	//	DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 	//}
 	// TODO: fix this so that it validates the body.
-	fakeHandler.ValidateRequest(t, makeUrl("/pods"), "POST", nil)
+	fakeHandler.ValidateRequest(t, makeURL("/pods"), "POST", nil)
 }
 
 func TestHandleWatchResponseNotSet(t *testing.T) {

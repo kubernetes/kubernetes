@@ -44,13 +44,16 @@ type ReplicationManager struct {
 	syncHandler func(controllerSpec api.ReplicationController) error
 }
 
-// An interface that knows how to add or delete pods
+// PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
+	// createReplica creates new replicated pods according to the spec.
 	createReplica(controllerSpec api.ReplicationController)
+	// deletePod deletes the pod identified by podID.
 	deletePod(podID string) error
 }
 
+// RealPodControl is the default implementation of PodControllerInterface.
 type RealPodControl struct {
 	kubeClient client.ClientInterface
 }
@@ -77,6 +80,7 @@ func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
 }
 
+// MakeReplicationManager craetes a new ReplicationManager.
 func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.ClientInterface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
@@ -91,7 +95,7 @@ func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Clien
 	return rm
 }
 
-// Begin watching and syncing.
+// Run begins watching and syncing.
 func (rm *ReplicationManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
 	go util.Forever(func() { rm.watchControllers() }, period)
@@ -145,9 +149,8 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api
 				return nil, err
 			}
 			return &controllerSpec, nil
-		} else {
-			return nil, fmt.Errorf("response node is null %#v", response)
 		}
+		return nil, fmt.Errorf("response node is null %#v", response)
 	} else if response.Action == "delete" {
 		// Ensure that the final state of a replication controller is applied before it is deleted.
 		// Otherwise, a replication controller could be modified and then deleted (for example, from 3 to 0
@@ -158,9 +161,8 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api
 				return nil, err
 			}
 			return &controllerSpec, nil
-		} else {
-			return nil, fmt.Errorf("previous node is null %#v", response)
 		}
+		return nil, fmt.Errorf("previous node is null %#v", response)
 	}
 
 	return nil, nil
