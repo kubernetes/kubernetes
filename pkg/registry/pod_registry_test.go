@@ -317,3 +317,30 @@ func TestFillPodInfo(t *testing.T) {
 		t.Errorf("Expected %s, saw %s", expectedIP, pod.CurrentState.PodIP)
 	}
 }
+
+func TestFillPodInfoNoData(t *testing.T) {
+	expectedIP := ""
+	fakeGetter := FakePodInfoGetter{
+		info: map[string]docker.Container{
+			"net": {
+				ID:   "foobar",
+				Path: "bin/run.sh",
+			},
+		},
+	}
+	storage := PodRegistryStorage{
+		podCache: &fakeGetter,
+	}
+
+	pod := api.Pod{}
+
+	storage.fillPodInfo(&pod)
+
+	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
+		t.Errorf("Unexpected mis-match: %#v vs %#v", fakeGetter.info, pod.CurrentState.Info)
+	}
+
+	if pod.CurrentState.PodIP != expectedIP {
+		t.Errorf("Expected %s, saw %s", expectedIP, pod.CurrentState.PodIP)
+	}
+}
