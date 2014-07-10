@@ -310,11 +310,11 @@ func TestFillPodInfo(t *testing.T) {
 	storage.fillPodInfo(&pod)
 
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
-		t.Errorf("Unexpected mis-match: %#v vs %#v", fakeGetter.info, pod.CurrentState.Info)
+		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
 	}
 
 	if pod.CurrentState.PodIP != expectedIP {
-		t.Errorf("Expected %s, saw %s", expectedIP, pod.CurrentState.PodIP)
+		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
 	}
 }
 
@@ -337,10 +337,10 @@ func TestFillPodInfoNoData(t *testing.T) {
 	storage.fillPodInfo(&pod)
 
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
-		t.Errorf("Unexpected mis-match: %#v vs %#v", fakeGetter.info, pod.CurrentState.Info)
+		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
 	}
 
 	if pod.CurrentState.PodIP != expectedIP {
-		t.Errorf("Expected %s, saw %s", expectedIP, pod.CurrentState.PodIP)
+		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
 	}
 }
