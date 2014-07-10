@@ -64,3 +64,66 @@ func MakeJSONString(o interface{}) string {
 	data, _ := json.Marshal(o)
 	return string(data)
 }
+
+// IntOrString is a type that can hold an int or a string.  When used in
+// JSON or YAML marshalling and unmarshalling, it produces or consumes the
+// inner type.  This allows you to have, for example, a JSON field that can
+// accept a name or number.
+type IntOrString struct {
+	Kind   IntstrKind
+	IntVal int
+	StrVal string
+}
+
+type IntstrKind int
+
+const (
+	IntstrInt IntstrKind = iota
+	IntstrString
+)
+
+func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
+	if intVal, ok := value.(int); ok {
+		intstr.Kind = IntstrInt
+		intstr.IntVal = intVal
+		return true
+	}
+	if strVal, ok := value.(string); ok {
+		intstr.Kind = IntstrString
+		intstr.StrVal = strVal
+		return true
+	}
+	return false
+}
+
+func (intstr IntOrString) GetYAML() (tag string, value interface{}) {
+	switch intstr.Kind {
+	case IntstrInt:
+		value = intstr.IntVal
+	case IntstrString:
+		value = intstr.StrVal
+	default:
+		panic("impossible IntOrString.Kind")
+	}
+	return
+}
+
+func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
+	if value[0] == '"' {
+		intstr.Kind = IntstrString
+		return json.Unmarshal(value, &intstr.StrVal)
+	}
+	intstr.Kind = IntstrInt
+	return json.Unmarshal(value, &intstr.IntVal)
+}
+
+func (intstr IntOrString) MarshalJSON() ([]byte, error) {
+	switch intstr.Kind {
+	case IntstrInt:
+		return json.Marshal(intstr.IntVal)
+	case IntstrString:
+		return json.Marshal(intstr.StrVal)
+	default:
+		panic("impossible IntOrString.Kind")
+	}
+}
