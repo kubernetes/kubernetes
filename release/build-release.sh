@@ -14,11 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script will build and release Kubernetes.
-#
-# The main parameters to this script come from the config.sh file.  This is set
-# up by default for development releases.  Feel free to edit it or override some
-# of the variables there.
+# This script will build a Kubernetes release tarball
 
 # exit on any error
 set -eu
