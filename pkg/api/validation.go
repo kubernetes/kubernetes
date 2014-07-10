@@ -246,3 +246,14 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	allErrs.Append(validateContainers(manifest.Containers, allVolumes)...)
 	return []error(allErrs)
 }
+
+func ValidateService(service *Service) []error {
+	allErrs := errorList{}
+	if service.ID == "" {
+		allErrs.Append(fmt.Errorf("ID should not be empty: %#v", *service))
+	}
+	if len(service.Selector) == 0 {
+		allErrs.Append(fmt.Errorf("Service %#v missing a selector", *service))
+	}
+	return []error(allErrs)
+}

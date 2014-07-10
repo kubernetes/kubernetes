@@ -112,8 +112,9 @@ func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
 
 func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(api.Service)
-	if srv.ID == "" {
-		return nil, fmt.Errorf("ID should not be empty: %#v", srv)
+	errs := api.ValidateService(&srv)
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
