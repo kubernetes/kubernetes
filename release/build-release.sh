@@ -21,7 +21,7 @@ set -eu
 set -o pipefail
 IFS=$'\n\t'
 
-SCRIPT_DIR=$(cd $(dirname $0); pwd)
+SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
 INSTANCE_PREFIX=$1
 
