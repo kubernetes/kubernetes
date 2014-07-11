@@ -29,8 +29,9 @@ import (
 	"github.com/golang/glog"
 )
 
-// ClientInterface holds the methods for clients of Kubenetes, an interface to allow mock testing
-type ClientInterface interface {
+// Interface holds the methods for clients of Kubenetes,
+// an interface to allow mock testing.
+type Interface interface {
 	ListPods(selector labels.Selector) (api.PodList, error)
 	GetPod(name string) (api.Pod, error)
 	DeletePod(name string) error

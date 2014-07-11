@@ -36,7 +36,7 @@ import (
 // TODO: Remove the etcd dependency and re-factor in terms of a generic watch interface
 type ReplicationManager struct {
 	etcdClient tools.EtcdClient
-	kubeClient client.ClientInterface
+	kubeClient client.Interface
 	podControl PodControlInterface
 	syncTime   <-chan time.Time
 
@@ -55,7 +55,7 @@ type PodControlInterface interface {
 
 // RealPodControl is the default implementation of PodControllerInterface.
 type RealPodControl struct {
-	kubeClient client.ClientInterface
+	kubeClient client.Interface
 }
 
 func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) {
@@ -81,7 +81,7 @@ func (r RealPodControl) deletePod(podID string) error {
 }
 
 // MakeReplicationManager craetes a new ReplicationManager.
-func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.ClientInterface) *ReplicationManager {
+func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Interface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
 		etcdClient: etcdClient,
