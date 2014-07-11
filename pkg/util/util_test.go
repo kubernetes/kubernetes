@@ -74,10 +74,10 @@ type IntOrStringHolder struct {
 
 func TestIntOrStringUnmarshalYAML(t *testing.T) {
 	{
-		yaml_code_int := "val: 123\n"
+		yamlCodeInt := "val: 123\n"
 
 		var result IntOrStringHolder
-		if err := yaml.Unmarshal([]byte(yaml_code_int), &result); err != nil {
+		if err := yaml.Unmarshal([]byte(yamlCodeInt), &result); err != nil {
 			t.Errorf("Failed to unmarshal: %v", err)
 		}
 		if result.IOrS.Kind != IntstrInt || result.IOrS.IntVal != 123 {
@@ -86,10 +86,10 @@ func TestIntOrStringUnmarshalYAML(t *testing.T) {
 	}
 
 	{
-		yaml_code_str := "val: \"123\"\n"
+		yamlCodeStr := "val: \"123\"\n"
 
 		var result IntOrStringHolder
-		if err := yaml.Unmarshal([]byte(yaml_code_str), &result); err != nil {
+		if err := yaml.Unmarshal([]byte(yamlCodeStr), &result); err != nil {
 			t.Errorf("Failed to unmarshal: %v", err)
 		}
 		if result.IOrS.Kind != IntstrString || result.IOrS.StrVal != "123" {
@@ -134,10 +134,10 @@ func TestIntOrStringMarshalYAML(t *testing.T) {
 
 func TestIntOrStringUnmarshalJSON(t *testing.T) {
 	{
-		json_code_int := "{\"val\": 123}"
+		jsonCodeInt := "{\"val\": 123}"
 
 		var result IntOrStringHolder
-		if err := json.Unmarshal([]byte(json_code_int), &result); err != nil {
+		if err := json.Unmarshal([]byte(jsonCodeInt), &result); err != nil {
 			t.Errorf("Failed to unmarshal: %v", err)
 		}
 		if result.IOrS.Kind != IntstrInt || result.IOrS.IntVal != 123 {
@@ -146,10 +146,10 @@ func TestIntOrStringUnmarshalJSON(t *testing.T) {
 	}
 
 	{
-		json_code_str := "{\"val\": \"123\"}"
+		jsonCodeStr := "{\"val\": \"123\"}"
 
 		var result IntOrStringHolder
-		if err := json.Unmarshal([]byte(json_code_str), &result); err != nil {
+		if err := json.Unmarshal([]byte(jsonCodeStr), &result); err != nil {
 			t.Errorf("Failed to unmarshal: %v", err)
 		}
 		if result.IOrS.Kind != IntstrString || result.IOrS.StrVal != "123" {
