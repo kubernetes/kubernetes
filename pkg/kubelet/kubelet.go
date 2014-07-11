@@ -732,7 +732,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 				glog.V(1).Infof("health check errored: %v", err)
 				continue
 			}
-			if !healthy {
+			if healthy != CheckHealthy {
 				glog.V(1).Infof("manifest %s container %s is unhealthy.", manifest.ID, container.Name)
 				if err != nil {
 					glog.V(1).Infof("Failed to get container info %v, for %s", err, containerID)
@@ -989,16 +989,16 @@ func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
 	return kl.statsFromContainerPath("/")
 }
 
-func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (bool, error) {
+func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (HealthCheckStatus, error) {
 	// Give the container 60 seconds to start up.
-	if !container.LivenessProbe.Enabled {
-		return true, nil
+	if container.LivenessProbe == nil {
+		return CheckHealthy, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return true, nil
+		return CheckHealthy, nil
 	}
 	if kl.HealthChecker == nil {
-		return true, nil
+		return CheckHealthy, nil
 	}
-	return kl.HealthChecker.IsHealthy(container)
+	return kl.HealthChecker.HealthCheck(container)
 }

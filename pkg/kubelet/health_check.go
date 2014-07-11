@@ -25,10 +25,16 @@ import (
 	"github.com/golang/glog"
 )
 
-// HealthChecker is an abstract interface for container health checker.
+type HealthCheckStatus int
+
+const (
+	CheckHealthy   HealthCheckStatus = 0
+	CheckUnhealthy HealthCheckStatus = 1
+	CheckUnknown   HealthCheckStatus = 2
+)
+
 type HealthChecker interface {
-	// IsHealthy checks if the container is healthy.
-	IsHealthy(container api.Container) (bool, error)
+	HealthCheck(container api.Container) (HealthCheckStatus, error)
 }
 
 type httpDoInterface interface {
@@ -51,14 +57,13 @@ type MuxHealthChecker struct {
 	checkers map[string]HealthChecker
 }
 
-// IsHealthy checks the health of the container by delegating to an appropriate HealthChecker according to container.LivenessProbe.Type.
-func (m *MuxHealthChecker) IsHealthy(container api.Container) (bool, error) {
+func (m *MuxHealthChecker) HealthCheck(container api.Container) (HealthCheckStatus, error) {
 	checker, ok := m.checkers[container.LivenessProbe.Type]
 	if !ok || checker == nil {
 		glog.Warningf("Failed to find health checker for %s %s", container.Name, container.LivenessProbe.Type)
-		return true, nil
+		return CheckUnknown, nil
 	}
-	return checker.IsHealthy(container)
+	return checker.HealthCheck(container)
 }
 
 // HTTPHealthChecker is an implementation of HealthChecker which checks container health by sending HTTP Get requests.
@@ -76,15 +81,17 @@ func (h *HTTPHealthChecker) findPort(container api.Container, portName string) i
 	return -1
 }
 
-// IsHealthy checks if the container is healthy by trying sending HTTP Get requests to the container.
-func (h *HTTPHealthChecker) IsHealthy(container api.Container) (bool, error) {
+func (h *HTTPHealthChecker) HealthCheck(container api.Container) (HealthCheckStatus, error) {
 	params := container.LivenessProbe.HTTPGet
+	if params == nil {
+		return CheckUnknown, fmt.Errorf("Error, no HTTP parameters specified: %v", container)
+	}
 	port := h.findPort(container, params.Port)
 	if port == -1 {
 		var err error
 		port, err = strconv.ParseInt(params.Port, 10, 0)
 		if err != nil {
-			return true, err
+			return CheckUnknown, err
 		}
 	}
 	var host string
@@ -100,7 +107,11 @@ func (h *HTTPHealthChecker) IsHealthy(container api.Container) (bool, error) {
 	}
 	if err != nil {
 		// At this point, if it fails, its either a policy (unlikely) or HTTP protocol (likely) error.
-		return false, nil
+		return CheckUnhealthy, nil
 	}
-	return res.StatusCode == http.StatusOK, nil
+	if res.StatusCode == http.StatusOK {
+		return CheckHealthy, nil
+	}
+	glog.V(1).Infof("Health check failed for %v, Response: %v", container, *res)
+	return CheckUnhealthy, nil
 }
