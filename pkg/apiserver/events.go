@@ -36,9 +36,7 @@ func NewEtcdEventStore(client tools.EtcdGetSet) EventStore {
 	}
 }
 
-const (
-	eventBase = "/events"
-)
+const eventBase = "/events"
 
 func (e *EtcdEventStore) ListEvents() ([]api.Event, error) {
 	key := eventBase
@@ -52,9 +50,10 @@ func (e *EtcdEventStore) ListEvents() ([]api.Event, error) {
 	var result []api.Event
 	for _, childKey := range keys {
 		var subList []api.Event
-		err = e.etcdHelper.ExtractList(key+"/"+childKey, &subList)
-		if err != nil && !tools.IsEtcdNotFound(err) {
-			return nil, err
+		if err = e.etcdHelper.ExtractList(key+"/"+childKey, &subList); err != nil {
+			if !tools.IsEtcdNotFound(err) {
+				return nil, err
+			}
 		}
 		result = append(result, subList...)
 	}
@@ -62,9 +61,8 @@ func (e *EtcdEventStore) ListEvents() ([]api.Event, error) {
 }
 
 func (e *EtcdEventStore) ListEventsForPod(podID string) ([]api.Event, error) {
-	key := eventBase + "/" + podID
 	var result []api.Event
-	err := e.etcdHelper.ExtractList(key, &result)
+	err := e.etcdHelper.ExtractList(eventBase+"/"+podID, &result)
 	if tools.IsEtcdNotFound(err) {
 		err = nil
 	}

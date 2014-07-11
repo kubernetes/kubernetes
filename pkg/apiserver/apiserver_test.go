@@ -135,7 +135,7 @@ func TestSimpleList(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, "/prefix/version")
+	handler := New(storage, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
@@ -152,7 +152,7 @@ func TestErrorList(t *testing.T) {
 		err: fmt.Errorf("test Error"),
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, "/prefix/version")
+	handler := New(storage, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
@@ -173,7 +173,7 @@ func TestNonEmptyList(t *testing.T) {
 		},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, "/prefix/version")
+	handler := New(storage, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
@@ -203,7 +203,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, "/prefix/version")
+	handler := New(storage, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
@@ -220,7 +220,7 @@ func TestDelete(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := New(storage, "/prefix/version")
+	handler := New(storage, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	client := http.Client{}
@@ -237,7 +237,7 @@ func TestUpdate(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := New(storage, "/prefix/version")
+	handler := New(storage, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	item := Simple{
@@ -255,7 +255,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestBadPath(t *testing.T) {
-	handler := New(map[string]RESTStorage{}, "/prefix/version")
+	handler := New(map[string]RESTStorage{}, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -269,7 +269,7 @@ func TestBadPath(t *testing.T) {
 }
 
 func TestMissingPath(t *testing.T) {
-	handler := New(map[string]RESTStorage{}, "/prefix/version")
+	handler := New(map[string]RESTStorage{}, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -285,7 +285,7 @@ func TestMissingPath(t *testing.T) {
 func TestMissingStorage(t *testing.T) {
 	handler := New(map[string]RESTStorage{
 		"foo": &SimpleRESTStorage{},
-	}, "/prefix/version")
+	}, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -302,7 +302,7 @@ func TestCreate(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, "/prefix/version")
+	}, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -345,7 +345,7 @@ func TestSyncCreate(t *testing.T) {
 	}
 	handler := New(map[string]RESTStorage{
 		"foo": &storage,
-	}, "/prefix/version")
+	}, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -382,7 +382,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	}
 	handler := New(map[string]RESTStorage{
 		"foo": &storage,
-	}, "/prefix/version")
+	}, nil, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 

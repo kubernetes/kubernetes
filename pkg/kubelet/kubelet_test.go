@@ -477,13 +477,16 @@ func TestEventWriting(t *testing.T) {
 		Container: &api.Container{
 			Name: "foo",
 		},
+		Manifest: &api.ContainerManifest{
+			ID: "bar",
+		},
 	}
 	err := kubelet.LogEvent(&expectedEvent)
 	expectNoError(t, err)
 	if fakeEtcd.Ix != 1 {
 		t.Errorf("Unexpected number of children added: %d, expected 1", fakeEtcd.Ix)
 	}
-	response, err := fakeEtcd.Get("/events/foo/1", false, false)
+	response, err := fakeEtcd.Get("/events/bar/1", false, false)
 	expectNoError(t, err)
 	var event api.Event
 	err = json.Unmarshal([]byte(response.Node.Value), &event)
@@ -501,6 +504,9 @@ func TestEventWritingError(t *testing.T) {
 		Event: "test",
 		Container: &api.Container{
 			Name: "foo",
+		},
+		Manifest: &api.ContainerManifest{
+			ID: "bar",
 		},
 	})
 	if err == nil {
