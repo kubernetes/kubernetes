@@ -38,10 +38,10 @@ type PodRegistry interface {
 // ControllerRegistry is an interface for things that know how to store Controllers.
 type ControllerRegistry interface {
 	ListControllers() ([]api.ReplicationController, error)
-	GetController(controllerId string) (*api.ReplicationController, error)
+	GetController(controllerID string) (*api.ReplicationController, error)
 	CreateController(controller api.ReplicationController) error
 	UpdateController(controller api.ReplicationController) error
-	DeleteController(controllerId string) error
+	DeleteController(controllerID string) error
 }
 
 // ServiceRegistry is an interface for things that know how to store services.
