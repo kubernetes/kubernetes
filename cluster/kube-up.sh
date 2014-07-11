@@ -133,6 +133,25 @@ until $(curl --insecure --user ${user}:${passwd} --max-time 1 \
     sleep 2
 done
 
+# Basic sanity checking
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    # Make sure docker is installed
+    gcutil ssh ${MINION_NAMES[$i]} which docker > /dev/null
+    if [ "$?" != "0" ]; then
+	echo "Docker failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
+        exit 1
+    fi
+
+    # Make sure the kubelet is running
+    gcutil ssh ${MINION_NAMES[$i]} /etc/init.d/kubelet status
+    if [ "$?" != "0" ]; then
+	echo "Kubelet failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
+        exit 1
+    fi
+done
+
 echo
 echo "Kubernetes cluster is running.  Access the master at:"
 echo
