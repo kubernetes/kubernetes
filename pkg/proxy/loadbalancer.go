@@ -22,6 +22,8 @@ import (
 	"net"
 )
 
+// LoadBalancer represents a load balancer that decides where to route
+// the incoming services for a particular service to.
 type LoadBalancer interface {
 	// LoadBalance takes an incoming request and figures out where to route it to.
 	// Determination is based on destination service (for example, 'mysql') as
