@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// LoadBalancerRR is a round-robin load balancer.
+// LoadBalancerRR is a round-robin load balancer. It implements LoadBalancer.
 type LoadBalancerRR struct {
 	lock         sync.RWMutex
 	endpointsMap map[string][]string
@@ -42,9 +42,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 	return &LoadBalancerRR{endpointsMap: make(map[string][]string), rrIndex: make(map[string]int)}
 }
 
-// LoadBalance registers srcAddr for the provided service.
-// It returns error if no entry is available for the service
-// or no previous endpoints are registered.
+// LoadBalance select an endpoint of the service by round-robin algorithm.
 func (impl LoadBalancerRR) LoadBalance(service string, srcAddr net.Addr) (string, error) {
 	impl.lock.RLock()
 	endpoints, exists := impl.endpointsMap[service]
@@ -61,8 +59,8 @@ func (impl LoadBalancerRR) LoadBalance(service string, srcAddr net.Addr) (string
 	return endpoint, nil
 }
 
-// IsValid returns true if spec is valid.
-func (impl LoadBalancerRR) IsValid(spec string) bool {
+// isValid returns true if spec is valid.
+func (impl LoadBalancerRR) isValid(spec string) bool {
 	index := strings.Index(spec, ":")
 	if index == -1 {
 		return false
@@ -74,11 +72,11 @@ func (impl LoadBalancerRR) IsValid(spec string) bool {
 	return value > 0
 }
 
-// FilterValidEndpoints filters out invalid endpoints.
-func (impl LoadBalancerRR) FilterValidEndpoints(endpoints []string) []string {
+// filterValidEndpoints filters out invalid endpoints.
+func (impl LoadBalancerRR) filterValidEndpoints(endpoints []string) []string {
 	var result []string
 	for _, spec := range endpoints {
-		if impl.IsValid(spec) {
+		if impl.isValid(spec) {
 			result = append(result, spec)
 		}
 	}
@@ -97,7 +95,7 @@ func (impl LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 		existingEndpoints, exists := impl.endpointsMap[value.Name]
 		if !exists || !reflect.DeepEqual(value.Endpoints, existingEndpoints) {
 			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", value.Name, value.Endpoints)
-			impl.endpointsMap[value.Name] = impl.FilterValidEndpoints(value.Endpoints)
+			impl.endpointsMap[value.Name] = impl.filterValidEndpoints(value.Endpoints)
 			// Start RR from the beginning if added or updated.
 			impl.rrIndex[value.Name] = 0
 		}

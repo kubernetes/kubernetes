@@ -38,8 +38,8 @@ func NewProxier(loadBalancer LoadBalancer) *Proxier {
 	return &Proxier{loadBalancer: loadBalancer, serviceMap: make(map[string]int)}
 }
 
-// CopyBytes copies bytes from in to out until EOF.
-func CopyBytes(in, out *net.TCPConn) {
+// copyBytes copies bytes from in to out until EOF.
+func copyBytes(in, out *net.TCPConn) {
 	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	_, err := io.Copy(in, out)
@@ -51,15 +51,17 @@ func CopyBytes(in, out *net.TCPConn) {
 	out.CloseWrite()
 }
 
-// ProxyConnection creates a bidirectional byte shuffler.
-// Copies bytes to/from each connection.
-func ProxyConnection(in, out *net.TCPConn) {
+// proxyConnection creates a bidirectional byte shuffler.
+// It copies bytes to/from each connection.
+func proxyConnection(in, out *net.TCPConn) {
 	glog.Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	go CopyBytes(in, out)
-	go CopyBytes(out, in)
+	go copyBytes(in, out)
+	go copyBytes(out, in)
 }
 
+// AcceptHandler begins accepting incoming connections from listener and proxying the connections to the load-balanced endpoints.
+// It never returns.
 func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 	for {
 		inConn, err := listener.Accept()
@@ -86,12 +88,12 @@ func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 			inConn.Close()
 			continue
 		}
-		go ProxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		go proxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 	}
 }
 
-// AddService starts listening for a new service on a given port.
-func (proxier Proxier) AddService(service string, port int) error {
+// addService starts listening for a new service on a given port.
+func (proxier Proxier) addService(service string, port int) error {
 	// Make sure we can start listening on the port before saying all's well.
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -127,7 +129,7 @@ func (proxier Proxier) OnUpdate(services []api.Service) {
 		port, exists := proxier.serviceMap[service.ID]
 		if !exists || port != service.Port {
 			glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
-			err := proxier.AddService(service.ID, service.Port)
+			err := proxier.addService(service.ID, service.Port)
 			if err == nil {
 				proxier.serviceMap[service.ID] = service.Port
 			} else {
