@@ -87,7 +87,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	s := scheduler.MakeFirstFitScheduler(m.podRegistry, m.random)
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(m.podRegistry, podInfoGetter, s, m.minionRegistry, cloud, podCache),
-		"replicationControllers": registry.MakeControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
+		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
 	}
