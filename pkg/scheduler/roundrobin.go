@@ -25,12 +25,14 @@ type RoundRobinScheduler struct {
 	currentIndex int
 }
 
+// MakeRoundRobinScheduler creates a new RoundRobinScheduler instance.
 func MakeRoundRobinScheduler() Scheduler {
 	return &RoundRobinScheduler{
 		currentIndex: -1,
 	}
 }
 
+// Schedule schedules a pod on the machine next to the last scheduled machine.
 func (s *RoundRobinScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
 	machines, err := minionLister.List()
 	if err != nil {
