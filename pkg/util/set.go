@@ -22,7 +22,7 @@ import (
 
 type empty struct{}
 
-// A set of strings, implemented via map[string]struct{} for minimal memory consumption.
+// StringSet is a set of strings, implemented via map[string]struct{} for minimal memory consumption.
 type StringSet map[string]empty
 
 // NewStringSet creates a StringSet from a list of values.
@@ -50,7 +50,7 @@ func (s StringSet) Has(item string) bool {
 	return contained
 }
 
-// Return the contents as a sorted string slice.
+// List returns the contents as a sorted string slice.
 func (s StringSet) List() []string {
 	res := make([]string, 0, len(s))
 	for key := range s {
