@@ -31,7 +31,7 @@ if [ ! -n "$PROJECT" ]; then
     exit 1
 fi
 
-if which md5 > /dev/null; then
+if which md5 > /dev/null 2>&1; then
   HASH=$(md5 -q -s $PROJECT)
 else
   HASH=$(echo -n "$PROJECT" | md5sum)
