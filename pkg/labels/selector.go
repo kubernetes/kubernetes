@@ -87,7 +87,7 @@ func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 	return "", "", false
 }
 
-// SelectorFromSet converts a Set into a Selector.
+// SelectorFromSet returns a Selector which will match exactly the given Set.
 func SelectorFromSet(ls Set) Selector {
 	var items []Selector
 	for label, value := range ls {

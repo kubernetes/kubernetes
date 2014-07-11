@@ -23,10 +23,11 @@ import (
 
 // Labels allows you to present labels independently from their storage.
 type Labels interface {
+	// Get returns the value identified by the label.
 	Get(label string) (value string)
 }
 
-// Set is a map of label:value. Implements Labels.
+// Set is a map of label:value. It implements Labels.
 type Set map[string]string
 
 // String returns all labels listed as a human readable string.
