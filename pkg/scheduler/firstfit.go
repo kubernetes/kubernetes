@@ -30,7 +30,7 @@ type FirstFitScheduler struct {
 	random *rand.Rand
 }
 
-func MakeFirstFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
+func NewFirstFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
 	return &FirstFitScheduler{
 		podLister: podLister,
 		random:    random,
