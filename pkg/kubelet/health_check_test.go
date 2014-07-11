@@ -55,8 +55,8 @@ func TestHttpHealth(t *testing.T) {
 		},
 	}
 
-	ok, err := check.IsHealthy(container)
-	if !ok {
+	ok, err := check.HealthCheck(container)
+	if ok != CheckHealthy {
 		t.Error("Unexpected unhealthy")
 	}
 	if err != nil {

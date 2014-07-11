@@ -424,8 +424,8 @@ func TestSyncManifestsDeletes(t *testing.T) {
 
 type FalseHealthChecker struct{}
 
-func (f *FalseHealthChecker) IsHealthy(container api.Container) (bool, error) {
-	return false, nil
+func (f *FalseHealthChecker) HealthCheck(container api.Container) (HealthCheckStatus, error) {
+	return CheckUnhealthy, nil
 }
 
 func TestSyncManifestsUnhealthy(t *testing.T) {
