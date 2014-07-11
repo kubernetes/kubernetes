@@ -33,6 +33,7 @@ func TestServiceRegistry(t *testing.T) {
 
 	svc := api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz"},
 	}
 	c, _ := storage.Create(svc)
 	<-c
@@ -56,6 +57,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 
 	svc := api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
+		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
 	c, _ := storage.Create(svc)
@@ -82,6 +84,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 
 	svc := api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
+		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
 	c, _ := storage.Create(svc)
@@ -106,6 +109,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 
 	svc := api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz"},
 	}
 	memory.CreateService(svc)
 
@@ -131,6 +135,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 	svc := api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
+		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
 	memory.CreateService(svc)

@@ -145,13 +145,19 @@ func runAtomicPutTest(c *client.Client) {
 			Labels: map[string]string{
 				"name": "atomicService",
 			},
+			// This is here because validation requires it.
+			Selector: map[string]string{
+				"foo": "bar",
+			},
 		},
 	).Do().Into(&svc)
 	if err != nil {
 		glog.Fatalf("Failed creating atomicService: %v", err)
 	}
 	glog.Info("Created atomicService")
-	testLabels := labels.Set{}
+	testLabels := labels.Set{
+		"foo": "bar",
+	}
 	for i := 0; i < 5; i++ {
 		// a: z, b: y, etc...
 		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
