@@ -28,7 +28,7 @@ import (
 // For testing, bypass HandleCrash.
 var ReallyCrash bool
 
-// Simply catches a crash and logs an error. Meant to be called via defer.
+// HandleCrash simply catches a crash and logs an error. Meant to be called via defer.
 func HandleCrash() {
 	if ReallyCrash {
 		return
@@ -48,7 +48,7 @@ func HandleCrash() {
 	}
 }
 
-// Loops forever running f every d.  Catches any panics, and keeps going.
+// Forever loops forever running f every d.  Catches any panics, and keeps going.
 func Forever(f func(), period time.Duration) {
 	for {
 		func() {
@@ -59,9 +59,9 @@ func Forever(f func(), period time.Duration) {
 	}
 }
 
-// Returns o marshalled as a JSON string, ignoring any errors.
-func MakeJSONString(o interface{}) string {
-	data, _ := json.Marshal(o)
+// MakeJSONString returns obj marshalled as a JSON string, ignoring any errors.
+func MakeJSONString(obj interface{}) string {
+	data, _ := json.Marshal(obj)
 	return string(data)
 }
 
@@ -75,13 +75,15 @@ type IntOrString struct {
 	StrVal string
 }
 
+// IntstrKind represents the stored type of IntOrString.
 type IntstrKind int
 
 const (
-	IntstrInt IntstrKind = iota
-	IntstrString
+	IntstrInt    IntstrKind = iota // The IntOrString holds an int.
+	IntstrString                   // The IntOrString holds a string.
 )
 
+// SetYAML implements the yaml.Setter interface.
 func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
 	if intVal, ok := value.(int); ok {
 		intstr.Kind = IntstrInt
@@ -96,6 +98,7 @@ func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
 	return false
 }
 
+// GetYAML implements the yaml.Getter interface.
 func (intstr IntOrString) GetYAML() (tag string, value interface{}) {
 	switch intstr.Kind {
 	case IntstrInt:
@@ -108,6 +111,7 @@ func (intstr IntOrString) GetYAML() (tag string, value interface{}) {
 	return
 }
 
+// UnmarshalJSON implements the json.Unmarshaller interface.
 func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	if value[0] == '"' {
 		intstr.Kind = IntstrString
@@ -117,6 +121,7 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 	return json.Unmarshal(value, &intstr.IntVal)
 }
 
+// MarshalJSON implements the json.Marshaller interface.
 func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	switch intstr.Kind {
 	case IntstrInt:
