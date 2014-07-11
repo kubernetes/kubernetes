@@ -23,47 +23,15 @@
 # exit on any error
 set -e
 
-source $(dirname $0)/config.sh
+SCRIPT_DIR=$(cd $(dirname $0); pwd)
+
+source $SCRIPT_DIR/config.sh
 
 source $(dirname ${BASH_SOURCE})/../cluster/${KUBE_CONFIG_FILE-"config-default.sh"}
 
-cd $(dirname $0)/..
+cd $SCRIPT_DIR/..
 
-# First build the release tar.  This gets copied on to the master and installed
-# from there.  It includes the go source for the necessary servers along with
-# the salt configs.
-rm -rf output/release/*
-
-MASTER_RELEASE_DIR=output/release/master-release
-mkdir -p $MASTER_RELEASE_DIR/bin
-mkdir -p $MASTER_RELEASE_DIR/src/scripts
-mkdir -p $MASTER_RELEASE_DIR/third_party/go
-
-echo "Building release tree"
-cp release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
-cp -r cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
-
-cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
-instance_prefix: $INSTANCE_PREFIX-minion
-EOF
-
-cp -r third_party/src $MASTER_RELEASE_DIR/third_party/go/src
-
-function find_go_files() {
-  find * -not \( \
-      \( \
-        -wholename 'third_party' \
-        -o -wholename 'release' \
-      \) -prune \
-    \) -name '*.go'
-}
-for f in $(find_go_files); do
-  mkdir -p $MASTER_RELEASE_DIR/src/go/$(dirname ${f})
-  cp ${f} ${MASTER_RELEASE_DIR}/src/go/${f}
-done
-
-echo "Packaging release"
-tar cz -C output/release -f output/release/master-release.tgz master-release
+$SCRIPT_DIR/build-release.sh $INSTANCE_PREFIX
 
 echo "Building launch script"
 # Create the local install script.  These are the tools to install the local
