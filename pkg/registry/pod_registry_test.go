@@ -35,6 +35,104 @@ func expectNoError(t *testing.T, err error) {
 	}
 }
 
+func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
+	out := <-ch
+	status, ok := out.(*api.Status)
+	if !ok {
+		t.Errorf("Expected an api.Status object, was %#v", out)
+		return
+	}
+	if msg != status.Details {
+		t.Errorf("Expected %#v, was %s", msg, status.Details)
+	}
+}
+
+func expectPod(t *testing.T, ch <-chan interface{}) (*api.Pod, bool) {
+	out := <-ch
+	pod, ok := out.(*api.Pod)
+	if !ok || pod == nil {
+		t.Errorf("Expected an api.Pod object, was %#v", out)
+		return nil, false
+	}
+	return pod, true
+}
+
+func TestCreatePodRegistryError(t *testing.T) {
+	mockRegistry := &MockPodRegistry{
+		err: fmt.Errorf("test error"),
+	}
+	storage := PodRegistryStorage{
+		scheduler: &MockScheduler{},
+		registry:  mockRegistry,
+	}
+	pod := api.Pod{}
+	ch, err := storage.Create(pod)
+	if err != nil {
+		t.Errorf("Expected %#v, Got %#v", nil, err)
+	}
+	expectApiStatusError(t, ch, mockRegistry.err.Error())
+}
+
+type MockScheduler struct {
+	err     error
+	pod     api.Pod
+	machine string
+}
+
+func (m *MockScheduler) Schedule(pod api.Pod, lister scheduler.MinionLister) (string, error) {
+	m.pod = pod
+	return m.machine, m.err
+}
+
+func TestCreatePodSchedulerError(t *testing.T) {
+	mockScheduler := MockScheduler{
+		err: fmt.Errorf("test error"),
+	}
+	storage := PodRegistryStorage{
+		scheduler: &mockScheduler,
+	}
+	pod := api.Pod{}
+	ch, err := storage.Create(pod)
+	if err != nil {
+		t.Errorf("Expected %#v, Got %#v", nil, err)
+	}
+	expectApiStatusError(t, ch, mockScheduler.err.Error())
+}
+
+type MockPodStorageRegistry struct {
+	MockPodRegistry
+	machine string
+}
+
+func (r *MockPodStorageRegistry) CreatePod(machine string, pod api.Pod) error {
+	r.MockPodRegistry.pod = &pod
+	r.machine = machine
+	return r.MockPodRegistry.err
+}
+
+func TestCreatePodSetsIds(t *testing.T) {
+	mockRegistry := &MockPodStorageRegistry{
+		MockPodRegistry: MockPodRegistry{err: fmt.Errorf("test error")},
+	}
+	storage := PodRegistryStorage{
+		scheduler: &MockScheduler{machine: "test"},
+		registry:  mockRegistry,
+	}
+	pod := api.Pod{}
+	ch, err := storage.Create(pod)
+	if err != nil {
+		t.Errorf("Expected %#v, Got %#v", nil, err)
+	}
+	expectApiStatusError(t, ch, mockRegistry.err.Error())
+
+	if len(mockRegistry.MockPodRegistry.pod.ID) == 0 {
+		t.Errorf("Expected pod ID to be set, Got %#v", pod)
+	}
+	if mockRegistry.MockPodRegistry.pod.DesiredState.Manifest.ID != mockRegistry.MockPodRegistry.pod.ID {
+		t.Errorf("Expected manifest ID to be equal to pod ID, Got %#v", pod)
+	}
+}
+
 func TestListPodsError(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		err: fmt.Errorf("test error"),

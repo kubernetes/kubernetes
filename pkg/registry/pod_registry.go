@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"code.google.com/p/go-uuid/uuid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -185,8 +186,9 @@ func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
 func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	pod := obj.(api.Pod)
 	if len(pod.ID) == 0 {
-		return nil, fmt.Errorf("id is unspecified: %#v", pod)
+		pod.ID = uuid.NewUUID().String()
 	}
+	pod.DesiredState.Manifest.ID = pod.ID
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO(lavalamp): Separate scheduler more cleanly.
@@ -205,7 +207,7 @@ func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 func (storage *PodRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	pod := obj.(api.Pod)
 	if len(pod.ID) == 0 {
-		return nil, fmt.Errorf("id is unspecified: %#v", pod)
+		return nil, fmt.Errorf("ID should not be empty: %#v", pod)
 	}
 
 	return apiserver.MakeAsync(func() (interface{}, error) {

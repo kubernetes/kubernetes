@@ -19,7 +19,6 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -64,9 +63,6 @@ func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) 
 		labels["replicationController"] = controllerSpec.ID
 	}
 	pod := api.Pod{
-		JSONBase: api.JSONBase{
-			ID: fmt.Sprintf("%08x", rand.Uint32()),
-		},
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	}
