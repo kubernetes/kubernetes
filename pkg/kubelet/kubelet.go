@@ -176,7 +176,7 @@ func (kl *Kubelet) LogEvent(event *api.Event) error {
 	}
 
 	var response *etcd.Response
-	response, err = kl.EtcdClient.AddChild(fmt.Sprintf("/events/%s", event.Container.Name), string(data), 60*60*48 /* 2 days */)
+	response, err = kl.EtcdClient.AddChild(fmt.Sprintf("/events/%s", event.Manifest.ID), string(data), 60*60*48 /* 2 days */)
 	// TODO(bburns) : examine response here.
 	if err != nil {
 		glog.Errorf("Error writing event: %s\n", err)
@@ -404,6 +404,15 @@ func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
+	})
+	kl.LogEvent(&api.Event{
+		Event: "START",
+		Manifest: &api.ContainerManifest{
+			ID: manifest.ID,
+		},
+		Container: &api.Container{
+			Name: container.Name,
+		},
 	})
 	return DockerID(dockerContainer.ID), err
 }

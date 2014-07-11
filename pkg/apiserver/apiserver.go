@@ -87,16 +87,18 @@ type APIServer struct {
 	storage   map[string]RESTStorage
 	ops       *Operations
 	logserver http.Handler
+	events    EventStore
 }
 
 // New creates a new APIServer object.
 // 'storage' contains a map of handlers.
 // 'prefix' is the hosting path prefix.
-func New(storage map[string]RESTStorage, prefix string) *APIServer {
+func New(storage map[string]RESTStorage, events EventStore, prefix string) *APIServer {
 	return &APIServer{
 		storage:   storage,
 		prefix:    prefix,
 		ops:       NewOperations(),
+		events:    events,
 		logserver: http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))),
 	}
 }
@@ -148,6 +150,10 @@ func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	if requestParts[0] == "operations" {
 		server.handleOperationRequest(requestParts[1:], w, req)
+		return
+	}
+	if requestParts[0] == "events" {
+		server.handleEventsRequest(requestParts[1:], w, req)
 		return
 	}
 	storage := server.storage[requestParts[0]]
@@ -346,5 +352,24 @@ func (server *APIServer) handleOperationRequest(parts []string, w http.ResponseW
 		server.write(http.StatusOK, obj, w)
 	} else {
 		server.write(http.StatusAccepted, obj, w)
+	}
+}
+
+func (server *APIServer) handleEventsRequest(parts []string, w http.ResponseWriter, req *http.Request) {
+	if server.events == nil {
+		server.error(fmt.Errorf("no event store registered."), w)
+		return
+	}
+	var events []api.Event
+	var err error
+	if len(parts) == 0 {
+		events, err = server.events.ListEvents()
+	} else {
+		events, err = server.events.ListEventsForPod(parts[0])
+	}
+	if err != nil {
+		server.error(err, w)
+	} else {
+		server.write(http.StatusOK, events, w)
 	}
 }
