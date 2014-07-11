@@ -250,10 +250,10 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 func ValidateService(service *Service) []error {
 	allErrs := errorList{}
 	if service.ID == "" {
-		allErrs.Append(fmt.Errorf("ID should not be empty: %#v", *service))
+		allErrs.Append(makeInvalidError("Service.ID", service.ID))
 	}
 	if len(service.Selector) == 0 {
-		allErrs.Append(fmt.Errorf("Service %#v missing a selector", *service))
+		allErrs.Append(makeInvalidError("Service.Selector", service.Selector))
 	}
 	return []error(allErrs)
 }
