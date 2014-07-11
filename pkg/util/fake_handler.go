@@ -26,6 +26,8 @@ import (
 type TestInterface interface {
 	Errorf(format string, args ...interface{})
 }
+
+// LogInterface is a simple interface to allow injection of Logf to report serving errors.
 type LogInterface interface {
 	Logf(format string, args ...interface{})
 }
@@ -53,6 +55,7 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	f.RequestBody = string(bodyReceived)
 }
 
+// ValidateRequest verifies that FakeHandler received a request with expected path, method, and body.
 func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
 	if f.RequestReceived.URL.Path != expectedPath {
 		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectedPath)
