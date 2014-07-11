@@ -86,8 +86,14 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 	if storage.podCache != nil {
 		info, err := storage.podCache.GetPodInfo(pod.CurrentState.Host, pod.ID)
 		if err != nil {
-			glog.Errorf("Error getting container info: %#v", err)
-			return
+			glog.Errorf("Error getting container info from cache: %#v", err)
+			if storage.podInfoGetter != nil {
+				info, err = storage.podInfoGetter.GetPodInfo(pod.CurrentState.Host, pod.ID)
+			}
+			if err != nil {
+				glog.Errorf("Error getting fresh container info: %#v", err)
+				return
+			}
 		}
 		pod.CurrentState.Info = info
 		netContainerInfo, ok := info["net"]
