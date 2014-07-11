@@ -58,6 +58,10 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	switch {
+	case u.Path == "/healthz":
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+		return
 	case u.Path == "/container" || u.Path == "/containers":
 		defer req.Body.Close()
 		data, err := ioutil.ReadAll(req.Body)
