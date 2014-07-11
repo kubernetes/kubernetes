@@ -32,10 +32,9 @@ import (
 
 // LoadBalancerRR is a round-robin load balancer.
 type LoadBalancerRR struct {
+	lock         sync.RWMutex
 	endpointsMap map[string][]string
 	rrIndex      map[string]int
-
-	lock sync.RWMutex
 }
 
 // NewLoadBalancerRR returns a new LoadBalancerRR.
