@@ -33,7 +33,6 @@ type ControllerRegistryStorage struct {
 	pollPeriod time.Duration
 }
 
-// NewControllerRegistryStorage creates a new NewControllerRegistryStorage instance.
 func NewControllerRegistryStorage(registry ControllerRegistry, podRegistry PodRegistry) apiserver.RESTStorage {
 	return &ControllerRegistryStorage{
 		registry:    registry,
@@ -97,7 +96,7 @@ func (storage *ControllerRegistryStorage) Create(obj interface{}) (<-chan interf
 	}), nil
 }
 
-// Update replaces a given ReplicationController instance with an existing instnace in storage.registry.
+// Update replaces a given ReplicationController instance with an existing instance in storage.registry.
 func (storage *ControllerRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	controller, ok := obj.(api.ReplicationController)
 	if !ok {
