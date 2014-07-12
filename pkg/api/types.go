@@ -17,9 +17,8 @@ limitations under the License.
 package api
 
 import (
-	"github.com/fsouza/go-dockerclient"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/fsouza/go-dockerclient"
 )
 
 // Common string formats
@@ -270,7 +269,8 @@ type Service struct {
 	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
 
-	// Container port to connect to, either a name or a port number
+	// ContainerPort is the name of the port on the container to direct traffic to.
+	// Optional, if unspecified use the first port on the container.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 }
 
