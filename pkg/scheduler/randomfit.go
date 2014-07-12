@@ -25,21 +25,21 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// FirstFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
-type FirstFitScheduler struct {
+// RandomFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
+type RandomFitScheduler struct {
 	podLister  PodLister
 	random     *rand.Rand
 	randomLock sync.Mutex
 }
 
-func MakeFirstFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
-	return &FirstFitScheduler{
+func MakeRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
+	return &RandomFitScheduler{
 		podLister: podLister,
 		random:    random,
 	}
 }
 
-func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
+func (s *RandomFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 	for _, container := range pod.DesiredState.Manifest.Containers {
 		for _, podPort := range container.Ports {
 			if podPort.HostPort == port.HostPort {
@@ -51,7 +51,7 @@ func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 }
 
 // Schedule schedules a pod on a random machine which matches its requirement.
-func (s *FirstFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
 	machines, err := minionLister.List()
 	if err != nil {
 		return "", err

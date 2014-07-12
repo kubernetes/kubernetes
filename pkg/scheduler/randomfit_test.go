@@ -23,31 +23,31 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestFirstFitSchedulerNothingScheduled(t *testing.T) {
+func TestRandomFitSchedulerNothingScheduled(t *testing.T) {
 	fakeRegistry := FakePodLister{}
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeFirstFitScheduler(&fakeRegistry, r),
+		scheduler:    MakeRandomFitScheduler(&fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectSchedule(api.Pod{}, "m3")
 }
 
-func TestFirstFitSchedulerFirstScheduled(t *testing.T) {
+func TestRandomFitSchedulerFirstScheduled(t *testing.T) {
 	fakeRegistry := FakePodLister{
 		makePod("m1", 8080),
 	}
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeFirstFitScheduler(fakeRegistry, r),
+		scheduler:    MakeRandomFitScheduler(fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectSchedule(makePod("", 8080), "m3")
 }
 
-func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
+func TestRandomFitSchedulerFirstScheduledComplicated(t *testing.T) {
 	fakeRegistry := FakePodLister{
 		makePod("m1", 80, 8080),
 		makePod("m2", 8081, 8082, 8083),
@@ -56,13 +56,13 @@ func TestFirstFitSchedulerFirstScheduledComplicated(t *testing.T) {
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeFirstFitScheduler(fakeRegistry, r),
+		scheduler:    MakeRandomFitScheduler(fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectSchedule(makePod("", 8080, 8081), "m3")
 }
 
-func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
+func TestRandomFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	fakeRegistry := FakePodLister{
 		makePod("m1", 8080),
 		makePod("m2", 8081),
@@ -71,7 +71,7 @@ func TestFirstFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeFirstFitScheduler(fakeRegistry, r),
+		scheduler:    MakeRandomFitScheduler(fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectFailure(makePod("", 8080, 8081))

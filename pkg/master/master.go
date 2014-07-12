@@ -84,7 +84,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	m.random = rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
 	go podCache.Loop()
-	s := scheduler.MakeFirstFitScheduler(m.podRegistry, m.random)
+	s := scheduler.MakeRandomFitScheduler(m.podRegistry, m.random)
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(m.podRegistry, podInfoGetter, s, m.minionRegistry, cloud, podCache),
 		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
