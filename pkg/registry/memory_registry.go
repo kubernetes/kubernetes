@@ -93,8 +93,8 @@ func (registry *MemoryRegistry) CreateController(controller api.ReplicationContr
 	return nil
 }
 
-func (registry *MemoryRegistry) DeleteController(controllerId string) error {
-	delete(registry.controllerData, controllerId)
+func (registry *MemoryRegistry) DeleteController(controllerID string) error {
+	delete(registry.controllerData, controllerID)
 	return nil
 }
 
