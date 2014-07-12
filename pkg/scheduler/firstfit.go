@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
+// FirstFitScheduler is a Scheduler interface implementation which uses first fit algorithm.
 type FirstFitScheduler struct {
 	podLister PodLister
 	// TODO: *rand.Rand is *not* threadsafe
@@ -48,6 +49,7 @@ func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 	return false
 }
 
+// Schedule schedules a pod on the first machine which matches its requirement.
 func (s *FirstFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
 	machines, err := minionLister.List()
 	if err != nil {
@@ -80,7 +82,6 @@ func (s *FirstFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (st
 	}
 	if len(machineOptions) == 0 {
 		return "", fmt.Errorf("failed to find fit for %#v", pod)
-	} else {
-		return machineOptions[s.random.Int()%len(machineOptions)], nil
 	}
+	return machineOptions[s.random.Int()%len(machineOptions)], nil
 }
