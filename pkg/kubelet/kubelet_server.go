@@ -46,8 +46,7 @@ type kubeletInterface interface {
 }
 
 func (s *KubeletServer) error(w http.ResponseWriter, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Error: %v", err)
+	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
 }
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -87,20 +86,17 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case u.Path == "/podInfo":
 		podID := u.Query().Get("podID")
 		if len(podID) == 0 {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "Missing 'podID=' query entry.")
+			http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
 			return
 		}
 		info, err := s.Kubelet.GetPodInfo(podID)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %v", err)
+			s.error(w, err)
 			return
 		}
 		data, err := json.Marshal(info)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Internal Error: %v", err)
+			s.error(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -109,8 +105,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case strings.HasPrefix(u.Path, "/stats"):
 		s.serveStats(w, req)
 	default:
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "Not found.")
+		http.Error(w, "Not found.", http.StatusNotFound)
 	}
 }
 
@@ -130,13 +125,11 @@ func (s *KubeletServer) serveStats(w http.ResponseWriter, req *http.Request) {
 	case 3:
 		stats, err = s.Kubelet.GetContainerStats(components[1], components[2])
 	default:
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprint(w, "unknown resource.")
+		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Internal Error: %v", err)
+		s.error(w, err)
 		return
 	}
 	if stats == nil {
@@ -146,8 +139,7 @@ func (s *KubeletServer) serveStats(w http.ResponseWriter, req *http.Request) {
 	}
 	data, err := json.Marshal(stats)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Internal Error: %v", err)
+		s.error(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
