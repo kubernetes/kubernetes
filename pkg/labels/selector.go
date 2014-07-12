@@ -89,7 +89,7 @@ func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 
 // Given a Set, return a Selector which will match exactly that Set.
 func SelectorFromSet(ls Set) Selector {
-	var items []Selector
+	items := make([]Selector, 0, len(ls))
 	for label, value := range ls {
 		items = append(items, &hasTerm{label: label, value: value})
 	}
