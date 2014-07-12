@@ -83,7 +83,7 @@ func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 			inConn.Close()
 			continue
 		}
-		go ProxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		ProxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 	}
 }
 
