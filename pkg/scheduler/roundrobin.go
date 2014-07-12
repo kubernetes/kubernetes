@@ -25,7 +25,6 @@ type RoundRobinScheduler struct {
 	currentIndex int
 }
 
-// MakeRoundRobinScheduler creates a new RoundRobinScheduler instance.
 func MakeRoundRobinScheduler() Scheduler {
 	return &RoundRobinScheduler{
 		currentIndex: -1,

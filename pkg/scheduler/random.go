@@ -28,7 +28,6 @@ type RandomScheduler struct {
 	random *rand.Rand
 }
 
-// MakeRandomScheduler creates a new RandomScheduler instance.
 func MakeRandomScheduler(random *rand.Rand) Scheduler {
 	return &RandomScheduler{
 		random: random,

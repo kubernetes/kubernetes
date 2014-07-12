@@ -31,7 +31,6 @@ type FirstFitScheduler struct {
 	random *rand.Rand
 }
 
-// MakeFirstFitScheduler creates a new instance of FirstFitScheduler.
 func MakeFirstFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
 	return &FirstFitScheduler{
 		podLister: podLister,
