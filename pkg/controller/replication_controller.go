@@ -100,10 +100,9 @@ func (rm *ReplicationManager) Run(period time.Duration) {
 func (rm *ReplicationManager) watchControllers() {
 	watchChannel := make(chan *etcd.Response)
 	stop := make(chan bool)
-	defer func() {
-		// Ensure that the call to watch ends.
-		close(stop)
-	}()
+	// Ensure that the call to watch ends.
+	defer close(stop)
+
 	go func() {
 		defer util.HandleCrash()
 		_, err := rm.etcdClient.Watch("/registry/controllers", 0, true, watchChannel, stop)
@@ -137,30 +136,29 @@ func (rm *ReplicationManager) watchControllers() {
 }
 
 func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api.ReplicationController, error) {
-	if response.Action == "set" {
-		if response.Node != nil {
-			var controllerSpec api.ReplicationController
-			err := json.Unmarshal([]byte(response.Node.Value), &controllerSpec)
-			if err != nil {
-				return nil, err
-			}
-			return &controllerSpec, nil
+	switch response.Action {
+	case "set":
+		if response.Node == nil {
+			return nil, fmt.Errorf("response node is null %#v", response)
 		}
-		return nil, fmt.Errorf("response node is null %#v", response)
-	} else if response.Action == "delete" {
+		var controllerSpec api.ReplicationController
+		if err := json.Unmarshal([]byte(response.Node.Value), &controllerSpec); err != nil {
+			return nil, err
+		}
+		return &controllerSpec, nil
+	case "delete":
 		// Ensure that the final state of a replication controller is applied before it is deleted.
 		// Otherwise, a replication controller could be modified and then deleted (for example, from 3 to 0
 		// replicas), and it would be non-deterministic which of its pods continued to exist.
-		if response.PrevNode != nil {
-			var controllerSpec api.ReplicationController
-			if err := json.Unmarshal([]byte(response.PrevNode.Value), &controllerSpec); err != nil {
-				return nil, err
-			}
-			return &controllerSpec, nil
+		if response.PrevNode == nil {
+			return nil, fmt.Errorf("previous node is null %#v", response)
 		}
-		return nil, fmt.Errorf("previous node is null %#v", response)
+		var controllerSpec api.ReplicationController
+		if err := json.Unmarshal([]byte(response.PrevNode.Value), &controllerSpec); err != nil {
+			return nil, err
+		}
+		return &controllerSpec, nil
 	}
-
 	return nil, nil
 }
 
@@ -190,7 +188,7 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 			rm.podControl.createReplica(controllerSpec)
 		}
 	} else if diff > 0 {
-		glog.Info("Too many replicas, deleting")
+		glog.Infof("Too many replicas, deleting %d\n", diff)
 		for i := 0; i < diff; i++ {
 			rm.podControl.deletePod(filteredList[i].ID)
 		}
