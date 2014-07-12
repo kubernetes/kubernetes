@@ -23,7 +23,6 @@ import (
 	"net"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -57,11 +56,11 @@ func (impl LoadBalancerRR) LoadBalance(service string, srcAddr net.Addr) (string
 }
 
 func (impl LoadBalancerRR) IsValid(spec string) bool {
-	index := strings.Index(spec, ":")
-	if index == -1 {
+	_, port, err := net.SplitHostPort(spec)
+	if err != nil {
 		return false
 	}
-	value, err := strconv.Atoi(spec[index+1:])
+	value, err := strconv.Atoi(port)
 	if err != nil {
 		return false
 	}
