@@ -56,7 +56,7 @@ func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	defer p.podLock.Unlock()
 	value, ok := p.podInfo[podID]
 	if !ok {
-		return nil, errors.New("No cached pod info")
+		return nil, errors.New("no cached pod info")
 	} else {
 		return value, nil
 	}
