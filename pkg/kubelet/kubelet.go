@@ -192,7 +192,7 @@ func (kl *Kubelet) getDockerContainers() (map[DockerID]docker.APIContainers, err
 	result := map[DockerID]docker.APIContainers{}
 	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	for _, value := range containerList {
 		// Skip containers that we didn't create to allow users to manually
@@ -202,7 +202,7 @@ func (kl *Kubelet) getDockerContainers() (map[DockerID]docker.APIContainers, err
 		}
 		result[DockerID(value.ID)] = value
 	}
-	return result, err
+	return result, nil
 }
 
 // Return Docker's container ID for a manifest's container. Returns an empty string if it doesn't exist.
