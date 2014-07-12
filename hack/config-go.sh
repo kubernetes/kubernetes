@@ -17,7 +17,7 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-if [ "$(which go)" == "" ]; then
+if [[ "$(which go)" == "" ]]; then
 	echo "Can't find 'go' in PATH, please fix and retry."
 	echo "See http://golang.org/doc/install for installation instructions."
 	exit 1
@@ -29,7 +29,7 @@ fi
 if [ "${TRAVIS}" != "true" ]; then
   GO_VERSION=($(go version))
 
-  if [ ${GO_VERSION[2]} \< "go1.2" ]; then
+  if [[ ${GO_VERSION[2]} < "go1.2" ]]; then
     echo "Detected go version: ${GO_VERSION}."
     echo "Kubernetes requires go version 1.2 or greater."
     echo "Please install Go version 1.2 or later"
@@ -37,10 +37,9 @@ if [ "${TRAVIS}" != "true" ]; then
   fi
 fi
 
-pushd $(dirname "${BASH_SOURCE}")/.. >/dev/null
-KUBE_REPO_ROOT="${PWD}"
+KUBE_REPO_REL_ROOT="$(dirname ${BASH_SOURCE:-$0})/.."
+KUBE_REPO_ROOT="$(readlink -f ${KUBE_REPO_REL_ROOT})"
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
-popd >/dev/null
 
 mkdir -p "${KUBE_TARGET}"
 
