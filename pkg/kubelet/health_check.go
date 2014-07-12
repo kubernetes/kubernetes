@@ -28,9 +28,9 @@ import (
 type HealthCheckStatus int
 
 const (
-	CheckHealthy   HealthCheckStatus = 0
-	CheckUnhealthy HealthCheckStatus = 1
-	CheckUnknown   HealthCheckStatus = 2
+	CheckHealthy HealthCheckStatus = iota
+	CheckUnhealthy
+	CheckUnknown
 )
 
 type HealthChecker interface {
