@@ -37,8 +37,13 @@ if [ "${TRAVIS}" != "true" ]; then
   fi
 fi
 
-KUBE_REPO_REL_ROOT="$(dirname ${BASH_SOURCE:-$0})/.."
-KUBE_REPO_ROOT="$(readlink -f ${KUBE_REPO_REL_ROOT})"
+if [[ "$OSTYPE" == *darwin* ]]; then
+  KUBE_REPO_ROOT="${PWD}"
+else
+  KUBE_REPO_REL_ROOT="$(dirname ${BASH_SOURCE:-$0})/.."
+  KUBE_REPO_ROOT="$(readlink -f ${KUBE_REPO_REL_ROOT})"
+fi
+
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
 
 mkdir -p "${KUBE_TARGET}"
