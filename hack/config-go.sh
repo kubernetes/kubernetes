@@ -38,7 +38,7 @@ if [ "${TRAVIS}" != "true" ]; then
 fi
 
 if [[ "$OSTYPE" == *darwin* ]]; then
-  KUBE_REPO_ROOT="${PWD}"
+  KUBE_REPO_ROOT="${PWD}/$(dirname ${BASH_SOURCE:-$0})/.."
 else
   KUBE_REPO_REL_ROOT="$(dirname ${BASH_SOURCE:-$0})/.."
   KUBE_REPO_ROOT="$(readlink -f ${KUBE_REPO_REL_ROOT})"
