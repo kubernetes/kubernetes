@@ -59,7 +59,7 @@ func TestLoadBalanceFilterWorks(t *testing.T) {
 
 func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	endpoints := make([]api.Endpoints, 0)
+	var endpoints []api.Endpoints
 	loadBalancer.OnUpdate(endpoints)
 	endpoint, err := loadBalancer.LoadBalance("foo", nil)
 	if err == nil {

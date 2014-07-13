@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package proxy implements the layer-3 network proxy
+// Package proxy implements the layer-3 network proxy.
 package proxy

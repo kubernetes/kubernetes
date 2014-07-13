@@ -33,10 +33,12 @@ type Proxier struct {
 	serviceMap   map[string]int
 }
 
+// NewProxier returns a new Proxier.
 func NewProxier(loadBalancer LoadBalancer) *Proxier {
 	return &Proxier{loadBalancer: loadBalancer, serviceMap: make(map[string]int)}
 }
 
+// CopyBytes copies bytes from in to out until EOF.
 func CopyBytes(in, out *net.TCPConn) {
 	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
@@ -49,7 +51,8 @@ func CopyBytes(in, out *net.TCPConn) {
 	out.CloseWrite()
 }
 
-// Create a bidirectional byte shuffler. Copies bytes to/from each connection.
+// ProxyConnection creates a bidirectional byte shuffler.
+// Copies bytes to/from each connection.
 func ProxyConnection(in, out *net.TCPConn) {
 	glog.Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
@@ -117,6 +120,7 @@ func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
 	go proxier.AcceptHandler(service, l)
 }
 
+// OnUpdate handles update notices for the updated services.
 func (proxier Proxier) OnUpdate(services []api.Service) {
 	glog.Infof("Received update notice: %+v", services)
 	for _, service := range services {
