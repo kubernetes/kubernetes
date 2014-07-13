@@ -18,14 +18,15 @@ package scheduler
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // RandomScheduler chooses machines uniformly at random.
 type RandomScheduler struct {
-	// TODO: rand.Rand is *NOT* thread safe.
-	random *rand.Rand
+	random     *rand.Rand
+	randomLock sync.Mutex
 }
 
 func MakeRandomScheduler(random *rand.Rand) Scheduler {
@@ -40,5 +41,8 @@ func (s *RandomScheduler) Schedule(pod api.Pod, minionLister MinionLister) (stri
 	if err != nil {
 		return "", err
 	}
+
+	s.randomLock.Lock()
+	defer s.randomLock.Unlock()
 	return machines[s.random.Int()%len(machines)], nil
 }
