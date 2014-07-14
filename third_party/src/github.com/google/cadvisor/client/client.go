@@ -15,6 +15,7 @@
 package cadvisor
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -49,7 +50,7 @@ func (self *Client) machineInfoUrl() string {
 func (self *Client) MachineInfo() (minfo *info.MachineInfo, err error) {
 	u := self.machineInfoUrl()
 	ret := new(info.MachineInfo)
-	err = self.httpGetJsonData(ret, u, "machine info")
+	err = self.httpGetJsonData(ret, nil, u, "machine info")
 	if err != nil {
 		return
 	}
@@ -64,8 +65,19 @@ func (self *Client) containerInfoUrl(name string) string {
 	return strings.Join([]string{self.baseUrl, "containers", name}, "/")
 }
 
-func (self *Client) httpGetJsonData(data interface{}, url, infoName string) error {
-	resp, err := http.Get(url)
+func (self *Client) httpGetJsonData(data, postData interface{}, url, infoName string) error {
+	var resp *http.Response
+	var err error
+
+	if postData != nil {
+		data, err := json.Marshal(postData)
+		if err != nil {
+			return fmt.Errorf("unable to marshal data: %v", err)
+		}
+		resp, err = http.Post(url, "application/json", bytes.NewBuffer(data))
+	} else {
+		resp, err = http.Get(url)
+	}
 	if err != nil {
 		err = fmt.Errorf("unable to get %v: %v", infoName, err)
 		return err
@@ -84,10 +96,12 @@ func (self *Client) httpGetJsonData(data interface{}, url, infoName string) erro
 	return nil
 }
 
-func (self *Client) ContainerInfo(name string) (cinfo *info.ContainerInfo, err error) {
+func (self *Client) ContainerInfo(
+	name string,
+	query *info.ContainerInfoRequest) (cinfo *info.ContainerInfo, err error) {
 	u := self.containerInfoUrl(name)
 	ret := new(info.ContainerInfo)
-	err = self.httpGetJsonData(ret, u, fmt.Sprintf("container info for %v", name))
+	err = self.httpGetJsonData(ret, query, u, fmt.Sprintf("container info for %v", name))
 	if err != nil {
 		return
 	}

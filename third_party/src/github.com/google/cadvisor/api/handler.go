@@ -19,12 +19,13 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/info"
 	"github.com/google/cadvisor/manager"
 )
 
@@ -34,8 +35,10 @@ const (
 	MachineApi    = "machine"
 )
 
-func HandleRequest(m manager.Manager, w http.ResponseWriter, u *url.URL) error {
+func HandleRequest(m manager.Manager, w http.ResponseWriter, r *http.Request) error {
 	start := time.Now()
+
+	u := r.URL
 
 	// Get API request type.
 	requestType := u.Path[len(ApiResource):]
@@ -46,7 +49,8 @@ func HandleRequest(m manager.Manager, w http.ResponseWriter, u *url.URL) error {
 		requestType = requestType[:i]
 	}
 
-	if requestType == MachineApi {
+	switch {
+	case requestType == MachineApi:
 		log.Printf("Api - Machine")
 
 		// Get the MachineInfo
@@ -60,14 +64,20 @@ func HandleRequest(m manager.Manager, w http.ResponseWriter, u *url.URL) error {
 			fmt.Fprintf(w, "Failed to marshall MachineInfo with error: %s", err)
 		}
 		w.Write(out)
-	} else if requestType == ContainersApi {
+	case requestType == ContainersApi:
 		// The container name is the path after the requestType
 		containerName := requestArgs
 
 		log.Printf("Api - Container(%s)", containerName)
 
+		var query info.ContainerInfoRequest
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&query)
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("unable to decode the json value: ", err)
+		}
 		// Get the container.
-		cont, err := m.GetContainerInfo(containerName)
+		cont, err := m.GetContainerInfo(containerName, &query)
 		if err != nil {
 			fmt.Fprintf(w, "Failed to get container \"%s\" with error: %s", containerName, err)
 			return err
@@ -79,7 +89,7 @@ func HandleRequest(m manager.Manager, w http.ResponseWriter, u *url.URL) error {
 			fmt.Fprintf(w, "Failed to marshall container %q with error: %s", containerName, err)
 		}
 		w.Write(out)
-	} else {
+	default:
 		return fmt.Errorf("unknown API request type %q", requestType)
 	}
 
