@@ -1,0 +1,11 @@
+[Unit]
+Description=Kubernetes Controller Manager
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/controller-manager
+ExecStart=/usr/local/bin/controller-manager "$DAEMON_ARGS"
+
+[Install]
+WantedBy=multi-user.target

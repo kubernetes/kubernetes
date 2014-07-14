@@ -1,0 +1,10 @@
+[Unit]
+Description=Kubernetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+EnvironmentFile=/etc/sysconfig/apiserver
+ExecStart=/usr/local/bin/apiserver "$DAEMON_ARGS"
+
+[Install]
+WantedBy=multi-user.target

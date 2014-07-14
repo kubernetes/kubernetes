@@ -14,20 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Push a new release to the cluster.
-#
-# This will find the release tar, cause it to be downloaded, unpacked, installed
-# and enacted.
-
-# exit on any error
-set -e
-
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
-
-echo "Updating cluster using provider: $KUBERNETES_PROVIDER"
-
-verify-prereqs
-kube-up
-
-echo "Done"
+## Contains configuration values for interacting with the Vagrant cluster in test mode
+source $(dirname ${BASH_SOURCE})/config-default.sh

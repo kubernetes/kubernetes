@@ -14,20 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Push a new release to the cluster.
-#
-# This will find the release tar, cause it to be downloaded, unpacked, installed
-# and enacted.
+## Contains configuration values for interacting with the Vagrant cluster
 
-# exit on any error
-set -e
+# NUMBER OF MINIONS IN THE CLUSTER
+NUM_MINIONS=${KUBERNETES_NUM_MINIONS-"3"}
 
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
+# IP LOCATIONS FOR INTERACTING WITH THE MASTER
+export KUBE_MASTER_IP="10.245.1.2"
+export KUBERNETES_MASTER="http://10.245.1.2:8080"
 
-echo "Updating cluster using provider: $KUBERNETES_PROVIDER"
-
-verify-prereqs
-kube-up
-
-echo "Done"
+# IP LOCATIONS FOR INTERACTING WITH THE MINIONS
+MINION_IP_BASE="10.245.2."
+for (( i=0; i <${NUM_MINIONS}; i++)) do
+	KUBE_MINION_IP_ADDRESSES[$i]="${MINION_IP_BASE}$[$i+2]"
+done

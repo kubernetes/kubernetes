@@ -1,0 +1,10 @@
+[Unit]
+Description=Kubernetes Kube-Proxy Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+EnvironmentFile=/etc/sysconfig/kube-proxy
+ExecStart=/usr/local/bin/kube-proxy "$DAEMON_ARGS"
+
+[Install]
+WantedBy=multi-user.target

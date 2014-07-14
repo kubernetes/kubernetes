@@ -1,0 +1,10 @@
+[Unit]
+Description=Kubernetes Kubelet Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+EnvironmentFile=/etc/sysconfig/kubelet
+ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
+
+[Install]
+WantedBy=multi-user.target

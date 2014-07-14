@@ -1,12 +1,21 @@
 {% set root = '/var/src/controller-manager' %}
 {% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
 {% set package_dir = root + '/src/' + package %}
+{% if grains['os_family'] == 'RedHat' %}
+{% set environment_file = '/etc/sysconfig/controller-manager' %}
+{% else %}
+{% set environment_file = '/etc/default/controller-manager' %}
+{% endif %}
 
 {{ package_dir }}:
   file.recurse:
     - source: salt://controller-manager/go
     - user: root
+    {% if grains['os_family'] == 'RedHat' %}
+    - group: root
+    {% else %}
     - group: staff
+    {% endif %}
     - dir_mode: 775
     - file_mode: 664
     - makedirs: True
@@ -20,7 +29,11 @@ controller-manager-third-party-go:
     - name: {{ root }}/src
     - source: salt://third-party/go/src
     - user: root
+    {% if grains['os_family'] == 'RedHat' %}
+    - group: root
+    {% else %}
     - group: staff
+    {% endif %}
     - dir_mode: 775
     - file_mode: 664
     - makedirs: True
@@ -29,7 +42,7 @@ controller-manager-third-party-go:
       - group
       - mode
 
-/etc/default/controller-manager:
+{{ environment_file }}:
   file.managed:
     - source: salt://controller-manager/default
     - template: jinja
@@ -54,12 +67,24 @@ controller-manager-build:
     - watch:
       - cmd: controller-manager-build
 
+{% if grains['os_family'] == 'RedHat' %}
+
+/usr/lib/systemd/system/controller-manager.service:
+  file.managed:
+    - source: salt://controller-manager/controller-manager.service
+    - user: root
+    - group: root
+
+{% else %}
+
 /etc/init.d/controller-manager:
   file.managed:
     - source: salt://controller-manager/initd
     - user: root
     - group: root
     - mode: 755
+
+{% endif %}
 
 controller-manager:
   group.present:
@@ -76,6 +101,9 @@ controller-manager:
     - watch:
       - cmd: controller-manager-build
       - file: /usr/local/bin/controller-manager
+      - file: {{ environment_file }}
+{% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/controller-manager
-      - file: /etc/default/controller-manager
+{% endif %}
+
 
