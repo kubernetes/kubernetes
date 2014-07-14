@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,6 +27,8 @@ import (
 	"strings"
 	"time"
 
+	"code.google.com/p/go.net/html"
+	"code.google.com/p/go.net/html/atom"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -110,27 +113,113 @@ func (server *ApiServer) handleIndex(w http.ResponseWriter) {
 	fmt.Fprint(w, data)
 }
 
-func (server *ApiServer) handleMinionReq(minion_info string, req *http.Request, w http.ResponseWriter) {
-	glog.Infof("???? handleMinionReq: %#v", req)
-	queryParts := strings.Split(minion_info, "=")
-	queryUrl := "http://" + queryParts[1] + ":10250"
-	glog.Infof("????query_url: %s", queryUrl)
+func (server *ApiServer) handleMinionReq(rawQuery string, w http.ResponseWriter) {
+	// Expect rawQuery as: id=${minion}&query=/stats/<podid>/<containerName> or
+	// id=${minion}&query=logs/
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		glog.Errorf("Invalid URL query: %s", rawQuery)
+		return
+	}
+	glog.Infof("???? queries 1: %v", pretty.Sprintf("%# v", values))
+
+	minionHost := values.Get("id")
+	queryUrl := "http://" + minionHost
+	if strings.LastIndex(queryUrl, ":10250") < 0 {
+		// No port information
+		queryUrl += ":10250"
+	}
 	remote, err := url.Parse(queryUrl)
 	if err != nil {
-		glog.Errorf("????? Failed to parse %p as url: %s", queryUrl, err)
+		glog.Errorf("Failed to parse %p as url: %s", queryUrl, err)
 	}
-	newReq, err := http.NewRequest("GET", "/stats", nil)
-	glog.Infof("???? newReq: %v", pretty.Sprintf("%# v", newReq))
+
+	query := values.Get("query")
+	newReq, err := http.NewRequest("GET", query, nil)
 	if err != nil {
-		glog.Errorf("????? Failed to create request: %s", err)
+		glog.Errorf("Failed to create request: %s", err)
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
+
+	proxy.Transport = &minionTransport{}
+
 	proxy.ServeHTTP(w, newReq)
+}
+
+type minionTransport struct{}
+
+func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+
+	glog.Infof("??????????RoundTrip request: %v", pretty.Sprintf("%# v", req))
+
+	if !strings.HasPrefix(req.URL.Path, "/logs/") {
+		// Do nothing, simply pass through
+		return resp, err
+	}
+
+	body, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		// copying the response body did not work
+		return nil, err
+	}
+	glog.Infof("??????? RESPONSE BODY: %s", string(body))
+	glog.Infof("??????? RESPONSE BODY LENGTH: %d", resp.ContentLength)
+
+	bodyNode := &html.Node{
+		Type:     html.ElementNode,
+		Data:     "body",
+		DataAtom: atom.Body,
+	}
+	nodes, err := html.ParseFragment(bytes.NewBuffer(body), bodyNode)
+	if err != nil {
+		glog.Errorf("Failed to found <body> node: %v", err)
+		return resp, err
+	}
+
+	// Define the method to traverse the doc tree and update href node to
+	// point to correct minion
+	var updateHRef func(*html.Node)
+	updateHRef = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for i, attr := range n.Attr {
+				if attr.Key == "href" {
+					glog.Infof("?????Update HREF: %v", req.URL.Host)
+					n.Attr[i].Val = "minion?id=" + req.URL.Host + "&query=" + req.URL.Path + attr.Val
+					break
+				}
+			}
+		} else if n.Type == html.TextNode && strings.Contains(n.Data, "Content-Length:") {
+			glog.Infof("???? node type: %v, data: %v, attrs: %v", n.Type, n.Data, n.Attr)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			updateHRef(c)
+		}
+	}
+
+	newContent := &bytes.Buffer{}
+	for _, n := range nodes {
+		updateHRef(n)
+		err = html.Render(newContent, n)
+		glog.Infof("????? Len 1: %v", newContent.Len())
+		if err != nil {
+			glog.Errorf("Failed to render: %v", err)
+		}
+	}
+
+	resp.Body = ioutil.NopCloser(newContent)
+	// Update header node with new content-length
+	resp.Header.Del("Content-Length")
+	resp.ContentLength = int64(newContent.Len())
+	glog.Infof("????? Len 2: %v", newContent.Len())
+
+	return resp, err
 }
 
 // HTTP Handler interface
 func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	glog.Infof("???? req: %v", pretty.Sprintf("%# v", req))
 	defer func() {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -145,8 +234,6 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusConflict,
 		),
 	).Log()
-	req.ParseForm()
-	glog.Infof("????? req.form:%#v", req.Form)
 	url, err := url.ParseRequestURI(req.RequestURI)
 	glog.Infof("????? after parse, url:%#v", url)
 	if err != nil {
@@ -158,9 +245,14 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if url.Path == "/minion" {
-		server.handleMinionReq(url.RawQuery, req, w)
+		server.handleMinionReq(url.RawQuery, w)
 		return
 	}
+	if url.Path == "/redirect" {
+		req.URL.Path = "/redirect1"
+		return
+	}
+
 	if strings.HasPrefix(url.Path, "/logs/") {
 		server.logserver.ServeHTTP(w, req)
 		return
