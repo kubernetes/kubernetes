@@ -29,6 +29,12 @@ This example also assumes that you have [Docker](http://docker.io) installed on 
 
 It also assumes that ```$DOCKER_USER``` is set to your docker user id.
 
+You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+
+```shell
+$ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
+```
+
 ### Step One: Build the image
 
     $ cd kubernetes/examples/update-demo/image
@@ -83,3 +89,5 @@ We will now update the servers that are running out in your cluster.
     $ cluster/kubecfg.sh -u=30s rollingupdate dataController
 
 Watch the UX, it will update one pod every 30 seconds until all of the pods have the new color.
+
+[cloud-console]: https://console.developer.google.com
