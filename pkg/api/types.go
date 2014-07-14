@@ -18,6 +18,8 @@ package api
 
 import (
 	"github.com/fsouza/go-dockerclient"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Common string formats
@@ -267,6 +269,9 @@ type Service struct {
 	// This service will route traffic to pods having labels matching this selector.
 	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
+
+	// Container port to connect to, either a name or a port number
+	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

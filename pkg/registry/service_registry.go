@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type ServiceRegistryStorage struct {
@@ -41,6 +42,39 @@ func MakeServiceRegistryStorage(registry ServiceRegistry, cloud cloudprovider.In
 	}
 }
 
+func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
+	prefix := strings.ToUpper(service.ID)
+	var port string
+	if service.ContainerPort.Kind == util.IntstrString {
+		port = service.ContainerPort.StrVal
+	} else {
+		port = strconv.Itoa(service.ContainerPort.IntVal)
+	}
+	portPrefix := prefix + "_PORT_" + port + "_TCP"
+	return []api.EnvVar{
+		{
+			Name:  prefix + "_PORT",
+			Value: fmt.Sprintf("tcp://%s:%d", machine, service.Port),
+		},
+		{
+			Name:  portPrefix,
+			Value: fmt.Sprintf("tcp://%s:%d", machine, service.Port),
+		},
+		{
+			Name:  portPrefix + "_PROTO",
+			Value: "tcp",
+		},
+		{
+			Name:  portPrefix + "_PORT",
+			Value: strconv.Itoa(service.Port),
+		},
+		{
+			Name:  portPrefix + "_ADDR",
+			Value: machine,
+		},
+	}
+}
+
 // GetServiceEnvironmentVariables populates a list of environment variables that are use
 // in the container environment to get access to services.
 func GetServiceEnvironmentVariables(registry ServiceRegistry, machine string) ([]api.EnvVar, error) {
@@ -53,6 +87,7 @@ func GetServiceEnvironmentVariables(registry ServiceRegistry, machine string) ([
 		name := strings.ToUpper(service.ID) + "_SERVICE_PORT"
 		value := strconv.Itoa(service.Port)
 		result = append(result, api.EnvVar{Name: name, Value: value})
+		result = append(result, makeLinkVariables(service, machine)...)
 	}
 	result = append(result, api.EnvVar{Name: "SERVICE_HOST", Value: machine})
 	return result, nil
