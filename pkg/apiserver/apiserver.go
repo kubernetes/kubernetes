@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
-	"github.com/kr/pretty"
 )
 
 // RESTStorage is a generic interface for RESTful storage services
@@ -121,7 +120,6 @@ func (server *ApiServer) handleMinionReq(rawQuery string, w http.ResponseWriter)
 		glog.Errorf("Invalid URL query: %s", rawQuery)
 		return
 	}
-	glog.Infof("???? queries 1: %v", pretty.Sprintf("%# v", values))
 
 	minionHost := values.Get("id")
 	queryUrl := "http://" + minionHost
@@ -152,8 +150,6 @@ type minionTransport struct{}
 func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := http.DefaultTransport.RoundTrip(req)
 
-	glog.Infof("??????????RoundTrip request: %v", pretty.Sprintf("%# v", req))
-
 	if !strings.HasPrefix(req.URL.Path, "/logs/") {
 		// Do nothing, simply pass through
 		return resp, err
@@ -164,8 +160,6 @@ func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		// copying the response body did not work
 		return nil, err
 	}
-	glog.Infof("??????? RESPONSE BODY: %s", string(body))
-	glog.Infof("??????? RESPONSE BODY LENGTH: %d", resp.ContentLength)
 
 	bodyNode := &html.Node{
 		Type:     html.ElementNode,
@@ -185,13 +179,10 @@ func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for i, attr := range n.Attr {
 				if attr.Key == "href" {
-					glog.Infof("?????Update HREF: %v", req.URL.Host)
 					n.Attr[i].Val = "minion?id=" + req.URL.Host + "&query=" + req.URL.Path + attr.Val
 					break
 				}
 			}
-		} else if n.Type == html.TextNode && strings.Contains(n.Data, "Content-Length:") {
-			glog.Infof("???? node type: %v, data: %v, attrs: %v", n.Type, n.Data, n.Attr)
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			updateHRef(c)
@@ -202,7 +193,6 @@ func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	for _, n := range nodes {
 		updateHRef(n)
 		err = html.Render(newContent, n)
-		glog.Infof("????? Len 1: %v", newContent.Len())
 		if err != nil {
 			glog.Errorf("Failed to render: %v", err)
 		}
@@ -212,14 +202,12 @@ func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Update header node with new content-length
 	resp.Header.Del("Content-Length")
 	resp.ContentLength = int64(newContent.Len())
-	glog.Infof("????? Len 2: %v", newContent.Len())
 
 	return resp, err
 }
 
 // HTTP Handler interface
 func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	glog.Infof("???? req: %v", pretty.Sprintf("%# v", req))
 	defer func() {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -235,7 +223,6 @@ func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		),
 	).Log()
 	url, err := url.ParseRequestURI(req.RequestURI)
-	glog.Infof("????? after parse, url:%#v", url)
 	if err != nil {
 		server.error(err, w)
 		return

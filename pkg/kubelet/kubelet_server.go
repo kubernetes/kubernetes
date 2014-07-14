@@ -29,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/golang/glog"
-	"github.com/kr/pretty"
 	"gopkg.in/v1/yaml"
 )
 
@@ -54,8 +53,6 @@ func (s *KubeletServer) error(w http.ResponseWriter, err error) {
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer apiserver.MakeLogged(req, &w).Log()
-
-	glog.Infof("???? newReq: %v", pretty.Sprintf("%# v", req))
 
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
