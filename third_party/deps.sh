@@ -11,6 +11,7 @@ DEP_PACKAGES="
   gopkg.in/v1/yaml
   bitbucket.org/kardianos/osext
   code.google.com/p/google-api-go-client/googleapi
+  code.google.com/p/go.net/html
   github.com/coreos/go-log/log
   github.com/coreos/go-systemd/journal
   github.com/google/cadvisor/info

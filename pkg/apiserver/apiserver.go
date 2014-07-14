@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"runtime/debug"
 	"strings"
@@ -111,7 +112,7 @@ func (server *APIServer) handleIndex(w http.ResponseWriter) {
 	fmt.Fprint(w, data)
 }
 
-func (server *ApiServer) handleMinionReq(rawQuery string, w http.ResponseWriter) {
+func (server *APIServer) handleMinionReq(rawQuery string, w http.ResponseWriter) {
 	// Expect rawQuery as: id=${minion}&query=/stats/<podid>/<containerName> or
 	// id=${minion}&query=logs/
 	values, err := url.ParseQuery(rawQuery)
@@ -206,7 +207,7 @@ func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // HTTP Handler interface
-func (server *ApiServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)

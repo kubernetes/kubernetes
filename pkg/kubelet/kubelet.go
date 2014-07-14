@@ -109,7 +109,7 @@ const (
 
 // RunKubelet starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestUrl, etcdServers, address string, port uint) {
+func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServers, address string, port uint) {
 	if kl.LogServer == nil {
 		kl.LogServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
 	}
