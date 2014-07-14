@@ -44,6 +44,8 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
+const defaultChanSize = 1024
+
 // DockerContainerData is the structured representation of the JSON object returned by Docker inspect
 type DockerContainerData struct {
 	state struct {
@@ -758,7 +760,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	glog.Infof("Desired: %+v", config)
 	var err error
 	dockerIdsToKeep := map[DockerID]empty{}
-	keepChannel := make(chan DockerID)
+	keepChannel := make(chan DockerID, defaultChanSize)
 	waitGroup := sync.WaitGroup{}
 
 	// Check for any containers that need starting
