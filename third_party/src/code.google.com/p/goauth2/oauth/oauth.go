@@ -317,6 +317,18 @@ func (t *Transport) Refresh() error {
 	return nil
 }
 
+// AuthenticateClient gets an access Token using the client_credentials grant
+// type.
+func (t *Transport) AuthenticateClient() error {
+	if t.Config == nil {
+		return OAuthError{"Exchange", "no Config supplied"}
+	}
+	if t.Token == nil {
+		t.Token = &Token{}
+	}
+	return t.updateToken(t.Token, url.Values{"grant_type": {"client_credentials"}})
+}
+
 func (t *Transport) updateToken(tok *Token, v url.Values) error {
 	v.Set("client_id", t.ClientId)
 	v.Set("client_secret", t.ClientSecret)
