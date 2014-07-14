@@ -14,7 +14,7 @@ import (
 	"unsafe"
 )
 
-var startUpcwd, getwdError = os.Getwd()
+var initCwd, initCwdErr = os.Getwd()
 
 func executable() (string, error) {
 	var mib [4]int32
@@ -26,20 +26,20 @@ func executable() (string, error) {
 	}
 
 	n := uintptr(0)
-	// get length
-	_, _, err := syscall.Syscall6(syscall.SYS___SYSCTL, uintptr(unsafe.Pointer(&mib[0])), 4, 0, uintptr(unsafe.Pointer(&n)), 0, 0)
-	if err != 0 {
-		return "", err
+	// Get length.
+	_, _, errNum := syscall.Syscall6(syscall.SYS___SYSCTL, uintptr(unsafe.Pointer(&mib[0])), 4, 0, uintptr(unsafe.Pointer(&n)), 0, 0)
+	if errNum != 0 {
+		return "", errNum
 	}
-	if n == 0 { // shouldn't happen
+	if n == 0 { // This shouldn't happen.
 		return "", nil
 	}
 	buf := make([]byte, n)
-	_, _, err = syscall.Syscall6(syscall.SYS___SYSCTL, uintptr(unsafe.Pointer(&mib[0])), 4, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&n)), 0, 0)
-	if err != 0 {
-		return "", err
+	_, _, errNum = syscall.Syscall6(syscall.SYS___SYSCTL, uintptr(unsafe.Pointer(&mib[0])), 4, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&n)), 0, 0)
+	if errNum != 0 {
+		return "", errNum
 	}
-	if n == 0 { // shouldn't happen
+	if n == 0 { // This shouldn't happen.
 		return "", nil
 	}
 	for i, v := range buf {
@@ -48,35 +48,32 @@ func executable() (string, error) {
 			break
 		}
 	}
-	var strpath string
-	if buf[0] != '/' {
-		var e error
-		if strpath, e = getAbs(buf); e != nil {
-			return strpath, e
+	var err error
+	execPath := string(buf)
+	// execPath will not be empty due to above checks.
+	// Try to get the absolute path if the execPath is not rooted.
+	if execPath[0] != '/' {
+		execPath, err = getAbs(execPath)
+		if err != nil {
+			return execPath, err
 		}
-	} else {
-		strpath = string(buf)
 	}
-	// darwin KERN_PROCARGS may return the path to a symlink rather than the
-	// actual executable
+	// For darwin KERN_PROCARGS may return the path to a symlink rather than the
+	// actual executable.
 	if runtime.GOOS == "darwin" {
-		if strpath, err := filepath.EvalSymlinks(strpath); err != nil {
-			return strpath, err
+		if execPath, err = filepath.EvalSymlinks(execPath); err != nil {
+			return execPath, err
 		}
 	}
-	return strpath, nil
+	return execPath, nil
 }
 
-func getAbs(buf []byte) (string, error) {
-	if getwdError != nil {
-		return string(buf), getwdError
-	} else {
-		if buf[0] == '.' {
-			buf = buf[1:]
-		}
-		if startUpcwd[len(startUpcwd)-1] != '/' && buf[0] != '/' {
-			return startUpcwd + "/" + string(buf), nil
-		}
-		return startUpcwd + string(buf), nil
+func getAbs(execPath string) (string, error) {
+	if initCwdErr != nil {
+		return execPath, initCwdErr
 	}
+	// The execPath may begin with a "../" or a "./" so clean it first.
+	// Join the two paths, trailing and starting slashes undetermined, so use
+	// the generic Join function.
+	return filepath.Join(initCwd, filepath.Clean(execPath)), nil
 }
