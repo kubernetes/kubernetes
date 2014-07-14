@@ -6,6 +6,7 @@ package googleapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -106,6 +107,7 @@ type CheckResponseTest struct {
 	in       *http.Response
 	bodyText string
 	want     error
+	errText  string
 }
 
 var checkResponseTests = []CheckResponseTest{
@@ -115,6 +117,18 @@ var checkResponseTests = []CheckResponseTest{
 		},
 		"",
 		nil,
+		"",
+	},
+	{
+		&http.Response{
+			StatusCode: http.StatusInternalServerError,
+		},
+		`{"error":{}}`,
+		&Error{
+			Code: http.StatusInternalServerError,
+			Body: `{"error":{}}`,
+		},
+		`googleapi: got HTTP response code 500 with body: {"error":{}}`,
 	},
 	{
 		&http.Response{
@@ -126,6 +140,7 @@ var checkResponseTests = []CheckResponseTest{
 			Message: "Error message for StatusNotFound.",
 			Body:    `{"error":{"message":"Error message for StatusNotFound."}}`,
 		},
+		"googleapi: Error 404: Error message for StatusNotFound.",
 	},
 	{
 		&http.Response{
@@ -136,6 +151,25 @@ var checkResponseTests = []CheckResponseTest{
 			Code: http.StatusBadRequest,
 			Body: `{"error":"invalid_token","error_description":"Invalid Value"}`,
 		},
+		`googleapi: got HTTP response code 400 with body: {"error":"invalid_token","error_description":"Invalid Value"}`,
+	},
+	{
+		&http.Response{
+			StatusCode: http.StatusBadRequest,
+		},
+		`{"error":{"errors":[{"domain":"usageLimits","reason":"keyInvalid","message":"Bad Request"}],"code":400,"message":"Bad Request"}}`,
+		&Error{
+			Code: http.StatusBadRequest,
+			Errors: []ErrorItem{
+				{
+					Reason:  "keyInvalid",
+					Message: "Bad Request",
+				},
+			},
+			Body:    `{"error":{"errors":[{"domain":"usageLimits","reason":"keyInvalid","message":"Bad Request"}],"code":400,"message":"Bad Request"}}`,
+			Message: "Bad Request",
+		},
+		"googleapi: Error 400: Bad Request, keyInvalid",
 	},
 }
 
@@ -145,8 +179,21 @@ func TestCheckResponse(t *testing.T) {
 		if test.bodyText != "" {
 			res.Body = ioutil.NopCloser(strings.NewReader(test.bodyText))
 		}
-		if g := CheckResponse(res); !reflect.DeepEqual(g, test.want) {
+		g := CheckResponse(res)
+		if !reflect.DeepEqual(g, test.want) {
 			t.Errorf("CheckResponse: got %v, want %v", g, test.want)
+			gotJson, err := json.Marshal(g)
+			if err != nil {
+				t.Error(err)
+			}
+			wantJson, err := json.Marshal(test.want)
+			if err != nil {
+				t.Error(err)
+			}
+			t.Errorf("json(got):  %q\njson(want): %q", string(gotJson), string(wantJson))
+		}
+		if g != nil && g.Error() != test.errText {
+			t.Errorf("CheckResponse: unexpected error message.\nGot:  %q\nwant: %q", g, test.errText)
 		}
 	}
 }
