@@ -53,9 +53,7 @@ func TestEtcdGetPodNotFound(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{
-			ErrorCode: 100,
-		},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	_, err := registry.GetPod("foo")
@@ -70,7 +68,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
@@ -133,13 +131,13 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 200},
+		E: tools.EtcdErrorValueRequired,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.CreatePod("machine", api.Pod{
@@ -154,7 +152,7 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	if err == nil {
 		t.Error("Unexpected non-error")
 	}
-	if err != nil && err.(*etcd.EtcdError).ErrorCode != 100 {
+	if !tools.IsEtcdNotFound(err) {
 		t.Errorf("Unexpected error: %#v", err)
 	}
 }
@@ -165,13 +163,13 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.CreatePod("machine", api.Pod{
@@ -213,7 +211,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
 		{
@@ -329,7 +327,7 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 	key := "/registry/hosts/machine/pods"
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pods, err := registry.ListPods(labels.Everything())
@@ -374,7 +372,7 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 	key := "/registry/controllers"
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	controllers, err := registry.ListControllers()
@@ -389,7 +387,7 @@ func TestEtcdListServicesNotFound(t *testing.T) {
 	key := "/registry/services/specs"
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	services, err := registry.ListServices()
@@ -442,9 +440,7 @@ func TestEtcdGetControllerNotFound(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{
-			ErrorCode: 100,
-		},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	ctrl, err := registry.GetController("foo")
@@ -538,7 +534,7 @@ func TestEtcdCreateService(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.CreateService(api.Service{
@@ -572,9 +568,7 @@ func TestEtcdGetServiceNotFound(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{
-			ErrorCode: 100,
-		},
+		E: tools.EtcdErrorNotFound,
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	_, err := registry.GetService("foo")

@@ -74,7 +74,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	result := f.Data[key]
 	if result.R == nil {
 		f.t.Errorf("Unexpected get for %s", key)
-		return &etcd.Response{}, &etcd.EtcdError{ErrorCode: 100} // Key not found
+		return &etcd.Response{}, EtcdErrorNotFound
 	}
 	f.t.Logf("returning %v: %v %#v", key, result.R, result.E)
 	return result.R, result.E
@@ -105,7 +105,7 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: &etcd.EtcdError{ErrorCode: 100},
+		E: EtcdErrorNotFound,
 	}
 
 	f.DeletedKeys = append(f.DeletedKeys, key)
