@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/google/cadvisor/info"
 )
 
@@ -117,4 +118,25 @@ func (self *machineSelector) FeasibleMachines() ([]string, error) {
 		return nil, self.err
 	}
 	return self.feasibleMachines, nil
+}
+
+type resourceCalculatorBasedOnPercentiles struct {
+	cpuPercentile       int
+	memPercentile       int
+	containerInfoGetter client.ContainerInfoGetter
+}
+
+func (self *resourceCalculatorBasedOnPercentiles) MaxContainer(host string) (*info.ContainerSpec, error) {
+	machineSpec, err := self.containerInfoGetter.GetMachineSpec(host)
+	if err != nil {
+		return nil, err
+	}
+	maxContainer := &info.ContainerSpec{
+		Cpu: &info.CpuSpec{
+			Limit: uint64(machineSpec.NumCores * 1000),
+		},
+		Memory: &info.MemorySpec{
+			Limit: uint64(machineSpec.MemoryCapacity),
+		},
+	}
 }
