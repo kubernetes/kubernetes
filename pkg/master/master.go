@@ -37,10 +37,7 @@ type Master struct {
 	controllerRegistry registry.ControllerRegistry
 	serviceRegistry    registry.ServiceRegistry
 	minionRegistry     registry.MinionRegistry
-
-	// TODO: don't reuse non-threadsafe objects.
-	random  *rand.Rand
-	storage map[string]apiserver.RESTStorage
+	storage            map[string]apiserver.RESTStorage
 }
 
 // NewMemoryServer returns a new instance of Master backed with memory (not etcd).
@@ -81,17 +78,16 @@ func minionRegistryMaker(minions []string, cloud cloudprovider.Interface, minion
 }
 
 func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
-	m.random = rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
 	go podCache.Loop()
-	s := scheduler.NewRandomFitScheduler(m.podRegistry, m.random)
+	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
+	s := scheduler.NewRandomFitScheduler(m.podRegistry, random)
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(m.podRegistry, podInfoGetter, s, m.minionRegistry, cloud, podCache),
 		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
 	}
-
 }
 
 // Run begins serving the Kubernetes API. It never returns.
