@@ -23,7 +23,7 @@ import (
 
 // Labels allows you to present labels independently from their storage.
 type Labels interface {
-	// Get returns the value identified by the label.
+	// Get returns the value for the provided label.
 	Get(label string) (value string)
 }
 
@@ -42,7 +42,7 @@ func (ls Set) String() string {
 	return strings.Join(selector, ",")
 }
 
-// Get returns the value for the provided label.
+// Get returns the value in the map for the provided label.
 func (ls Set) Get(label string) string {
 	return ls[label]
 }

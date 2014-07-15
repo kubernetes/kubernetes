@@ -40,7 +40,7 @@ type PodCache struct {
 	podLock sync.Mutex
 }
 
-// NewPodCache returns a new PodCache.
+// NewPodCache returns a new PodCache which watches container information registered in the given PodRegistry.
 func NewPodCache(info client.PodInfoGetter, pods registry.PodRegistry, period time.Duration) *PodCache {
 	return &PodCache{
 		containerInfo: info,
@@ -88,7 +88,8 @@ func (p *PodCache) UpdateAllContainers() {
 	}
 }
 
-// Loop runs forever, it is expected to be placed in a go routine.
+// Loop begins watching updates of container information.
+// It runs forever, and is expected to be placed in a go routine.
 func (p *PodCache) Loop() {
 	util.Forever(func() { p.UpdateAllContainers() }, p.period)
 }

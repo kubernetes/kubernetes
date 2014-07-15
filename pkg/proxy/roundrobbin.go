@@ -36,7 +36,7 @@ type LoadBalancerRR struct {
 	rrIndex      map[string]int
 }
 
-// NewLoadBalancerRR returns a new LoadBalancerRR.
+// NewLoadBalancerRR returns a newly created and correctly initialized instance of LoadBalancerRR.
 func NewLoadBalancerRR() *LoadBalancerRR {
 	return &LoadBalancerRR{endpointsMap: make(map[string][]string), rrIndex: make(map[string]int)}
 }
@@ -70,7 +70,6 @@ func (impl LoadBalancerRR) isValid(spec string) bool {
 	return value > 0
 }
 
-// filterValidEndpoints filters out invalid endpoints.
 func (impl LoadBalancerRR) filterValidEndpoints(endpoints []string) []string {
 	var result []string
 	for _, spec := range endpoints {

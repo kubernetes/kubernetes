@@ -51,15 +51,14 @@ type serviceConfig struct {
 	} `json: "service"`
 }
 
-// ConfigSourceFile periodically reads service configurations in JSON from a file, and sends the services and endpoints defined in th file to the specified channels.
+// ConfigSourceFile periodically reads service configurations in JSON from a file, and sends the services and endpoints defined in the file to the specified channels.
 type ConfigSourceFile struct {
 	serviceChannel   chan ServiceUpdate
 	endpointsChannel chan EndpointsUpdate
 	filename         string
 }
 
-// NewConfigSourceFile creates a new ConfigSourceFile.
-// It immediately runs the created ConfigSourceFile in a goroutine.
+// NewConfigSourceFile creates a new ConfigSourceFile and let it immediately runs the created ConfigSourceFile in a goroutine.
 func NewConfigSourceFile(filename string, serviceChannel chan ServiceUpdate, endpointsChannel chan EndpointsUpdate) ConfigSourceFile {
 	config := ConfigSourceFile{
 		filename:         filename,

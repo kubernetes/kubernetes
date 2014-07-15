@@ -33,12 +33,11 @@ type Proxier struct {
 	serviceMap   map[string]int
 }
 
-// NewProxier returns a new Proxier.
+// NewProxier returns a newly created and correctly initialized instance of Proxier.
 func NewProxier(loadBalancer LoadBalancer) *Proxier {
 	return &Proxier{loadBalancer: loadBalancer, serviceMap: make(map[string]int)}
 }
 
-// copyBytes copies bytes from in to out until EOF.
 func copyBytes(in, out *net.TCPConn) {
 	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
@@ -122,7 +121,8 @@ func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
 	go proxier.AcceptHandler(service, l)
 }
 
-// OnUpdate handles update notices for the updated services.
+// OnUpdate recieves update notices for the updated services and start listening newly added services.
+// It implements "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config".ServiceConfigHandler.OnUpdate.
 func (proxier Proxier) OnUpdate(services []api.Service) {
 	glog.Infof("Received update notice: %+v", services)
 	for _, service := range services {

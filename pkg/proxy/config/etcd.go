@@ -54,8 +54,7 @@ type ConfigSourceEtcd struct {
 	endpointsChannel chan EndpointsUpdate
 }
 
-// NewConfigSourceEtcd creates a new ConfigSourceEtcd.
-// It immediately runs the created ConfigSourceEtcd in a goroutine.
+// NewConfigSourceEtcd creates a new ConfigSourceEtcd and immediately runs the created ConfigSourceEtcd in a goroutine.
 func NewConfigSourceEtcd(client *etcd.Client, serviceChannel chan ServiceUpdate, endpointsChannel chan EndpointsUpdate) ConfigSourceEtcd {
 	config := ConfigSourceEtcd{
 		client:           client,
