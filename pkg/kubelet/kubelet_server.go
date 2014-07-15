@@ -33,8 +33,9 @@ import (
 
 // KubeletServer is a http.Handler which exposes kubelet functionality over HTTP.
 type KubeletServer struct {
-	Kubelet       kubeletInterface
-	UpdateChannel chan<- manifestUpdate
+	Kubelet         kubeletInterface
+	UpdateChannel   chan<- manifestUpdate
+	DelegateHandler http.Handler
 }
 
 // kubeletInterface contains all the kubelet methods required by the server.
@@ -58,10 +59,6 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	switch {
-	case u.Path == "/healthz":
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-		return
 	case u.Path == "/container" || u.Path == "/containers":
 		defer req.Body.Close()
 		data, err := ioutil.ReadAll(req.Body)
@@ -109,7 +106,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case strings.HasPrefix(u.Path, "/stats"):
 		s.serveStats(w, req)
 	default:
-		http.Error(w, "Not found.", http.StatusNotFound)
+		s.DelegateHandler.ServeHTTP(w, req)
 	}
 }
 
