@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2014-07-14)
+- Add support for systemd systems.
+- Fixes for UI with InfluxDB storage driver.
+
 ## 0.1.2 (2014-07-10)
 - Added Storage Driver concept (flag: storage_driver), default is the in-memory driver
 - Implemented InfluxDB storage driver

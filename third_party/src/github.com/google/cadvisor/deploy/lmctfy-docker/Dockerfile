@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y -q --no-install-recommends pkg-config l
 # Get the lcmtfy and cAdvisor binaries.
 ADD http://storage.googleapis.com/cadvisor-bin/lmctfy/lmctfy /usr/bin/lmctfy
 ADD http://storage.googleapis.com/cadvisor-bin/lmctfy/libre2.so.0.0.0 /usr/lib/libre2.so.0
-ADD http://storage.googleapis.com/cadvisor-bin/cadvisor-0.1.2 /usr/bin/cadvisor
+ADD http://storage.googleapis.com/cadvisor-bin/cadvisor-0.1.3 /usr/bin/cadvisor
 RUN chmod +x /usr/bin/lmctfy && chmod +x /usr/bin/cadvisor
 
 EXPOSE 8080

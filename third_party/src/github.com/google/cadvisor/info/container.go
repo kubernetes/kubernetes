@@ -110,6 +110,52 @@ type ContainerInfo struct {
 	StatsPercentiles *ContainerStatsPercentiles `json:"stats_summary,omitempty"`
 }
 
+// ContainerInfo may be (un)marshaled by json or other en/decoder. In that
+// case, the Timestamp field in each stats/sample may not be precisely
+// en/decoded.  This will lead to small but acceptable differences between a
+// ContainerInfo and its encode-then-decode version.  Eq() is used to compare
+// two ContainerInfo accepting small difference (<10ms) of Time fields.
+func (self *ContainerInfo) Eq(b *ContainerInfo) bool {
+
+	// If both self and b are nil, then Eq() returns true
+	if self == nil {
+		return b == nil
+	}
+	if b == nil {
+		return self == nil
+	}
+
+	// For fields other than time.Time, we will compare them precisely.
+	// This would require that any slice should have same order.
+	if !reflect.DeepEqual(self.ContainerReference, b.ContainerReference) {
+		return false
+	}
+	if !reflect.DeepEqual(self.Subcontainers, b.Subcontainers) {
+		return false
+	}
+	if !reflect.DeepEqual(self.Spec, b.Spec) {
+		return false
+	}
+	if !reflect.DeepEqual(self.StatsPercentiles, b.StatsPercentiles) {
+		return false
+	}
+
+	for i, expectedStats := range b.Stats {
+		selfStats := self.Stats[i]
+		if !expectedStats.Eq(selfStats) {
+			return false
+		}
+	}
+
+	for i, expectedSample := range b.Samples {
+		selfSample := self.Samples[i]
+		if !expectedSample.Eq(selfSample) {
+			return false
+		}
+	}
+	return true
+}
+
 func (self *ContainerInfo) StatsAfter(ref time.Time) []*ContainerStats {
 	n := len(self.Stats) + 1
 	for i, s := range self.Stats {
