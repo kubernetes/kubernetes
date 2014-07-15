@@ -409,3 +409,37 @@ func TestSyncCreateTimeout(t *testing.T) {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, 202, response)
 	}
 }
+
+func TestOpGet(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	simple := Simple{Name: "foo"}
+	data, _ := api.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
+	expectNoError(t, err)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusAccepted {
+		t.Errorf("Unexpected response %#v", response)
+	}
+
+	var itemOut api.Status
+	body, err := extractBody(response, &itemOut)
+	expectNoError(t, err)
+	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
+		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
+	}
+
+	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details, nil)
+	expectNoError(t, err)
+	_, err = client.Do(req2)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusAccepted {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}

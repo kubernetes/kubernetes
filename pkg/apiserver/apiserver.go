@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
+	"path"
 	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -83,25 +85,37 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIServer struct {
-	prefix    string
-	storage   map[string]RESTStorage
-	ops       *Operations
-	logserver http.Handler
+	prefix  string
+	storage map[string]RESTStorage
+	ops     *Operations
+	mux     *http.ServeMux
 }
 
 // New creates a new APIServer object.
 // 'storage' contains a map of handlers.
 // 'prefix' is the hosting path prefix.
 func New(storage map[string]RESTStorage, prefix string) *APIServer {
-	return &APIServer{
-		storage:   storage,
-		prefix:    prefix,
-		ops:       NewOperations(),
-		logserver: http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))),
+	s := &APIServer{
+		storage: storage,
+		prefix:  strings.TrimRight(prefix, "/"),
+		ops:     NewOperations(),
+		mux:     http.NewServeMux(),
 	}
+
+	s.mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+	s.mux.HandleFunc(s.prefix+"/", s.ServeREST)
+	healthz.InstallHandler(s.mux)
+	s.mux.HandleFunc("/index.html", s.handleIndex)
+
+	// Handle both operations and operations/* with the same handler
+	opPrefix := path.Join(s.prefix, "operations")
+	s.mux.HandleFunc(opPrefix, s.handleOperationRequest)
+	s.mux.HandleFunc(opPrefix+"/", s.handleOperationRequest)
+
+	return s
 }
 
-func (server *APIServer) handleIndex(w http.ResponseWriter) {
+func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	// TODO: serve this out of a file?
 	data := "<html><body>Welcome to Kubernetes</body></html>"
@@ -117,47 +131,37 @@ func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 		}
 	}()
-	defer MakeLogged(req, &w).StacktraceWhen(
-		StatusIsNot(
+	defer httplog.MakeLogged(req, &w).StacktraceWhen(
+		httplog.StatusIsNot(
 			http.StatusOK,
 			http.StatusAccepted,
 			http.StatusConflict,
 		),
 	).Log()
-	url, err := url.ParseRequestURI(req.RequestURI)
-	if err != nil {
-		server.error(err, w)
-		return
-	}
-	if url.Path == "/index.html" || url.Path == "/" || url.Path == "" {
-		server.handleIndex(w)
-		return
-	}
-	if strings.HasPrefix(url.Path, "/logs/") {
-		server.logserver.ServeHTTP(w, req)
-		return
-	}
-	if !strings.HasPrefix(url.Path, server.prefix) {
+
+	// Dispatch via our mux.
+	server.mux.ServeHTTP(w, req)
+}
+
+// ServeREST handles requests to all our RESTStorage objects.
+func (server *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
+	if !strings.HasPrefix(req.URL.Path, server.prefix) {
 		server.notFound(req, w)
 		return
 	}
-	requestParts := strings.Split(url.Path[len(server.prefix):], "/")[1:]
+	requestParts := strings.Split(req.URL.Path[len(server.prefix):], "/")[1:]
 	if len(requestParts) < 1 {
 		server.notFound(req, w)
 		return
 	}
-	if requestParts[0] == "operations" {
-		server.handleOperationRequest(requestParts[1:], w, req)
-		return
-	}
 	storage := server.storage[requestParts[0]]
 	if storage == nil {
-		LogOf(w).Addf("'%v' has no storage object", requestParts[0])
+		httplog.LogOf(w).Addf("'%v' has no storage object", requestParts[0])
 		server.notFound(req, w)
 		return
 	}
 
-	server.handleREST(requestParts, url, req, w, storage)
+	server.handleREST(requestParts, req, w, storage)
 }
 
 func (server *APIServer) notFound(req *http.Request, w http.ResponseWriter) {
@@ -197,7 +201,7 @@ func (server *APIServer) finishReq(out <-chan interface{}, sync bool, timeout ti
 		status := http.StatusOK
 		switch stat := obj.(type) {
 		case api.Status:
-			LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
+			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
 			if stat.Code != 0 {
 				status = stat.Code
 			}
@@ -236,14 +240,14 @@ func parseTimeout(str string) time.Duration {
 //    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
-func (server *APIServer) handleREST(parts []string, requestURL *url.URL, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	sync := requestURL.Query().Get("sync") == "true"
-	timeout := parseTimeout(requestURL.Query().Get("timeout"))
+func (server *APIServer) handleREST(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+	sync := req.URL.Query().Get("sync") == "true"
+	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {
 	case "GET":
 		switch len(parts) {
 		case 1:
-			selector, err := labels.ParseSelector(requestURL.Query().Get("labels"))
+			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
 			if err != nil {
 				server.error(err, w)
 				return
@@ -325,7 +329,18 @@ func (server *APIServer) handleREST(parts []string, requestURL *url.URL, req *ht
 	}
 }
 
-func (server *APIServer) handleOperationRequest(parts []string, w http.ResponseWriter, req *http.Request) {
+func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Request) {
+	opPrefix := path.Join(server.prefix, "operations")
+	if !strings.HasPrefix(req.URL.Path, opPrefix) {
+		server.notFound(req, w)
+		return
+	}
+	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
+	parts := strings.Split(trimmed, "/")
+	if len(parts) > 1 {
+		server.notFound(req, w)
+		return
+	}
 	if req.Method != "GET" {
 		server.notFound(req, w)
 	}

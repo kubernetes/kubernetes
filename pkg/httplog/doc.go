@@ -14,22 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package healthz
-
-import (
-	"net/http"
-)
-
-func init() {
-	http.HandleFunc("/healthz", handleHealthz)
-}
-
-func handleHealthz(w http.ResponseWriter, r *http.Request) {
-	// TODO Support user supplied health functions too.
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
-}
-
-func InstallHandler(mux *http.ServeMux) {
-	mux.HandleFunc("/healthz", handleHealthz)
-}
+// Package httplog contains a helper object and functions to maintain a log
+// along with an http response.
+package httplog
