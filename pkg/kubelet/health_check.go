@@ -28,9 +28,9 @@ import (
 type HealthCheckStatus int
 
 const (
-	CheckHealthy   HealthCheckStatus = 0
-	CheckUnhealthy HealthCheckStatus = 1
-	CheckUnknown   HealthCheckStatus = 2
+	CheckHealthy HealthCheckStatus = iota
+	CheckUnhealthy
+	CheckUnknown
 )
 
 type HealthChecker interface {
@@ -102,13 +102,11 @@ func (h *HTTPHealthChecker) HealthCheck(container api.Container) (HealthCheckSta
 	}
 	url := fmt.Sprintf("http://%s:%d%s", host, port, params.Path)
 	res, err := h.client.Get(url)
-	if res != nil && res.Body != nil {
-		defer res.Body.Close()
-	}
 	if err != nil {
 		// At this point, if it fails, its either a policy (unlikely) or HTTP protocol (likely) error.
 		return CheckUnhealthy, nil
 	}
+	defer res.Body.Close()
 	if res.StatusCode == http.StatusOK {
 		return CheckHealthy, nil
 	}

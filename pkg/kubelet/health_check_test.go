@@ -17,6 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -38,6 +40,7 @@ func TestHttpHealth(t *testing.T) {
 	fakeClient := fakeHTTPClient{
 		res: http.Response{
 			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(make([]byte, 0))),
 		},
 	}
 
