@@ -71,6 +71,78 @@ func (p dockerPuller) Pull(image string) error {
 	return p.client.PullImage(opts, docker.AuthConfiguration{})
 }
 
+// DockerContainers is a map of containers
+type DockerContainers map[DockerID]*docker.APIContainers
+
+func (c DockerContainers) FindPodContainer(manifestID, containerName string) (*docker.APIContainers, bool) {
+	for _, dockerContainer := range c {
+		dockerManifestID, dockerContainerName := parseDockerName(dockerContainer.Names[0])
+		if dockerManifestID == manifestID && dockerContainerName == containerName {
+			return dockerContainer, true
+		}
+	}
+	return nil, false
+}
+
+func (c DockerContainers) FindContainersByPodFullName(manifestID string) map[string]*docker.APIContainers {
+	containers := make(map[string]*docker.APIContainers)
+
+	for _, dockerContainer := range c {
+		dockerManifestID, dockerContainerName := parseDockerName(dockerContainer.Names[0])
+		if dockerManifestID == manifestID {
+			containers[dockerContainerName] = dockerContainer
+		}
+	}
+	return containers
+}
+
+// GetKubeletDockerContainers returns a map of docker containers that we manage. The map key is the docker container ID
+func getKubeletDockerContainers(client DockerInterface) (DockerContainers, error) {
+	result := make(DockerContainers)
+	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for i := range containers {
+		container := &containers[i]
+		// Skip containers that we didn't create to allow users to manually
+		// spin up their own containers if they want.
+		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
+			continue
+		}
+		result[DockerID(container.ID)] = container
+	}
+	return result, nil
+}
+
+// GetDockerPodInfo returns docker info for all containers in the pod/manifest.
+func getDockerPodInfo(client DockerInterface, manifestID string) (api.PodInfo, error) {
+	info := api.PodInfo{}
+
+	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, value := range containers {
+		dockerManifestID, dockerContainerName := parseDockerName(value.Names[0])
+		if dockerManifestID != manifestID {
+			continue
+		}
+		inspectResult, err := client.InspectContainer(value.ID)
+		if err != nil {
+			return nil, err
+		}
+		if inspectResult == nil {
+			// Why did we not get an error?
+			info[dockerContainerName] = docker.Container{}
+		} else {
+			info[dockerContainerName] = *inspectResult
+		}
+	}
+	return info, nil
+}
+
 // Converts "-" to "_-_" and "_" to "___" so that we can use "--" to meaningfully separate parts of a docker name.
 func escapeDash(in string) (out string) {
 	out = strings.Replace(in, "_", "___", -1)
