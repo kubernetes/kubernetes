@@ -247,6 +247,7 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	return []error(allErrs)
 }
 
+// ValidateService tests if required fields in the service are set.
 func ValidateService(service *Service) []error {
 	allErrs := errorList{}
 	if service.ID == "" {

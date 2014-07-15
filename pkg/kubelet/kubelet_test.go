@@ -966,7 +966,7 @@ func TestGetContainerStats(t *testing.T) {
 				{80, 180},
 				{90, 190},
 			},
-			CpuUsagePercentiles: []info.Percentile{
+			CPUUsagePercentiles: []info.Percentile{
 				{51, 101},
 				{81, 181},
 				{91, 191},
@@ -995,7 +995,7 @@ func TestGetContainerStats(t *testing.T) {
 	if stats.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
 		t.Errorf("wrong max memory usage")
 	}
-	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CpuUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CPUUsagePercentiles, t)
 	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
@@ -1036,7 +1036,7 @@ func TestGetMachineStats(t *testing.T) {
 	if stats.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
 		t.Errorf("wrong max memory usage")
 	}
-	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CpuUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CPUUsagePercentiles, t)
 	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
@@ -1060,8 +1060,8 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 	if stats.MaxMemoryUsage != 0 {
 		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.MaxMemoryUsage)
 	}
-	if len(stats.CpuUsagePercentiles) > 0 {
-		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.CpuUsagePercentiles)
+	if len(stats.CPUUsagePercentiles) > 0 {
+		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.CPUUsagePercentiles)
 	}
 	if len(stats.MemoryUsagePercentiles) > 0 {
 		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.MemoryUsagePercentiles)

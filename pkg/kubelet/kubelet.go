@@ -963,7 +963,7 @@ func (kl *Kubelet) statsFromContainerPath(containerPath string) (*api.ContainerS
 			percentiles[i].Percentage = p.Percentage
 			percentiles[i].Value = p.Value
 		}
-		ret.CpuUsagePercentiles = percentiles
+		ret.CPUUsagePercentiles = percentiles
 	}
 	if len(info.StatsPercentiles.MemoryUsagePercentiles) > 0 {
 		percentiles := make([]api.Percentile, len(info.StatsPercentiles.MemoryUsagePercentiles))

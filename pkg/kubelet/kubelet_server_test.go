@@ -150,7 +150,7 @@ func TestContainerStats(t *testing.T) {
 	fw := makeServerTest()
 	expectedStats := &api.ContainerStats{
 		MaxMemoryUsage: 1024001,
-		CpuUsagePercentiles: []api.Percentile{
+		CPUUsagePercentiles: []api.Percentile{
 			{50, 150},
 			{80, 180},
 			{90, 190},
@@ -190,7 +190,7 @@ func TestMachineStats(t *testing.T) {
 	fw := makeServerTest()
 	expectedStats := &api.ContainerStats{
 		MaxMemoryUsage: 1024001,
-		CpuUsagePercentiles: []api.Percentile{
+		CPUUsagePercentiles: []api.Percentile{
 			{50, 150},
 			{80, 180},
 			{90, 190},

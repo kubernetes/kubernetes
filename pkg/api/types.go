@@ -156,7 +156,7 @@ type Percentile struct {
 
 // ContainerStats represents statistical information of a container
 type ContainerStats struct {
-	CpuUsagePercentiles    []Percentile `json:"cpu_usage_percentiles,omitempty"`
+	CPUUsagePercentiles    []Percentile `json:"cpu_usage_percentiles,omitempty"`
 	MemoryUsagePercentiles []Percentile `json:"memory_usage_percentiles,omitempty"`
 	MaxMemoryUsage         uint64       `json:"max_memory_usage,omitempty"`
 }
