@@ -948,7 +948,7 @@ func areSamePercentiles(
 	}
 }
 
-func TestGetContainerStats(t *testing.T) {
+func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
 	containerInfo := &info.ContainerInfo{
@@ -1001,7 +1001,7 @@ func TestGetContainerStats(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetMachineStats(t *testing.T) {
+func TestGetRooInfo(t *testing.T) {
 	containerPath := "/"
 	containerInfo := &info.ContainerInfo{
 		ContainerReference: info.ContainerReference{
@@ -1032,7 +1032,7 @@ func TestGetMachineStats(t *testing.T) {
 	}
 
 	// If the container name is an empty string, then it means the root container.
-	stats, err := kubelet.GetMachineStats(req)
+	stats, err := kubelet.GetRootInfo(req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1044,7 +1044,7 @@ func TestGetMachineStats(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
+func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
 	kubelet, _, fakeDocker := makeTestKubelet(t)
 	fakeDocker.containerList = []docker.APIContainers{
 		{
@@ -1071,7 +1071,7 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 	}
 }
 
-func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
+func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
 
@@ -1107,7 +1107,7 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
+func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor := &mockCadvisorClient{}
 
 	kubelet, _, fakeDocker := makeTestKubelet(t)
