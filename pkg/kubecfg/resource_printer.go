@@ -22,6 +22,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"text/template"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -234,4 +235,20 @@ func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error
 		_, err := fmt.Fprintf(w, "Error: unknown type %#v", obj)
 		return err
 	}
+}
+
+type TemplatePrinter struct {
+	Template *template.Template
+}
+
+func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
+	obj, err := api.Decode(data)
+	if err != nil {
+		return err
+	}
+	return t.PrintObj(obj, w)
+}
+
+func (t *TemplatePrinter) PrintObj(obj interface{}, w io.Writer) error {
+	return t.Template.Execute(w, obj)
 }
