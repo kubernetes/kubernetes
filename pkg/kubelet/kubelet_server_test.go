@@ -36,6 +36,7 @@ type fakeKubelet struct {
 	infoFunc           func(name string) (api.PodInfo, error)
 	containerStatsFunc func(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	machineStatsFunc   func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	machineSpecFunc    func() (*info.MachineInfo, error)
 }
 
 func (fk *fakeKubelet) GetPodInfo(name string) (api.PodInfo, error) {
@@ -48,6 +49,10 @@ func (fk *fakeKubelet) GetContainerInfo(podID, containerName string, req *info.C
 
 func (fk *fakeKubelet) GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	return fk.machineStatsFunc(req)
+}
+
+func (fk *fakeKubelet) GetMachineSpec() (*info.MachineInfo, error) {
+	return fk.machineSpecFunc()
 }
 
 type serverTestFramework struct {
@@ -223,5 +228,31 @@ func TestMachineStats(t *testing.T) {
 	}
 	if !reflect.DeepEqual(&receivedStats, expectedStats) {
 		t.Errorf("received wrong data: %#v", receivedStats)
+	}
+}
+
+func TestMachineSpec(t *testing.T) {
+	fw := makeServerTest()
+	expectedSpec := &info.MachineInfo{
+		NumCores:       4,
+		MemoryCapacity: 1024,
+	}
+	fw.fakeKubelet.machineSpecFunc = func() (*info.MachineInfo, error) {
+		return expectedSpec, nil
+	}
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/spec")
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	var receivedSpec info.MachineInfo
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&receivedSpec)
+	if err != nil {
+		t.Fatalf("received invalid json data: %v", err)
+	}
+	if !reflect.DeepEqual(&receivedSpec, expectedSpec) {
+		t.Errorf("received wrong data: %#v", receivedSpec)
 	}
 }

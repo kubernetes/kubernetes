@@ -169,3 +169,40 @@ func TestHTTPContainerInfoGetterGetMachineInfoWithError(t *testing.T) {
 	)
 	testHTTPContainerInfoGetter(req, cinfo, "", "", http.StatusNotFound, t)
 }
+
+func TestHTTPGetMachineSpec(t *testing.T) {
+	mspec := &info.MachineInfo{
+		NumCores:       4,
+		MemoryCapacity: 2048,
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		encoder := json.NewEncoder(w)
+		err := encoder.Encode(mspec)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}))
+	hostURL, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(hostURL.Host, ":")
+
+	port, err := strconv.Atoi(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	containerInfoGetter := &HTTPContainerInfoGetter{
+		Client: http.DefaultClient,
+		Port:   port,
+	}
+
+	received, err := containerInfoGetter.GetMachineSpec(parts[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(received, mspec) {
+		t.Errorf("received wrong machine spec")
+	}
+}

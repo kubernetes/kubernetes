@@ -45,6 +45,7 @@ type KubeletServer struct {
 type kubeletInterface interface {
 	GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetMachineSpec() (*info.MachineInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
 }
 
@@ -107,6 +108,19 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Write(data)
 	case strings.HasPrefix(u.Path, "/stats"):
 		s.serveStats(w, req)
+	case strings.HasPrefix(u.Path, "/spec"):
+		info, err := s.Kubelet.GetMachineSpec()
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		data, err := json.Marshal(info)
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		w.Header().Add("Content-type", "application/json")
+		w.Write(data)
 	default:
 		s.DelegateHandler.ServeHTTP(w, req)
 	}

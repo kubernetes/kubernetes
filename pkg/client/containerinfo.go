@@ -31,11 +31,43 @@ import (
 type ContainerInfoGetter interface {
 	GetContainerInfo(host, podID, containerID string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo(host string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	// XXX(monnand): We need to have better names.
+	GetMachineSpec() (*info.MachineInfo, error)
 }
 
 type HTTPContainerInfoGetter struct {
 	Client *http.Client
 	Port   int
+}
+
+func (self *HTTPContainerInfoGetter) GetMachineSpec(host string) (*info.MachineInfo, error) {
+	request, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("http://%v/spec",
+			net.JoinHostPort(host, strconv.Itoa(self.Port)),
+		),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := self.Client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("trying to get machine spec from %v; received status %v",
+			host, response.Status)
+	}
+	decoder := json.NewDecoder(response.Body)
+	var minfo info.MachineInfo
+	err = decoder.Decode(&minfo)
+	if err != nil {
+		return nil, err
+	}
+	return &minfo, nil
 }
 
 func (self *HTTPContainerInfoGetter) getContainerInfo(host, path string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
