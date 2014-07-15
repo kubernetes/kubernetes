@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 func TestRandomScheduler(t *testing.T) {

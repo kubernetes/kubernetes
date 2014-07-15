@@ -19,7 +19,7 @@ package scheduler
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 // Some functions used by multiple scheduler tests.

@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 )
 
 // PodInfoGetter is an interface for things that can get information about a pod's containers.

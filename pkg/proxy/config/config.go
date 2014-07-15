@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/golang/glog"
 )
 
@@ -40,7 +40,7 @@ const (
 // which will reset the system state to that specified in this operation for this source channel.
 // To remove all services, set Services to empty array and Op to SET
 type ServiceUpdate struct {
-	Services []api.Service
+	Services []internal.Service
 	Op       Operation
 }
 
@@ -50,7 +50,7 @@ type ServiceUpdate struct {
 // which will reset the system state to that specified in this operation for this source channel.
 // To remove all endpoints, set Endpoints to empty array and Op to SET
 type EndpointsUpdate struct {
-	Endpoints []api.Endpoints
+	Endpoints []internal.Endpoints
 	Op        Operation
 }
 
@@ -58,7 +58,7 @@ type EndpointsUpdate struct {
 type ServiceConfigHandler interface {
 	// OnUpdate gets called when a configuration has been changed by one of the sources.
 	// This is the union of all the configuration sources.
-	OnUpdate(services []api.Service)
+	OnUpdate(services []internal.Service)
 }
 
 // EndpointsConfigHandler is an abstract interface of objects which receive update notifications for the set of endpoints.
@@ -66,7 +66,7 @@ type EndpointsConfigHandler interface {
 	// OnUpdate gets called when endpoints configuration is changed for a given
 	// service on any of the configuration sources. An example is when a new
 	// service comes up, or when containers come up or down for an existing service.
-	OnUpdate(endpoints []api.Endpoints)
+	OnUpdate(endpoints []internal.Endpoints)
 }
 
 // ServiceConfig tracks a set of service configurations and their endpoint configurations.
@@ -86,8 +86,8 @@ type ServiceConfig struct {
 	// from each source to array of services/endpoints that have been configured
 	// through that channel.
 	configLock     sync.RWMutex
-	serviceConfig  map[string]map[string]api.Service
-	endpointConfig map[string]map[string]api.Endpoints
+	serviceConfig  map[string]map[string]internal.Service
+	endpointConfig map[string]map[string]internal.Endpoints
 
 	// Channel that service configuration source listeners use to signal of new
 	// configurations.
@@ -108,8 +108,8 @@ func NewServiceConfig() *ServiceConfig {
 		endpointsConfigSources: make(map[string]chan EndpointsUpdate),
 		serviceHandlers:        make([]ServiceConfigHandler, 10),
 		endpointHandlers:       make([]EndpointsConfigHandler, 10),
-		serviceConfig:          make(map[string]map[string]api.Service),
-		endpointConfig:         make(map[string]map[string]api.Endpoints),
+		serviceConfig:          make(map[string]map[string]internal.Service),
+		endpointConfig:         make(map[string]map[string]internal.Endpoints),
 		serviceNotifyChannel:   make(chan string),
 		endpointsNotifyChannel: make(chan string),
 	}
@@ -138,7 +138,7 @@ func (impl *ServiceConfig) Run() {
 // It never returns.
 func (impl *ServiceConfig) serviceChannelListener(source string, listenChannel chan ServiceUpdate) {
 	// Represents the current services configuration for this channel.
-	serviceMap := make(map[string]api.Service)
+	serviceMap := make(map[string]internal.Service)
 	for {
 		select {
 		case update := <-listenChannel:
@@ -157,7 +157,7 @@ func (impl *ServiceConfig) serviceChannelListener(source string, listenChannel c
 			case SET:
 				glog.Infof("Setting services %v", update)
 				// Clear the old map entries by just creating a new map
-				serviceMap = make(map[string]api.Service)
+				serviceMap = make(map[string]internal.Service)
 				for _, value := range update.Services {
 					serviceMap[value.ID] = value
 				}
@@ -175,7 +175,7 @@ func (impl *ServiceConfig) serviceChannelListener(source string, listenChannel c
 // endpointsChannelListener begins a loop to handle incoming EndpointsUpdate notifications from the channel.
 // It never returns.
 func (impl *ServiceConfig) endpointsChannelListener(source string, listenChannel chan EndpointsUpdate) {
-	endpointMap := make(map[string]api.Endpoints)
+	endpointMap := make(map[string]internal.Endpoints)
 	for {
 		select {
 		case update := <-listenChannel:
@@ -195,7 +195,7 @@ func (impl *ServiceConfig) endpointsChannelListener(source string, listenChannel
 			case SET:
 				glog.Infof("Setting services %v", update)
 				// Clear the old map entries by just creating a new map
-				endpointMap = make(map[string]api.Endpoints)
+				endpointMap = make(map[string]internal.Endpoints)
 				for _, value := range update.Endpoints {
 					endpointMap[value.Name] = value
 				}
@@ -287,7 +287,7 @@ func (impl *ServiceConfig) RegisterEndpointsHandler(handler EndpointsConfigHandl
 
 // notifyServiceUpdate calls the registered ServiceConfigHandlers with the current states of services.
 func (impl *ServiceConfig) notifyServiceUpdate() {
-	services := []api.Service{}
+	services := []internal.Service{}
 	impl.configLock.RLock()
 	for _, sourceServices := range impl.serviceConfig {
 		for _, value := range sourceServices {
@@ -308,7 +308,7 @@ func (impl *ServiceConfig) notifyServiceUpdate() {
 
 // notifyEndpointsUpdate calls the registered EndpointsConfigHandlers with the current states of endpoints.
 func (impl *ServiceConfig) notifyEndpointsUpdate() {
-	endpoints := []api.Endpoints{}
+	endpoints := []internal.Endpoints{}
 	impl.configLock.RLock()
 	for _, sourceEndpoints := range impl.endpointConfig {
 		for _, value := range sourceEndpoints {
