@@ -23,7 +23,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -37,6 +39,7 @@ type fakeKubelet struct {
 	containerInfoFunc func(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	machineInfoFunc   func() (*info.MachineInfo, error)
+	logFunc           func(w http.ResponseWriter, req *http.Request)
 }
 
 func (fk *fakeKubelet) GetPodInfo(name string) (api.PodInfo, error) {
@@ -53,6 +56,10 @@ func (fk *fakeKubelet) GetRootInfo(req *info.ContainerInfoRequest) (*info.Contai
 
 func (fk *fakeKubelet) GetMachineInfo() (*info.MachineInfo, error) {
 	return fk.machineInfoFunc()
+}
+
+func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
+	fk.logFunc(w, req)
 }
 
 type serverTestFramework struct {
@@ -251,5 +258,33 @@ func TestMachineInfo(t *testing.T) {
 	}
 	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
 		t.Errorf("received wrong data: %#v", receivedInfo)
+	}
+}
+
+func TestServeLogs(t *testing.T) {
+	fw := makeServerTest()
+
+	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
+
+	fw.fakeKubelet.logFunc = func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Content-Type", "text/html")
+		w.Write([]byte(content))
+	}
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/logs/")
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := httputil.DumpResponse(resp, true)
+	if err != nil {
+		// copying the response body did not work
+		t.Errorf("Cannot copy resp: %#v", err)
+	}
+	result := string(body)
+	if !strings.Contains(result, "kubelet.log") || !strings.Contains(result, "google.log") {
+		t.Errorf("Received wrong data: %s", result)
 	}
 }
