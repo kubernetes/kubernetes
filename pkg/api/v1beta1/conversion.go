@@ -14,6 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package api includes all types used to communicate between the various
-// parts of the Kubernetes system.
 package v1beta1
+
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+)
+
+func ExternalizePodInfo(obj internal.PodInfo) PodInfo {
+	return PodInfo(obj)
+}
+
+func InternalizePodInfo(obj PodInfo) internal.PodInfo {
+	return internal.PodInfo(obj)
+}

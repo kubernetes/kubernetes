@@ -23,6 +23,7 @@ import (
 	"time"
 
 	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
@@ -37,7 +38,7 @@ func expectNoError(t *testing.T, err error) {
 
 func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
 	out := <-ch
-	status, ok := out.(*api.Status)
+	status, ok := out.(*v1beta1.Status)
 	if !ok {
 		t.Errorf("Expected an api.Status object, was %#v", out)
 		return
@@ -378,11 +379,11 @@ func TestCreatePod(t *testing.T) {
 }
 
 type FakePodInfoGetter struct {
-	info api.PodInfo
+	info v1beta1.PodInfo
 	err  error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (v1beta1.PodInfo, error) {
 	return f.info, f.err
 }
 
@@ -407,7 +408,7 @@ func TestFillPodInfo(t *testing.T) {
 
 	storage.fillPodInfo(&pod)
 
-	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
+	if !reflect.DeepEqual(fakeGetter.info, v1beta1.ExternalizePodInfo(pod.CurrentState.Info)) {
 		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
 	}
 
@@ -434,7 +435,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 
 	storage.fillPodInfo(&pod)
 
-	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
+	if !reflect.DeepEqual(fakeGetter.info, v1beta1.ExternalizePodInfo(pod.CurrentState.Info)) {
 		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
 	}
 

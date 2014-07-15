@@ -23,6 +23,7 @@ import (
 
 	"code.google.com/p/go-uuid/uuid"
 	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -95,7 +96,7 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 				return
 			}
 		}
-		pod.CurrentState.Info = info
+		pod.CurrentState.Info = v1beta1.InternalizePodInfo(info)
 		netContainerInfo, ok := info["net"]
 		if ok {
 			if netContainerInfo.NetworkSettings != nil {

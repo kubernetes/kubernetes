@@ -37,9 +37,9 @@ import (
 //     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?
 //
-//  DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
-//      to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
-//      by the following regex:
+// DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
+//     to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
+//     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*

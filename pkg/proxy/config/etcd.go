@@ -145,14 +145,9 @@ func (impl ConfigSourceEtcd) getServices() ([]internal.Service, []internal.Endpo
 	return nil, nil, fmt.Errorf("did not get the root of the registry %s", registryRoot)
 }
 
-<<<<<<< HEAD
 // getEndpoints finds the list of endpoints of the service from etcd.
-func (impl ConfigSourceEtcd) getEndpoints(service string) (api.Endpoints, error) {
+func (impl ConfigSourceEtcd) getEndpoints(service string) (internal.Endpoints, error) {
 	key := fmt.Sprintf(registryRoot + "/endpoints/" + service)
-=======
-func (impl ConfigSourceEtcd) GetEndpoints(service string) (internal.Endpoints, error) {
-	key := fmt.Sprintf(RegistryRoot + "/endpoints/" + service)
->>>>>>> split the api
 	response, err := impl.client.Get(key, true, false)
 	if err != nil {
 		glog.Errorf("Failed to get the key: %s %v", key, err)
@@ -162,14 +157,8 @@ func (impl ConfigSourceEtcd) GetEndpoints(service string) (internal.Endpoints, e
 	return parseEndpoints(response.Node.Value)
 }
 
-<<<<<<< HEAD
 // etcdResponseToService takes an etcd response and pulls it apart to find service.
-func etcdResponseToService(response *etcd.Response) (*api.Service, error) {
-=======
-// EtcdResponseToServiceAndLocalport takes an etcd response and pulls it apart to find
-// service
-func EtcdResponseToService(response *etcd.Response) (*internal.Service, error) {
->>>>>>> split the api
+func etcdResponseToService(response *etcd.Response) (*internal.Service, error) {
 	if response.Node == nil {
 		return nil, fmt.Errorf("invalid response from etcd: %#v", response)
 	}
@@ -181,13 +170,8 @@ func EtcdResponseToService(response *etcd.Response) (*internal.Service, error) {
 	return &svc, err
 }
 
-<<<<<<< HEAD
-func parseEndpoints(jsonString string) (api.Endpoints, error) {
-	var e api.Endpoints
-=======
-func ParseEndpoints(jsonString string) (internal.Endpoints, error) {
+func parseEndpoints(jsonString string) (internal.Endpoints, error) {
 	var e internal.Endpoints
->>>>>>> split the api
 	err := json.Unmarshal([]byte(jsonString), &e)
 	return e, err
 }
@@ -202,13 +186,8 @@ func (impl ConfigSourceEtcd) watchForChanges() {
 	}
 }
 
-<<<<<<< HEAD
 func (impl ConfigSourceEtcd) processChange(response *etcd.Response) {
 	glog.Infof("Processing a change in service configuration... %s", *response)
-=======
-func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
-	glog.Infof("Processing a change in service configuration.. %s", *response)
->>>>>>> split the api
 
 	// If it's a new service being added (signified by a localport being added)
 	// then process it as such
@@ -238,15 +217,9 @@ func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	}
 }
 
-<<<<<<< HEAD
 func (impl ConfigSourceEtcd) processEndpointResponse(response *etcd.Response) {
 	glog.Infof("Processing a change in endpoint configuration... %s", *response)
-	var endpoints api.Endpoints
-=======
-func (impl ConfigSourceEtcd) ProcessEndpointResponse(response *etcd.Response) {
-	glog.Infof("Processing a change in endpoint configuration.. %s", *response)
 	var endpoints internal.Endpoints
->>>>>>> split the api
 	err := json.Unmarshal([]byte(response.Node.Value), &endpoints)
 	if err != nil {
 		glog.Errorf("Failed to parse service out of etcd key: %v : %+v", response.Node.Value, err)

@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"gopkg.in/v1/yaml"
 )
 

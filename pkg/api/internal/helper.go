@@ -27,6 +27,7 @@ import (
 var knownTypes = map[string]reflect.Type{}
 
 func init() {
+	// Add types here in order for Encode/Decode to work properly
 	AddKnownTypes(
 		PodList{},
 		Pod{},
@@ -116,7 +117,7 @@ func prepareEncode(obj interface{}) (*JSONBase, error) {
 	return jsonBase, nil
 }
 
-// Returns the name of the type (sans pointer), and its kind field. Takes pointer-to-struct..
+// Returns the name of the type (sans pointer), and its kind field. Takes pointer-to-struct.
 func nameAndJSONBase(obj interface{}) (string, *JSONBase, error) {
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
