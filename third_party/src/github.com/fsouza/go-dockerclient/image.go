@@ -187,7 +187,7 @@ func (c *Client) PushImage(opts PushImageOptions, auth AuthConfiguration) error 
 
 	headers["X-Registry-Auth"] = base64.URLEncoding.EncodeToString(buf.Bytes())
 
-	return c.stream("POST", path, headers, nil, opts.OutputStream)
+	return c.stream("POST", path, true, headers, nil, opts.OutputStream, nil)
 }
 
 // PullImageOptions present the set of options available for pulling an image
@@ -219,7 +219,7 @@ func (c *Client) PullImage(opts PullImageOptions, auth AuthConfiguration) error 
 
 func (c *Client) createImage(qs string, headers map[string]string, in io.Reader, w io.Writer) error {
 	path := "/images/create?" + qs
-	return c.stream("POST", path, headers, in, w)
+	return c.stream("POST", path, true, headers, in, w, nil)
 }
 
 // ImportImageOptions present the set of informations available for importing
@@ -286,7 +286,7 @@ func (c *Client) BuildImage(opts BuildImageOptions) error {
 		return ErrMissingRepo
 	}
 	return c.stream("POST", fmt.Sprintf("/build?%s",
-		queryString(&opts)), headers, opts.InputStream, opts.OutputStream)
+		queryString(&opts)), true, headers, opts.InputStream, opts.OutputStream, nil)
 }
 
 // TagImageOptions present the set of options to tag an image

@@ -44,6 +44,7 @@ type kubeletInterface interface {
 	GetContainerStats(podID, containerName string) (*api.ContainerStats, error)
 	GetMachineStats() (*api.ContainerStats, error)
 	GetPodInfo(name string) (api.PodInfo, error)
+	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
 func (s *KubeletServer) error(w http.ResponseWriter, err error) {
@@ -105,6 +106,8 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Write(data)
 	case strings.HasPrefix(u.Path, "/stats"):
 		s.serveStats(w, req)
+	case strings.HasPrefix(u.Path, "/logs/"):
+		s.Kubelet.ServeLogs(w, req)
 	default:
 		s.DelegateHandler.ServeHTTP(w, req)
 	}

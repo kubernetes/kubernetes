@@ -16,6 +16,7 @@ package info
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 )
@@ -55,6 +56,40 @@ type ContainerReference struct {
 	Name string `json:"name"`
 
 	Aliases []string `json:"aliases,omitempty"`
+}
+
+// ContainerInfoQuery is used when users check a container info from the REST api.
+// It specifies how much data users want to get about a container
+type ContainerInfoRequest struct {
+	// Max number of stats to return.
+	NumStats int `json:"num_stats,omitempty"`
+	// Max number of samples to return.
+	NumSamples int `json:"num_samples,omitempty"`
+
+	// Different percentiles of CPU usage within a period. The values must be within [0, 100]
+	CpuUsagePercentiles []int `json:"cpu_usage_percentiles,omitempty"`
+	// Different percentiles of memory usage within a period. The values must be within [0, 100]
+	MemoryUsagePercentages []int `json:"memory_usage_percentiles,omitempty"`
+}
+
+func (self *ContainerInfoRequest) FillDefaults() *ContainerInfoRequest {
+	ret := self
+	if ret == nil {
+		ret = new(ContainerInfoRequest)
+	}
+	if ret.NumStats <= 0 {
+		ret.NumStats = 1024
+	}
+	if ret.NumSamples <= 0 {
+		ret.NumSamples = 1024
+	}
+	if len(ret.CpuUsagePercentiles) == 0 {
+		ret.CpuUsagePercentiles = []int{50, 80, 90, 99}
+	}
+	if len(ret.MemoryUsagePercentages) == 0 {
+		ret.MemoryUsagePercentages = []int{50, 80, 90, 99}
+	}
+	return ret
 }
 
 type ContainerInfo struct {
@@ -119,7 +154,7 @@ type CpuStats struct {
 
 		// Per CPU/core usage of the container.
 		// Unit: nanoseconds.
-		PerCpu []uint64 `json:"per_cpu,omitempty"`
+		PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
 
 		// Time spent in user space.
 		// Unit: nanoseconds
@@ -165,6 +200,42 @@ type ContainerStats struct {
 	Memory    *MemoryStats `json:"memory,omitempty"`
 }
 
+// Makes a deep copy of the ContainerStats and returns a pointer to the new
+// copy. Copy() will allocate a new ContainerStats object if dst is nil.
+func (self *ContainerStats) Copy(dst *ContainerStats) *ContainerStats {
+	if dst == nil {
+		dst = new(ContainerStats)
+	}
+	dst.Timestamp = self.Timestamp
+	if self.Cpu != nil {
+		if dst.Cpu == nil {
+			dst.Cpu = new(CpuStats)
+		}
+		// To make a deep copy of a slice, we need to copy every value
+		// in the slice. To make less memory allocation, we would like
+		// to reuse the slice in dst if possible.
+		percpu := dst.Cpu.Usage.PerCpu
+		if len(percpu) != len(self.Cpu.Usage.PerCpu) {
+			percpu = make([]uint64, len(self.Cpu.Usage.PerCpu))
+		}
+		dst.Cpu.Usage = self.Cpu.Usage
+		dst.Cpu.Load = self.Cpu.Load
+		copy(percpu, self.Cpu.Usage.PerCpu)
+		dst.Cpu.Usage.PerCpu = percpu
+	} else {
+		dst.Cpu = nil
+	}
+	if self.Memory != nil {
+		if dst.Memory == nil {
+			dst.Memory = new(MemoryStats)
+		}
+		*dst.Memory = *self.Memory
+	} else {
+		dst.Memory = nil
+	}
+	return dst
+}
+
 type ContainerStatsSample struct {
 	// Timetamp of the end of the sample period
 	Timestamp time.Time `json:"timestamp"`
@@ -173,11 +244,75 @@ type ContainerStatsSample struct {
 	Cpu      struct {
 		// number of nanoseconds of CPU time used by the container
 		Usage uint64 `json:"usage"`
+
+		// Per-core usage of the container. (unit: nanoseconds)
+		PerCpuUsage []uint64 `json:"per_cpu_usage,omitempty"`
 	} `json:"cpu"`
 	Memory struct {
 		// Units: Bytes.
 		Usage uint64 `json:"usage"`
 	} `json:"memory"`
+}
+
+func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {
+	// t1 should not be later than t2
+	if t1.After(t2) {
+		t1, t2 = t2, t1
+	}
+	diff := t2.Sub(t1)
+	if diff <= tolerance {
+		return true
+	}
+	return false
+}
+
+func durationEq(a, b time.Duration, tolerance time.Duration) bool {
+	if a > b {
+		a, b = b, a
+	}
+	diff := a - b
+	if diff <= tolerance {
+		return true
+	}
+	return false
+}
+
+const (
+	// 10ms, i.e. 0.01s
+	timePrecision time.Duration = 10 * time.Millisecond
+)
+
+// This function is useful because we do not require precise time
+// representation.
+func (a *ContainerStats) Eq(b *ContainerStats) bool {
+	if !timeEq(a.Timestamp, b.Timestamp, timePrecision) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Cpu, b.Cpu) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Memory, b.Memory) {
+		return false
+	}
+	return true
+}
+
+// This function is useful because we do not require precise time
+// representation.
+func (a *ContainerStatsSample) Eq(b *ContainerStatsSample) bool {
+	if !timeEq(a.Timestamp, b.Timestamp, timePrecision) {
+		return false
+	}
+	if !durationEq(a.Duration, b.Duration, timePrecision) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Cpu, b.Cpu) {
+		return false
+	}
+	if !reflect.DeepEqual(a.Memory, b.Memory) {
+		return false
+	}
+	return true
 }
 
 type Percentile struct {
@@ -211,9 +346,28 @@ func NewSample(prev, current *ContainerStats) (*ContainerStatsSample, error) {
 	if current.Cpu.Usage.Total < prev.Cpu.Usage.Total {
 		return nil, fmt.Errorf("current CPU usage is less than prev CPU usage (cumulative).")
 	}
+
+	var percpu []uint64
+
+	if len(current.Cpu.Usage.PerCpu) > 0 {
+		curNumCpus := len(current.Cpu.Usage.PerCpu)
+		percpu = make([]uint64, curNumCpus)
+
+		for i, currUsage := range current.Cpu.Usage.PerCpu {
+			var prevUsage uint64 = 0
+			if i < len(prev.Cpu.Usage.PerCpu) {
+				prevUsage = prev.Cpu.Usage.PerCpu[i]
+			}
+			if currUsage < prevUsage {
+				return nil, fmt.Errorf("current per-core CPU usage is less than prev per-core CPU usage (cumulative).")
+			}
+			percpu[i] = currUsage - prevUsage
+		}
+	}
 	sample := new(ContainerStatsSample)
 	// Calculate the diff to get the CPU usage within the time interval.
 	sample.Cpu.Usage = current.Cpu.Usage.Total - prev.Cpu.Usage.Total
+	sample.Cpu.PerCpuUsage = percpu
 	// Memory usage is current memory usage
 	sample.Memory.Usage = current.Memory.Usage
 	sample.Timestamp = current.Timestamp

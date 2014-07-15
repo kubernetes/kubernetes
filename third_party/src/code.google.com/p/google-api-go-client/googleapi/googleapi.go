@@ -40,13 +40,39 @@ type Error struct {
 	// Body is the raw response returned by the server.
 	// It is often but not always JSON, depending on how the request fails.
 	Body string
+
+	Errors []ErrorItem
+}
+
+// ErrorItem is a detailed error code & message from the Google API frontend.
+type ErrorItem struct {
+	// Reason is the typed error code. For example: "some_example".
+	Reason string `json:"reason"`
+	// Message is the human-readable description of the error.
+	Message string `json:"message"`
 }
 
 func (e *Error) Error() string {
-	if e.Message != "" {
-		return fmt.Sprintf("googleapi: Error %d: %v", e.Code, e.Message)
+	if len(e.Errors) == 0 && e.Message == "" {
+		return fmt.Sprintf("googleapi: got HTTP response code %d with body: %v", e.Code, e.Body)
 	}
-	return fmt.Sprintf("googleapi: got HTTP response code %d with body: %v", e.Code, e.Body)
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "googleapi: Error %d: ", e.Code)
+	if e.Message != "" {
+		fmt.Fprintf(&buf, "%s", e.Message)
+	}
+	if len(e.Errors) == 0 {
+		return strings.TrimSpace(buf.String())
+	}
+	if len(e.Errors) == 1 && e.Errors[0].Message == e.Message {
+		fmt.Fprintf(&buf, ", %s", e.Errors[0].Reason)
+		return buf.String()
+	}
+	fmt.Fprintln(&buf, "\nMore details:")
+	for _, v := range e.Errors {
+		fmt.Fprintf(&buf, "Reason: %s, Message: %s\n", v.Reason, v.Message)
+	}
+	return buf.String()
 }
 
 type errorReply struct {

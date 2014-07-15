@@ -1,6 +1,6 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"C11OM5Qtr9122-scy_WeqND9D3o/qLGD1lW3Gg5l2ZgG6H6aby7D0Xw\"",
+ "etag": "\"C11OM5Qtr9122-scy_WeqND9D3o/oKNcPENu4cYVP-aSqiH_bsbzkBM\"",
  "discoveryVersion": "v1",
  "id": "compute:v1",
  "name": "compute",
@@ -349,6 +349,13 @@
      "description": "Type of the resource.",
      "default": "compute#attachedDisk"
     },
+    "licenses": {
+     "type": "array",
+     "description": "Public visible licenses.",
+     "items": {
+      "type": "string"
+     }
+    },
     "mode": {
      "type": "string",
      "description": "The mode in which to attach this disk, either \"READ_WRITE\" or \"READ_ONLY\".",
@@ -634,6 +641,13 @@
      "type": "string",
      "description": "Type of the resource.",
      "default": "compute#disk"
+    },
+    "licenses": {
+     "type": "array",
+     "description": "Public visible licenses.",
+     "items": {
+      "type": "string"
+     }
     },
     "name": {
      "type": "string",
@@ -1529,6 +1543,13 @@
      "description": "Type of the resource.",
      "default": "compute#image"
     },
+    "licenses": {
+     "type": "array",
+     "description": "Public visible licenses.",
+     "items": {
+      "type": "string"
+     }
+    },
     "name": {
      "type": "string",
      "description": "Name of the resource; provided by the client when the resource is created. The name must be 1-63 characters long, and comply with RFC1035.",
@@ -1884,6 +1905,32 @@
        "description": "Optional human-readable details for this warning."
       }
      }
+    }
+   }
+  },
+  "License": {
+   "id": "License",
+   "type": "object",
+   "description": "A license resource.",
+   "properties": {
+    "kind": {
+     "type": "string",
+     "description": "Identifies what kind of resource this is. Value: the fixed string \"compute#license\".",
+     "default": "compute#license"
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of the resource; provided by the client when the resource is created. The name must be 1-63 characters long, and comply with RFC1035.",
+     "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+     "annotations": {
+      "required": [
+       "compute.images.insert"
+      ]
+     }
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for the resource (output only)."
     }
    }
   },
@@ -3133,6 +3180,13 @@
      "type": "string",
      "description": "Type of the resource.",
      "default": "compute#snapshot"
+    },
+    "licenses": {
+     "type": "array",
+     "description": "Public visible licenses.",
+     "items": {
+      "type": "string"
+     }
     },
     "name": {
      "type": "string",
@@ -6959,6 +7013,43 @@
      },
      "scopes": [
       "https://www.googleapis.com/auth/compute"
+     ]
+    }
+   }
+  },
+  "licenses": {
+   "methods": {
+    "get": {
+     "id": "compute.licenses.get",
+     "path": "{project}/global/licenses/{license}",
+     "httpMethod": "GET",
+     "description": "Returns the specified license resource.",
+     "parameters": {
+      "license": {
+       "type": "string",
+       "description": "Name of the license resource to return.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "license"
+     ],
+     "response": {
+      "$ref": "License"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
      ]
     }
    }

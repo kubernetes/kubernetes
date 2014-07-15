@@ -59,6 +59,19 @@ var requests = []struct {
 		auth:        "Basic Y2wxM250MWQ6czNjcjN0",
 	},
 	{path: "/secure", auth: "Bearer token3", body: "third payload"},
+	{
+		path:        "/token",
+		query:       "grant_type=client_credentials&client_id=cl13nt1d&client_secret=s3cr3t",
+		contenttype: "application/json",
+		auth:        "Basic Y2wxM250MWQ6czNjcjN0",
+		body: `
+			{
+				"access_token":"token4",
+				"expires_in":3600
+			}
+		`,
+	},
+	{path: "/secure", auth: "Bearer token4", body: "fourth payload"},
 }
 
 func TestOAuth(t *testing.T) {
@@ -134,6 +147,18 @@ func TestOAuth(t *testing.T) {
 	}
 	checkBody(t, resp, "third payload")
 	checkToken(t, transport.Token, "token3", "refreshtoken3", "idtoken3")
+
+	transport.Token = &Token{}
+	err = transport.AuthenticateClient()
+	if err != nil {
+		t.Fatalf("AuthenticateClient: %v", err)
+	}
+	checkToken(t, transport.Token, "token4", "", "")
+	resp, err = c.Get(server.URL + "/secure")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	checkBody(t, resp, "fourth payload")
 }
 
 func checkToken(t *testing.T, tok *Token, access, refresh, id string) {
@@ -155,7 +180,7 @@ func checkToken(t *testing.T, tok *Token, access, refresh, id string) {
 func checkBody(t *testing.T, r *http.Response, body string) {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		t.Error("reading reponse body: %v, want %q", err, body)
+		t.Errorf("reading reponse body: %v, want %q", err, body)
 	}
 	if g, w := string(b), body; g != w {
 		t.Errorf("request body mismatch: got %q, want %q", g, w)

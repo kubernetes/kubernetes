@@ -74,6 +74,7 @@ func New(client *http.Client) (*Service, error) {
 	s.HttpHealthChecks = NewHttpHealthChecksService(s)
 	s.Images = NewImagesService(s)
 	s.Instances = NewInstancesService(s)
+	s.Licenses = NewLicensesService(s)
 	s.MachineTypes = NewMachineTypesService(s)
 	s.Networks = NewNetworksService(s)
 	s.Projects = NewProjectsService(s)
@@ -117,6 +118,8 @@ type Service struct {
 	Images *ImagesService
 
 	Instances *InstancesService
+
+	Licenses *LicensesService
 
 	MachineTypes *MachineTypesService
 
@@ -250,6 +253,15 @@ func NewInstancesService(s *Service) *InstancesService {
 }
 
 type InstancesService struct {
+	s *Service
+}
+
+func NewLicensesService(s *Service) *LicensesService {
+	rs := &LicensesService{s: s}
+	return rs
+}
+
+type LicensesService struct {
 	s *Service
 }
 
@@ -522,6 +534,9 @@ type AttachedDisk struct {
 	// Kind: Type of the resource.
 	Kind string `json:"kind,omitempty"`
 
+	// Licenses: Public visible licenses.
+	Licenses []string `json:"licenses,omitempty"`
+
 	// Mode: The mode in which to attach this disk, either "READ_WRITE" or
 	// "READ_ONLY".
 	Mode string `json:"mode,omitempty"`
@@ -707,6 +722,9 @@ type Disk struct {
 
 	// Kind: Type of the resource.
 	Kind string `json:"kind,omitempty"`
+
+	// Licenses: Public visible licenses.
+	Licenses []string `json:"licenses,omitempty"`
 
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
@@ -1268,6 +1286,9 @@ type Image struct {
 	// Kind: Type of the resource.
 	Kind string `json:"kind,omitempty"`
 
+	// Licenses: Public visible licenses.
+	Licenses []string `json:"licenses,omitempty"`
+
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
 	// RFC1035.
@@ -1478,6 +1499,20 @@ type InstancesScopedListWarningData struct {
 
 	// Value: A warning data value corresponding to the key.
 	Value string `json:"value,omitempty"`
+}
+
+type License struct {
+	// Kind: Identifies what kind of resource this is. Value: the fixed
+	// string "compute#license".
+	Kind string `json:"kind,omitempty"`
+
+	// Name: Name of the resource; provided by the client when the resource
+	// is created. The name must be 1-63 characters long, and comply with
+	// RFC1035.
+	Name string `json:"name,omitempty"`
+
+	// SelfLink: Server defined URL for the resource (output only).
+	SelfLink string `json:"selfLink,omitempty"`
 }
 
 type MachineType struct {
@@ -2180,6 +2215,9 @@ type Snapshot struct {
 
 	// Kind: Type of the resource.
 	Kind string `json:"kind,omitempty"`
+
+	// Licenses: Public visible licenses.
+	Licenses []string `json:"licenses,omitempty"`
 
 	// Name: Name of the resource; provided by the client when the resource
 	// is created. The name must be 1-63 characters long, and comply with
@@ -9619,6 +9657,83 @@ func (c *InstancesSetTagsCall) Do() (*Operation, error) {
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/compute"
+	//   ]
+	// }
+
+}
+
+// method id "compute.licenses.get":
+
+type LicensesGetCall struct {
+	s       *Service
+	project string
+	license string
+	opt_    map[string]interface{}
+}
+
+// Get: Returns the specified license resource.
+func (r *LicensesService) Get(project string, license string) *LicensesGetCall {
+	c := &LicensesGetCall{s: r.s, opt_: make(map[string]interface{})}
+	c.project = project
+	c.license = license
+	return c
+}
+
+func (c *LicensesGetCall) Do() (*License, error) {
+	var body io.Reader = nil
+	params := make(url.Values)
+	params.Set("alt", "json")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "{project}/global/licenses/{license}")
+	urls += "?" + params.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	req.URL.Path = strings.Replace(req.URL.Path, "{project}", url.QueryEscape(c.project), 1)
+	req.URL.Path = strings.Replace(req.URL.Path, "{license}", url.QueryEscape(c.license), 1)
+	googleapi.SetOpaque(req.URL)
+	req.Header.Set("User-Agent", "google-api-go-client/0.5")
+	res, err := c.s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	var ret *License
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Returns the specified license resource.",
+	//   "httpMethod": "GET",
+	//   "id": "compute.licenses.get",
+	//   "parameterOrder": [
+	//     "project",
+	//     "license"
+	//   ],
+	//   "parameters": {
+	//     "license": {
+	//       "description": "Name of the license resource to return.",
+	//       "location": "path",
+	//       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+	//       "required": true,
+	//       "type": "string"
+	//     },
+	//     "project": {
+	//       "description": "Name of the project scoping this request.",
+	//       "location": "path",
+	//       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+	//       "required": true,
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "{project}/global/licenses/{license}",
+	//   "response": {
+	//     "$ref": "License"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/compute",
+	//     "https://www.googleapis.com/auth/compute.readonly"
 	//   ]
 	// }
 
