@@ -43,7 +43,7 @@ func copyBytes(in, out *net.TCPConn) {
 	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	_, err := io.Copy(in, out)
-	if err != nil && err != io.EOF {
+	if err != nil {
 		glog.Errorf("I/O error: %v", err)
 	}
 
@@ -88,7 +88,7 @@ func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 			inConn.Close()
 			continue
 		}
-		go proxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		proxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 	}
 }
 

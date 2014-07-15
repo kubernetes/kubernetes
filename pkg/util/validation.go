@@ -22,7 +22,7 @@ import (
 
 const dnsLabelFmt string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
 
-var dnsLabelRegexp *regexp.Regexp = regexp.MustCompile("^" + dnsLabelFmt + "$")
+var dnsLabelRegexp = regexp.MustCompile("^" + dnsLabelFmt + "$")
 
 const dnsLabelMaxLength int = 63
 
@@ -34,7 +34,7 @@ func IsDNSLabel(value string) bool {
 
 const dnsSubdomainFmt string = dnsLabelFmt + "(\\." + dnsLabelFmt + ")*"
 
-var dnsSubdomainRegexp *regexp.Regexp = regexp.MustCompile("^" + dnsSubdomainFmt + "$")
+var dnsSubdomainRegexp = regexp.MustCompile("^" + dnsSubdomainFmt + "$")
 
 const dnsSubdomainMaxLength int = 253
 
@@ -46,7 +46,7 @@ func IsDNSSubdomain(value string) bool {
 
 const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
 
-var cIdentifierRegexp *regexp.Regexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
+var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
 
 // IsCIdentifier tests for a string that conforms the definition of an identifier
 // in C. This checks the format, but not the length.

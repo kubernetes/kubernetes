@@ -17,11 +17,13 @@ limitations under the License.
 package registry
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -35,6 +37,26 @@ func MakeEndpointController(serviceRegistry ServiceRegistry, podRegistry PodRegi
 type EndpointController struct {
 	serviceRegistry ServiceRegistry
 	podRegistry     PodRegistry
+}
+
+func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, error) {
+	if ((portName.Kind == util.IntstrString && len(portName.StrVal) == 0) ||
+		(portName.Kind == util.IntstrInt && portName.IntVal == 0)) &&
+		len(manifest.Containers[0].Ports) > 0 {
+		return manifest.Containers[0].Ports[0].ContainerPort, nil
+	}
+	if portName.Kind == util.IntstrInt {
+		return portName.IntVal, nil
+	}
+	name := portName.StrVal
+	for _, container := range manifest.Containers {
+		for _, port := range container.Ports {
+			if port.Name == name {
+				return port.ContainerPort, nil
+			}
+		}
+	}
+	return -1, fmt.Errorf("no suitable port for manifest: %s", manifest.ID)
 }
 
 func (e *EndpointController) SyncServiceEndpoints() error {
@@ -52,11 +74,12 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		}
 		endpoints := make([]string, len(pods))
 		for ix, pod := range pods {
-			// TODO: Use port names in the service object, don't just use port #0
-			endpoints[ix] = net.JoinHostPort(
-				pod.CurrentState.Host,
-				strconv.Itoa(pod.DesiredState.Manifest.Containers[0].Ports[0].HostPort),
-			)
+			port, err := findPort(&pod.DesiredState.Manifest, service.ContainerPort)
+			if err != nil {
+				glog.Errorf("Failed to find port for service: %v, %v", service, err)
+				continue
+			}
+			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
 		}
 		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
 			Name:      service.ID,

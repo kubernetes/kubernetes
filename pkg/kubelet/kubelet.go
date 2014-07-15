@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -43,6 +44,8 @@ import (
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
+
+const defaultChanSize = 1024
 
 // DockerContainerData is the structured representation of the JSON object returned by Docker inspect
 type DockerContainerData struct {
@@ -143,8 +146,9 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 	if address != "" {
 		glog.Infof("Starting to listen on %s:%d", address, port)
 		handler := KubeletServer{
-			Kubelet:       kl,
-			UpdateChannel: updateChannel,
+			Kubelet:         kl,
+			UpdateChannel:   updateChannel,
+			DelegateHandler: http.DefaultServeMux,
 		}
 		s := &http.Server{
 			Addr:           net.JoinHostPort(address, strconv.FormatUint(uint64(port), 10)),
@@ -192,7 +196,7 @@ func (kl *Kubelet) getDockerContainers() (map[DockerID]docker.APIContainers, err
 	result := map[DockerID]docker.APIContainers{}
 	containerList, err := kl.DockerClient.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	for _, value := range containerList {
 		// Skip containers that we didn't create to allow users to manually
@@ -202,7 +206,7 @@ func (kl *Kubelet) getDockerContainers() (map[DockerID]docker.APIContainers, err
 		}
 		result[DockerID(value.ID)] = value
 	}
-	return result, err
+	return result, nil
 }
 
 // Return Docker's container ID for a manifest's container. Returns an empty string if it doesn't exist.
@@ -732,7 +736,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 				glog.V(1).Infof("health check errored: %v", err)
 				continue
 			}
-			if !healthy {
+			if healthy != CheckHealthy {
 				glog.V(1).Infof("manifest %s container %s is unhealthy.", manifest.ID, container.Name)
 				if err != nil {
 					glog.V(1).Infof("Failed to get container info %v, for %s", err, containerID)
@@ -758,7 +762,7 @@ func (kl *Kubelet) SyncManifests(config []api.ContainerManifest) error {
 	glog.Infof("Desired: %+v", config)
 	var err error
 	dockerIdsToKeep := map[DockerID]empty{}
-	keepChannel := make(chan DockerID)
+	keepChannel := make(chan DockerID, defaultChanSize)
 	waitGroup := sync.WaitGroup{}
 
 	// Check for any containers that need starting
@@ -989,16 +993,16 @@ func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
 	return kl.statsFromContainerPath("/")
 }
 
-func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (bool, error) {
+func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (HealthCheckStatus, error) {
 	// Give the container 60 seconds to start up.
-	if !container.LivenessProbe.Enabled {
-		return true, nil
+	if container.LivenessProbe == nil {
+		return CheckHealthy, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return true, nil
+		return CheckHealthy, nil
 	}
 	if kl.HealthChecker == nil {
-		return true, nil
+		return CheckHealthy, nil
 	}
-	return kl.HealthChecker.IsHealthy(container)
+	return kl.HealthChecker.HealthCheck(container)
 }

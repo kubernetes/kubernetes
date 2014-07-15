@@ -21,27 +21,28 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// Anything that can list minions for a scheduler.
+// MinionLister interface represents anything that can list minions for a scheduler.
 type MinionLister interface {
 	List() (machines []string, err error)
 }
 
-// Make a MinionLister from a []string
+// FakeMinionLister implements MinionLister on a []string for test purposes.
 type FakeMinionLister []string
 
-// Returns minions as a []string
+// List returns minions as a []string
 func (f FakeMinionLister) List() ([]string, error) {
 	return []string(f), nil
 }
 
-// Anything that can list pods for a scheduler
+// PodLister interface represents anything that can list pods for a scheduler
 type PodLister interface {
 	ListPods(labels.Selector) ([]api.Pod, error)
 }
 
-// Make a MinionLister from an []api.Pods
+// FakePodLister implements PodLister on an []api.Pods for test purposes.
 type FakePodLister []api.Pod
 
+// ListPods returns []api.Pod matching a query.
 func (f FakePodLister) ListPods(s labels.Selector) (selected []api.Pod, err error) {
 	for _, pod := range f {
 		if s.Matches(labels.Set(pod.Labels)) {

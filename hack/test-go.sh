@@ -35,14 +35,16 @@ find_test_dirs() {
   )
 }
 
+# -covermode=atomic becomes default with -race in Go >=1.3
+KUBE_COVER="-cover -covermode=atomic -coverprofile=\"tmp.out\""
 
 cd "${KUBE_TARGET}"
 
 if [ "$1" != "" ]; then
-  go test -race -cover -coverprofile="tmp.out" "$KUBE_GO_PACKAGE/$1" "${@:2}"
+  go test -race $KUBE_COVER "$KUBE_GO_PACKAGE/$1" "${@:2}"
   exit 0
 fi
 
 for package in $(find_test_dirs); do
-  go test -race -cover -coverprofile="tmp.out" "${KUBE_GO_PACKAGE}/${package}" "${@:2}"
+  go test -race $KUBE_COVER "${KUBE_GO_PACKAGE}/${package}" "${@:2}"
 done

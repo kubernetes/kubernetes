@@ -85,14 +85,14 @@ const (
 
 // SetYAML implements the yaml.Setter interface.
 func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
-	if intVal, ok := value.(int); ok {
+	switch v := value.(type) {
+	case int:
 		intstr.Kind = IntstrInt
-		intstr.IntVal = intVal
+		intstr.IntVal = v
 		return true
-	}
-	if strVal, ok := value.(string); ok {
+	case string:
 		intstr.Kind = IntstrString
-		intstr.StrVal = strVal
+		intstr.StrVal = v
 		return true
 	}
 	return false
@@ -129,6 +129,6 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	case IntstrString:
 		return json.Marshal(intstr.StrVal)
 	default:
-		panic("impossible IntOrString.Kind")
+		return []byte{}, fmt.Errorf("impossible IntOrString.Kind")
 	}
 }

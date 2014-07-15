@@ -246,3 +246,14 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	allErrs.Append(validateContainers(manifest.Containers, allVolumes)...)
 	return []error(allErrs)
 }
+
+func ValidateService(service *Service) []error {
+	allErrs := errorList{}
+	if service.ID == "" {
+		allErrs.Append(makeInvalidError("Service.ID", service.ID))
+	}
+	if len(service.Selector) == 0 {
+		allErrs.Append(makeInvalidError("Service.Selector", service.Selector))
+	}
+	return []error(allErrs)
+}

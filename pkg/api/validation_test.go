@@ -262,3 +262,36 @@ func TestValidateManifest(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateService(t *testing.T) {
+	errs := ValidateService(&Service{
+		JSONBase: JSONBase{ID: "foo"},
+		Selector: map[string]string{
+			"foo": "bar",
+		},
+	})
+	if len(errs) != 0 {
+		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	}
+
+	errs = ValidateService(&Service{
+		Selector: map[string]string{
+			"foo": "bar",
+		},
+	})
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+
+	errs = ValidateService(&Service{
+		JSONBase: JSONBase{ID: "foo"},
+	})
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+
+	errs = ValidateService(&Service{})
+	if len(errs) != 2 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+}

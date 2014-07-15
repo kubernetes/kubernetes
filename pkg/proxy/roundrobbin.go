@@ -23,7 +23,6 @@ import (
 	"net"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -59,13 +58,12 @@ func (impl LoadBalancerRR) LoadBalance(service string, srcAddr net.Addr) (string
 	return endpoint, nil
 }
 
-// isValid returns true if spec is valid.
 func (impl LoadBalancerRR) isValid(spec string) bool {
-	index := strings.Index(spec, ":")
-	if index == -1 {
+	_, port, err := net.SplitHostPort(spec)
+	if err != nil {
 		return false
 	}
-	value, err := strconv.Atoi(spec[index+1:])
+	value, err := strconv.Atoi(port)
 	if err != nil {
 		return false
 	}
@@ -93,9 +91,10 @@ func (impl LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	// First update / add all new endpoints for services.
 	for _, value := range endpoints {
 		existingEndpoints, exists := impl.endpointsMap[value.Name]
-		if !exists || !reflect.DeepEqual(value.Endpoints, existingEndpoints) {
+		validEndpoints := impl.filterValidEndpoints(value.Endpoints)
+		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
 			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", value.Name, value.Endpoints)
-			impl.endpointsMap[value.Name] = impl.filterValidEndpoints(value.Endpoints)
+			impl.endpointsMap[value.Name] = validEndpoints
 			// Start RR from the beginning if added or updated.
 			impl.rrIndex[value.Name] = 0
 		}

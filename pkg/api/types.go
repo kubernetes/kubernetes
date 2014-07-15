@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -50,6 +51,7 @@ type ContainerManifest struct {
 	// Required: This must be a supported version string, such as "v1beta1".
 	Version string `yaml:"version" json:"version"`
 	// Required: This must be a DNS_SUBDOMAIN.
+	// TODO: ID on Manifest is deprecated and will be removed in the future.
 	ID         string      `yaml:"id" json:"id"`
 	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
 	Containers []Container `yaml:"containers" json:"containers"`
@@ -116,11 +118,10 @@ type HTTPGetProbe struct {
 
 // LivenessProbe describes a liveness probe to be examined to the container.
 type LivenessProbe struct {
-	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	// Type of liveness probe.  Current legal values "http"
 	Type string `yaml:"type,omitempty" json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'http'
-	HTTPGet HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+	HTTPGet *HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
 }
@@ -141,9 +142,9 @@ type Container struct {
 	// Optional: Defaults to unlimited.
 	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
 	// Optional: Defaults to unlimited.
-	CPU           int           `yaml:"cpu,omitempty" json:"cpu,omitempty"`
-	VolumeMounts  []VolumeMount `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
-	LivenessProbe LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
+	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty"`
+	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
+	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 }
 
 // Percentile represents a pair which contains a percentage from 0 to 100 and
@@ -267,6 +268,10 @@ type Service struct {
 	// This service will route traffic to pods having labels matching this selector.
 	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
+
+	// ContainerPort is the name of the port on the container to direct traffic to.
+	// Optional, if unspecified use the first port on the container.
+	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

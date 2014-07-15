@@ -21,7 +21,61 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+func TestFindPort(t *testing.T) {
+	manifest := api.ContainerManifest{
+		Containers: []api.Container{
+			{
+				Ports: []api.Port{
+					{
+						Name:          "foo",
+						ContainerPort: 8080,
+						HostPort:      9090,
+					},
+					{
+						Name:          "bar",
+						ContainerPort: 8000,
+						HostPort:      9000,
+					},
+				},
+			},
+		},
+	}
+	port, err := findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "foo"})
+	expectNoError(t, err)
+	if port != 8080 {
+		t.Errorf("Expected 8080, Got %d", port)
+	}
+	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "bar"})
+	expectNoError(t, err)
+	if port != 8000 {
+		t.Errorf("Expected 8000, Got %d", port)
+	}
+	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrInt, IntVal: 8000})
+	if port != 8000 {
+		t.Errorf("Expected 8000, Got %d", port)
+	}
+	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrInt, IntVal: 7000})
+	if port != 7000 {
+		t.Errorf("Expected 7000, Got %d", port)
+	}
+	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "baz"})
+	if err == nil {
+		t.Error("unexpected non-error")
+	}
+	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: ""})
+	expectNoError(t, err)
+	if port != 8080 {
+		t.Errorf("Expected 8080, Got %d", port)
+	}
+	port, err = findPort(&manifest, util.IntOrString{})
+	expectNoError(t, err)
+	if port != 8080 {
+		t.Errorf("Expected 8080, Got %d", port)
+	}
+}
 
 func TestSyncEndpointsEmpty(t *testing.T) {
 	serviceRegistry := MockServiceRegistry{}

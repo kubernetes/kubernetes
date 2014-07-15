@@ -23,7 +23,7 @@
 # exit on any error
 set -e
 
-SCRIPT_DIR=$(cd $(dirname $0); pwd)
+SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
 source $SCRIPT_DIR/config.sh
 

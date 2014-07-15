@@ -19,25 +19,27 @@ package scheduler
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-type FirstFitScheduler struct {
-	podLister PodLister
-	// TODO: *rand.Rand is *not* threadsafe
-	random *rand.Rand
+// RandomFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
+type RandomFitScheduler struct {
+	podLister  PodLister
+	random     *rand.Rand
+	randomLock sync.Mutex
 }
 
-func NewFirstFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
-	return &FirstFitScheduler{
+func NewRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
+	return &RandomFitScheduler{
 		podLister: podLister,
 		random:    random,
 	}
 }
 
-func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
+func (s *RandomFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 	for _, container := range pod.DesiredState.Manifest.Containers {
 		for _, podPort := range container.Ports {
 			if podPort.HostPort == port.HostPort {
@@ -48,7 +50,8 @@ func (s *FirstFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
 	return false
 }
 
-func (s *FirstFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+// Schedule schedules a pod on a random machine which matches its requirement.
+func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
 	machines, err := minionLister.List()
 	if err != nil {
 		return "", err
@@ -80,7 +83,8 @@ func (s *FirstFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (st
 	}
 	if len(machineOptions) == 0 {
 		return "", fmt.Errorf("failed to find fit for %#v", pod)
-	} else {
-		return machineOptions[s.random.Int()%len(machineOptions)], nil
 	}
+	s.randomLock.Lock()
+	defer s.randomLock.Unlock()
+	return machineOptions[s.random.Int()%len(machineOptions)], nil
 }
