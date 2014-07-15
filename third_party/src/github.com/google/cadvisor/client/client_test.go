@@ -110,32 +110,7 @@ func TestGetContainerInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// We cannot use DeepEqual() to compare them directly,
-	// because json en/decoded time may have precision issues.
-	if !reflect.DeepEqual(returned.ContainerReference, cinfo.ContainerReference) {
-		t.Errorf("received unexpected container ref")
-	}
-	if !reflect.DeepEqual(returned.Subcontainers, cinfo.Subcontainers) {
-		t.Errorf("received unexpected subcontainers")
-	}
-	if !reflect.DeepEqual(returned.Spec, cinfo.Spec) {
-		t.Errorf("received unexpected spec")
-	}
-	if !reflect.DeepEqual(returned.StatsPercentiles, cinfo.StatsPercentiles) {
-		t.Errorf("received unexpected spec")
-	}
-
-	for i, expectedStats := range cinfo.Stats {
-		returnedStats := returned.Stats[i]
-		if !expectedStats.Eq(returnedStats) {
-			t.Errorf("received unexpected stats")
-		}
-	}
-
-	for i, expectedSample := range cinfo.Samples {
-		returnedSample := returned.Samples[i]
-		if !expectedSample.Eq(returnedSample) {
-			t.Errorf("received unexpected sample")
-		}
+	if !returned.Eq(cinfo) {
+		t.Error("received unexpected ContainerInfo")
 	}
 }
