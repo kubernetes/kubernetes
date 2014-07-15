@@ -127,14 +127,15 @@ func (proxier Proxier) OnUpdate(services []api.Service) {
 	glog.Infof("Received update notice: %+v", services)
 	for _, service := range services {
 		port, exists := proxier.serviceMap[service.ID]
-		if !exists || port != service.Port {
-			glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
-			err := proxier.addService(service.ID, service.Port)
-			if err == nil {
-				proxier.serviceMap[service.ID] = service.Port
-			} else {
-				glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
-			}
+		if exists && port == service.Port {
+			continue
 		}
+		glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
+		err := proxier.addService(service.ID, service.Port)
+		if err != nil {
+			glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
+			continue
+		}
+		proxier.serviceMap[service.ID] = service.Port
 	}
 }
