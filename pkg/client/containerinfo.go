@@ -32,7 +32,7 @@ type ContainerInfoGetter interface {
 	GetContainerInfo(host, podID, containerID string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo(host string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	// XXX(monnand): We need to have better names.
-	GetMachineSpec() (*info.MachineInfo, error)
+	GetMachineSpec(host string) (*info.MachineInfo, error)
 }
 
 type HTTPContainerInfoGetter struct {
