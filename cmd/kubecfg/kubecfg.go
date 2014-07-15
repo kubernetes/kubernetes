@@ -24,6 +24,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -50,6 +51,7 @@ var (
 	verbose      = flag.Bool("verbose", false, "If true, print extra information")
 	proxy        = flag.Bool("proxy", false, "If true, run a proxy to the api server")
 	www          = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
+	templateFile = flag.String("template", "", "If present load this file as a golang template and us it for output printing")
 )
 
 func usage() {
@@ -188,6 +190,20 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 		printer = &kubecfg.IdentityPrinter{}
 	} else if *yaml {
 		printer = &kubecfg.YAMLPrinter{}
+	} else if len(*templateFile) > 0 {
+		data, err := ioutil.ReadFile(*templateFile)
+		if err != nil {
+			glog.Fatalf("Error reading template %s, %v\n", *templateFile, err)
+			return false
+		}
+		tmpl, err := template.New("output").Parse(string(data))
+		if err != nil {
+			glog.Fatalf("Error parsing template %s, %v\n", string(data), err)
+			return false
+		}
+		printer = &kubecfg.TemplatePrinter{
+			Template: tmpl,
+		}
 	} else {
 		printer = &kubecfg.HumanReadablePrinter{}
 	}
