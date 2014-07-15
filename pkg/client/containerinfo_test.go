@@ -99,8 +99,34 @@ func testHTTPContainerInfoGetter(
 		if err != nil {
 			t.Errorf("received unexpected error: %v", err)
 		}
-		if !reflect.DeepEqual(receivedContainerInfo, cinfo) {
-			t.Errorf("received wrong container info")
+
+		// We cannot use DeepEqual() to compare them directly,
+		// because json en/decoded time may have precision issues.
+		if !reflect.DeepEqual(receivedContainerInfo.ContainerReference, cinfo.ContainerReference) {
+			t.Errorf("received unexpected container ref")
+		}
+		if !reflect.DeepEqual(receivedContainerInfo.Subcontainers, cinfo.Subcontainers) {
+			t.Errorf("received unexpected subcontainers")
+		}
+		if !reflect.DeepEqual(receivedContainerInfo.Spec, cinfo.Spec) {
+			t.Errorf("received unexpected spec")
+		}
+		if !reflect.DeepEqual(receivedContainerInfo.StatsPercentiles, cinfo.StatsPercentiles) {
+			t.Errorf("received unexpected spec")
+		}
+
+		for i, expectedStats := range cinfo.Stats {
+			receivedContainerInfoStats := receivedContainerInfo.Stats[i]
+			if !expectedStats.Eq(receivedContainerInfoStats) {
+				t.Errorf("received unexpected stats")
+			}
+		}
+
+		for i, expectedSample := range cinfo.Samples {
+			receivedContainerInfoSample := receivedContainerInfo.Samples[i]
+			if !expectedSample.Eq(receivedContainerInfoSample) {
+				t.Errorf("received unexpected sample")
+			}
 		}
 	} else {
 		if err == nil {
