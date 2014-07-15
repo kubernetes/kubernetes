@@ -16,7 +16,19 @@ limitations under the License.
 
 package scheduler
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+import (
+	"fmt"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/google/cadvisor/info"
+)
+
+type FreeResourceCalculator interface {
+	// MaxContainer() returns the max. available resource set on a given
+	// machine. The resource set is reprecented in terms of
+	// info.ContainerSpec
+	MaxContainer(host string) (*info.ContainerSpec, error)
+}
 
 // machineSelector selects feasible machines based on some constraints.
 type machineSelector struct {
@@ -37,6 +49,9 @@ func containsPort(pod *api.Pod, port api.Port) bool {
 }
 
 func (self *machineSelector) PortsOpenFor(pod *api.Pod) *machineSelector {
+	if self.err != nil {
+		return self
+	}
 	newFeasibleMachines := make([]string, 0, len(self.feasibleMachines))
 	for _, machine := range self.feasibleMachines {
 		podFits := true
@@ -56,6 +71,44 @@ func (self *machineSelector) PortsOpenFor(pod *api.Pod) *machineSelector {
 		}
 	}
 	self.feasibleMachines = newFeasibleMachines
+	if len(self.feasibleMachines) == 0 {
+		self.feasibleMachines = nil
+		self.err = fmt.Errorf("failed to find fit for %#v: no ports available", pod)
+	}
+	return self
+}
+
+// Return true if all resources in a is larger than resources in b.
+func isLargerThan(a, b *info.ContainerSpec) bool {
+	if a.Cpu.Limit < b.Cpu.Limit {
+		return false
+	}
+	if a.Memory.Limit < b.Memory.Limit {
+		return false
+	}
+	return true
+}
+
+func (self *machineSelector) Fits(requirement *info.ContainerSpec, calc FreeResourceCalculator, pod *api.Pod) *machineSelector {
+	if self.err != nil {
+		return self
+	}
+	newFeasibleMachines := make([]string, 0, len(self.feasibleMachines))
+	for _, machine := range self.feasibleMachines {
+		maxContainer, err := calc.MaxContainer(machine)
+		if err != nil {
+			self.err = err
+			return self
+		}
+		if isLargerThan(maxContainer, requirement) {
+			newFeasibleMachines = append(newFeasibleMachines, machine)
+		}
+	}
+	self.feasibleMachines = newFeasibleMachines
+	if len(self.feasibleMachines) == 0 {
+		self.feasibleMachines = nil
+		self.err = fmt.Errorf("failed to find fit for %#v: no resources available", pod)
+	}
 	return self
 }
 
