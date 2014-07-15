@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -85,6 +86,9 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	handler := delegateHandler{}
 	apiserver := httptest.NewServer(&handler)
+
+	etcdClient := etcd.NewClient(servers)
+
 	cl := client.New(apiserver.URL, nil)
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
@@ -93,32 +97,39 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "", cl)
 	handler.delegate = m.ConstructHandler("/api/v1beta1")
 
-	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), cl)
-
+	controllerManager := controller.MakeReplicationManager(etcdClient, cl)
 	controllerManager.Run(1 * time.Second)
 
-	// Kubelet
-	myKubelet := kubelet.Kubelet{
-		Hostname:           machineList[0],
-		DockerClient:       &fakeDocker1,
-		DockerPuller:       &kubelet.FakeDockerPuller{},
-		FileCheckFrequency: 5 * time.Second,
-		SyncFrequency:      5 * time.Second,
-		HTTPCheckFrequency: 5 * time.Second,
+	// Kubelet (localhost)
+	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
+	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, 30*time.Second, cfg1.Channel("etcd"))
+	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
+	myKubelet := &kubelet.Kubelet{
+		Hostname:     machineList[0],
+		DockerClient: &fakeDocker1,
+		DockerPuller: &kubelet.FakeDockerPuller{},
 	}
-	go myKubelet.RunKubelet("", "", manifestURL, servers, "localhost", 10250)
+	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
+	go util.Forever(cfg1.Sync, 3*time.Second)
+	go util.Forever(func() {
+		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), http.DefaultServeMux, "localhost", 10250)
+	}, 0)
 
+	// Kubelet (machine)
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	otherKubelet := kubelet.Kubelet{
-		Hostname:           machineList[1],
-		DockerClient:       &fakeDocker2,
-		DockerPuller:       &kubelet.FakeDockerPuller{},
-		FileCheckFrequency: 5 * time.Second,
-		SyncFrequency:      5 * time.Second,
-		HTTPCheckFrequency: 5 * time.Second,
+	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
+	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, 30*time.Second, cfg2.Channel("etcd"))
+	otherKubelet := &kubelet.Kubelet{
+		Hostname:     machineList[1],
+		DockerClient: &fakeDocker2,
+		DockerPuller: &kubelet.FakeDockerPuller{},
 	}
-	go otherKubelet.RunKubelet("", "", "", servers, "localhost", 10251)
+	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
+	go util.Forever(cfg2.Sync, 3*time.Second)
+	go util.Forever(func() {
+		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), http.DefaultServeMux, "localhost", 10251)
+	}, 0)
 
 	return apiserver.URL
 }

@@ -22,28 +22,49 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	Kubelet         kubeletInterface
-	UpdateChannel   chan<- manifestUpdate
-	DelegateHandler http.Handler
+	host    HostInterface
+	updates chan<- interface{}
+	handler http.Handler
 }
 
-// kubeletInterface contains all the kubelet methods required by the server.
+func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, delegate http.Handler, address string, port uint) {
+	glog.Infof("Starting to listen on %s:%d", address, port)
+	handler := Server{
+		host:    host,
+		updates: updates,
+		handler: delegate,
+	}
+	s := &http.Server{
+		Addr:           net.JoinHostPort(address, strconv.FormatUint(uint64(port), 10)),
+		Handler:        &handler,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	s.ListenAndServe()
+}
+
+// HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
-type kubeletInterface interface {
-	GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+type HostInterface interface {
+	GetContainerInfo(podFullName, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
@@ -78,13 +99,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		if u.Path == "/container" {
 			// This is to provide backward compatibility. It only supports a single manifest
-			var manifest api.ContainerManifest
-			err = yaml.Unmarshal(data, &manifest)
+			var pod Pod
+			err = yaml.Unmarshal(data, &pod.Manifest)
 			if err != nil {
 				s.error(w, err)
 				return
 			}
-			s.UpdateChannel <- manifestUpdate{httpServerSource, []api.ContainerManifest{manifest}}
+			//TODO: sha1 of manifest?
+			pod.Name = "1"
+			s.updates <- PodUpdate{[]Pod{pod}, SET}
 		} else if u.Path == "/containers" {
 			var manifests []api.ContainerManifest
 			err = yaml.Unmarshal(data, &manifests)
@@ -92,15 +115,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				s.error(w, err)
 				return
 			}
-			s.UpdateChannel <- manifestUpdate{httpServerSource, manifests}
+			pods := make([]Pod, len(manifests))
+			for i := range manifests {
+				pods[i].Name = fmt.Sprintf("%d", i+1)
+				pods[i].Manifest = manifests[i]
+			}
+			s.updates <- PodUpdate{pods, SET}
 		}
 	case u.Path == "/podInfo":
 		podID := u.Query().Get("podID")
 		if len(podID) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
 			http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
 			return
 		}
-		info, err := s.Kubelet.GetPodInfo(podID)
+		// TODO: backwards compatibility with existing API, needs API change
+		podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
+		info, err := s.host.GetPodInfo(podFullName)
 		if err == ErrNoContainersInPod {
 			http.Error(w, "Pod does not exist", http.StatusNotFound)
 			return
@@ -120,7 +151,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case strings.HasPrefix(u.Path, "/stats"):
 		s.serveStats(w, req)
 	case strings.HasPrefix(u.Path, "/spec"):
-		info, err := s.Kubelet.GetMachineInfo()
+		info, err := s.host.GetMachineInfo()
 		if err != nil {
 			s.error(w, err)
 			return
@@ -133,14 +164,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Content-type", "application/json")
 		w.Write(data)
 	case strings.HasPrefix(u.Path, "/logs/"):
-		s.Kubelet.ServeLogs(w, req)
+		s.host.ServeLogs(w, req)
 	default:
-		s.DelegateHandler.ServeHTTP(w, req)
+		if s.handler != nil {
+			s.handler.ServeHTTP(w, req)
+		}
 	}
 }
 
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// /stats/<podid>/<containerName>
+	// /stats/<podfullname>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
 	var stats *info.ContainerInfo
 	var err error
@@ -153,13 +186,13 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	switch len(components) {
 	case 1:
 		// Machine stats
-		stats, err = s.Kubelet.GetRootInfo(&query)
+		stats, err = s.host.GetRootInfo(&query)
 	case 2:
 		// pod stats
 		// TODO(monnand) Implement this
 		errors.New("pod level status currently unimplemented")
 	case 3:
-		stats, err = s.Kubelet.GetContainerInfo(components[1], components[2], &query)
+		stats, err = s.host.GetContainerInfo(components[1], components[2], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return

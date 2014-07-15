@@ -174,14 +174,14 @@ func unescapeDash(in string) (out string) {
 const containerNamePrefix = "k8s"
 
 // Creates a name which can be reversed to identify both manifest id and container name.
-func buildDockerName(manifest *api.ContainerManifest, container *api.Container) string {
+func buildDockerName(pod *Pod, container *api.Container) string {
 	// Note, manifest.ID could be blank.
-	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.ID), rand.Uint32())
+	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(GetPodFullName(pod)), rand.Uint32())
 }
 
 // Upacks a container name, returning the manifest id and container name we would have used to
 // construct the docker name. If the docker name isn't one we created, we may return empty strings.
-func parseDockerName(name string) (manifestID, containerName string) {
+func parseDockerName(name string) (podFullName, containerName string) {
 	// For some reason docker appears to be appending '/' to names.
 	// If its there, strip it.
 	if name[0] == '/' {
@@ -195,7 +195,7 @@ func parseDockerName(name string) (manifestID, containerName string) {
 		containerName = unescapeDash(parts[1])
 	}
 	if len(parts) > 2 {
-		manifestID = unescapeDash(parts[2])
+		podFullName = unescapeDash(parts[2])
 	}
 	return
 }
