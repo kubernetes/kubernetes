@@ -34,7 +34,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -145,7 +144,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 	}
 	if address != "" {
 		glog.Infof("Starting to listen on %s:%d", address, port)
-		handler := KubeletServer{
+		handler := Server{
 			Kubelet:         kl,
 			UpdateChannel:   updateChannel,
 			DelegateHandler: http.DefaultServeMux,

@@ -25,14 +25,17 @@ import (
 	"github.com/golang/glog"
 )
 
+// HealthCheckStatus is an enum type which describes a status of health check.
 type HealthCheckStatus int
 
+// These are the valid values of HealthCheckStatus.
 const (
 	CheckHealthy   HealthCheckStatus = 0
 	CheckUnhealthy HealthCheckStatus = 1
 	CheckUnknown   HealthCheckStatus = 2
 )
 
+// HealthChecker hides implementation details of checking health of containers.
 type HealthChecker interface {
 	HealthCheck(container api.Container) (HealthCheckStatus, error)
 }
@@ -57,6 +60,8 @@ type MuxHealthChecker struct {
 	checkers map[string]HealthChecker
 }
 
+// HealthCheck delegates the health-checking of the container to one of the bundled implementations.
+// It chooses an implementation according to container.LivenessProbe.Type.
 func (m *MuxHealthChecker) HealthCheck(container api.Container) (HealthCheckStatus, error) {
 	checker, ok := m.checkers[container.LivenessProbe.Type]
 	if !ok || checker == nil {
@@ -81,6 +86,7 @@ func (h *HTTPHealthChecker) findPort(container api.Container, portName string) i
 	return -1
 }
 
+// HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
 func (h *HTTPHealthChecker) HealthCheck(container api.Container) (HealthCheckStatus, error) {
 	params := container.LivenessProbe.HTTPGet
 	if params == nil {
