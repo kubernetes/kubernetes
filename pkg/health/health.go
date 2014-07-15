@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package health
 
 import (
 	"net/http"
@@ -22,30 +22,30 @@ import (
 	"github.com/golang/glog"
 )
 
-type HealthCheckStatus int
+type Status int
 
 const (
-	CheckHealthy   HealthCheckStatus = 0
-	CheckUnhealthy HealthCheckStatus = 1
-	CheckUnknown   HealthCheckStatus = 2
+	Healthy Status = iota
+	Unhealthy
+	Unknown
 )
 
 type HTTPGetInterface interface {
 	Get(url string) (*http.Response, error)
 }
 
-func IsHealthy(url string, client HTTPGetInterface) (HealthCheckStatus, error) {
+func Check(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if res.Body != nil {
 		defer res.Body.Close()
 	}
 	if err != nil {
-		return CheckUnknown, err
+		return Unknown, err
 	}
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return CheckHealthy, nil
+		return Healthy, nil
 	} else {
 		glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-		return CheckUnhealthy, nil
+		return Unhealthy, nil
 	}
 }

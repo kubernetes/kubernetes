@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -94,7 +95,7 @@ type Kubelet struct {
 	SyncFrequency      time.Duration
 	HTTPCheckFrequency time.Duration
 	pullLock           sync.Mutex
-	HealthChecker      HealthChecker
+	HealthChecker      health.HealthChecker
 }
 
 type manifestUpdate struct {
@@ -159,7 +160,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 		}
 		go util.Forever(func() { s.ListenAndServe() }, 0)
 	}
-	kl.HealthChecker = MakeHealthChecker()
+	kl.HealthChecker = health.MakeHealthChecker()
 	kl.syncLoop(updateChannel, kl)
 }
 
@@ -736,7 +737,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 				glog.V(1).Infof("health check errored: %v", err)
 				continue
 			}
-			if healthy != util.CheckHealthy {
+			if healthy != health.Healthy {
 				glog.V(1).Infof("manifest %s container %s is unhealthy.", manifest.ID, container.Name)
 				if err != nil {
 					glog.V(1).Infof("Failed to get container info %v, for %s", err, containerID)
@@ -993,16 +994,16 @@ func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
 	return kl.statsFromContainerPath("/")
 }
 
-func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (util.HealthCheckStatus, error) {
+func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
-		return util.CheckHealthy, nil
+		return health.Healthy, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return util.CheckHealthy, nil
+		return health.Healthy, nil
 	}
 	if kl.HealthChecker == nil {
-		return util.CheckHealthy, nil
+		return health.Healthy, nil
 	}
 	return kl.HealthChecker.HealthCheck(container)
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package health
 
 import (
 	"fmt"
@@ -22,12 +22,11 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
 type HealthChecker interface {
-	HealthCheck(container api.Container) (util.HealthCheckStatus, error)
+	HealthCheck(container api.Container) (Status, error)
 }
 
 // MakeHealthChecker creates a new HealthChecker.
@@ -46,18 +45,18 @@ type MuxHealthChecker struct {
 	checkers map[string]HealthChecker
 }
 
-func (m *MuxHealthChecker) HealthCheck(container api.Container) (util.HealthCheckStatus, error) {
+func (m *MuxHealthChecker) HealthCheck(container api.Container) (Status, error) {
 	checker, ok := m.checkers[container.LivenessProbe.Type]
 	if !ok || checker == nil {
 		glog.Warningf("Failed to find health checker for %s %s", container.Name, container.LivenessProbe.Type)
-		return util.CheckUnknown, nil
+		return Unknown, nil
 	}
 	return checker.HealthCheck(container)
 }
 
 // HTTPHealthChecker is an implementation of HealthChecker which checks container health by sending HTTP Get requests.
 type HTTPHealthChecker struct {
-	client util.HTTPGetInterface
+	client HTTPGetInterface
 }
 
 func (h *HTTPHealthChecker) findPort(container api.Container, portName string) int64 {
@@ -70,17 +69,17 @@ func (h *HTTPHealthChecker) findPort(container api.Container, portName string) i
 	return -1
 }
 
-func (h *HTTPHealthChecker) HealthCheck(container api.Container) (util.HealthCheckStatus, error) {
+func (h *HTTPHealthChecker) HealthCheck(container api.Container) (Status, error) {
 	params := container.LivenessProbe.HTTPGet
 	if params == nil {
-		return util.CheckUnknown, fmt.Errorf("Error, no HTTP parameters specified: %v", container)
+		return Unknown, fmt.Errorf("Error, no HTTP parameters specified: %v", container)
 	}
 	port := h.findPort(container, params.Port)
 	if port == -1 {
 		var err error
 		port, err = strconv.ParseInt(params.Port, 10, 0)
 		if err != nil {
-			return util.CheckUnknown, err
+			return Unknown, err
 		}
 	}
 	var host string
@@ -90,5 +89,5 @@ func (h *HTTPHealthChecker) HealthCheck(container api.Container) (util.HealthChe
 		host = "localhost"
 	}
 	url := fmt.Sprintf("http://%s:%d%s", host, port, params.Path)
-	return util.IsHealthy(url, h.client)
+	return Check(url, h.client)
 }

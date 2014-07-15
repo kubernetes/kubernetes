@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package health
 
 import (
 	"net/http"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type fakeHTTPClient struct {
@@ -57,7 +56,7 @@ func TestHttpHealth(t *testing.T) {
 	}
 
 	ok, err := check.HealthCheck(container)
-	if ok != util.CheckHealthy {
+	if ok != Healthy {
 		t.Error("Unexpected unhealthy")
 	}
 	if err != nil {

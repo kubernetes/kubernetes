@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 )
 
 type HealthyMinionRegistry struct {
 	delegate MinionRegistry
-	client   util.HTTPGetInterface
+	client   health.HTTPGetInterface
 	port     int
 }
 
@@ -48,11 +48,11 @@ func (h *HealthyMinionRegistry) List() (currentMinions []string, err error) {
 		return result, err
 	}
 	for _, minion := range list {
-		status, err := util.IsHealthy(h.makeMinionURL(minion), h.client)
+		status, err := health.Check(h.makeMinionURL(minion), h.client)
 		if err != nil {
 			return result, err
 		}
-		if status == util.CheckHealthy {
+		if status == health.Healthy {
 			result = append(result, minion)
 		}
 	}
@@ -75,11 +75,11 @@ func (h *HealthyMinionRegistry) Contains(minion string) (bool, error) {
 	if !contains {
 		return false, nil
 	}
-	status, err := util.IsHealthy(h.makeMinionURL(minion), h.client)
+	status, err := health.Check(h.makeMinionURL(minion), h.client)
 	if err != nil {
 		return false, err
 	}
-	if status == util.CheckUnhealthy {
+	if status == health.Unhealthy {
 		return false, nil
 	}
 	return true, nil
