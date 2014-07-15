@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Watches etcd and gets the full configuration on preset intervals.
-// Expects the list of exposed services to live under:
+// It expects the list of exposed services to live under:
 // registry/services
 // which in etcd is exposed like so:
 // http://<etcd server>/v2/keys/registry/services
@@ -30,7 +30,7 @@ limitations under the License.
 // '[ { "machine": <host>, "name": <name", "port": <port> },
 //    { "machine": <host2>, "name": <name2", "port": <port2> }
 //  ]',
-//
+
 package config
 
 import (
@@ -44,14 +44,17 @@ import (
 	"github.com/golang/glog"
 )
 
-const RegistryRoot = "registry/services"
+// registryRoot is the key prefix for service configs in etcd.
+const registryRoot = "registry/services"
 
+// ConfigSourceEtcd communicates with a etcd via the client, and sends the change notification of services and endpoints to the specified channels.
 type ConfigSourceEtcd struct {
 	client           *etcd.Client
 	serviceChannel   chan ServiceUpdate
 	endpointsChannel chan EndpointsUpdate
 }
 
+// NewConfigSourceEtcd creates a new ConfigSourceEtcd and immediately runs the created ConfigSourceEtcd in a goroutine.
 func NewConfigSourceEtcd(client *etcd.Client, serviceChannel chan ServiceUpdate, endpointsChannel chan EndpointsUpdate) ConfigSourceEtcd {
 	config := ConfigSourceEtcd{
 		client:           client,
@@ -62,13 +65,14 @@ func NewConfigSourceEtcd(client *etcd.Client, serviceChannel chan ServiceUpdate,
 	return config
 }
 
+// Run begins watching for new services and their endpoints on etcd.
 func (impl ConfigSourceEtcd) Run() {
 	// Initially, just wait for the etcd to come up before doing anything more complicated.
 	var services []api.Service
 	var endpoints []api.Endpoints
 	var err error
 	for {
-		services, endpoints, err = impl.GetServices()
+		services, endpoints, err = impl.getServices()
 		if err == nil {
 			break
 		}
@@ -87,10 +91,10 @@ func (impl ConfigSourceEtcd) Run() {
 
 	// Ok, so we got something back from etcd. Let's set up a watch for new services, and
 	// their endpoints
-	go impl.WatchForChanges()
+	go impl.watchForChanges()
 
 	for {
-		services, endpoints, err = impl.GetServices()
+		services, endpoints, err = impl.getServices()
 		if err != nil {
 			glog.Errorf("ConfigSourceEtcd: Failed to get services: %v", err)
 		} else {
@@ -107,12 +111,12 @@ func (impl ConfigSourceEtcd) Run() {
 	}
 }
 
-// Finds the list of services and their endpoints from etcd.
+// getServices finds the list of services and their endpoints from etcd.
 // This operation is akin to a set a known good at regular intervals.
-func (impl ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) {
-	response, err := impl.client.Get(RegistryRoot+"/specs", true, false)
+func (impl ConfigSourceEtcd) getServices() ([]api.Service, []api.Endpoints, error) {
+	response, err := impl.client.Get(registryRoot+"/specs", true, false)
 	if err != nil {
-		glog.Errorf("Failed to get the key %s: %v", RegistryRoot, err)
+		glog.Errorf("Failed to get the key %s: %v", registryRoot, err)
 		return make([]api.Service, 0), make([]api.Endpoints, 0), err
 	}
 	if response.Node.Dir == true {
@@ -129,7 +133,7 @@ func (impl ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, erro
 				continue
 			}
 			retServices[i] = svc
-			endpoints, err := impl.GetEndpoints(svc.ID)
+			endpoints, err := impl.getEndpoints(svc.ID)
 			if err != nil {
 				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.ID, err)
 			}
@@ -138,23 +142,23 @@ func (impl ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, erro
 		}
 		return retServices, retEndpoints, err
 	}
-	return nil, nil, fmt.Errorf("did not get the root of the registry %s", RegistryRoot)
+	return nil, nil, fmt.Errorf("did not get the root of the registry %s", registryRoot)
 }
 
-func (impl ConfigSourceEtcd) GetEndpoints(service string) (api.Endpoints, error) {
-	key := fmt.Sprintf(RegistryRoot + "/endpoints/" + service)
+// getEndpoints finds the list of endpoints of the service from etcd.
+func (impl ConfigSourceEtcd) getEndpoints(service string) (api.Endpoints, error) {
+	key := fmt.Sprintf(registryRoot + "/endpoints/" + service)
 	response, err := impl.client.Get(key, true, false)
 	if err != nil {
 		glog.Errorf("Failed to get the key: %s %v", key, err)
 		return api.Endpoints{}, err
 	}
 	// Parse all the endpoint specifications in this value.
-	return ParseEndpoints(response.Node.Value)
+	return parseEndpoints(response.Node.Value)
 }
 
-// EtcdResponseToServiceAndLocalport takes an etcd response and pulls it apart to find
-// service
-func EtcdResponseToService(response *etcd.Response) (*api.Service, error) {
+// etcdResponseToService takes an etcd response and pulls it apart to find service.
+func etcdResponseToService(response *etcd.Response) (*api.Service, error) {
 	if response.Node == nil {
 		return nil, fmt.Errorf("invalid response from etcd: %#v", response)
 	}
@@ -166,31 +170,31 @@ func EtcdResponseToService(response *etcd.Response) (*api.Service, error) {
 	return &svc, err
 }
 
-func ParseEndpoints(jsonString string) (api.Endpoints, error) {
+func parseEndpoints(jsonString string) (api.Endpoints, error) {
 	var e api.Endpoints
 	err := json.Unmarshal([]byte(jsonString), &e)
 	return e, err
 }
 
-func (impl ConfigSourceEtcd) WatchForChanges() {
+func (impl ConfigSourceEtcd) watchForChanges() {
 	glog.Info("Setting up a watch for new services")
 	watchChannel := make(chan *etcd.Response)
 	go impl.client.Watch("/registry/services/", 0, true, watchChannel, nil)
 	for {
 		watchResponse := <-watchChannel
-		impl.ProcessChange(watchResponse)
+		impl.processChange(watchResponse)
 	}
 }
 
-func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
+func (impl ConfigSourceEtcd) processChange(response *etcd.Response) {
 	glog.Infof("Processing a change in service configuration... %s", *response)
 
 	// If it's a new service being added (signified by a localport being added)
 	// then process it as such
 	if strings.Contains(response.Node.Key, "/endpoints/") {
-		impl.ProcessEndpointResponse(response)
+		impl.processEndpointResponse(response)
 	} else if response.Action == "set" {
-		service, err := EtcdResponseToService(response)
+		service, err := etcdResponseToService(response)
 		if err != nil {
 			glog.Errorf("Failed to parse %s Port: %s", response, err)
 			return
@@ -208,13 +212,12 @@ func (impl ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{JSONBase: api.JSONBase{ID: parts[3]}}}}
 			impl.serviceChannel <- serviceUpdate
 			return
-		} else {
-			glog.Infof("Unknown service delete: %#v", parts)
 		}
+		glog.Infof("Unknown service delete: %#v", parts)
 	}
 }
 
-func (impl ConfigSourceEtcd) ProcessEndpointResponse(response *etcd.Response) {
+func (impl ConfigSourceEtcd) processEndpointResponse(response *etcd.Response) {
 	glog.Infof("Processing a change in endpoint configuration... %s", *response)
 	var endpoints api.Endpoints
 	err := json.Unmarshal([]byte(response.Node.Value), &endpoints)

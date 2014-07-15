@@ -40,6 +40,7 @@ type PodCache struct {
 	podLock sync.Mutex
 }
 
+// NewPodCache returns a new PodCache which watches container information registered in the given PodRegistry.
 func NewPodCache(info client.PodInfoGetter, pods registry.PodRegistry, period time.Duration) *PodCache {
 	return &PodCache{
 		containerInfo: info,
@@ -49,7 +50,7 @@ func NewPodCache(info client.PodInfoGetter, pods registry.PodRegistry, period ti
 	}
 }
 
-// Implements the PodInfoGetter interface.
+// GetPodInfo Implements the PodInfoGetter.GetPodInfo.
 // The returned value should be treated as read-only.
 func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	p.podLock.Lock()
@@ -57,9 +58,8 @@ func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	value, ok := p.podInfo[podID]
 	if !ok {
 		return nil, errors.New("no cached pod info")
-	} else {
-		return value, nil
 	}
+	return value, nil
 }
 
 func (p *PodCache) updatePodInfo(host, id string) error {
@@ -73,7 +73,7 @@ func (p *PodCache) updatePodInfo(host, id string) error {
 	return nil
 }
 
-// Update information about all containers.  Either called by Loop() below, or one-off.
+// UpdateAllContainers updates information about all containers.  Either called by Loop() below, or one-off.
 func (p *PodCache) UpdateAllContainers() {
 	pods, err := p.pods.ListPods(labels.Everything())
 	if err != nil {
@@ -88,7 +88,8 @@ func (p *PodCache) UpdateAllContainers() {
 	}
 }
 
-// Loop runs forever, it is expected to be placed in a go routine.
+// Loop begins watching updates of container information.
+// It runs forever, and is expected to be placed in a go routine.
 func (p *PodCache) Loop() {
 	util.Forever(func() { p.UpdateAllContainers() }, p.period)
 }

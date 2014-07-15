@@ -22,12 +22,12 @@ import (
 	"strings"
 )
 
-// Represents a selector.
+// Selector represents a label selector.
 type Selector interface {
-	// Returns true if this selector matches the given set of labels.
+	// Matches returns true if this selector matches the given set of labels.
 	Matches(Labels) bool
 
-	// Prints a human readable version of this selector.
+	// String returns a human readable string that represents this selector.
 	String() string
 }
 
@@ -87,7 +87,7 @@ func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 	return "", "", false
 }
 
-// Given a Set, return a Selector which will match exactly that Set.
+// SelectorFromSet returns a Selector which will match exactly the given Set.
 func SelectorFromSet(ls Set) Selector {
 	items := make([]Selector, 0, len(ls))
 	for label, value := range ls {
@@ -99,7 +99,8 @@ func SelectorFromSet(ls Set) Selector {
 	return andTerm(items)
 }
 
-// Takes a string repsenting a selector and returns an object suitable for matching, or an error.
+// ParseSelector takes a string repsenting a selector and returns an
+// object suitable for matching, or an error.
 func ParseSelector(selector string) (Selector, error) {
 	parts := strings.Split(selector, ",")
 	sort.StringSlice(parts).Sort()

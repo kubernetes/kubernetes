@@ -24,40 +24,44 @@ import (
 	"github.com/golang/glog"
 )
 
+// Operation is a type of operation of services or endpoints.
 type Operation int
 
+// These are the available operation types.
 const (
 	SET Operation = iota
 	ADD
 	REMOVE
 )
 
-// Defines an operation sent on the channel. You can add or remove single services by
-// sending an array of size one and Op == ADD|REMOVE. For setting the state of the system
-// to a given state for this source configuration, set Services as desired and Op to SET,
-// which will reset the system state to that specified in this operation for this source
-// channel. To remove all services, set Services to empty array and Op to SET
+// ServiceUpdate describes an operation of services, sent on the channel.
+// You can add or remove single services by sending an array of size one and Op == ADD|REMOVE.
+// For setting the state of the system to a given state for this source configuration, set Services as desired and Op to SET,
+// which will reset the system state to that specified in this operation for this source channel.
+// To remove all services, set Services to empty array and Op to SET
 type ServiceUpdate struct {
 	Services []api.Service
 	Op       Operation
 }
 
-// Defines an operation sent on the channel. You can add or remove single endpoints by
-// sending an array of size one and Op == ADD|REMOVE. For setting the state of the system
-// to a given state for this source configuration, set Endpoints as desired and Op to SET,
-// which will reset the system state to that specified in this operation for this source
-// channel. To remove all endpoints, set Endpoints to empty array and Op to SET
+// EndpointsUpdate describes an operation of endpoints, sent on the channel.
+// You can add or remove single endpoints by sending an array of size one and Op == ADD|REMOVE.
+// For setting the state of the system to a given state for this source configuration, set Endpoints as desired and Op to SET,
+// which will reset the system state to that specified in this operation for this source channel.
+// To remove all endpoints, set Endpoints to empty array and Op to SET
 type EndpointsUpdate struct {
 	Endpoints []api.Endpoints
 	Op        Operation
 }
 
+// ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
 type ServiceConfigHandler interface {
-	// Sent when a configuration has been changed by one of the sources. This is the
-	// union of all the configuration sources.
+	// OnUpdate gets called when a configuration has been changed by one of the sources.
+	// This is the union of all the configuration sources.
 	OnUpdate(services []api.Service)
 }
 
+// EndpointsConfigHandler is an abstract interface of objects which receive update notifications for the set of endpoints.
 type EndpointsConfigHandler interface {
 	// OnUpdate gets called when endpoints configuration is changed for a given
 	// service on any of the configuration sources. An example is when a new
@@ -65,6 +69,8 @@ type EndpointsConfigHandler interface {
 	OnUpdate(endpoints []api.Endpoints)
 }
 
+// ServiceConfig tracks a set of service configurations and their endpoint configurations.
+// It accepts "set", "add" and "remove" operations of services and endpoints via channels, and invokes registered handlers on change.
 type ServiceConfig struct {
 	// Configuration sources and their lock.
 	configSourceLock       sync.RWMutex
@@ -94,6 +100,8 @@ type ServiceConfig struct {
 	endpointsNotifyChannel chan string
 }
 
+// NewServiceConfig creates a new ServiceConfig.
+// It immediately runs the created ServiceConfig.
 func NewServiceConfig() *ServiceConfig {
 	config := &ServiceConfig{
 		serviceConfigSources:   make(map[string]chan ServiceUpdate),
@@ -109,22 +117,26 @@ func NewServiceConfig() *ServiceConfig {
 	return config
 }
 
+// Run begins a loop to accept new service configurations and new endpoint configurations.
+// It never returns.
 func (impl *ServiceConfig) Run() {
 	glog.Infof("Starting the config Run loop")
 	for {
 		select {
 		case source := <-impl.serviceNotifyChannel:
 			glog.Infof("Got new service configuration from source %s", source)
-			impl.NotifyServiceUpdate()
+			impl.notifyServiceUpdate()
 		case source := <-impl.endpointsNotifyChannel:
 			glog.Infof("Got new endpoint configuration from source %s", source)
-			impl.NotifyEndpointsUpdate()
+			impl.notifyEndpointsUpdate()
 		case <-time.After(1 * time.Second):
 		}
 	}
 }
 
-func (impl *ServiceConfig) ServiceChannelListener(source string, listenChannel chan ServiceUpdate) {
+// serviceChannelListener begins a loop to handle incoming ServiceUpdate notifications from the channel.
+// It never returns.
+func (impl *ServiceConfig) serviceChannelListener(source string, listenChannel chan ServiceUpdate) {
 	// Represents the current services configuration for this channel.
 	serviceMap := make(map[string]api.Service)
 	for {
@@ -160,7 +172,9 @@ func (impl *ServiceConfig) ServiceChannelListener(source string, listenChannel c
 	}
 }
 
-func (impl *ServiceConfig) EndpointsChannelListener(source string, listenChannel chan EndpointsUpdate) {
+// endpointsChannelListener begins a loop to handle incoming EndpointsUpdate notifications from the channel.
+// It never returns.
+func (impl *ServiceConfig) endpointsChannelListener(source string, listenChannel chan EndpointsUpdate) {
 	endpointMap := make(map[string]api.Endpoints)
 	for {
 		select {
@@ -214,11 +228,11 @@ func (impl *ServiceConfig) GetServiceConfigurationChannel(source string) chan Se
 	}
 	newChannel := make(chan ServiceUpdate)
 	impl.serviceConfigSources[source] = newChannel
-	go impl.ServiceChannelListener(source, newChannel)
+	go impl.serviceChannelListener(source, newChannel)
 	return newChannel
 }
 
-// GetEndpointConfigurationChannel returns a channel where a configuration source
+// GetEndpointsConfigurationChannel returns a channel where a configuration source
 // can send updates of new endpoint configurations. Multiple calls with the same
 // source will return the same channel. This allows change and state based sources
 // to use the same channel. Difference source names however will be treated as a
@@ -235,11 +249,11 @@ func (impl *ServiceConfig) GetEndpointsConfigurationChannel(source string) chan 
 	}
 	newChannel := make(chan EndpointsUpdate)
 	impl.endpointsConfigSources[source] = newChannel
-	go impl.EndpointsChannelListener(source, newChannel)
+	go impl.endpointsChannelListener(source, newChannel)
 	return newChannel
 }
 
-// Register ServiceConfigHandler to receive updates of changes to services.
+// RegisterServiceHandler registers the ServiceConfigHandler to receive updates of changes to services.
 func (impl *ServiceConfig) RegisterServiceHandler(handler ServiceConfigHandler) {
 	impl.handlerLock.Lock()
 	defer impl.handlerLock.Unlock()
@@ -255,7 +269,7 @@ func (impl *ServiceConfig) RegisterServiceHandler(handler ServiceConfigHandler) 
 	panic("Only up to 10 service handlers supported for now")
 }
 
-// Register ServiceConfigHandler to receive updates of changes to services.
+// RegisterEndpointsHandler registers the EndpointsConfigHandler to receive updates of changes to services.
 func (impl *ServiceConfig) RegisterEndpointsHandler(handler EndpointsConfigHandler) {
 	impl.handlerLock.Lock()
 	defer impl.handlerLock.Unlock()
@@ -271,8 +285,9 @@ func (impl *ServiceConfig) RegisterEndpointsHandler(handler EndpointsConfigHandl
 	panic("Only up to 10 endpoint handlers supported for now")
 }
 
-func (impl *ServiceConfig) NotifyServiceUpdate() {
-	services := make([]api.Service, 0)
+// notifyServiceUpdate calls the registered ServiceConfigHandlers with the current states of services.
+func (impl *ServiceConfig) notifyServiceUpdate() {
+	services := []api.Service{}
 	impl.configLock.RLock()
 	for _, sourceServices := range impl.serviceConfig {
 		for _, value := range sourceServices {
@@ -291,8 +306,9 @@ func (impl *ServiceConfig) NotifyServiceUpdate() {
 	}
 }
 
-func (impl *ServiceConfig) NotifyEndpointsUpdate() {
-	endpoints := make([]api.Endpoints, 0)
+// notifyEndpointsUpdate calls the registered EndpointsConfigHandlers with the current states of endpoints.
+func (impl *ServiceConfig) notifyEndpointsUpdate() {
+	endpoints := []api.Endpoints{}
 	impl.configLock.RLock()
 	for _, sourceEndpoints := range impl.endpointConfig {
 		for _, value := range sourceEndpoints {

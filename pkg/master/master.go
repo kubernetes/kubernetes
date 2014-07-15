@@ -43,7 +43,7 @@ type Master struct {
 	storage map[string]apiserver.RESTStorage
 }
 
-// Returns a memory (not etcd) backed apiserver.
+// NewMemoryServer returns a new instance of Master backed with memory (not etcd).
 func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface) *Master {
 	m := &Master{
 		podRegistry:        registry.MakeMemoryRegistry(),
@@ -55,7 +55,7 @@ func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud
 	return m
 }
 
-// Returns a new apiserver.
+// New returns a new instance of Master connected to the given etcdServer.
 func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string) *Master {
 	etcdClient := etcd.NewClient(etcdServers)
 	minionRegistry := minionRegistryMaker(minions, cloud, minionRegexp)
@@ -84,7 +84,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	m.random = rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
 	go podCache.Loop()
-	s := scheduler.MakeRandomFitScheduler(m.podRegistry, m.random)
+	s := scheduler.NewRandomFitScheduler(m.podRegistry, m.random)
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": registry.MakePodRegistryStorage(m.podRegistry, podInfoGetter, s, m.minionRegistry, cloud, podCache),
 		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
@@ -94,7 +94,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 
 }
 
-// Runs master. Never returns.
+// Run begins serving the Kubernetes API. It never returns.
 func (m *Master) Run(myAddress, apiPrefix string) error {
 	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.podRegistry)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
@@ -109,8 +109,9 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 	return s.ListenAndServe()
 }
 
-// Instead of calling Run, call ConstructHandler to get a handler for your own
-// server. Intended for testing. Only call once.
+// ConstructHandler returns an http.Handler which serves the Kubernetes API.
+// Instead of calling Run, you can call this function to get a handler for your own server.
+// It is intended for testing. Only call once.
 func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
 	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.podRegistry)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
