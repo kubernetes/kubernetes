@@ -62,6 +62,15 @@ type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
 	Name string `yaml:"name" json:"name"`
+	// When multiple volume types are supported, only one of them may be specified.
+	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
+	// DEPRECATED: If no volume type is specified, HostDirectory will be assumed.
+	// The path of the directory will be specified in the VolumeMount struct in this case.
+}
+
+// Bare host directory volume.
+type HostDirectory struct {
+	Path string `yaml:"path" json:"path"`
 }
 
 // Port represents a network port in a single container
@@ -92,6 +101,7 @@ type VolumeMount struct {
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
 	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
+	// DEPRECATED: MountType will be removed in a future version of the API.
 	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
 

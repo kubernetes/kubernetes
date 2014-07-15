@@ -25,9 +25,9 @@ import (
 
 func TestValidateVolumes(t *testing.T) {
 	successCase := []Volume{
-		{Name: "abc"},
-		{Name: "123"},
-		{Name: "abc-123"},
+		{Name: "abc", HostDirectory: &HostDirectory{"/mnt/path1"}},
+		{Name: "123", HostDirectory: &HostDirectory{"/mnt/path2"}},
+		{Name: "abc-123", HostDirectory: &HostDirectory{"/mnt/path3"}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -206,7 +206,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []Volume{{Name: "vol1"}, {Name: "vol2"}},
+			Volumes: []Volume{{Name: "vol1", HostDirectory: &HostDirectory{"/mnt/vol1"}},
+				          {Name: "vol2", HostDirectory: &HostDirectory{"/mnt/vol2"}}},
 			Containers: []Container{
 				{
 					Name:       "abc",

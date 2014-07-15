@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -62,6 +63,8 @@ func New() *Kubelet {
 	return &Kubelet{}
 }
 
+type volumeMap map[string]volume.Interface
+
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	Hostname           string
@@ -74,6 +77,7 @@ type Kubelet struct {
 	HTTPCheckFrequency time.Duration
 	pullLock           sync.Mutex
 	HealthChecker      health.HealthChecker
+	extVolumes	   map[string]volumes.Interface
 }
 
 type manifestUpdate struct {
@@ -178,13 +182,16 @@ func makeEnvironmentVariables(container *api.Container) []string {
 	return result
 }
 
-func makeVolumesAndBinds(manifestID string, container *api.Container) (map[string]struct{}, []string) {
+func makeVolumesAndBinds(manifestID string, container *api.Container, podVolumes volumeMap) (map[string]struct{}, []string) {
 	volumes := map[string]struct{}{}
 	binds := []string{}
 	for _, volume := range container.VolumeMounts {
 		var basePath string
-		if volume.MountType == "HOST" {
+		if hostVol, ok := podVolumes[volume.Name]; ok {
 			// Host volumes are not Docker volumes and are directly mounted from the host.
+			basePath = fmt.Sprintf("%s:%s", hostVol.GetPath(), volume.MountPath)
+		} else if volume.MountType == "HOST" {
+			// DEPRECATED: VolumeMount.MountType will be moved to the Volume struct.
 			basePath = fmt.Sprintf("%s:%s", volume.MountPath, volume.MountPath)
 		} else {
 			volumes[volume.MountPath] = struct{}{}
@@ -237,10 +244,26 @@ func milliCPUToShares(milliCPU int) int {
 	return shares
 }
 
+func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volumeMap, error) {
+	podVolumes := make(volumeMap)
+	for _, vol := range manifest.Volumes {
+		extVolume, err := volume.CreateVolume(&vol, manifest.ID)
+		if err != nil {
+			return nil, err
+		}
+		podVolumes[vol.Name] = extVolume
+		// Only prepare the volume if it is not already mounted.
+		if _, err := os.Stat(extVolume.GetPath()); os.IsNotExist(err) {
+			extVolume.SetUp()
+		}
+	}
+	return podVolumes, nil
+}
+
 // Run a single container from a manifest. Returns the docker container ID
-func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.Container, netMode string) (id DockerID, err error) {
+func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.Container, podVolumes volumeMap, netMode string) (id DockerID, err error) {
 	envVariables := makeEnvironmentVariables(container)
-	volumes, binds := makeVolumesAndBinds(manifest.ID, container)
+	volumes, binds := makeVolumesAndBinds(manifest.ID, container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
 	opts := docker.CreateContainerOptions{
@@ -540,7 +563,7 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (Dock
 		Ports:   ports,
 	}
 	kl.DockerPuller.Pull("busybox")
-	return kl.runContainer(manifest, container, "")
+	return kl.runContainer(manifest, container, nil, "")
 }
 
 func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, dockerContainers DockerContainers, keepChannel chan<- DockerID) error {
@@ -557,7 +580,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, dockerContainer
 		netID = dockerNetworkID
 	}
 	keepChannel <- netID
-
+	podVolumes, err := kl.mountExternalVolumes(manifest)
 	for _, container := range manifest.Containers {
 		if dockerContainer, found := dockerContainers.FindPodContainer(manifest.ID, container.Name); found {
 			containerID := DockerID(dockerContainer.ID)
@@ -587,7 +610,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, dockerContainer
 			glog.Errorf("Failed to create container: %v skipping manifest %s container %s.", err, manifest.ID, container.Name)
 			continue
 		}
-		containerID, err := kl.runContainer(manifest, &container, "container:"+string(netID))
+		containerID, err := kl.runContainer(manifest, &container, podVolumes, "container:"+string(netID))
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?
 			glog.Errorf("Error running manifest %s container %s: %v", manifest.ID, container.Name, err)

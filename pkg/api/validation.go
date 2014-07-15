@@ -76,6 +76,10 @@ func validateVolumes(volumes []Volume) (util.StringSet, errorList) {
 	allNames := util.StringSet{}
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
+		if vol.HostDirectory != nil {
+			errs := validateHostDir(vol.HostDirectory)
+			allErrs.Append(errs...)
+		}
 		if !util.IsDNSLabel(vol.Name) {
 			allErrs.Append(makeInvalidError("Volume.Name", vol.Name))
 		} else if allNames.Has(vol.Name) {
@@ -85,6 +89,14 @@ func validateVolumes(volumes []Volume) (util.StringSet, errorList) {
 		}
 	}
 	return allNames, allErrs
+}
+
+func validateHostDir(hostDir *HostDirectory) errorList {
+	allErrs := errorList{}
+	if hostDir.Path == "" {
+		allErrs.Append(makeNotFoundError("Volume.HostDir.Path", hostDir.Path))
+	}
+	return allErrs
 }
 
 var supportedPortProtocols = util.NewStringSet("TCP", "UDP")
@@ -163,6 +175,11 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errorLis
 				mnt.Path = ""
 			}
 		}
+		if len(mnt.MountType) != 0 {
+			glog.Warning("DEPRECATED: VolumeMount.MountType will be removed. The Volume struct will handle types")
+		}
+
+
 	}
 	return allErrs
 }
