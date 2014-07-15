@@ -324,9 +324,7 @@ func TestGetKubeletStateFromEtcdNotFound(t *testing.T) {
 	reader := startReading(channel)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
-		E: &etcd.EtcdError{
-			ErrorCode: 100,
-		},
+		E: tools.EtcdErrorNotFound,
 	}
 	err := kubelet.getKubeletStateFromEtcd("/registry/hosts/machine/kubelet", channel)
 	expectNoError(t, err)

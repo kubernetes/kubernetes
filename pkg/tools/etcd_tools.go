@@ -25,6 +25,16 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+const (
+	EtcdErrorCodeNotFound      = 100
+	EtcdErrorCodeValueRequired = 200
+)
+
+var (
+	EtcdErrorNotFound      = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNotFound}
+	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
+)
+
 // EtcdClient is an injectable interface for testing.
 type EtcdClient interface {
 	AddChild(key, data string, ttl uint64) (*etcd.Response, error)

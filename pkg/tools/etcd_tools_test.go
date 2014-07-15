@@ -36,7 +36,7 @@ func TestIsNotFoundErr(t *testing.T) {
 			t.Errorf("Expected %#v to return %v, but it did not", err, isNotFound)
 		}
 	}
-	try(&etcd.EtcdError{ErrorCode: 100}, true)
+	try(EtcdErrorNotFound, true)
 	try(&etcd.EtcdError{ErrorCode: 101}, false)
 	try(nil, false)
 	try(fmt.Errorf("some other kind of error"), false)
