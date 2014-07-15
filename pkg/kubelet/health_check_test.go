@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type fakeHTTPClient struct {
@@ -56,7 +57,7 @@ func TestHttpHealth(t *testing.T) {
 	}
 
 	ok, err := check.HealthCheck(container)
-	if ok != CheckHealthy {
+	if ok != util.CheckHealthy {
 		t.Error("Unexpected unhealthy")
 	}
 	if err != nil {
