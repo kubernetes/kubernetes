@@ -41,7 +41,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 	return &LoadBalancerRR{endpointsMap: make(map[string][]string), rrIndex: make(map[string]int)}
 }
 
-// LoadBalance select an endpoint of the service by round-robin algorithm.
+// LoadBalance selects an endpoint of the service by round-robin algorithm.
 func (impl LoadBalancerRR) LoadBalance(service string, srcAddr net.Addr) (string, error) {
 	impl.lock.RLock()
 	endpoints, exists := impl.endpointsMap[service]

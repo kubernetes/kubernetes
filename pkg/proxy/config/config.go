@@ -54,14 +54,14 @@ type EndpointsUpdate struct {
 	Op        Operation
 }
 
-// ServiceConfigHandler is an abstract interface of objects which receive update notifications of the set of services.
+// ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.
 type ServiceConfigHandler interface {
 	// OnUpdate gets called when a configuration has been changed by one of the sources.
 	// This is the union of all the configuration sources.
 	OnUpdate(services []api.Service)
 }
 
-// EndpointsConfigHandler is an abstract interface of objects which receive update notifications of the set of endpoints.
+// EndpointsConfigHandler is an abstract interface of objects which receive update notifications for the set of endpoints.
 type EndpointsConfigHandler interface {
 	// OnUpdate gets called when endpoints configuration is changed for a given
 	// service on any of the configuration sources. An example is when a new

@@ -109,7 +109,7 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 	return s.ListenAndServe()
 }
 
-// ConstructHandler returns an http.Handler which serves Kubernetes API.
+// ConstructHandler returns an http.Handler which serves the Kubernetes API.
 // Instead of calling Run, you can call this function to get a handler for your own server.
 // It is intended for testing. Only call once.
 func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
