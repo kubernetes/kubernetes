@@ -124,6 +124,10 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	defer close(injectedError)
 	f.WatchInjectError = injectedError
 
+	if receiver == nil {
+		return f.Get(prefix, false, recursive)
+	}
+
 	f.watchCompletedChan <- true
 	select {
 	case <-stop:

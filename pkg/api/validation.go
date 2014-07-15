@@ -272,9 +272,6 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	} else if !supportedManifestVersions.Has(strings.ToLower(manifest.Version)) {
 		allErrs.Append(makeNotSupportedError("ContainerManifest.Version", manifest.Version))
 	}
-	if !util.IsDNSSubdomain(manifest.ID) {
-		allErrs.Append(makeInvalidError("ContainerManifest.ID", manifest.ID))
-	}
 	allVolumes, errs := validateVolumes(manifest.Volumes)
 	if len(errs) != 0 {
 		allErrs.Append(errs...)
