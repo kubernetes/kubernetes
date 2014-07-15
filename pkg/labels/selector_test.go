@@ -25,10 +25,19 @@ func TestSelectorParse(t *testing.T) {
 		"x=a,y=b,z=c",
 		"",
 		"x!=a,y=b",
+		"x=*",
+		"x=<<foo>>",
+		"x=<<bar$baz$foo>>",
 	}
 	testBadStrings := []string{
 		"x=a||y=b",
 		"x==a==b",
+		"x!=*",
+		"x!=<<>>",
+		"x!=<<$>>",
+		"x=<<$foo>>",
+		"x!=<<foo$>>",
+		"x!=<<foo$$bar>>",
 	}
 	for _, test := range testGoodStrings {
 		lq, err := ParseSelector(test)
@@ -91,9 +100,13 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "x=y", Set{"x": "y"})
 	expectMatch(t, "x=y,z=w", Set{"x": "y", "z": "w"})
 	expectMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "a"})
+	expectMatch(t, "x=*,z=*", Set{"x": "a", "z": "b"})
+	expectMatch(t, "x!=<<c$d>>,z=<<a$b>>", Set{"x": "a", "z": "b"})
 	expectNoMatch(t, "x=y", Set{"x": "z"})
 	expectNoMatch(t, "x=y,z=w", Set{"x": "w", "z": "w"})
 	expectNoMatch(t, "x!=y,z!=w", Set{"x": "z", "z": "w"})
+	expectNoMatch(t, "x=*,z=a", Set{"x": "a", "z": "b"})
+	expectNoMatch(t, "x=<<c$d$e>>,z!=<<b>>", Set{"x": "a", "z": "b"})
 
 	labelset := Set{
 		"foo": "bar",
@@ -102,9 +115,11 @@ func TestSelectorMatches(t *testing.T) {
 	expectMatch(t, "foo=bar", labelset)
 	expectMatch(t, "baz=blah", labelset)
 	expectMatch(t, "foo=bar,baz=blah", labelset)
+	expectMatch(t, "foo==<<bar$blah>>,baz!=<<bar>>", labelset)
 	expectNoMatch(t, "foo=blah", labelset)
 	expectNoMatch(t, "baz=bar", labelset)
 	expectNoMatch(t, "foo=bar,foobar=bar,baz=blah", labelset)
+	expectNoMatch(t, "foo!=<<bar>>,baz==<<blah>>", labelset)
 }
 
 func expectMatchDirect(t *testing.T, selector, ls Set) {
