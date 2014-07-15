@@ -43,7 +43,7 @@ type KubeletServer struct {
 // kubeletInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type kubeletInterface interface {
-	GetContainerStats(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
 }
@@ -133,7 +133,7 @@ func (s *KubeletServer) serveStats(w http.ResponseWriter, req *http.Request) {
 		// TODO(monnand) Implement this
 		errors.New("pod level status currently unimplemented")
 	case 3:
-		stats, err = s.Kubelet.GetContainerStats(components[1], components[2], &query)
+		stats, err = s.Kubelet.GetContainerInfo(components[1], components[2], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return

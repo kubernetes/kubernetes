@@ -42,7 +42,7 @@ func (fk *fakeKubelet) GetPodInfo(name string) (api.PodInfo, error) {
 	return fk.infoFunc(name)
 }
 
-func (fk *fakeKubelet) GetContainerStats(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (fk *fakeKubelet) GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	return fk.containerStatsFunc(podID, containerName, req)
 }
 

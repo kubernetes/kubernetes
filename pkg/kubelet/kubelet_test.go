@@ -988,7 +988,7 @@ func TestGetContainerStats(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerStats("qux", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1054,7 +1054,7 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 		},
 	}
 
-	stats, _ := kubelet.GetContainerStats("qux", "foo", nil)
+	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
 	// When there's no cAdvisor, the stats should be either nil or empty
 	if stats == nil {
 		return
@@ -1092,7 +1092,7 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerStats("qux", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
@@ -1113,7 +1113,7 @@ func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
 	kubelet.CadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{}
 
-	stats, _ := kubelet.GetContainerStats("qux", "foo", nil)
+	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
 	if stats != nil {
 		t.Errorf("non-nil stats on non exist container")
 	}

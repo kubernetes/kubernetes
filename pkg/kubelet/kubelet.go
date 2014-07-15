@@ -850,7 +850,7 @@ func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.Contai
 }
 
 // GetContainerStats returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerStats(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (kl *Kubelet) GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	if kl.CadvisorClient == nil {
 		return nil, nil
 	}
