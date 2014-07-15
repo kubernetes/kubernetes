@@ -34,7 +34,7 @@ type Operation struct {
 	awaiting <-chan interface{}
 	finished *time.Time
 	lock     sync.Mutex
-	notify   chan bool
+	notify   chan struct{}
 }
 
 // Operations tracks all the ongoing operations.
@@ -62,7 +62,7 @@ func (ops *Operations) NewOperation(from <-chan interface{}) *Operation {
 	op := &Operation{
 		ID:       strconv.FormatInt(id, 10),
 		awaiting: from,
-		notify:   make(chan bool, 1),
+		notify:   make(chan struct{}),
 	}
 	go op.wait()
 	go ops.insert(op)
@@ -116,7 +116,7 @@ func (ops *Operations) expire(maxAge time.Duration) {
 
 // Waits forever for the operation to complete; call via go when
 // the operation is created. Sets op.finished when the operation
-// does complete, and sends on the notify channel, in case there
+// does complete, and closes the notify channel, in case there
 // are any WaitFor() calls in progress.
 // Does not keep op locked while waiting.
 func (op *Operation) wait() {
@@ -128,7 +128,7 @@ func (op *Operation) wait() {
 	op.result = result
 	finished := time.Now()
 	op.finished = &finished
-	op.notify <- true
+	close(op.notify)
 }
 
 // WaitFor waits for the specified duration, or until the operation finishes,
@@ -137,9 +137,6 @@ func (op *Operation) WaitFor(timeout time.Duration) {
 	select {
 	case <-time.After(timeout):
 	case <-op.notify:
-		// Re-send on this channel in case there are others
-		// waiting for notification.
-		op.notify <- true
 	}
 }
 
