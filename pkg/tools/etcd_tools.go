@@ -101,6 +101,18 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, error) {
 	return result.Node.Nodes, nil
 }
 
+func (h *EtcdHelper) ListChildren(key string) ([]string, error) {
+	var result []string
+	list, err := h.listEtcdNode(key)
+	if err != nil {
+		return result, err
+	}
+	for _, node := range list {
+		result = append(result, node.Key)
+	}
+	return result, nil
+}
+
 // Extract a go object per etcd node into a slice.
 func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 	nodes, err := h.listEtcdNode(key)

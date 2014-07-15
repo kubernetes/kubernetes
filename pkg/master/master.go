@@ -37,6 +37,7 @@ type Master struct {
 	controllerRegistry registry.ControllerRegistry
 	serviceRegistry    registry.ServiceRegistry
 	minionRegistry     registry.MinionRegistry
+	eventStore         apiserver.EventStore
 
 	// TODO: don't reuse non-threadsafe objects.
 	random  *rand.Rand
@@ -64,6 +65,7 @@ func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, clou
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		serviceRegistry:    registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
+		eventStore:         apiserver.NewEtcdEventStore(etcdClient),
 	}
 	m.init(cloud, podInfoGetter)
 	return m
@@ -101,7 +103,7 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 
 	s := &http.Server{
 		Addr:           myAddress,
-		Handler:        apiserver.New(m.storage, apiPrefix),
+		Handler:        apiserver.New(m.storage, m.eventStore, apiPrefix),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -116,5 +118,5 @@ func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
 	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.podRegistry)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
-	return apiserver.New(m.storage, apiPrefix)
+	return apiserver.New(m.storage, m.eventStore, apiPrefix)
 }
