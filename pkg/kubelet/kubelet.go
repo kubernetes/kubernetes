@@ -391,13 +391,14 @@ func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.
 	opts := docker.CreateContainerOptions{
 		Name: buildDockerName(manifest, container),
 		Config: &docker.Config{
+			Cmd:          container.Command,
+			Env:          envVariables,
+			ExposedPorts: exposedPorts,
 			Hostname:     container.Name,
 			Image:        container.Image,
-			ExposedPorts: exposedPorts,
-			Env:          envVariables,
+			Memory:       int64(container.Memory),
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
-			Cmd:          container.Command,
 		},
 	}
 	dockerContainer, err := kl.DockerClient.CreateContainer(opts)
