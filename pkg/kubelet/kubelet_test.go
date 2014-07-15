@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -422,8 +423,8 @@ func TestSyncManifestsDeletes(t *testing.T) {
 
 type FalseHealthChecker struct{}
 
-func (f *FalseHealthChecker) HealthCheck(container api.Container) (HealthCheckStatus, error) {
-	return CheckUnhealthy, nil
+func (f *FalseHealthChecker) HealthCheck(container api.Container) (health.Status, error) {
+	return health.Unhealthy, nil
 }
 
 func TestSyncManifestsUnhealthy(t *testing.T) {

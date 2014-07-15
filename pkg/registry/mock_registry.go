@@ -75,3 +75,53 @@ func (registry *MockPodRegistry) DeletePod(podId string) error {
 	defer registry.Unlock()
 	return registry.err
 }
+
+type MockMinionRegistry struct {
+	err     error
+	minion  string
+	minions []string
+	sync.Mutex
+}
+
+func MakeMockMinionRegistry(minions []string) *MockMinionRegistry {
+	return &MockMinionRegistry{
+		minions: minions,
+	}
+}
+
+func (registry *MockMinionRegistry) List() ([]string, error) {
+	registry.Lock()
+	defer registry.Unlock()
+	return registry.minions, registry.err
+}
+
+func (registry *MockMinionRegistry) Insert(minion string) error {
+	registry.Lock()
+	defer registry.Unlock()
+	registry.minion = minion
+	return registry.err
+}
+
+func (registry *MockMinionRegistry) Contains(minion string) (bool, error) {
+	registry.Lock()
+	defer registry.Unlock()
+	for _, name := range registry.minions {
+		if name == minion {
+			return true, registry.err
+		}
+	}
+	return false, registry.err
+}
+
+func (registry *MockMinionRegistry) Delete(minion string) error {
+	registry.Lock()
+	defer registry.Unlock()
+	var newList []string
+	for _, name := range registry.minions {
+		if name != minion {
+			newList = append(newList, name)
+		}
+	}
+	registry.minions = newList
+	return registry.err
+}
