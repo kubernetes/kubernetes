@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/golang/glog"
@@ -28,7 +29,7 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// EtcdRegistry is an implementation of both ControllerRegistry and PodRegistry which is backed with etcd.
+// EtcdRegistry implements PodRegistry, ControllerRegistry and ServiceRegistry with backed by etcd.
 type EtcdRegistry struct {
 	etcdClient      tools.EtcdClient
 	machines        MinionRegistry
@@ -143,6 +144,9 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 	// machine and attempt to put it somewhere.
 	podKey := makePodKey(machine, podID)
 	_, err := registry.etcdClient.Delete(podKey, true)
+	if tools.IsEtcdNotFound(err) {
+		return apiserver.NewNotFoundErr("pod", podID)
+	}
 	if err != nil {
 		return err
 	}
@@ -191,7 +195,7 @@ func (registry *EtcdRegistry) findPod(podID string) (api.Pod, string, error) {
 			return pod, machine, nil
 		}
 	}
-	return api.Pod{}, "", fmt.Errorf("pod not found %s", podID)
+	return api.Pod{}, "", apiserver.NewNotFoundErr("pod", podID)
 }
 
 // ListControllers obtains a list of ReplicationControllers.
@@ -210,6 +214,9 @@ func (registry *EtcdRegistry) GetController(controllerID string) (*api.Replicati
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
 	err := registry.helper().ExtractObj(key, &controller, false)
+	if tools.IsEtcdNotFound(err) {
+		return nil, apiserver.NewNotFoundErr("replicationController", controllerID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +238,9 @@ func (registry *EtcdRegistry) UpdateController(controller api.ReplicationControl
 func (registry *EtcdRegistry) DeleteController(controllerID string) error {
 	key := makeControllerKey(controllerID)
 	_, err := registry.etcdClient.Delete(key, false)
+	if tools.IsEtcdNotFound(err) {
+		return apiserver.NewNotFoundErr("replicationController", controllerID)
+	}
 	return err
 }
 
@@ -255,6 +265,9 @@ func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
 	err := registry.helper().ExtractObj(key, &svc, false)
+	if tools.IsEtcdNotFound(err) {
+		return nil, apiserver.NewNotFoundErr("service", name)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -265,6 +278,9 @@ func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 func (registry *EtcdRegistry) DeleteService(name string) error {
 	key := makeServiceKey(name)
 	_, err := registry.etcdClient.Delete(key, true)
+	if tools.IsEtcdNotFound(err) {
+		return apiserver.NewNotFoundErr("service", name)
+	}
 	if err != nil {
 		return err
 	}

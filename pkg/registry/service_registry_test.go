@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
@@ -94,9 +95,12 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService("foo")
-	expectNoError(t, err)
-	if srv != nil {
-		t.Errorf("Unexpected service: %#v", *srv)
+	if !apiserver.IsNotFound(err) {
+		if err != nil {
+			t.Errorf("memory.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
+		} else {
+			t.Errorf("memory.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
+		}
 	}
 }
 
@@ -120,9 +124,12 @@ func TestServiceRegistryDelete(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService(svc.ID)
-	expectNoError(t, err)
-	if srv != nil {
-		t.Errorf("Unexpected service: %#v", *srv)
+	if !apiserver.IsNotFound(err) {
+		if err != nil {
+			t.Errorf("memory.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
+		} else {
+			t.Errorf("memory.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
+		}
 	}
 }
 
@@ -147,8 +154,11 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService(svc.ID)
-	expectNoError(t, err)
-	if srv != nil {
-		t.Errorf("Unexpected service: %#v", *srv)
+	if !apiserver.IsNotFound(err) {
+		if err != nil {
+			t.Errorf("memory.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
+		} else {
+			t.Errorf("memory.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
+		}
 	}
 }

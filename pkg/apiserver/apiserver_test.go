@@ -53,7 +53,7 @@ type SimpleList struct {
 }
 
 type SimpleRESTStorage struct {
-	err     error
+	errors  map[string]error
 	list    []Simple
 	item    Simple
 	deleted string
@@ -69,17 +69,17 @@ func (storage *SimpleRESTStorage) List(labels.Selector) (interface{}, error) {
 	result := &SimpleList{
 		Items: storage.list,
 	}
-	return result, storage.err
+	return result, storage.errors["list"]
 }
 
 func (storage *SimpleRESTStorage) Get(id string) (interface{}, error) {
-	return storage.item, storage.err
+	return storage.item, storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) {
 	storage.deleted = id
-	if storage.err != nil {
-		return nil, storage.err
+	if storage.errors["delete"] != nil {
+		return nil, storage.errors["delete"]
 	}
 	return MakeAsync(func() (interface{}, error) {
 		if storage.injectedFunction != nil {
@@ -92,13 +92,13 @@ func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) 
 func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
 	var item Simple
 	api.DecodeInto(body, &item)
-	return item, storage.err
+	return item, storage.errors["extract"]
 }
 
 func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	storage.created = obj.(Simple)
-	if storage.err != nil {
-		return nil, storage.err
+	if storage.errors["create"] != nil {
+		return nil, storage.errors["create"]
 	}
 	return MakeAsync(func() (interface{}, error) {
 		if storage.injectedFunction != nil {
@@ -110,8 +110,8 @@ func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, e
 
 func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	storage.updated = obj.(Simple)
-	if storage.err != nil {
-		return nil, storage.err
+	if storage.errors["update"] != nil {
+		return nil, storage.errors["update"]
 	}
 	return MakeAsync(func() (interface{}, error) {
 		if storage.injectedFunction != nil {
@@ -141,15 +141,15 @@ func TestSimpleList(t *testing.T) {
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
 	expectNoError(t, err)
 
-	if resp.StatusCode != 200 {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, 200, resp)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
 	}
 }
 
 func TestErrorList(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{
-		err: fmt.Errorf("test Error"),
+		errors: map[string]error{"list": fmt.Errorf("test Error")},
 	}
 	storage["simple"] = &simpleStorage
 	handler := New(storage, "/prefix/version")
@@ -158,8 +158,8 @@ func TestErrorList(t *testing.T) {
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
 	expectNoError(t, err)
 
-	if resp.StatusCode != 500 {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, 200, resp)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
 	}
 }
 
@@ -179,8 +179,8 @@ func TestNonEmptyList(t *testing.T) {
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
 	expectNoError(t, err)
 
-	if resp.StatusCode != 200 {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, 200, resp)
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
 	}
 
 	var listOut SimpleList
@@ -215,6 +215,22 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetMissing(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{
+		errors: map[string]error{"get": NewNotFoundErr("simple", "id")},
+	}
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
+	expectNoError(t, err)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Unexpected response %#v", resp)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{}
@@ -229,6 +245,25 @@ func TestDelete(t *testing.T) {
 	expectNoError(t, err)
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s (%s)", simpleStorage.deleted, ID)
+	}
+}
+
+func TestDeleteMissing(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	ID := "id"
+	simpleStorage := SimpleRESTStorage{
+		errors: map[string]error{"delete": NewNotFoundErr("simple", ID)},
+	}
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusNotFound {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
@@ -254,6 +289,30 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestUpdateMissing(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	ID := "id"
+	simpleStorage := SimpleRESTStorage{
+		errors: map[string]error{"update": NewNotFoundErr("simple", ID)},
+	}
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	item := Simple{
+		Name: "bar",
+	}
+	body, err := api.Encode(item)
+	expectNoError(t, err)
+	client := http.Client{}
+	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusNotFound {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
 func TestBadPath(t *testing.T) {
 	handler := New(map[string]RESTStorage{}, "/prefix/version")
 	server := httptest.NewServer(handler)
@@ -263,7 +322,7 @@ func TestBadPath(t *testing.T) {
 	expectNoError(t, err)
 	response, err := client.Do(request)
 	expectNoError(t, err)
-	if response.StatusCode != 404 {
+	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
@@ -277,7 +336,7 @@ func TestMissingPath(t *testing.T) {
 	expectNoError(t, err)
 	response, err := client.Do(request)
 	expectNoError(t, err)
-	if response.StatusCode != 404 {
+	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
@@ -293,7 +352,7 @@ func TestMissingStorage(t *testing.T) {
 	expectNoError(t, err)
 	response, err := client.Do(request)
 	expectNoError(t, err)
-	if response.StatusCode != 404 {
+	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
@@ -321,6 +380,29 @@ func TestCreate(t *testing.T) {
 	expectNoError(t, err)
 	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
 		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
+	}
+}
+
+func TestCreateNotFound(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{
+		// storage.Create can fail with not found error in theory.
+		// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
+		errors: map[string]error{"create": NewNotFoundErr("simple", "id")},
+	}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	simple := Simple{Name: "foo"}
+	data, _ := api.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
+	expectNoError(t, err)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusNotFound {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
