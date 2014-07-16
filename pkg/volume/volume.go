@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package volumes
+package volume
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
@@ -32,33 +34,64 @@ type Interface interface {
 	TearDown()
 }
 
-// Host Directory Volumes represent a bare host directory mount.
-type HostDirectoryVolume struct {
+// Host Directory volumes represent a bare host directory mount.
+// The directory in Path will be directly exposed to the container.
+type HostDirectory struct {
 	Path string
 }
 
-// Simple host directory mounts require no setup or cleanup, but still
+// Host directory mounts require no setup or cleanup, but still
 // need to fulfill the interface definitions.
-func (hostVol *HostDirectoryVolume) SetUp() {}
+func (hostVol *HostDirectory) SetUp() {}
 
-func (hostVol *HostDirectoryVolume) TearDown() {}
+func (hostVol *HostDirectory) TearDown() {}
 
-func (hostVol *HostDirectoryVolume) GetPath() string {
+func (hostVol *HostDirectory) GetPath() string {
 	return hostVol.Path
 }
 
-// Interprets API volume as a HostDirectory
-func createHostDirectoryVolume(volume *api.Volume) *HostDirectoryVolume {
-	return &HostDirectoryVolume{volume.HostDirectory.Path}
+// EmptyDirectory volumes are temporary directories exposed to the pod.
+// These do not persist beyond the lifetime of a pod.
+
+type EmptyDirectory struct {
+	Name string
+	PodID string
 }
 
-// Interprets parameters passed in the API as an internal structure
-// with utility procedures for mounting.
-func CreateVolume(volume *api.Volume) (Interface, error) {
-	// TODO(jonesdl) We should probably not check every
-	// pointer and directly resolve these types instead.
-	if volume.HostDirectory != nil {
-		return createHostDirectoryVolume(volume), nil
+// SetUp creates the new directory.
+func (emptyDir *EmptyDirectory) SetUp() {
+	os.MkdirAll(emptyDir.GetPath(), 0750)
+}
+
+// TODO(jonesdl) when we can properly invoke TearDown(), we should delete
+// the directory created by SetUp.
+func (emptyDir *EmptyDirectory) TearDown() {}
+
+func (emptyDir *EmptyDirectory) GetPath() string {
+	// TODO(jonesdl) We will want to add a flag to designate a root
+	// directory for kubelet to write to. For now this will just be /exports
+	return fmt.Sprintf("/exports/%v/%v", emptyDir.PodID, emptyDir.Name)
+}
+// Interprets API volume as a HostDirectory
+func createHostDirectory(volume *api.Volume) *HostDirectory {
+	return &HostDirectory{volume.Source.HostDirectory.Path}
+}
+
+// Interprets API volume as an EmptyDirectory
+func createEmptyDirectory(volume *api.Volume, podID string) *EmptyDirectory {
+	return &EmptyDirectory{volume.Name, podID}
+}
+
+// CreateVolume returns an Interface capable of mounting a volume described by an
+// *api.Volume, or an error.
+func CreateVolume(volume *api.Volume, podID string) (Interface, error) {
+	// TODO(jonesdl) We should probably not check every pointer and directly
+	// resolve these types instead.
+	source := volume.Source
+	if source.HostDirectory != nil {
+		return createHostDirectory(volume), nil
+	} else if source.EmptyDirectory != nil {
+		return createEmptyDirectory(volume, podID), nil
 	} else {
 		return nil, errors.New("Unsupported volume type.")
 	}
