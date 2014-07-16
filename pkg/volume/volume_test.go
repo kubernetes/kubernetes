@@ -26,12 +26,21 @@ func TestCreateVolumes(t *testing.T) {
 	volumes := []api.Volume{
 		{
 			Name: "host-dir",
-			HostDirectory: &api.HostDirectory{"/dir/path"},
+			Source: &api.VolumeSource{
+				HostDirectory: &api.HostDirectory{"/dir/path"},
+			},
+		},
+		{
+			Name: "empty-dir",
+			Source: &api.VolumeSource{
+				EmptyDirectory: &api.EmptyDirectory{},
+			},
 		},
 	}
-	expectedPaths := []string{"/dir/path"}
+	fakePodID := "my-id"
+	expectedPaths := []string{"/dir/path", "/exports/my-id/empty-dir"}
 	for i, volume := range volumes {
-		extVolume, _ := CreateVolume(&volume)
+		extVolume, _ := CreateVolume(&volume, fakePodID)
 		expectedPath := expectedPaths[i]
 		path := extVolume.GetPath()
 		if expectedPath != path {

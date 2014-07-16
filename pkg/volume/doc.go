@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package volumes includes internal representations of external volume types
+// Package volume includes internal representations of external volume types
 // as well as utility methods required to mount/unmount volumes to kubelets.
 package volume

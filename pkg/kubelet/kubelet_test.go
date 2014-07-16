@@ -535,13 +535,15 @@ func TestMountExternalVolumes(t *testing.T) {
 		Volumes: []api.Volume{
 			{
 				Name: "host-dir",
-				HostDirectory: &api.HostDirectory{"/dir/path"},
+				Source: &api.VolumeSource{
+					HostDirectory: &api.HostDirectory{"/dir/path"},
+				},
 			},
 		},
 	}
 	podVolumes, _ := kubelet.mountExternalVolumes(&manifest)
-	expectedPodVolumes := make(map[string]volumes.Interface)
-	expectedPodVolumes["host-dir"] = &volumes.HostDirectoryVolume{"/dir/path"}
+	expectedPodVolumes := make(volumeMap)
+	expectedPodVolumes["host-dir"] = &volume.HostDirectory{"/dir/path"}
 	if len(expectedPodVolumes) != len(podVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, manifest)
 	}
@@ -551,8 +553,6 @@ func TestMountExternalVolumes(t *testing.T) {
 		}
 	}
 }
-
-
 
 func TestMakeVolumesAndBinds(t *testing.T) {
 	container := api.Container{

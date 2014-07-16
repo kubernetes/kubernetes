@@ -77,7 +77,6 @@ type Kubelet struct {
 	HTTPCheckFrequency time.Duration
 	pullLock           sync.Mutex
 	HealthChecker      health.HealthChecker
-	extVolumes	   map[string]volumes.Interface
 }
 
 type manifestUpdate struct {
@@ -187,13 +186,15 @@ func makeVolumesAndBinds(manifestID string, container *api.Container, podVolumes
 	binds := []string{}
 	for _, volume := range container.VolumeMounts {
 		var basePath string
-		if hostVol, ok := podVolumes[volume.Name]; ok {
+		if vol, ok := podVolumes[volume.Name]; ok {
 			// Host volumes are not Docker volumes and are directly mounted from the host.
-			basePath = fmt.Sprintf("%s:%s", hostVol.GetPath(), volume.MountPath)
+			basePath = fmt.Sprintf("%s:%s", vol.GetPath(), volume.MountPath)
 		} else if volume.MountType == "HOST" {
-			// DEPRECATED: VolumeMount.MountType will be moved to the Volume struct.
+			// DEPRECATED: VolumeMount.MountType will be handled by the Volume struct.
 			basePath = fmt.Sprintf("%s:%s", volume.MountPath, volume.MountPath)
 		} else {
+			// TODO(jonesdl) This clause should be deleted and an error should be thrown. The default
+			// behavior is now supported by the EmptyDirectory type.
 			volumes[volume.MountPath] = struct{}{}
 			basePath = fmt.Sprintf("/exports/%s/%s:%s", manifestID, volume.Name, volume.MountPath)
 		}
@@ -251,11 +252,13 @@ func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volume
 		if err != nil {
 			return nil, err
 		}
-		podVolumes[vol.Name] = extVolume
-		// Only prepare the volume if it is not already mounted.
-		if _, err := os.Stat(extVolume.GetPath()); os.IsNotExist(err) {
-			extVolume.SetUp()
+		// TODO(jonesdl) When the default volume behavior is no longer supported, this case
+		// should never occur and an error should be thrown instead.
+		if extVolume == nil {
+			continue
 		}
+		podVolumes[vol.Name] = extVolume
+		extVolume.SetUp()
 	}
 	return podVolumes, nil
 }
@@ -581,6 +584,9 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, dockerContainer
 	}
 	keepChannel <- netID
 	podVolumes, err := kl.mountExternalVolumes(manifest)
+	if err != nil {
+		glog.Errorf("Unable to mount volumes for manifest %s: (%v)", manifest.ID, err)
+	}
 	for _, container := range manifest.Containers {
 		if dockerContainer, found := dockerContainers.FindPodContainer(manifest.ID, container.Name); found {
 			containerID := DockerID(dockerContainer.ID)
