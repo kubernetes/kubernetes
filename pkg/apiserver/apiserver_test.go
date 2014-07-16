@@ -215,6 +215,20 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetMissing(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{err: NewNotFoundErr("simple", "id")}
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
+	expectNoError(t, err)
+	if resp.StatusCode != 404 {
+		t.Errorf("Unexpected response %#v", resp)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{}
@@ -229,6 +243,23 @@ func TestDelete(t *testing.T) {
 	expectNoError(t, err)
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s (%s)", simpleStorage.deleted, ID)
+	}
+}
+
+func TestDeleteMissing(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{err: NewNotFoundErr("simple", "id")}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != 404 {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
@@ -251,6 +282,28 @@ func TestUpdate(t *testing.T) {
 	expectNoError(t, err)
 	if simpleStorage.updated.Name != item.Name {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
+	}
+}
+
+func TestUpdateMissing(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{err: NewNotFoundErr("simple", "id")}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	item := Simple{
+		Name: "bar",
+	}
+	body, err := api.Encode(item)
+	expectNoError(t, err)
+	client := http.Client{}
+	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != 404 {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
