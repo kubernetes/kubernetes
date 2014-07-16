@@ -30,8 +30,8 @@ type HealthChecker interface {
 	HealthCheck(container api.Container) (Status, error)
 }
 
-// MakeHealthChecker creates a new HealthChecker.
-func MakeHealthChecker() HealthChecker {
+// NewHealthChecker creates a new HealthChecker which supports multiple types of liveness probes.
+func NewHealthChecker() HealthChecker {
 	return &MuxHealthChecker{
 		checkers: map[string]HealthChecker{
 			"http": &HTTPHealthChecker{
