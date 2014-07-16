@@ -53,7 +53,7 @@ func (fk *fakeKubelet) GetMachineStats(req *info.ContainerInfoRequest) (*info.Co
 type serverTestFramework struct {
 	updateChan      chan manifestUpdate
 	updateReader    *channelReader
-	serverUnderTest *KubeletServer
+	serverUnderTest *Server
 	fakeKubelet     *fakeKubelet
 	testHTTPServer  *httptest.Server
 }
@@ -64,7 +64,7 @@ func makeServerTest() *serverTestFramework {
 	}
 	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{}
-	fw.serverUnderTest = &KubeletServer{
+	fw.serverUnderTest = &Server{
 		Kubelet:       fw.fakeKubelet,
 		UpdateChannel: fw.updateChan,
 	}
