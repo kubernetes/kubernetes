@@ -28,13 +28,13 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/google/cadvisor/info"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
 
-// KubeletServer is a http.Handler which exposes kubelet functionality over HTTP.
-type KubeletServer struct {
+// Server is a http.Handler which exposes kubelet functionality over HTTP.
+type Server struct {
 	Kubelet         kubeletInterface
 	UpdateChannel   chan<- manifestUpdate
 	DelegateHandler http.Handler
@@ -48,11 +48,11 @@ type kubeletInterface interface {
 	GetPodInfo(name string) (api.PodInfo, error)
 }
 
-func (s *KubeletServer) error(w http.ResponseWriter, err error) {
+func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
 }
 
-func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer httplog.MakeLogged(req, &w).Log()
 
 	u, err := url.ParseRequestURI(req.RequestURI)
@@ -113,7 +113,7 @@ func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *KubeletServer) serveStats(w http.ResponseWriter, req *http.Request) {
+func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	// /stats/<podid>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
 	var stats *info.ContainerInfo

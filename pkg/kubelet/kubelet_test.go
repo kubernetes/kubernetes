@@ -1064,7 +1064,7 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.StatsPercentiles.MaxMemoryUsage)
 	}
 	if len(stats.StatsPercentiles.CpuUsagePercentiles) > 0 {
-		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.CpuUsagePercentiles)
+		t.Errorf("CPU usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.CpuUsagePercentiles)
 	}
 	if len(stats.StatsPercentiles.MemoryUsagePercentiles) > 0 {
 		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.MemoryUsagePercentiles)

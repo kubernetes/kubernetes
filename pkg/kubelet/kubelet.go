@@ -34,7 +34,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -49,8 +48,8 @@ const defaultChanSize = 1024
 
 // taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 const minShares = 2
-const sharesPerCpu = 1024
-const milliCpuToCpu = 1000
+const sharesPerCPU = 1024
+const milliCPUToCPU = 1000
 
 // CadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type CadvisorInterface interface {
@@ -125,7 +124,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 	}
 	if address != "" {
 		glog.Infof("Starting to listen on %s:%d", address, port)
-		handler := KubeletServer{
+		handler := Server{
 			Kubelet:         kl,
 			UpdateChannel:   updateChannel,
 			DelegateHandler: http.DefaultServeMux,
@@ -275,9 +274,9 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
-func milliCpuToShares(milliCpu int) int {
-	// Conceptually (milliCpu / milliCpuToCpu) * sharesPerCpu, but factored to improve rounding.
-	shares := (milliCpu * sharesPerCpu) / milliCpuToCpu
+func milliCPUToShares(milliCPU int) int {
+	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
+	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
 	if shares < minShares {
 		return minShares
 	}
@@ -299,7 +298,7 @@ func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.
 			Hostname:     container.Name,
 			Image:        container.Image,
 			Memory:       int64(container.Memory),
-			CpuShares:    int64(milliCpuToShares(container.CPU)),
+			CpuShares:    int64(milliCPUToShares(container.CPU)),
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
 		},
@@ -865,7 +864,7 @@ func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.Contai
 	return cinfo, nil
 }
 
-// GetContainerStats returns stats (from Cadvisor) for a container.
+// GetContainerInfo returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	if kl.CadvisorClient == nil {
 		return nil, nil
