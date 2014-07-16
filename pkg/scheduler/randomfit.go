@@ -32,7 +32,7 @@ type RandomFitScheduler struct {
 	randomLock sync.Mutex
 }
 
-func MakeRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
+func NewRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
 	return &RandomFitScheduler{
 		podLister: podLister,
 		random:    random,

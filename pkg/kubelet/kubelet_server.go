@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -27,7 +28,8 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
 )
 
@@ -41,8 +43,8 @@ type Server struct {
 // kubeletInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type kubeletInterface interface {
-	GetContainerStats(podID, containerName string) (*api.ContainerStats, error)
-	GetMachineStats() (*api.ContainerStats, error)
+	GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
 }
 
@@ -51,13 +53,14 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer apiserver.MakeLogged(req, &w).Log()
+	defer httplog.MakeLogged(req, &w).Log()
 
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
+	// TODO: use an http.ServeMux instead of a switch.
 	switch {
 	case u.Path == "/container" || u.Path == "/containers":
 		defer req.Body.Close()
@@ -113,18 +116,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	// /stats/<podid>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
-	var stats *api.ContainerStats
+	var stats *info.ContainerInfo
 	var err error
+	var query info.ContainerInfoRequest
+	decoder := json.NewDecoder(req.Body)
+	err = decoder.Decode(&query)
+	if err != nil && err != io.EOF {
+		s.error(w, err)
+		return
+	}
 	switch len(components) {
 	case 1:
 		// Machine stats
-		stats, err = s.Kubelet.GetMachineStats()
+		stats, err = s.Kubelet.GetMachineStats(&query)
 	case 2:
 		// pod stats
 		// TODO(monnand) Implement this
 		errors.New("pod level status currently unimplemented")
 	case 3:
-		stats, err = s.Kubelet.GetContainerStats(components[1], components[2])
+		stats, err = s.Kubelet.GetContainerInfo(components[1], components[2], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return

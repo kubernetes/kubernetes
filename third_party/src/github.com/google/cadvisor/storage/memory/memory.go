@@ -41,20 +41,7 @@ func (self *containerStorage) updatePrevStats(stats *info.ContainerStats) {
 		self.prevStats = nil
 		return
 	}
-	if self.prevStats == nil {
-		self.prevStats = &info.ContainerStats{
-			Cpu:    &info.CpuStats{},
-			Memory: &info.MemoryStats{},
-		}
-	}
-	// make a deep copy.
-	self.prevStats.Timestamp = stats.Timestamp
-	*self.prevStats.Cpu = *stats.Cpu
-	self.prevStats.Cpu.Usage.PerCpu = make([]uint64, len(stats.Cpu.Usage.PerCpu))
-	for i, perCpu := range stats.Cpu.Usage.PerCpu {
-		self.prevStats.Cpu.Usage.PerCpu[i] = perCpu
-	}
-	*self.prevStats.Memory = *stats.Memory
+	self.prevStats = stats.Copy(self.prevStats)
 }
 
 func (self *containerStorage) AddStats(stats *info.ContainerStats) error {
@@ -75,9 +62,9 @@ func (self *containerStorage) AddStats(stats *info.ContainerStats) error {
 		}
 	}
 	if self.recentStats.Len() >= self.maxNumStats {
-		self.recentStats.Remove(self.recentStats.Front())
+		self.recentStats.Remove(self.recentStats.Back())
 	}
-	self.recentStats.PushBack(stats)
+	self.recentStats.PushFront(stats)
 	self.updatePrevStats(stats)
 	return nil
 }
@@ -88,18 +75,25 @@ func (self *containerStorage) RecentStats(numStats int) ([]*info.ContainerStats,
 	if self.recentStats.Len() < numStats || numStats < 0 {
 		numStats = self.recentStats.Len()
 	}
-	ret := make([]*info.ContainerStats, 0, numStats)
+
+	// Stats in the recentStats list are stored in reverse chronological
+	// order, i.e. most recent stats is in the front.
+	// numStats will always <= recentStats.Len() so that there will be
+	// always at least numStats available stats to retrieve. We traverse
+	// the recentStats list from its head and fill the ret slice in
+	// reverse order so that the returned slice will be in chronological
+	// order. The order of the returned slice is not specified by the
+	// StorageDriver interface, so it is not necessary for other storage
+	// drivers to return the slice in the same order.
+	ret := make([]*info.ContainerStats, numStats)
 	e := self.recentStats.Front()
-	for i := 0; i < numStats; i++ {
+	for i := numStats - 1; i >= 0; i-- {
 		data, ok := e.Value.(*info.ContainerStats)
 		if !ok {
 			return nil, fmt.Errorf("The %vth element is not a ContainerStats", i)
 		}
-		ret = append(ret, data)
+		ret[i] = data
 		e = e.Next()
-		if e == nil {
-			break
-		}
 	}
 	return ret, nil
 }
@@ -162,23 +156,34 @@ type InMemoryStorage struct {
 func (self *InMemoryStorage) AddStats(ref info.ContainerReference, stats *info.ContainerStats) error {
 	var cstore *containerStorage
 	var ok bool
-	self.lock.Lock()
-	if cstore, ok = self.containerStorageMap[ref.Name]; !ok {
-		cstore = newContainerStore(ref, self.maxNumSamples, self.maxNumStats)
-		self.containerStorageMap[ref.Name] = cstore
-	}
-	self.lock.Unlock()
+
+	func() {
+		self.lock.Lock()
+		defer self.lock.Unlock()
+		if cstore, ok = self.containerStorageMap[ref.Name]; !ok {
+			cstore = newContainerStore(ref, self.maxNumSamples, self.maxNumStats)
+			self.containerStorageMap[ref.Name] = cstore
+		}
+	}()
 	return cstore.AddStats(stats)
 }
 
 func (self *InMemoryStorage) Samples(name string, numSamples int) ([]*info.ContainerStatsSample, error) {
 	var cstore *containerStorage
 	var ok bool
-	self.lock.RLock()
-	if cstore, ok = self.containerStorageMap[name]; !ok {
-		return nil, fmt.Errorf("unable to find data for container %v", name)
+
+	err := func() error {
+		self.lock.RLock()
+		defer self.lock.RUnlock()
+		if cstore, ok = self.containerStorageMap[name]; !ok {
+			return fmt.Errorf("unable to find data for container %v", name)
+		}
+		return nil
+	}()
+
+	if err != nil {
+		return nil, err
 	}
-	self.lock.RUnlock()
 
 	return cstore.Samples(numSamples)
 }
@@ -186,11 +191,17 @@ func (self *InMemoryStorage) Samples(name string, numSamples int) ([]*info.Conta
 func (self *InMemoryStorage) RecentStats(name string, numStats int) ([]*info.ContainerStats, error) {
 	var cstore *containerStorage
 	var ok bool
-	self.lock.RLock()
-	if cstore, ok = self.containerStorageMap[name]; !ok {
-		return nil, fmt.Errorf("unable to find data for container %v", name)
+	err := func() error {
+		self.lock.RLock()
+		defer self.lock.RUnlock()
+		if cstore, ok = self.containerStorageMap[name]; !ok {
+			return fmt.Errorf("unable to find data for container %v", name)
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
 	}
-	self.lock.RUnlock()
 
 	return cstore.RecentStats(numStats)
 }
@@ -198,11 +209,17 @@ func (self *InMemoryStorage) RecentStats(name string, numStats int) ([]*info.Con
 func (self *InMemoryStorage) Percentiles(name string, cpuPercentiles, memPercentiles []int) (*info.ContainerStatsPercentiles, error) {
 	var cstore *containerStorage
 	var ok bool
-	self.lock.RLock()
-	if cstore, ok = self.containerStorageMap[name]; !ok {
-		return nil, fmt.Errorf("unable to find data for container %v", name)
+	err := func() error {
+		self.lock.RLock()
+		defer self.lock.RUnlock()
+		if cstore, ok = self.containerStorageMap[name]; !ok {
+			return fmt.Errorf("unable to find data for container %v", name)
+		}
+		return nil
+	}()
+	if err != nil {
+		return nil, err
 	}
-	self.lock.RUnlock()
 
 	return cstore.Percentiles(cpuPercentiles, memPercentiles)
 }

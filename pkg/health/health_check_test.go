@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package health
 
 import (
 	"net/http"
@@ -56,7 +56,7 @@ func TestHttpHealth(t *testing.T) {
 	}
 
 	ok, err := check.HealthCheck(container)
-	if ok != CheckHealthy {
+	if ok != Healthy {
 		t.Error("Unexpected unhealthy")
 	}
 	if err != nil {

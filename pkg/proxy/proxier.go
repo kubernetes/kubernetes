@@ -33,11 +33,12 @@ type Proxier struct {
 	serviceMap   map[string]int
 }
 
+// NewProxier returns a newly created and correctly initialized instance of Proxier.
 func NewProxier(loadBalancer LoadBalancer) *Proxier {
 	return &Proxier{loadBalancer: loadBalancer, serviceMap: make(map[string]int)}
 }
 
-func CopyBytes(in, out *net.TCPConn) {
+func copyBytes(in, out *net.TCPConn) {
 	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	_, err := io.Copy(in, out)
@@ -49,14 +50,17 @@ func CopyBytes(in, out *net.TCPConn) {
 	out.CloseWrite()
 }
 
-// Create a bidirectional byte shuffler. Copies bytes to/from each connection.
-func ProxyConnection(in, out *net.TCPConn) {
+// proxyConnection creates a bidirectional byte shuffler.
+// It copies bytes to/from each connection.
+func proxyConnection(in, out *net.TCPConn) {
 	glog.Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	go CopyBytes(in, out)
-	go CopyBytes(out, in)
+	go copyBytes(in, out)
+	go copyBytes(out, in)
 }
 
+// AcceptHandler begins accepting incoming connections from listener and proxying the connections to the load-balanced endpoints.
+// It never returns.
 func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 	for {
 		inConn, err := listener.Accept()
@@ -83,12 +87,12 @@ func (proxier Proxier) AcceptHandler(service string, listener net.Listener) {
 			inConn.Close()
 			continue
 		}
-		ProxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		proxyConnection(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 	}
 }
 
-// AddService starts listening for a new service on a given port.
-func (proxier Proxier) AddService(service string, port int) error {
+// addService starts listening for a new service on a given port.
+func (proxier Proxier) addService(service string, port int) error {
 	// Make sure we can start listening on the port before saying all's well.
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -117,18 +121,21 @@ func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
 	go proxier.AcceptHandler(service, l)
 }
 
+// OnUpdate recieves update notices for the updated services and start listening newly added services.
+// It implements "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config".ServiceConfigHandler.OnUpdate.
 func (proxier Proxier) OnUpdate(services []api.Service) {
 	glog.Infof("Received update notice: %+v", services)
 	for _, service := range services {
 		port, exists := proxier.serviceMap[service.ID]
-		if !exists || port != service.Port {
-			glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
-			err := proxier.AddService(service.ID, service.Port)
-			if err == nil {
-				proxier.serviceMap[service.ID] = service.Port
-			} else {
-				glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
-			}
+		if exists && port == service.Port {
+			continue
 		}
+		glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
+		err := proxier.addService(service.ID, service.Port)
+		if err != nil {
+			glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
+			continue
+		}
+		proxier.serviceMap[service.ID] = service.Port
 	}
 }

@@ -5,6 +5,8 @@ TOP_PACKAGES="
   code.google.com/p/goauth2/compute/serviceaccount
   code.google.com/p/goauth2/oauth
   code.google.com/p/google-api-go-client/compute/v1
+  github.com/google/cadvisor/info
+  github.com/google/cadvisor/client
 "
 
 DEP_PACKAGES="
@@ -13,7 +15,6 @@ DEP_PACKAGES="
   code.google.com/p/google-api-go-client/googleapi
   github.com/coreos/go-log/log
   github.com/coreos/go-systemd/journal
-  github.com/google/cadvisor/info
 "
 
 PACKAGES="$TOP_PACKAGES $DEP_PACKAGES"

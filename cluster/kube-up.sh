@@ -127,7 +127,7 @@ echo "  This might loop forever if there was some uncaught error during start"
 echo "  up."
 echo
 
-until $(curl --insecure --user ${user}:${passwd} --max-time 1 \
+until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
         --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
     printf "."
     sleep 2

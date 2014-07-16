@@ -24,16 +24,16 @@ import (
 
 func TestLoadBalanceValidateWorks(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	if loadBalancer.IsValid("") {
+	if loadBalancer.isValid("") {
 		t.Errorf("Didn't fail for empty string")
 	}
-	if loadBalancer.IsValid("foobar") {
+	if loadBalancer.isValid("foobar") {
 		t.Errorf("Didn't fail with no port")
 	}
-	if loadBalancer.IsValid("foobar:-1") {
+	if loadBalancer.isValid("foobar:-1") {
 		t.Errorf("Didn't fail with a negative port")
 	}
-	if !loadBalancer.IsValid("foobar:8080") {
+	if !loadBalancer.isValid("foobar:8080") {
 		t.Errorf("Failed a valid config.")
 	}
 }
@@ -41,7 +41,7 @@ func TestLoadBalanceValidateWorks(t *testing.T) {
 func TestLoadBalanceFilterWorks(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	endpoints := []string{"foobar:1", "foobar:2", "foobar:-1", "foobar:3", "foobar:-2"}
-	filtered := loadBalancer.FilterValidEndpoints(endpoints)
+	filtered := loadBalancer.filterValidEndpoints(endpoints)
 
 	if len(filtered) != 3 {
 		t.Errorf("Failed to filter to the correct size")
@@ -59,7 +59,7 @@ func TestLoadBalanceFilterWorks(t *testing.T) {
 
 func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	endpoints := make([]api.Endpoints, 0)
+	var endpoints []api.Endpoints
 	loadBalancer.OnUpdate(endpoints)
 	endpoint, err := loadBalancer.LoadBalance("foo", nil)
 	if err == nil {

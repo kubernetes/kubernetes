@@ -28,6 +28,7 @@ limitations under the License.
 //   }
 //]
 //}
+
 package config
 
 import (
@@ -41,22 +42,23 @@ import (
 	"github.com/golang/glog"
 )
 
-// TODO: kill this struct.
-type ServiceJSON struct {
-	Name      string
-	Port      int
-	Endpoints []string
-}
-type ConfigFile struct {
-	Services []ServiceJSON
+// serviceConfig is a deserialized form of the config file format which ConfigSourceFile accepts.
+type serviceConfig struct {
+	Services []struct {
+		Name      string   `json: "name"`
+		Port      int      `json: "port"`
+		Endpoints []string `json: "endpoints"`
+	} `json: "service"`
 }
 
+// ConfigSourceFile periodically reads service configurations in JSON from a file, and sends the services and endpoints defined in the file to the specified channels.
 type ConfigSourceFile struct {
 	serviceChannel   chan ServiceUpdate
 	endpointsChannel chan EndpointsUpdate
 	filename         string
 }
 
+// NewConfigSourceFile creates a new ConfigSourceFile and let it immediately runs the created ConfigSourceFile in a goroutine.
 func NewConfigSourceFile(filename string, serviceChannel chan ServiceUpdate, endpointsChannel chan EndpointsUpdate) ConfigSourceFile {
 	config := ConfigSourceFile{
 		filename:         filename,
@@ -67,6 +69,7 @@ func NewConfigSourceFile(filename string, serviceChannel chan ServiceUpdate, end
 	return config
 }
 
+// Run begins watching the config file.
 func (impl ConfigSourceFile) Run() {
 	glog.Infof("Watching file %s", impl.filename)
 	var lastData []byte
@@ -85,7 +88,7 @@ func (impl ConfigSourceFile) Run() {
 		}
 		lastData = data
 
-		config := new(ConfigFile)
+		config := &serviceConfig{}
 		if err = json.Unmarshal(data, config); err != nil {
 			glog.Errorf("Couldn't unmarshal configuration from file : %s %v", data, err)
 			continue

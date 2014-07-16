@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package httplog
 
 import (
 	"fmt"
@@ -24,6 +24,18 @@ import (
 
 	"github.com/golang/glog"
 )
+
+// Handler wraps all HTTP calls to delegate with nice logging.
+// delegate may use LogOf(w).Addf(...) to write additional info to
+// the per-request log message.
+//
+// Intended to wrap calls to your ServeMux.
+func Handler(delegate http.Handler, pred StacktracePred) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer MakeLogged(req, &w).StacktraceWhen(pred).Log()
+		delegate.ServeHTTP(w, req)
+	})
+}
 
 // StacktracePred returns true if a stacktrace should be logged for this status
 type StacktracePred func(httpStatus int) (logStacktrace bool)
@@ -44,7 +56,7 @@ type respLogger struct {
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
-	return status != http.StatusOK && status != http.StatusAccepted
+	return status < http.StatusOK || status >= http.StatusBadRequest
 }
 
 // MakeLogged turns a normal response writer into a logged response writer.
@@ -60,6 +72,10 @@ func DefaultStacktracePred(status int) bool {
 //
 // Use LogOf(w).Addf(...) to log something along with the response result.
 func MakeLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
+	if _, ok := (*w).(*respLogger); ok {
+		// Don't double-wrap!
+		panic("multiple MakeLogged calls!")
+	}
 	rl := &respLogger{
 		startTime:         time.Now(),
 		req:               req,

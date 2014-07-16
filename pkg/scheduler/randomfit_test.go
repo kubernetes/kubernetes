@@ -28,7 +28,7 @@ func TestRandomFitSchedulerNothingScheduled(t *testing.T) {
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeRandomFitScheduler(&fakeRegistry, r),
+		scheduler:    NewRandomFitScheduler(&fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectSchedule(api.Pod{}, "m3")
@@ -41,7 +41,7 @@ func TestRandomFitSchedulerFirstScheduled(t *testing.T) {
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeRandomFitScheduler(fakeRegistry, r),
+		scheduler:    NewRandomFitScheduler(fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectSchedule(makePod("", 8080), "m3")
@@ -56,7 +56,7 @@ func TestRandomFitSchedulerFirstScheduledComplicated(t *testing.T) {
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeRandomFitScheduler(fakeRegistry, r),
+		scheduler:    NewRandomFitScheduler(fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectSchedule(makePod("", 8080, 8081), "m3")
@@ -71,7 +71,7 @@ func TestRandomFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	r := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeRandomFitScheduler(fakeRegistry, r),
+		scheduler:    NewRandomFitScheduler(fakeRegistry, r),
 		minionLister: FakeMinionLister{"m1", "m2", "m3"},
 	}
 	st.expectFailure(makePod("", 8080, 8081))

@@ -29,3 +29,7 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
 }
+
+func InstallHandler(mux *http.ServeMux) {
+	mux.HandleFunc("/healthz", handleHealthz)
+}

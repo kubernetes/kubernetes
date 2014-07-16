@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -34,6 +33,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -46,34 +46,14 @@ import (
 
 const defaultChanSize = 1024
 
-// DockerContainerData is the structured representation of the JSON object returned by Docker inspect
-type DockerContainerData struct {
-	state struct {
-		Running bool
-	}
-}
-
-// DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
-type DockerInterface interface {
-	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
-	InspectContainer(id string) (*docker.Container, error)
-	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
-	StartContainer(id string, hostConfig *docker.HostConfig) error
-	StopContainer(id string, timeout uint) error
-	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
-}
-
-// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
-type DockerID string
-
-// DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
-type DockerPuller interface {
-	Pull(image string) error
-}
+// taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+const minShares = 2
+const sharesPerCpu = 1024
+const milliCpuToCpu = 1000
 
 // CadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type CadvisorInterface interface {
-	ContainerInfo(name string) (*info.ContainerInfo, error)
+	ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	MachineInfo() (*info.MachineInfo, error)
 }
 
@@ -93,7 +73,7 @@ type Kubelet struct {
 	SyncFrequency      time.Duration
 	HTTPCheckFrequency time.Duration
 	pullLock           sync.Mutex
-	HealthChecker      HealthChecker
+	HealthChecker      health.HealthChecker
 }
 
 type manifestUpdate struct {
@@ -119,7 +99,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 		}
 	}
 	if kl.DockerPuller == nil {
-		kl.DockerPuller = kl.MakeDockerPuller()
+		kl.DockerPuller = NewDockerPuller(kl.DockerClient)
 	}
 	updateChannel := make(chan manifestUpdate)
 	if configPath != "" {
@@ -158,7 +138,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 		}
 		go util.Forever(func() { s.ListenAndServe() }, 0)
 	}
-	kl.HealthChecker = MakeHealthChecker()
+	kl.HealthChecker = health.MakeHealthChecker()
 	kl.syncLoop(updateChannel, kl)
 }
 
@@ -236,70 +216,6 @@ func (kl *Kubelet) getContainer(ID DockerID) (*docker.APIContainers, error) {
 	return nil, nil
 }
 
-// MakeDockerPuller creates a new instance of the default implementation of DockerPuller.
-func (kl *Kubelet) MakeDockerPuller() DockerPuller {
-	return dockerPuller{
-		client: kl.DockerClient,
-	}
-}
-
-// dockerPuller is the default implementation of DockerPuller.
-type dockerPuller struct {
-	client DockerInterface
-}
-
-func (p dockerPuller) Pull(image string) error {
-	image, tag := parseImageName(image)
-	opts := docker.PullImageOptions{
-		Repository: image,
-		Tag:        tag,
-	}
-	return p.client.PullImage(opts, docker.AuthConfiguration{})
-}
-
-// Converts "-" to "_-_" and "_" to "___" so that we can use "--" to meaningfully separate parts of a docker name.
-func escapeDash(in string) (out string) {
-	out = strings.Replace(in, "_", "___", -1)
-	out = strings.Replace(out, "-", "_-_", -1)
-	return
-}
-
-// Reverses the transformation of escapeDash.
-func unescapeDash(in string) (out string) {
-	out = strings.Replace(in, "_-_", "-", -1)
-	out = strings.Replace(out, "___", "_", -1)
-	return
-}
-
-const containerNamePrefix = "k8s"
-
-// Creates a name which can be reversed to identify both manifest id and container name.
-func buildDockerName(manifest *api.ContainerManifest, container *api.Container) string {
-	// Note, manifest.ID could be blank.
-	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, escapeDash(container.Name), escapeDash(manifest.ID), rand.Uint32())
-}
-
-// Upacks a container name, returning the manifest id and container name we would have used to
-// construct the docker name. If the docker name isn't one we created, we may return empty strings.
-func parseDockerName(name string) (manifestID, containerName string) {
-	// For some reason docker appears to be appending '/' to names.
-	// If its there, strip it.
-	if name[0] == '/' {
-		name = name[1:]
-	}
-	parts := strings.Split(name, "--")
-	if len(parts) == 0 || parts[0] != containerNamePrefix {
-		return
-	}
-	if len(parts) > 1 {
-		containerName = unescapeDash(parts[1])
-	}
-	if len(parts) > 2 {
-		manifestID = unescapeDash(parts[2])
-	}
-	return
-}
-
 func makeEnvironmentVariables(container *api.Container) []string {
 	var result []string
 	for _, value := range container.Env {
@@ -358,27 +274,13 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
-// Parses image name including an tag and returns image name and tag
-// TODO: Future Docker versions can parse the tag on daemon side, see:
-// https://github.com/dotcloud/docker/issues/6876
-// So this can be deprecated at some point.
-func parseImageName(image string) (string, string) {
-	tag := ""
-	parts := strings.SplitN(image, "/", 2)
-	repo := ""
-	if len(parts) == 2 {
-		repo = parts[0]
-		image = parts[1]
+func milliCpuToShares(milliCpu int) int {
+	// Conceptually (milliCpu / milliCpuToCpu) * sharesPerCpu, but factored to improve rounding.
+	shares := (milliCpu * sharesPerCpu) / milliCpuToCpu
+	if shares < minShares {
+		return minShares
 	}
-	parts = strings.SplitN(image, ":", 2)
-	if len(parts) == 2 {
-		image = parts[0]
-		tag = parts[1]
-	}
-	if repo != "" {
-		image = fmt.Sprintf("%s/%s", repo, image)
-	}
-	return image, tag
+	return shares
 }
 
 // Run a single container from a manifest. Returns the docker container ID
@@ -390,13 +292,15 @@ func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.
 	opts := docker.CreateContainerOptions{
 		Name: buildDockerName(manifest, container),
 		Config: &docker.Config{
+			Cmd:          container.Command,
+			Env:          envVariables,
+			ExposedPorts: exposedPorts,
 			Hostname:     container.Name,
 			Image:        container.Image,
-			ExposedPorts: exposedPorts,
-			Env:          envVariables,
+			Memory:       int64(container.Memory),
+			CpuShares:    int64(milliCpuToShares(container.CPU)),
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
-			Cmd:          container.Command,
 		},
 	}
 	dockerContainer, err := kl.DockerClient.CreateContainer(opts)
@@ -735,7 +639,7 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, keepChannel cha
 				glog.V(1).Infof("health check errored: %v", err)
 				continue
 			}
-			if healthy != CheckHealthy {
+			if healthy != health.Healthy {
 				glog.V(1).Infof("manifest %s container %s is unhealthy.", manifest.ID, container.Name)
 				if err != nil {
 					glog.V(1).Infof("Failed to get container info %v, for %s", err, containerID)
@@ -939,44 +843,29 @@ func (kl *Kubelet) getDockerIDFromPodIDAndContainerName(podID, containerName str
 	return "", errors.New("couldn't find container")
 }
 
+func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.ContainerInfoRequest {
+	ret := &info.ContainerInfoRequest{
+		NumStats:               req.NumStats,
+		CpuUsagePercentiles:    req.CpuUsagePercentiles,
+		MemoryUsagePercentages: req.MemoryUsagePercentages,
+	}
+	return ret
+}
+
 // This method takes a container's absolute path and returns the stats for the
 // container.  The container's absolute path refers to its hierarchy in the
 // cgroup file system. e.g. The root container, which represents the whole
 // machine, has path "/"; all docker containers have path "/docker/<docker id>"
-func (kl *Kubelet) statsFromContainerPath(containerPath string) (*api.ContainerStats, error) {
-	info, err := kl.CadvisorClient.ContainerInfo(containerPath)
-
+func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	cinfo, err := kl.CadvisorClient.ContainerInfo(containerPath, getCadvisorContainerInfoRequest(req))
 	if err != nil {
 		return nil, err
 	}
-	// When the stats data for the container is not available yet.
-	if info.StatsPercentiles == nil {
-		return nil, nil
-	}
-
-	ret := new(api.ContainerStats)
-	ret.MaxMemoryUsage = info.StatsPercentiles.MaxMemoryUsage
-	if len(info.StatsPercentiles.CpuUsagePercentiles) > 0 {
-		percentiles := make([]api.Percentile, len(info.StatsPercentiles.CpuUsagePercentiles))
-		for i, p := range info.StatsPercentiles.CpuUsagePercentiles {
-			percentiles[i].Percentage = p.Percentage
-			percentiles[i].Value = p.Value
-		}
-		ret.CPUUsagePercentiles = percentiles
-	}
-	if len(info.StatsPercentiles.MemoryUsagePercentiles) > 0 {
-		percentiles := make([]api.Percentile, len(info.StatsPercentiles.MemoryUsagePercentiles))
-		for i, p := range info.StatsPercentiles.MemoryUsagePercentiles {
-			percentiles[i].Percentage = p.Percentage
-			percentiles[i].Value = p.Value
-		}
-		ret.MemoryUsagePercentiles = percentiles
-	}
-	return ret, nil
+	return cinfo, nil
 }
 
 // GetContainerStats returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.ContainerStats, error) {
+func (kl *Kubelet) GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	if kl.CadvisorClient == nil {
 		return nil, nil
 	}
@@ -984,24 +873,24 @@ func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.Containe
 	if err != nil || len(dockerID) == 0 {
 		return nil, err
 	}
-	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", string(dockerID)))
+	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", string(dockerID)), req)
 }
 
 // GetMachineStats returns stats (from Cadvisor) of current machine.
-func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
-	return kl.statsFromContainerPath("/")
+func (kl *Kubelet) GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	return kl.statsFromContainerPath("/", req)
 }
 
-func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (HealthCheckStatus, error) {
+func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
-		return CheckHealthy, nil
+		return health.Healthy, nil
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
-		return CheckHealthy, nil
+		return health.Healthy, nil
 	}
 	if kl.HealthChecker == nil {
-		return CheckHealthy, nil
+		return health.Healthy, nil
 	}
 	return kl.HealthChecker.HealthCheck(container)
 }
