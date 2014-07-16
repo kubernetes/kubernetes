@@ -47,6 +47,11 @@ import (
 
 const defaultChanSize = 1024
 
+// taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+const minShares = 2
+const sharesPerCpu = 1024
+const milliCpuToCpu = 1000
+
 // CadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type CadvisorInterface interface {
 	ContainerInfo(name string) (*info.ContainerInfo, error)
@@ -270,6 +275,15 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	return exposedPorts, portBindings
 }
 
+func milliCpuToShares(milliCpu int) int {
+	// Conceptually (milliCpu / milliCpuToCpu) * sharesPerCpu, but factored to improve rounding.
+	shares := (milliCpu * sharesPerCpu) / milliCpuToCpu
+	if shares < minShares {
+		return minShares
+	}
+	return shares
+}
+
 // Run a single container from a manifest. Returns the docker container ID
 func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.Container, netMode string) (id DockerID, err error) {
 	envVariables := makeEnvironmentVariables(container)
@@ -285,6 +299,7 @@ func (kl *Kubelet) runContainer(manifest *api.ContainerManifest, container *api.
 			Hostname:     container.Name,
 			Image:        container.Image,
 			Memory:       int64(container.Memory),
+			CpuShares:    int64(milliCpuToShares(container.CPU)),
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
 		},
