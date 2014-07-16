@@ -22,18 +22,25 @@ import (
 	"github.com/golang/glog"
 )
 
+// Status is a enum type which describes a health status of a container.
 type Status int
 
+// These are the valid values of type Status.
 const (
 	Healthy Status = iota
 	Unhealthy
 	Unknown
 )
 
+// HTTPGetInterface is an abstract interface for testability. It abstracts the interface of http.Client.Get.
 type HTTPGetInterface interface {
 	Get(url string) (*http.Response, error)
 }
 
+// Check checks if GET request to the url succeeds.
+// If the HTTP response code is successful, it returns Healthy.
+// If the HTTP response code is unsuccessful, it returns Unhealthy.
+// And it return Unknown and err if the HTTP communication itself fails.
 func Check(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if res.Body != nil {
@@ -44,8 +51,7 @@ func Check(url string, client HTTPGetInterface) (Status, error) {
 	}
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		return Healthy, nil
-	} else {
-		glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-		return Unhealthy, nil
 	}
+	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
+	return Unhealthy, nil
 }
