@@ -54,7 +54,7 @@ const milliCpuToCpu = 1000
 
 // CadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
 type CadvisorInterface interface {
-	ContainerInfo(name string) (*info.ContainerInfo, error)
+	ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	MachineInfo() (*info.MachineInfo, error)
 }
 
@@ -844,44 +844,29 @@ func (kl *Kubelet) getDockerIDFromPodIDAndContainerName(podID, containerName str
 	return "", errors.New("couldn't find container")
 }
 
+func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.ContainerInfoRequest {
+	ret := &info.ContainerInfoRequest{
+		NumStats:               req.NumStats,
+		CpuUsagePercentiles:    req.CpuUsagePercentiles,
+		MemoryUsagePercentages: req.MemoryUsagePercentages,
+	}
+	return ret
+}
+
 // This method takes a container's absolute path and returns the stats for the
 // container.  The container's absolute path refers to its hierarchy in the
 // cgroup file system. e.g. The root container, which represents the whole
 // machine, has path "/"; all docker containers have path "/docker/<docker id>"
-func (kl *Kubelet) statsFromContainerPath(containerPath string) (*api.ContainerStats, error) {
-	info, err := kl.CadvisorClient.ContainerInfo(containerPath)
-
+func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	cinfo, err := kl.CadvisorClient.ContainerInfo(containerPath, getCadvisorContainerInfoRequest(req))
 	if err != nil {
 		return nil, err
 	}
-	// When the stats data for the container is not available yet.
-	if info.StatsPercentiles == nil {
-		return nil, nil
-	}
-
-	ret := new(api.ContainerStats)
-	ret.MaxMemoryUsage = info.StatsPercentiles.MaxMemoryUsage
-	if len(info.StatsPercentiles.CpuUsagePercentiles) > 0 {
-		percentiles := make([]api.Percentile, len(info.StatsPercentiles.CpuUsagePercentiles))
-		for i, p := range info.StatsPercentiles.CpuUsagePercentiles {
-			percentiles[i].Percentage = p.Percentage
-			percentiles[i].Value = p.Value
-		}
-		ret.CpuUsagePercentiles = percentiles
-	}
-	if len(info.StatsPercentiles.MemoryUsagePercentiles) > 0 {
-		percentiles := make([]api.Percentile, len(info.StatsPercentiles.MemoryUsagePercentiles))
-		for i, p := range info.StatsPercentiles.MemoryUsagePercentiles {
-			percentiles[i].Percentage = p.Percentage
-			percentiles[i].Value = p.Value
-		}
-		ret.MemoryUsagePercentiles = percentiles
-	}
-	return ret, nil
+	return cinfo, nil
 }
 
 // GetContainerStats returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.ContainerStats, error) {
+func (kl *Kubelet) GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	if kl.CadvisorClient == nil {
 		return nil, nil
 	}
@@ -889,12 +874,12 @@ func (kl *Kubelet) GetContainerStats(podID, containerName string) (*api.Containe
 	if err != nil || len(dockerID) == 0 {
 		return nil, err
 	}
-	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", string(dockerID)))
+	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", string(dockerID)), req)
 }
 
 // GetMachineStats returns stats (from Cadvisor) of current machine.
-func (kl *Kubelet) GetMachineStats() (*api.ContainerStats, error) {
-	return kl.statsFromContainerPath("/")
+func (kl *Kubelet) GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	return kl.statsFromContainerPath("/", req)
 }
 
 func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {

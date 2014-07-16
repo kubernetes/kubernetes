@@ -912,8 +912,8 @@ type mockCadvisorClient struct {
 }
 
 // ContainerInfo is a mock implementation of CadvisorInterface.ContainerInfo.
-func (c *mockCadvisorClient) ContainerInfo(name string) (*info.ContainerInfo, error) {
-	args := c.Called(name)
+func (c *mockCadvisorClient) ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	args := c.Called(name, req)
 	return args.Get(0).(*info.ContainerInfo), args.Error(1)
 }
 
@@ -925,7 +925,7 @@ func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
 
 func areSamePercentiles(
 	cadvisorPercentiles []info.Percentile,
-	kubePercentiles []api.Percentile,
+	kubePercentiles []info.Percentile,
 	t *testing.T,
 ) {
 	if len(cadvisorPercentiles) != len(kubePercentiles) {
@@ -974,7 +974,9 @@ func TestGetContainerStats(t *testing.T) {
 	}
 
 	mockCadvisor := &mockCadvisorClient{}
-	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, nil)
+	req := &info.ContainerInfoRequest{}
+	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet, _, fakeDocker := makeTestKubelet(t)
 	kubelet.CadvisorClient = mockCadvisor
@@ -987,15 +989,15 @@ func TestGetContainerStats(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerStats("qux", "foo")
+	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if stats.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
+	if stats.StatsPercentiles.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
 		t.Errorf("wrong max memory usage")
 	}
-	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CpuUsagePercentiles, t)
-	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.StatsPercentiles.CpuUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.StatsPercentiles.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
 
@@ -1019,7 +1021,9 @@ func TestGetMachineStats(t *testing.T) {
 	}
 
 	mockCadvisor := &mockCadvisorClient{}
-	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, nil)
+	req := &info.ContainerInfoRequest{}
+	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
 		DockerClient:   &fakeDocker,
@@ -1028,15 +1032,15 @@ func TestGetMachineStats(t *testing.T) {
 	}
 
 	// If the container name is an empty string, then it means the root container.
-	stats, err := kubelet.GetMachineStats()
+	stats, err := kubelet.GetMachineStats(req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if stats.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
+	if stats.StatsPercentiles.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
 		t.Errorf("wrong max memory usage")
 	}
-	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.CpuUsagePercentiles, t)
-	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.MemoryUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.StatsPercentiles.CpuUsagePercentiles, t)
+	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.StatsPercentiles.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
 
@@ -1051,19 +1055,19 @@ func TestGetContainerStatsWithoutCadvisor(t *testing.T) {
 		},
 	}
 
-	stats, _ := kubelet.GetContainerStats("qux", "foo")
+	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
 	// When there's no cAdvisor, the stats should be either nil or empty
 	if stats == nil {
 		return
 	}
-	if stats.MaxMemoryUsage != 0 {
-		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.MaxMemoryUsage)
+	if stats.StatsPercentiles.MaxMemoryUsage != 0 {
+		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.StatsPercentiles.MaxMemoryUsage)
 	}
-	if len(stats.CpuUsagePercentiles) > 0 {
-		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.CpuUsagePercentiles)
+	if len(stats.StatsPercentiles.CpuUsagePercentiles) > 0 {
+		t.Errorf("Cpu usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.CpuUsagePercentiles)
 	}
-	if len(stats.MemoryUsagePercentiles) > 0 {
-		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.MemoryUsagePercentiles)
+	if len(stats.StatsPercentiles.MemoryUsagePercentiles) > 0 {
+		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.MemoryUsagePercentiles)
 	}
 }
 
@@ -1073,8 +1077,10 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 
 	containerInfo := &info.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
+	req := &info.ContainerInfoRequest{}
+	cadvisorReq := getCadvisorContainerInfoRequest(req)
 	expectedErr := fmt.Errorf("some error")
-	mockCadvisor.On("ContainerInfo", containerPath).Return(containerInfo, expectedErr)
+	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, expectedErr)
 
 	kubelet, _, fakeDocker := makeTestKubelet(t)
 	kubelet.CadvisorClient = mockCadvisor
@@ -1087,7 +1093,7 @@ func TestGetContainerStatsWhenCadvisorFailed(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerStats("qux", "foo")
+	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
@@ -1108,7 +1114,7 @@ func TestGetContainerStatsOnNonExistContainer(t *testing.T) {
 	kubelet.CadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{}
 
-	stats, _ := kubelet.GetContainerStats("qux", "foo")
+	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
 	if stats != nil {
 		t.Errorf("non-nil stats on non exist container")
 	}
