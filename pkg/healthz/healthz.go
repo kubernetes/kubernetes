@@ -30,6 +30,7 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("ok"))
 }
 
+// InstallHandler registers a handler for health checking on the path "/healthz" to mux.
 func InstallHandler(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", handleHealthz)
 }
