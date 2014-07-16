@@ -21,6 +21,7 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -39,18 +40,28 @@ func TestDecoder(t *testing.T) {
 		}
 	}()
 
-	action, got, err := decoder.Decode()
-	if err != nil {
-		t.Errorf("Unexpected error %v", err)
-	}
-	if e, a := watch.Added, action; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
+	done := make(chan struct{})
+	go func() {
+		action, got, err := decoder.Decode()
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if e, a := watch.Added, action; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := expect, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+		break
+	case <-time.After(10 * time.Second):
+		t.Error("Timeout")
 	}
 
-	done := make(chan struct{})
+	done = make(chan struct{})
 
 	go func() {
 		_, _, err := decoder.Decode()
@@ -62,7 +73,12 @@ func TestDecoder(t *testing.T) {
 
 	decoder.Close()
 
-	<-done
+	select {
+	case <-done:
+		break
+	case <-time.After(10 * time.Second):
+		t.Error("Timeout")
+	}
 }
 
 func TestDecoder_SourceClose(t *testing.T) {
@@ -81,5 +97,10 @@ func TestDecoder_SourceClose(t *testing.T) {
 
 	in.Close()
 
-	<-done
+	select {
+	case <-done:
+		break
+	case <-time.After(10 * time.Second):
+		t.Error("Timeout")
+	}
 }

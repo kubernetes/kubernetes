@@ -34,7 +34,7 @@ func DoParseTest(t *testing.T, storage string, obj interface{}) {
 	jsonData, _ := api.Encode(obj)
 	yamlData, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
-
+	t.Logf("Intermediate json:\n%v\n", string(jsonData))
 	jsonGot, jsonErr := ToWireFormat(jsonData, storage)
 	yamlGot, yamlErr := ToWireFormat(yamlData, storage)
 
@@ -56,7 +56,7 @@ func DoParseTest(t *testing.T, storage string, obj interface{}) {
 
 func TestParsePod(t *testing.T) {
 	DoParseTest(t, "pods", api.Pod{
-		JSONBase: api.JSONBase{ID: "test pod"},
+		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "test pod", Kind: "Pod"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "My manifest",
@@ -73,7 +73,7 @@ func TestParsePod(t *testing.T) {
 
 func TestParseService(t *testing.T) {
 	DoParseTest(t, "services", api.Service{
-		JSONBase: api.JSONBase{ID: "my service"},
+		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "my service", Kind: "Service"},
 		Port:     8080,
 		Labels: map[string]string{
 			"area": "staging",
@@ -86,6 +86,7 @@ func TestParseService(t *testing.T) {
 
 func TestParseController(t *testing.T) {
 	DoParseTest(t, "replicationControllers", api.ReplicationController{
+		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "my controller", Kind: "ReplicationController"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 9001,
 			PodTemplate: api.PodTemplate{

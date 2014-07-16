@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -36,8 +37,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+func convert(obj interface{}) (interface{}, error) {
+	return obj, nil
+}
+
 func init() {
-	api.AddKnownTypes(Simple{}, SimpleList{})
+	api.AddKnownTypes("", Simple{}, SimpleList{})
+	api.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
+	api.AddExternalConversion("Simple", convert)
+	api.AddInternalConversion("Simple", convert)
+	api.AddExternalConversion("SimpleList", convert)
+	api.AddInternalConversion("SimpleList", convert)
 }
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -154,6 +164,7 @@ func (storage *SimpleRESTStorage) WatchSingle(id string) (watch.Interface, error
 func extractBody(response *http.Response, object interface{}) (string, error) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
+	log.Printf("FOO: %s", body)
 	if err != nil {
 		return string(body), err
 	}
@@ -198,7 +209,8 @@ func TestNonEmptyList(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []Simple{
 			{
-				Name: "foo",
+				JSONBase: api.JSONBase{Kind: "Simple"},
+				Name:     "foo",
 			},
 		},
 	}
@@ -395,7 +407,9 @@ func TestCreate(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{Name: "foo"}
+	simple := Simple{
+		Name: "foo",
+	}
 	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
 	expectNoError(t, err)
@@ -461,7 +475,9 @@ func TestSyncCreate(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{Name: "foo"}
+	simple := Simple{
+		Name: "foo",
+	}
 	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
 	expectNoError(t, err)
@@ -530,8 +546,12 @@ func TestOpGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{Name: "foo"}
-	data, _ := api.Encode(simple)
+	simple := Simple{
+		Name: "foo",
+	}
+	data, err := api.Encode(simple)
+	t.Log(string(data))
+	expectNoError(t, err)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	response, err := client.Do(request)

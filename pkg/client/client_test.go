@@ -175,9 +175,7 @@ func TestGetController(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: api.ReplicationController{
-				JSONBase: api.JSONBase{
-					ID: "foo",
-				},
+				JSONBase: api.JSONBase{ID: "foo"},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
 				},
@@ -194,18 +192,14 @@ func TestGetController(t *testing.T) {
 
 func TestUpdateController(t *testing.T) {
 	requestController := api.ReplicationController{
-		JSONBase: api.JSONBase{
-			ID: "foo",
-		},
+		JSONBase: api.JSONBase{ID: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: "/replicationControllers/foo"},
 		Response: Response{
 			StatusCode: 200,
 			Body: api.ReplicationController{
-				JSONBase: api.JSONBase{
-					ID: "foo",
-				},
+				JSONBase: api.JSONBase{ID: "foo"},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
 				},
@@ -231,18 +225,14 @@ func TestDeleteController(t *testing.T) {
 
 func TestCreateController(t *testing.T) {
 	requestController := api.ReplicationController{
-		JSONBase: api.JSONBase{
-			ID: "foo",
-		},
+		JSONBase: api.JSONBase{ID: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: "/replicationControllers", Body: requestController},
 		Response: Response{
 			StatusCode: 200,
 			Body: api.ReplicationController{
-				JSONBase: api.JSONBase{
-					ID: "foo",
-				},
+				JSONBase: api.JSONBase{ID: "foo"},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
 				},
