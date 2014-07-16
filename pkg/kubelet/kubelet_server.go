@@ -28,8 +28,8 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/google/cadvisor/info"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"gopkg.in/v1/yaml"
 )
 
@@ -53,13 +53,14 @@ func (s *KubeletServer) error(w http.ResponseWriter, err error) {
 }
 
 func (s *KubeletServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer apiserver.MakeLogged(req, &w).Log()
+	defer httplog.MakeLogged(req, &w).Log()
 
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
+	// TODO: use an http.ServeMux instead of a switch.
 	switch {
 	case u.Path == "/container" || u.Path == "/containers":
 		defer req.Body.Close()
