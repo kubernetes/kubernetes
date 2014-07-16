@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package internal
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -37,9 +37,9 @@ import (
 //     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?
 //
-//  DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
-//      to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
-//      by the following regex:
+// DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
+//     to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
+//     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
@@ -145,6 +145,20 @@ type Container struct {
 	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty"`
 	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
+}
+
+// Percentile represents a pair which contains a percentage from 0 to 100 and
+// its corresponding value.
+type Percentile struct {
+	Percentage int    `json:"percentage,omitempty"`
+	Value      uint64 `json:"value,omitempty"`
+}
+
+// ContainerStats represents statistical information of a container
+type ContainerStats struct {
+	CpuUsagePercentiles    []Percentile `json:"cpu_usage_percentiles,omitempty"`
+	MemoryUsagePercentiles []Percentile `json:"memory_usage_percentiles,omitempty"`
+	MaxMemoryUsage         uint64       `json:"max_memory_usage,omitempty"`
 }
 
 // Event is the representation of an event logged to etcd backends

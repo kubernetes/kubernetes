@@ -27,7 +27,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package internal
 
 import (
 	"fmt"
@@ -247,7 +247,6 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	return []error(allErrs)
 }
 
-// ValidateService tests if required fields in the service are set.
 func ValidateService(service *Service) []error {
 	allErrs := errorList{}
 	if service.ID == "" {

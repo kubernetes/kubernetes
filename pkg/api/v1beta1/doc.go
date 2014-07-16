@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package api includes all types used to communicate between the various
 // parts of the Kubernetes system.
-package api
+package v1beta1

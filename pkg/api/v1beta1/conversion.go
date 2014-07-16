@@ -14,22 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduler
+package v1beta1
 
 import (
-	"testing"
-
-	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
-func TestRoundRobinScheduler(t *testing.T) {
-	st := schedulerTester{
-		t:            t,
-		scheduler:    MakeRoundRobinScheduler(),
-		minionLister: FakeMinionLister{"m1", "m2", "m3", "m4"},
-	}
-	st.expectSchedule(api.Pod{}, "m1")
-	st.expectSchedule(api.Pod{}, "m2")
-	st.expectSchedule(api.Pod{}, "m3")
-	st.expectSchedule(api.Pod{}, "m4")
+func ExternalizePodInfo(obj internal.PodInfo) PodInfo {
+	return PodInfo(obj)
+}
+
+func InternalizePodInfo(obj PodInfo) internal.PodInfo {
+	return internal.PodInfo(obj)
 }

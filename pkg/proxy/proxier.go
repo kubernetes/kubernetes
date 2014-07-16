@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/golang/glog"
 )
 
@@ -123,8 +123,7 @@ func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
 
 // OnUpdate recieves update notices for the updated services and start listening newly added services.
 // It implements "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config".ServiceConfigHandler.OnUpdate.
-func (proxier Proxier) OnUpdate(services []api.Service) {
-	glog.Infof("Received update notice: %+v", services)
+func (proxier Proxier) OnUpdate(services []internal.Service) {
 	for _, service := range services {
 		port, exists := proxier.serviceMap[service.ID]
 		if exists && port == service.Port {

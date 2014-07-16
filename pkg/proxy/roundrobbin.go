@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/golang/glog"
 )
 
@@ -83,7 +83,7 @@ func (impl LoadBalancerRR) filterValidEndpoints(endpoints []string) []string {
 // OnUpdate updates the registered endpoints with the new
 // endpoint information, removes the registered endpoints
 // no longer present in the provided endpoints.
-func (impl LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
+func (impl LoadBalancerRR) OnUpdate(endpoints []internal.Endpoints) {
 	tmp := make(map[string]bool)
 	impl.lock.Lock()
 	defer impl.lock.Unlock()

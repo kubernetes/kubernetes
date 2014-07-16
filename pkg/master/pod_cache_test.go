@@ -21,7 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
 	"github.com/fsouza/go-dockerclient"
 )
@@ -29,11 +30,11 @@ import (
 type FakePodInfoGetter struct {
 	host string
 	id   string
-	data api.PodInfo
+	data v1beta1.PodInfo
 	err  error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, id string) (api.PodInfo, error) {
+func (f *FakePodInfoGetter) GetPodInfo(host, id string) (v1beta1.PodInfo, error) {
 	f.host = host
 	f.id = id
 	return f.data, f.err
@@ -42,7 +43,7 @@ func (f *FakePodInfoGetter) GetPodInfo(host, id string) (api.PodInfo, error) {
 func TestPodCacheGet(t *testing.T) {
 	cache := NewPodCache(nil, nil, time.Second*1)
 
-	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
+	expected := v1beta1.PodInfo{"foo": docker.Container{ID: "foo"}}
 	cache.podInfo["foo"] = expected
 
 	info, err := cache.GetPodInfo("host", "foo")
@@ -67,7 +68,7 @@ func TestPodCacheGetMissing(t *testing.T) {
 }
 
 func TestPodGetPodInfoGetter(t *testing.T) {
-	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
+	expected := v1beta1.PodInfo{"foo": docker.Container{ID: "foo"}}
 	fake := FakePodInfoGetter{
 		data: expected,
 	}
@@ -99,7 +100,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	pods := []api.Pod{pod}
 	mockRegistry := registry.MakeMockPodRegistry(pods)
 
-	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
+	expected := v1beta1.PodInfo{"foo": docker.Container{ID: "foo"}}
 	fake := FakePodInfoGetter{
 		data: expected,
 	}
