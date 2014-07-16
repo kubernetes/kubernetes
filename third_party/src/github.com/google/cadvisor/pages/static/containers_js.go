@@ -128,7 +128,7 @@ function drawCpuPerCoreUsage(elementId, machineInfo, stats) {
 		elements.push(cur.timestamp);
 		for (var j = 0; j < machineInfo.num_cores; j++) {
 			// TODO(vmarmol): This assumes we sample every second, use the timestamps.
-			elements.push((cur.cpu.usage.per_cpu[j] - prev.cpu.usage.per_cpu[j]) / 1000000000);
+			elements.push((cur.cpu.usage.per_cpu_usage[j] - prev.cpu.usage.per_cpu_usage[j]) / 1000000000);
 		}
 		data.push(elements);
 	}
