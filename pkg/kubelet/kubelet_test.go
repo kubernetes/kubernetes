@@ -145,13 +145,7 @@ func TestContainerManifestNaming(t *testing.T) {
 }
 
 func TestGetContainerID(t *testing.T) {
-	kubelet, _, fakeDocker := makeTestKubelet(t)
-	manifest := api.ContainerManifest{
-		ID: "qux",
-	}
-	container := api.Container{
-		Name: "foo",
-	}
+	_, _, fakeDocker := makeTestKubelet(t)
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			ID:    "foobar",
@@ -166,21 +160,24 @@ func TestGetContainerID(t *testing.T) {
 		ID: "foobar",
 	}
 
-	id, err := kubelet.getContainerID(&manifest, &container)
-	verifyCalls(t, fakeDocker, []string{"list"})
-	if id == "" {
-		t.Errorf("Failed to find container %#v", container)
-	}
+	dockerContainers, err := getKubeletDockerContainers(fakeDocker)
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Errorf("Expected no error, Got %#v", err)
+	}
+	if len(dockerContainers) != 2 {
+		t.Errorf("Expected %#v, Got %#v", fakeDocker.containerList, dockerContainers)
+	}
+	verifyCalls(t, fakeDocker, []string{"list"})
+	dockerContainer, found := dockerContainers.FindPodContainer("qux", "foo")
+	if dockerContainer == nil || !found {
+		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
 
 	fakeDocker.clearCalls()
-	missingManifest := api.ContainerManifest{ID: "foobar"}
-	id, err = kubelet.getContainerID(&missingManifest, &container)
-	verifyCalls(t, fakeDocker, []string{"list"})
-	if id != "" {
-		t.Errorf("Failed to not find container %#v", missingManifest)
+	dockerContainer, found = dockerContainers.FindPodContainer("foobar", "foo")
+	verifyCalls(t, fakeDocker, []string{})
+	if dockerContainer != nil || found {
+		t.Errorf("Should not have found container %#v", dockerContainer)
 	}
 }
 
@@ -383,7 +380,7 @@ func TestSyncManifestsDoesNothing(t *testing.T) {
 		},
 	})
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list", "list", "list", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "list"})
 }
 
 func TestSyncManifestsDeletes(t *testing.T) {
@@ -406,7 +403,7 @@ func TestSyncManifestsDeletes(t *testing.T) {
 	}
 	err := kubelet.SyncManifests([]api.ContainerManifest{})
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "list", "stop", "stop"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -455,7 +452,7 @@ func TestSyncManifestsUnhealthy(t *testing.T) {
 			},
 		}})
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list", "list", "list", "stop", "create", "start", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start", "list"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -992,6 +989,9 @@ func TestGetContainerStats(t *testing.T) {
 	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if stats == nil {
+		t.Fatalf("stats should not be nil")
 	}
 	if stats.StatsPercentiles.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
 		t.Errorf("wrong max memory usage")
