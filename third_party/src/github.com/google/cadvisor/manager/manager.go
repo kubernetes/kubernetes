@@ -30,7 +30,7 @@ type Manager interface {
 	Start() error
 
 	// Get information about a container.
-	GetContainerInfo(containerName string) (*info.ContainerInfo, error)
+	GetContainerInfo(containerName string, query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 
 	// Get information about the machine.
 	GetMachineInfo() (*info.MachineInfo, error)
@@ -106,8 +106,8 @@ func (m *manager) Start() error {
 }
 
 // Get a container by name.
-func (m *manager) GetContainerInfo(containerName string) (*info.ContainerInfo, error) {
-	log.Printf("Get(%s)", containerName)
+func (m *manager) GetContainerInfo(containerName string, query *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	log.Printf("Get(%s); %+v", containerName, query)
 	var cont *containerData
 	var ok bool
 	func() {
@@ -130,21 +130,21 @@ func (m *manager) GetContainerInfo(containerName string) (*info.ContainerInfo, e
 	var percentiles *info.ContainerStatsPercentiles
 	var samples []*info.ContainerStatsSample
 	var stats []*info.ContainerStats
-	// TODO(monnand): These numbers should not be hard coded
+	query = query.FillDefaults()
 	percentiles, err = m.storageDriver.Percentiles(
 		cinfo.Name,
-		[]int{50, 80, 90, 99},
-		[]int{50, 80, 90, 99},
+		query.CpuUsagePercentiles,
+		query.MemoryUsagePercentages,
 	)
 	if err != nil {
 		return nil, err
 	}
-	samples, err = m.storageDriver.Samples(cinfo.Name, 1024)
+	samples, err = m.storageDriver.Samples(cinfo.Name, query.NumSamples)
 	if err != nil {
 		return nil, err
 	}
 
-	stats, err = m.storageDriver.RecentStats(cinfo.Name, 1024)
+	stats, err = m.storageDriver.RecentStats(cinfo.Name, query.NumStats)
 	if err != nil {
 		return nil, err
 	}

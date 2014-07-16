@@ -21,7 +21,9 @@ type StorageDriver interface {
 
 	// Read most recent stats. numStats indicates max number of stats
 	// returned. The returned stats must be consecutive observed stats. If
-	// numStats < 0, then return all stats stored in the storage.
+	// numStats < 0, then return all stats stored in the storage. The
+	// returned stats should be sorted in time increasing order, i.e. Most
+	// recent stats should be the last.
 	RecentStats(containerName string, numStats int) ([]*info.ContainerStats, error)
 
 	// Read the specified percentiles of CPU and memory usage of the container.
@@ -31,7 +33,7 @@ type StorageDriver interface {
 	// Returns samples of the container stats. If numSamples < 0, then
 	// the number of returned samples is implementation defined. Otherwise, the driver
 	// should return at most numSamples samples.
-	Samples(containername string, numSamples int) ([]*info.ContainerStatsSample, error)
+	Samples(containerName string, numSamples int) ([]*info.ContainerStatsSample, error)
 
 	// Close will clear the state of the storage driver. The elements
 	// stored in the underlying storage may or may not be deleted depending

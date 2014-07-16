@@ -21,12 +21,14 @@ import (
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/fs"
+	"github.com/docker/libcontainer/cgroups/systemd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info"
@@ -98,8 +100,11 @@ func (self *dockerContainerHandler) splitName() (string, string, error) {
 	if nestedLevels > 0 {
 		// we are running inside a docker container
 		upperLevel := strings.Repeat("../../", nestedLevels)
-		//parent = strings.Join([]string{parent, upperLevel}, "/")
-		parent = fmt.Sprintf("%v%v", upperLevel, parent)
+		parent = filepath.Join(upperLevel, parent)
+	}
+	// Strip the last "/"
+	if parent[len(parent)-1] == '/' {
+		parent = parent[:len(parent)-1]
 	}
 	return parent, id, nil
 }
@@ -118,7 +123,7 @@ func (self *dockerContainerHandler) isDockerContainer() bool {
 }
 
 // TODO(vmarmol): Switch to getting this from libcontainer once we have a solid API.
-func readLibcontainerSpec(id string) (spec *libcontainer.Container, err error) {
+func readLibcontainerSpec(id string) (spec *libcontainer.Config, err error) {
 	dir := "/var/lib/docker/execdriver/native"
 	configPath := path.Join(dir, id, "container.json")
 	f, err := os.Open(configPath)
@@ -127,7 +132,7 @@ func readLibcontainerSpec(id string) (spec *libcontainer.Container, err error) {
 	}
 	defer f.Close()
 	d := json.NewDecoder(f)
-	ret := new(libcontainer.Container)
+	ret := new(libcontainer.Config)
 	err = d.Decode(ret)
 	if err != nil {
 		return
@@ -136,7 +141,7 @@ func readLibcontainerSpec(id string) (spec *libcontainer.Container, err error) {
 	return
 }
 
-func libcontainerConfigToContainerSpec(config *libcontainer.Container, mi *info.MachineInfo) *info.ContainerSpec {
+func libcontainerConfigToContainerSpec(config *libcontainer.Config, mi *info.MachineInfo) *info.ContainerSpec {
 	spec := new(info.ContainerSpec)
 	spec.Memory = new(info.MemorySpec)
 	spec.Memory.Limit = math.MaxUint64
@@ -209,6 +214,12 @@ func libcontainerToContainerStats(s *cgroups.Stats, mi *info.MachineInfo) *info.
 		ret.Memory.ContainerData.Pgmajfault = v
 		ret.Memory.HierarchicalData.Pgmajfault = v
 	}
+	if v, ok := s.MemoryStats.Stats["total_inactive_anon"]; ok {
+		ret.Memory.WorkingSet = ret.Memory.Usage - v
+		if v, ok := s.MemoryStats.Stats["total_active_file"]; ok {
+			ret.Memory.WorkingSet -= v
+		}
+	}
 	return ret
 }
 
@@ -231,7 +242,15 @@ func (self *dockerContainerHandler) GetStats() (stats *info.ContainerStats, err 
 		Parent: parent,
 		Name:   id,
 	}
-	s, err := fs.GetStats(cg)
+
+	// TODO(vmarmol): Use libcontainer's Stats() in the new API when that is ready.
+	// Use systemd paths if systemd is being used.
+	var s *cgroups.Stats
+	if systemd.UseSystemd() {
+		s, err = systemd.GetStats(cg)
+	} else {
+		s, err = fs.GetStats(cg)
+	}
 	if err != nil {
 		return
 	}
