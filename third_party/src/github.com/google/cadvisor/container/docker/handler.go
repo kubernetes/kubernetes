@@ -21,12 +21,14 @@ import (
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/fs"
+	"github.com/docker/libcontainer/cgroups/systemd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info"
@@ -98,8 +100,11 @@ func (self *dockerContainerHandler) splitName() (string, string, error) {
 	if nestedLevels > 0 {
 		// we are running inside a docker container
 		upperLevel := strings.Repeat("../../", nestedLevels)
-		//parent = strings.Join([]string{parent, upperLevel}, "/")
-		parent = fmt.Sprintf("%v%v", upperLevel, parent)
+		parent = filepath.Join(upperLevel, parent)
+	}
+	// Strip the last "/"
+	if parent[len(parent)-1] == '/' {
+		parent = parent[:len(parent)-1]
 	}
 	return parent, id, nil
 }
@@ -237,7 +242,15 @@ func (self *dockerContainerHandler) GetStats() (stats *info.ContainerStats, err 
 		Parent: parent,
 		Name:   id,
 	}
-	s, err := fs.GetStats(cg)
+
+	// TODO(vmarmol): Use libcontainer's Stats() in the new API when that is ready.
+	// Use systemd paths if systemd is being used.
+	var s *cgroups.Stats
+	if systemd.UseSystemd() {
+		s, err = systemd.GetStats(cg)
+	} else {
+		s, err = fs.GetStats(cg)
+	}
 	if err != nil {
 		return
 	}
