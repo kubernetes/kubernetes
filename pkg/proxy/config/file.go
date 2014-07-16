@@ -70,16 +70,16 @@ func NewConfigSourceFile(filename string, serviceChannel chan ServiceUpdate, end
 }
 
 // Run begins watching the config file.
-func (impl ConfigSourceFile) Run() {
-	glog.Infof("Watching file %s", impl.filename)
+func (s ConfigSourceFile) Run() {
+	glog.Infof("Watching file %s", s.filename)
 	var lastData []byte
 	var lastServices []api.Service
 	var lastEndpoints []api.Endpoints
 
 	for {
-		data, err := ioutil.ReadFile(impl.filename)
+		data, err := ioutil.ReadFile(s.filename)
 		if err != nil {
-			glog.Errorf("Couldn't read file: %s : %v", impl.filename, err)
+			glog.Errorf("Couldn't read file: %s : %v", s.filename, err)
 			continue
 		}
 
@@ -103,12 +103,12 @@ func (impl ConfigSourceFile) Run() {
 		}
 		if !reflect.DeepEqual(lastServices, newServices) {
 			serviceUpdate := ServiceUpdate{Op: SET, Services: newServices}
-			impl.serviceChannel <- serviceUpdate
+			s.serviceChannel <- serviceUpdate
 			lastServices = newServices
 		}
 		if !reflect.DeepEqual(lastEndpoints, newEndpoints) {
 			endpointsUpdate := EndpointsUpdate{Op: SET, Endpoints: newEndpoints}
-			impl.endpointsChannel <- endpointsUpdate
+			s.endpointsChannel <- endpointsUpdate
 			lastEndpoints = newEndpoints
 		}
 
