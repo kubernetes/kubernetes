@@ -23,7 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// fakeHTTPClient is a face implementation of HTTPGetInterface.
+// fakeHTTPClient is a fake implementation of HTTPGetInterface.
 type fakeHTTPClient struct {
 	req string
 	res http.Response

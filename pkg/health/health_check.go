@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// HealthChecker hides implementation details of how to check if the container is healthy.
+// HealthChecker defines an abstract interface for checking container health.
 type HealthChecker interface {
 	HealthCheck(container api.Container) (Status, error)
 }
@@ -48,6 +48,7 @@ type MuxHealthChecker struct {
 
 // HealthCheck delegates the health-checking of the container to one of the bundled implementations.
 // It chooses an implementation according to container.LivenessProbe.Type.
+// If there is no matching healthc checker it returns Unknown, nil.
 func (m *MuxHealthChecker) HealthCheck(container api.Container) (Status, error) {
 	checker, ok := m.checkers[container.LivenessProbe.Type]
 	if !ok || checker == nil {

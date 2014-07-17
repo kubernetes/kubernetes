@@ -22,10 +22,9 @@ import (
 	"github.com/golang/glog"
 )
 
-// Status is a enum type which describes a health status of a container.
 type Status int
 
-// These are the valid values of type Status.
+// Status takes only one of values of these constants.
 const (
 	Healthy Status = iota
 	Unhealthy
@@ -37,10 +36,10 @@ type HTTPGetInterface interface {
 	Get(url string) (*http.Response, error)
 }
 
-// Check checks if GET request to the url succeeds.
-// If the HTTP response code is successful, it returns Healthy.
+// Check checks if a GET request to the url succeeds.
+// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
 // If the HTTP response code is unsuccessful, it returns Unhealthy.
-// And it return Unknown and err if the HTTP communication itself fails.
+// It returns Unknown and err if the HTTP communication itself fails.
 func Check(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if res.Body != nil {
