@@ -769,9 +769,13 @@ func (kl *Kubelet) GetContainerInfo(manifestID, containerName string, req *info.
 	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", dockerContainer.ID), req)
 }
 
-// GetMachineStats returns stats (from Cadvisor) of current machine.
-func (kl *Kubelet) GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+// GetRootInfo returns stats (from Cadvisor) of current machine (root container).
+func (kl *Kubelet) GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 	return kl.statsFromContainerPath("/", req)
+}
+
+func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
+	return kl.CadvisorClient.MachineInfo()
 }
 
 func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {

@@ -44,7 +44,8 @@ type Server struct {
 // For testablitiy.
 type kubeletInterface interface {
 	GetContainerInfo(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	GetMachineStats(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
 }
 
@@ -108,6 +109,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Write(data)
 	case strings.HasPrefix(u.Path, "/stats"):
 		s.serveStats(w, req)
+	case strings.HasPrefix(u.Path, "/spec"):
+		info, err := s.Kubelet.GetMachineInfo()
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		data, err := json.Marshal(info)
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		w.Header().Add("Content-type", "application/json")
+		w.Write(data)
 	default:
 		s.DelegateHandler.ServeHTTP(w, req)
 	}
@@ -119,8 +133,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	var stats *info.ContainerInfo
 	var err error
 	var query info.ContainerInfoRequest
-	decoder := json.NewDecoder(req.Body)
-	err = decoder.Decode(&query)
+	err = json.NewDecoder(req.Body).Decode(&query)
 	if err != nil && err != io.EOF {
 		s.error(w, err)
 		return
@@ -128,7 +141,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	switch len(components) {
 	case 1:
 		// Machine stats
-		stats, err = s.Kubelet.GetMachineStats(&query)
+		stats, err = s.Kubelet.GetRootInfo(&query)
 	case 2:
 		// pod stats
 		// TODO(monnand) Implement this

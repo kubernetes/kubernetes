@@ -53,9 +53,8 @@ func testHTTPContainerInfoGetter(
 				expectedPath, r.URL.Path)
 		}
 
-		decoder := json.NewDecoder(r.Body)
 		var receivedReq info.ContainerInfoRequest
-		err := decoder.Decode(&receivedReq)
+		err := json.NewDecoder(r.Body).Decode(&receivedReq)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,8 +66,7 @@ func testHTTPContainerInfoGetter(
 		if !reflect.DeepEqual(expectedReq, &receivedReq) {
 			t.Errorf("received wrong request")
 		}
-		encoder := json.NewEncoder(w)
-		err = encoder.Encode(cinfo)
+		err = json.NewEncoder(w).Encode(cinfo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +91,7 @@ func testHTTPContainerInfoGetter(
 	if len(podID) > 0 && len(containerID) > 0 {
 		receivedContainerInfo, err = containerInfoGetter.GetContainerInfo(parts[0], podID, containerID, req)
 	} else {
-		receivedContainerInfo, err = containerInfoGetter.GetMachineInfo(parts[0], req)
+		receivedContainerInfo, err = containerInfoGetter.GetRootInfo(parts[0], req)
 	}
 	if status == 0 || status == http.StatusOK {
 		if err != nil {
@@ -125,7 +123,7 @@ func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 	testHTTPContainerInfoGetter(req, cinfo, "somePodID", "containerNameInK8S", 0, t)
 }
 
-func TestHTTPContainerInfoGetterGetMachineInfoSuccessfully(t *testing.T) {
+func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
 	req := &info.ContainerInfoRequest{
 		NumStats:   10,
 		NumSamples: 10,
@@ -155,7 +153,7 @@ func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 	testHTTPContainerInfoGetter(req, cinfo, "somePodID", "containerNameInK8S", http.StatusNotFound, t)
 }
 
-func TestHTTPContainerInfoGetterGetMachineInfoWithError(t *testing.T) {
+func TestHTTPContainerInfoGetterGetRootInfoWithError(t *testing.T) {
 	req := &info.ContainerInfoRequest{
 		NumStats:   10,
 		NumSamples: 10,
@@ -168,4 +166,40 @@ func TestHTTPContainerInfoGetterGetMachineInfoWithError(t *testing.T) {
 		1*time.Second,
 	)
 	testHTTPContainerInfoGetter(req, cinfo, "", "", http.StatusNotFound, t)
+}
+
+func TestHTTPGetMachineInfo(t *testing.T) {
+	mspec := &info.MachineInfo{
+		NumCores:       4,
+		MemoryCapacity: 2048,
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := json.NewEncoder(w).Encode(mspec)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}))
+	hostURL, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(hostURL.Host, ":")
+
+	port, err := strconv.Atoi(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	containerInfoGetter := &HTTPContainerInfoGetter{
+		Client: http.DefaultClient,
+		Port:   port,
+	}
+
+	received, err := containerInfoGetter.GetMachineInfo(parts[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(received, mspec) {
+		t.Errorf("received wrong machine spec")
+	}
 }
