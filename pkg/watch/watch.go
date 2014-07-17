@@ -29,7 +29,7 @@ type Interface interface {
 	// Returns a chan which will receive all the events. If an error occurs
 	// or Stop() is called, this channel will be closed, in which case the
 	// watch should be completely cleaned up.
-	ResultChan() <-chan *Event
+	ResultChan() <-chan Event
 }
 
 // EventType defines the possible types of events.
@@ -52,14 +52,14 @@ type Event struct {
 
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
-	result  chan *Event
+	result  chan Event
 	Stopped bool
 	sync.Mutex
 }
 
 func NewFake() *FakeWatcher {
 	return &FakeWatcher{
-		result: make(chan *Event),
+		result: make(chan Event),
 	}
 }
 
@@ -67,30 +67,32 @@ func NewFake() *FakeWatcher {
 func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
-	close(f.result)
-	f.Stopped = true
+	if !f.Stopped {
+		close(f.result)
+		f.Stopped = true
+	}
 }
 
-func (f *FakeWatcher) ResultChan() <-chan *Event {
+func (f *FakeWatcher) ResultChan() <-chan Event {
 	return f.result
 }
 
 // Add sends an add event.
 func (f *FakeWatcher) Add(obj interface{}) {
-	f.result <- &Event{Added, obj}
+	f.result <- Event{Added, obj}
 }
 
 // Modify sends a modify event.
 func (f *FakeWatcher) Modify(obj interface{}) {
-	f.result <- &Event{Modified, obj}
+	f.result <- Event{Modified, obj}
 }
 
 // Delete sends a delete event.
 func (f *FakeWatcher) Delete(lastValue interface{}) {
-	f.result <- &Event{Deleted, lastValue}
+	f.result <- Event{Deleted, lastValue}
 }
 
 // Action sends an event of the requested type, for table-based testing.
 func (f *FakeWatcher) Action(action EventType, obj interface{}) {
-	f.result <- &Event{action, obj}
+	f.result <- Event{action, obj}
 }

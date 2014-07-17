@@ -18,16 +18,20 @@ package client
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func TestDoRequestNewWay(t *testing.T) {
@@ -301,5 +305,93 @@ func TestPolling(t *testing.T) {
 	for _, f := range trials {
 		callNumber = 0
 		f()
+	}
+}
+
+func authFromReq(r *http.Request) (*AuthInfo, bool) {
+	auth, ok := r.Header["Authorization"]
+	if !ok {
+		return nil, false
+	}
+
+	encoded := strings.Split(auth[0], " ")
+	if len(encoded) != 2 || encoded[0] != "Basic" {
+		return nil, false
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(encoded[1])
+	if err != nil {
+		return nil, false
+	}
+	parts := strings.Split(string(decoded), ":")
+	if len(parts) != 2 {
+		return nil, false
+	}
+	return &AuthInfo{User: parts[0], Password: parts[1]}, true
+}
+
+// checkAuth sets errors if the auth found in r doesn't match the expectation.
+// TODO: Move to util, test in more places.
+func checkAuth(t *testing.T, expect AuthInfo, r *http.Request) {
+	foundAuth, found := authFromReq(r)
+	if !found {
+		t.Errorf("no auth found")
+	} else if e, a := expect, *foundAuth; !reflect.DeepEqual(e, a) {
+		t.Fatalf("Wrong basic auth: wanted %#v, got %#v", e, a)
+	}
+}
+
+func TestWatch(t *testing.T) {
+	var table = []struct {
+		t   watch.EventType
+		obj interface{}
+	}{
+		{watch.Added, &api.Pod{JSONBase: api.JSONBase{ID: "first"}}},
+		{watch.Modified, &api.Pod{JSONBase: api.JSONBase{ID: "second"}}},
+		{watch.Deleted, &api.Pod{JSONBase: api.JSONBase{ID: "third"}}},
+	}
+
+	auth := AuthInfo{User: "user", Password: "pass"}
+	testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		checkAuth(t, auth, r)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("need flusher!")
+		}
+
+		w.Header().Set("Transfer-Encoding", "chunked")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
+
+		encoder := json.NewEncoder(w)
+		for _, item := range table {
+			encoder.Encode(&api.WatchEvent{item.t, api.APIObject{item.obj}})
+			flusher.Flush()
+		}
+	}))
+
+	s := New(testServer.URL, &auth)
+
+	watching, err := s.Get().Path("path/to/watch/thing").Watch()
+	if err != nil {
+		t.Fatalf("Unexpected error")
+	}
+
+	for _, item := range table {
+		got, ok := <-watching.ResultChan()
+		if !ok {
+			t.Fatalf("Unexpected early close")
+		}
+		if e, a := item.t, got.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := item.obj, got.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
+	_, ok := <-watching.ResultChan()
+	if ok {
+		t.Fatal("Unexpected non-close")
 	}
 }
