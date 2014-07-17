@@ -18,17 +18,21 @@ package apiserver
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -60,6 +64,12 @@ type SimpleRESTStorage struct {
 	updated Simple
 	created Simple
 
+	// Valid if WatchAll or WatchSingle is called
+	fakeWatch *watch.FakeWatcher
+
+	// Set if WatchSingle is called
+	requestedID string
+
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj recieves the original input to the update, delete, or create call.
 	injectedFunction func(obj interface{}) (returnObj interface{}, err error)
@@ -78,8 +88,8 @@ func (storage *SimpleRESTStorage) Get(id string) (interface{}, error) {
 
 func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) {
 	storage.deleted = id
-	if storage.errors["delete"] != nil {
-		return nil, storage.errors["delete"]
+	if err := storage.errors["delete"]; err != nil {
+		return nil, err
 	}
 	return MakeAsync(func() (interface{}, error) {
 		if storage.injectedFunction != nil {
@@ -97,8 +107,8 @@ func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
 
 func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	storage.created = obj.(Simple)
-	if storage.errors["create"] != nil {
-		return nil, storage.errors["create"]
+	if err := storage.errors["create"]; err != nil {
+		return nil, err
 	}
 	return MakeAsync(func() (interface{}, error) {
 		if storage.injectedFunction != nil {
@@ -110,8 +120,8 @@ func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, e
 
 func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	storage.updated = obj.(Simple)
-	if storage.errors["update"] != nil {
-		return nil, storage.errors["update"]
+	if err := storage.errors["update"]; err != nil {
+		return nil, err
 	}
 	return MakeAsync(func() (interface{}, error) {
 		if storage.injectedFunction != nil {
@@ -119,6 +129,25 @@ func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, e
 		}
 		return obj, nil
 	}), nil
+}
+
+// Implement ResourceWatcher.
+func (storage *SimpleRESTStorage) WatchAll() (watch.Interface, error) {
+	if err := storage.errors["watchAll"]; err != nil {
+		return nil, err
+	}
+	storage.fakeWatch = watch.NewFake()
+	return storage.fakeWatch, nil
+}
+
+// Implement ResourceWatcher.
+func (storage *SimpleRESTStorage) WatchSingle(id string) (watch.Interface, error) {
+	storage.requestedID = id
+	if err := storage.errors["watchSingle"]; err != nil {
+		return nil, err
+	}
+	storage.fakeWatch = watch.NewFake()
+	return storage.fakeWatch, nil
 }
 
 func extractBody(response *http.Response, object interface{}) (string, error) {
@@ -523,5 +552,125 @@ func TestOpGet(t *testing.T) {
 	expectNoError(t, err)
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
+var watchTestTable = []struct {
+	t   watch.EventType
+	obj interface{}
+}{
+	{watch.Added, &Simple{Name: "A Name"}},
+	{watch.Modified, &Simple{Name: "Another Name"}},
+	{watch.Deleted, &Simple{Name: "Another Name"}},
+}
+
+func TestWatchWebsocket(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	dest, _ := url.Parse(server.URL)
+	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
+	dest.Path = "/prefix/version/watch/foo"
+	dest.RawQuery = "id=myID"
+
+	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
+	expectNoError(t, err)
+
+	if a, e := simpleStorage.requestedID, "myID"; a != e {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+
+	try := func(action watch.EventType, object interface{}) {
+		// Send
+		simpleStorage.fakeWatch.Action(action, object)
+		// Test receive
+		var got api.WatchEvent
+		err := websocket.JSON.Receive(ws, &got)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if got.Type != action {
+			t.Errorf("Unexpected type: %v", got.Type)
+		}
+		apiObj, err := api.Decode(got.EmbeddedObject)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(object, apiObj) {
+			t.Errorf("Expected %v, got %v", object, apiObj)
+		}
+	}
+
+	for _, item := range watchTestTable {
+		try(item.t, item.obj)
+	}
+	simpleStorage.fakeWatch.Stop()
+
+	var got api.WatchEvent
+	err = websocket.JSON.Receive(ws, &got)
+	if err == nil {
+		t.Errorf("Unexpected non-error")
+	}
+}
+
+func TestWatchHTTP(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/prefix/version/watch/foo"
+	dest.RawQuery = "id=myID"
+
+	request, err := http.NewRequest("GET", dest.String(), nil)
+	expectNoError(t, err)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Unexpected response %#v", response)
+	}
+
+	if a, e := simpleStorage.requestedID, "myID"; a != e {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+
+	decoder := json.NewDecoder(response.Body)
+
+	try := func(action watch.EventType, object interface{}) {
+		// Send
+		simpleStorage.fakeWatch.Action(action, object)
+		// Test receive
+		var got api.WatchEvent
+		err := decoder.Decode(&got)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if got.Type != action {
+			t.Errorf("Unexpected type: %v", got.Type)
+		}
+		apiObj, err := api.Decode(got.EmbeddedObject)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(object, apiObj) {
+			t.Errorf("Expected %v, got %v", object, apiObj)
+		}
+	}
+
+	for _, item := range watchTestTable {
+		try(item.t, item.obj)
+	}
+	simpleStorage.fakeWatch.Stop()
+
+	var got api.WatchEvent
+	err = decoder.Decode(&got)
+	if err == nil {
+		t.Errorf("Unexpected non-error")
 	}
 }
