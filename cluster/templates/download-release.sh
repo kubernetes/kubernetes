@@ -21,7 +21,7 @@
 # master and run.
 
 echo "Downloading release ($MASTER_RELEASE_TAR)"
-gsutil cp $MASTER_RELEASE_TAR master-release.tgz
+until gsutil cp $MASTER_RELEASE_TAR master-release.tgz; do sleep 1 ; echo "Retrying master download" ; done
 
 
 echo "Unpacking release"
