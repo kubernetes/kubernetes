@@ -25,25 +25,27 @@ SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
 INSTANCE_PREFIX=$1
 
+KUBE_DIR=$SCRIPT_DIR/..
+
 # First build the release tar.  This gets copied on to the master and installed
 # from there.  It includes the go source for the necessary servers along with
 # the salt configs.
-rm -rf output/release/*
+rm -rf $KUBE_DIR/output/release/*
 
-MASTER_RELEASE_DIR=output/release/master-release
+MASTER_RELEASE_DIR=$KUBE_DIR/output/release/master-release
 mkdir -p $MASTER_RELEASE_DIR/bin
 mkdir -p $MASTER_RELEASE_DIR/src/scripts
 mkdir -p $MASTER_RELEASE_DIR/third_party/go
 
 echo "Building release tree"
-cp release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
-cp -r cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
+cp $KUBE_DIR/release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
+cp -r $KUBE_DIR/cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
 
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
 EOF
 
-cp -r third_party/src $MASTER_RELEASE_DIR/third_party/go/src
+cp -r $KUBE_DIR/third_party/src $MASTER_RELEASE_DIR/third_party/go/src
 
 function find_go_files() {
   find * -not \( \
@@ -53,10 +55,13 @@ function find_go_files() {
       \) -prune \
     \) -name '*.go'
 }
+# find_go_files is directory dependant
+pushd $KUBE_DIR
 for f in $(find_go_files); do
   mkdir -p $MASTER_RELEASE_DIR/src/go/$(dirname ${f})
   cp ${f} ${MASTER_RELEASE_DIR}/src/go/${f}
 done
+popd
 
 echo "Packaging release"
-tar cz -C output/release -f output/release/master-release.tgz master-release
+tar cz -C $KUBE_DIR/output/release -f $KUBE_DIR/output/release/master-release.tgz master-release
