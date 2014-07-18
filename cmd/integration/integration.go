@@ -66,19 +66,33 @@ func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	return c.GetPodInfo("localhost", podID)
 }
 
+type delegateHandler struct {
+	delegate http.Handler
+}
+
+func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if h.delegate != nil {
+		h.delegate.ServeHTTP(w, req)
+	}
+	w.WriteHeader(http.StatusNotFound)
+}
+
 func startComponents(manifestURL string) (apiServerURL string) {
 	// Setup
 	servers := []string{"http://localhost:4001"}
 	glog.Infof("Creating etcd client pointing to %v", servers)
 	machineList := []string{"localhost", "machine"}
 
-	// Master
-	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "")
-	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
-
+	handler := delegateHandler{}
+	apiserver := httptest.NewServer(&handler)
 	cl := client.New(apiserver.URL, nil)
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
+
+	// Master
+	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "", cl)
+	handler.delegate = m.ConstructHandler("/api/v1beta1")
+
 	controllerManager := controller.MakeReplicationManager(etcd.NewClient(servers), cl)
 
 	controllerManager.Run(1 * time.Second)

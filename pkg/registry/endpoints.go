@@ -22,21 +22,22 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
-func MakeEndpointController(serviceRegistry ServiceRegistry, podRegistry PodRegistry) *EndpointController {
+func MakeEndpointController(serviceRegistry ServiceRegistry, client *client.Client) *EndpointController {
 	return &EndpointController{
 		serviceRegistry: serviceRegistry,
-		podRegistry:     podRegistry,
+		client:          client,
 	}
 }
 
 type EndpointController struct {
 	serviceRegistry ServiceRegistry
-	podRegistry     PodRegistry
+	client          *client.Client
 }
 
 func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, error) {
@@ -62,18 +63,19 @@ func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, 
 func (e *EndpointController) SyncServiceEndpoints() error {
 	services, err := e.serviceRegistry.ListServices()
 	if err != nil {
+		glog.Errorf("Failed to list services!")
 		return err
 	}
 	var resultErr error
 	for _, service := range services.Items {
-		pods, err := e.podRegistry.ListPods(labels.Set(service.Selector).AsSelector())
+		pods, err := e.client.ListPods(labels.Set(service.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error syncing service: %#v, skipping.", service)
 			resultErr = err
 			continue
 		}
-		endpoints := make([]string, len(pods))
-		for ix, pod := range pods {
+		endpoints := make([]string, len(pods.Items))
+		for ix, pod := range pods.Items {
 			port, err := findPort(&pod.DesiredState.Manifest, service.ContainerPort)
 			if err != nil {
 				glog.Errorf("Failed to find port for service: %v, %v", service, err)
