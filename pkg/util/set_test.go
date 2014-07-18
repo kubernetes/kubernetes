@@ -43,12 +43,18 @@ func TestStringSet(t *testing.T) {
 		t.Errorf("Unexpected contents: %#v", s)
 	}
 	s.Insert("a")
+	if s.HasAll("a","b","d") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if !s.HasAll("a","b",) {
+		t.Errorf("Missing contents: %#v", s)
+	}
 	s2.Insert("a","b","d")
-	if s.HasAll(s2) {
+	if s.IsSuperset(s2) {
 		t.Errorf("Unexpected contents: %#v", s)
 	}
 	s2.Delete("d")
-	if !s.HasAll(s2) {
+	if !s.IsSuperset(s2) {
 		t.Errorf("Missing contents: %#v", s)
 	}
 }

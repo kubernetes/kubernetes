@@ -51,7 +51,17 @@ func (s StringSet) Has(item string) bool {
 }
 
 // HasAll returns true iff all items are contained in the set.
-func (s1 StringSet) HasAll(s2 StringSet) bool {
+func (s StringSet) HasAll(items ...string) bool {
+	for _, item := range items {
+		if !s.Has(item) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsSuperset returns true iff s1 is a superset of s2.
+func (s1 StringSet) IsSuperset(s2 StringSet) bool {
 	for item, _ := range s2 {
 		if !s1.Has(item) {
 			return false
