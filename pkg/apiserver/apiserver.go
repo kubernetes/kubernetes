@@ -164,6 +164,7 @@ func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusOK,
 			http.StatusAccepted,
 			http.StatusConflict,
+			http.StatusNotFound,
 		),
 	).Log()
 
@@ -352,6 +353,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		body, err := server.readBody(req)
 		if err != nil {
 			server.error(err, w)
+			return
 		}
 		obj, err := storage.Extract(body)
 		if IsNotFound(err) {
@@ -391,6 +393,7 @@ func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http
 	}
 	if req.Method != "GET" {
 		server.notFound(req, w)
+		return
 	}
 	if len(parts) == 0 {
 		// List outstanding operations.
@@ -402,6 +405,7 @@ func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http
 	op := server.ops.Get(parts[0])
 	if op == nil {
 		server.notFound(req, w)
+		return
 	}
 
 	obj, complete := op.StatusOrResult()
