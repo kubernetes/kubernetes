@@ -180,7 +180,6 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 	}
 	filteredList := rm.filterActivePods(podList.Items)
 	diff := len(filteredList) - controllerSpec.DesiredState.Replicas
-	glog.Infof("%#v", filteredList)
 	if diff < 0 {
 		diff *= -1
 		glog.Infof("Too few replicas, creating %d\n", diff)
