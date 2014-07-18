@@ -48,7 +48,7 @@ type MuxHealthChecker struct {
 
 // HealthCheck delegates the health-checking of the container to one of the bundled implementations.
 // It chooses an implementation according to container.LivenessProbe.Type.
-// If there is no matching healthc checker it returns Unknown, nil.
+// If there is no matching health checker it returns Unknown, nil.
 func (m *MuxHealthChecker) HealthCheck(container api.Container) (Status, error) {
 	checker, ok := m.checkers[container.LivenessProbe.Type]
 	if !ok || checker == nil {
