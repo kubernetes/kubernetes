@@ -42,7 +42,7 @@ var (
 	httpServer   = flag.String("h", "", "The host to connect to.")
 	config       = flag.String("c", "", "Path to the config file.")
 	selector     = flag.String("l", "", "Selector (label query) to use for listing")
-	updatePeriod = flag.Duration("u", 60*time.Second, "Update interarrival period")
+	updatePeriod = flag.Duration("u", 60*time.Second, "Update interval period")
 	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
 	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
@@ -51,8 +51,8 @@ var (
 	verbose      = flag.Bool("verbose", false, "If true, print extra information")
 	proxy        = flag.Bool("proxy", false, "If true, run a proxy to the api server")
 	www          = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
-	templateFile = flag.String("template_file", "", "If present load this file as a golang template and us it for output printing")
-	templateStr  = flag.String("template", "", "If present parse this string as a golang template and us it for output printing")
+	templateFile = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
+	templateStr  = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 )
 
 func usage() {

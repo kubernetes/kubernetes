@@ -98,7 +98,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podName, containerName string)
 
 func verifyBoolean(t *testing.T, expected, value bool) {
 	if expected != value {
-		t.Errorf("Unexpected boolean.  Expected %s.  Found %s", expected, value)
+		t.Errorf("Unexpected boolean.  Expected %t.  Found %t", expected, value)
 	}
 }
 
@@ -521,7 +521,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 		}
 	}
 	if len(binds) != len(expectedBinds) {
-		t.Errorf("Unexpected binds: Expected %# got %#v.  Container was: %#v", expectedBinds, binds, container)
+		t.Errorf("Unexpected binds: Expected %#v got %#v.  Container was: %#v", expectedBinds, binds, container)
 	}
 	verifyStringArrayEquals(t, binds, expectedBinds)
 }

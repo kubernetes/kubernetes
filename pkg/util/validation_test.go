@@ -112,14 +112,14 @@ func TestIsValidPortNum(t *testing.T) {
 	goodValues := []int{1, 2, 1000, 16384, 32768, 65535}
 	for _, val := range goodValues {
 		if !IsValidPortNum(val) {
-			t.Errorf("expected true for '%s'", val)
+			t.Errorf("expected true for '%d'", val)
 		}
 	}
 
 	badValues := []int{0, -1, 65536, 100000}
 	for _, val := range badValues {
 		if IsValidPortNum(val) {
-			t.Errorf("expected false for '%s'", val)
+			t.Errorf("expected false for '%d'", val)
 		}
 	}
 }
