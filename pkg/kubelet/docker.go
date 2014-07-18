@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -115,6 +116,9 @@ func getKubeletDockerContainers(client DockerInterface) (DockerContainers, error
 	return result, nil
 }
 
+// ErrNoContainersInPod is returned when there are no running containers for a given pod
+var ErrNoContainersInPod = errors.New("no containers exist for this pod")
+
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
 func getDockerPodInfo(client DockerInterface, manifestID string) (api.PodInfo, error) {
 	info := api.PodInfo{}
@@ -140,6 +144,10 @@ func getDockerPodInfo(client DockerInterface, manifestID string) (api.PodInfo, e
 			info[dockerContainerName] = *inspectResult
 		}
 	}
+	if len(info) == 0 {
+		return nil, ErrNoContainersInPod
+	}
+
 	return info, nil
 }
 

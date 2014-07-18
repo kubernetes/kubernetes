@@ -54,7 +54,12 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer httplog.MakeLogged(req, &w).Log()
+	defer httplog.MakeLogged(req, &w).StacktraceWhen(
+		httplog.StatusIsNot(
+			http.StatusOK,
+			http.StatusNotFound,
+		),
+	).Log()
 
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
@@ -95,6 +100,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		info, err := s.Kubelet.GetPodInfo(podID)
+		if err == ErrNoContainersInPod {
+			http.Error(w, "Pod does not exist", http.StatusNotFound)
+			return
+		}
 		if err != nil {
 			s.error(w, err)
 			return

@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -57,7 +56,7 @@ func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	defer p.podLock.Unlock()
 	value, ok := p.podInfo[podID]
 	if !ok {
-		return nil, errors.New("no cached pod info")
+		return nil, client.ErrPodInfoNotAvailable
 	}
 	return value, nil
 }
@@ -82,7 +81,7 @@ func (p *PodCache) UpdateAllContainers() {
 	}
 	for _, pod := range pods {
 		err := p.updatePodInfo(pod.CurrentState.Host, pod.ID)
-		if err != nil {
+		if err != nil && err != client.ErrPodInfoNotAvailable {
 			glog.Errorf("Error synchronizing container: %#v", err)
 		}
 	}

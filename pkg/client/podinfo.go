@@ -18,6 +18,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -26,6 +27,9 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
+
+// ErrPodInfoNotAvailable may be returned when the requested pod info is not available
+var ErrPodInfoNotAvailable = errors.New("no pod info available")
 
 // PodInfoGetter is an interface for things that can get information about a pod's containers.
 // Injectable for easy testing.
@@ -58,6 +62,9 @@ func (c *HTTPPodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) 
 		return nil, err
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return nil, ErrPodInfoNotAvailable
+	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
