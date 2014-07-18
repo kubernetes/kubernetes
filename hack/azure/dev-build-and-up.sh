@@ -17,8 +17,10 @@
 # This script will build a dev release and bring up a new cluster with that
 # release.
 
+SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
+
 # First build a release
-$(dirname $0)/../release/release-azure.sh
+$SCRIPT_DIR/../../release/azure/release.sh
 
 # Now bring a new cluster up with that release.
-$(dirname $0)/../cluster/kube-up-azure.sh
+$SCRIPT_DIR/../../cluster/azure/kube-up.sh

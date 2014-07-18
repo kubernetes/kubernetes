@@ -25,10 +25,10 @@ function json_val () {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1'';
 }
 
-source $SCRIPT_DIR/config-azure.sh
-source $SCRIPT_DIR/../cluster/${KUBE_CONFIG_FILE-"config-default.sh"}
+source $SCRIPT_DIR/config.sh
+source $SCRIPT_DIR/../../cluster/${KUBE_CONFIG_FILE-"config-default.sh"}
 
-$SCRIPT_DIR/build-release.sh $INSTANCE_PREFIX
+$SCRIPT_DIR/../build-release.sh $INSTANCE_PREFIX
 
 if [ -z "$(azure storage account show $STG_ACCOUNT 2>/dev/null | \
     grep data)" ]; then
@@ -59,6 +59,6 @@ fi
 azure storage blob upload \
     -a $STG_ACCOUNT \
     -k "$stg_key" \
-    $SCRIPT_DIR/../output/release/master-release.tgz \
+    $SCRIPT_DIR/../../output/release/master-release.tgz \
     $CONTAINER \
     master-release.tgz

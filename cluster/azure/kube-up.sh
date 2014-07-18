@@ -21,15 +21,15 @@ set -eu
 set -o pipefail
 SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
-source $SCRIPT_DIR/../release/config-azure.sh
-source $SCRIPT_DIR/util.sh
+source $SCRIPT_DIR/../../release/azure/config.sh
+source $SCRIPT_DIR/../util.sh
 
 KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
 trap "rm -rf ${KUBE_TEMP}" EXIT
 
 get-password
 echo "Using password: $user:$passwd"
-python $SCRIPT_DIR/../third_party/htpasswd/htpasswd.py -b -c \
+python $SCRIPT_DIR/../../third_party/htpasswd/htpasswd.py -b -c \
     ${KUBE_TEMP}/htpasswd $user $passwd
 HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
@@ -39,8 +39,8 @@ HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
   echo "MASTER_NAME=${MASTER_NAME}"
   echo "MASTER_RELEASE_TAR=${FULL_URL}"
   echo "MASTER_HTPASSWD='${HTPASSWD}'"
-  grep -v "^#" $SCRIPT_DIR/templates/download-release-azure.sh
-  grep -v "^#" $SCRIPT_DIR/templates/salt-master-azure.sh
+  grep -v "^#" $SCRIPT_DIR/templates/download-release.sh
+  grep -v "^#" $SCRIPT_DIR/templates/salt-master.sh
 ) > ${KUBE_TEMP}/master-start.sh
 
 echo "Starting VMs"
@@ -81,7 +81,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         echo "#!/bin/bash"
         echo "MASTER_NAME=${MASTER_NAME}"
         echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
-        grep -v "^#" $SCRIPT_DIR/templates/salt-minion-azure.sh
+        grep -v "^#" $SCRIPT_DIR/templates/salt-minion.sh
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
     azure vm create \
