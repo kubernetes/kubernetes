@@ -34,7 +34,8 @@ func TestValidateVolumes(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != 4 || !names.Has("abc") || !names.Has("123") || !names.Has("abc-123") || !names.Has("empty") {
+	expectedSet := util.NewStringSet("abc", "123", "abc-123", "empty")
+	if len(names) != 4 || !names.HasAll(expectedSet) {
 		t.Errorf("wrong names result: %v", names)
 	}
 
