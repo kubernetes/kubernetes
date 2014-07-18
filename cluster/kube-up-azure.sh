@@ -15,10 +15,6 @@
 # limitations under the License.
 
 # Bring up a Kubernetes cluster.
-#
-# If the full release name (gs://<bucket>/<release>) is passed in then we take
-# that directly.  If not then we assume we are doing development stuff and take
-# the defaults in the release config.
 
 # exit on any error
 set -eu
@@ -33,7 +29,8 @@ trap "rm -rf ${KUBE_TEMP}" EXIT
 
 get-password
 echo "Using password: $user:$passwd"
-python $SCRIPT_DIR/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $user $passwd
+python $SCRIPT_DIR/../third_party/htpasswd/htpasswd.py -b -c \
+    ${KUBE_TEMP}/htpasswd $user $passwd
 HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
 # Build up start up script for master
@@ -51,11 +48,12 @@ echo "Starting VMs"
 if [ ! -f $AZ_SSH_KEY ]; then
     ssh-keygen -f $AZ_SSH_KEY -N ''
 fi
- 
+
 if [ ! -f $AZ_SSH_CERT ]; then
     openssl req -new -key $AZ_SSH_KEY -out ${KUBE_TEMP}/temp.csr \
-	-subj "/C=US/ST=WA/L=Redmond/O=Azure-CLI/CN=Azure"
-    openssl req -x509 -key $AZ_SSH_KEY -in ${KUBE_TEMP}/temp.csr -out $AZ_SSH_CERT -days 1095
+        -subj "/C=US/ST=WA/L=Redmond/O=Azure-CLI/CN=Azure"
+    openssl req -x509 -key $AZ_SSH_KEY -in ${KUBE_TEMP}/temp.csr \
+        -out $AZ_SSH_CERT -days 1095
     rm ${KUBE_TEMP}/temp.csr
 fi
 
@@ -65,7 +63,6 @@ if [ -z "$(azure network vnet show $AZ_VNET 2>/dev/null | grep data)" ]; then
     echo error create vnet $AZ_VNET with subnet $AZ_SUBNET
     exit 1
 fi
-
 
 azure vm create \
     -w $AZ_VNET \
@@ -77,32 +74,28 @@ azure vm create \
     -b $AZ_SUBNET \
     $AZ_CS $AZ_IMAGE $USER
 
-
 ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
-	echo "#!/bin/bash"
-	echo "MASTER_NAME=${MASTER_NAME}"
-	echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
-	grep -v "^#" $SCRIPT_DIR/templates/salt-minion-azure.sh
+        echo "#!/bin/bash"
+        echo "MASTER_NAME=${MASTER_NAME}"
+        echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
+        grep -v "^#" $SCRIPT_DIR/templates/salt-minion-azure.sh
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
     azure vm create \
-	-c -w $AZ_VNET \
-	-n ${MINION_NAMES[$i]} \
-	-l "$AZ_LOCATION" \
-	-t $AZ_SSH_CERT \
-	-e ${ssh_ports[$i]} -P \
-	-d ${KUBE_TEMP}/minion-start-${i}.sh \
-	-b $AZ_SUBNET \
-	$AZ_CS $AZ_IMAGE $USER
-
+        -c -w $AZ_VNET \
+        -n ${MINION_NAMES[$i]} \
+        -l "$AZ_LOCATION" \
+        -t $AZ_SSH_CERT \
+        -e ${ssh_ports[$i]} -P \
+        -d ${KUBE_TEMP}/minion-start-${i}.sh \
+        -b $AZ_SUBNET \
+        $AZ_CS $AZ_IMAGE $USER
 done
 
 azure vm endpoint create $MASTER_NAME 443
-
-echo "  https://${user}:${passwd}@$AZ_CS.cloudapp.net"
 
 echo "Waiting for cluster initialization."
 echo
@@ -122,7 +115,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Make sure docker is installed
     ssh -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net which docker > /dev/null
     if [ "$?" != "0" ]; then
-	echo "Docker failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Docker failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
     fi
@@ -130,7 +123,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Make sure the kubelet is running
     ssh -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net /etc/init.d/kubelet status
     if [ "$?" != "0" ]; then
-	echo "Kubelet failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Kubelet failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
     fi
