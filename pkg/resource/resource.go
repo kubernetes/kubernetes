@@ -38,16 +38,31 @@ type Resource struct {
 	Type *ResourceType
 	Name string
 	// An optional field to specify additional values for a resource
-	Attr map[string]string
-}
-
-// Resources whose values are categorical
-type CategoricalResource struct {
-	Resource
-	Value []string
-}
-
-type QuantitativeResource struct {
-	Resource
+	Attr  map[string]string
 	Value uint64
+}
+
+type ResourceSet struct {
+	resources map[string]map[string]*Resource
+}
+
+func (self *ResourceSet) Add(res *Resource) {
+	resType := res.Type
+	resTypeName := resType.Name
+
+	var resMap map[string]*Resource
+	var ok bool
+
+	if resMap, ok = self.resources[resTypeName]; !ok {
+		resMap = make(map[string]*Resource, 1)
+	}
+
+	// If there's a resource with same name, then add this resource on it.
+	// So if it is a categorical resource, then use different name.
+	if r, ok := resMap[res.Name]; ok {
+		r.Value += res.Value
+	} else {
+		resMap[res.Name] = res
+	}
+	self.resources[resTypeName] = resMap
 }
