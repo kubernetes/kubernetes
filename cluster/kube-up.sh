@@ -133,6 +133,9 @@ until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
     sleep 2
 done
 
+# Don't bail on errors, we want to be able to print some info.
+set +e
+
 # Basic sanity checking
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Make sure docker is installed
