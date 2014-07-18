@@ -138,7 +138,7 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 		}
 		go util.Forever(func() { s.ListenAndServe() }, 0)
 	}
-	kl.HealthChecker = health.MakeHealthChecker()
+	kl.HealthChecker = health.NewHealthChecker()
 	kl.syncLoop(updateChannel, kl)
 }
 

@@ -24,16 +24,22 @@ import (
 
 type Status int
 
+// Status takes only one of values of these constants.
 const (
 	Healthy Status = iota
 	Unhealthy
 	Unknown
 )
 
+// HTTPGetInterface is an abstract interface for testability. It abstracts the interface of http.Client.Get.
 type HTTPGetInterface interface {
 	Get(url string) (*http.Response, error)
 }
 
+// Check checks if a GET request to the url succeeds.
+// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
+// If the HTTP response code is unsuccessful, it returns Unhealthy.
+// It returns Unknown and err if the HTTP communication itself fails.
 func Check(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if res.Body != nil {
@@ -44,8 +50,7 @@ func Check(url string, client HTTPGetInterface) (Status, error) {
 	}
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		return Healthy, nil
-	} else {
-		glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-		return Unhealthy, nil
 	}
+	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
+	return Unhealthy, nil
 }
