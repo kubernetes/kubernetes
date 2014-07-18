@@ -73,7 +73,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	machineList := []string{"localhost", "machine"}
 
 	// Master
-	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "")
+	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "", false, 0)
 	apiserver := httptest.NewServer(m.ConstructHandler("/api/v1beta1"))
 
 	cl := client.New(apiserver.URL, nil)
