@@ -79,6 +79,10 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				glog.Errorf("Failed to find port for service: %v, %v", service, err)
 				continue
 			}
+			if len(pod.CurrentState.PodIP) == 0 {
+				glog.Errorf("Failed to find an IP for pod: %v", pod)
+				continue
+			}
 			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
 		}
 		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
