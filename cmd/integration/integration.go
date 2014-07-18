@@ -94,7 +94,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	cl.Sync = true
 
 	// Master
-	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "", cl)
+	m := master.New(servers, machineList, fakePodInfoGetter{}, nil, "", cl, false, 0)
 	handler.delegate = m.ConstructHandler("/api/v1beta1")
 
 	controllerManager := controller.MakeReplicationManager(etcdClient, cl)
