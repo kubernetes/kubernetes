@@ -40,7 +40,7 @@ HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
   echo "MASTER_RELEASE_TAR=${FULL_URL}"
   echo "MASTER_HTPASSWD='${HTPASSWD}'"
   grep -v "^#" $SCRIPT_DIR/templates/download-release-azure.sh
-  grep -v "^#" $SCRIPT_DIR/templates/salt-master.sh
+  grep -v "^#" $SCRIPT_DIR/templates/salt-master-azure.sh
 ) > ${KUBE_TEMP}/master-start.sh
 
 echo "Starting VMs"
