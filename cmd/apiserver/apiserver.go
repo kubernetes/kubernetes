@@ -76,7 +76,7 @@ func main() {
 		Port:   *minionPort,
 	}
 
-	client := client.New("http://localhost:8080", nil)
+	client := client.New("http://"+net.JoinHostPort(*address, strconv.Itoa(int(*port))), nil)
 
 	var m *master.Master
 	if len(etcdServerList) > 0 {
