@@ -76,14 +76,17 @@ func (s ConfigSourceFile) Run() {
 	var lastServices []api.Service
 	var lastEndpoints []api.Endpoints
 
+	sleep := 5 * time.Second
 	for {
 		data, err := ioutil.ReadFile(s.filename)
 		if err != nil {
 			glog.Errorf("Couldn't read file: %s : %v", s.filename, err)
+			time.Sleep(sleep)
 			continue
 		}
 
 		if bytes.Equal(lastData, data) {
+			time.Sleep(sleep)
 			continue
 		}
 		lastData = data
@@ -112,6 +115,6 @@ func (s ConfigSourceFile) Run() {
 			lastEndpoints = newEndpoints
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(sleep)
 	}
 }
