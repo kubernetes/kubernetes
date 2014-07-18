@@ -70,6 +70,7 @@ func NewMainKubelet(
 		cadvisorClient: cc,
 		etcdClient:     ec,
 		rootDirectory:  rd,
+		podWorkers:     newPodWorkers(),
 	}
 }
 
@@ -80,6 +81,7 @@ func NewIntegrationTestKubelet(hn string, dc DockerInterface) *Kubelet {
 		hostname:     hn,
 		dockerClient: dc,
 		dockerPuller: &FakeDockerPuller{},
+		podWorkers:   newPodWorkers(),
 	}
 }
 
@@ -88,6 +90,7 @@ type Kubelet struct {
 	hostname      string
 	dockerClient  DockerInterface
 	rootDirectory string
+	podWorkers    podWorkers
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
@@ -113,6 +116,43 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		kl.healthChecker = health.NewHealthChecker()
 	}
 	kl.syncLoop(updates, kl)
+}
+
+// Per-pod workers.
+type podWorkers struct {
+	lock sync.Mutex
+
+	// Set of pods with existing workers.
+	workers util.StringSet
+}
+
+func newPodWorkers() podWorkers {
+	return podWorkers{
+		workers: util.NewStringSet(),
+	}
+}
+
+// Runs a worker for "podFullName" asynchronously with the specified "action".
+// If the worker for the "podFullName" is already running, functions as a no-op.
+func (self *podWorkers) Run(podFullName string, action func()) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	// This worker is already running, let it finish.
+	if self.workers.Has(podFullName) {
+		return
+	}
+	self.workers.Insert(podFullName)
+
+	// Run worker async.
+	go func() {
+		defer util.HandleCrash()
+		action()
+
+		self.lock.Lock()
+		defer self.lock.Unlock()
+		self.workers.Delete(podFullName)
+	}()
 }
 
 // LogEvent logs an event to the etcd backend.
@@ -262,6 +302,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 
 // Kill a docker container
 func (kl *Kubelet) killContainer(dockerContainer docker.APIContainers) error {
+	glog.Infof("Killing: %s", dockerContainer.ID)
 	err := kl.dockerClient.StopContainer(dockerContainer.ID, 10)
 	podFullName, containerName := parseDockerName(dockerContainer.Names[0])
 	kl.LogEvent(&api.Event{
@@ -300,9 +341,14 @@ func (kl *Kubelet) createNetworkContainer(pod *Pod) (DockerID, error) {
 	return kl.runContainer(pod, container, nil, "")
 }
 
-func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers, keepChannel chan<- DockerID) error {
-	podFullName := GetPodFullName(pod)
+type empty struct{}
 
+func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
+	podFullName := GetPodFullName(pod)
+	containersToKeep := make(map[DockerID]empty)
+	killedContainers := make(map[DockerID]empty)
+
+	// Make sure we have a network container
 	var netID DockerID
 	if networkDockerContainer, found := dockerContainers.FindPodContainer(podFullName, networkContainerName); found {
 		netID = DockerID(networkDockerContainer.ID)
@@ -315,7 +361,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers, keepChan
 		}
 		netID = dockerNetworkID
 	}
-	keepChannel <- netID
+	containersToKeep[netID] = empty{}
 
 	podVolumes, err := kl.mountExternalVolumes(&pod.Manifest)
 	if err != nil {
@@ -335,7 +381,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers, keepChan
 				continue
 			}
 			if healthy == health.Healthy {
-				keepChannel <- containerID
+				containersToKeep[containerID] = empty{}
 				continue
 			}
 
@@ -344,6 +390,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers, keepChan
 				glog.V(1).Infof("Failed to kill container %s: %v", dockerContainer.ID, err)
 				continue
 			}
+			killedContainers[containerID] = empty{}
 		}
 
 		glog.Infof("Container doesn't exist, creating %#v", container)
@@ -357,20 +404,38 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers, keepChan
 			glog.Errorf("Error running pod %s container %s: %v", podFullName, container.Name, err)
 			continue
 		}
-		keepChannel <- containerID
+		containersToKeep[containerID] = empty{}
 	}
+
+	// Kill any containers in this pod which were not identified above (guards against duplicates).
+	for id, container := range dockerContainers {
+		curPodFullName, _ := parseDockerName(container.Names[0])
+		if curPodFullName == podFullName {
+			// Don't kill containers we want to keep or those we already killed.
+			_, keep := containersToKeep[id]
+			_, killed := killedContainers[id]
+			if !keep && !killed {
+				err = kl.killContainer(*container)
+				if err != nil {
+					glog.Errorf("Error killing container: %v", err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
-type empty struct{}
+type podContainer struct {
+	podFullName   string
+	containerName string
+}
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(pods []Pod) error {
 	glog.Infof("Desired [%s]: %+v", kl.hostname, pods)
 	var err error
-	dockerIdsToKeep := map[DockerID]empty{}
-	keepChannel := make(chan DockerID, defaultChanSize)
-	waitGroup := sync.WaitGroup{}
+	desiredContainers := make(map[podContainer]empty)
 
 	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient)
 	if err != nil {
@@ -380,30 +445,23 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 
 	// Check for any containers that need starting
 	for i := range pods {
-		waitGroup.Add(1)
-		go func(index int) {
-			defer util.HandleCrash()
-			defer waitGroup.Done()
-			// necessary to dereference by index here b/c otherwise the shared value
-			// in the for each is re-used.
-			err := kl.syncPod(&pods[index], dockerContainers, keepChannel)
+		pod := &pods[i]
+		podFullName := GetPodFullName(pod)
+
+		// Add all containers (including net) to the map.
+		desiredContainers[podContainer{podFullName, networkContainerName}] = empty{}
+		for _, cont := range pod.Manifest.Containers {
+			desiredContainers[podContainer{podFullName, cont.Name}] = empty{}
+		}
+
+		// Run the sync in an async manifest worker.
+		kl.podWorkers.Run(podFullName, func() {
+			err := kl.syncPod(pod, dockerContainers)
 			if err != nil {
 				glog.Errorf("Error syncing pod: %v skipping.", err)
 			}
-		}(i)
+		})
 	}
-	ch := make(chan bool)
-	go func() {
-		for id := range keepChannel {
-			dockerIdsToKeep[id] = empty{}
-		}
-		ch <- true
-	}()
-	if len(pods) > 0 {
-		waitGroup.Wait()
-	}
-	close(keepChannel)
-	<-ch
 
 	// Kill any containers we don't need
 	existingContainers, err := getKubeletDockerContainers(kl.dockerClient)
@@ -411,9 +469,10 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 		glog.Errorf("Error listing containers: %v", err)
 		return err
 	}
-	for id, container := range existingContainers {
-		if _, ok := dockerIdsToKeep[id]; !ok {
-			glog.Infof("Killing: %s", id)
+	for _, container := range existingContainers {
+		// Don't kill containers that are in the desired pods.
+		podFullName, containerName := parseDockerName(container.Names[0])
+		if _, ok := desiredContainers[podContainer{podFullName, containerName}]; !ok {
 			err = kl.killContainer(*container)
 			if err != nil {
 				glog.Errorf("Error killing container: %v", err)
