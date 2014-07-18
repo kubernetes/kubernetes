@@ -62,7 +62,30 @@ type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
 	Name string `yaml:"name" json:"name"`
+	// Source represents the location and type of a volume to mount.
+	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
+	// This implied behavior is deprecated and will be removed in a future version.
+        Source *VolumeSource `yaml:"source" json:"source"`
 }
+
+type VolumeSource struct {
+	// Only one of the following sources may be specified
+	// HostDirectory represents a pre-existing directory on the host machine that is directly
+	// exposed to the container. This is generally used for system agents or other privileged
+	// things that are allowed to see the host machine. Most containers will NOT need this.
+	// TODO(jonesdl) We need to restrict who can use host directory mounts and
+	// who can/can not mount host directories as read/write.
+	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
+	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
+	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
+}
+
+// Bare host directory volume.
+type HostDirectory struct {
+	Path string `yaml:"path" json:"path"`
+}
+
+type EmptyDirectory struct {}
 
 // Port represents a network port in a single container
 type Port struct {
@@ -92,6 +115,7 @@ type VolumeMount struct {
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
 	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
 	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
+	// DEPRECATED: MountType will be removed in a future version of the API.
 	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
 

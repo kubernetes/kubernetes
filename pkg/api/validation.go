@@ -76,15 +76,48 @@ func validateVolumes(volumes []Volume) (util.StringSet, errorList) {
 	allNames := util.StringSet{}
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
+		errs := errorList{}
+		// TODO(thockin) enforce that a source is set once we deprecate the implied form.
+		if vol.Source != nil {
+			errs = validateSource(vol.Source)
+		}
 		if !util.IsDNSLabel(vol.Name) {
-			allErrs.Append(makeInvalidError("Volume.Name", vol.Name))
+			errs.Append(makeInvalidError("Volume.Name", vol.Name))
 		} else if allNames.Has(vol.Name) {
-			allErrs.Append(makeDuplicateError("Volume.Name", vol.Name))
-		} else {
+			errs.Append(makeDuplicateError("Volume.Name", vol.Name))
+		}
+		if len(errs) == 0 {
 			allNames.Insert(vol.Name)
+		} else {
+			allErrs.Append(errs...)
 		}
 	}
 	return allNames, allErrs
+}
+
+func validateSource(source *VolumeSource) errorList {
+	numVolumes := 0
+	allErrs := errorList{}
+	if source.HostDirectory != nil {
+		numVolumes++
+		allErrs.Append(validateHostDir(source.HostDirectory)...)
+	}
+	if source.EmptyDirectory != nil {
+		numVolumes++
+		//EmptyDirs have nothing to validate
+	}
+	if numVolumes != 1 {
+		allErrs.Append(makeInvalidError("Volume.Source", source))
+	}
+	return allErrs
+}
+
+func validateHostDir(hostDir *HostDirectory) errorList {
+	allErrs := errorList{}
+	if hostDir.Path == "" {
+		allErrs.Append(makeNotFoundError("HostDir.Path", hostDir.Path))
+	}
+	return allErrs
 }
 
 var supportedPortProtocols = util.NewStringSet("TCP", "UDP")
@@ -162,6 +195,9 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errorLis
 				mnt.MountPath = mnt.Path
 				mnt.Path = ""
 			}
+		}
+		if len(mnt.MountType) != 0 {
+			glog.Warning("DEPRECATED: VolumeMount.MountType will be removed. The Volume struct will handle types")
 		}
 	}
 	return allErrs

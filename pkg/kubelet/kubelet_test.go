@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
@@ -528,6 +529,31 @@ func TestMakeEnvVariables(t *testing.T) {
 	}
 }
 
+func TestMountExternalVolumes(t *testing.T) {
+	kubelet, _, _ := makeTestKubelet(t)
+	manifest := api.ContainerManifest{
+		Volumes: []api.Volume{
+			{
+				Name: "host-dir",
+				Source: &api.VolumeSource{
+					HostDirectory: &api.HostDirectory{"/dir/path"},
+				},
+			},
+		},
+	}
+	podVolumes, _ := kubelet.mountExternalVolumes(&manifest)
+	expectedPodVolumes := make(volumeMap)
+	expectedPodVolumes["host-dir"] = &volume.HostDirectory{"/dir/path"}
+	if len(expectedPodVolumes) != len(podVolumes) {
+		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Manifest was: %#v", expectedPodVolumes, podVolumes, manifest)
+	}
+	for name, expectedVolume := range expectedPodVolumes {
+		if _, ok := podVolumes[name]; !ok {
+			t.Errorf("Pod volumes map is missing key: %s. %#v", expectedVolume, podVolumes)
+		}
+	}
+}
+
 func TestMakeVolumesAndBinds(t *testing.T) {
 	container := api.Container{
 		VolumeMounts: []api.VolumeMount{
@@ -548,12 +574,22 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 				ReadOnly:  false,
 				MountType: "HOST",
 			},
+			{
+				MountPath: "/mnt/path4",
+				Name:      "disk4",
+				ReadOnly:  false,
+			},
 		},
 	}
-	volumes, binds := makeVolumesAndBinds("pod", &container)
+
+	podVolumes := make(volumeMap)
+	podVolumes["disk4"] = &volume.HostDirectory{"/mnt/host"}
+
+	volumes, binds := makeVolumesAndBinds("pod", &container, podVolumes)
 
 	expectedVolumes := []string{"/mnt/path", "/mnt/path2"}
-	expectedBinds := []string{"/exports/pod/disk:/mnt/path", "/exports/pod/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3"}
+	expectedBinds := []string{"/exports/pod/disk:/mnt/path", "/exports/pod/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3",
+				  "/mnt/host:/mnt/path4"}
 	if len(volumes) != len(expectedVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Container was: %#v", expectedVolumes, volumes, container)
 	}

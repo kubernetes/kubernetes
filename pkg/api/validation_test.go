@@ -26,14 +26,15 @@ import (
 func TestValidateVolumes(t *testing.T) {
 	successCase := []Volume{
 		{Name: "abc"},
-		{Name: "123"},
-		{Name: "abc-123"},
+		{Name: "123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path2"}}},
+		{Name: "abc-123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path3"}}},
+		{Name: "empty", Source: &VolumeSource{EmptyDirectory: &EmptyDirectory{}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != 3 || !names.Has("abc") || !names.Has("123") || !names.Has("abc-123") {
+	if len(names) != 4 || !names.Has("abc") || !names.Has("123") || !names.Has("abc-123") || !names.Has("empty") {
 		t.Errorf("wrong names result: %v", names)
 	}
 
@@ -206,7 +207,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []Volume{{Name: "vol1"}, {Name: "vol2"}},
+			Volumes: []Volume{{Name: "vol1", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol1"}}},
+			                  {Name: "vol2", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol2"}}}},
 			Containers: []Container{
 				{
 					Name:       "abc",
