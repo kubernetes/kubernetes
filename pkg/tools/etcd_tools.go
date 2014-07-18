@@ -72,20 +72,8 @@ func IsEtcdConflict(err error) bool {
 
 // Returns true iff err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
-	if err == nil {
-		return false
-	}
-	switch err.(type) {
-	case *etcd.EtcdError:
-		etcdError := err.(*etcd.EtcdError)
-		if etcdError == nil {
-			return false
-		}
-		if etcdError.ErrorCode == errorCode {
-			return true
-		}
-	}
-	return false
+	etcdError, ok := err.(*etcd.EtcdError)
+	return ok && etcdError != nil && etcdError.ErrorCode == errorCode
 }
 
 func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, error) {

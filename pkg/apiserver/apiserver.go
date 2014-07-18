@@ -34,11 +34,39 @@ import (
 	"github.com/golang/glog"
 )
 
+// errNotFound is an error which indicates that a specified resource is not found.
+type errNotFound string
+
+// Error returns a string representation of the err.
+func (err errNotFound) Error() string {
+	return string(err)
+}
+
+// IsNotFound determines if the err is an error which indicates that a specified resource was not found.
+func IsNotFound(err error) bool {
+	_, ok := err.(errNotFound)
+	return ok
+}
+
+// NewNotFoundErr returns a new error which indicates that the resource of the kind and the name was not found.
+func NewNotFoundErr(kind, name string) error {
+	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
+}
+
 // RESTStorage is a generic interface for RESTful storage services
+// Resources whicih are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
+	// List selects resources in the storage which match to the selector.
 	List(labels.Selector) (interface{}, error)
+
+	// Get finds a resource in the storage by id and returns it.
+	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
 	Get(id string) (interface{}, error)
+
+	// Delete finds a resource in the storage and deletes it.
+	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
 	Delete(id string) (<-chan interface{}, error)
+
 	Extract(body []byte) (interface{}, error)
 	Create(interface{}) (<-chan interface{}, error)
 	Update(interface{}) (<-chan interface{}, error)
@@ -260,12 +288,12 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			server.write(http.StatusOK, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
-			if err != nil {
-				server.error(err, w)
+			if IsNotFound(err) {
+				server.notFound(req, w)
 				return
 			}
-			if item == nil {
-				server.notFound(req, w)
+			if err != nil {
+				server.error(err, w)
 				return
 			}
 			server.write(http.StatusOK, item, w)
@@ -283,11 +311,19 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		obj, err := storage.Extract(body)
+		if IsNotFound(err) {
+			server.notFound(req, w)
+			return
+		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
 		out, err := storage.Create(obj)
+		if IsNotFound(err) {
+			server.notFound(req, w)
+			return
+		}
 		if err != nil {
 			server.error(err, w)
 			return
@@ -299,6 +335,10 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		out, err := storage.Delete(parts[1])
+		if IsNotFound(err) {
+			server.notFound(req, w)
+			return
+		}
 		if err != nil {
 			server.error(err, w)
 			return
@@ -314,11 +354,19 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			server.error(err, w)
 		}
 		obj, err := storage.Extract(body)
+		if IsNotFound(err) {
+			server.notFound(req, w)
+			return
+		}
 		if err != nil {
 			server.error(err, w)
 			return
 		}
 		out, err := storage.Update(obj)
+		if IsNotFound(err) {
+			server.notFound(req, w)
+			return
+		}
 		if err != nil {
 			server.error(err, w)
 			return
