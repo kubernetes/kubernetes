@@ -17,12 +17,45 @@ limitations under the License.
 package registry
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+func makePodList(count int) api.PodList {
+	pods := []api.Pod{}
+	for i := 0; i < count; i++ {
+		pods = append(pods, api.Pod{
+			JSONBase: api.JSONBase{
+				ID: fmt.Sprintf("pod%d", i),
+			},
+			DesiredState: api.PodState{
+				Manifest: api.ContainerManifest{
+					Containers: []api.Container{
+						{
+							Ports: []api.Port{
+								{
+									ContainerPort: 8080,
+								},
+							},
+						},
+					},
+				},
+			},
+			CurrentState: api.PodState{
+				PodIP: "1.2.3.4",
+			},
+		})
+	}
+	return api.PodList{
+		Items: pods,
+	}
+}
 
 func TestFindPort(t *testing.T) {
 	manifest := api.ContainerManifest{
@@ -78,21 +111,35 @@ func TestFindPort(t *testing.T) {
 }
 
 func TestSyncEndpointsEmpty(t *testing.T) {
-	serviceRegistry := MockServiceRegistry{}
-	podRegistry := MockPodRegistry{}
+	body, _ := json.Marshal(makePodList(0))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.New(testServer.URL, nil)
 
-	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
+	serviceRegistry := MockServiceRegistry{}
+
+	endpoints := MakeEndpointController(&serviceRegistry, client)
 	err := endpoints.SyncServiceEndpoints()
 	expectNoError(t, err)
 }
 
 func TestSyncEndpointsError(t *testing.T) {
+	body, _ := json.Marshal(makePodList(0))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.New(testServer.URL, nil)
+
 	serviceRegistry := MockServiceRegistry{
 		err: fmt.Errorf("test error"),
 	}
-	podRegistry := MockPodRegistry{}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, client)
 	err := endpoints.SyncServiceEndpoints()
 	if err != serviceRegistry.err {
 		t.Errorf("Errors don't match: %#v %#v", err, serviceRegistry.err)
@@ -100,6 +147,14 @@ func TestSyncEndpointsError(t *testing.T) {
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
+	body, _ := json.Marshal(makePodList(1))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.New(testServer.URL, nil)
+
 	serviceRegistry := MockServiceRegistry{
 		list: api.ServiceList{
 			Items: []api.Service{
@@ -111,30 +166,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	}
-	podRegistry := MockPodRegistry{
-		pods: []api.Pod{
-			{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Ports: []api.Port{
-									{
-										HostPort: 8080,
-									},
-								},
-							},
-						},
-					},
-				},
-				Labels: map[string]string{
-					"foo": "bar",
-				},
-			},
-		},
-	}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, client)
 	err := endpoints.SyncServiceEndpoints()
 	expectNoError(t, err)
 	if len(serviceRegistry.endpoints.Endpoints) != 1 {
@@ -143,6 +176,12 @@ func TestSyncEndpointsItems(t *testing.T) {
 }
 
 func TestSyncEndpointsPodError(t *testing.T) {
+	fakeHandler := util.FakeHandler{
+		StatusCode: 500,
+	}
+	testServer := httptest.NewTLSServer(&fakeHandler)
+	client := client.New(testServer.URL, nil)
+
 	serviceRegistry := MockServiceRegistry{
 		list: api.ServiceList{
 			Items: []api.Service{
@@ -154,11 +193,8 @@ func TestSyncEndpointsPodError(t *testing.T) {
 			},
 		},
 	}
-	podRegistry := MockPodRegistry{
-		err: fmt.Errorf("test error."),
-	}
 
-	endpoints := MakeEndpointController(&serviceRegistry, &podRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, client)
 	err := endpoints.SyncServiceEndpoints()
 	if err == nil {
 		t.Error("Unexpected non-error")

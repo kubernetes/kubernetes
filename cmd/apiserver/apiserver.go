@@ -76,11 +76,13 @@ func main() {
 		Port:   *minionPort,
 	}
 
+	client := client.New("http://"+net.JoinHostPort(*address, strconv.Itoa(int(*port))), nil)
+
 	var m *master.Master
 	if len(etcdServerList) > 0 {
-		m = master.New(etcdServerList, machineList, podInfoGetter, cloud, *minionRegexp)
+		m = master.New(etcdServerList, machineList, podInfoGetter, cloud, *minionRegexp, client)
 	} else {
-		m = master.NewMemoryServer(machineList, podInfoGetter, cloud)
+		m = master.NewMemoryServer(machineList, podInfoGetter, cloud, client)
 	}
 
 	glog.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))

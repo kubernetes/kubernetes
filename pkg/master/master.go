@@ -38,22 +38,24 @@ type Master struct {
 	serviceRegistry    registry.ServiceRegistry
 	minionRegistry     registry.MinionRegistry
 	storage            map[string]apiserver.RESTStorage
+	client             *client.Client
 }
 
 // NewMemoryServer returns a new instance of Master backed with memory (not etcd).
-func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface) *Master {
+func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, client *client.Client) *Master {
 	m := &Master{
 		podRegistry:        registry.MakeMemoryRegistry(),
 		controllerRegistry: registry.MakeMemoryRegistry(),
 		serviceRegistry:    registry.MakeMemoryRegistry(),
 		minionRegistry:     registry.MakeMinionRegistry(minions),
+		client:             client,
 	}
 	m.init(cloud, podInfoGetter)
 	return m
 }
 
 // New returns a new instance of Master connected to the given etcdServer.
-func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string) *Master {
+func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string, client *client.Client) *Master {
 	etcdClient := etcd.NewClient(etcdServers)
 	minionRegistry := minionRegistryMaker(minions, cloud, minionRegexp)
 	m := &Master{
@@ -61,6 +63,7 @@ func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, clou
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		serviceRegistry:    registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
+		client:             client,
 	}
 	m.init(cloud, podInfoGetter)
 	return m
@@ -92,7 +95,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 
 // Run begins serving the Kubernetes API. It never returns.
 func (m *Master) Run(myAddress, apiPrefix string) error {
-	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.podRegistry)
+	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	s := &http.Server{
@@ -109,7 +112,7 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 // Instead of calling Run, you can call this function to get a handler for your own server.
 // It is intended for testing. Only call once.
 func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
-	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.podRegistry)
+	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	return apiserver.New(m.storage, apiPrefix)
