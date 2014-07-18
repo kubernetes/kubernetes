@@ -320,7 +320,6 @@ func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) 
 	for _, file := range files {
 		manifest, err := kl.extractFromFile(file)
 		if err != nil {
-			glog.Errorf("Couldn't read from file %s: %v", file, err)
 			return manifests, err
 		}
 		manifests = append(manifests, manifest)
@@ -331,8 +330,6 @@ func (kl *Kubelet) extractFromDir(name string) ([]api.ContainerManifest, error) 
 // WatchFiles watches a file or direcory of files for changes to the set of pods that
 // should run on this Kubelet.
 func (kl *Kubelet) WatchFiles(configPath string, updateChannel chan<- manifestUpdate) {
-	var err error
-
 	statInfo, err := os.Stat(configPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -340,37 +337,34 @@ func (kl *Kubelet) WatchFiles(configPath string, updateChannel chan<- manifestUp
 		}
 		return
 	}
-	if statInfo.Mode().IsDir() {
+
+	switch {
+	case statInfo.Mode().IsDir():
 		manifests, err := kl.extractFromDir(configPath)
 		if err != nil {
 			glog.Errorf("Error polling dir: %v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, manifests}
-	} else if statInfo.Mode().IsRegular() {
+	case statInfo.Mode().IsRegular():
 		manifest, err := kl.extractFromFile(configPath)
 		if err != nil {
 			glog.Errorf("Error polling file: %v", err)
 			return
 		}
 		updateChannel <- manifestUpdate{fileSource, []api.ContainerManifest{manifest}}
-	} else {
+	default:
 		glog.Errorf("Error accessing config - not a directory or file")
-		return
 	}
 }
 
 func (kl *Kubelet) extractFromHTTP(url string, updateChannel chan<- manifestUpdate) error {
-	request, err := http.NewRequest("GET", url, nil)
+	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	data, err := ioutil.ReadAll(response.Body)
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -483,8 +477,7 @@ func (kl *Kubelet) TimeoutWatch(done chan bool) {
 
 // ExtractYAMLData extracts data from YAML file into a list of containers.
 func (kl *Kubelet) ExtractYAMLData(buf []byte, output interface{}) error {
-	err := yaml.Unmarshal(buf, output)
-	if err != nil {
+	if err := yaml.Unmarshal(buf, output); err != nil {
 		glog.Errorf("Couldn't unmarshal configuration: %v", err)
 		return err
 	}
