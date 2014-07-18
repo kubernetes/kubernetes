@@ -133,6 +133,11 @@ until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
     sleep 2
 done
 
+echo "Kubernetes cluster created."
+echo "Sanity checking cluster..."
+
+sleep 5
+
 # Don't bail on errors, we want to be able to print some info.
 set +e
 
