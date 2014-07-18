@@ -67,3 +67,31 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }
+
+func TestHTTPPodInfoGetterNotFound(t *testing.T) {
+	expectObj := api.PodInfo{
+		"myID": docker.Container{ID: "myID"},
+	}
+	_, err := json.Marshal(expectObj)
+	expectNoError(t, err)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   404,
+		ResponseBody: "Pod not found",
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+
+	hostURL, err := url.Parse(testServer.URL)
+	expectNoError(t, err)
+	parts := strings.Split(hostURL.Host, ":")
+
+	port, err := strconv.Atoi(parts[1])
+	expectNoError(t, err)
+	podInfoGetter := &HTTPPodInfoGetter{
+		Client: http.DefaultClient,
+		Port:   uint(port),
+	}
+	_, err = podInfoGetter.GetPodInfo(parts[0], "foo")
+	if err != ErrPodInfoNotAvailable {
+		t.Errorf("Expected %#v, Got %#v", ErrPodInfoNotAvailable, err)
+	}
+}

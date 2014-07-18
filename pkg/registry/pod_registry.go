@@ -86,12 +86,16 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 	if storage.podCache != nil {
 		info, err := storage.podCache.GetPodInfo(pod.CurrentState.Host, pod.ID)
 		if err != nil {
-			glog.Errorf("Error getting container info from cache: %#v", err)
+			if err != client.ErrPodInfoNotAvailable {
+				glog.Errorf("Error getting container info from cache: %#v", err)
+			}
 			if storage.podInfoGetter != nil {
 				info, err = storage.podInfoGetter.GetPodInfo(pod.CurrentState.Host, pod.ID)
 			}
 			if err != nil {
-				glog.Errorf("Error getting fresh container info: %#v", err)
+				if err != client.ErrPodInfoNotAvailable {
+					glog.Errorf("Error getting fresh container info: %#v", err)
+				}
 				return
 			}
 		}
@@ -104,7 +108,7 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 				glog.Warningf("No network settings: %#v", netContainerInfo)
 			}
 		} else {
-			glog.Warningf("Couldn't find network container in %v", info)
+			glog.Warningf("Couldn't find network container for %s in %v", pod.ID, info)
 		}
 	}
 }
