@@ -15,6 +15,7 @@ DEP_PACKAGES="
   code.google.com/p/google-api-go-client/googleapi
   github.com/coreos/go-log/log
   github.com/coreos/go-systemd/journal
+  code.google.com/p/go.net/websocket
 "
 
 PACKAGES="$TOP_PACKAGES $DEP_PACKAGES"

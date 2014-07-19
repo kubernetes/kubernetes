@@ -18,6 +18,7 @@ package api
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -337,4 +338,13 @@ type ServerOp struct {
 type ServerOpList struct {
 	JSONBase `yaml:",inline" json:",inline"`
 	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
+}
+
+// WatchEvent objects are streamed from the api server in response to a watch request.
+type WatchEvent struct {
+	// The type of the watch event; added, modified, or deleted.
+	Type watch.EventType
+
+	// An object which can be decoded via api.Decode
+	EmbeddedObject []byte
 }

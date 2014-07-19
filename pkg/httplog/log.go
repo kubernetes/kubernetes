@@ -96,6 +96,14 @@ func LogOf(w http.ResponseWriter) *respLogger {
 	return nil
 }
 
+// Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
+func Unlogged(w http.ResponseWriter) http.ResponseWriter {
+	if rl, ok := w.(*respLogger); ok {
+		return rl.w
+	}
+	return w
+}
+
 // Sets the stacktrace logging predicate, which decides when to log a stacktrace.
 // There's a default, so you don't need to call this unless you don't like the default.
 func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
