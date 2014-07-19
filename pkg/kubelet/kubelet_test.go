@@ -61,6 +61,7 @@ func makeTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *FakeDocker
 	kubelet.dockerClient = fakeDocker
 	kubelet.dockerPuller = &FakeDockerPuller{}
 	kubelet.etcdClient = fakeEtcdClient
+	kubelet.rootDirectory = "/tmp/kubelet"
 	return kubelet, fakeEtcdClient, fakeDocker
 }
 
@@ -445,6 +446,11 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 				Name:      "disk4",
 				ReadOnly:  false,
 			},
+			{
+				MountPath: "/mnt/path5",
+				Name:      "disk5",
+				ReadOnly:  false,
+			},
 		},
 	}
 
@@ -455,12 +461,13 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 
 	podVolumes := make(volumeMap)
 	podVolumes["disk4"] = &volume.HostDirectory{"/mnt/host"}
+	podVolumes["disk5"] = &volume.EmptyDirectory{"disk5", "podID", "/var/lib/kubelet"}
 
 	volumes, binds := makeVolumesAndBinds(&pod, &container, podVolumes)
 
 	expectedVolumes := []string{"/mnt/path", "/mnt/path2"}
 	expectedBinds := []string{"/exports/pod.test/disk:/mnt/path", "/exports/pod.test/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3",
-		"/mnt/host:/mnt/path4"}
+		"/mnt/host:/mnt/path4", "/var/lib/kubelet/podID/volumes/empty/disk5:/mnt/path5"}
 
 	if len(volumes) != len(expectedVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Container was: %#v", expectedVolumes, volumes, container)

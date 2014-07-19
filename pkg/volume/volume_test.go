@@ -38,9 +38,10 @@ func TestCreateVolumes(t *testing.T) {
 		},
 	}
 	fakePodID := "my-id"
-	expectedPaths := []string{"/dir/path", "/exports/my-id/empty-dir"}
+	rootDir := "/var/lib/kubelet"
+	expectedPaths := []string{"/dir/path", "/var/lib/kubelet/my-id/volumes/empty/empty-dir"}
 	for i, volume := range volumes {
-		extVolume, _ := CreateVolume(&volume, fakePodID)
+		extVolume, _ := CreateVolume(&volume, fakePodID, rootDir)
 		expectedPath := expectedPaths[i]
 		path := extVolume.GetPath()
 		if expectedPath != path {

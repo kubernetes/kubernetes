@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"time"
 
@@ -40,6 +41,8 @@ import (
 	"github.com/google/cadvisor/client"
 )
 
+const defaultRootDir = "/var/lib/kubelet"
+
 var (
 	config             = flag.String("config", "", "Path to the config file or directory of files")
 	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
@@ -51,6 +54,7 @@ var (
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 	etcdServerList     util.StringList
+	rootDirectory      = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
 )
 
 func init() {
@@ -105,6 +109,12 @@ func main() {
 
 	hostname := getHostname()
 
+	if *rootDirectory == "" {
+		glog.Fatal("Invalid root directory path.")
+	}
+	*rootDirectory = path.Clean(*rootDirectory)
+	os.MkdirAll(*rootDirectory, 0750)
+
 	// source of all configuration
 	cfg := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates)
 
@@ -133,7 +143,8 @@ func main() {
 		getHostname(),
 		dockerClient,
 		cadvisorClient,
-		etcdClient)
+		etcdClient,
+		*rootDirectory)
 
 	// start the kubelet
 	go util.Forever(func() { k.Run(cfg.Updates()) }, 0)
