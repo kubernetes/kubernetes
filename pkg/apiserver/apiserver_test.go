@@ -595,12 +595,8 @@ func TestWatchWebsocket(t *testing.T) {
 		if got.Type != action {
 			t.Errorf("Unexpected type: %v", got.Type)
 		}
-		apiObj, err := api.Decode(got.EmbeddedObject)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(object, apiObj) {
-			t.Errorf("Expected %v, got %v", object, apiObj)
+		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
 
@@ -654,12 +650,8 @@ func TestWatchHTTP(t *testing.T) {
 		if got.Type != action {
 			t.Errorf("Unexpected type: %v", got.Type)
 		}
-		apiObj, err := api.Decode(got.EmbeddedObject)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(object, apiObj) {
-			t.Errorf("Expected %v, got %v", object, apiObj)
+		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
 

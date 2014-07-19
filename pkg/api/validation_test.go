@@ -208,7 +208,7 @@ func TestValidateManifest(t *testing.T) {
 			Version: "v1beta1",
 			ID:      "abc",
 			Volumes: []Volume{{Name: "vol1", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol1"}}},
-			                  {Name: "vol2", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol2"}}}},
+				{Name: "vol2", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol2"}}}},
 			Containers: []Container{
 				{
 					Name:       "abc",
