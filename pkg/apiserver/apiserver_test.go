@@ -244,7 +244,7 @@ func TestDelete(t *testing.T) {
 	_, err = client.Do(request)
 	expectNoError(t, err)
 	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+		t.Errorf("Unexpected delete: %s, expected %s (%s)", simpleStorage.deleted, ID)
 	}
 }
 

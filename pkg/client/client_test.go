@@ -317,7 +317,7 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 
 	if c.Error {
 		if err == nil {
-			t.Errorf("error expected for %#v, got none", c.Request)
+			t.Errorf("error expeced for %#v, got none", c.Request)
 		}
 		return
 	}
@@ -348,7 +348,7 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	}
 
 	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
-		t.Errorf("bad response for request %#v: expected %s, got %s", c.Request, c.Response.Body, received)
+		t.Errorf("bad response for request %#v: expeced %s, got %s", c.Request, c.Response.Body, received)
 	}
 }
 
