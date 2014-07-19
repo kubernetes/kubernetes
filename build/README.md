@@ -6,9 +6,9 @@ To build Kubernetes you need to have access to a Docker installation through eit
 
 1. Be running Docker.  2 options supported/tested:
   1. **Mac OS X** The best way to go is to use `boot2docker`.  See instructions [here](https://docs.docker.com/installation/mac/).
-  1. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
-1. Have python installed.  Pretty much it is installed everywhere at this point so you can probably ignore this.
-1. For releasing, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.  The default release mechanism will upload Docker images to a private registry backed by Google Cloud Storage.  Non-image release artifacts will be uploaded to Google Cloud Storage also.
+  2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
+2. Have python installed.  Pretty much it is installed everywhere at this point so you can probably ignore this.
+3. For releasing, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.  The default release mechanism will upload Docker images to a private registry backed by Google Cloud Storage.  Non-image release artifacts will be uploaded to Google Cloud Storage also.
 
 ## Key scripts
 

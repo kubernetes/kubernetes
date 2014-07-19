@@ -133,7 +133,7 @@ func verifyPackUnpack(t *testing.T, manifestID, containerName string) {
 
 func verifyBoolean(t *testing.T, expected, value bool) {
 	if expected != value {
-		t.Errorf("Unexpected boolean.  Expected %s.  Found %s", expected, value)
+		t.Errorf("Unexpected boolean.  Expected %t.  Found %t", expected, value)
 	}
 }
 
@@ -599,7 +599,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 		}
 	}
 	if len(binds) != len(expectedBinds) {
-		t.Errorf("Unexpected binds: Expected %# got %#v.  Container was: %#v", expectedBinds, binds, container)
+		t.Errorf("Unexpected binds: Expected %#v got %#v.  Container was: %#v", expectedBinds, binds, container)
 	}
 	verifyStringArrayEquals(t, binds, expectedBinds)
 }
@@ -1160,26 +1160,26 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 func TestParseImageName(t *testing.T) {
 	name, tag := parseImageName("ubuntu")
 	if name != "ubuntu" || tag != "" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+		t.Fatalf("Unexpected name/tag: %s/%s", name, tag)
 	}
 
 	name, tag = parseImageName("ubuntu:2342")
 	if name != "ubuntu" || tag != "2342" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+		t.Fatalf("Unexpected name/tag: %s/%s", name, tag)
 	}
 
 	name, tag = parseImageName("foo/bar:445566")
 	if name != "foo/bar" || tag != "445566" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+		t.Fatalf("Unexpected name/tag: %s/%s", name, tag)
 	}
 
 	name, tag = parseImageName("registry.example.com:5000/foobar")
 	if name != "registry.example.com:5000/foobar" || tag != "" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+		t.Fatalf("Unexpected name/tag: %s/%s", name, tag)
 	}
 
 	name, tag = parseImageName("registry.example.com:5000/foobar:5342")
 	if name != "registry.example.com:5000/foobar" || tag != "5342" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+		t.Fatalf("Unexpected name/tag: %s/%s", name, tag)
 	}
 }

@@ -61,7 +61,7 @@ func main() {
 		var err error
 		cloud, err = cloudprovider.NewGCECloud()
 		if err != nil {
-			glog.Fatal("Couldn't connect to GCE cloud: %#v", err)
+			glog.Fatalf("Couldn't connect to GCE cloud: %#v", err)
 		}
 	default:
 		if len(*cloudProvider) > 0 {

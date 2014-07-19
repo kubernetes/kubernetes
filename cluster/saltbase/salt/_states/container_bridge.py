@@ -19,13 +19,13 @@ import salt.utils.ipaddr as ipaddr
 
 def ensure(name, cidr, mtu=1460):
     '''
-    Ensure that a bridge (named <name>) is configured for contianers.
+    Ensure that a bridge (named <name>) is configured for containers.
 
     Under the covers we will make sure that
       - The bridge exists
       - The MTU is set
       - The correct network is added to the bridge
-      - iptables is set up for MASQUARADE for egress
+      - iptables is set up for MASQUERADE for egress
 
     cidr:
         The cidr range in the form of 10.244.x.0/24
