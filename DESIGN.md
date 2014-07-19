@@ -38,6 +38,12 @@ A single Kubernetes cluster is not intended to span multiple availability zones.
 
 Kubernetes is not currently suitable for use by multiple users -- see [Cluster Security](#cluster-security), below.
 
+### Cluster Architecture
+
+A running Kubernetes cluster contains node agents (kubelet) and master components (APIs, scheduler, etc), on top of a distributed storage solution. This diagram shows our desired eventual state, though we're still working on a few things, like making kubelet itself (all our components, really) run within docker, and making the scheduler 100% pluggable.
+
+![Architecture Diagram](/docs/architecture.png?raw=true "Architecture overview")
+
 ## Key Concepts
 
 While Docker itself works with individual containers, Kubernetes provides higher-level organizational constructs in support of common cluster-level usage patterns, currently focused on service applications, but which could also be expanded to batch and test workloads in the future.
