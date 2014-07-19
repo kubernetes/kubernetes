@@ -541,7 +541,10 @@ func (kl *Kubelet) WatchEtcd(watchChannel <-chan *etcd.Response, updateChannel c
 	}
 }
 
-const networkContainerName = "net"
+const (
+	networkContainerName  = "net"
+	networkContainerImage = "kubernetes/pause:latest"
+)
 
 // Create a network container for a manifest. Returns the docker container ID of the newly created container.
 func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (DockerID, error) {
@@ -552,12 +555,11 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (Dock
 		ports = append(ports, container.Ports...)
 	}
 	container := &api.Container{
-		Name:    networkContainerName,
-		Image:   "busybox",
-		Command: []string{"sh", "-c", "rm -f nap && mkfifo nap && exec cat nap"},
-		Ports:   ports,
+		Name:  networkContainerName,
+		Image: networkContainerImage,
+		Ports: ports,
 	}
-	kl.DockerPuller.Pull("busybox")
+	kl.DockerPuller.Pull(networkContainerImage)
 	return kl.runContainer(manifest, container, nil, "")
 }
 
