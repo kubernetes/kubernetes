@@ -80,7 +80,7 @@ func Update(name string, client client.Interface, updatePeriod time.Duration) er
 	}
 	for _, pod := range podList.Items {
 		// We delete the pod here, the controller will recreate it.  This will result in pulling
-		// a new Docker image.  This isn't a full "update" but it's what we support for now.
+		// a new Docker image.  This isn't a full "update" but its what we support for now.
 		err = client.DeletePod(pod.ID)
 		if err != nil {
 			return err

@@ -48,7 +48,7 @@ func (impl LoadBalancerRR) LoadBalance(service string, srcAddr net.Addr) (string
 	index := impl.rrIndex[service]
 	impl.lock.RUnlock()
 	if !exists {
-		return "", errors.New("no service entry for: " + service)
+		return "", errors.New("no service entry for:" + service)
 	}
 	if len(endpoints) == 0 {
 		return "", errors.New("no endpoints for: " + service)
