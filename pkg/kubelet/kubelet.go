@@ -93,7 +93,7 @@ const (
 
 // RunKubelet starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
-func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServers, address string, port uint) {
+func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL string, etcdServers []string, address string, port uint) {
 	if kl.CadvisorClient == nil {
 		var err error
 		kl.CadvisorClient, err = cadvisor.NewClient("http://127.0.0.1:5000")
@@ -119,10 +119,9 @@ func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL, etcdServe
 			}
 		}, kl.HTTPCheckFrequency)
 	}
-	if etcdServers != "" {
-		servers := []string{etcdServers}
-		glog.Infof("Watching for etcd configs at %v", servers)
-		kl.EtcdClient = etcd.NewClient(servers)
+	if len(etcdServers) > 0 {
+		glog.Infof("Watching for etcd configs at %v", etcdServers)
+		kl.EtcdClient = etcd.NewClient(etcdServers)
 		go util.Forever(func() { kl.SyncAndSetupEtcdWatch(updateChannel) }, 20*time.Second)
 	}
 	if address != "" {

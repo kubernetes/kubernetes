@@ -37,7 +37,6 @@ import (
 
 var (
 	config             = flag.String("config", "", "Path to the config file or directory of files")
-	etcdServers        = flag.String("etcd_servers", "", "Url of etcd servers in the cluster")
 	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
 	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking config files for new data")
 	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
@@ -46,7 +45,12 @@ var (
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
+	etcdServerList     util.StringList
 )
+
+func init() {
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+}
 
 func getDockerEndpoint() string {
 	var endpoint string
@@ -96,5 +100,5 @@ func main() {
 		SyncFrequency:      *syncFrequency,
 		HTTPCheckFrequency: *httpCheckFrequency,
 	}
-	k.RunKubelet(*dockerEndpoint, *config, *manifestURL, *etcdServers, *address, *port)
+	k.RunKubelet(*dockerEndpoint, *config, *manifestURL, etcdServerList, *address, *port)
 }

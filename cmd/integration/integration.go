@@ -106,7 +106,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go myKubelet.RunKubelet("", "", manifestURL, servers[0], "localhost", 10250)
+	go myKubelet.RunKubelet("", "", manifestURL, servers, "localhost", 10250)
 
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
@@ -118,7 +118,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		SyncFrequency:      5 * time.Second,
 		HTTPCheckFrequency: 5 * time.Second,
 	}
-	go otherKubelet.RunKubelet("", "", "", servers[0], "localhost", 10251)
+	go otherKubelet.RunKubelet("", "", "", servers, "localhost", 10251)
 
 	return apiserver.URL
 }

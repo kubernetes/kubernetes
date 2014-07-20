@@ -33,16 +33,20 @@ import (
 )
 
 var (
-	etcdServers = flag.String("etcd_servers", "", "Servers for the etcd (http://ip:port).")
-	master      = flag.String("master", "", "The address of the Kubernetes API server")
+	etcdServerList util.StringList
+	master         = flag.String("master", "", "The address of the Kubernetes API server")
 )
+
+func init() {
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+}
 
 func main() {
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	if len(*etcdServers) == 0 || len(*master) == 0 {
+	if len(etcdServerList) == 0 || len(*master) == 0 {
 		glog.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
 	}
 
@@ -50,7 +54,7 @@ func main() {
 	etcd.SetLogger(util.NewLogger("etcd "))
 
 	controllerManager := controller.MakeReplicationManager(
-		etcd.NewClient([]string{*etcdServers}),
+		etcd.NewClient(etcdServerList),
 		client.New("http://"+*master, nil))
 
 	controllerManager.Run(10 * time.Second)
