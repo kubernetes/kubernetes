@@ -503,14 +503,9 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			wireFormat, err := api.Encode(event.Object)
-			if err != nil {
-				glog.Errorf("error encoding %#v: %v", event.Object, err)
-				return
-			}
-			err = websocket.JSON.Send(ws, &api.WatchEvent{
-				Type:           event.Type,
-				EmbeddedObject: wireFormat,
+			err := websocket.JSON.Send(ws, &api.WatchEvent{
+				Type:   event.Type,
+				Object: api.APIObject{event.Object},
 			})
 			if err != nil {
 				// Client disconnect.
@@ -555,14 +550,9 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			wireFormat, err := api.Encode(event.Object)
-			if err != nil {
-				glog.Errorf("error encoding %#v: %v", event.Object, err)
-				return
-			}
-			err = encoder.Encode(&api.WatchEvent{
-				Type:           event.Type,
-				EmbeddedObject: wireFormat,
+			err := encoder.Encode(&api.WatchEvent{
+				Type:   event.Type,
+				Object: api.APIObject{event.Object},
 			})
 			if err != nil {
 				// Client disconnect.

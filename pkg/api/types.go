@@ -66,7 +66,7 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-        Source *VolumeSource `yaml:"source" json:"source"`
+	Source *VolumeSource `yaml:"source" json:"source"`
 }
 
 type VolumeSource struct {
@@ -86,7 +86,7 @@ type HostDirectory struct {
 	Path string `yaml:"path" json:"path"`
 }
 
-type EmptyDirectory struct {}
+type EmptyDirectory struct{}
 
 // Port represents a network port in a single container
 type Port struct {
@@ -345,6 +345,16 @@ type WatchEvent struct {
 	// The type of the watch event; added, modified, or deleted.
 	Type watch.EventType
 
-	// An object which can be decoded via api.Decode
-	EmbeddedObject []byte
+	// For added or modified objects, this is the new object; for deleted objects,
+	// it's the state of the object immediately prior to its deletion.
+	Object APIObject
+}
+
+// APIObject has appropriate encoder and decoder functions, such that on the wire, it's
+// stored as a []byte, but in memory, the contained object is accessable as an interface{}
+// via the Get() function. Only objects having a JSONBase may be stored via APIObject.
+// The purpose of this is to allow an API object of type known only at runtime to be
+// embedded within other API objects.
+type APIObject struct {
+	Object interface{}
 }

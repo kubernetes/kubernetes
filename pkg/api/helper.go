@@ -66,7 +66,7 @@ func FindJSONBaseRO(obj interface{}) (JSONBase, error) {
 		v = v.Elem()
 	}
 	if v.Kind() != reflect.Struct {
-		return JSONBase{}, fmt.Errorf("expected struct, but got %v", v.Type().Name())
+		return JSONBase{}, fmt.Errorf("expected struct, but got %v (%#v)", v.Type().Name(), v.Interface())
 	}
 	jsonBase := v.FieldByName("JSONBase")
 	if !jsonBase.IsValid() {
@@ -125,7 +125,7 @@ func nameAndJSONBase(obj interface{}) (string, *JSONBase, error) {
 	v = v.Elem()
 	name := v.Type().Name()
 	if v.Kind() != reflect.Struct {
-		return "", nil, fmt.Errorf("expected struct, but got %v", name)
+		return "", nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), v.Type().Name(), v.Interface())
 	}
 	jsonBase := v.FieldByName("JSONBase")
 	if !jsonBase.IsValid() {
