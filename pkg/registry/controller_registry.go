@@ -17,6 +17,7 @@ limitations under the License.
 package registry
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // ControllerRegistryStorage is an implementation of RESTStorage for the api server.
@@ -134,4 +136,16 @@ func (storage *ControllerRegistryStorage) waitForController(ctrl api.Replication
 		time.Sleep(storage.pollPeriod)
 	}
 	return ctrl, nil
+}
+
+// WatchAll returns ReplicationController events via a watch.Interface, implementing
+// apiserver.ResourceWatcher.
+func (storage *ControllerRegistryStorage) WatchAll() (watch.Interface, error) {
+	return storage.registry.WatchControllers()
+}
+
+// WatchSingle returns events for a single ReplicationController via a watch.Interface,
+// implementing apiserver.ResourceWatcher.
+func (storage *ControllerRegistryStorage) WatchSingle(id string) (watch.Interface, error) {
+	return nil, errors.New("unimplemented")
 }

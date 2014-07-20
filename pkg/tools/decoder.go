@@ -18,6 +18,7 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -44,7 +45,14 @@ func NewAPIEventDecoder(stream io.ReadCloser) *APIEventDecoder {
 func (d *APIEventDecoder) Decode() (action watch.EventType, object interface{}, err error) {
 	var got api.WatchEvent
 	err = d.decoder.Decode(&got)
-	return got.Type, got.Object.Object, err
+	if err != nil {
+		return action, nil, err
+	}
+	switch got.Type {
+	case watch.Added, watch.Modified, watch.Deleted:
+		return got.Type, got.Object.Object, err
+	}
+	return action, nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 }
 
 // Close closes the underlying stream.

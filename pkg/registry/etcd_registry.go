@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
@@ -205,6 +206,12 @@ func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, er
 	var controllers []api.ReplicationController
 	err := registry.helper().ExtractList("/registry/controllers", &controllers)
 	return controllers, err
+}
+
+// WatchControllers begins watching for new, changed, or deleted controllers.
+// TODO: Add id/selector parameters?
+func (registry *EtcdRegistry) WatchControllers() (watch.Interface, error) {
+	return registry.helper().WatchList("/registry/controllers", tools.Everything)
 }
 
 func makeControllerKey(id string) string {

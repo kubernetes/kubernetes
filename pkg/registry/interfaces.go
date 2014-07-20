@@ -19,6 +19,7 @@ package registry
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // PodRegistry is an interface implemented by things that know how to store Pod objects.
@@ -38,6 +39,7 @@ type PodRegistry interface {
 // ControllerRegistry is an interface for things that know how to store ReplicationControllers.
 type ControllerRegistry interface {
 	ListControllers() ([]api.ReplicationController, error)
+	WatchControllers() (watch.Interface, error)
 	GetController(controllerID string) (*api.ReplicationController, error)
 	CreateController(controller api.ReplicationController) error
 	UpdateController(controller api.ReplicationController) error

@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -221,142 +222,6 @@ func TestCreateReplica(t *testing.T) {
 	}
 }
 
-func TestHandleWatchResponseNotSet(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
-
-	fakePodControl := FakePodControl{}
-
-	manager := MakeReplicationManager(nil, client)
-	manager.podControl = &fakePodControl
-	_, err := manager.handleWatchResponse(&etcd.Response{
-		Action: "update",
-	})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-}
-
-func TestHandleWatchResponseNoNode(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
-
-	fakePodControl := FakePodControl{}
-
-	manager := MakeReplicationManager(nil, client)
-	manager.podControl = &fakePodControl
-	_, err := manager.handleWatchResponse(&etcd.Response{
-		Action: "set",
-	})
-	if err == nil {
-		t.Error("Unexpected non-error")
-	}
-}
-
-func TestHandleWatchResponseBadData(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
-
-	fakePodControl := FakePodControl{}
-
-	manager := MakeReplicationManager(nil, client)
-	manager.podControl = &fakePodControl
-	_, err := manager.handleWatchResponse(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: "foobar",
-		},
-	})
-	if err == nil {
-		t.Error("Unexpected non-error")
-	}
-}
-
-func TestHandleWatchResponse(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
-
-	fakePodControl := FakePodControl{}
-
-	manager := MakeReplicationManager(nil, client)
-	manager.podControl = &fakePodControl
-
-	controller := makeReplicationController(2)
-
-	// TODO: fixme when etcd uses Encode/Decode
-	data, err := json.Marshal(controller)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: string(data),
-		},
-	})
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-	if !reflect.DeepEqual(controller, *controllerOut) {
-		t.Errorf("Unexpected mismatch.  Expected %#v, Saw: %#v", controller, controllerOut)
-	}
-}
-
-func TestHandleWatchResponseDelete(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
-
-	fakePodControl := FakePodControl{}
-
-	manager := MakeReplicationManager(nil, client)
-	manager.podControl = &fakePodControl
-
-	controller := makeReplicationController(2)
-
-	// TODO: fixme when etcd writing uses api.Encode
-	data, err := json.Marshal(controller)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
-		Action: "delete",
-		PrevNode: &etcd.Node{
-			Value: string(data),
-		},
-	})
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-	if !reflect.DeepEqual(controller, *controllerOut) {
-		t.Errorf("Unexpected mismatch.  Expected %#v, Saw: %#v", controller, controllerOut)
-	}
-}
-
 func TestSyncronize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1"},
@@ -435,9 +300,14 @@ func TestSyncronize(t *testing.T) {
 
 func TestWatchControllers(t *testing.T) {
 	fakeEtcd := tools.MakeFakeEtcdClient(t)
+	fakeWatcher := watch.NewFake()
 	manager := MakeReplicationManager(fakeEtcd, nil)
+	manager.watchMaker = func() (watch.Interface, error) {
+		return fakeWatcher, nil
+	}
+
 	var testControllerSpec api.ReplicationController
-	received := make(chan bool)
+	received := make(chan struct{})
 	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
 		if !reflect.DeepEqual(controllerSpec, testControllerSpec) {
 			t.Errorf("Expected %#v, but got %#v", testControllerSpec, controllerSpec)
@@ -448,38 +318,13 @@ func TestWatchControllers(t *testing.T) {
 
 	go manager.watchControllers()
 
-	fakeEtcd.WaitForWatchCompletion()
-
 	// Test normal case
 	testControllerSpec.ID = "foo"
-	fakeEtcd.WatchResponse <- &etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: util.MakeJSONString(testControllerSpec),
-		},
-	}
+	fakeWatcher.Add(&testControllerSpec)
 
 	select {
 	case <-received:
 	case <-time.After(10 * time.Millisecond):
 		t.Errorf("Expected 1 call but got 0")
-	}
-
-	// Test error case
-	fakeEtcd.WatchInjectError <- fmt.Errorf("Injected error")
-
-	// Did everything shut down?
-	if _, open := <-fakeEtcd.WatchResponse; open {
-		t.Errorf("An injected error did not cause a graceful shutdown")
-	}
-
-	// Test purposeful shutdown
-	go manager.watchControllers()
-	fakeEtcd.WaitForWatchCompletion()
-	fakeEtcd.WatchStop <- true
-
-	// Did everything shut down?
-	if _, open := <-fakeEtcd.WatchResponse; open {
-		t.Errorf("A stop did not cause a graceful shutdown")
 	}
 }

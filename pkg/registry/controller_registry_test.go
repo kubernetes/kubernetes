@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type MockControllerRegistry struct {
@@ -50,6 +51,9 @@ func (registry *MockControllerRegistry) UpdateController(controller api.Replicat
 }
 func (registry *MockControllerRegistry) DeleteController(ID string) error {
 	return registry.err
+}
+func (registry *MockControllerRegistry) WatchControllers() (watch.Interface, error) {
+	return nil, registry.err
 }
 
 func TestListControllersError(t *testing.T) {
@@ -267,13 +271,13 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 	}
 
 	failureCases := map[string]api.ReplicationController{
-		"empty ID": api.ReplicationController{
+		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
-		"empty selector": api.ReplicationController{
+		"empty selector": {
 			JSONBase:     api.JSONBase{ID: "abc"},
 			DesiredState: api.ReplicationControllerState{},
 		},
@@ -298,13 +302,13 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 	}
 
 	failureCases := map[string]api.ReplicationController{
-		"empty ID": api.ReplicationController{
+		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
-		"empty selector": api.ReplicationController{
+		"empty selector": {
 			JSONBase:     api.JSONBase{ID: "abc"},
 			DesiredState: api.ReplicationControllerState{},
 		},
