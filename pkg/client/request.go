@@ -18,19 +18,17 @@ package client
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
@@ -231,7 +229,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Got status: %v", response.StatusCode)
 	}
-	return newHTTPWatcher(response.Body), nil
+	return watch.NewStreamWatcher(tools.NewAPIEventDecoder(response.Body)), nil
 }
 
 // Do formats and executes the request. Returns the API object received, or an error.
@@ -292,75 +290,4 @@ func (r Result) Into(obj interface{}) error {
 // Returns the error executing the request, nil if no error occurred.
 func (r Result) Error() error {
 	return r.err
-}
-
-type httpWatcher struct {
-	source io.ReadCloser
-	result chan watch.Event
-	done   chan struct{}
-	sync.Mutex
-	stopped bool
-}
-
-func newHTTPWatcher(source io.ReadCloser) *httpWatcher {
-	hw := &httpWatcher{
-		source: source,
-		result: make(chan watch.Event),
-		done:   make(chan struct{}),
-	}
-	go hw.receive()
-	return hw
-}
-
-// Implements watch.Interface
-func (hw *httpWatcher) ResultChan() <-chan watch.Event {
-	return hw.result
-}
-
-// Implements watch.Interface
-func (hw *httpWatcher) Stop() {
-	hw.Lock()
-	defer hw.Unlock()
-	if !hw.stopped {
-		close(hw.done)
-		hw.stopped = true
-	}
-}
-
-// In a loop, read results from http, decode, and send down the result channel.
-func (hw *httpWatcher) receive() {
-	defer close(hw.result)
-	defer hw.source.Close()
-	defer util.HandleCrash()
-
-	decoder := json.NewDecoder(hw.source)
-
-	decoded := make(chan *api.WatchEvent)
-
-	// Read one at a time. Have to do this separately because Decode blocks and
-	// we want to wait on the done channel, too.
-	go func() {
-		defer util.HandleCrash()
-		for {
-			var got api.WatchEvent
-			err := decoder.Decode(&got)
-			if err != nil {
-				hw.Stop()
-				return
-			}
-			decoded <- &got
-		}
-	}()
-
-	for {
-		select {
-		case <-hw.done:
-			return
-		case got := <-decoded:
-			hw.result <- watch.Event{
-				Type:   got.Type,
-				Object: got.Object.Object,
-			}
-		}
-	}
 }
