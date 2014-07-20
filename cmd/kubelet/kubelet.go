@@ -48,15 +48,7 @@ var (
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 )
 
-func main() {
-	flag.Parse()
-	util.InitLogs()
-	defer util.FlushLogs()
-	rand.Seed(time.Now().UTC().UnixNano())
-
-	// Set up logger for etcd client
-	etcd.SetLogger(util.NewLogger("etcd "))
-
+func getDockerEndpoint() string {
 	var endpoint string
 	if len(*dockerEndpoint) > 0 {
 		endpoint = *dockerEndpoint
@@ -66,23 +58,39 @@ func main() {
 		endpoint = "unix:///var/run/docker.sock"
 	}
 	glog.Infof("Connecting to docker on %s", endpoint)
-	dockerClient, err := docker.NewClient(endpoint)
-	if err != nil {
-		glog.Fatal("Couldn't connnect to docker.")
-	}
 
+	return endpoint
+}
+
+func getHostname() string {
 	hostname := []byte(*hostnameOverride)
 	if string(hostname) == "" {
 		// Note: We use exec here instead of os.Hostname() because we
 		// want the FQDN, and this is the easiest way to get it.
-		hostname, err = exec.Command("hostname", "-f").Output()
+		fqdn, err := exec.Command("hostname", "-f").Output()
 		if err != nil {
 			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
+		hostname = fqdn
+	}
+	return string(hostname)
+}
+
+func main() {
+	flag.Parse()
+	util.InitLogs()
+	defer util.FlushLogs()
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	etcd.SetLogger(util.NewLogger("etcd "))
+
+	dockerClient, err := docker.NewClient(getDockerEndpoint())
+	if err != nil {
+		glog.Fatal("Couldn't connect to docker.")
 	}
 
 	k := kubelet.Kubelet{
-		Hostname:           string(hostname),
+		Hostname:           getHostname(),
 		DockerClient:       dockerClient,
 		FileCheckFrequency: *fileCheckFrequency,
 		SyncFrequency:      *syncFrequency,
