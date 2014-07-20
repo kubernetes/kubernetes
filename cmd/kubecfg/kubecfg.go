@@ -36,7 +36,6 @@ import (
 // AppVersion is the current version of kubecfg.
 const AppVersion = "0.1"
 
-// The flag package provides a default help printer via -h switch
 var (
 	versionFlag  = flag.Bool("V", false, "Print the version number.")
 	httpServer   = flag.String("h", "", "The host to connect to.")
@@ -71,7 +70,8 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-// Reads & parses config file. On error, calls glog.Fatal().
+// readConfig reads and parses pod, replicationController, and service
+// configuration files. If any errors log and exit non-zero.
 func readConfig(storage string) []byte {
 	if len(*config) == 0 {
 		glog.Fatal("Need config file (-c)")
@@ -90,13 +90,12 @@ func readConfig(storage string) []byte {
 	return data
 }
 
-// CloudCfg command line tool.
 func main() {
 	flag.Usage = func() {
 		usage()
 	}
 
-	flag.Parse() // Scan the arguments list
+	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
 
@@ -150,7 +149,6 @@ func main() {
 	}
 }
 
-// Attempts to execute an API request
 func executeAPIRequest(method string, s *kube_client.Client) bool {
 	parseStorage := func() string {
 		if len(flag.Args()) != 2 {
@@ -225,7 +223,6 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	return true
 }
 
-// Attempts to execute a replicationController request
 func executeControllerRequest(method string, c *kube_client.Client) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
