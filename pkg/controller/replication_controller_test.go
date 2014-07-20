@@ -228,7 +228,7 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 		Action: "update",
 	})
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -295,7 +295,7 @@ func TestHandleWatchResponse(t *testing.T) {
 
 	data, err := json.Marshal(controller)
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
@@ -329,7 +329,7 @@ func TestHandleWatchResponseDelete(t *testing.T) {
 
 	data, err := json.Marshal(controller)
 	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "delete",
