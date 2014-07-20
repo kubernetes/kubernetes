@@ -42,7 +42,7 @@ var (
 )
 
 func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "Servers for the etcd (http://ip:port), comma separated")
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 }
 

@@ -27,9 +27,13 @@ import (
 )
 
 var (
-	configFile  = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
-	etcdServers = flag.String("etcd_servers", "http://10.240.10.57:4001", "Servers for the etcd cluster (http://ip:port).")
+	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
+	etcdServerList util.StringList
 )
+
+func init() {
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+}
 
 func main() {
 	flag.Parse()
@@ -39,13 +43,13 @@ func main() {
 	// Set up logger for etcd client
 	etcd.SetLogger(util.NewLogger("etcd "))
 
-	glog.Infof("Using configuration file %s and etcd_servers %s", *configFile, *etcdServers)
+	glog.Infof("Using configuration file %s and etcd_servers %v", *configFile, etcdServerList)
 
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
 
 	// Create a configuration source that handles configuration from etcd.
-	etcdClient := etcd.NewClient([]string{*etcdServers})
+	etcdClient := etcd.NewClient(etcdServerList)
 	config.NewConfigSourceEtcd(etcdClient,
 		serviceConfig.Channel("etcd"),
 		endpointsConfig.Channel("etcd"))
