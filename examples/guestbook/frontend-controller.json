@@ -1,7 +1,7 @@
   {
     "id": "frontendController",
     "desiredState": {
-      "replicas": 1,
+      "replicas": 3,
       "replicaSelector": {"name": "frontend"},
       "podTemplate": {
         "desiredState": {
