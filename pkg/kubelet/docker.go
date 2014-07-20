@@ -65,6 +65,12 @@ func NewDockerPuller(client DockerInterface) DockerPuller {
 
 func (p dockerPuller) Pull(image string) error {
 	image, tag := parseImageName(image)
+
+	// If no tag was specified, use the default "latest".
+	if len(tag) == 0 {
+		tag = "latest"
+	}
+
 	opts := docker.PullImageOptions{
 		Repository: image,
 		Tag:        tag,
@@ -194,7 +200,7 @@ func parseDockerName(name string) (manifestID, containerName string) {
 	return
 }
 
-// Parses image name including an tag and returns image name and tag
+// Parses image name including a tag and returns image name and tag.
 // TODO: Future Docker versions can parse the tag on daemon side, see:
 // https://github.com/dotcloud/docker/issues/6876
 // So this can be deprecated at some point.
