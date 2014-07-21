@@ -1,5 +1,11 @@
 {%- set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() %}
-DAEMON_ARGS="$DAEMON_ARGS -etcd_servers=http://{{ ips[0][0] }}:4001 -minion_regexp '{{ pillar['instance_prefix'] }}.*'"
+DAEMON_ARGS="$DAEMON_ARGS -etcd_servers=http://{{ ips[0][0] }}:4001"
 
+{% if grains['cloud'] is not defined or grains['cloud'] != 'azure' %}
+DAEMON_ARGS="$DAEMON_ARGS -minion_regexp='{{ pillar['instance_prefix'] }}.*'"
 MACHINES="{{ ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) }}"
-DAEMON_ARGS="$DAEMON_ARGS --machines $MACHINES"
+{% else %}
+MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') }}"
+{% endif %}
+
+DAEMON_ARGS="$DAEMON_ARGS -machines=$MACHINES"

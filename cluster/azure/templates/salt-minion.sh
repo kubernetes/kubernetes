@@ -21,12 +21,16 @@ echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
 
+hostnamef=$(hostname -f)
+
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-pool
   cbr-cidr: $MINION_IP_RANGE
+  cloud: azure
+  hostnamef: $hostnamef
 EOF
 
 # Install Salt

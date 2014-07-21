@@ -57,6 +57,7 @@ apiserver-build:
 /etc/init.d/apiserver:
   file.managed:
     - source: salt://apiserver/initd
+    - template: jinja
     - user: root
     - group: root
     - mode: 755
