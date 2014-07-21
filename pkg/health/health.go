@@ -42,12 +42,10 @@ type HTTPGetInterface interface {
 // It returns Unknown and err if the HTTP communication itself fails.
 func Check(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
-	if res.Body != nil {
-		defer res.Body.Close()
-	}
 	if err != nil {
 		return Unknown, err
 	}
+	defer res.Body.Close()
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		return Healthy, nil
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"testing"
@@ -24,10 +26,15 @@ import (
 
 type alwaysYes struct{}
 
-func (alwaysYes) Get(url string) (*http.Response, error) {
+func fakeHTTPResponse(status int) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusOK,
-	}, nil
+		StatusCode: status,
+		Body:       ioutil.NopCloser(&bytes.Buffer{}),
+	}
+}
+
+func (alwaysYes) Get(url string) (*http.Response, error) {
+	return fakeHTTPResponse(http.StatusOK), nil
 }
 
 func TestBasicDelegation(t *testing.T) {
@@ -66,9 +73,9 @@ type notMinion struct {
 
 func (n *notMinion) Get(url string) (*http.Response, error) {
 	if url != "http://"+n.minion+":10250/healthz" {
-		return &http.Response{StatusCode: http.StatusOK}, nil
+		return fakeHTTPResponse(http.StatusOK), nil
 	} else {
-		return &http.Response{StatusCode: http.StatusInternalServerError}, nil
+		return fakeHTTPResponse(http.StatusInternalServerError), nil
 	}
 }
 
