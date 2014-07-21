@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -287,19 +288,24 @@ func TestLoadAuthInfo(t *testing.T) {
 	}
 }
 
-func validatePort(t *testing.T, p api.Port, external int, internal int) {
-	if p.HostPort != external || p.ContainerPort != internal {
-		t.Errorf("Unexpected port: %#v != (%d, %d)", p, external, internal)
-	}
-}
-
 func TestMakePorts(t *testing.T) {
-	ports := makePorts("8080:80,8081:8081,443:444")
-	if len(ports) != 3 {
-		t.Errorf("Unexpected ports: %#v", ports)
+	var makePortsTests = []struct {
+		spec  string
+		ports []api.Port
+	}{
+		{
+			"8080:80,8081:8081,443:444",
+			[]api.Port{
+				api.Port{HostPort: 8080, ContainerPort: 80},
+				api.Port{HostPort: 8081, ContainerPort: 8081},
+				api.Port{HostPort: 443, ContainerPort: 444},
+			},
+		},
 	}
-
-	validatePort(t, ports[0], 8080, 80)
-	validatePort(t, ports[1], 8081, 8081)
-	validatePort(t, ports[2], 443, 444)
+	for _, tt := range makePortsTests {
+		ports := makePorts(tt.spec)
+		if !reflect.DeepEqual(ports, tt.ports) {
+			t.Errorf("Expected %#v, got %#v", tt.ports, ports)
+		}
+	}
 }
