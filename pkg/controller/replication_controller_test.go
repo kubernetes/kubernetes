@@ -34,13 +34,6 @@ import (
 // TODO: Move this to a common place, it's needed in multiple tests.
 var apiPath = "/api/v1beta1"
 
-// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-}
-
 func makeURL(suffix string) string {
 	return apiPath + suffix
 }
@@ -234,7 +227,9 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "update",
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }
 
 func TestHandleWatchResponseNoNode(t *testing.T) {
@@ -299,7 +294,9 @@ func TestHandleWatchResponse(t *testing.T) {
 	controller := makeReplicationController(2)
 
 	data, err := json.Marshal(controller)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
 		Node: &etcd.Node{
@@ -331,7 +328,9 @@ func TestHandleWatchResponseDelete(t *testing.T) {
 	controller := makeReplicationController(2)
 
 	data, err := json.Marshal(controller)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "delete",
 		PrevNode: &etcd.Node{
