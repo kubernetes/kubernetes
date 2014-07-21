@@ -589,7 +589,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 
 	expectedVolumes := []string{"/mnt/path", "/mnt/path2"}
 	expectedBinds := []string{"/exports/pod/disk:/mnt/path", "/exports/pod/disk2:/mnt/path2:ro", "/mnt/path3:/mnt/path3",
-				  "/mnt/host:/mnt/path4"}
+		"/mnt/host:/mnt/path4"}
 	if len(volumes) != len(expectedVolumes) {
 		t.Errorf("Unexpected volumes. Expected %#v got %#v.  Container was: %#v", expectedVolumes, volumes, container)
 	}
@@ -1157,29 +1157,25 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
+var parseImageNameTests = []struct {
+	imageName string
+	name      string
+	tag       string
+}{
+	{"ubuntu", "ubuntu", ""},
+	{"ubuntu:2342", "ubuntu", "2342"},
+	{"ubuntu:latest", "ubuntu", "latest"},
+	{"foo/bar:445566", "foo/bar", "445566"},
+	{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", ""},
+	{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
+	{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
+}
+
 func TestParseImageName(t *testing.T) {
-	name, tag := parseImageName("ubuntu")
-	if name != "ubuntu" || tag != "" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
-	}
-
-	name, tag = parseImageName("ubuntu:2342")
-	if name != "ubuntu" || tag != "2342" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
-	}
-
-	name, tag = parseImageName("foo/bar:445566")
-	if name != "foo/bar" || tag != "445566" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
-	}
-
-	name, tag = parseImageName("registry.example.com:5000/foobar")
-	if name != "registry.example.com:5000/foobar" || tag != "" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
-	}
-
-	name, tag = parseImageName("registry.example.com:5000/foobar:5342")
-	if name != "registry.example.com:5000/foobar" || tag != "5342" {
-		t.Fatal("Unexpected name/tag: %s/%s", name, tag)
+	for _, tt := range parseImageNameTests {
+		name, tag := parseImageName(tt.imageName)
+		if name != tt.name || tag != tt.tag {
+			t.Errorf("Expected name/tag: %s/%s, got %s/%s", tt.name, tt.tag, name, tag)
+		}
 	}
 }
