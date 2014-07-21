@@ -203,7 +203,7 @@ func (server *APIServer) handleMinionReq(w http.ResponseWriter, req *http.Reques
 	minionHost := path[:idx]
 	_, port, _ := net.SplitHostPort(minionHost)
 	if port == "" {
-		// No port information
+		// Couldn't retrieve port information
 		// TODO: Retrieve port info from a common object
 		minionHost += ":10250"
 	}
