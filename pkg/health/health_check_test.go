@@ -17,54 +17,62 @@ limitations under the License.
 package health
 
 import (
+	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// fakeHTTPClient is a fake implementation of HTTPGetInterface.
-type fakeHTTPClient struct {
-	req string
-	res http.Response
-	err error
-}
+const statusServerEarlyShutdown = -1
 
-func (f *fakeHTTPClient) Get(url string) (*http.Response, error) {
-	f.req = url
-	return &f.res, f.err
-}
-
-func TestHttpHealth(t *testing.T) {
-	fakeClient := fakeHTTPClient{
-		res: http.Response{
-			StatusCode: http.StatusOK,
-		},
+func TestHealthChecker(t *testing.T) {
+	var healthCheckerTests = []struct {
+		status int
+		health Status
+	}{
+		{http.StatusOK, Healthy},
+		{statusServerEarlyShutdown, Unknown},
+		{http.StatusBadRequest, Unhealthy},
+		{http.StatusBadGateway, Unhealthy},
+		{http.StatusInternalServerError, Unhealthy},
 	}
-
-	check := HTTPHealthChecker{
-		client: &fakeClient,
-	}
-
-	container := api.Container{
-		LivenessProbe: &api.LivenessProbe{
-			HTTPGet: &api.HTTPGetProbe{
-				Port: "8080",
-				Path: "/foo/bar",
+	for _, healthCheckerTest := range healthCheckerTests {
+		tt := healthCheckerTest
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(tt.status)
+		}))
+		u, err := url.Parse(ts.URL)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		host, port, err := net.SplitHostPort(u.Host)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if tt.status == statusServerEarlyShutdown {
+			ts.Close()
+		}
+		container := api.Container{
+			LivenessProbe: &api.LivenessProbe{
+				HTTPGet: &api.HTTPGetProbe{
+					Port: port,
+					Path: "/foo/bar",
+					Host: host,
+				},
+				Type: "http",
 			},
-			Type: "http",
-		},
-	}
-
-	ok, err := check.HealthCheck(container)
-	if ok != Healthy {
-		t.Error("Unexpected unhealthy")
-	}
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-	if fakeClient.req != "http://localhost:8080/foo/bar" {
-		t.Errorf("Unexpected url: %s", fakeClient.req)
+		}
+		hc := NewHealthChecker()
+		health, err := hc.HealthCheck(container)
+		if err != nil && tt.health != Unknown {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if health != tt.health {
+			t.Errorf("Expected %v, got %v", tt.health, health)
+		}
 	}
 }
 
@@ -81,12 +89,10 @@ func TestFindPort(t *testing.T) {
 			},
 		},
 	}
-	check := HTTPHealthChecker{}
-	validatePort(t, check.findPort(container, "foo"), 8080)
-}
-
-func validatePort(t *testing.T, port int64, expectedPort int64) {
-	if port != expectedPort {
-		t.Errorf("Unexpected port: %d, expected: %d", port, expectedPort)
+	checker := HTTPHealthChecker{}
+	want := int64(8080)
+	got := checker.findPort(container, "foo")
+	if got != want {
+		t.Errorf("Expected %v, got %v", want, got)
 	}
 }
