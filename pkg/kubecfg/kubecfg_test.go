@@ -27,13 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-}
-
 type Action struct {
 	action string
 	value  interface{}
@@ -223,7 +216,9 @@ func TestCloudCfgDeleteController(t *testing.T) {
 	fakeClient := FakeKubeClient{}
 	name := "name"
 	err := DeleteController(name, &fakeClient)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if len(fakeClient.actions) != 2 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.actions)
 	}
