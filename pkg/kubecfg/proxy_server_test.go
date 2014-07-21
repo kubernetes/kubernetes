@@ -26,20 +26,30 @@ import (
 func TestFileServing(t *testing.T) {
 	data := "This is test data"
 	dir, err := ioutil.TempDir("", "data")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	err = ioutil.WriteFile(dir+"/test.txt", []byte(data), 0755)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	prefix := "/foo/"
 	handler := makeFileHandler(prefix, dir)
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 	req, err := http.NewRequest("GET", server.URL+prefix+"test.txt", nil)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	res, err := client.Do(req)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	defer res.Body.Close()
 	b, err := ioutil.ReadAll(res.Body)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d", res.StatusCode)
 	}
