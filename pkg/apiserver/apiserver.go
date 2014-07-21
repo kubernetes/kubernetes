@@ -17,15 +17,21 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"path"
 	"runtime/debug"
 	"strings"
 	"time"
 
+	"code.google.com/p/go.net/html"
+	"code.google.com/p/go.net/html/atom"
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -153,6 +159,8 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 
 	s.mux.HandleFunc("/", s.notFound)
 
+	s.mux.HandleFunc("/proxy/minion/", s.handleMinionReq)
+
 	return s
 }
 
@@ -169,6 +177,120 @@ func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
 	// TODO: serve this out of a file?
 	data := "<html><body>Welcome to Kubernetes</body></html>"
 	fmt.Fprint(w, data)
+}
+
+func (server *APIServer) handleMinionReq(w http.ResponseWriter, req *http.Request) {
+	minionPrefix := "/proxy/minion/"
+	if !strings.HasPrefix(req.URL.Path, minionPrefix) {
+		server.notFound(w, req)
+		return
+	}
+
+	path := req.URL.Path[len(minionPrefix):]
+	rawQuery := req.URL.RawQuery
+
+	// Expect path as: ${minion}/${query_to_minion}
+	// and query_to_minion can be any query that kubelet will accept.
+	//
+	// For example:
+	// To query stats of a minion or a pod or a container,
+	// path string can be ${minion}/stats/<podid>/<containerName> or
+	// ${minion}/podInfo?podID=<podid>
+	//
+	// To query logs on a minion, path string can be:
+	// ${minion}/logs/
+	idx := strings.Index(path, "/")
+	minionHost := path[:idx]
+	_, port, _ := net.SplitHostPort(minionHost)
+	if port == "" {
+		// Couldn't retrieve port information
+		// TODO: Retrieve port info from a common object
+		minionHost += ":10250"
+	}
+	minionPath := path[idx:]
+
+	minionURL := &url.URL{
+		Scheme: "http",
+		Host:   minionHost,
+	}
+	newReq, err := http.NewRequest("GET", minionPath+"?"+rawQuery, nil)
+	if err != nil {
+		glog.Errorf("Failed to create request: %s", err)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(minionURL)
+	proxy.Transport = &minionTransport{}
+	proxy.ServeHTTP(w, newReq)
+}
+
+type minionTransport struct{}
+
+func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(req)
+
+	if strings.Contains(resp.Header.Get("Content-Type"), "text/plain") {
+		// Do nothing, simply pass through
+		return resp, err
+	}
+
+	resp, err = t.ProcessResponse(req, resp)
+	return resp, err
+}
+
+func (t *minionTransport) ProcessResponse(req *http.Request, resp *http.Response) (*http.Response, error) {
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		// copying the response body did not work
+		return nil, err
+	}
+
+	bodyNode := &html.Node{
+		Type:     html.ElementNode,
+		Data:     "body",
+		DataAtom: atom.Body,
+	}
+	nodes, err := html.ParseFragment(bytes.NewBuffer(body), bodyNode)
+	if err != nil {
+		glog.Errorf("Failed to found <body> node: %v", err)
+		return resp, err
+	}
+
+	// Define the method to traverse the doc tree and update href node to
+	// point to correct minion
+	var updateHRef func(*html.Node)
+	updateHRef = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for i, attr := range n.Attr {
+				if attr.Key == "href" {
+					Url := &url.URL{
+						Path: "/proxy/minion/" + req.URL.Host + req.URL.Path + attr.Val,
+					}
+					n.Attr[i].Val = Url.String()
+					break
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			updateHRef(c)
+		}
+	}
+
+	newContent := &bytes.Buffer{}
+	for _, n := range nodes {
+		updateHRef(n)
+		err = html.Render(newContent, n)
+		if err != nil {
+			glog.Errorf("Failed to render: %v", err)
+		}
+	}
+
+	resp.Body = ioutil.NopCloser(newContent)
+	// Update header node with new content-length
+	// TODO: Remove any hash/signature headers here?
+	resp.Header.Del("Content-Length")
+	resp.ContentLength = int64(newContent.Len())
+
+	return resp, err
 }
 
 // HTTP Handler interface

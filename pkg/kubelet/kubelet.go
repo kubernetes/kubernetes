@@ -59,6 +59,8 @@ type CadvisorInterface interface {
 }
 
 // New creates a new Kubelet.
+// TODO: currently it is only called by test code.
+// Need cleanup.
 func New() *Kubelet {
 	return &Kubelet{}
 }
@@ -77,6 +79,7 @@ type Kubelet struct {
 	HTTPCheckFrequency time.Duration
 	pullLock           sync.Mutex
 	HealthChecker      health.HealthChecker
+	LogServer          http.Handler
 }
 
 type manifestUpdate struct {
@@ -94,6 +97,9 @@ const (
 // RunKubelet starts background goroutines. If config_path, manifest_url, or address are empty,
 // they are not watched. Never returns.
 func (kl *Kubelet) RunKubelet(dockerEndpoint, configPath, manifestURL string, etcdServers []string, address string, port uint) {
+	if kl.LogServer == nil {
+		kl.LogServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
+	}
 	if kl.CadvisorClient == nil {
 		var err error
 		kl.CadvisorClient, err = cadvisor.NewClient("http://127.0.0.1:5000")
@@ -813,4 +819,10 @@ func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIC
 		return health.Healthy, nil
 	}
 	return kl.HealthChecker.HealthCheck(container)
+}
+
+// Returns logs of current machine.
+func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
+	// TODO: whitelist logs we are willing to serve
+	kl.LogServer.ServeHTTP(w, req)
 }

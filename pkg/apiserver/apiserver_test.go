@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -664,5 +665,54 @@ func TestWatchHTTP(t *testing.T) {
 	err = decoder.Decode(&got)
 	if err == nil {
 		t.Errorf("Unexpected non-error")
+	}
+}
+
+func TestMinionTransport(t *testing.T) {
+	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
+	transport := &minionTransport{}
+
+	// Test /logs/
+	request := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Scheme: "http",
+			Host:   "minion1:10250",
+			Path:   "/logs/",
+		},
+	}
+	response := &http.Response{
+		Status:     "200 OK",
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader(content)),
+		Close:      true,
+	}
+	updated_resp, _ := transport.ProcessResponse(request, response)
+	body, _ := ioutil.ReadAll(updated_resp.Body)
+	expected := string(`<pre><a href="/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`)
+	if !strings.Contains(string(body), expected) {
+		t.Errorf("Received wrong content: %s", string(body))
+	}
+
+	// Test subdir under /logs/
+	request = &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Scheme: "http",
+			Host:   "minion1:8080",
+			Path:   "/whatever/apt/",
+		},
+	}
+	response = &http.Response{
+		Status:     "200 OK",
+		StatusCode: http.StatusOK,
+		Body:       ioutil.NopCloser(strings.NewReader(content)),
+		Close:      true,
+	}
+	updated_resp, _ = transport.ProcessResponse(request, response)
+	body, _ = ioutil.ReadAll(updated_resp.Body)
+	expected = string(`<pre><a href="/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a></pre>`)
+	if !strings.Contains(string(body), expected) {
+		t.Errorf("Received wrong content: %s", string(body))
 	}
 }

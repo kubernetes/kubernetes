@@ -47,6 +47,7 @@ type kubeletInterface interface {
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
+	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
 func (s *Server) error(w http.ResponseWriter, err error) {
@@ -131,6 +132,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.Header().Add("Content-type", "application/json")
 		w.Write(data)
+	case strings.HasPrefix(u.Path, "/logs/"):
+		s.Kubelet.ServeLogs(w, req)
 	default:
 		s.DelegateHandler.ServeHTTP(w, req)
 	}
