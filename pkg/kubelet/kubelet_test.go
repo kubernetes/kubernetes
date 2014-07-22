@@ -57,10 +57,10 @@ func makeTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *FakeDocker
 		err: nil,
 	}
 
-	kubelet := New()
-	kubelet.DockerClient = fakeDocker
-	kubelet.DockerPuller = &FakeDockerPuller{}
-	kubelet.EtcdClient = fakeEtcdClient
+	kubelet := &Kubelet{}
+	kubelet.dockerClient = fakeDocker
+	kubelet.dockerPuller = &FakeDockerPuller{}
+	kubelet.etcdClient = fakeEtcdClient
 	return kubelet, fakeEtcdClient, fakeDocker
 }
 
@@ -160,7 +160,7 @@ func TestKillContainerWithError(t *testing.T) {
 		},
 	}
 	kubelet, _, _ := makeTestKubelet(t)
-	kubelet.DockerClient = fakeDocker
+	kubelet.dockerClient = fakeDocker
 	err := kubelet.killContainer(fakeDocker.containerList[0])
 	verifyError(t, err)
 	verifyCalls(t, fakeDocker, []string{"stop"})
@@ -289,7 +289,7 @@ func (f *FalseHealthChecker) HealthCheck(container api.Container) (health.Status
 
 func TestSyncPodsUnhealthy(t *testing.T) {
 	kubelet, _, fakeDocker := makeTestKubelet(t)
-	kubelet.HealthChecker = &FalseHealthChecker{}
+	kubelet.healthChecker = &FalseHealthChecker{}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			// the k8s prefix is required for the kubelet to manage the container
@@ -639,7 +639,7 @@ func TestGetContainerInfo(t *testing.T) {
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet, _, fakeDocker := makeTestKubelet(t)
-	kubelet.CadvisorClient = mockCadvisor
+	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			ID: containerID,
@@ -689,9 +689,9 @@ func TestGetRooInfo(t *testing.T) {
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
-		DockerClient:   &fakeDocker,
-		DockerPuller:   &FakeDockerPuller{},
-		CadvisorClient: mockCadvisor,
+		dockerClient:   &fakeDocker,
+		dockerPuller:   &FakeDockerPuller{},
+		cadvisorClient: mockCadvisor,
 	}
 
 	// If the container name is an empty string, then it means the root container.
@@ -746,7 +746,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, expectedErr)
 
 	kubelet, _, fakeDocker := makeTestKubelet(t)
-	kubelet.CadvisorClient = mockCadvisor
+	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			ID: containerID,
@@ -774,7 +774,7 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor := &mockCadvisorClient{}
 
 	kubelet, _, fakeDocker := makeTestKubelet(t)
-	kubelet.CadvisorClient = mockCadvisor
+	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{}
 
 	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
