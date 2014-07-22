@@ -29,7 +29,8 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// EtcdRegistry implements PodRegistry, ControllerRegistry and ServiceRegistry with backed by etcd.
+// EtcdRegistry implements PodRegistry, ControllerRegistry, ServiceRegistry, and JobRegistry
+// backed by etcd.
 type EtcdRegistry struct {
 	etcdClient      tools.EtcdClient
 	machines        MinionRegistry
@@ -307,4 +308,88 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
 	return registry.helper().SetObj("/registry/services/endpoints/"+e.ID, e)
+}
+
+// ListJobs obtains a list of Jobs.
+func (registry *EtcdRegistry) ListJobs() ([]api.Job, error) {
+	var jobs []api.Job
+	response, err := registry.etcdClient.Get("/jobs", false, false)
+	if err != nil {
+		if tools.IsEtcdNotFound(err) {
+			return jobs, nil
+		}
+		return jobs, err
+	}
+	for _, node := range response.Node.Nodes {
+		jobType := node.Key
+		var jobTypeJobs []api.Job
+		err := registry.helper().ExtractList(jobType, &jobTypeJobs)
+		if err != nil {
+			return jobs, err
+		}
+		for _, job := range jobTypeJobs {
+			jobs = append(jobs, job)
+		}
+	}
+	return jobs, nil
+}
+
+func makeJobKey(jobType, id string) string {
+	return "/jobs/" + jobType + "/" + id
+}
+
+// GetJob gets a specific Job specified by its ID.
+func (registry *EtcdRegistry) GetJob(jobID string) (*api.Job, error) {
+	job, _, err := registry.findJob(jobID)
+	return &job, err
+}
+
+func (registry *EtcdRegistry) findJob(jobID string) (api.Job, string, error) {
+	response, err := registry.etcdClient.Get("/jobs", false, false)
+	if err != nil {
+		return api.Job{}, "", err
+	}
+	for _, node := range response.Node.Nodes {
+		jobType := node.Key
+		job, err := registry.getJobForType(jobType, jobID)
+		if err == nil {
+			return job, jobType, nil
+		}
+	}
+
+	return api.Job{}, "", apiserver.NewNotFoundErr("job", jobID)
+}
+
+func (registry *EtcdRegistry) getJobForType(jobType, jobID string) (job api.Job, err error) {
+	key := makeJobKey(jobType, jobID)
+	err = registry.helper().ExtractObj(key, &job, false)
+	return
+}
+
+// CreateJob creates a new Job.
+func (registry *EtcdRegistry) CreateJob(job api.Job) error {
+	return registry.UpdateJob(job)
+}
+
+// UpdateJob replaces an existing Job.
+func (registry *EtcdRegistry) UpdateJob(job api.Job) error {
+	return registry.helper().SetObj(makeJobKey(job.Type, job.ID), job)
+}
+
+// DeleteJob deletes a Job specified by its ID.
+func (registry *EtcdRegistry) DeleteJob(jobID string) error {
+	_, jobType, err := registry.findJob(jobID)
+	if err != nil {
+		return err
+	}
+	return registry.deleteJobForType(jobType, jobID)
+}
+
+func (registry *EtcdRegistry) deleteJobForType(jobType, jobID string) error {
+	key := makeJobKey(jobType, jobID)
+	_, err := registry.etcdClient.Delete(key, false)
+	if tools.IsEtcdNotFound(err) {
+		return apiserver.NewNotFoundErr("job", jobType+"/"+jobID)
+	}
+	return err
 }

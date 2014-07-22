@@ -373,6 +373,13 @@ type WatchEvent struct {
 	Object APIObject
 }
 
+// JobList is a collection of jobs.
+type JobList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Job `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+// Job is a task that can be scheduled.
 type Job struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	State    JobState          `json:"state,omitempty" yaml:"state,omitempty"`

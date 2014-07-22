@@ -49,6 +49,7 @@ type Master struct {
 	controllerRegistry registry.ControllerRegistry
 	serviceRegistry    registry.ServiceRegistry
 	minionRegistry     registry.MinionRegistry
+	jobRegistry        registry.JobRegistry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 }
@@ -117,6 +118,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
+		"jobs":                   registry.NewJobRegistryStorage(m.jobRegistry),
 	}
 }
 
