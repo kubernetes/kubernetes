@@ -18,6 +18,7 @@ package client
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -27,6 +28,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
@@ -191,25 +194,51 @@ func (r *Request) PollPeriod(d time.Duration) *Request {
 	return r
 }
 
+func (r *Request) finalURL() string {
+	finalURL := r.c.host + r.path
+	query := url.Values{}
+	if r.selector != nil {
+		query.Add("labels", r.selector.String())
+	}
+	if r.sync {
+		query.Add("sync", "true")
+		if r.timeout != 0 {
+			query.Add("timeout", r.timeout.String())
+		}
+	}
+	finalURL += "?" + query.Encode()
+	return finalURL
+}
+
+// Attempts to begin watching the requested location. Returns a watch.Interface, or an error.
+func (r *Request) Watch() (watch.Interface, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
+	if err != nil {
+		return nil, err
+	}
+	if r.c.auth != nil {
+		req.SetBasicAuth(r.c.auth.User, r.c.auth.Password)
+	}
+	response, err := r.c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Got status: %v", response.StatusCode)
+	}
+	return watch.NewStreamWatcher(tools.NewAPIEventDecoder(response.Body)), nil
+}
+
 // Do formats and executes the request. Returns the API object received, or an error.
 func (r *Request) Do() Result {
 	for {
 		if r.err != nil {
 			return Result{err: r.err}
 		}
-		finalURL := r.c.host + r.path
-		query := url.Values{}
-		if r.selector != nil {
-			query.Add("labels", r.selector.String())
-		}
-		if r.sync {
-			query.Add("sync", "true")
-			if r.timeout != 0 {
-				query.Add("timeout", r.timeout.String())
-			}
-		}
-		finalURL += "?" + query.Encode()
-		req, err := http.NewRequest(r.verb, finalURL, r.body)
+		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
 		if err != nil {
 			return Result{err: err}
 		}

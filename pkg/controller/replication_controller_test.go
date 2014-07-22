@@ -419,29 +419,7 @@ func TestSyncronize(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 7, 0)
 }
 
-type asyncTimeout struct {
-	doneChan chan bool
-}
-
-func beginTimeout(d time.Duration) *asyncTimeout {
-	a := &asyncTimeout{doneChan: make(chan bool)}
-	go func() {
-		select {
-		case <-a.doneChan:
-			return
-		case <-time.After(d):
-			panic("Timeout expired!")
-		}
-	}()
-	return a
-}
-
-func (a *asyncTimeout) done() {
-	close(a.doneChan)
-}
-
 func TestWatchControllers(t *testing.T) {
-	defer beginTimeout(20 * time.Second).done()
 	fakeEtcd := tools.MakeFakeEtcdClient(t)
 	manager := MakeReplicationManager(fakeEtcd, nil)
 	var testControllerSpec api.ReplicationController
