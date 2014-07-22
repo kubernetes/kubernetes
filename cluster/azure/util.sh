@@ -70,12 +70,47 @@ function kube-up {
         ${KUBE_TEMP}/htpasswd $user $passwd
     HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
+    # Generate openvpn certs
+    echo 01 > ${KUBE_TEMP}/ca.srl
+    openssl genrsa -out ${KUBE_TEMP}/ca.key
+    openssl req -new -x509 -days 1095 \
+        -key ${KUBE_TEMP}/ca.key \
+        -out ${KUBE_TEMP}/ca.crt \
+        -subj "/CN=openvpn-ca"
+    openssl genrsa -out ${KUBE_TEMP}/server.key
+    openssl req -new \
+        -key ${KUBE_TEMP}/server.key \
+        -out ${KUBE_TEMP}/server.csr \
+        -subj "/CN=server"
+    openssl x509 -req -days 1095 \
+        -in ${KUBE_TEMP}/server.csr \
+        -CA ${KUBE_TEMP}/ca.crt \
+        -CAkey ${KUBE_TEMP}/ca.key \
+        -CAserial ${KUBE_TEMP}/ca.srl \
+        -out ${KUBE_TEMP}/server.crt
+    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+        openssl genrsa -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.key
+        openssl req -new \
+            -key ${KUBE_TEMP}/${MINION_NAMES[$i]}.key \
+            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
+            -subj "/CN=${MINION_NAMES[$i]}"
+        openssl x509 -req -days 1095 \
+            -in ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
+            -CA ${KUBE_TEMP}/ca.crt \
+            -CAkey ${KUBE_TEMP}/ca.key \
+            -CAserial ${KUBE_TEMP}/ca.srl \
+            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt
+    done
+
     # Build up start up script for master
     (
         echo "#!/bin/bash"
         echo "MASTER_NAME=${MASTER_NAME}"
         echo "MASTER_RELEASE_TAR=${FULL_URL}"
         echo "MASTER_HTPASSWD='${HTPASSWD}'"
+        echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
+        echo "SERVER_CRT=\"$(cat ${KUBE_TEMP}/server.crt)\""
+        echo "SERVER_KEY=\"$(cat ${KUBE_TEMP}/server.key)\""
         grep -v "^#" $SCRIPT_DIR/azure/templates/download-release.sh
         grep -v "^#" $SCRIPT_DIR/azure/templates/salt-master.sh
     ) > ${KUBE_TEMP}/master-start.sh
@@ -87,11 +122,8 @@ function kube-up {
     fi
 
     if [ ! -f $AZ_SSH_CERT ]; then
-        openssl req -new -key $AZ_SSH_KEY -out ${KUBE_TEMP}/temp.csr \
-            -subj "/C=US/ST=WA/L=Redmond/O=Azure-CLI/CN=Azure"
-        openssl req -x509 -key $AZ_SSH_KEY -in ${KUBE_TEMP}/temp.csr \
-            -out $AZ_SSH_CERT -days 1095
-        rm ${KUBE_TEMP}/temp.csr
+        openssl req -new -x509 -days 1095 -key $AZ_SSH_KEY -out $AZ_SSH_CERT \
+            -subj "/CN=azure-ssh-key"
     fi
 
     if [ -z "$(azure network vnet show $AZ_VNET 2>/dev/null | grep data)" ]; then
@@ -118,6 +150,9 @@ function kube-up {
             echo "#!/bin/bash"
             echo "MASTER_NAME=${MASTER_NAME}"
             echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
+            echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
+            echo "CLIENT_CRT=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt)\""
+            echo "CLIENT_KEY=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.key)\""
             grep -v "^#" $SCRIPT_DIR/azure/templates/salt-minion.sh
         ) > ${KUBE_TEMP}/minion-start-${i}.sh
 

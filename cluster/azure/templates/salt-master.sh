@@ -41,6 +41,14 @@ EOF
 mkdir -p /srv/salt/nginx
 echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
+mkdir -p /etc/openvpn
+umask=$(umask)
+umask 0066
+echo "$CA_CRT" > /etc/openvpn/ca.crt
+echo "$SERVER_CRT" > /etc/openvpn/server.crt
+echo "$SERVER_KEY" > /etc/openvpn/server.key
+umask $umask
+
 # Install Salt
 #
 # We specify -X to avoid a race condition that can cause minion failure to

@@ -14,6 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+mkdir -p /etc/openvpn
+umask=$(umask)
+umask 0066
+echo "$CA_CRT" > /etc/openvpn/ca.crt
+echo "$CLIENT_CRT" > /etc/openvpn/client.crt
+echo "$CLIENT_KEY" > /etc/openvpn/client.key
+umask $umask
+
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
@@ -22,6 +30,10 @@ echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
 
 hostnamef=$(hostname -f)
+sudo apt-get install ipcalc
+netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
+network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')
+cbrstring="$network $netmask"
 
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
@@ -31,6 +43,7 @@ grains:
   cbr-cidr: $MINION_IP_RANGE
   cloud: azure
   hostnamef: $hostnamef
+  cbr-string: $cbrstring
 EOF
 
 # Install Salt
