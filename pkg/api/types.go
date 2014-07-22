@@ -375,11 +375,20 @@ type WatchEvent struct {
 
 type Job struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	State    string            `json:"state,omitempty" yaml:"state,omitempty"`
+	State    JobState          `json:"state,omitempty" yaml:"state,omitempty"`
 	Success  bool              `json:"success,omitempty" yaml:"success,omitempty"`
 	Type     string            `json:"type,omitempty" yaml:"type,omitempty"`
 	Context  map[string]string `json:"context,omitempty" yaml:"context,omitempty"`
 }
+
+type JobState string
+
+const (
+	JobNew      JobState = "new"
+	JobPending  JobState = "pending"
+	JobRunning  JobState = "running"
+	JobComplete JobState = "complete"
+)
 
 // APIObject has appropriate encoder and decoder functions, such that on the wire, it's
 // stored as a []byte, but in memory, the contained object is accessable as an interface{}

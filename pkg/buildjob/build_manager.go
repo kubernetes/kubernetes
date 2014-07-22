@@ -1,23 +1,8 @@
-/*
-Copyright 2014 Google Inc. All rights reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package buildjob
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,45 +16,72 @@ import (
 )
 
 type BuildJobManager struct {
-	etcdClient tools.EtcdClient
-	kubeClient client.Interface
-	podControl PodControlInterface
-	syncTime   <-chan time.Time
-
-	syncHandler func(jobSpec api.Job) error
+	etcdClient    tools.EtcdClient
+	kubeClient    client.Interface
+	podControl    PodControlInterface
+	syncTime      <-chan time.Time
+	syncHandler   func(jobSpec api.Job) error
+	typeDelegates map[string]BuildTypeDelegate
 }
+
+type BuildTypeDelegate func(jobSpec api.Job) (*api.Pod, error)
 
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
-	// createReplica creates new replicated pods according to the spec.
+	// run a pod for the specified job
 	runJob(jobSpec api.Job)
 	// deletePod deletes the pod identified by podID.
 	deletePod(podID string) error
 }
 
-// RealPodControl is the default implementation of PodControllerInterface.
+// RealPodControl is the default implementation of PodControlInterface.
 type RealPodControl struct {
 	kubeClient client.Interface
 }
 
-func (r RealPodControl) runJob(controllerSpec api.ReplicationController) {
-	labels := controllerSpec.DesiredState.PodTemplate.Labels
-	if labels != nil {
-		labels["replicationController"] = controllerSpec.ID
+func (r RealPodControl) runJob(jobSpec api.Job) {
+	createPodConfig := typeDelegates[jobSpec.Type]
+	if createPodConfig == nil {
+		jobSpec.State = api.JobComplete
+		jobSpec.Success = false
+		// TODO: handle error
+		// kubeClient.UpdateJob(jobSpec)
+		return
 	}
-	pod := api.Pod{
-		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
-		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
+
+	pod, err := createPodConfig(jobSpec)
+	if err != nil {
+		jobSpec.State = api.JobComplete
+		jobSpec.Success = false
+		// TODO: update state of job
+		// kubeClient.UpdateJob(jobSpec)
+		return
 	}
-	_, err := r.kubeClient.CreatePod(pod)
+
+	_, err = r.kubeClient.CreatePod(*pod)
 	if err != nil {
 		glog.Errorf("%#v\n", err)
+		jobSpec.State = api.JobComplete
+		jobSpec.Success = false
+		// kubeClient.UpdateJob(jobSpec)
 	}
+
+	jobSpec.State = api.JobNew
+	// kubeClient.UpdateJob(jobSpec)
 }
 
 func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
+}
+
+func dockerfileBuildJobFor(jobSpec api.Job) (*api.Pod, error) {
+	pod := api.Pod{}
+	return nil, nil
+}
+
+func stiBuildJobFor(jobSpec api.Job) (*api.Pod, error) {
+	return nil, nil
 }
 
 func MakeBuildJobManager(etcdClient tools.EtcdClient, kubeClient client.Interface) *BuildJobManager {
@@ -79,8 +91,12 @@ func MakeBuildJobManager(etcdClient tools.EtcdClient, kubeClient client.Interfac
 		podControl: RealPodControl{
 			kubeClient: kubeClient,
 		},
+		typeDelegates: map[string]BuildTypeDelegate{
+			"dockerfile": dockerfileBuildJobFor,
+			"sti":        stiBuildJobFor,
+		},
 	}
-	// TODO
+
 	rm.syncHandler = func(jobSpec api.Job) error {
 		return rm.syncJobState(jobSpec)
 	}
@@ -145,42 +161,61 @@ func (rm *BuildJobManager) handleWatchResponse(response *etcd.Response) (*api.Jo
 		}
 		return &jobSpec, nil
 	case "delete":
-		// Ensure that the final state of a replication controller is applied before it is deleted.
-		// Otherwise, a replication controller could be modified and then deleted (for example, from 3 to 0
-		// replicas), and it would be non-deterministic which of its pods continued to exist.
-		if response.PrevNode == nil {
-			return nil, fmt.Errorf("previous node is null %#v", response)
-		}
-		var jobSpec api.Job
-		if err := json.Unmarshal([]byte(response.PrevNode.Value), &jobSpec); err != nil {
-			return nil, err
-		}
-		return &jobSpec, nil
+		// TODO: determine if some cleanup should be done here
 	}
+
 	return nil, nil
 }
 
 // Sync loop implementation, pointed to by rm.syncHandler
 func (rm *BuildJobManager) syncJobState(jobSpec api.Job) error {
-	s := labels.Set(controllerSpec.DesiredState.ReplicaSelector).AsSelector()
-	podList, err := rm.kubeClient.ListPods(s)
+	jobPod, err := rm.kubeClient.GetPod(jobSpec.PodId)
 	if err != nil {
 		return err
 	}
-	filteredList := rm.filterActivePods(podList.Items)
-	diff := len(filteredList) - controllerSpec.DesiredState.Replicas
-	if diff < 0 {
-		diff *= -1
-		glog.Infof("Too few replicas, creating %d\n", diff)
-		for i := 0; i < diff; i++ {
-			rm.podControl.createReplica(controllerSpec)
+
+	var (
+		podStatus = jobPod.CurrentState.Status
+		podInfo   = jobPod.CurrentState.Info
+		jobState  = jobSpec.State
+		update    = false
+	)
+
+	switch podStatus {
+	case api.PodRunning:
+		switch jobState {
+		case api.JobNew || api.JobPending:
+			jobSpec.State = api.JobRunning
+			update = true
+		case api.JobComplete:
+			return errors.New("Illegal state transition")
 		}
-	} else if diff > 0 {
-		glog.Infof("Too many replicas, deleting %d\n", diff)
-		for i := 0; i < diff; i++ {
-			rm.podControl.deletePod(filteredList[i].ID)
+	case api.PodPending:
+		switch jobState {
+		case api.JobNew:
+			jobSpec.State = api.JobPending
+			update = true
+		case api.JobComplete:
+			return errors.New("Illegal state transition")
+		}
+	case api.PodStopped:
+		if jobState == api.JobComplete {
+			return nil
+		}
+
+		jobSpec.State = api.JobComplete
+		containerState = podInfo[0].State
+		update = true
+
+		if containerState.ExitCode == 0 {
+			jobSpec.Success = true
 		}
 	}
+
+	if update {
+		kubeClient.UpdateJob(jobSpec)
+	}
+
 	return nil
 }
 
