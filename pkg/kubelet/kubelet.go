@@ -303,6 +303,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
+		Privileged:   container.Privileged,
 	})
 	return DockerID(dockerContainer.ID), err
 }
