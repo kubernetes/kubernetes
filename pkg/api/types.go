@@ -371,6 +371,14 @@ type WatchEvent struct {
 	Object APIObject
 }
 
+type Job struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	State    string            `json:"state,omitempty" yaml:"state,omitempty"`
+	Success  bool              `json:"success,omitempty" yaml:"success,omitempty"`
+	Type     string            `json:"type,omitempty" yaml:"type,omitempty"`
+	Context  map[string]string `json:"context,omitempty" yaml:"context,omitempty"`
+}
+
 // APIObject has appropriate encoder and decoder functions, such that on the wire, it's
 // stored as a []byte, but in memory, the contained object is accessable as an interface{}
 // via the Get() function. Only objects having a JSONBase may be stored via APIObject.
