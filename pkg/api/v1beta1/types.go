@@ -211,6 +211,21 @@ const (
 // PodInfo contains one entry for every container with available info.
 type PodInfo map[string]docker.Container
 
+// RestartPolicyType represents a restart policy for a pod.
+type RestartPolicyType string
+
+// Valid restart policies defined for a PodState.RestartPolicy.
+const (
+	RestartAlways    RestartPolicyType = "RestartAlways"
+	RestartOnFailure RestartPolicyType = "RestartOnFailure"
+	RestartNever     RestartPolicyType = "RestartNever"
+)
+
+type RestartPolicy struct {
+	// Optional: Defaults to "RestartAlways".
+	Type RestartPolicyType `yaml:"type,omitempty" json:"type,omitempty"`
+}
+
 // PodState is the state of a pod, used as either input (desired state) or output (current state)
 type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
@@ -224,7 +239,8 @@ type PodState struct {
 	// of `docker inspect`. This output format is *not* final and should not be relied
 	// upon.
 	// TODO: Make real decisions about what our info should look like.
-	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
+	Info          PodInfo       `json:"info,omitempty" yaml:"info,omitempty"`
+	RestartPolicy RestartPolicy `json:"restartpolicy,omitempty" yaml:"restartpolicy,omitempty"`
 }
 
 // PodList is a list of Pods.

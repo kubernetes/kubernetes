@@ -262,6 +262,48 @@ func TestValidateManifest(t *testing.T) {
 	}
 }
 
+func TestValidatePod(t *testing.T) {
+	errs := ValidatePod(&Pod{
+		JSONBase: JSONBase{ID: "foo"},
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+		DesiredState: PodState{
+			Manifest:      ContainerManifest{Version: "v1beta1", ID: "abc"},
+			RestartPolicy: RestartPolicy{Type: "RestartAlways"},
+		},
+	})
+	if len(errs) != 0 {
+		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	}
+	errs = ValidatePod(&Pod{
+		JSONBase: JSONBase{ID: "foo"},
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+		DesiredState: PodState{
+			Manifest: ContainerManifest{Version: "v1beta1", ID: "abc"},
+		},
+	})
+	if len(errs) != 0 {
+		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	}
+
+	errs = ValidatePod(&Pod{
+		JSONBase: JSONBase{ID: "foo"},
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+		DesiredState: PodState{
+			Manifest:      ContainerManifest{Version: "v1beta1", ID: "abc"},
+			RestartPolicy: RestartPolicy{Type: "WhatEver"},
+		},
+	})
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+}
+
 func TestValidateService(t *testing.T) {
 	errs := ValidateService(&Service{
 		JSONBase: JSONBase{ID: "foo"},
