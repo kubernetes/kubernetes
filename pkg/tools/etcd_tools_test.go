@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -42,10 +43,6 @@ func TestIsNotFoundErr(t *testing.T) {
 	try(fmt.Errorf("some other kind of error"), false)
 }
 
-type testMarshalType struct {
-	ID string `json:"id"`
-}
-
 func TestExtractList(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
@@ -65,12 +62,12 @@ func TestExtractList(t *testing.T) {
 			},
 		},
 	}
-	expect := []testMarshalType{
-		{"foo"},
-		{"bar"},
-		{"baz"},
+	expect := []api.Pod{
+		{JSONBase: api.JSONBase{ID: "foo"}},
+		{JSONBase: api.JSONBase{ID: "bar"}},
+		{JSONBase: api.JSONBase{ID: "baz"}},
 	}
-	var got []testMarshalType
+	var got []api.Pod
 	helper := EtcdHelper{fakeClient}
 	err := helper.ExtractList("/some/key", &got)
 	if err != nil {
@@ -83,10 +80,10 @@ func TestExtractList(t *testing.T) {
 
 func TestExtractObj(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	expect := testMarshalType{ID: "foo"}
+	expect := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	fakeClient.Set("/some/key", util.MakeJSONString(expect), 0)
 	helper := EtcdHelper{fakeClient}
-	var got testMarshalType
+	var got api.Pod
 	err := helper.ExtractObj("/some/key", &got, false)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -120,7 +117,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	}
 	helper := EtcdHelper{fakeClient}
 	try := func(key string) {
-		var got testMarshalType
+		var got api.Pod
 		err := helper.ExtractObj(key, &got, false)
 		if err == nil {
 			t.Errorf("%s: wanted error but didn't get one", key)
@@ -137,14 +134,18 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 }
 
 func TestSetObj(t *testing.T) {
-	obj := testMarshalType{ID: "foo"}
+	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	fakeClient := MakeFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	expect := util.MakeJSONString(obj)
+	data, err := api.Encode(obj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expect := string(data)
 	got := fakeClient.Data["/some/key"].R.Node.Value
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
