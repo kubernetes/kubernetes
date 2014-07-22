@@ -116,8 +116,8 @@ func (storage *PodRegistryStorage) fillPodInfo(pod *api.Pod) {
 }
 
 func makePodStatus(pod *api.Pod) api.PodStatus {
-	if pod.CurrentState.Info == nil {
-		return api.PodPending
+	if pod.CurrentState.Info == nil || pod.CurrentState.Host == "" {
+		return api.PodWaiting
 	}
 	running := 0
 	stopped := 0
@@ -138,11 +138,11 @@ func makePodStatus(pod *api.Pod) api.PodStatus {
 	case running > 0 && stopped == 0 && unknown == 0:
 		return api.PodRunning
 	case running == 0 && stopped > 0 && unknown == 0:
-		return api.PodStopped
+		return api.PodTerminated
 	case running == 0 && stopped == 0 && unknown > 0:
-		return api.PodPending
+		return api.PodWaiting
 	default:
-		return api.PodPending
+		return api.PodWaiting
 	}
 }
 
@@ -251,7 +251,7 @@ func (storage *PodRegistryStorage) waitForPodRunning(pod api.Pod) (interface{}, 
 			return nil, fmt.Errorf("Error %#v is not an api.Pod!", podObj)
 		}
 		switch podPtr.CurrentState.Status {
-		case api.PodRunning, api.PodStopped:
+		case api.PodRunning, api.PodTerminated:
 			return pod, nil
 		default:
 			time.Sleep(storage.podPollPeriod)
