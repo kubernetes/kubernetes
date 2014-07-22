@@ -17,9 +17,6 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="The Kubernetes API server"
 NAME=apiserver
 DAEMON=/usr/local/bin/apiserver
-{% if grains['cloud'] is not defined or grains['cloud'] != 'azure' %}
-DAEMON_ARGS="-cloud_provider gce"
-{% endif %}
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
