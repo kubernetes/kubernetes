@@ -131,6 +131,21 @@ type EnvVar struct {
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
 
+// DockerRegistry contains details about the registry to pull the Image
+type DockerRegistry struct {
+	// Optional: the docker registry to connect to. Defaults to "" to
+	// use Docker's default
+	Host string             `yaml:"host,omitempty" json:"host,omitempty"`
+	Auth DockerRegistryAuth `yaml:"auth,omitempty" json:"auth,omitempty"`
+}
+
+// DockerRegistryAuth represents docker registry authentication details
+type DockerRegistryAuth struct {
+	Username string `yaml:"username" json:"username"`
+	Password string `yaml:"password" json:"password"`
+	Email    string `yaml:"email" json:"email"`
+}
+
 // HTTPGetProbe describes a liveness probe based on HTTP Get requests.
 type HTTPGetProbe struct {
 	// Path to access on the http server
@@ -161,9 +176,10 @@ type Container struct {
 	// Optional: Defaults to whatever is defined in the image.
 	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
 	// Optional: Defaults to Docker's default.
-	WorkingDir string   `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
-	Ports      []Port   `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Env        []EnvVar `yaml:"env,omitempty" json:"env,omitempty"`
+	WorkingDir string         `yaml:"workingDir,omitempty" json:"workingDir,omitempty"`
+	Ports      []Port         `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Env        []EnvVar       `yaml:"env,omitempty" json:"env,omitempty"`
+	Registry   DockerRegistry `yaml:"registry,omitempty" json:"registry,omitempty"`
 	// Optional: Defaults to unlimited.
 	Memory int `yaml:"memory,omitempty" json:"memory,omitempty"`
 	// Optional: Defaults to unlimited.

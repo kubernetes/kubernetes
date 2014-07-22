@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -107,7 +108,7 @@ type FakeDockerPuller struct {
 }
 
 // Pull records the image pull attempt, and optionally injects an error.
-func (f *FakeDockerPuller) Pull(image string) error {
+func (f *FakeDockerPuller) Pull(image string, registry api.DockerRegistry) error {
 	f.ImagesPulled = append(f.ImagesPulled, image)
 
 	if n := len(f.ErrorsToInject); n > 0 {

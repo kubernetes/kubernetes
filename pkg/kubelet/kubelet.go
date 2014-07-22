@@ -565,7 +565,7 @@ func (kl *Kubelet) createNetworkContainer(manifest *api.ContainerManifest) (Dock
 		Image: networkContainerImage,
 		Ports: ports,
 	}
-	kl.DockerPuller.Pull(networkContainerImage)
+	kl.DockerPuller.Pull(networkContainerImage, api.DockerRegistry{})
 	return kl.runContainer(manifest, container, nil, "")
 }
 
@@ -612,7 +612,8 @@ func (kl *Kubelet) syncManifest(manifest *api.ContainerManifest, dockerContainer
 		}
 
 		glog.Infof("%+v doesn't exist, creating", container)
-		if err := kl.DockerPuller.Pull(container.Image); err != nil {
+		// use custom Docker registry and authentication from ContainerManifest
+		if err := kl.DockerPuller.Pull(container.Image, container.Registry); err != nil {
 			glog.Errorf("Failed to create container: %v skipping manifest %s container %s.", err, manifest.ID, container.Name)
 			continue
 		}

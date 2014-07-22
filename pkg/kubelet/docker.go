@@ -48,7 +48,7 @@ type DockerID string
 
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
-	Pull(image string) error
+	Pull(image string, registry api.DockerRegistry) error
 }
 
 // dockerPuller is the default implementation of DockerPuller.
@@ -63,7 +63,7 @@ func NewDockerPuller(client DockerInterface) DockerPuller {
 	}
 }
 
-func (p dockerPuller) Pull(image string) error {
+func (p dockerPuller) Pull(image string, registry api.DockerRegistry) error {
 	image, tag := parseImageName(image)
 
 	// If no tag was specified, use the default "latest".
@@ -74,8 +74,13 @@ func (p dockerPuller) Pull(image string) error {
 	opts := docker.PullImageOptions{
 		Repository: image,
 		Tag:        tag,
+		Registry:   registry.Host,
 	}
-	return p.client.PullImage(opts, docker.AuthConfiguration{})
+	return p.client.PullImage(opts, docker.AuthConfiguration{
+		Username: registry.Auth.Username,
+		Password: registry.Auth.Password,
+		Email:    registry.Auth.Email,
+	})
 }
 
 // DockerContainers is a map of containers
