@@ -149,15 +149,14 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	s.mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
 	s.mux.HandleFunc(s.prefix+"/", s.ServeREST)
 	healthz.InstallHandler(s.mux)
-	s.mux.HandleFunc("/index.html", s.handleIndex)
+
+	s.mux.HandleFunc("/", s.handleIndex)
 
 	// Handle both operations and operations/* with the same handler
 	s.mux.HandleFunc(s.operationPrefix(), s.handleOperationRequest)
 	s.mux.HandleFunc(s.operationPrefix()+"/", s.handleOperationRequest)
 
 	s.mux.HandleFunc(s.watchPrefix()+"/", s.handleWatch)
-
-	s.mux.HandleFunc("/", s.notFound)
 
 	s.mux.HandleFunc("/proxy/minion/", s.handleMinionReq)
 
@@ -173,6 +172,10 @@ func (s *APIServer) watchPrefix() string {
 }
 
 func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
+	if req.URL.Path != "/" && req.URL.Path != "/index.html" {
+		server.notFound(w, req)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	// TODO: serve this out of a file?
 	data := "<html><body>Welcome to Kubernetes</body></html>"
