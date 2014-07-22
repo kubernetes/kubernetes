@@ -242,11 +242,8 @@ func TestValidateManifest(t *testing.T) {
 	}
 
 	errorCases := map[string]ContainerManifest{
-		"empty version":          {Version: "", ID: "abc"},
-		"invalid version":        {Version: "bogus", ID: "abc"},
-		"zero-length id":         {Version: "v1beta1", ID: ""},
-		"id > 255 characters":    {Version: "v1beta1", ID: strings.Repeat("a", 256)},
-		"id not a DNS subdomain": {Version: "v1beta1", ID: "a.b.c."},
+		"empty version":   {Version: "", ID: "abc"},
+		"invalid version": {Version: "bogus", ID: "abc"},
 		"invalid volume name": {
 			Version: "v1beta1",
 			ID:      "abc",

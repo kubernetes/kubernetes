@@ -70,6 +70,11 @@ func IsEtcdConflict(err error) bool {
 	return isEtcdErrorNum(err, 101)
 }
 
+// IsEtcdWatchStoppedByUser returns true iff err is a client triggered stop.
+func IsEtcdWatchStoppedByUser(err error) bool {
+	return etcd.ErrWatchStoppedByUser == err
+}
+
 // Returns true iff err is an etcd error, whose errorCode matches errorCode
 func isEtcdErrorNum(err error, errorCode int) bool {
 	etcdError, ok := err.(*etcd.EtcdError)

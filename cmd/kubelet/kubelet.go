@@ -23,16 +23,20 @@ package main
 import (
 	"flag"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/client"
 )
 
 var (
@@ -77,7 +81,7 @@ func getHostname() string {
 		}
 		hostname = fqdn
 	}
-	return string(hostname)
+	return strings.TrimSpace(string(hostname))
 }
 
 func main() {
@@ -93,12 +97,57 @@ func main() {
 		glog.Fatal("Couldn't connect to docker.")
 	}
 
-	k := kubelet.Kubelet{
-		Hostname:           getHostname(),
-		DockerClient:       dockerClient,
-		FileCheckFrequency: *fileCheckFrequency,
-		SyncFrequency:      *syncFrequency,
-		HTTPCheckFrequency: *httpCheckFrequency,
+	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:5000")
+	if err != nil {
+		glog.Errorf("Error on creating cadvisor client: %v", err)
 	}
-	k.RunKubelet(*dockerEndpoint, *config, *manifestURL, etcdServerList, *address, *port)
+
+	hostname := getHostname()
+
+	k := &kubelet.Kubelet{
+		Hostname:       hostname,
+		DockerClient:   dockerClient,
+		CadvisorClient: cadvisorClient,
+	}
+
+	// source of all configuration
+	cfg := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates)
+
+	// define file config source
+	if *config != "" {
+		kconfig.NewSourceFile(*config, *fileCheckFrequency, cfg.Channel("file"))
+	}
+
+	// define url config source
+	if *manifestURL != "" {
+		kconfig.NewSourceURL(*manifestURL, *httpCheckFrequency, cfg.Channel("http"))
+	}
+
+	// define etcd config source and initialize etcd client
+	if len(etcdServerList) > 0 {
+		glog.Infof("Watching for etcd configs at %v", etcdServerList)
+		k.EtcdClient = etcd.NewClient(etcdServerList)
+		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), k.EtcdClient, 30*time.Second, cfg.Channel("etcd"))
+	}
+
+	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
+	// up into "per source" synchronizations
+
+	// start the kubelet
+	go util.Forever(func() { k.Run(cfg.Updates()) }, 0)
+
+	// resynchronize periodically
+	// TODO: make this part of PodConfig so that it is only delivered after syncFrequency has elapsed without
+	// an update
+	go util.Forever(cfg.Sync, *syncFrequency)
+
+	// start the kubelet server
+	if *address != "" {
+		go util.Forever(func() {
+			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), http.DefaultServeMux, *address, *port)
+		}, 0)
+	}
+
+	// runs forever
+	select {}
 }
