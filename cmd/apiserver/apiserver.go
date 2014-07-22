@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -38,6 +39,8 @@ var (
 	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	minionRegexp                = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
 	minionPort                  = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
+	healthCheckMinions          = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
+	minionCacheTTL              = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. [default 30 seconds]")
 	etcdServerList, machineList util.StringList
 )
 
@@ -80,7 +83,7 @@ func main() {
 
 	var m *master.Master
 	if len(etcdServerList) > 0 {
-		m = master.New(etcdServerList, machineList, podInfoGetter, cloud, *minionRegexp, client)
+		m = master.New(etcdServerList, machineList, podInfoGetter, cloud, *minionRegexp, client, *healthCheckMinions, *minionCacheTTL)
 	} else {
 		m = master.NewMemoryServer(machineList, podInfoGetter, cloud, client)
 	}

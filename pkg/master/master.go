@@ -55,9 +55,9 @@ func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud
 }
 
 // New returns a new instance of Master connected to the given etcdServer.
-func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string, client *client.Client) *Master {
+func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string, client *client.Client, healthCheckMinions bool, cacheMinionsTTL time.Duration) *Master {
 	etcdClient := etcd.NewClient(etcdServers)
-	minionRegistry := minionRegistryMaker(minions, cloud, minionRegexp)
+	minionRegistry := minionRegistryMaker(minions, cloud, minionRegexp, healthCheckMinions, cacheMinionsTTL)
 	m := &Master{
 		podRegistry:        registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),
@@ -69,15 +69,30 @@ func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, clou
 	return m
 }
 
-func minionRegistryMaker(minions []string, cloud cloudprovider.Interface, minionRegexp string) registry.MinionRegistry {
+func minionRegistryMaker(minions []string, cloud cloudprovider.Interface, minionRegexp string, healthCheck bool, cacheTTL time.Duration) registry.MinionRegistry {
+	var minionRegistry registry.MinionRegistry
 	if cloud != nil && len(minionRegexp) > 0 {
-		minionRegistry, err := registry.MakeCloudMinionRegistry(cloud, minionRegexp)
+		var err error
+		minionRegistry, err = registry.MakeCloudMinionRegistry(cloud, minionRegexp)
 		if err != nil {
 			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
 		}
-		return minionRegistry
 	}
-	return registry.MakeMinionRegistry(minions)
+	if minionRegistry == nil {
+		minionRegistry = registry.MakeMinionRegistry(minions)
+	}
+	if healthCheck {
+		minionRegistry = registry.NewHealthyMinionRegistry(minionRegistry, &http.Client{})
+	}
+	if cacheTTL > 0 {
+		cachingMinionRegistry, err := registry.NewCachingMinionRegistry(minionRegistry, cacheTTL)
+		if err != nil {
+			glog.Errorf("Failed to initialize caching layer, ignoring cache.")
+		} else {
+			minionRegistry = cachingMinionRegistry
+		}
+	}
+	return minionRegistry
 }
 
 func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
