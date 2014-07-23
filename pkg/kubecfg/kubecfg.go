@@ -166,9 +166,10 @@ func RunController(image, name string, replicas int, client client.Interface, po
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
 					Manifest: api.ContainerManifest{
+						Version: "v1beta2",
 						Containers: []api.Container{
 							{
-								Name:  name,
+								Name:  strings.ToLower(name),
 								Image: image,
 								Ports: makePorts(portSpec),
 							},
