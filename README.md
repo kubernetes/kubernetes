@@ -89,13 +89,29 @@ Where pod.json contains something like:
 
 ```
 {
-  "ID": "nginx",
+  "id": "php",
   "desiredState": {
-    "image": "dockerfile/nginx",
-    "networkPorts": [{
-      "containerPort": 80,
-      "hostPort": 8080
-    }]
+    "manifest": {
+      "version": "v1beta1",
+      "id": "php",
+      "containers": [{
+        "name": "nginx",
+        "image": "dockerfile/nginx",
+        "ports": [{
+          "containerPort": 80,
+          "hostPort": 8080
+        }],
+        "livenessProbe": {
+          "enabled": true,
+          "type": "http",
+          "initialDelaySeconds": 30,
+          "httpGet": {
+            "path": "/index.html",
+            "port": "8080"
+          }
+        }
+      }]
+    }
   },
   "labels": {
     "name": "foo"
