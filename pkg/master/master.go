@@ -122,6 +122,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
+		"bindings":               registry.MakeBindingStorage(m.podRegistry),
 	}
 }
 
