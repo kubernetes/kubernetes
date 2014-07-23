@@ -156,35 +156,59 @@ func main() {
 	}
 }
 
-func executeAPIRequest(method string, s *kube_client.Client) bool {
-	if len(flag.Args()) < 2 {
-		glog.Fatalf("usage: kubecfg [OPTIONS] get|list|create|update|delete <%s>[/<id>]", prettyWireStorage())
+// storagePathFromArg normalizes a path and breaks out the first segment if available
+func storagePathFromArg(arg string) (storage, path string, hasSuffix bool) {
+	path = strings.Trim(arg, "/")
+	segments := strings.SplitN(path, "/", 2)
+	storage = segments[0]
+	if len(segments) > 1 && segments[1] != "" {
+		hasSuffix = true
 	}
+	return storage, path, hasSuffix
+}
 
+//checkStorage returns true if the provided storage is valid
+func checkStorage(storage string) bool {
+	for _, allowed := range kubecfg.SupportedWireStorage() {
+		if allowed == storage {
+			return true
+		}
+	}
+	return false
+}
+
+func executeAPIRequest(method string, s *kube_client.Client) bool {
+	storage, path, hasSuffix := storagePathFromArg(flag.Arg(1))
+	validStorage := checkStorage(storage)
 	verb := ""
-	segments := strings.SplitN(flag.Arg(1), "/", 2)
-	storage := segments[0]
-	path := strings.Trim(flag.Arg(1), "/")
 	setBody := false
 	switch method {
-	case "get", "list":
+	case "get":
 		verb = "GET"
+		if !validStorage || !hasSuffix {
+			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>[/<id>]", method, prettyWireStorage())
+		}
+	case "list":
+		verb = "GET"
+		if !validStorage || hasSuffix {
+			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>", method, prettyWireStorage())
+		}
 	case "delete":
 		verb = "DELETE"
-		if len(segments) == 1 || segments[1] == "" {
-			glog.Fatalf("usage: kubecfg [OPTIONS] delete <%s>/<id>", prettyWireStorage())
+		if !validStorage || !hasSuffix {
+			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>/<id>", method, prettyWireStorage())
 		}
 	case "create":
 		verb = "POST"
 		setBody = true
-		if len(segments) != 1 {
-			glog.Fatalf("usage: kubecfg [OPTIONS] create <%s>", prettyWireStorage())
+		if !validStorage || hasSuffix {
+			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>", method, prettyWireStorage())
 		}
 	case "update":
 		verb = "PUT"
 		setBody = true
-		if len(segments) == 1 || segments[1] == "" {
-			glog.Fatalf("usage: kubecfg [OPTIONS] update <%s>/<id>", prettyWireStorage())
+		if !validStorage || !hasSuffix {
+			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>/<id>", method, prettyWireStorage())
 		}
 	default:
 		return false
