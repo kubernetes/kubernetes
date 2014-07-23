@@ -18,12 +18,14 @@ package kubelet
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/fsouza/go-dockerclient"
 )
 
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
+	lock          sync.Mutex
 	containerList []docker.APIContainers
 	container     *docker.Container
 	err           error
@@ -37,28 +39,30 @@ func (f *FakeDockerClient) clearCalls() {
 	f.called = []string{}
 }
 
-func (f *FakeDockerClient) appendCall(call string) {
-	f.called = append(f.called, call)
-}
-
 // ListContainers is a test-spy implementation of DockerInterface.ListContainers.
 // It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	f.appendCall("list")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.called = append(f.called, "list")
 	return f.containerList, f.err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
 // It adds an entry "inspect" to the internal method call record.
 func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
-	f.appendCall("inspect")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.called = append(f.called, "inspect")
 	return f.container, f.err
 }
 
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
 // It adds an entry "create" to the internal method call record.
 func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*docker.Container, error) {
-	f.appendCall("create")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.called = append(f.called, "create")
 	f.Created = append(f.Created, c.Name)
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
@@ -70,14 +74,18 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
 // It adds an entry "start" to the internal method call record.
 func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConfig) error {
-	f.appendCall("start")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.called = append(f.called, "start")
 	return f.err
 }
 
 // StopContainer is a test-spy implementation of DockerInterface.StopContainer.
 // It adds an entry "stop" to the internal method call record.
 func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
-	f.appendCall("stop")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.called = append(f.called, "stop")
 	f.stopped = append(f.stopped, id)
 	var newList []docker.APIContainers
 	for _, container := range f.containerList {
@@ -92,13 +100,16 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 // PullImage is a test-spy implementation of DockerInterface.StopContainer.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
-	f.appendCall("pull")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.called = append(f.called, "pull")
 	f.pulled = append(f.pulled, fmt.Sprintf("%s/%s:%s", opts.Repository, opts.Registry, opts.Tag))
 	return f.err
 }
 
 // FakeDockerPuller is a stub implementation of DockerPuller.
 type FakeDockerPuller struct {
+	lock         sync.Mutex
 	ImagesPulled []string
 
 	// Every pull will return the first error here, and then reslice
@@ -107,13 +118,14 @@ type FakeDockerPuller struct {
 }
 
 // Pull records the image pull attempt, and optionally injects an error.
-func (f *FakeDockerPuller) Pull(image string) error {
+func (f *FakeDockerPuller) Pull(image string) (err error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.ImagesPulled = append(f.ImagesPulled, image)
 
-	if n := len(f.ErrorsToInject); n > 0 {
-		err := f.ErrorsToInject[0]
-		f.ErrorsToInject = f.ErrorsToInject[:n-1]
-		return err
+	if len(f.ErrorsToInject) > 0 {
+		err = f.ErrorsToInject[0]
+		f.ErrorsToInject = f.ErrorsToInject[1:]
 	}
-	return nil
+	return err
 }
