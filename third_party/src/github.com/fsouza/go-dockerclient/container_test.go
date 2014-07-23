@@ -14,11 +14,31 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestStateString(t *testing.T) {
+	started := time.Now().Add(-3 * time.Hour)
+	var tests = []struct {
+		input    State
+		expected string
+	}{
+		{State{Running: true, Paused: true}, "^paused$"},
+		{State{Running: true, StartedAt: started}, "^Up 3h.*$"},
+		{State{Running: false, ExitCode: 7}, "^Exit 7$"},
+	}
+	for _, tt := range tests {
+		re := regexp.MustCompile(tt.expected)
+		if got := tt.input.String(); !re.MatchString(got) {
+			t.Errorf("State.String(): wrong result. Want %q. Got %q.", tt.expected, got)
+		}
+	}
+}
 
 func TestListContainers(t *testing.T) {
 	jsonContainers := `[
@@ -132,8 +152,8 @@ func TestInspectContainer(t *testing.T) {
              "Config": {
                      "Hostname": "4fa6e0f0c678",
                      "User": "",
-                     "Memory": 0,
-                     "MemorySwap": 0,
+                     "Memory": 17179869184,
+                     "MemorySwap": 34359738368,
                      "AttachStdin": false,
                      "AttachStdout": true,
                      "AttachStderr": true,
@@ -445,6 +465,60 @@ func TestRestartContainerNotFound(t *testing.T) {
 	}
 }
 
+func TestPauseContainer(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusNoContent}
+	client := newTestClient(fakeRT)
+	id := "4fa6e0f0c6786287e131c3852c58a2e01cc697a68231826813597e4994f1d6e2"
+	err := client.PauseContainer(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := fakeRT.requests[0]
+	if req.Method != "POST" {
+		t.Errorf("PauseContainer(%q): wrong HTTP method. Want %q. Got %q.", id, "POST", req.Method)
+	}
+	expectedURL, _ := url.Parse(client.getURL("/containers/" + id + "/pause"))
+	if gotPath := req.URL.Path; gotPath != expectedURL.Path {
+		t.Errorf("PauseContainer(%q): Wrong path in request. Want %q. Got %q.", id, expectedURL.Path, gotPath)
+	}
+}
+
+func TestPauseContainerNotFound(t *testing.T) {
+	client := newTestClient(&FakeRoundTripper{message: "no such container", status: http.StatusNotFound})
+	err := client.PauseContainer("a2334")
+	expected := &NoSuchContainer{ID: "a2334"}
+	if !reflect.DeepEqual(err, expected) {
+		t.Errorf("PauseContainer: Wrong error returned. Want %#v. Got %#v.", expected, err)
+	}
+}
+
+func TestUnpauseContainer(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusNoContent}
+	client := newTestClient(fakeRT)
+	id := "4fa6e0f0c6786287e131c3852c58a2e01cc697a68231826813597e4994f1d6e2"
+	err := client.UnpauseContainer(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := fakeRT.requests[0]
+	if req.Method != "POST" {
+		t.Errorf("PauseContainer(%q): wrong HTTP method. Want %q. Got %q.", id, "POST", req.Method)
+	}
+	expectedURL, _ := url.Parse(client.getURL("/containers/" + id + "/unpause"))
+	if gotPath := req.URL.Path; gotPath != expectedURL.Path {
+		t.Errorf("PauseContainer(%q): Wrong path in request. Want %q. Got %q.", id, expectedURL.Path, gotPath)
+	}
+}
+
+func TestUnpauseContainerNotFound(t *testing.T) {
+	client := newTestClient(&FakeRoundTripper{message: "no such container", status: http.StatusNotFound})
+	err := client.UnpauseContainer("a2334")
+	expected := &NoSuchContainer{ID: "a2334"}
+	if !reflect.DeepEqual(err, expected) {
+		t.Errorf("PauseContainer: Wrong error returned. Want %#v. Got %#v.", expected, err)
+	}
+}
+
 func TestKillContainer(t *testing.T) {
 	fakeRT := &FakeRoundTripper{message: "", status: http.StatusNoContent}
 	client := newTestClient(fakeRT)
@@ -736,7 +810,7 @@ func TestAttachToContainer(t *testing.T) {
 		Stream:       true,
 		RawTerminal:  true,
 	}
-	var err = client.AttachToContainer(opts)
+	err := client.AttachToContainer(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,6 +853,63 @@ func TestAttachToContainerSentinel(t *testing.T) {
 	}
 	go client.AttachToContainer(opts)
 	success <- <-success
+}
+
+func TestAttachToContainerNilStdout(t *testing.T) {
+	var reader = strings.NewReader("send value")
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
+		w.Write([]byte("hello"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var stderr bytes.Buffer
+	opts := AttachToContainerOptions{
+		Container:    "a123456",
+		OutputStream: nil,
+		ErrorStream:  &stderr,
+		InputStream:  reader,
+		Stdin:        true,
+		Stdout:       true,
+		Stderr:       true,
+		Stream:       true,
+		RawTerminal:  true,
+	}
+	err := client.AttachToContainer(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAttachToContainerNilStderr(t *testing.T) {
+	var reader = strings.NewReader("send value")
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte{1, 0, 0, 0, 0, 0, 0, 5})
+		w.Write([]byte("hello"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var stdout bytes.Buffer
+	opts := AttachToContainerOptions{
+		Container:    "a123456",
+		OutputStream: &stdout,
+		InputStream:  reader,
+		Stdin:        true,
+		Stdout:       true,
+		Stderr:       true,
+		Stream:       true,
+		RawTerminal:  true,
+	}
+	err := client.AttachToContainer(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestAttachToContainerRawTerminalFalse(t *testing.T) {
@@ -838,6 +969,8 @@ func TestAttachToContainerWithoutContainer(t *testing.T) {
 func TestLogs(t *testing.T) {
 	var req http.Request
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := []byte{1, 0, 0, 0, 0, 0, 0, 19}
+		w.Write(prefix)
 		w.Write([]byte("something happened!"))
 		req = *r
 	}))
@@ -873,10 +1006,138 @@ func TestLogs(t *testing.T) {
 		"stdout":     {"1"},
 		"stderr":     {"1"},
 		"timestamps": {"1"},
+		"tail":       {"all"},
 	}
 	got := map[string][]string(req.URL.Query())
 	if !reflect.DeepEqual(got, expectedQs) {
 		t.Errorf("Logs: wrong query string. Want %#v. Got %#v.", expectedQs, got)
+	}
+}
+
+func TestLogsNilStdoutDoesntFail(t *testing.T) {
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := []byte{1, 0, 0, 0, 0, 0, 0, 19}
+		w.Write(prefix)
+		w.Write([]byte("something happened!"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	opts := LogsOptions{
+		Container:  "a123456",
+		Follow:     true,
+		Stdout:     true,
+		Stderr:     true,
+		Timestamps: true,
+	}
+	err := client.Logs(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLogsNilStderrDoesntFail(t *testing.T) {
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := []byte{2, 0, 0, 0, 0, 0, 0, 19}
+		w.Write(prefix)
+		w.Write([]byte("something happened!"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	opts := LogsOptions{
+		Container:  "a123456",
+		Follow:     true,
+		Stdout:     true,
+		Stderr:     true,
+		Timestamps: true,
+	}
+	err := client.Logs(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLogsSpecifyingTail(t *testing.T) {
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		prefix := []byte{1, 0, 0, 0, 0, 0, 0, 19}
+		w.Write(prefix)
+		w.Write([]byte("something happened!"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var buf bytes.Buffer
+	opts := LogsOptions{
+		Container:    "a123456",
+		OutputStream: &buf,
+		Follow:       true,
+		Stdout:       true,
+		Stderr:       true,
+		Timestamps:   true,
+		Tail:         "100",
+	}
+	err := client.Logs(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "something happened!"
+	if buf.String() != expected {
+		t.Errorf("Logs: wrong output. Want %q. Got %q.", expected, buf.String())
+	}
+	if req.Method != "GET" {
+		t.Errorf("Logs: wrong HTTP method. Want GET. Got %s.", req.Method)
+	}
+	u, _ := url.Parse(client.getURL("/containers/a123456/logs"))
+	if req.URL.Path != u.Path {
+		t.Errorf("AttachToContainer for logs: wrong HTTP path. Want %q. Got %q.", u.Path, req.URL.Path)
+	}
+	expectedQs := map[string][]string{
+		"follow":     {"1"},
+		"stdout":     {"1"},
+		"stderr":     {"1"},
+		"timestamps": {"1"},
+		"tail":       {"100"},
+	}
+	got := map[string][]string(req.URL.Query())
+	if !reflect.DeepEqual(got, expectedQs) {
+		t.Errorf("Logs: wrong query string. Want %#v. Got %#v.", expectedQs, got)
+	}
+}
+
+func TestLogsRawTerminal(t *testing.T) {
+	var req http.Request
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("something happened!"))
+		req = *r
+	}))
+	defer server.Close()
+	client, _ := NewClient(server.URL)
+	client.SkipServerVersionCheck = true
+	var buf bytes.Buffer
+	opts := LogsOptions{
+		Container:    "a123456",
+		OutputStream: &buf,
+		Follow:       true,
+		RawTerminal:  true,
+		Stdout:       true,
+		Stderr:       true,
+		Timestamps:   true,
+		Tail:         "100",
+	}
+	err := client.Logs(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "something happened!"
+	if buf.String() != expected {
+		t.Errorf("Logs: wrong output. Want %q. Got %q.", expected, buf.String())
 	}
 }
 
