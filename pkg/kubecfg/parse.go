@@ -44,3 +44,11 @@ func ToWireFormat(data []byte, storage string) ([]byte, error) {
 	}
 	return api.Encode(obj)
 }
+
+func SupportedWireStorage() []string {
+	types := []string{}
+	for k, _ := range storageToType {
+		types = append(types, k)
+	}
+	return types
+}

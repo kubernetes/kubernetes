@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -55,10 +56,10 @@ var (
 )
 
 func usage() {
-	fmt.Fprint(os.Stderr, `usage: kubecfg -h [-c config/file.json] [-p :,..., :] <method>
+	fmt.Fprintf(os.Stderr, `usage: kubecfg -h [-c config/file.json] [-p :,..., :] <method>
 
   Kubernetes REST API:
-  kubecfg [OPTIONS] get|list|create|delete|update <url>
+  kubecfg [OPTIONS] get|list|create|delete|update <%s>[/<id>]
 
   Manage replication controllers:
   kubecfg [OPTIONS] stop|rm|rollingupdate <controller>
@@ -66,8 +67,14 @@ func usage() {
   kubecfg [OPTIONS] resize <controller> <replicas>
 
   Options:
-`)
+`, prettyWireStorage())
 	flag.PrintDefaults()
+}
+
+func prettyWireStorage() string {
+	types := kubecfg.SupportedWireStorage()
+	sort.Strings(types)
+	return strings.Join(types, "|")
 }
 
 // readConfig reads and parses pod, replicationController, and service
@@ -150,32 +157,44 @@ func main() {
 }
 
 func executeAPIRequest(method string, s *kube_client.Client) bool {
-	parseStorage := func() string {
-		if len(flag.Args()) != 2 {
-			glog.Fatal("usage: kubecfg [OPTIONS] get|list|create|update|delete <url>")
-		}
-		return strings.Trim(flag.Arg(1), "/")
+	if len(flag.Args()) != 2 {
+		glog.Fatalf("usage: kubecfg [OPTIONS] get|list|create|update|delete <%s>[/<id>]", prettyWireStorage())
 	}
 
 	verb := ""
+	segments := strings.SplitN(flag.Arg(1), "/", 2)
+	storage := segments[0]
+	path := strings.Trim(flag.Arg(1), "/")
+	setBody := false
 	switch method {
 	case "get", "list":
 		verb = "GET"
 	case "delete":
 		verb = "DELETE"
+		if len(segments) == 1 || segments[1] == "" {
+			glog.Fatalf("usage: kubecfg [OPTIONS] delete <%s>/<id>", prettyWireStorage())
+		}
 	case "create":
 		verb = "POST"
+		setBody = true
+		if len(segments) != 1 {
+			glog.Fatalf("usage: kubecfg [OPTIONS] create <%s>", prettyWireStorage())
+		}
 	case "update":
 		verb = "PUT"
+		setBody = true
+		if len(segments) == 1 || segments[1] == "" {
+			glog.Fatalf("usage: kubecfg [OPTIONS] update <%s>/<id>", prettyWireStorage())
+		}
 	default:
 		return false
 	}
 
 	r := s.Verb(verb).
-		Path(parseStorage()).
+		Path(path).
 		ParseSelector(*selector)
-	if method == "create" || method == "update" {
-		r.Body(readConfig(parseStorage()))
+	if setBody {
+		r.Body(readConfig(storage))
 	}
 	result := r.Do()
 	obj, err := result.Get()
