@@ -58,6 +58,12 @@ type ContainerManifest struct {
 	Containers []Container `yaml:"containers" json:"containers"`
 }
 
+// ContainerManifestList is used to communicate container manifests to kubelet.
+type ContainerManifestList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
@@ -289,8 +295,8 @@ type Service struct {
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	Name      string
-	Endpoints []string
+	JSONBase  `json:",inline" yaml:",inline"`
+	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }
 
 // Minion is a worker node in Kubernetenes.

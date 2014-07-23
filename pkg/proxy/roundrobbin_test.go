@@ -87,7 +87,10 @@ func TestLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 	endpoints := make([]api.Endpoints, 1)
-	endpoints[0] = api.Endpoints{Name: "foo", Endpoints: []string{"endpoint1:40"}}
+	endpoints[0] = api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint1:40"},
+	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint1:40")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint1:40")
@@ -102,7 +105,10 @@ func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 	endpoints := make([]api.Endpoints, 1)
-	endpoints[0] = api.Endpoints{Name: "foo", Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"}}
+	endpoints[0] = api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:2")
@@ -117,7 +123,10 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 	endpoints := make([]api.Endpoints, 1)
-	endpoints[0] = api.Endpoints{Name: "foo", Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"}}
+	endpoints[0] = api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:2")
@@ -126,14 +135,16 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:2")
 	// Then update the configuration with one fewer endpoints, make sure
 	// we start in the beginning again
-	endpoints[0] = api.Endpoints{Name: "foo", Endpoints: []string{"endpoint:8", "endpoint:9"}}
+	endpoints[0] = api.Endpoints{JSONBase: api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint:8", "endpoint:9"},
+	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:8")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:9")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:8")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:9")
 	// Clear endpoints
-	endpoints[0] = api.Endpoints{Name: "foo", Endpoints: []string{}}
+	endpoints[0] = api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}}
 	loadBalancer.OnUpdate(endpoints)
 
 	endpoint, err = loadBalancer.LoadBalance("foo", nil)
@@ -149,8 +160,14 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 		t.Errorf("Didn't fail with non-existent service")
 	}
 	endpoints := make([]api.Endpoints, 2)
-	endpoints[0] = api.Endpoints{Name: "foo", Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"}}
-	endpoints[1] = api.Endpoints{Name: "bar", Endpoints: []string{"endpoint:4", "endpoint:5"}}
+	endpoints[0] = api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint:1", "endpoint:2", "endpoint:3"},
+	}
+	endpoints[1] = api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "bar"},
+		Endpoints: []string{"endpoint:4", "endpoint:5"},
+	}
 	loadBalancer.OnUpdate(endpoints)
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:1")
 	expectEndpoint(t, loadBalancer, "foo", "endpoint:2")

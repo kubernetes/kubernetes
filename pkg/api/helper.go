@@ -44,6 +44,8 @@ func init() {
 		Status{},
 		ServerOpList{},
 		ServerOp{},
+		ContainerManifestList{},
+		Endpoints{},
 	)
 	AddKnownTypes("v1beta1",
 		v1beta1.PodList{},
@@ -104,6 +106,15 @@ func FindJSONBaseRO(obj interface{}) (JSONBase, error) {
 		return JSONBase{}, fmt.Errorf("struct %v lacks embedded JSON type", v.Type().Name())
 	}
 	return jsonBase.Interface().(JSONBase), nil
+}
+
+// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
+func EncodeOrDie(obj interface{}) string {
+	bytes, err := Encode(obj)
+	if err != nil {
+		panic(err)
+	}
+	return string(bytes)
 }
 
 // Encode turns the given api object into an appropriate JSON string.
