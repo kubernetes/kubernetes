@@ -157,7 +157,7 @@ func main() {
 }
 
 func executeAPIRequest(method string, s *kube_client.Client) bool {
-	if len(flag.Args()) != 2 {
+	if len(flag.Args()) < 2 {
 		glog.Fatalf("usage: kubecfg [OPTIONS] get|list|create|update|delete <%s>[/<id>]", prettyWireStorage())
 	}
 
