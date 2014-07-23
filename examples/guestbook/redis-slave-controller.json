@@ -9,7 +9,7 @@
              "version": "v1beta1",
              "id": "redisSlaveController",
              "containers": [{
-               "name": "slave"
+               "name": "slave",
                "image": "brendanburns/redis-slave",
                "ports": [{"containerPort": 6379, "hostPort": 6380}]
              }]
