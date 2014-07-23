@@ -41,6 +41,7 @@ readonly KUBE_RUN_IMAGE_BASE="kubernetes"
 readonly KUBE_RUN_BINARIES="
     apiserver
     controller-manager
+    build-job-manager
     proxy
   "
 
