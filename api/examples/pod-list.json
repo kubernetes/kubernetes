@@ -11,12 +11,13 @@
                 "version": "v1beta1",
                 "id": "my-pod-1",
                 "containers": [{
+                  "name": "nginx",
                   "image": "dockerfile/nginx",
                   "ports": [{
                     "hostPort": 8080,
                     "containerPort": 80
                   }]
-                }
+                }]
               }
             },
             "currentState": {
@@ -34,12 +35,13 @@
                 "version": "v1beta1",
                 "id": "my-pod-2",
                 "containers": [{
+                  "name": "nginx",
                   "image": "dockerfile/nginx",
                   "ports": [{
                     "hostPort": 8080,
                     "containerPort": 80
                   }]
-                }
+                }]
               }
             },
             "currentState": {

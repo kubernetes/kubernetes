@@ -9,13 +9,16 @@
                 },
                 "podTemplate": {
                     "desiredState": {
-                        "image": "dockerfile/nginx",
-                        "networkPorts": [
-                            {
-                                "hostPort": 8080,
-                                "containerPort": 80
-                            }
-                        ]
+                        "manifest": {
+                            "version": "v1beta1",
+                            "image": "dockerfile/nginx",
+                            "networkPorts": [
+                                {
+                                    "hostPort": 8080,
+                                    "containerPort": 80
+                                }
+                            ]
+                        }
                     },
                     "labels": {
                         "name": "testRun"

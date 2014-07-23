@@ -5,7 +5,7 @@
             "port": 8000,
             "labels": {
                 "name": "nginx"
-            }
+            },
             "selector": {
                 "name": "nginx"
             }
@@ -16,7 +16,7 @@
             "labels": {
                 "env": "prod",
                 "name": "jetty"
-            }
+            },
             "selector": {
                 "env": "prod",
                 "name": "jetty"
