@@ -83,8 +83,8 @@ func TestGetEtcd(t *testing.T) {
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	lastIndex, err := c.fetchNextState(0)
 	expectNoError(t, err)
-	if lastIndex != 1 {
-		t.Errorf("Expected %#v, Got %#v", 1, lastIndex)
+	if lastIndex != 2 {
+		t.Errorf("Expected %#v, Got %#v", 2, lastIndex)
 	}
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}})
@@ -108,8 +108,8 @@ func TestWatchEtcd(t *testing.T) {
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	lastIndex, err := c.fetchNextState(1)
 	expectNoError(t, err)
-	if lastIndex != 2 {
-		t.Errorf("Expected %d, Got %d", 1, lastIndex)
+	if lastIndex != 3 {
+		t.Errorf("Expected %d, Got %d", 3, lastIndex)
 	}
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET)

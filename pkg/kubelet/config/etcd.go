@@ -62,20 +62,20 @@ func NewSourceEtcd(key string, client tools.EtcdClient, period time.Duration, up
 func (s *SourceEtcd) run() {
 	index := uint64(0)
 	for {
-		lastIndex, err := s.fetchNextState(index)
+		nextIndex, err := s.fetchNextState(index)
 		if err != nil {
 			if !tools.IsEtcdNotFound(err) {
 				glog.Errorf("Unable to extract from the response (%s): %%v", s.key, err)
 			}
 			return
 		}
-		index = lastIndex + 1
+		index = nextIndex
 	}
 }
 
 // fetchNextState fetches the key (or waits for a change to a key) and then returns
-// the index read.  It will watch no longer than s.waitDuration and then return
-func (s *SourceEtcd) fetchNextState(fromIndex uint64) (lastIndex uint64, err error) {
+// the nextIndex to read.  It will watch no longer than s.waitDuration and then return
+func (s *SourceEtcd) fetchNextState(fromIndex uint64) (nextIndex uint64, err error) {
 	var response *etcd.Response
 
 	if fromIndex == 0 {
@@ -87,7 +87,7 @@ func (s *SourceEtcd) fetchNextState(fromIndex uint64) (lastIndex uint64, err err
 		}
 	}
 	if err != nil {
-		return 0, err
+		return fromIndex, err
 	}
 
 	pods, err := responseToPods(response)
@@ -99,7 +99,7 @@ func (s *SourceEtcd) fetchNextState(fromIndex uint64) (lastIndex uint64, err err
 	glog.Infof("Got state from etcd: %+v", pods)
 	s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
 
-	return response.Node.ModifiedIndex, nil
+	return response.Node.ModifiedIndex + 1, nil
 }
 
 // responseToPods takes an etcd Response object, and turns it into a structured list of containers.
