@@ -1,0 +1,7 @@
+{
+  "id": "frontend",
+  "port": 9998,
+  "selector": {
+    "name": "frontend"
+  }
+}
