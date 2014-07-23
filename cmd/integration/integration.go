@@ -104,11 +104,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, 30*time.Second, cfg1.Channel("etcd"))
 	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
-	myKubelet := &kubelet.Kubelet{
-		Hostname:     machineList[0],
-		DockerClient: &fakeDocker1,
-		DockerPuller: &kubelet.FakeDockerPuller{},
-	}
+	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
 	go util.Forever(cfg1.Sync, 3*time.Second)
 	go util.Forever(func() {
@@ -120,11 +116,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// have a place they can schedule.
 	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, 30*time.Second, cfg2.Channel("etcd"))
-	otherKubelet := &kubelet.Kubelet{
-		Hostname:     machineList[1],
-		DockerClient: &fakeDocker2,
-		DockerPuller: &kubelet.FakeDockerPuller{},
-	}
+	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
 	go util.Forever(cfg2.Sync, 3*time.Second)
 	go util.Forever(func() {

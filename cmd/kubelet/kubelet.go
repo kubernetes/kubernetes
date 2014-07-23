@@ -32,6 +32,7 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
@@ -104,12 +105,6 @@ func main() {
 
 	hostname := getHostname()
 
-	k := &kubelet.Kubelet{
-		Hostname:       hostname,
-		DockerClient:   dockerClient,
-		CadvisorClient: cadvisorClient,
-	}
-
 	// source of all configuration
 	cfg := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates)
 
@@ -124,14 +119,21 @@ func main() {
 	}
 
 	// define etcd config source and initialize etcd client
+	var etcdClient tools.EtcdClient
 	if len(etcdServerList) > 0 {
 		glog.Infof("Watching for etcd configs at %v", etcdServerList)
-		k.EtcdClient = etcd.NewClient(etcdServerList)
-		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), k.EtcdClient, 30*time.Second, cfg.Channel("etcd"))
+		etcdClient = etcd.NewClient(etcdServerList)
+		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), etcdClient, 30*time.Second, cfg.Channel("etcd"))
 	}
 
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
+
+	k := kubelet.NewMainKubelet(
+		getHostname(),
+		dockerClient,
+		cadvisorClient,
+		etcdClient)
 
 	// start the kubelet
 	go util.Forever(func() { k.Run(cfg.Updates()) }, 0)
