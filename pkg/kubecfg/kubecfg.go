@@ -168,6 +168,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{
+								Name:  name,
 								Image: image,
 								Ports: makePorts(portSpec),
 							},
