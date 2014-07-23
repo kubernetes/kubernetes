@@ -157,10 +157,6 @@ func main() {
 }
 
 func executeAPIRequest(method string, s *kube_client.Client) bool {
-	if len(flag.Args()) < 2 {
-		glog.Fatalf("usage: kubecfg [OPTIONS] get|list|create|update|delete <%s>[/<id>]", prettyWireStorage())
-	}
-
 	verb := ""
 	segments := strings.SplitN(flag.Arg(1), "/", 2)
 	storage := segments[0]
@@ -188,6 +184,10 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 		}
 	default:
 		return false
+	}
+
+	if len(flag.Args()) < 2 {
+		glog.Fatalf("usage: kubecfg [OPTIONS] get|list|create|update|delete <%s>[/<id>]", prettyWireStorage())
 	}
 
 	r := s.Verb(verb).
