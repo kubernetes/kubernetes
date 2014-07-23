@@ -201,6 +201,13 @@ cd kubernetes
 hack/integration-test.sh
 ```
 
+### End-to-End tests
+With a GCE account set up for running `cluster/kube-up.sh` (see Setup above):
+```
+cd kubernetes
+hack/e2e-test.sh
+```
+
 ### Keeping your development fork in sync
 One time after cloning your forked repo:
 ```
