@@ -8,7 +8,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -20,17 +19,17 @@ type BuildJobManager struct {
 	kubeClient    client.Interface
 	podControl    PodControlInterface
 	syncTime      <-chan time.Time
-	syncHandler   func(jobSpec api.Job) error
+	syncHandler   func(job api.Job) error
 	typeDelegates map[string]BuildTypeDelegate
 }
 
-type BuildTypeDelegate func(jobSpec api.Job) (*api.Pod, error)
+type BuildTypeDelegate func(job api.Job) (*api.Pod, error)
 
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
 	// run a pod for the specified job
-	runJob(jobSpec api.Job)
+	runJob(job api.Job)
 	// deletePod deletes the pod identified by podID.
 	deletePod(podID string) error
 }
@@ -40,47 +39,47 @@ type RealPodControl struct {
 	kubeClient client.Interface
 }
 
-func (r RealPodControl) runJob(jobSpec api.Job) {
-	createPodConfig := typeDelegates[jobSpec.Type]
+func (r RealPodControl) runJob(job api.Job) {
+	createPodConfig := typeDelegates[job.Type]
 	if createPodConfig == nil {
-		jobSpec.State = api.JobComplete
-		jobSpec.Success = false
+		job.State = api.JobComplete
+		job.Success = false
 		// TODO: handle error
-		// kubeClient.UpdateJob(jobSpec)
+		// kubeClient.UpdateJob(job)
 		return
 	}
 
-	pod, err := createPodConfig(jobSpec)
+	pod, err := createPodConfig(job)
 	if err != nil {
-		jobSpec.State = api.JobComplete
-		jobSpec.Success = false
+		job.State = api.JobComplete
+		job.Success = false
 		// TODO: update state of job
-		// kubeClient.UpdateJob(jobSpec)
+		// kubeClient.UpdateJob(job)
 		return
 	}
 
 	_, err = r.kubeClient.CreatePod(*pod)
 	if err != nil {
 		glog.Errorf("%#v\n", err)
-		jobSpec.State = api.JobComplete
-		jobSpec.Success = false
-		// kubeClient.UpdateJob(jobSpec)
+		job.State = api.JobComplete
+		job.Success = false
+		// kubeClient.UpdateJob(job)
 	}
 
-	jobSpec.State = api.JobNew
-	// kubeClient.UpdateJob(jobSpec)
+	job.State = api.JobNew
+	// kubeClient.UpdateJob(job)
 }
 
 func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
 }
 
-func dockerfileBuildJobFor(jobSpec api.Job) (*api.Pod, error) {
+func dockerfileBuildJobFor(job api.Job) (*api.Pod, error) {
 	pod := api.Pod{}
 	return nil, nil
 }
 
-func stiBuildJobFor(jobSpec api.Job) (*api.Pod, error) {
+func stiBuildJobFor(job api.Job) (*api.Pod, error) {
 	return nil, nil
 }
 
@@ -97,8 +96,8 @@ func MakeBuildJobManager(etcdClient tools.EtcdClient, kubeClient client.Interfac
 		},
 	}
 
-	rm.syncHandler = func(jobSpec api.Job) error {
-		return rm.syncJobState(jobSpec)
+	rm.syncHandler = func(job api.Job) error {
+		return rm.syncJobState(job)
 	}
 
 	return rm
@@ -139,12 +138,12 @@ func (rm *BuildJobManager) watchBuildJobs() {
 				return
 			}
 			glog.Infof("Got watch: %#v", watchResponse)
-			controller, err := rm.handleWatchResponse(watchResponse)
+			job, err := rm.handleWatchResponse(watchResponse)
 			if err != nil {
 				glog.Errorf("Error handling data: %#v, %#v", err, watchResponse)
 				continue
 			}
-			rm.syncHandler(*controller)
+			rm.syncHandler(*job)
 		}
 	}
 }
@@ -155,11 +154,11 @@ func (rm *BuildJobManager) handleWatchResponse(response *etcd.Response) (*api.Jo
 		if response.Node == nil {
 			return nil, fmt.Errorf("response node is null %#v", response)
 		}
-		var jobSpec api.Job
-		if err := json.Unmarshal([]byte(response.Node.Value), &jobSpec); err != nil {
+		var job api.Job
+		if err := json.Unmarshal([]byte(response.Node.Value), &job); err != nil {
 			return nil, err
 		}
-		return &jobSpec, nil
+		return &job, nil
 	case "delete":
 		// TODO: determine if some cleanup should be done here
 	}
@@ -168,8 +167,8 @@ func (rm *BuildJobManager) handleWatchResponse(response *etcd.Response) (*api.Jo
 }
 
 // Sync loop implementation, pointed to by rm.syncHandler
-func (rm *BuildJobManager) syncJobState(jobSpec api.Job) error {
-	jobPod, err := rm.kubeClient.GetPod(jobSpec.PodId)
+func (rm *BuildJobManager) syncJobState(job api.Job) error {
+	jobPod, err := rm.kubeClient.GetPod(job.PodId)
 	if err != nil {
 		return err
 	}
@@ -177,7 +176,7 @@ func (rm *BuildJobManager) syncJobState(jobSpec api.Job) error {
 	var (
 		podStatus = jobPod.CurrentState.Status
 		podInfo   = jobPod.CurrentState.Info
-		jobState  = jobSpec.State
+		jobState  = job.State
 		update    = false
 	)
 
@@ -185,7 +184,7 @@ func (rm *BuildJobManager) syncJobState(jobSpec api.Job) error {
 	case api.PodRunning:
 		switch jobState {
 		case api.JobNew || api.JobPending:
-			jobSpec.State = api.JobRunning
+			job.State = api.JobRunning
 			update = true
 		case api.JobComplete:
 			return errors.New("Illegal state transition")
@@ -193,7 +192,7 @@ func (rm *BuildJobManager) syncJobState(jobSpec api.Job) error {
 	case api.PodPending:
 		switch jobState {
 		case api.JobNew:
-			jobSpec.State = api.JobPending
+			job.State = api.JobPending
 			update = true
 		case api.JobComplete:
 			return errors.New("Illegal state transition")
@@ -203,32 +202,30 @@ func (rm *BuildJobManager) syncJobState(jobSpec api.Job) error {
 			return nil
 		}
 
-		jobSpec.State = api.JobComplete
+		job.State = api.JobComplete
 		containerState = podInfo[0].State
 		update = true
 
 		if containerState.ExitCode == 0 {
-			jobSpec.Success = true
+			job.Success = true
 		}
 	}
 
 	if update {
-		kubeClient.UpdateJob(jobSpec)
+		kubeClient.UpdateJob(job)
 	}
 
 	return nil
 }
 
 func (rm *BuildJobManager) synchronize() {
-	var jobSpecs []api.Job
-	helper := tools.EtcdHelper{rm.etcdClient}
-	err := helper.ExtractList("/jobs/build", &jobSpecs)
+	jobs, err := kubeClient.ListJobs()
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 		return
 	}
-	for _, jobSpec := range jobSpecs {
-		err = rm.syncHandler(jobSpec)
+	for _, job := range jobs {
+		err = rm.syncHandler(job)
 		if err != nil {
 			glog.Errorf("Error synchronizing: %#v", err)
 		}

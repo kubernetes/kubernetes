@@ -49,6 +49,9 @@ type Interface interface {
 	CreateService(api.Service) (api.Service, error)
 	UpdateService(api.Service) (api.Service, error)
 	DeleteService(string) error
+
+	ListJobs() (api.JobList, error)
+	UpdateJob(api.Job) (api.Job, error)
 }
 
 // StatusErr might get returned from an api call if your request is still being processed
