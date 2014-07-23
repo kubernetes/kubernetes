@@ -312,6 +312,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 func (kl *Kubelet) killContainer(dockerContainer docker.APIContainers) error {
 	glog.Infof("Killing: %s", dockerContainer.ID)
 	err := kl.dockerClient.StopContainer(dockerContainer.ID, 10)
+	err = kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: dockerContainer.ID, Force: true})
 	podFullName, containerName := parseDockerName(dockerContainer.Names[0])
 	kl.LogEvent(&api.Event{
 		Event: "STOP",
@@ -383,8 +384,21 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 			glog.Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
 			glog.V(1).Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
 
+			var c *docker.Container
+			var cerr error
+			if c, cerr = kl.dockerClient.InspectContainer(dockerContainer.ID); cerr != nil || c == nil {
+				glog.Errorf("couldn't find docker container with id %v: %s", dockerContainer.ID, cerr)
+				continue
+			}
+
+			if !c.State.Running && container.RestartPolicy == "runOnce" {
+				glog.Infof("allowing pod %s container %s (id %v) to remain stopped due to runOnce restart policy", podFullName, container.Name, containerID)
+				keepChannel <- containerID
+				continue
+			}
+
 			// TODO: This should probably be separated out into a separate goroutine.
-			healthy, err := kl.healthy(container, dockerContainer)
+			healthy, err := kl.healthy(container, dockerContainer, c)
 			if err != nil {
 				glog.V(1).Infof("health check errored: %v", err)
 				continue
@@ -446,7 +460,7 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 	var err error
 	desiredContainers := make(map[podContainer]empty)
 
-	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient)
+	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient, true)
 	if err != nil {
 		glog.Errorf("Error listing containers %#v", dockerContainers)
 		return err
@@ -473,7 +487,7 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 	}
 
 	// Kill any containers we don't need
-	existingContainers, err := getKubeletDockerContainers(kl.dockerClient)
+	existingContainers, err := getKubeletDockerContainers(kl.dockerClient, true)
 	if err != nil {
 		glog.Errorf("Error listing containers: %v", err)
 		return err
@@ -573,7 +587,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName, containerName string, req *info
 	if kl.cadvisorClient == nil {
 		return nil, nil
 	}
-	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient)
+	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient, true)
 	if err != nil {
 		return nil, err
 	}
@@ -593,10 +607,14 @@ func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
 	return kl.cadvisorClient.MachineInfo()
 }
 
-func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
+func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers, c *docker.Container) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
-		return health.Healthy, nil
+		if c.State.Running {
+			return health.Healthy, nil
+		} else {
+			return health.Unhealthy, nil
+		}
 	}
 	if time.Now().Unix()-dockerContainer.Created < container.LivenessProbe.InitialDelaySeconds {
 		return health.Healthy, nil

@@ -174,7 +174,8 @@ type Container struct {
 	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 	// Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	Privileged    bool   `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	RestartPolicy string `yaml:"restartPolicy,omitempty" json:"restartPolicy,omitempty"`
 }
 
 // Event is the representation of an event logged to etcd backends
