@@ -62,6 +62,7 @@ func makeTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *FakeDocker
 	kubelet.dockerPuller = &FakeDockerPuller{}
 	kubelet.etcdClient = fakeEtcdClient
 	kubelet.rootDirectory = "/tmp/kubelet"
+	kubelet.podWorkers = newPodWorkers()
 	return kubelet, fakeEtcdClient, fakeDocker
 }
 
@@ -269,7 +270,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 	expectNoError(t, err)
 	verifyCalls(t, fakeDocker, []string{"list", "list", "stop", "stop"})
 
-	// A map interation is used to delete containers, so must not depend on
+	// A map iteration is used to delete containers, so must not depend on
 	// order here.
 	expectedToStop := map[string]bool{
 		"1234": true,
@@ -282,45 +283,87 @@ func TestSyncPodsDeletes(t *testing.T) {
 	}
 }
 
+func TestSyncPodDeletesDuplicate(t *testing.T) {
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	dockerContainers := DockerContainers{
+		"1234": &docker.APIContainers{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s--foo--bar.test--1"},
+			ID:    "1234",
+		},
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s--net--bar.test--"},
+			ID:    "9876",
+		},
+		"4567": &docker.APIContainers{
+			// Duplicate for the same container.
+			Names: []string{"/k8s--foo--bar.test--2"},
+			ID:    "4567",
+		},
+		"2304": &docker.APIContainers{
+			// Container for another pod, untouched.
+			Names: []string{"/k8s--baz--fiz.test--6"},
+			ID:    "2304",
+		},
+	}
+	err := kubelet.syncPod(&Pod{
+		Name:      "bar",
+		Namespace: "test",
+		Manifest: api.ContainerManifest{
+			ID: "bar",
+			Containers: []api.Container{
+				{Name: "foo"},
+			},
+		},
+	}, dockerContainers)
+	expectNoError(t, err)
+	verifyCalls(t, fakeDocker, []string{"stop"})
+
+	// Expect one of the duplicates to be killed.
+	if len(fakeDocker.stopped) != 1 || (len(fakeDocker.stopped) != 0 && fakeDocker.stopped[0] != "1234" && fakeDocker.stopped[0] != "4567") {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
+	}
+}
+
 type FalseHealthChecker struct{}
 
 func (f *FalseHealthChecker) HealthCheck(container api.Container) (health.Status, error) {
 	return health.Unhealthy, nil
 }
 
-func TestSyncPodsUnhealthy(t *testing.T) {
+func TestSyncPodUnhealthy(t *testing.T) {
 	kubelet, _, fakeDocker := makeTestKubelet(t)
 	kubelet.healthChecker = &FalseHealthChecker{}
-	fakeDocker.containerList = []docker.APIContainers{
-		{
+	dockerContainers := DockerContainers{
+		"1234": &docker.APIContainers{
 			// the k8s prefix is required for the kubelet to manage the container
 			Names: []string{"/k8s--bar--foo.test"},
 			ID:    "1234",
 		},
-		{
+		"9876": &docker.APIContainers{
 			// network container
 			Names: []string{"/k8s--net--foo.test--"},
 			ID:    "9876",
 		},
 	}
-	err := kubelet.SyncPods([]Pod{
-		{
-			Name:      "foo",
-			Namespace: "test",
-			Manifest: api.ContainerManifest{
-				ID: "foo",
-				Containers: []api.Container{
-					{Name: "bar",
-						LivenessProbe: &api.LivenessProbe{
-							// Always returns healthy == false
-							Type: "false",
-						},
+	err := kubelet.syncPod(&Pod{
+		Name:      "foo",
+		Namespace: "test",
+		Manifest: api.ContainerManifest{
+			ID: "foo",
+			Containers: []api.Container{
+				{Name: "bar",
+					LivenessProbe: &api.LivenessProbe{
+						// Always returns healthy == false
+						Type: "false",
 					},
 				},
 			},
-		}})
+		},
+	}, dockerContainers)
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start", "list"})
+	verifyCalls(t, fakeDocker, []string{"stop", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -699,6 +742,7 @@ func TestGetRooInfo(t *testing.T) {
 		dockerClient:   &fakeDocker,
 		dockerPuller:   &FakeDockerPuller{},
 		cadvisorClient: mockCadvisor,
+		podWorkers:     newPodWorkers(),
 	}
 
 	// If the container name is an empty string, then it means the root container.
