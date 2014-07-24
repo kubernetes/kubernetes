@@ -67,14 +67,12 @@ ${GO_OUT}/controller-manager \
 CTLRMGR_PID=$!
 
 BLDMGR_LOG=/tmp/build-controller.log
-${GO_OUT}/build-job-manager \
-  --etcd_servers="http://127.0.0.1:4001" \
+${GO_OUT}/build-controller \
   --master="127.0.0.1:${API_PORT}" &> ${BLDMGR_LOG} &
 BLDMGR_PID=$!
 
 JOBCTR_LOG=/tmp/job-controller.log
 ${GO_OUT}/job-controller \
-  --etcd_servers="http://127.0.0.1:4001" \
   --master="127.0.0.1:${API_PORT}" &> ${JOBCTR_LOG} &
 JOBCTR_PID=$!
 

@@ -241,7 +241,6 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	}
 	result := r.Do()
 	obj, err := result.Get()
-	glog.Infof("%v", obj)
 	if err != nil {
 		glog.Fatalf("Got request error: %v\n", err)
 		return false

@@ -7,14 +7,14 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
 type BuildController struct {
-	kubeClient client.Interface
-	syncTime   <-chan time.Time
+	kubeClient  client.Interface
+	syncTime    <-chan time.Time
+	buildRunner BuildRunner
 }
 
 // BuildRunner is an interface that knows how to run builds and was
@@ -65,17 +65,20 @@ func (bc *BuildController) synchronize() {
 // TODO: improve handling of illegal state transitions
 func (bc *BuildController) syncBuildState(build api.Build) error {
 	glog.Infof("Syncing build state for build ID %s", build.ID)
+	glog.Infof("Build details: %#v", build)
 	if build.Status == api.BuildNew {
 		return bc.buildRunner.run(build)
-	} else if build.Status == api.BuildPending && len(build.jobID) == 0 {
+	} else if build.Status == api.BuildPending && len(build.JobID) == 0 {
 		return nil
 	}
 
-	glog.Infof("Retrieving info for job ID %s for build ID %s", build.jobID, build.ID)
+	glog.Infof("Retrieving info for job ID %s for build ID %s", build.JobID, build.ID)
 	job, err := bc.kubeClient.GetJob(build.JobID)
 	if err != nil {
 		return err
 	}
+
+	update := false
 
 	glog.Infof("Status for job ID %s: %s", job.ID, job.Status)
 	switch job.Status {
@@ -96,7 +99,7 @@ func (bc *BuildController) syncBuildState(build api.Build) error {
 		case api.BuildComplete:
 			return errors.New("Illegal state transition")
 		}
-	case api.JobStopped:
+	case api.JobComplete:
 		if build.Status == api.BuildComplete {
 			glog.Infof("Build status is already complete - no-op")
 			return nil
@@ -119,62 +122,58 @@ func (bc *BuildController) syncBuildState(build api.Build) error {
 	return nil
 }
 
-/*
 func (r *DefaultBuildRunner) run(build api.Build) error {
-	glog.Infof("Attempting to run job for build %v: %#v", build.ID, job.Pod)
-	pod, err := r.kubeClient.CreatePod(job.Pod)
-
-	if err != nil {
-		glog.Errorf("Error creating pod for job ID %v: %#v\n", job.ID, err)
-
-		job.Status = api.JobComplete
-		job.Success = false
-
-		_, err := r.kubeClient.UpdateJob(job)
-		if err != nil {
-			return errors.New(fmt.Sprintf("Couldn't update Job: %#v : %s", job, err.Error()))
-		}
-
-		return nil
-	}
-
-	glog.Infof("Setting job state to pending, pod id = %s", pod.ID)
-	job.Status = api.JobPending
-	job.PodID = pod.ID
-
-	_, err = r.kubeClient.UpdateJob(job)
-	if err != nil {
-		return errors.New(fmt.Sprintf("Couldn't update Job: %#v : %s", job, err.Error()))
-	}
-
-	return nil
-}
-
-
-func (r *DefaultBuildRunner) run(build api.Build) (*api.Pod, error) {
 	var envVars []api.EnvVar
 	for k, v := range build.Context {
 		envVars = append(envVars, api.EnvVar{Name: k, Value: v})
 	}
 
-	pod := &api.Pod{
-		Labels: map[string]string{},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-				Containers: []api.Container{
-					{
-						Name:          "docker-build",
-						Image:         "ironcladlou/openshift-docker-builder",
-						Privileged:    true,
-						RestartPolicy: "runOnce",
-						Env:           envVars,
+	job := api.Job{
+		Pod: api.Pod{
+			Labels: map[string]string{},
+			DesiredState: api.PodState{
+				Manifest: api.ContainerManifest{
+					Version: "v1beta1",
+					Containers: []api.Container{
+						{
+							Name:          "docker-build",
+							Image:         "ironcladlou/openshift-docker-builder",
+							Privileged:    true,
+							RestartPolicy: "runOnce",
+							Env:           envVars,
+						},
 					},
 				},
 			},
 		},
 	}
 
-	return pod, nil
+	glog.Infof("Creating job for build %s", build.ID)
+	job, err := r.kubeClient.CreateJob(job)
+
+	if err != nil {
+		glog.Errorf("Error creating job for build ID %s: %s\n", build.ID, err.Error())
+
+		build.Status = api.BuildComplete
+		build.Success = false
+
+		_, err := r.kubeClient.UpdateBuild(build)
+		if err != nil {
+			return fmt.Errorf("Couldn't update build: %#v : %s", build, err.Error())
+		}
+
+		//TODO should this return nil or some error?
+		return nil
+	}
+
+	glog.Infof("Setting build state to pending, job id = %s", job.ID)
+	build.Status = api.BuildPending
+	build.JobID = job.ID
+
+	_, err = r.kubeClient.UpdateBuild(build)
+	if err != nil {
+		return fmt.Errorf("Couldn't update Job: %#v : %s", job, err.Error())
+	}
+
+	return nil
 }
-*/

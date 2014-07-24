@@ -13,8 +13,7 @@ import (
 )
 
 var (
-	etcdServerList util.StringList
-	master         = flag.String("master", "", "The address of the Kubernetes API server")
+	master = flag.String("master", "", "The address of the Kubernetes API server")
 )
 
 func init() {
@@ -25,7 +24,7 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	if len(etcdServerList) == 0 || len(*master) == 0 {
+	if len(*master) == 0 {
 		glog.Fatal("usage: controller-manager -master <master>")
 	}
 

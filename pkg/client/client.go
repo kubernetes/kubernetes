@@ -51,6 +51,8 @@ type Interface interface {
 	DeleteService(string) error
 
 	ListJobs() (api.JobList, error)
+	GetJob(name string) (api.Job, error)
+	CreateJob(api.Job) (api.Job, error)
 	UpdateJob(api.Job) (api.Job, error)
 
 	ListBuilds() (api.BuildList, error)

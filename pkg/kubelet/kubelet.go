@@ -393,7 +393,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 
 			if !c.State.Running && container.RestartPolicy == "runOnce" {
 				glog.Infof("allowing pod %s container %s (id %v) to remain stopped due to runOnce restart policy", podFullName, container.Name, containerID)
-				keepChannel <- containerID
+				containersToKeep[containerID] = empty{}
 				continue
 			}
 
