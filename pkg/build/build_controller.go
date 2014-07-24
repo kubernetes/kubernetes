@@ -1,4 +1,4 @@
-package buildjob
+package build
 
 import (
 	"errors"
@@ -12,89 +12,13 @@ import (
 	"github.com/golang/glog"
 )
 
-type BuildJobManager struct {
+type BuildController struct {
 	etcdClient tools.EtcdClient
 	kubeClient client.Interface
-	podControl PodControlInterface
 	syncTime   <-chan time.Time
 }
 
-// PodControlInterface is an interface that knows how to add or delete pods
-// created as an interface to allow testing.
-type PodControlInterface interface {
-	// run a pod for the specified job
-	runJob(job api.Job) error
-	// deletePod deletes the pod identified by podID.
-	deletePod(podID string) error
-}
-
 type BuildTypeDelegate func(jobSpec api.Job) (*api.Pod, error)
-
-// RealPodControl is the default implementation of PodControlInterface.
-type RealPodControl struct {
-	kubeClient    client.Interface
-	typeDelegates map[string]BuildTypeDelegate
-}
-
-func (r RealPodControl) runJob(job api.Job) error {
-	glog.Infof("Running job ID %s", job.ID)
-	createPodConfig := r.typeDelegates["dockerfile"]
-	if createPodConfig == nil {
-		job.State = api.JobComplete
-		job.Success = false
-
-		_, err := r.kubeClient.UpdateJob(job)
-		if err != nil {
-			return errors.New(fmt.Sprintf("Couldn't update Job: %+v : %s", job, err.Error()))
-		}
-
-		return nil
-	}
-
-	podSpec, err := createPodConfig(job)
-	if err != nil {
-		job.State = api.JobComplete
-		job.Success = false
-
-		_, err := r.kubeClient.UpdateJob(job)
-		if err != nil {
-			return errors.New(fmt.Sprintf("Couldn't update Job: %+v : %s", job, err.Error()))
-		}
-
-		return nil
-	}
-
-	glog.Infof("Attempting to create pod for job ID %s", job.ID)
-	pod, err := r.kubeClient.CreatePod(*podSpec)
-	if err != nil {
-		glog.Errorf("%#v\n", err)
-
-		job.State = api.JobComplete
-		job.Success = false
-
-		_, err := r.kubeClient.UpdateJob(job)
-		if err != nil {
-			return errors.New(fmt.Sprintf("Couldn't update Job: %+v : %s", job, err.Error()))
-		}
-
-		return nil
-	}
-
-	glog.Infof("Setting job state to pending, pod id = %s", pod.ID)
-	job.State = api.JobPending
-	job.PodID = pod.ID
-
-	_, err = r.kubeClient.UpdateJob(job)
-	if err != nil {
-		return errors.New(fmt.Sprintf("Couldn't update Job: %+v : %s", job, err.Error()))
-	}
-
-	return nil
-}
-
-func (r RealPodControl) deletePod(podID string) error {
-	return r.kubeClient.DeletePod(podID)
-}
 
 func dockerfileBuildJobFor(job api.Job) (*api.Pod, error) {
 	var envVars []api.EnvVar
@@ -129,8 +53,8 @@ func stiBuildJobFor(job api.Job) (*api.Pod, error) {
 	return nil, nil
 }
 
-func MakeBuildJobManager(etcdClient tools.EtcdClient, kubeClient client.Interface) *BuildJobManager {
-	rm := &BuildJobManager{
+func MakeBuildController(etcdClient tools.EtcdClient, kubeClient client.Interface) *BuildController {
+	rm := &BuildController{
 		kubeClient: kubeClient,
 		etcdClient: etcdClient,
 		podControl: RealPodControl{
@@ -146,14 +70,14 @@ func MakeBuildJobManager(etcdClient tools.EtcdClient, kubeClient client.Interfac
 }
 
 // Run begins watching and syncing.
-func (rm *BuildJobManager) Run(period time.Duration) {
+func (rm *BuildController) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
 	go util.Forever(func() { rm.synchronize() }, period)
 }
 
 // Sync loop implementation, pointed to by rm.syncHandler
 // TODO: improve handling of illegal state transitions
-func (rm *BuildJobManager) syncJobState(job api.Job) error {
+func (rm *BuildController) syncBuildState(job api.Job) error {
 	glog.Infof("Syncing job state for job ID %s", job.ID)
 	if job.State == api.JobNew {
 		return rm.podControl.runJob(job)
@@ -226,14 +150,14 @@ func (rm *BuildJobManager) syncJobState(job api.Job) error {
 	return nil
 }
 
-func (rm *BuildJobManager) synchronize() {
+func (rm *BuildController) synchronize() {
 	jobs, err := rm.kubeClient.ListJobs()
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 		return
 	}
 	for _, job := range jobs.Items {
-		err = rm.syncJobState(job)
+		err = rm.syncBuildState(job)
 		if err != nil {
 			glog.Errorf("Error synchronizing: %#v", err)
 		}

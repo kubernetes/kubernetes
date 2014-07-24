@@ -1,12 +1,12 @@
-// The build job manager is responsible for watching build jobs, running them,
-// and monitoring them.
+// The build controller is responsible for running jobs for builds
+// watching them, and updating build state.
 package main
 
 import (
 	"flag"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/buildjob"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -34,10 +34,10 @@ func main() {
 	// Set up logger for etcd client
 	etcd.SetLogger(util.NewLogger("etcd "))
 
-	buildManager := buildjob.MakeBuildJobManager(
+	buildController := build.MakeBuildController(
 		etcd.NewClient(etcdServerList),
 		client.New("http://"+*master, nil))
 
-	buildManager.Run(10 * time.Second)
+	buildController.Run(10 * time.Second)
 	select {}
 }
