@@ -17,7 +17,7 @@ name
 : One or more rfc1035/rfc1123 labels separated by '.' with a maximum length of 253 characters
 
 [rfc4122](http://www.ietf.org/rfc/rfc4122.txt) universally unique identifier (UUID)
-: A 128 bit generated value that is extremely unilkely to collide across time and space and requires no central coordination
+: A 128 bit generated value that is extremely unlikely to collide across time and space and requires no central coordination
 
 ## Objectives for names and identifiers
 

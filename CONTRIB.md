@@ -21,7 +21,7 @@ Follow either of the two links above to access the appropriate CLA and instructi
 
 ## Protocols for Collaborative Development
 
-Please read [this doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/collab.md) for information on how we're runnig development for the project.
+Please read [this doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/collab.md) for information on how we're running development for the project.
 
 ## Adding dependencies
 
