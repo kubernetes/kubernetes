@@ -151,13 +151,16 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         exit 1
     fi
 
-    # Make sure the kubelet is running
-    gcutil ssh ${MINION_NAMES[$i]} /etc/init.d/kubelet status
-    if [ "$?" != "0" ]; then
+    # Make sure the kubelet is healthy
+    if [ "$(curl --insecure --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
 	echo "Kubelet failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
+    else
+	echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
+
     fi
+
 done
 
 echo
