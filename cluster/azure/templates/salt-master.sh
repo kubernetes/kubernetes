@@ -22,6 +22,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-master
+  cloud: azure
 EOF
 
 # Auto accept all keys from minions that try to join

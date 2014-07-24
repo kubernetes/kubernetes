@@ -31,6 +31,7 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: $MINION_IP_RANGE
+  cloud: gce
 EOF
 
 # Install Salt
