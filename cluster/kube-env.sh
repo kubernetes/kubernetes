@@ -14,20 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Push a new release to the cluster.
-#
-# This will find the release tar, cause it to be downloaded, unpacked, installed
-# and enacted.
+# Set provider independent environment variables
 
-# exit on any error
-set -e
-
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
-
-echo "Updating cluster using provider: $KUBERNETES_PROVIDER"
-
-verify-prereqs
-kube-up
-
-echo "Done"
+# Set provider of Kubernetes cluster to know where to load provider-specific scripts, values: gce, vagrant, etc.
+KUBERNETES_PROVIDER="gce"
+#KUBERNETES_PROVIDER="vagrant"

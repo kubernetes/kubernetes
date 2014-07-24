@@ -20,8 +20,8 @@
 # Exit on error
 set -e
 
-source "${KUBE_REPO_ROOT}/cluster/util.sh"
-detect-project
+source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
+source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 # Launch a container
 $CLOUDCFG -p 8080:80 run dockerfile/nginx 2 myNginx

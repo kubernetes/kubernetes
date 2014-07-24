@@ -1,2 +1,18 @@
-{%- set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() %}
-DAEMON_ARGS="$DAEMON_ARGS -etcd_servers=http://{{ ips[0][0] }}:4001 -address=$HOSTNAME -config=/etc/kubernetes/manifests"
+{% set daemon_args = "$DAEMON_ARGS" %}
+{% if grains['os_family'] == 'RedHat' %}
+	{% set daemon_args = "" %}
+{% endif %}
+{% if grains.etcd_servers is defined %}
+  {% set etcd_servers = "-etcd_servers=http://" + grains.etcd_servers + ":4001" %}
+{% else %}
+  {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() %}
+  {% set etcd_servers = "-etcd_servers=http://" + ips[0][0] + ":4001" %}
+{% endif %}
+
+{% if grains.minion_ip is defined %}
+  {% set address = "-address=" + grains.minion_ip + " -hostname_override=" + grains.minion_ip %}
+{% else %}
+  {% set address = "-address=$HOSTNAME" %}
+{% endif %}
+
+DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{address}} -config=/etc/kubernetes/manifests"

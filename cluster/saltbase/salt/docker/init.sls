@@ -1,3 +1,11 @@
+{% if grains['os_family'] == 'RedHat' %}
+{% set environment_file = '/etc/sysconfig/docker' %}
+{% else %}
+{% set environment_file = '/etc/default/docker' %}
+{% endif %}
+
+{% if grains['os_family'] != 'RedHat' %}
+
 docker-repo:
   pkgrepo.managed:
     - humanname: Docker Repo
@@ -25,7 +33,23 @@ cbr0:
     - cidr: {{ grains['cbr-cidr'] }}
     - mtu: 1460
 
-/etc/default/docker:
+{% endif %}
+
+{% if grains['os_family'] == 'RedHat' %}
+
+docker-io:
+  pkg:
+    - installed
+
+docker:
+  service.running:
+    - enable: True
+    - require: 
+      - pkg: docker-io
+
+{% else %}
+
+{{ environment_file }}:
   file.managed:
     - source: salt://docker/docker-defaults
     - template: jinja
@@ -51,3 +75,5 @@ lxc-docker:
 #       - pkg: lxc-docker
 #     - watch:
 #       - file: /etc/default/docker
+
+{% endif %}

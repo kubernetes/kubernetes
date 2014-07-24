@@ -19,37 +19,12 @@
 # exit on any error
 set -e
 
-source $(dirname $0)/util.sh
+source $(dirname $0)/kube-env.sh
+source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
-# Detect the project into $PROJECT
-detect-project
+echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
-echo "Bringing down cluster"
-gcutil deletefirewall  \
-  --project ${PROJECT} \
-  --norespect_terminal_width \
-  --force \
-  ${MASTER_NAME}-https &
+verify-prereqs
+kube-down
 
-gcutil deleteinstance \
-  --project ${PROJECT} \
-  --norespect_terminal_width \
-  --force \
-  --delete_boot_pd \
-  --zone ${ZONE} \
-  ${MASTER_NAME} &
-
-gcutil deleteinstance \
-  --project ${PROJECT} \
-  --norespect_terminal_width \
-  --force \
-  --delete_boot_pd \
-  --zone ${ZONE} \
-  ${MINION_NAMES[*]} &
-
-gcutil deleteroute  \
-  --project ${PROJECT} \
-  --force \
-  ${MINION_NAMES[*]} &
-
-wait
+echo "Done"

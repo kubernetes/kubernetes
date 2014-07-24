@@ -13,7 +13,7 @@ base:
   'roles:kubernetes-master':
     - match: grain
     - golang
+    - etcd
     - apiserver
     - controller-manager
-    - etcd
     - nginx

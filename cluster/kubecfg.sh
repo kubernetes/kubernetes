@@ -16,7 +16,8 @@
 
 #!/bin/bash
 
-source $(dirname $0)/util.sh
+source $(dirname $0)/kube-env.sh
+source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
 CLOUDCFG=$(dirname $0)/../output/go/kubecfg
 if [ ! -x $CLOUDCFG ]; then
