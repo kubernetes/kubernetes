@@ -25,7 +25,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -72,17 +71,15 @@ func getDockerEndpoint() string {
 }
 
 func getHostname() string {
-	hostname := []byte(*hostnameOverride)
-	if string(hostname) == "" {
-		// Note: We use exec here instead of os.Hostname() because we
-		// want the FQDN, and this is the easiest way to get it.
-		fqdn, err := exec.Command("hostname", "-f").Output()
+	var err error
+	hostname := *hostnameOverride
+	if hostname == "" {
+		hostname, err = os.Hostname()
 		if err != nil {
 			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
-		hostname = fqdn
 	}
-	return strings.TrimSpace(string(hostname))
+	return strings.TrimSpace(hostname)
 }
 
 func main() {
