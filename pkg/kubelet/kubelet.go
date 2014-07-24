@@ -62,12 +62,14 @@ func NewMainKubelet(
 	hn string,
 	dc DockerInterface,
 	cc CadvisorInterface,
-	ec tools.EtcdClient) *Kubelet {
+	ec tools.EtcdClient,
+	rd string) *Kubelet {
 	return &Kubelet{
 		hostname:       hn,
 		dockerClient:   dc,
 		cadvisorClient: cc,
 		etcdClient:     ec,
+		rootDirectory:  rd,
 	}
 }
 
@@ -83,8 +85,9 @@ func NewIntegrationTestKubelet(hn string, dc DockerInterface) *Kubelet {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	hostname     string
-	dockerClient DockerInterface
+	hostname      string
+	dockerClient  DockerInterface
+	rootDirectory string
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
@@ -210,7 +213,7 @@ func milliCPUToShares(milliCPU int) int {
 func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volumeMap, error) {
 	podVolumes := make(volumeMap)
 	for _, vol := range manifest.Volumes {
-		extVolume, err := volume.CreateVolume(&vol, manifest.ID)
+		extVolume, err := volume.CreateVolume(&vol, manifest.ID, kl.rootDirectory)
 		if err != nil {
 			return nil, err
 		}

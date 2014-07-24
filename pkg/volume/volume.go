@@ -18,17 +18,18 @@ package volume
 
 import (
 	"errors"
-	"fmt"
 	"os"
+	"path"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
 )
-
 
 // All volume types are expected to implement this interface
 type Interface interface {
 	// Prepares and mounts/unpacks the volume to a directory path.
 	// This procedure must be idempotent.
+	// TODO(jonesdl) SetUp should return an error if it fails.
 	SetUp()
 	// Returns the directory path the volume is mounted to.
 	GetPath() string
@@ -56,16 +57,18 @@ func (hostVol *HostDirectory) GetPath() string {
 // EmptyDirectory volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
 type EmptyDirectory struct {
-	Name string
-	PodID string
+	Name    string
+	PodID   string
+	RootDir string
 }
 
 // SetUp creates the new directory.
 func (emptyDir *EmptyDirectory) SetUp() {
-	if _, err := os.Stat(emptyDir.GetPath()); os.IsNotExist(err) {
-		os.MkdirAll(emptyDir.GetPath(), 0750)
+	path := emptyDir.GetPath()
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.MkdirAll(path, 0750)
 	} else {
-		glog.Warningf("Directory already exists: (%v)", emptyDir.GetPath())
+		glog.Warningf("Directory already exists: (%v)", path)
 	}
 }
 
@@ -74,9 +77,7 @@ func (emptyDir *EmptyDirectory) SetUp() {
 func (emptyDir *EmptyDirectory) TearDown() {}
 
 func (emptyDir *EmptyDirectory) GetPath() string {
-	// TODO(jonesdl) We will want to add a flag to designate a root
-	// directory for kubelet to write to. For now this will just be /exports
-	return fmt.Sprintf("/exports/%v/%v", emptyDir.PodID, emptyDir.Name)
+	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
 // Interprets API volume as a HostDirectory
@@ -85,13 +86,13 @@ func createHostDirectory(volume *api.Volume) *HostDirectory {
 }
 
 // Interprets API volume as an EmptyDirectory
-func createEmptyDirectory(volume *api.Volume, podID string) *EmptyDirectory {
-	return &EmptyDirectory{volume.Name, podID}
+func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
+	return &EmptyDirectory{volume.Name, podID, rootDir}
 }
 
 // CreateVolume returns an Interface capable of mounting a volume described by an
 // *api.Volume and whether or not it is mounted, or an error.
-func CreateVolume(volume *api.Volume, podID string) (Interface, error) {
+func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, error) {
 	source := volume.Source
 	// TODO(jonesdl) We will want to throw an error here when we no longer
 	// support the default behavior.
@@ -104,7 +105,7 @@ func CreateVolume(volume *api.Volume, podID string) (Interface, error) {
 	if source.HostDirectory != nil {
 		vol = createHostDirectory(volume)
 	} else if source.EmptyDirectory != nil {
-		vol = createEmptyDirectory(volume, podID)
+		vol = createEmptyDirectory(volume, podID, rootDir)
 	} else {
 		return nil, errors.New("Unsupported volume type.")
 	}
