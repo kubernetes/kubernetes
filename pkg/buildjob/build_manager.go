@@ -38,7 +38,7 @@ type RealPodControl struct {
 
 func (r RealPodControl) runJob(job api.Job) error {
 	glog.Infof("Running job ID %s", job.ID)
-	createPodConfig := r.typeDelegates[job.Type]
+	createPodConfig := r.typeDelegates["dockerfile"]
 	if createPodConfig == nil {
 		job.State = api.JobComplete
 		job.Success = false

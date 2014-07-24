@@ -56,7 +56,7 @@ type ServiceRegistry interface {
 
 // JobRegistry is an interface for things that know how to store Jobs.
 type JobRegistry interface {
-	ListJobs() ([]api.Job, error)
+	ListJobs() (api.JobList, error)
 	GetJob(jobID string) (*api.Job, error)
 	CreateJob(job api.Job) error
 	UpdateJob(job api.Job) error

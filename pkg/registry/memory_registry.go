@@ -159,12 +159,12 @@ func (registry *MemoryRegistry) UpdateEndpoints(e api.Endpoints) error {
 	return nil
 }
 
-func (registry *MemoryRegistry) ListJobs() ([]api.Job, error) {
+func (registry *MemoryRegistry) ListJobs() (api.JobList, error) {
 	result := []api.Job{}
 	for _, value := range registry.jobData {
 		result = append(result, value)
 	}
-	return result, nil
+	return api.JobList{Items: result}, nil
 }
 
 func (registry *MemoryRegistry) GetJob(jobID string) (*api.Job, error) {

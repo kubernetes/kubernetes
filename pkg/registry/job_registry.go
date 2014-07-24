@@ -41,7 +41,7 @@ func (storage *JobRegistryStorage) List(selector labels.Selector) (interface{}, 
 	result := api.JobList{}
 	jobs, err := storage.registry.ListJobs()
 	if err == nil {
-		for _, job := range jobs {
+		for _, job := range jobs.Items {
 			result.Items = append(result.Items, job)
 		}
 	}
