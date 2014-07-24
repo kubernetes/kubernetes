@@ -1,7 +1,6 @@
 package buildjob
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
@@ -39,6 +37,7 @@ type RealPodControl struct {
 }
 
 func (r RealPodControl) runJob(job api.Job) error {
+	glog.Infof("Running job ID %s", job.ID)
 	createPodConfig := r.typeDelegates[job.Type]
 	if createPodConfig == nil {
 		job.State = api.JobComplete
@@ -65,6 +64,7 @@ func (r RealPodControl) runJob(job api.Job) error {
 		return nil
 	}
 
+	glog.Infof("Attempting to create pod for job ID %s", job.ID)
 	pod, err := r.kubeClient.CreatePod(*podSpec)
 	if err != nil {
 		glog.Errorf("%#v\n", err)
@@ -80,7 +80,8 @@ func (r RealPodControl) runJob(job api.Job) error {
 		return nil
 	}
 
-	job.State = api.JobNew
+	glog.Infof("Setting job state to pending, pod id = %s", pod.ID)
+	job.State = api.JobPending
 	job.PodID = pod.ID
 
 	_, err = r.kubeClient.UpdateJob(job)
@@ -96,6 +97,11 @@ func (r RealPodControl) deletePod(podID string) error {
 }
 
 func dockerfileBuildJobFor(job api.Job) (*api.Pod, error) {
+	var envVars []api.EnvVar
+	for k, v := range job.Context {
+		envVars = append(envVars, api.EnvVar{Name: k, Value: v})
+	}
+
 	pod := &api.Pod{
 		Labels: map[string]string{
 			"podType": "job",
@@ -110,10 +116,7 @@ func dockerfileBuildJobFor(job api.Job) (*api.Pod, error) {
 						Image:         "ironcladlou/openshift-docker-builder",
 						Privileged:    true,
 						RestartPolicy: "runOnce",
-						Env: []api.EnvVar{
-							{Name: "BUILD_TAG", Value: job.Context["BUILD_TAG"]},
-							{Name: "DOCKER_CONTEXT_URL", Value: job.Context["DOCKER_CONTEXT_URL"]},
-						},
+						Env:           envVars,
 					},
 				},
 			},
@@ -145,68 +148,7 @@ func MakeBuildJobManager(etcdClient tools.EtcdClient, kubeClient client.Interfac
 // Run begins watching and syncing.
 func (rm *BuildJobManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	go util.Forever(func() { rm.watchBuildJobs() }, period)
-}
-
-// watch loop
-func (rm *BuildJobManager) watchBuildJobs() {
-	watchChannel := make(chan *etcd.Response)
-	stop := make(chan bool)
-	// Ensure that the call to watch ends.
-	defer close(stop)
-
-	go func() {
-		defer util.HandleCrash()
-		_, err := rm.etcdClient.Watch("/jobs/build", 0, true, watchChannel, stop)
-		if err == etcd.ErrWatchStoppedByUser {
-			close(watchChannel)
-		} else {
-			glog.Errorf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
-		}
-	}()
-
-	for {
-		select {
-		case <-rm.syncTime:
-			rm.synchronize()
-		case watchResponse, open := <-watchChannel:
-			if !open || watchResponse == nil {
-				// watchChannel has been closed, or something else went
-				// wrong with our etcd watch call. Let the util.Forever()
-				// that called us call us again.
-				return
-			}
-			glog.Infof("Got watch: %#v", watchResponse)
-			job, err := rm.handleWatchResponse(watchResponse)
-			if err != nil {
-				glog.Errorf("Error handling data: %#v, %#v", err, watchResponse)
-				continue
-			}
-
-			err = rm.syncJobState(*job)
-			if err != nil {
-				glog.Errorf("Error syncing job state: %+v, %s", job, err.Error())
-			}
-		}
-	}
-}
-
-func (rm *BuildJobManager) handleWatchResponse(response *etcd.Response) (*api.Job, error) {
-	switch response.Action {
-	case "set":
-		if response.Node == nil {
-			return nil, fmt.Errorf("response node is null %#v", response)
-		}
-		var job api.Job
-		if err := json.Unmarshal([]byte(response.Node.Value), &job); err != nil {
-			return nil, err
-		}
-		return &job, nil
-	case "delete":
-		// TODO: determine if some cleanup should be done here
-	}
-
-	return nil, nil
+	go util.Forever(func() { rm.synchronize() }, period)
 }
 
 // Sync loop implementation, pointed to by rm.syncHandler
@@ -219,6 +161,7 @@ func (rm *BuildJobManager) syncJobState(job api.Job) error {
 		return nil
 	}
 
+	glog.Infof("Retrieving info for pod ID %s for job ID %s", job.PodID, job.ID)
 	jobPod, err := rm.kubeClient.GetPod(job.PodID)
 	if err != nil {
 		return err
@@ -231,10 +174,12 @@ func (rm *BuildJobManager) syncJobState(job api.Job) error {
 		update    = false
 	)
 
+	glog.Infof("Status for pod ID %s: %s", job.PodID, podStatus)
 	switch podStatus {
 	case api.PodRunning:
 		switch jobState {
 		case api.JobNew, api.JobPending:
+			glog.Infof("Setting job state to running")
 			job.State = api.JobRunning
 			update = true
 		case api.JobComplete:
@@ -250,10 +195,12 @@ func (rm *BuildJobManager) syncJobState(job api.Job) error {
 		}
 	case api.PodStopped:
 		if jobState == api.JobComplete {
+			glog.Infof("Job status is already complete - no-op")
 			return nil
 		}
 
 		// TODO: better way of evaluating job completion
+		glog.Infof("Setting job state to complete")
 		job.State = api.JobComplete
 
 		infoKeys := make([]string, len(podInfo))
@@ -266,9 +213,7 @@ func (rm *BuildJobManager) syncJobState(job api.Job) error {
 		containerState := podInfo[infoKeys[0]].State
 		update = true
 
-		if containerState.ExitCode == 0 {
-			job.Success = true
-		}
+		job.Success = containerState.ExitCode == 0
 	}
 
 	if update {

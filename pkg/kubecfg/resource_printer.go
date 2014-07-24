@@ -89,7 +89,7 @@ var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Rep
 var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
 var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
-var jobColumns = []string{"ID", "State"}
+var jobColumns = []string{"ID", "State", "Pod ID"}
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
@@ -132,7 +132,7 @@ func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer) e
 }
 
 func (h *HumanReadablePrinter) printJob(job *api.Job, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s", job.ID, job.State)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", job.ID, job.State, job.PodID)
 	return err
 }
 

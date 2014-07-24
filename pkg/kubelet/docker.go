@@ -130,7 +130,7 @@ var ErrNoContainersInPod = errors.New("no containers exist for this pod")
 func getDockerPodInfo(client DockerInterface, podFullName string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
