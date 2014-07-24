@@ -345,6 +345,7 @@ func (server *APIServer) notFound(w http.ResponseWriter, req *http.Request) {
 }
 
 func (server *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	output, err := api.Encode(object)
 	if err != nil {
