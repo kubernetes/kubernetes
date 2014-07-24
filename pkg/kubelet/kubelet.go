@@ -263,7 +263,10 @@ func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volume
 			continue
 		}
 		podVolumes[vol.Name] = extVolume
-		extVolume.SetUp()
+		err = extVolume.SetUp()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return podVolumes, nil
 }
@@ -365,7 +368,8 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 
 	podVolumes, err := kl.mountExternalVolumes(&pod.Manifest)
 	if err != nil {
-		glog.Errorf("Unable to mount volumes for pod %s: (%v)", podFullName, err)
+		glog.Errorf("Unable to mount volumes for pod %s: (%v) Skipping pod.", podFullName, err)
+		return err
 	}
 
 	for _, container := range pod.Manifest.Containers {
