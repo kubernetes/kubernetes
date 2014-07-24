@@ -22,7 +22,6 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/golang/glog"
 )
 
 // All volume types are expected to implement this interface
@@ -30,12 +29,12 @@ type Interface interface {
 	// Prepares and mounts/unpacks the volume to a directory path.
 	// This procedure must be idempotent.
 	// TODO(jonesdl) SetUp should return an error if it fails.
-	SetUp()
+	SetUp() error
 	// Returns the directory path the volume is mounted to.
 	GetPath() string
 	// Unmounts the volume and removes traces of the SetUp procedure.
 	// This procedure must be idempotent.
-	TearDown()
+	TearDown() error
 }
 
 // Host Directory volumes represent a bare host directory mount.
@@ -46,9 +45,13 @@ type HostDirectory struct {
 
 // Host directory mounts require no setup or cleanup, but still
 // need to fulfill the interface definitions.
-func (hostVol *HostDirectory) SetUp() {}
+func (hostVol *HostDirectory) SetUp() error {
+	return nil
+}
 
-func (hostVol *HostDirectory) TearDown() {}
+func (hostVol *HostDirectory) TearDown() error {
+	return nil
+}
 
 func (hostVol *HostDirectory) GetPath() string {
 	return hostVol.Path
@@ -63,18 +66,20 @@ type EmptyDirectory struct {
 }
 
 // SetUp creates the new directory.
-func (emptyDir *EmptyDirectory) SetUp() {
+func (emptyDir *EmptyDirectory) SetUp() error {
 	path := emptyDir.GetPath()
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		os.MkdirAll(path, 0750)
-	} else {
-		glog.Warningf("Directory already exists: (%v)", path)
+	err := os.MkdirAll(path, 0750)
+	if err != nil {
+		return err
 	}
+	return nil
 }
 
 // TODO(jonesdl) when we can properly invoke TearDown(), we should delete
 // the directory created by SetUp.
-func (emptyDir *EmptyDirectory) TearDown() {}
+func (emptyDir *EmptyDirectory) TearDown() error {
+	return nil
+}
 
 func (emptyDir *EmptyDirectory) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
