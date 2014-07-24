@@ -47,20 +47,17 @@ type ApiVersion []int
 // <minor> and <patch> are integer numbers.
 func NewApiVersion(input string) (ApiVersion, error) {
 	if !strings.Contains(input, ".") {
-		return nil, fmt.Errorf("Unable to parse version '%s'", input)
+		return nil, fmt.Errorf("Unable to parse version %q", input)
 	}
-
 	arr := strings.Split(input, ".")
 	ret := make(ApiVersion, len(arr))
-
 	var err error
 	for i, val := range arr {
 		ret[i], err = strconv.Atoi(val)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Unable to parse version %q: %q is not an integer", input, val)
 		}
 	}
-
 	return ret, nil
 }
 
@@ -203,6 +200,21 @@ func parseApiVersionString(input string) (version uint16, err error) {
 	return version, nil
 }
 
+// Ping pings the docker server
+//
+// See http://goo.gl/stJENm for more details.
+func (c *Client) Ping() error {
+	path := "/_ping"
+	body, status, err := c.do("GET", path, nil)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return newError(status, body)
+	}
+	return nil
+}
+
 func (c *Client) getServerApiVersionString() (version string, err error) {
 	body, status, err := c.do("GET", "/version", nil)
 	if err != nil {
@@ -257,6 +269,7 @@ func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) 
 		if err != nil {
 			return nil, -1, err
 		}
+		defer dial.Close()
 		clientconn := httputil.NewClientConn(dial, nil)
 		resp, err = clientconn.Do(req)
 		if err != nil {
@@ -283,11 +296,10 @@ func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) 
 	return body, resp.StatusCode, nil
 }
 
-func (c *Client) stream(method, path string, headers map[string]string, in io.Reader, out io.Writer) error {
+func (c *Client) stream(method, path string, setRawTerminal bool, headers map[string]string, in io.Reader, stdout, stderr io.Writer) error {
 	if (method == "POST" || method == "PUT") && in == nil {
 		in = bytes.NewReader(nil)
 	}
-
 	if path != "/version" && !c.SkipServerVersionCheck && c.expectedApiVersion == nil {
 		err := c.checkApiVersion()
 		if err != nil {
@@ -308,8 +320,11 @@ func (c *Client) stream(method, path string, headers map[string]string, in io.Re
 	var resp *http.Response
 	protocol := c.endpointURL.Scheme
 	address := c.endpointURL.Path
-	if out == nil {
-		out = ioutil.Discard
+	if stdout == nil {
+		stdout = ioutil.Discard
+	}
+	if stderr == nil {
+		stderr = ioutil.Discard
 	}
 	if protocol == "unix" {
 		dial, err := net.Dial(protocol, address)
@@ -346,20 +361,23 @@ func (c *Client) stream(method, path string, headers map[string]string, in io.Re
 				return err
 			}
 			if m.Stream != "" {
-				fmt.Fprint(out, m.Stream)
+				fmt.Fprint(stdout, m.Stream)
 			} else if m.Progress != "" {
-				fmt.Fprintf(out, "%s %s\r", m.Status, m.Progress)
+				fmt.Fprintf(stdout, "%s %s\r", m.Status, m.Progress)
 			} else if m.Error != "" {
 				return errors.New(m.Error)
 			}
 			if m.Status != "" {
-				fmt.Fprintln(out, m.Status)
+				fmt.Fprintln(stdout, m.Status)
 			}
 		}
 	} else {
-		if _, err := io.Copy(out, resp.Body); err != nil {
-			return err
+		if setRawTerminal {
+			_, err = io.Copy(stdout, resp.Body)
+		} else {
+			_, err = utils.StdCopy(stdout, stderr, resp.Body)
 		}
+		return err
 	}
 	return nil
 }
@@ -370,6 +388,12 @@ func (c *Client) hijack(method, path string, success chan struct{}, setRawTermin
 		if err != nil {
 			return err
 		}
+	}
+	if stdout == nil {
+		stdout = ioutil.Discard
+	}
+	if stderr == nil {
+		stderr = ioutil.Discard
 	}
 	req, err := http.NewRequest(method, c.getURL(path), nil)
 	if err != nil {

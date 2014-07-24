@@ -239,7 +239,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 			ExposedPorts: exposedPorts,
 			Hostname:     container.Name,
 			Image:        container.Image,
-			Memory:       int64(container.Memory),
+			Memory:       uint64(container.Memory),
 			CpuShares:    int64(milliCPUToShares(container.CPU)),
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,

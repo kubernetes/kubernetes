@@ -148,6 +148,25 @@ func TestQueryString(t *testing.T) {
 	}
 }
 
+func TestNewApiVersionFailures(t *testing.T) {
+	var tests = []struct {
+		input         string
+		expectedError string
+	}{
+		{"1-0", `Unable to parse version "1-0"`},
+		{"1.0-beta", `Unable to parse version "1.0-beta": "0-beta" is not an integer`},
+	}
+	for _, tt := range tests {
+		v, err := NewApiVersion(tt.input)
+		if v != nil {
+			t.Errorf("Expected <nil> version, got %v.", v)
+		}
+		if err.Error() != tt.expectedError {
+			t.Errorf("NewApiVersion(%q): wrong error. Want %q. Got %q", tt.input, tt.expectedError, err.Error())
+		}
+	}
+}
+
 func TestApiVersions(t *testing.T) {
 	var tests = []struct {
 		a                              string
@@ -189,6 +208,41 @@ func TestApiVersions(t *testing.T) {
 		if tt.expectedAGreaterThanOrEqualToB && !a.GreaterThanOrEqualTo(b) {
 			t.Errorf("Expected %#v >= %#v", a, b)
 		}
+	}
+}
+
+func TestPing(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusOK}
+	client := newTestClient(fakeRT)
+	err := client.Ping()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPingFailing(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusInternalServerError}
+	client := newTestClient(fakeRT)
+	err := client.Ping()
+	if err == nil {
+		t.Fatal("Expected non nil error, got nil")
+	}
+	expectedErrMsg := "API error (500): "
+	if err.Error() != expectedErrMsg {
+		t.Fatalf("Expected error to be %q, got: %q", expectedErrMsg, err.Error())
+	}
+}
+
+func TestPingFailingWrongStatus(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "", status: http.StatusAccepted}
+	client := newTestClient(fakeRT)
+	err := client.Ping()
+	if err == nil {
+		t.Fatal("Expected non nil error, got nil")
+	}
+	expectedErrMsg := "API error (202): "
+	if err.Error() != expectedErrMsg {
+		t.Fatalf("Expected error to be %q, got: %q", expectedErrMsg, err.Error())
 	}
 }
 

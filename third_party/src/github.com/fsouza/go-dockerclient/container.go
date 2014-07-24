@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -87,22 +86,19 @@ func (p Port) Proto() string {
 
 // State represents the state of a container.
 type State struct {
-	sync.RWMutex
 	Running    bool
+	Paused     bool
 	Pid        int
 	ExitCode   int
 	StartedAt  time.Time
 	FinishedAt time.Time
-	Ghost      bool
 }
 
 // String returns the string representation of a state.
 func (s *State) String() string {
-	s.RLock()
-	defer s.RUnlock()
 	if s.Running {
-		if s.Ghost {
-			return "Ghost"
+		if s.Paused {
+			return "paused"
 		}
 		return fmt.Sprintf("Up %s", time.Now().UTC().Sub(s.StartedAt))
 	}
@@ -162,8 +158,8 @@ type Config struct {
 	Hostname        string
 	Domainname      string
 	User            string
-	Memory          int64
-	MemorySwap      int64
+	Memory          uint64
+	MemorySwap      uint64
 	CpuShares       int64
 	AttachStdin     bool
 	AttachStdout    bool
@@ -341,6 +337,36 @@ func (c *Client) StopContainer(id string, timeout uint) error {
 // See http://goo.gl/zms73Z for more details.
 func (c *Client) RestartContainer(id string, timeout uint) error {
 	path := fmt.Sprintf("/containers/%s/restart?t=%d", id, timeout)
+	_, status, err := c.do("POST", path, nil)
+	if status == http.StatusNotFound {
+		return &NoSuchContainer{ID: id}
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// PauseContainer pauses the given container.
+//
+// See http://goo.gl/AM5t42 for more details.
+func (c *Client) PauseContainer(id string) error {
+	path := fmt.Sprintf("/containers/%s/pause", id)
+	_, status, err := c.do("POST", path, nil)
+	if status == http.StatusNotFound {
+		return &NoSuchContainer{ID: id}
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// UnpauseContainer pauses the given container.
+//
+// See http://goo.gl/eBrNSL for more details.
+func (c *Client) UnpauseContainer(id string) error {
+	path := fmt.Sprintf("/containers/%s/unpause", id)
 	_, status, err := c.do("POST", path, nil)
 	if status == http.StatusNotFound {
 		return &NoSuchContainer{ID: id}
@@ -542,10 +568,15 @@ func (c *Client) AttachToContainer(opts AttachToContainerOptions) error {
 type LogsOptions struct {
 	Container    string    `qs:"-"`
 	OutputStream io.Writer `qs:"-"`
+	ErrorStream  io.Writer `qs:"-"`
 	Follow       bool
 	Stdout       bool
 	Stderr       bool
 	Timestamps   bool
+	Tail         string
+
+	// Use raw terminal? Usually true when the container contains a TTY.
+	RawTerminal bool `qs:"-"`
 }
 
 // Logs gets stdout and stderr logs from the specified container.
@@ -555,8 +586,11 @@ func (c *Client) Logs(opts LogsOptions) error {
 	if opts.Container == "" {
 		return &NoSuchContainer{ID: opts.Container}
 	}
+	if opts.Tail == "" {
+		opts.Tail = "all"
+	}
 	path := "/containers/" + opts.Container + "/logs?" + queryString(opts)
-	return c.stream("GET", path, nil, nil, opts.OutputStream)
+	return c.stream("GET", path, opts.RawTerminal, nil, nil, opts.OutputStream, opts.ErrorStream)
 }
 
 // ResizeContainerTTY resizes the terminal to the given height and width.
@@ -586,7 +620,7 @@ func (c *Client) ExportContainer(opts ExportContainerOptions) error {
 		return NoSuchContainer{ID: opts.ID}
 	}
 	url := fmt.Sprintf("/containers/%s/export", opts.ID)
-	return c.stream("GET", url, nil, nil, opts.OutputStream)
+	return c.stream("GET", url, true, nil, nil, opts.OutputStream, nil)
 }
 
 // NoSuchContainer is the error returned when a given container does not exist.
