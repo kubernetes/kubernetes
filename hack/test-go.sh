@@ -36,7 +36,7 @@ find_test_dirs() {
 }
 
 # -covermode=atomic becomes default with -race in Go >=1.3
-KUBE_COVER="-cover -covermode=atomic -coverprofile=\"tmp.out\""
+KUBE_COVER="-cover -covermode=atomic -coverprofile=tmp.out"
 
 cd "${KUBE_TARGET}"
 
