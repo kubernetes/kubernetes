@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -41,13 +42,18 @@ func makeURL(suffix string) string {
 type FakePodControl struct {
 	controllerSpec []api.ReplicationController
 	deletePodID    []string
+	lock           sync.Mutex
 }
 
 func (f *FakePodControl) createReplica(spec api.ReplicationController) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
 func (f *FakePodControl) deletePod(podID string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.deletePodID = append(f.deletePodID, podID)
 	return nil
 }
