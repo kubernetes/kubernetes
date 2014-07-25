@@ -28,6 +28,6 @@ source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 echo "Updating cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
-kube-up
+kube-push
 
 echo "Done"
