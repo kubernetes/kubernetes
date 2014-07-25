@@ -294,3 +294,63 @@ func TestValidateService(t *testing.T) {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 }
+
+func TestValidateReplicationController(t *testing.T) {
+	validSelector := map[string]string{"a": "b"}
+	validPodTemplate := PodTemplate{
+		DesiredState: PodState{
+			Manifest: ContainerManifest{
+				Version: "v1beta1",
+			},
+		},
+	}
+
+	successCases := []ReplicationController{
+		{
+			JSONBase: JSONBase{ID: "abc"},
+			DesiredState: ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     validPodTemplate,
+			},
+		},
+		{
+			JSONBase: JSONBase{ID: "abc-123"},
+			DesiredState: ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     validPodTemplate,
+			},
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateReplicationController(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]ReplicationController{
+		"zero-length ID": {
+			JSONBase: JSONBase{ID: ""},
+			DesiredState: ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     validPodTemplate,
+			},
+		},
+		"empty selector": {
+			JSONBase: JSONBase{ID: "abc"},
+			DesiredState: ReplicationControllerState{
+				PodTemplate: validPodTemplate,
+			},
+		},
+		"invalid manifest": {
+			JSONBase: JSONBase{ID: "abc"},
+			DesiredState: ReplicationControllerState{
+				ReplicaSelector: validSelector,
+			},
+		},
+	}
+	for k, v := range errorCases {
+		if errs := ValidateReplicationController(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}

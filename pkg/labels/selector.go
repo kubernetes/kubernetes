@@ -27,6 +27,9 @@ type Selector interface {
 	// Matches returns true if this selector matches the given set of labels.
 	Matches(Labels) bool
 
+	// Empty returns true if this selector does not restrict the selection space.
+	Empty() bool
+
 	// String returns a human readable string that represents this selector.
 	String() string
 }
@@ -44,6 +47,10 @@ func (t *hasTerm) Matches(ls Labels) bool {
 	return ls.Get(t.label) == t.value
 }
 
+func (t *hasTerm) Empty() bool {
+	return false
+}
+
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.label, t.value)
 }
@@ -56,6 +63,10 @@ func (t *notHasTerm) Matches(ls Labels) bool {
 	return ls.Get(t.label) != t.value
 }
 
+func (t *notHasTerm) Empty() bool {
+	return false
+}
+
 func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.label, t.value)
 }
@@ -65,6 +76,21 @@ type andTerm []Selector
 func (t andTerm) Matches(ls Labels) bool {
 	for _, q := range t {
 		if !q.Matches(ls) {
+			return false
+		}
+	}
+	return true
+}
+
+func (t andTerm) Empty() bool {
+	if t == nil {
+		return true
+	}
+	if len([]Selector(t)) == 0 {
+		return true
+	}
+	for i := range t {
+		if !t[i].Empty() {
 			return false
 		}
 	}
@@ -87,8 +113,12 @@ func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 	return "", "", false
 }
 
-// SelectorFromSet returns a Selector which will match exactly the given Set.
+// SelectorFromSet returns a Selector which will match exactly the given Set. A
+// nil Set is considered equivalent to Everything().
 func SelectorFromSet(ls Set) Selector {
+	if ls == nil {
+		return Everything()
+	}
 	items := make([]Selector, 0, len(ls))
 	for label, value := range ls {
 		items = append(items, &hasTerm{label: label, value: value})
@@ -123,4 +153,13 @@ func ParseSelector(selector string) (Selector, error) {
 		return items[0], nil
 	}
 	return andTerm(items), nil
+}
+
+// MustParseSelector parses the selection or panics.
+func MustParseSelector(selector string) Selector {
+	s, err := ParseSelector(selector)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }

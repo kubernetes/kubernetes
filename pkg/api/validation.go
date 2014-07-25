@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -286,8 +287,21 @@ func ValidateService(service *Service) []error {
 	if service.ID == "" {
 		allErrs.Append(makeInvalidError("Service.ID", service.ID))
 	}
-	if len(service.Selector) == 0 {
+	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs.Append(makeInvalidError("Service.Selector", service.Selector))
 	}
 	return []error(allErrs)
+}
+
+// ValidateReplicationController tests if required fields in the replication controller are set.
+func ValidateReplicationController(controller *ReplicationController) []error {
+	errors := []error{}
+	if controller.ID == "" {
+		errors = append(errors, makeInvalidError("ReplicationController.ID", controller.ID))
+	}
+	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
+		errors = append(errors, makeInvalidError("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
+	}
+	errors = append(errors, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest)...)
+	return errors
 }
