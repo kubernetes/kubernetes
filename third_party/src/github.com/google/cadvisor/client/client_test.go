@@ -96,7 +96,7 @@ func TestGetContainerInfo(t *testing.T) {
 		NumStats:               3,
 		NumSamples:             2,
 		CpuUsagePercentiles:    []int{10, 50, 90},
-		MemoryUsagePercentages: []int{10, 80, 90},
+		MemoryUsagePercentiles: []int{10, 80, 90},
 	}
 	containerName := "/some/container"
 	cinfo := itest.GenerateRandomContainerInfo(containerName, 4, query, 1*time.Second)
