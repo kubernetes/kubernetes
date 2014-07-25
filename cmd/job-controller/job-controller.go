@@ -9,7 +9,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/job"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
@@ -19,7 +18,6 @@ var (
 )
 
 func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
 }
 
 func main() {
@@ -28,15 +26,10 @@ func main() {
 	defer util.FlushLogs()
 
 	if len(etcdServerList) == 0 || len(*master) == 0 {
-		glog.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
+		glog.Fatal("usage: controller-manager -master <master>")
 	}
 
-	// Set up logger for etcd client
-	etcd.SetLogger(util.NewLogger("etcd "))
-
-	jobController := job.MakeJobController(
-		etcd.NewClient(etcdServerList),
-		client.New("http://"+*master, nil))
+	jobController := job.MakeJobController(client.New("http://"+*master, nil))
 
 	jobController.Run(10 * time.Second)
 	select {}

@@ -80,8 +80,8 @@ func (storage *JobRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 	if len(job.ID) == 0 {
 		job.ID = uuid.NewUUID().String()
 	}
-	if len(job.State) == 0 {
-		job.State = api.JobNew
+	if len(job.Status) == 0 {
+		job.Status = api.JobNew
 	}
 
 	return apiserver.MakeAsync(func() (interface{}, error) {

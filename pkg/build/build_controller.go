@@ -13,30 +13,158 @@ import (
 )
 
 type BuildController struct {
-	etcdClient tools.EtcdClient
 	kubeClient client.Interface
 	syncTime   <-chan time.Time
 }
 
-type BuildTypeDelegate func(jobSpec api.Job) (*api.Pod, error)
+// BuildRunner is an interface that knows how to run builds and was
+// created as an interface to allow testing.
+type BuildRunner interface {
+	// run a job for the specified build
+	run(build api.Build) error
+}
 
-func dockerfileBuildJobFor(job api.Job) (*api.Pod, error) {
+// DefaultBuildRunner is the default implementation of BuildRunner interface.
+type DefaultBuildRunner struct {
+	kubeClient client.Interface
+}
+
+func MakeBuildController(kubeClient client.Interface) *BuildController {
+	bc := &BuildController{
+		kubeClient: kubeClient,
+		buildRunner: &DefaultBuildRunner{
+			kubeClient: kubeClient,
+		},
+	}
+
+	return bc
+}
+
+// Run begins watching and syncing.
+func (bc *BuildController) Run(period time.Duration) {
+	bc.syncTime = time.Tick(period)
+	go util.Forever(func() { bc.synchronize() }, period)
+}
+
+// The main sync loop. Iterates over current builds and delegates syncing.
+func (bc *BuildController) synchronize() {
+	builds, err := bc.kubeClient.ListBuilds()
+	if err != nil {
+		glog.Errorf("Synchronization error: %v (%#v)", err, err)
+		return
+	}
+	for _, build := range builds.Items {
+		err = bc.syncBuildState(build)
+		if err != nil {
+			glog.Errorf("Error synchronizing: %#v", err)
+		}
+	}
+}
+
+// Sync loop brings the build state into sync with its corresponding job.
+// TODO: improve handling of illegal state transitions
+func (bc *BuildController) syncBuildState(build api.Build) error {
+	glog.Infof("Syncing build state for build ID %s", build.ID)
+	if build.Status == api.BuildNew {
+		return bc.buildRunner.run(build)
+	} else if build.Status == api.BuildPending && len(build.jobID) == 0 {
+		return nil
+	}
+
+	glog.Infof("Retrieving info for job ID %s for build ID %s", build.jobID, build.ID)
+	job, err := bc.kubeClient.GetJob(build.JobID)
+	if err != nil {
+		return err
+	}
+
+	glog.Infof("Status for job ID %s: %s", job.ID, job.Status)
+	switch job.Status {
+	case api.JobRunning:
+		switch build.Status {
+		case api.BuildNew, api.BuildPending:
+			glog.Infof("Setting build state to running")
+			build.Status = api.BuildRunning
+			update = true
+		case api.BuildComplete:
+			return errors.New("Illegal state transition")
+		}
+	case api.JobPending:
+		switch build.Status {
+		case api.BuildNew:
+			build.Status = api.BuildPending
+			update = true
+		case api.BuildComplete:
+			return errors.New("Illegal state transition")
+		}
+	case api.JobStopped:
+		if build.Status == api.BuildComplete {
+			glog.Infof("Build status is already complete - no-op")
+			return nil
+		}
+
+		// TODO: better way of evaluating job completion
+		glog.Infof("Setting build state to complete")
+		build.Status = api.BuildComplete
+		build.Success = job.Success
+		update = true
+	}
+
+	if update {
+		_, err := bc.kubeClient.UpdateBuild(build)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+/*
+func (r *DefaultBuildRunner) run(build api.Build) error {
+	glog.Infof("Attempting to run job for build %v: %#v", build.ID, job.Pod)
+	pod, err := r.kubeClient.CreatePod(job.Pod)
+
+	if err != nil {
+		glog.Errorf("Error creating pod for job ID %v: %#v\n", job.ID, err)
+
+		job.Status = api.JobComplete
+		job.Success = false
+
+		_, err := r.kubeClient.UpdateJob(job)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Couldn't update Job: %#v : %s", job, err.Error()))
+		}
+
+		return nil
+	}
+
+	glog.Infof("Setting job state to pending, pod id = %s", pod.ID)
+	job.Status = api.JobPending
+	job.PodID = pod.ID
+
+	_, err = r.kubeClient.UpdateJob(job)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Couldn't update Job: %#v : %s", job, err.Error()))
+	}
+
+	return nil
+}
+
+
+func (r *DefaultBuildRunner) run(build api.Build) (*api.Pod, error) {
 	var envVars []api.EnvVar
-	for k, v := range job.Context {
+	for k, v := range build.Context {
 		envVars = append(envVars, api.EnvVar{Name: k, Value: v})
 	}
 
 	pod := &api.Pod{
-		Labels: map[string]string{
-			"podType": "job",
-			"jobType": "build",
-		},
+		Labels: map[string]string{},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 				Containers: []api.Container{
 					{
-						Name:          "build-job-" + job.ID,
+						Name:          "docker-build",
 						Image:         "ironcladlou/openshift-docker-builder",
 						Privileged:    true,
 						RestartPolicy: "runOnce",
@@ -46,120 +174,7 @@ func dockerfileBuildJobFor(job api.Job) (*api.Pod, error) {
 			},
 		},
 	}
+
 	return pod, nil
 }
-
-func stiBuildJobFor(job api.Job) (*api.Pod, error) {
-	return nil, nil
-}
-
-func MakeBuildController(etcdClient tools.EtcdClient, kubeClient client.Interface) *BuildController {
-	rm := &BuildController{
-		kubeClient: kubeClient,
-		etcdClient: etcdClient,
-		podControl: RealPodControl{
-			kubeClient: kubeClient,
-			typeDelegates: map[string]BuildTypeDelegate{
-				"dockerfile": dockerfileBuildJobFor,
-				"sti":        stiBuildJobFor,
-			},
-		},
-	}
-
-	return rm
-}
-
-// Run begins watching and syncing.
-func (rm *BuildController) Run(period time.Duration) {
-	rm.syncTime = time.Tick(period)
-	go util.Forever(func() { rm.synchronize() }, period)
-}
-
-// Sync loop implementation, pointed to by rm.syncHandler
-// TODO: improve handling of illegal state transitions
-func (rm *BuildController) syncBuildState(job api.Job) error {
-	glog.Infof("Syncing job state for job ID %s", job.ID)
-	if job.State == api.JobNew {
-		return rm.podControl.runJob(job)
-	} else if job.State == api.JobPending && len(job.PodID) == 0 {
-		return nil
-	}
-
-	glog.Infof("Retrieving info for pod ID %s for job ID %s", job.PodID, job.ID)
-	jobPod, err := rm.kubeClient.GetPod(job.PodID)
-	if err != nil {
-		return err
-	}
-
-	var (
-		podStatus = jobPod.CurrentState.Status
-		podInfo   = jobPod.CurrentState.Info
-		jobState  = job.State
-		update    = false
-	)
-
-	glog.Infof("Status for pod ID %s: %s", job.PodID, podStatus)
-	switch podStatus {
-	case api.PodRunning:
-		switch jobState {
-		case api.JobNew, api.JobPending:
-			glog.Infof("Setting job state to running")
-			job.State = api.JobRunning
-			update = true
-		case api.JobComplete:
-			return errors.New("Illegal state transition")
-		}
-	case api.PodPending:
-		switch jobState {
-		case api.JobNew:
-			job.State = api.JobPending
-			update = true
-		case api.JobComplete:
-			return errors.New("Illegal state transition")
-		}
-	case api.PodStopped:
-		if jobState == api.JobComplete {
-			glog.Infof("Job status is already complete - no-op")
-			return nil
-		}
-
-		// TODO: better way of evaluating job completion
-		glog.Infof("Setting job state to complete")
-		job.State = api.JobComplete
-
-		infoKeys := make([]string, len(podInfo))
-		i := 0
-		for k, _ := range podInfo {
-			infoKeys[i] = k
-			i++
-		}
-
-		containerState := podInfo[infoKeys[0]].State
-		update = true
-
-		job.Success = containerState.ExitCode == 0
-	}
-
-	if update {
-		_, err := rm.kubeClient.UpdateJob(job)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (rm *BuildController) synchronize() {
-	jobs, err := rm.kubeClient.ListJobs()
-	if err != nil {
-		glog.Errorf("Synchronization error: %v (%#v)", err, err)
-		return
-	}
-	for _, job := range jobs.Items {
-		err = rm.syncBuildState(job)
-		if err != nil {
-			glog.Errorf("Error synchronizing: %#v", err)
-		}
-	}
-}
+*/

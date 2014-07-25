@@ -62,3 +62,12 @@ type JobRegistry interface {
 	UpdateJob(job api.Job) error
 	DeleteJob(jobID string) error
 }
+
+// BuildRegistry is an interface for things that know how to store Builds.
+type BuildRegistry interface {
+	ListBuilds() (api.BuildList, error)
+	GetBuild(buildID string) (*api.Build, error)
+	CreateBuild(build api.Build) error
+	UpdateBuild(build api.Build) error
+	DeleteBuild(buildID string) error
+}

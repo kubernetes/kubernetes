@@ -29,6 +29,7 @@ var storageToType = map[string]reflect.Type{
 	"replicationControllers": reflect.TypeOf(api.ReplicationController{}),
 	"minions":                reflect.TypeOf(api.Minion{}),
 	"jobs":                   reflect.TypeOf(api.Job{}),
+	"builds":                 reflect.TypeOf(api.Build{}),
 }
 
 // ToWireFormat takes input 'data' as either json or yaml, checks that it parses as the

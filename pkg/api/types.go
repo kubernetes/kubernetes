@@ -374,29 +374,56 @@ type WatchEvent struct {
 	Object APIObject
 }
 
-// JobList is a collection of jobs.
+// Job is a task that can be scheduled.
+type Job struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Status   JobStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Success  bool      `json:"success,omitempty" yaml:"success,omitempty"`
+	Pod      Pod       `json:"pod,omitempty" yaml:"pod,omitempty"`
+	PodID    string    `json:"podID,omitempty" yaml:"podID,omitempty"`
+}
+
+// JobStatus represents the status of a Job at a point in time.
+type JobStatus string
+
+const (
+	JobNew      JobStatus = "new"
+	JobPending  JobStatus = "pending"
+	JobRunning  JobStatus = "running"
+	JobComplete JobStatus = "complete"
+)
+
+// JobList is a collection of Jobs.
 type JobList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Job `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
-// Job is a task that can be scheduled.
-type Job struct {
+// Build encapsulates the inputs needed to produce a new deployable image, as well as
+// the status of the operation and a reference to the Job which runs the build.
+type Build struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	State    JobState          `json:"state,omitempty" yaml:"state,omitempty"`
-	Success  bool              `json:"success,omitempty" yaml:"success,omitempty"`
 	Context  map[string]string `json:"context,omitempty" yaml:"context,omitempty"`
-	PodID    string            `json:"podID,omitempty" yaml:"podID,omitempty"`
+	Status   BuildStatus       `json:"status,omitempty" yaml:"status,omitempty"`
+	Success  bool              `json:"success,omitempty" yaml:"success,omitempty"`
+	JobID    string            `json:"jobID,omitempty" yaml:"jobID,omitempty"`
 }
 
-type JobState string
+// BuildStatus represents the status of a Build at a point in time.
+type BuildStatus string
 
 const (
-	JobNew      JobState = "new"
-	JobPending  JobState = "pending"
-	JobRunning  JobState = "running"
-	JobComplete JobState = "complete"
+	BuildNew      BuildStatus = "new"
+	BuildPending  BuildStatus = "pending"
+	BuildRunning  BuildStatus = "running"
+	BuildComplete BuildStatus = "complete"
 )
+
+// BuildList is a collection of Builds.
+type BuildList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Build `json:"items,omitempty" yaml:"items,omitempty"`
+}
 
 // APIObject has appropriate encoder and decoder functions, such that on the wire, it's
 // stored as a []byte, but in memory, the contained object is accessable as an interface{}

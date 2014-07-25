@@ -29,6 +29,7 @@ type MemoryRegistry struct {
 	controllerData map[string]api.ReplicationController
 	serviceData    map[string]api.Service
 	jobData        map[string]api.Job
+	buildData      map[string]api.Build
 }
 
 func MakeMemoryRegistry() *MemoryRegistry {
@@ -37,6 +38,7 @@ func MakeMemoryRegistry() *MemoryRegistry {
 		controllerData: map[string]api.ReplicationController{},
 		serviceData:    map[string]api.Service{},
 		jobData:        map[string]api.Job{},
+		buildData:      map[string]api.Build{},
 	}
 }
 
@@ -194,5 +196,43 @@ func (registry *MemoryRegistry) UpdateJob(job api.Job) error {
 		return apiserver.NewNotFoundErr("job", job.ID)
 	}
 	registry.jobData[job.ID] = job
+	return nil
+}
+
+func (registry *MemoryRegistry) ListBuilds() (api.BuildList, error) {
+	result := []api.Build{}
+	for _, value := range registry.buildData {
+		result = append(result, value)
+	}
+	return api.BuildList{Items: result}, nil
+}
+
+func (registry *MemoryRegistry) GetBuild(buildID string) (*api.Build, error) {
+	build, found := registry.buildData[buildID]
+	if found {
+		return &build, nil
+	} else {
+		return nil, apiserver.NewNotFoundErr("build", buildID)
+	}
+}
+
+func (registry *MemoryRegistry) CreateBuild(build api.Build) error {
+	registry.buildData[build.ID] = build
+	return nil
+}
+
+func (registry *MemoryRegistry) DeleteBuild(buildID string) error {
+	if _, ok := registry.buildData[buildID]; !ok {
+		return apiserver.NewNotFoundErr("build", buildID)
+	}
+	delete(registry.buildData, buildID)
+	return nil
+}
+
+func (registry *MemoryRegistry) UpdateBuild(build api.Build) error {
+	if _, ok := registry.buildData[build.ID]; !ok {
+		return apiserver.NewNotFoundErr("build", build.ID)
+	}
+	registry.buildData[build.ID] = build
 	return nil
 }
