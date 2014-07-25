@@ -50,7 +50,7 @@ func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
 	} else {
 		port = strconv.Itoa(service.ContainerPort.IntVal)
 	}
-	portPrefix := prefix + "_PORT_" + port + "_TCP"
+	portPrefix := prefix + "_PORT_" + strings.ToUpper(strings.Replace(port,"-","_",-1)) + "_TCP"
 	return []api.EnvVar{
 		{
 			Name:  prefix + "_PORT",
