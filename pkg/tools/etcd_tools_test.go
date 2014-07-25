@@ -20,8 +20,11 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -148,5 +151,183 @@ func TestSetObj(t *testing.T) {
 	got := fakeClient.Data["/some/key"].R.Node.Value
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+}
+
+func TestWatchInterpretation_ListAdd(t *testing.T) {
+	called := false
+	w := newEtcdWatcher(true, func(interface{}) bool {
+		called = true
+		return true
+	})
+	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBytes, _ := api.Encode(pod)
+
+	go w.sendResult(&etcd.Response{
+		Action: "set",
+		Node: &etcd.Node{
+			Nodes: etcd.Nodes{
+				{
+					Value: string(podBytes),
+				},
+			},
+		},
+	})
+
+	got := <-w.outgoing
+	if e, a := watch.Added, got.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if !called {
+		t.Errorf("filter never called")
+	}
+}
+
+func TestWatchInterpretation_ListDelete(t *testing.T) {
+	called := false
+	w := newEtcdWatcher(true, func(interface{}) bool {
+		called = true
+		return true
+	})
+	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBytes, _ := api.Encode(pod)
+
+	go w.sendResult(&etcd.Response{
+		Action: "delete",
+		PrevNode: &etcd.Node{
+			Nodes: etcd.Nodes{
+				{
+					Value: string(podBytes),
+				},
+			},
+		},
+	})
+
+	got := <-w.outgoing
+	if e, a := watch.Deleted, got.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if !called {
+		t.Errorf("filter never called")
+	}
+}
+
+func TestWatchInterpretation_SingleAdd(t *testing.T) {
+	w := newEtcdWatcher(false, func(interface{}) bool {
+		t.Errorf("unexpected filter call")
+		return true
+	})
+	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBytes, _ := api.Encode(pod)
+
+	go w.sendResult(&etcd.Response{
+		Action: "set",
+		Node: &etcd.Node{
+			Value: string(podBytes),
+		},
+	})
+
+	got := <-w.outgoing
+	if e, a := watch.Added, got.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
+func TestWatchInterpretation_SingleDelete(t *testing.T) {
+	w := newEtcdWatcher(false, func(interface{}) bool {
+		t.Errorf("unexpected filter call")
+		return true
+	})
+	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBytes, _ := api.Encode(pod)
+
+	go w.sendResult(&etcd.Response{
+		Action: "delete",
+		PrevNode: &etcd.Node{
+			Value: string(podBytes),
+		},
+	})
+
+	got := <-w.outgoing
+	if e, a := watch.Deleted, got.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
+func TestWatch(t *testing.T) {
+	fakeEtcd := MakeFakeEtcdClient(t)
+	h := EtcdHelper{fakeEtcd}
+
+	watching, err := h.Watch("/some/key")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	fakeEtcd.WaitForWatchCompletion()
+
+	// Test normal case
+	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBytes, _ := api.Encode(pod)
+	fakeEtcd.WatchResponse <- &etcd.Response{
+		Action: "set",
+		Node: &etcd.Node{
+			Value: string(podBytes),
+		},
+	}
+
+	select {
+	case event := <-watching.ResultChan():
+		if e, a := watch.Added, event.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	case <-time.After(10 * time.Millisecond):
+		t.Errorf("Expected 1 call but got 0")
+	}
+
+	// Test error case
+	fakeEtcd.WatchInjectError <- fmt.Errorf("Injected error")
+
+	// Did everything shut down?
+	if _, open := <-fakeEtcd.WatchResponse; open {
+		t.Errorf("An injected error did not cause a graceful shutdown")
+	}
+	if _, open := <-watching.ResultChan(); open {
+		t.Errorf("An injected error did not cause a graceful shutdown")
+	}
+}
+
+func TestWatchPurposefulShutdown(t *testing.T) {
+	fakeEtcd := MakeFakeEtcdClient(t)
+	h := EtcdHelper{fakeEtcd}
+
+	// Test purposeful shutdown
+	watching, err := h.Watch("/some/key")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	fakeEtcd.WaitForWatchCompletion()
+	watching.Stop()
+
+	// Did everything shut down?
+	if _, open := <-fakeEtcd.WatchResponse; open {
+		t.Errorf("A stop did not cause a graceful shutdown")
+	}
+	if _, open := <-watching.ResultChan(); open {
+		t.Errorf("An injected error did not cause a graceful shutdown")
 	}
 }
