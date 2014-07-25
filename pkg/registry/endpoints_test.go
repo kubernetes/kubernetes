@@ -32,7 +32,8 @@ func makePodList(count int) api.PodList {
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
 			JSONBase: api.JSONBase{
-				ID: fmt.Sprintf("pod%d", i),
+				ID:         fmt.Sprintf("pod%d", i),
+				APIVersion: "v1beta1",
 			},
 			DesiredState: api.PodState{
 				Manifest: api.ContainerManifest{
@@ -53,7 +54,8 @@ func makePodList(count int) api.PodList {
 		})
 	}
 	return api.PodList{
-		Items: pods,
+		JSONBase: api.JSONBase{APIVersion: "v1beta1", Kind: "PodList"},
+		Items:    pods,
 	}
 }
 

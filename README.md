@@ -91,6 +91,8 @@ Where pod.json contains something like:
 ```
 {
   "id": "php",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
   "desiredState": {
     "manifest": {
       "version": "v1beta1",

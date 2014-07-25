@@ -1,4 +1,6 @@
 {
+    "kind": "PodList",
+    "apiVersion": "v1beta1",
     "items": [
         {
             "id": "my-pod-1",

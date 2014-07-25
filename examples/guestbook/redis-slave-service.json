@@ -1,5 +1,7 @@
 {
   "id": "redisslave",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
   "port": 10001,
   "labels": {
     "name": "redisslave"

@@ -1,4 +1,6 @@
 {
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
   "id": "php",
   "desiredState": {
     "manifest": {

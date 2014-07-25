@@ -1,4 +1,6 @@
 {
+    "kind": "ServiceList",
+    "apiVersion": "v1beta1",
     "items": [
         {
             "id": "example1",

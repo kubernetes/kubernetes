@@ -99,7 +99,7 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -119,7 +119,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -139,7 +139,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body := "{ \"items\": [] }"
+	body, _ := api.Encode(makePodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -159,7 +159,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	body := "{}"
+	body, _ := api.Encode(api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -172,6 +172,9 @@ func TestCreateReplica(t *testing.T) {
 	}
 
 	controllerSpec := api.ReplicationController{
+		JSONBase: api.JSONBase{
+			Kind: "ReplicationController",
+		},
 		DesiredState: api.ReplicationControllerState{
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
@@ -195,7 +198,8 @@ func TestCreateReplica(t *testing.T) {
 
 	expectedPod := api.Pod{
 		JSONBase: api.JSONBase{
-			Kind: "Pod",
+			Kind:       "Pod",
+			APIVersion: "v1beta1",
 		},
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
@@ -207,12 +211,12 @@ func TestCreateReplica(t *testing.T) {
 	}
 	if !reflect.DeepEqual(expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
-		t.Errorf("Unexpected mismatch.  Expected %#v, Got: %#v", expectedPod, actualPod)
+		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", expectedPod, actualPod)
 	}
 }
 
 func TestHandleWatchResponseNotSet(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -233,7 +237,7 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 }
 
 func TestHandleWatchResponseNoNode(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -254,7 +258,7 @@ func TestHandleWatchResponseNoNode(t *testing.T) {
 }
 
 func TestHandleWatchResponseBadData(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -278,7 +282,7 @@ func TestHandleWatchResponseBadData(t *testing.T) {
 }
 
 func TestHandleWatchResponse(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -293,6 +297,7 @@ func TestHandleWatchResponse(t *testing.T) {
 
 	controller := makeReplicationController(2)
 
+	// TODO: fixme when etcd uses Encode/Decode
 	data, err := json.Marshal(controller)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -312,7 +317,7 @@ func TestHandleWatchResponse(t *testing.T) {
 }
 
 func TestHandleWatchResponseDelete(t *testing.T) {
-	body, _ := json.Marshal(makePodList(2))
+	body, _ := api.Encode(makePodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -327,6 +332,7 @@ func TestHandleWatchResponseDelete(t *testing.T) {
 
 	controller := makeReplicationController(2)
 
+	// TODO: fixme when etcd writing uses api.Encode
 	data, err := json.Marshal(controller)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -347,6 +353,7 @@ func TestHandleWatchResponseDelete(t *testing.T) {
 
 func TestSyncronize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
+		JSONBase: api.JSONBase{APIVersion: "v1beta1"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 4,
 			PodTemplate: api.PodTemplate{
@@ -367,6 +374,7 @@ func TestSyncronize(t *testing.T) {
 		},
 	}
 	controllerSpec2 := api.ReplicationController{
+		JSONBase: api.JSONBase{APIVersion: "v1beta1"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 3,
 			PodTemplate: api.PodTemplate{
@@ -405,7 +413,7 @@ func TestSyncronize(t *testing.T) {
 
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "{}",
+		ResponseBody: "{\"apiVersion\": \"v1beta1\", \"kind\": \"PodList\"}",
 		T:            t,
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)

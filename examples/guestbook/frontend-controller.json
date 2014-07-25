@@ -1,5 +1,7 @@
   {
     "id": "frontendController",
+    "kind": "ReplicationController",
+    "apiVersion": "v1beta1",
     "desiredState": {
       "replicas": 3,
       "replicaSelector": {"name": "frontend"},

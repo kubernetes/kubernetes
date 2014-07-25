@@ -41,10 +41,10 @@ KUBE_COVER="-cover -covermode=atomic -coverprofile=\"tmp.out\""
 cd "${KUBE_TARGET}"
 
 if [ "$1" != "" ]; then
-  go test -race $KUBE_COVER "$KUBE_GO_PACKAGE/$1" "${@:2}"
+  go test -race -timeout 30s $KUBE_COVER "$KUBE_GO_PACKAGE/$1" "${@:2}"
   exit 0
 fi
 
 for package in $(find_test_dirs); do
-  go test -race $KUBE_COVER "${KUBE_GO_PACKAGE}/${package}" "${@:2}"
+  go test -race -timeout 30s $KUBE_COVER "${KUBE_GO_PACKAGE}/${package}" "${@:2}"
 done

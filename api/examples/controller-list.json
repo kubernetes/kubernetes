@@ -1,4 +1,6 @@
 {
+    "kind": "ReplicationControllerList",
+    "apiVersion": "v1beta1",
     "items": [
         {
             "id": "testRun",

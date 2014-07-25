@@ -1,5 +1,7 @@
 {
   "id": "redis-master-2",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
   "desiredState": {
     "manifest": {
       "version": "v1beta1",
