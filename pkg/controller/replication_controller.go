@@ -19,6 +19,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -203,10 +204,16 @@ func (rm *ReplicationManager) synchronize() {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 		return
 	}
-	for _, controllerSpec := range controllerSpecs {
-		err = rm.syncHandler(controllerSpec)
-		if err != nil {
-			glog.Errorf("Error synchronizing: %#v", err)
-		}
+	wg := sync.WaitGroup{}
+	wg.Add(len(controllerSpecs))
+	for ix := range controllerSpecs {
+		go func(ix int) {
+			defer wg.Done()
+			err := rm.syncHandler(controllerSpecs[ix])
+			if err != nil {
+				glog.Errorf("Error synchronizing: %#v", err)
+			}
+		}(ix)
 	}
+	wg.Wait()
 }
