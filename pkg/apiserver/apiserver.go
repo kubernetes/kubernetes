@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
@@ -151,6 +152,7 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	healthz.InstallHandler(s.mux)
 
 	s.mux.HandleFunc("/", s.handleIndex)
+	s.mux.HandleFunc("/version", s.handleVersionReq)
 
 	// Handle both operations and operations/* with the same handler
 	s.mux.HandleFunc(s.operationPrefix(), s.handleOperationRequest)
@@ -180,6 +182,11 @@ func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
 	// TODO: serve this out of a file?
 	data := "<html><body>Welcome to Kubernetes</body></html>"
 	fmt.Fprint(w, data)
+}
+
+// handleVersionReq writes the server's version information.
+func (server *APIServer) handleVersionReq(w http.ResponseWriter, req *http.Request) {
+	server.writeRawJSON(http.StatusOK, version.Get(), w)
 }
 
 func (server *APIServer) handleMinionReq(w http.ResponseWriter, req *http.Request) {
@@ -344,14 +351,27 @@ func (server *APIServer) notFound(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "Not Found: %#v", req)
 }
 
+// write writes an API object in wire format.
 func (server *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
 	output, err := api.Encode(object)
 	if err != nil {
 		server.error(err, w)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	w.Write(output)
+}
+
+// writeRawJSON writes a non-API object in JSON.
+func (server *APIServer) writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
+	output, err := json.Marshal(object)
+	if err != nil {
+		server.error(err, w)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 	w.Write(output)
 }
 

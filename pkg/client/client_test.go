@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
 // TODO: Move this to a common place, it's needed in multiple tests.
@@ -455,4 +457,31 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
 	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
+}
+
+func TestGetServerVersion(t *testing.T) {
+	expect := version.Info{
+		Major:     "foo",
+		Minor:     "bar",
+		GitCommit: "baz",
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		output, err := json.Marshal(expect)
+		if err != nil {
+			t.Errorf("unexpected encoding error: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(output)
+	}))
+	client := New(server.URL, nil)
+
+	got, err := client.ServerVersion()
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+	if e, a := expect, *got; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }

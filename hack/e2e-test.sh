@@ -39,7 +39,7 @@ set -e
 # Use testing config
 export KUBE_CONFIG_FILE="config-test.sh"
 export KUBE_REPO_ROOT="$(dirname $0)/.."
-export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh"
+export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
 
 # Build a release required by the test provider [if any]
 test-build-release
