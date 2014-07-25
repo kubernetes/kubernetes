@@ -25,13 +25,10 @@ source $(dirname $0)/config-go.sh
 
 cd "${KUBE_TARGET}"
 
-BINARIES="proxy integration apiserver controller-manager kubelet kubecfg"
+BINARIES="cmd/proxy cmd/integration cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg"
 
 if [ $# -gt 0 ]; then
   BINARIES="$@"
 fi
 
-for b in $BINARIES; do
-  echo "+++ Building ${b}"
-  go build "${KUBE_GO_PACKAGE}"/cmd/${b}
-done
+go build $(for b in $BINARIES; do echo "${KUBE_GO_PACKAGE}"/${b}; done)
