@@ -80,7 +80,7 @@ func (emptyDir *EmptyDirectory) SetUp() error {
 // TODO(jonesdl) when we can properly invoke TearDown(), we should delete
 // the directory created by SetUp.
 func (emptyDir *EmptyDirectory) TearDown() error {
-	return nil
+	return os.RemoveAll(emptyDir.GetPath())
 }
 
 func (emptyDir *EmptyDirectory) GetPath() string {
@@ -88,12 +88,12 @@ func (emptyDir *EmptyDirectory) GetPath() string {
 }
 
 // Interprets API volume as a HostDirectory
-func createHostDirectory(volume *api.Volume) *HostDirectory {
+func CreateHostDirectory(volume *api.Volume) *HostDirectory {
 	return &HostDirectory{volume.Source.HostDirectory.Path}
 }
 
 // Interprets API volume as an EmptyDirectory
-func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
+func CreateEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
 	return &EmptyDirectory{volume.Name, podID, rootDir}
 }
 
@@ -110,9 +110,9 @@ func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, 
 	// TODO(jonesdl) We should probably not check every pointer and directly
 	// resolve these types instead.
 	if source.HostDirectory != nil {
-		vol = createHostDirectory(volume)
+		vol = CreateHostDirectory(volume)
 	} else if source.EmptyDirectory != nil {
-		vol = createEmptyDirectory(volume, podID, rootDir)
+		vol = CreateEmptyDirectory(volume, podID, rootDir)
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}

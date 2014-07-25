@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -449,6 +451,52 @@ type podContainer struct {
 	containerName string
 }
 
+func determineValidVolumes(pods []Pod) map[string]api.Volume {
+	validVolumes := make(map[string]api.Volume)
+	for _, pod := range pods {
+		for _, volume := range pod.Manifest.Volumes {
+			identifier := pod.Manifest.ID + volume.Name
+			validVolumes[identifier] = volume
+		}
+	}
+	return validVolumes
+}
+
+func (kl *Kubelet) determineActiveVolumes() map[string]volume.Interface {
+	activeVolumes := make(map[string]volume.Interface)
+	filepath.Walk(kl.rootDirectory, func(path string, info os.FileInfo, err error) error {
+		var name string
+		var podID string
+		dir := getDir(path)
+		glog.Infof("Traversing filepath %s", path)
+		if dir == "empty" {
+			name = info.Name()
+			podID = getDir(filepath.Dir(filepath.Dir(path)))
+			glog.Infof("Adding active volume %s of pod %s", name, podID)
+			activeVolumes[podID+name] = &volume.EmptyDirectory{name, podID, kl.rootDirectory}
+		}
+		return nil
+	})
+	return activeVolumes
+}
+
+func getDir(path string) string {
+	return filepath.Base(filepath.Dir(path))
+}
+
+func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
+	validVolumes := determineValidVolumes(pods)
+	activeVolumes := kl.determineActiveVolumes()
+	glog.Infof("ValidVolumes: %v  \n ActiveVolumes: %v", validVolumes, activeVolumes)
+	for name, volume := range activeVolumes {
+		if _, ok := validVolumes[name]; !ok {
+			glog.Infof("Volume found with no respective pod, tearing down volume %s", name)
+			volume.TearDown()
+		}
+	}
+	return nil
+}
+
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(pods []Pod) error {
 	glog.Infof("Desired [%s]: %+v", kl.hostname, pods)
@@ -480,6 +528,7 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 			}
 		})
 	}
+	kl.reconcileVolumes(pods)
 
 	// Kill any containers we don't need
 	existingContainers, err := getKubeletDockerContainers(kl.dockerClient)
