@@ -19,6 +19,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -182,15 +183,27 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 	diff := len(filteredList) - controllerSpec.DesiredState.Replicas
 	if diff < 0 {
 		diff *= -1
+		wait := sync.WaitGroup{}
+		wait.Add(diff)
 		glog.Infof("Too few replicas, creating %d\n", diff)
 		for i := 0; i < diff; i++ {
-			rm.podControl.createReplica(controllerSpec)
+			go func() {
+				defer wait.Done()
+				rm.podControl.createReplica(controllerSpec)
+			}()
 		}
+		wait.Wait()
 	} else if diff > 0 {
 		glog.Infof("Too many replicas, deleting %d\n", diff)
+		wait := sync.WaitGroup{}
+		wait.Add(diff)
 		for i := 0; i < diff; i++ {
-			rm.podControl.deletePod(filteredList[i].ID)
+			go func(ix int) {
+				defer wait.Done()
+				rm.podControl.deletePod(filteredList[ix].ID)
+			}(i)
 		}
+		wait.Wait()
 	}
 	return nil
 }
