@@ -23,6 +23,7 @@ var updateColor = function($http, server) {
 	    console.log(data);
 	})
     .error(function(data) {
+            server.color = "#000";
 	    console.log(data);
 	});
 };
