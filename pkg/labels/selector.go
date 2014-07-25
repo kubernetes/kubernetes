@@ -154,12 +154,3 @@ func ParseSelector(selector string) (Selector, error) {
 	}
 	return andTerm(items), nil
 }
-
-// MustParseSelector parses the selection or panics.
-func MustParseSelector(selector string) Selector {
-	s, err := ParseSelector(selector)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}

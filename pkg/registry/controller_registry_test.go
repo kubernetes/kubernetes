@@ -187,12 +187,27 @@ func TestControllerParsing(t *testing.T) {
 	}
 }
 
+var validPodTemplate = api.PodTemplate{
+	DesiredState: api.PodState{
+		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
+			Containers: []api.Container{
+				{
+					Name:  "test",
+					Image: "test_image",
+				},
+			},
+		},
+	},
+}
+
 func TestCreateController(t *testing.T) {
 	mockRegistry := MockControllerRegistry{}
 	mockPodRegistry := MockPodRegistry{
 		pods: []api.Pod{
 			{
 				JSONBase: api.JSONBase{ID: "foo"},
+				Labels:   map[string]string{"a": "b"},
 			},
 		},
 	}
@@ -204,10 +219,15 @@ func TestCreateController(t *testing.T) {
 	controller := api.ReplicationController{
 		JSONBase: api.JSONBase{ID: "test"},
 		DesiredState: api.ReplicationControllerState{
-			Replicas: 2,
+			Replicas:        2,
+			ReplicaSelector: map[string]string{"a": "b"},
+			PodTemplate:     validPodTemplate,
 		},
 	}
 	channel, err := storage.Create(controller)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	expectNoError(t, err)
 
 	select {
@@ -221,9 +241,11 @@ func TestCreateController(t *testing.T) {
 	mockPodRegistry.pods = []api.Pod{
 		{
 			JSONBase: api.JSONBase{ID: "foo"},
+			Labels:   map[string]string{"a": "b"},
 		},
 		{
 			JSONBase: api.JSONBase{ID: "bar"},
+			Labels:   map[string]string{"a": "b"},
 		},
 	}
 	mockPodRegistry.Unlock()
@@ -233,5 +255,67 @@ func TestCreateController(t *testing.T) {
 		t.Error("Unexpected timeout")
 	case <-channel:
 		// Do nothing, this is expected
+	}
+}
+
+func TestControllerStorageValidatesCreate(t *testing.T) {
+	mockRegistry := MockControllerRegistry{}
+	storage := ControllerRegistryStorage{
+		registry:    &mockRegistry,
+		podRegistry: nil,
+		pollPeriod:  time.Millisecond * 1,
+	}
+
+	failureCases := map[string]api.ReplicationController{
+		"empty ID": api.ReplicationController{
+			JSONBase: api.JSONBase{ID: ""},
+			DesiredState: api.ReplicationControllerState{
+				ReplicaSelector: map[string]string{"bar": "baz"},
+			},
+		},
+		"empty selector": api.ReplicationController{
+			JSONBase:     api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{},
+		},
+	}
+	for _, failureCase := range failureCases {
+		c, err := storage.Create(failureCase)
+		if c != nil {
+			t.Errorf("Expected nil channel")
+		}
+		if err == nil {
+			t.Errorf("Expected to get an error")
+		}
+	}
+}
+
+func TestControllerStorageValidatesUpdate(t *testing.T) {
+	mockRegistry := MockControllerRegistry{}
+	storage := ControllerRegistryStorage{
+		registry:    &mockRegistry,
+		podRegistry: nil,
+		pollPeriod:  time.Millisecond * 1,
+	}
+
+	failureCases := map[string]api.ReplicationController{
+		"empty ID": api.ReplicationController{
+			JSONBase: api.JSONBase{ID: ""},
+			DesiredState: api.ReplicationControllerState{
+				ReplicaSelector: map[string]string{"bar": "baz"},
+			},
+		},
+		"empty selector": api.ReplicationController{
+			JSONBase:     api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{},
+		},
+	}
+	for _, failureCase := range failureCases {
+		c, err := storage.Update(failureCase)
+		if c != nil {
+			t.Errorf("Expected nil channel")
+		}
+		if err == nil {
+			t.Errorf("Expected to get an error")
+		}
 	}
 }
