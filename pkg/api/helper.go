@@ -460,7 +460,7 @@ func internalize(obj interface{}) (interface{}, error) {
 	case *v1beta1.ReplicationControllerList:
 		var items []ReplicationController
 		if cObj.Items != nil {
-			items := make([]ReplicationController, len(cObj.Items))
+			items = make([]ReplicationController, len(cObj.Items))
 			for ix := range cObj.Items {
 				rc, err := internalize(cObj.Items[ix])
 				if err != nil {
