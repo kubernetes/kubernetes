@@ -259,7 +259,7 @@ func milliCPUToShares(milliCPU int) int {
 func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volumeMap, error) {
 	podVolumes := make(volumeMap)
 	for _, vol := range manifest.Volumes {
-		extVolume, err := volume.CreateVolume(&vol, manifest.ID, kl.rootDirectory)
+		extVolume, err := volume.CreateVolumeBuilder(&vol, manifest.ID, kl.rootDirectory)
 		if err != nil {
 			return nil, err
 		}
@@ -451,46 +451,58 @@ type podContainer struct {
 	containerName string
 }
 
+// Stores all volumes defined by the set of pods in a map.
 func determineValidVolumes(pods []Pod) map[string]api.Volume {
 	validVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Manifest.Volumes {
-			identifier := pod.Manifest.ID + volume.Name
+			identifier := pod.Manifest.ID + "/" + volume.Name
 			validVolumes[identifier] = volume
 		}
 	}
 	return validVolumes
 }
 
-func (kl *Kubelet) determineActiveVolumes() map[string]volume.Interface {
-	activeVolumes := make(map[string]volume.Interface)
+// Examines directory structure to determine volumes that are presently
+// active and mounted. Builds their respective Cleaner type in case they need to be deleted.
+func (kl *Kubelet) determineActiveVolumes() map[string]volume.Cleaner {
+	activeVolumes := make(map[string]volume.Cleaner)
 	filepath.Walk(kl.rootDirectory, func(path string, info os.FileInfo, err error) error {
+		// Search for volume dir structure : $ROOTDIR/$PODID/volumes/$VOLUMETYPE/$VOLUMENAME
 		var name string
 		var podID string
+		// Extract volume type for dir structure
 		dir := getDir(path)
 		glog.Infof("Traversing filepath %s", path)
+		// Handle emptyDirectory types.
 		if dir == "empty" {
 			name = info.Name()
+			// Retrieve podID from dir structure
 			podID = getDir(filepath.Dir(filepath.Dir(path)))
-			glog.Infof("Adding active volume %s of pod %s", name, podID)
-			activeVolumes[podID+name] = &volume.EmptyDirectory{name, podID, kl.rootDirectory}
+			glog.Infof("Found active volume %s of pod %s", name, podID)
+			identifier := podID + "/" + name
+			activeVolumes[identifier] = &volume.EmptyDirectoryCleaner{path}
 		}
 		return nil
 	})
 	return activeVolumes
 }
 
+// Utility function to extract only the directory name.
 func getDir(path string) string {
 	return filepath.Base(filepath.Dir(path))
 }
 
+// Compares the map of active volumes to the map of valid volumes.
+// If an active volume does not have a respective valid volume, clean it up.
 func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
 	validVolumes := determineValidVolumes(pods)
 	activeVolumes := kl.determineActiveVolumes()
-	glog.Infof("ValidVolumes: %v  \n ActiveVolumes: %v", validVolumes, activeVolumes)
+	glog.Infof("ValidVolumes: %v", validVolumes)
+	glog.Infof("ActiveVolumes: %v", activeVolumes)
 	for name, volume := range activeVolumes {
 		if _, ok := validVolumes[name]; !ok {
-			glog.Infof("Volume found with no respective pod, tearing down volume %s", name)
+			glog.Infof("Orphaned volume %s found, tearing down volume", name)
 			volume.TearDown()
 		}
 	}
@@ -528,6 +540,8 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 			}
 		})
 	}
+
+	// Remove any orphaned volumes.
 	kl.reconcileVolumes(pods)
 
 	// Kill any containers we don't need

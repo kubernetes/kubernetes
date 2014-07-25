@@ -26,15 +26,25 @@ import (
 
 var ErrUnsupportedVolumeType = errors.New("unsupported volume type")
 
-// Interface is a directory used by pods or hosts. Interface implementations
+// Interface is a directory used by pods or hosts. All volume interface implementations
 // must be idempotent.
 type Interface interface {
-	// SetUp prepares and mounts/unpacks the volume to a directory path.
-	SetUp() error
-
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
 
+}
+
+// The Builder interface provides the method to set up/mount the volume.
+type Builder interface {
+	Interface
+	// SetUp prepares and mounts/unpacks the volume to a directory path.
+	SetUp() error
+
+}
+
+// The Cleaner interface provides the method to cleanup/unmount the volumes.
+type Cleaner interface {
+	Interface
 	// TearDown unmounts the volume and removes traces of the SetUp procedure.
 	TearDown() error
 }
@@ -61,14 +71,14 @@ func (hostVol *HostDirectory) GetPath() string {
 
 // EmptyDirectory volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
-type EmptyDirectory struct {
+type EmptyDirectoryBuilder struct {
 	Name    string
 	PodID   string
 	RootDir string
 }
 
 // SetUp creates the new directory.
-func (emptyDir *EmptyDirectory) SetUp() error {
+func (emptyDir *EmptyDirectoryBuilder) SetUp() error {
 	path := emptyDir.GetPath()
 	err := os.MkdirAll(path, 0750)
 	if err != nil {
@@ -77,42 +87,50 @@ func (emptyDir *EmptyDirectory) SetUp() error {
 	return nil
 }
 
-// TODO(jonesdl) when we can properly invoke TearDown(), we should delete
-// the directory created by SetUp.
-func (emptyDir *EmptyDirectory) TearDown() error {
-	return os.RemoveAll(emptyDir.GetPath())
-}
-
-func (emptyDir *EmptyDirectory) GetPath() string {
+func (emptyDir *EmptyDirectoryBuilder) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
+// EmptyDirectoryCleaners only need to know what path the are cleaning
+type EmptyDirectoryCleaner struct {
+	Path string
+}
+
+// Simply delete everything in the directory.
+func (emptyDir *EmptyDirectoryCleaner) TearDown() error {
+	return os.RemoveAll(emptyDir.GetPath())
+}
+
+func (emptyDir *EmptyDirectoryCleaner) GetPath() string {
+	return emptyDir.Path
+}
+
 // Interprets API volume as a HostDirectory
-func CreateHostDirectory(volume *api.Volume) *HostDirectory {
+func CreateHostDirectoryBuilder(volume *api.Volume) *HostDirectory {
 	return &HostDirectory{volume.Source.HostDirectory.Path}
 }
 
-// Interprets API volume as an EmptyDirectory
-func CreateEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
-	return &EmptyDirectory{volume.Name, podID, rootDir}
+// Interprets API volume as an EmptyDirectoryBuilder
+func CreateEmptyDirectoryBuilder(volume *api.Volume, podID string, rootDir string) *EmptyDirectoryBuilder {
+	return &EmptyDirectoryBuilder{volume.Name, podID, rootDir}
 }
 
-// CreateVolume returns an Interface capable of mounting a volume described by an
-// *api.Volume and whether or not it is mounted, or an error.
-func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, error) {
+// CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
+// *api.Volume, or an error.
+func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Builder, error) {
 	source := volume.Source
 	// TODO(jonesdl) We will want to throw an error here when we no longer
 	// support the default behavior.
 	if source == nil {
 		return nil, nil
 	}
-	var vol Interface
+	var vol Builder
 	// TODO(jonesdl) We should probably not check every pointer and directly
 	// resolve these types instead.
 	if source.HostDirectory != nil {
-		vol = CreateHostDirectory(volume)
+		vol = CreateHostDirectoryBuilder(volume)
 	} else if source.EmptyDirectory != nil {
-		vol = CreateEmptyDirectory(volume, podID, rootDir)
+		vol = CreateEmptyDirectoryBuilder(volume, podID, rootDir)
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}

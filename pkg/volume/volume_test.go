@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestCreateVolumes(t *testing.T) {
+func TestCreateVolumeBuilders(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", "CreateVolumes")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -35,6 +35,7 @@ func TestCreateVolumes(t *testing.T) {
 		volume api.Volume
 		path   string
 		podID  string
+		kind   string
 	}{
 		{
 			api.Volume{
@@ -45,6 +46,7 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			"/dir/path",
 			"my-id",
+			"host",
 		},
 		{
 			api.Volume{
@@ -55,6 +57,7 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			path.Join(tempDir, "/my-id/volumes/empty/empty-dir"),
 			"my-id",
+			"empty",
 		},
 		{api.Volume{}, "", ""},
 		{
@@ -64,11 +67,12 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			"",
 			"",
+			"",
 		},
 	}
 	for _, createVolumesTest := range createVolumesTests {
 		tt := createVolumesTest
-		v, err := CreateVolume(&tt.volume, tt.podID, tempDir)
+		v, err := CreateVolumeBuilder(&tt.volume, tt.podID, tempDir)
 		if tt.volume.Source == nil {
 			if v != nil {
 				t.Errorf("Expected volume to be nil")
@@ -91,6 +95,12 @@ func TestCreateVolumes(t *testing.T) {
 		path := v.GetPath()
 		if path != tt.path {
 			t.Errorf("Unexpected bind path. Expected %v, got %v", tt.path, path)
+		}
+		v, err = CreateVolumeCleaner(tt.kind)
+		if tt.kind == "" {
+			if err != ErrUnsupportedVolumeType {
+				t.Errorf("Unexpected error: %v", err)
+			}
 		}
 		err = v.TearDown()
 		if err != nil {
