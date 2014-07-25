@@ -27,6 +27,7 @@ var storageToType = map[string]reflect.Type{
 	"pods":                   reflect.TypeOf(api.Pod{}),
 	"services":               reflect.TypeOf(api.Service{}),
 	"replicationControllers": reflect.TypeOf(api.ReplicationController{}),
+	"minions":                reflect.TypeOf(api.Minion{}),
 }
 
 // ToWireFormat takes input 'data' as either json or yaml, checks that it parses as the
@@ -47,7 +48,7 @@ func ToWireFormat(data []byte, storage string) ([]byte, error) {
 
 func SupportedWireStorage() []string {
 	types := []string{}
-	for k, _ := range storageToType {
+	for k := range storageToType {
 		types = append(types, k)
 	}
 	return types
