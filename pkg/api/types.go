@@ -38,7 +38,7 @@ import (
 //     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?
 //
-//  DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
+// DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
 //      to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
 //      by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
@@ -223,7 +223,8 @@ type PodState struct {
 	// entry per container in the manifest. The value of this map is currently the output
 	// of `docker inspect`. This output format is *not* final and should not be relied
 	// upon.
-	// TODO: Make real decisions about what our info should look like.
+	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
+	// when we have done this.
 	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 

@@ -68,6 +68,7 @@ func TestAPIObject(t *testing.T) {
 
 	// Things that Decode would have done for us:
 	decodedViaJSON.Kind = ""
+	decodedViaJSON.APIVersion = ""
 
 	if e, a := outer, &decodedViaJSON; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %#v but got %#v", e, a)

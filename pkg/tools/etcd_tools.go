@@ -148,7 +148,7 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 	body = response.Node.Value
 	err = api.DecodeInto([]byte(body), objPtr)
 	if jsonBase, err := api.FindJSONBase(objPtr); err == nil {
-		jsonBase.ResourceVersion = response.Node.ModifiedIndex
+		jsonBase.SetResourceVersion(response.Node.ModifiedIndex)
 		// Note that err shadows the err returned below, so we won't
 		// return an error just because we failed to find a JSONBase.
 		// This is intentional.

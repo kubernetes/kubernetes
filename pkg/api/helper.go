@@ -25,11 +25,33 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
+var versionMap = map[string]map[string]reflect.Type{}
+
+// typeNamePath records go's name and path of a go struct.
+type typeNamePath struct {
+	typeName string
+	typePath string
+}
+
+// typeNamePathToVersion allows one to figure out the version for a
+// given go object.
+var typeNamePathToVersion = map[typeNamePath]string{}
+
+// ConversionFunc knows how to translate a type from one api version to another.
 type ConversionFunc func(input interface{}) (output interface{}, err error)
 
-var versionMap = map[string]map[string]reflect.Type{}
-var externalFuncs = map[string]ConversionFunc{}
-var internalFuncs = map[string]ConversionFunc{}
+// typeTuple indexes a conversionFunc by source and dest version, and
+// the name of the type it operates on.
+type typeTuple struct {
+	sourceVersion string
+	destVersion   string
+
+	// Go name of this type.
+	typeName string
+}
+
+// conversionFuncs is a map of all known conversion functions.
+var conversionFuncs = map[typeTuple]ConversionFunc{}
 
 func init() {
 	AddKnownTypes("",
@@ -59,7 +81,28 @@ func init() {
 		v1beta1.Status{},
 		v1beta1.ServerOpList{},
 		v1beta1.ServerOp{},
+		v1beta1.ContainerManifestList{},
+		v1beta1.Endpoints{},
 	)
+
+	defaultCopyList := []string{
+		"PodList",
+		"Pod",
+		"ReplicationControllerList",
+		"ReplicationController",
+		"ServiceList",
+		"Service",
+		"MinionList",
+		"Minion",
+		"Status",
+		"ServerOpList",
+		"ServerOp",
+		"ContainerManifestList",
+		"Endpoints",
+	}
+
+	AddDefaultCopy("", "v1beta1", defaultCopyList...)
+	AddDefaultCopy("v1beta1", "", defaultCopyList...)
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
@@ -72,23 +115,87 @@ func AddKnownTypes(version string, types ...interface{}) {
 	}
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
+		if t.Kind() != reflect.Struct {
+			panic("All types must be structs.")
+		}
 		knownTypes[t.Name()] = t
+		typeNamePathToVersion[typeNamePath{
+			typeName: t.Name(),
+			typePath: t.PkgPath(),
+		}] = version
 	}
 }
 
-func AddExternalConversion(name string, fn ConversionFunc) {
-	externalFuncs[name] = fn
+// New returns a new API object of the given version ("" for internal
+// representation) and name, or an error if it hasn't been registered.
+func New(versionName, typeName string) (interface{}, error) {
+	if types, ok := versionMap[versionName]; ok {
+		if t, ok := types[typeName]; ok {
+			return reflect.New(t).Interface(), nil
+		}
+		return nil, fmt.Errorf("No type '%v' for version '%v'", typeName, versionName)
+	}
+	return nil, fmt.Errorf("No version '%v'", versionName)
 }
 
-func AddInternalConversion(name string, fn ConversionFunc) {
-	internalFuncs[name] = fn
+// AddExternalConversion adds a function to the list of conversion functions. The given
+// function should know how to convert the internal representation of 'typeName' to the
+// external, versioned representation ("v1beta1").
+// TODO: When we make the next api version, this function will have to add a destination
+// version parameter.
+func AddExternalConversion(typeName string, fn ConversionFunc) {
+	conversionFuncs[typeTuple{"", "v1beta1", typeName}] = fn
+}
+
+// AddInternalConversion adds a function to the list of conversion functions. The given
+// function should know how to convert the external, versioned representation of 'typeName'
+// to the internal representation.
+// TODO: When we make the next api version, this function will have to add a source
+// version parameter.
+func AddInternalConversion(typeName string, fn ConversionFunc) {
+	conversionFuncs[typeTuple{"v1beta1", "", typeName}] = fn
+}
+
+// AddDefaultCopy registers a general copying function for turning objects of version
+// sourceVersion into the same object of version destVersion.
+func AddDefaultCopy(sourceVersion, destVersion string, types ...string) {
+	for i := range types {
+		t := types[i]
+		conversionFuncs[typeTuple{sourceVersion, destVersion, t}] = func(in interface{}) (interface{}, error) {
+			out, err := New(destVersion, t)
+			if err != nil {
+				return nil, err
+			}
+			err = DefaultCopy(in, out)
+			if err != nil {
+				return nil, err
+			}
+			return out, nil
+		}
+	}
 }
 
 // FindJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
 // obj must be a pointer to an api type.
-func FindJSONBase(obj interface{}) (*JSONBase, error) {
-	_, jsonBase, err := nameAndJSONBase(obj)
-	return jsonBase, err
+func FindJSONBase(obj interface{}) (JSONBaseInterface, error) {
+	v, err := enforcePtr(obj)
+	if err != nil {
+		return nil, err
+	}
+	t := v.Type()
+	name := t.Name()
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
+	}
+	jsonBase := v.FieldByName("JSONBase")
+	if !jsonBase.IsValid() {
+		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
+	}
+	g, err := newGenericJSONBase(jsonBase)
+	if err != nil {
+		return nil, err
+	}
+	return g, nil
 }
 
 // FindJSONBaseRO takes an arbitary api type, return a copy of its JSONBase field.
@@ -120,44 +227,95 @@ func EncodeOrDie(obj interface{}) string {
 // Encode turns the given api object into an appropriate JSON string.
 // Will return an error if the object doesn't have an embedded JSONBase.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
-// will be made so that the object's Kind field can be set. If a pointer,
-// we change the Kind field, marshal, and then set the kind field back to
-// "". Having to keep track of the kind field makes tests very annoying,
-// so the rule is it's set only in wire format (json), not when in native
-// format.
+// must be made. If a pointer, the object may be modified before encoding,
+// but will be put back into its original state before returning.
+//
+// Memory/wire format differences:
+//  * Having to keep track of the Kind and APIVersion fields makes tests
+//    very annoying, so the rule is that they are set only in wire format
+//    (json), not when in native (memory) format. This is possible because
+//    both pieces of information are implicit in the go typed object.
+//     * An exception: note that, if there are embedded API objects of known
+//       type, for example, PodList{... Items []Pod ...}, these embedded
+//       objects must be of the same version of the object they are embedded
+//       within, and their APIVersion and Kind must both be empty.
+//     * Note that the exception does not apply to the APIObject type, which
+//       recursively does Encode()/Decode(), and is capable of expressing any
+//       API object.
+//  * Only versioned objects should be encoded. This means that, if you pass
+//    a native object, Encode will convert it to a versioned object. For
+//    example, an api.Pod will get converted to a v1beta1.Pod. However, if
+//    you pass in an object that's already versioned (v1beta1.Pod), Encode
+//    will not modify it.
+//
+// The purpose of the above complex conversion behavior is to allow us to
+// change the memory format yet not break compatibility with any stored
+// objects, whether they be in our storage layer (e.g., etcd), or in user's
+// config files.
+//
+// TODO/next steps: When we add our second versioned type, this package will
+// need a version of Encode that lets you choose the wire version. A configurable
+// default will be needed, to allow operating in clusters that haven't yet
+// upgraded.
+//
 func Encode(obj interface{}) (data []byte, err error) {
-	obj = checkPtr(obj)
-	base, err := prepareEncode(obj)
+	obj = maybeCopy(obj)
+	obj, err = maybeExternalize(obj)
 	if err != nil {
 		return nil, err
 	}
-	if len(base.APIVersion) == 0 {
-		out, err := externalize(obj)
-		if err != nil {
-			return nil, err
-		}
-		_, jsonBase, err := nameAndJSONBase(obj)
-		if err != nil {
-			return nil, err
-		}
-		jsonBase.Kind = ""
-		obj = out
-		_, err = prepareEncode(out)
-		if err != nil {
-			return nil, err
-		}
+
+	jsonBase, err := prepareEncode(obj)
+	if err != nil {
+		return nil, err
 	}
 
 	data, err = json.MarshalIndent(obj, "", "	")
-	_, jsonBase, err := nameAndJSONBase(obj)
 	if err != nil {
 		return nil, err
 	}
-	jsonBase.Kind = ""
+	// Leave these blank in memory.
+	jsonBase.SetKind("")
+	jsonBase.SetAPIVersion("")
 	return data, err
 }
 
-func checkPtr(obj interface{}) interface{} {
+// Returns the API version of the go object, or an error if it's not a
+// pointer or is unregistered.
+func objAPIVersionAndName(obj interface{}) (apiVersion, name string, err error) {
+	v, err := enforcePtr(obj)
+	if err != nil {
+		return "", "", err
+	}
+	t := v.Type()
+	key := typeNamePath{
+		typeName: t.Name(),
+		typePath: t.PkgPath(),
+	}
+	if version, ok := typeNamePathToVersion[key]; !ok {
+		return "", "", fmt.Errorf("Unregistered type: %#v", key)
+	} else {
+		return version, t.Name(), nil
+	}
+}
+
+// maybeExternalize converts obj to an external object if it isn't one already.
+// obj must be a pointer.
+func maybeExternalize(obj interface{}) (interface{}, error) {
+	version, _, err := objAPIVersionAndName(obj)
+	if err != nil {
+		return nil, err
+	}
+	if version != "" {
+		// Object is already of an external versioned type.
+		return obj, nil
+	}
+	return externalize(obj)
+}
+
+// maybeCopy copies obj if it is not a pointer, to get a settable/addressable
+// object. Guaranteed to return a pointer.
+func maybeCopy(obj interface{}) interface{} {
 	v := reflect.ValueOf(obj)
 	if v.Kind() == reflect.Ptr {
 		return obj
@@ -167,772 +325,190 @@ func checkPtr(obj interface{}) interface{} {
 	return v2.Interface()
 }
 
-func prepareEncode(obj interface{}) (*JSONBase, error) {
-	name, jsonBase, err := nameAndJSONBase(obj)
+// prepareEncode sets the APIVersion and Kind fields to match the go type in obj.
+// Returns an error if the (version, name) pair isn't registered for the type or
+// if the type is an internal, non-versioned object.
+func prepareEncode(obj interface{}) (JSONBaseInterface, error) {
+	version, name, err := objAPIVersionAndName(obj)
 	if err != nil {
 		return nil, err
 	}
-	knownTypes, found := versionMap[jsonBase.APIVersion]
+	if version == "" {
+		return nil, fmt.Errorf("No version for '%v' (%#v); extremely inadvisable to write it in wire format.", name, obj)
+	}
+	jsonBase, err := FindJSONBase(obj)
+	if err != nil {
+		return nil, err
+	}
+	knownTypes, found := versionMap[version]
 	if !found {
-		return nil, fmt.Errorf("struct %s, %v won't be unmarshalable because it's not in known versions", jsonBase.APIVersion, obj)
+		return nil, fmt.Errorf("struct %s, %s won't be unmarshalable because it's not in known versions", version, name)
 	}
 	if _, contains := knownTypes[name]; !contains {
-		return nil, fmt.Errorf("struct %s won't be unmarshalable because it's not in knownTypes", name)
+		return nil, fmt.Errorf("struct %s, %s won't be unmarshalable because it's not in knownTypes", version, name)
 	}
-	jsonBase.Kind = name
+	jsonBase.SetAPIVersion(version)
+	jsonBase.SetKind(name)
 	return jsonBase, nil
 }
 
-// Returns the name of the type (sans pointer), and its kind field. Takes pointer-to-struct..
-func nameAndJSONBase(obj interface{}) (string, *JSONBase, error) {
+// Ensures that obj is a pointer of some sort. Returns a reflect.Value of the
+// dereferenced pointer, ensuring that it is settable/addressable.
+// Returns an error if this is not possible.
+func enforcePtr(obj interface{}) (reflect.Value, error) {
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
-		return "", nil, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
+		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
 	}
-	v = v.Elem()
-	name := v.Type().Name()
-	if v.Kind() != reflect.Struct {
-		return "", nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), v.Type().Name(), v.Interface())
-	}
-	jsonBase := v.FieldByName("JSONBase")
-	if !jsonBase.IsValid() {
-		return "", nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
-	}
-	output, ok := jsonBase.Addr().Interface().(*JSONBase)
-	if !ok {
-		internal, err := internalize(jsonBase.Addr().Interface())
-		if err != nil {
-			return name, nil, err
-		}
-		output = internal.(*JSONBase)
-	}
-	return name, output, nil
+	return v.Elem(), nil
 }
 
-// Decode converts a JSON string back into a pointer to an api object. Deduces the type
-// based upon the Kind field (set by encode).
-func Decode(data []byte) (interface{}, error) {
+// VersionAndKind will return the APIVersion and Kind of the given wire-format
+// enconding of an APIObject, or an error.
+func VersionAndKind(data []byte) (version, kind string, err error) {
 	findKind := struct {
 		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	}{}
-	// yaml is a superset of json, so we use it to decode here. That way, we understand both.
-	err := yaml.Unmarshal(data, &findKind)
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, &findKind)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get kind: %#v", err)
+		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
 	}
-	knownTypes, found := versionMap[findKind.APIVersion]
-	if !found {
-		return nil, fmt.Errorf("Unknown api verson: %s", findKind.APIVersion)
+	return findKind.APIVersion, findKind.Kind, nil
+}
+
+// Decode converts a YAML or JSON string back into a pointer to an api object.
+// Deduces the type based upon the APIVersion and Kind fields, which are set
+// by Encode. Only versioned objects (APIVersion != "") are accepted. The object
+// will be converted into the in-memory unversioned type before being returned.
+func Decode(data []byte) (interface{}, error) {
+	version, kind, err := VersionAndKind(data)
+	if err != nil {
+		return nil, err
 	}
-	objType, found := knownTypes[findKind.Kind]
-	if !found {
-		return nil, fmt.Errorf("%#v is not a known type for decoding", findKind)
+	if version == "" {
+		return nil, fmt.Errorf("API Version not set in '%s'", string(data))
 	}
-	obj := reflect.New(objType).Interface()
+	obj, err := New(version, kind)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to create new object of type ('%s', '%s')", version, kind)
+	}
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
 	err = yaml.Unmarshal(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	if len(findKind.APIVersion) != 0 {
-		obj, err = internalize(obj)
-		if err != nil {
-			return nil, err
-		}
-	}
-	_, jsonBase, err := nameAndJSONBase(obj)
+	obj, err = internalize(obj)
 	if err != nil {
 		return nil, err
 	}
-	// Don't leave these set. Track type with go's type.
-	jsonBase.Kind = ""
+	jsonBase, err := FindJSONBase(obj)
+	if err != nil {
+		return nil, err
+	}
+	// Don't leave these set. Type and version info is deducible from go's type.
+	jsonBase.SetKind("")
+	jsonBase.SetAPIVersion("")
 	return obj, nil
 }
 
-// DecodeInto parses a JSON string and stores it in obj. Returns an error
+// DecodeInto parses a YAML or JSON string and stores it in obj. Returns an error
 // if data.Kind is set and doesn't match the type of obj. Obj should be a
 // pointer to an api type.
+// If obj's APIVersion doesn't match that in data, an attempt will be made to convert
+// data into obj's version.
 func DecodeInto(data []byte, obj interface{}) error {
-	internal, err := Decode(data)
+	dataVersion, dataKind, err := VersionAndKind(data)
 	if err != nil {
 		return err
 	}
-	v := reflect.ValueOf(obj)
-	iv := reflect.ValueOf(internal)
-	if !iv.Type().AssignableTo(v.Type()) {
-		return fmt.Errorf("%s is not assignable to %s", v.Type(), iv.Type())
-	}
-	v.Elem().Set(iv.Elem())
-	name, jsonBase, err := nameAndJSONBase(obj)
+	objVersion, objKind, err := objAPIVersionAndName(obj)
 	if err != nil {
 		return err
 	}
-	if jsonBase.Kind != "" && jsonBase.Kind != name {
-		return fmt.Errorf("data had kind %v, but passed object was of type %v", jsonBase.Kind, name)
+	if dataKind == "" {
+		// Assume objects with unset Kind fields are being unmarshalled into the
+		// correct type.
+		dataKind = objKind
 	}
-	// Don't leave these set. Track type with go's type.
-	jsonBase.Kind = ""
+	if dataKind != objKind {
+		return fmt.Errorf("data of kind '%v', obj of type '%v'", dataKind, objKind)
+	}
+	if dataVersion == "" {
+		// Assume objects with unset Version fields are being unmarshalled into the
+		// correct type.
+		dataVersion = objVersion
+	}
+
+	if objVersion == dataVersion {
+		// Easy case!
+		err = yaml.Unmarshal(data, obj)
+		if err != nil {
+			return err
+		}
+	} else {
+		// TODO: look up in our map to see if we can do this dataVersion -> objVersion
+		// conversion.
+		if objVersion != "" || dataVersion != "v1beta1" {
+			return fmt.Errorf("Can't convert from '%v' to '%v' for type '%v'", dataVersion, objVersion, dataKind)
+		}
+
+		external, err := New(dataVersion, dataKind)
+		if err != nil {
+			return fmt.Errorf("Unable to create new object of type ('%s', '%s')", dataVersion, dataKind)
+		}
+		// yaml is a superset of json, so we use it to decode here. That way,
+		// we understand both.
+		err = yaml.Unmarshal(data, external)
+		if err != nil {
+			return err
+		}
+		internal, err := internalize(external)
+		if err != nil {
+			return err
+		}
+		// Copy to the provided object.
+		vObj := reflect.ValueOf(obj)
+		vInternal := reflect.ValueOf(internal)
+		if !vInternal.Type().AssignableTo(vObj.Type()) {
+			return fmt.Errorf("%s is not assignable to %s", vInternal.Type(), vObj.Type())
+		}
+		vObj.Elem().Set(vInternal.Elem())
+	}
+
+	jsonBase, err := FindJSONBase(obj)
+	if err != nil {
+		return err
+	}
+	// Don't leave these set. Type and version info is deducible from go's type.
+	jsonBase.SetKind("")
+	jsonBase.SetAPIVersion("")
 	return nil
 }
 
-// TODO: Switch to registered functions for each type.
 func internalize(obj interface{}) (interface{}, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		value := reflect.New(v.Type())
-		value.Elem().Set(v)
-		result, err := internalize(value.Interface())
-		if err != nil {
-			return nil, err
-		}
-		return reflect.ValueOf(result).Elem().Interface(), nil
+	objVersion, objKind, err := objAPIVersionAndName(obj)
+	if err != nil {
+		return nil, err
 	}
-	switch cObj := obj.(type) {
-	case *v1beta1.JSONBase:
-		obj := JSONBase(*cObj)
-		return &obj, nil
-	case *v1beta1.PodList:
-		var items []Pod
-		if cObj.Items != nil {
-			items = make([]Pod, len(cObj.Items))
-			for ix := range cObj.Items {
-				iObj, err := internalize(cObj.Items[ix])
-				if err != nil {
-					return nil, err
-				}
-				items[ix] = iObj.(Pod)
-			}
-		}
-		result := PodList{
-			JSONBase: JSONBase(cObj.JSONBase),
-			Items:    items,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.Pod:
-		current, err := internalize(cObj.CurrentState)
-		if err != nil {
-			return nil, err
-		}
-		desired, err := internalize(cObj.DesiredState)
-		if err != nil {
-			return nil, err
-		}
-		result := Pod{
-			JSONBase:     JSONBase(cObj.JSONBase),
-			Labels:       cObj.Labels,
-			CurrentState: current.(PodState),
-			DesiredState: desired.(PodState),
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.PodState:
-		manifest, err := internalize(cObj.Manifest)
-		if err != nil {
-			return nil, err
-		}
-		result := PodState{
-			Manifest: manifest.(ContainerManifest),
-			Status:   PodStatus(cObj.Status),
-			Host:     cObj.Host,
-			HostIP:   cObj.HostIP,
-			PodIP:    cObj.PodIP,
-			Info:     PodInfo(cObj.Info),
-		}
-		return &result, nil
-	case *v1beta1.ContainerManifest:
-		var volumes []Volume
-		if cObj.Volumes != nil {
-			volumes = make([]Volume, len(cObj.Volumes))
-			for ix := range cObj.Volumes {
-				v, err := internalize(cObj.Volumes[ix])
-				if err != nil {
-					return nil, err
-				}
-				volumes[ix] = *(v.(*Volume))
-			}
-		}
-		var containers []Container
-		if cObj.Containers != nil {
-			containers = make([]Container, len(cObj.Containers))
-			for ix := range cObj.Containers {
-				v, err := internalize(cObj.Containers[ix])
-				if err != nil {
-					return nil, err
-				}
-				containers[ix] = v.(Container)
-			}
-		}
-		result := ContainerManifest{
-			Version:    cObj.Version,
-			ID:         cObj.ID,
-			Volumes:    volumes,
-			Containers: containers,
-		}
-		return &result, nil
-	case *v1beta1.Volume:
-		var src *VolumeSource
-		if cObj.Source != nil {
-			obj, err := internalize(cObj.Source)
-			if err != nil {
-				return nil, err
-			}
-			src = obj.(*VolumeSource)
-		}
-		result := &Volume{
-			Name:   cObj.Name,
-			Source: src,
-		}
-		return &result, nil
-	case *v1beta1.VolumeSource:
-		var hostDir *HostDirectory
-		if cObj.HostDirectory != nil {
-			hostDir = &HostDirectory{
-				Path: cObj.HostDirectory.Path,
-			}
-		}
-		var emptyDir *EmptyDirectory
-		if cObj.EmptyDirectory != nil {
-			emptyDir = &EmptyDirectory{}
-		}
-		result := VolumeSource{
-			HostDirectory:  hostDir,
-			EmptyDirectory: emptyDir,
-		}
-		return &result, nil
-	case *v1beta1.Container:
-		ports := make([]Port, len(cObj.Ports))
-		for ix := range cObj.Ports {
-			p, err := internalize(cObj.Ports[ix])
-			if err != nil {
-				return nil, err
-			}
-			ports[ix] = (p.(Port))
-		}
-		env := make([]EnvVar, len(cObj.Env))
-		for ix := range cObj.Env {
-			e, err := internalize(cObj.Env[ix])
-			if err != nil {
-				return nil, err
-			}
-			env[ix] = e.(EnvVar)
-		}
-		mounts := make([]VolumeMount, len(cObj.VolumeMounts))
-		for ix := range cObj.VolumeMounts {
-			v, err := internalize(cObj.VolumeMounts[ix])
-			if err != nil {
-				return nil, err
-			}
-			mounts[ix] = v.(VolumeMount)
-		}
-		var liveness *LivenessProbe
-		if cObj.LivenessProbe != nil {
-			probe, err := internalize(*cObj.LivenessProbe)
-			if err != nil {
-				return nil, err
-			}
-			live := probe.(LivenessProbe)
-			liveness = &live
-		}
-		result := Container{
-			Name:          cObj.Name,
-			Image:         cObj.Image,
-			Command:       cObj.Command,
-			WorkingDir:    cObj.WorkingDir,
-			Ports:         ports,
-			Env:           env,
-			Memory:        cObj.Memory,
-			CPU:           cObj.CPU,
-			VolumeMounts:  mounts,
-			LivenessProbe: liveness,
-		}
-		return &result, nil
-	case *v1beta1.Port:
-		result := Port(*cObj)
-		return &result, nil
-	case *v1beta1.EnvVar:
-		result := EnvVar(*cObj)
-		return &result, nil
-	case *v1beta1.VolumeMount:
-		result := VolumeMount(*cObj)
-		return &result, nil
-	case *v1beta1.LivenessProbe:
-		var http *HTTPGetProbe
-		if cObj.HTTPGet != nil {
-			httpProbe := HTTPGetProbe(*cObj.HTTPGet)
-			http = &httpProbe
-		}
-		result := LivenessProbe{
-			Type:                cObj.Type,
-			HTTPGet:             http,
-			InitialDelaySeconds: cObj.InitialDelaySeconds,
-		}
-		return &result, nil
-	case *v1beta1.ReplicationControllerList:
-		var items []ReplicationController
-		if cObj.Items != nil {
-			items = make([]ReplicationController, len(cObj.Items))
-			for ix := range cObj.Items {
-				rc, err := internalize(cObj.Items[ix])
-				if err != nil {
-					return nil, err
-				}
-				items[ix] = rc.(ReplicationController)
-			}
-		}
-		result := ReplicationControllerList{
-			JSONBase: JSONBase(cObj.JSONBase),
-			Items:    items,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.ReplicationController:
-		desired, err := internalize(cObj.DesiredState)
-		if err != nil {
-			return nil, err
-		}
-		result := ReplicationController{
-			JSONBase:     JSONBase(cObj.JSONBase),
-			DesiredState: desired.(ReplicationControllerState),
-			Labels:       cObj.Labels,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.ReplicationControllerState:
-		template, err := internalize(cObj.PodTemplate)
-		if err != nil {
-			return nil, err
-		}
-		result := ReplicationControllerState{
-			Replicas:        cObj.Replicas,
-			ReplicaSelector: cObj.ReplicaSelector,
-			PodTemplate:     template.(PodTemplate),
-		}
-		return &result, nil
-	case *v1beta1.PodTemplate:
-		desired, err := internalize(cObj.DesiredState)
-		if err != nil {
-			return nil, err
-		}
-		return &PodTemplate{
-			DesiredState: desired.(PodState),
-			Labels:       cObj.Labels,
-		}, nil
-	case *v1beta1.ServiceList:
-		var services []Service
-		if cObj.Items != nil {
-			services = make([]Service, len(cObj.Items))
-			for ix := range cObj.Items {
-				s, err := internalize(cObj.Items[ix])
-				if err != nil {
-					return nil, err
-				}
-				services[ix] = s.(Service)
-				services[ix].APIVersion = ""
-			}
-		}
-		result := ServiceList{
-			JSONBase: JSONBase(cObj.JSONBase),
-			Items:    services,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.Service:
-		result := Service{
-			JSONBase:                   JSONBase(cObj.JSONBase),
-			Port:                       cObj.Port,
-			Labels:                     cObj.Labels,
-			Selector:                   cObj.Selector,
-			CreateExternalLoadBalancer: cObj.CreateExternalLoadBalancer,
-			ContainerPort:              cObj.ContainerPort,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.MinionList:
-		minions := make([]Minion, len(cObj.Items))
-		for ix := range cObj.Items {
-			m, err := internalize(cObj.Items[ix])
-			if err != nil {
-				return nil, err
-			}
-			minions[ix] = m.(Minion)
-		}
-		result := MinionList{
-			JSONBase: JSONBase(cObj.JSONBase),
-			Items:    minions,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.Minion:
-		result := Minion{
-			JSONBase: JSONBase(cObj.JSONBase),
-			HostIP:   cObj.HostIP,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.Status:
-		result := Status{
-			JSONBase: JSONBase(cObj.JSONBase),
-			Status:   cObj.Status,
-			Details:  cObj.Details,
-			Code:     cObj.Code,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.ServerOpList:
-		ops := make([]ServerOp, len(cObj.Items))
-		for ix := range cObj.Items {
-			o, err := internalize(cObj.Items[ix])
-			if err != nil {
-				return nil, err
-			}
-			ops[ix] = o.(ServerOp)
-		}
-		result := ServerOpList{
-			JSONBase: JSONBase(cObj.JSONBase),
-			Items:    ops,
-		}
-		result.APIVersion = ""
-		return &result, nil
-	case *v1beta1.ServerOp:
-		result := ServerOp{
-			JSONBase: JSONBase(cObj.JSONBase),
-		}
-		result.APIVersion = ""
-		return &result, nil
-	default:
-		fn, ok := internalFuncs[reflect.ValueOf(cObj).Elem().Type().Name()]
-		if !ok {
-			fmt.Printf("unknown object to internalize: %s", reflect.ValueOf(cObj).Type().Name())
-			panic(fmt.Sprintf("unknown object to internalize: %s", reflect.ValueOf(cObj).Type().Name()))
-		}
-		return fn(cObj)
+	if fn, ok := conversionFuncs[typeTuple{objVersion, "", objKind}]; ok {
+		return fn(obj)
 	}
-	return obj, nil
+	return nil, fmt.Errorf("No conversion handler that knows how to convert a '%v' from '%v'",
+		objKind, objVersion)
 }
 
-// TODO: switch to registered functions for each type.
 func externalize(obj interface{}) (interface{}, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		value := reflect.New(v.Type())
-		value.Elem().Set(v)
-		result, err := externalize(value.Interface())
-		if err != nil {
-			return nil, err
-		}
-		return reflect.ValueOf(result).Elem().Interface(), nil
+	objVersion, objKind, err := objAPIVersionAndName(obj)
+	if err != nil {
+		return nil, err
 	}
-	switch cObj := obj.(type) {
-	case *PodList:
-		var items []v1beta1.Pod
-		if cObj.Items != nil {
-			items = make([]v1beta1.Pod, len(cObj.Items))
-			for ix := range cObj.Items {
-				iObj, err := externalize(cObj.Items[ix])
-				if err != nil {
-					return nil, err
-				}
-				items[ix] = iObj.(v1beta1.Pod)
-			}
-		}
-		result := v1beta1.PodList{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			Items:    items,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *Pod:
-		current, err := externalize(cObj.CurrentState)
-		if err != nil {
-			return nil, err
-		}
-		desired, err := externalize(cObj.DesiredState)
-		if err != nil {
-			return nil, err
-		}
-		result := v1beta1.Pod{
-			JSONBase:     v1beta1.JSONBase(cObj.JSONBase),
-			Labels:       cObj.Labels,
-			CurrentState: current.(v1beta1.PodState),
-			DesiredState: desired.(v1beta1.PodState),
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *PodState:
-		manifest, err := externalize(cObj.Manifest)
-		if err != nil {
-			return nil, err
-		}
-		result := v1beta1.PodState{
-			Manifest: manifest.(v1beta1.ContainerManifest),
-			Status:   v1beta1.PodStatus(cObj.Status),
-			Host:     cObj.Host,
-			HostIP:   cObj.HostIP,
-			PodIP:    cObj.PodIP,
-			Info:     v1beta1.PodInfo(cObj.Info),
-		}
-		return &result, nil
-	case *ContainerManifest:
-		var volumes []v1beta1.Volume
-		if cObj.Volumes != nil {
-			volumes = make([]v1beta1.Volume, len(cObj.Volumes))
-			for ix := range cObj.Volumes {
-				v, err := externalize(cObj.Volumes[ix])
-				if err != nil {
-					return nil, err
-				}
-				volumes[ix] = *(v.(*v1beta1.Volume))
-			}
-		}
-		var containers []v1beta1.Container
-		if cObj.Containers != nil {
-			containers = make([]v1beta1.Container, len(cObj.Containers))
-			for ix := range cObj.Containers {
-				v, err := externalize(cObj.Containers[ix])
-				if err != nil {
-					return nil, err
-				}
-				containers[ix] = v.(v1beta1.Container)
-			}
-		}
-		result := v1beta1.ContainerManifest{
-			Version:    cObj.Version,
-			ID:         cObj.ID,
-			Volumes:    volumes,
-			Containers: containers,
-		}
-		return &result, nil
-	case *Volume:
-		var src *v1beta1.VolumeSource
-		if cObj.Source != nil {
-			obj, err := externalize(cObj.Source)
-			if err != nil {
-				return nil, err
-			}
-			src = obj.(*v1beta1.VolumeSource)
-		}
-		result := &v1beta1.Volume{
-			Name:   cObj.Name,
-			Source: src,
-		}
-		return &result, nil
-	case *VolumeSource:
-		var hostDir *v1beta1.HostDirectory
-		if cObj.HostDirectory != nil {
-			hostDir = &v1beta1.HostDirectory{
-				Path: cObj.HostDirectory.Path,
-			}
-		}
-		var emptyDir *v1beta1.EmptyDirectory
-		if cObj.EmptyDirectory != nil {
-			emptyDir = &v1beta1.EmptyDirectory{}
-		}
-		result := v1beta1.VolumeSource{
-			HostDirectory:  hostDir,
-			EmptyDirectory: emptyDir,
-		}
-		return &result, nil
-	case *Container:
-		ports := make([]v1beta1.Port, len(cObj.Ports))
-		for ix := range cObj.Ports {
-			p, err := externalize(cObj.Ports[ix])
-			if err != nil {
-				return nil, err
-			}
-			ports[ix] = p.(v1beta1.Port)
-		}
-		env := make([]v1beta1.EnvVar, len(cObj.Env))
-		for ix := range cObj.Env {
-			e, err := externalize(cObj.Env[ix])
-			if err != nil {
-				return nil, err
-			}
-			env[ix] = e.(v1beta1.EnvVar)
-		}
-		mounts := make([]v1beta1.VolumeMount, len(cObj.VolumeMounts))
-		for ix := range cObj.VolumeMounts {
-			v, err := externalize(cObj.VolumeMounts[ix])
-			if err != nil {
-				return nil, err
-			}
-			mounts[ix] = v.(v1beta1.VolumeMount)
-		}
-		var liveness *v1beta1.LivenessProbe
-		if cObj.LivenessProbe != nil {
-			probe, err := externalize(*cObj.LivenessProbe)
-			if err != nil {
-				return nil, err
-			}
-			live := probe.(v1beta1.LivenessProbe)
-			liveness = &live
-		}
-		result := v1beta1.Container{
-			Name:          cObj.Name,
-			Image:         cObj.Image,
-			Command:       cObj.Command,
-			WorkingDir:    cObj.WorkingDir,
-			Ports:         ports,
-			Env:           env,
-			Memory:        cObj.Memory,
-			CPU:           cObj.CPU,
-			VolumeMounts:  mounts,
-			LivenessProbe: liveness,
-		}
-		return &result, nil
-	case *Port:
-		result := v1beta1.Port(*cObj)
-		return &result, nil
-	case *EnvVar:
-		result := v1beta1.EnvVar(*cObj)
-		return &result, nil
-	case *VolumeMount:
-		result := v1beta1.VolumeMount(*cObj)
-		return &result, nil
-	case *LivenessProbe:
-		var http *v1beta1.HTTPGetProbe
-		if cObj.HTTPGet != nil {
-			httpProbe := v1beta1.HTTPGetProbe(*cObj.HTTPGet)
-			http = &httpProbe
-		}
-		result := v1beta1.LivenessProbe{
-			Type:                cObj.Type,
-			HTTPGet:             http,
-			InitialDelaySeconds: cObj.InitialDelaySeconds,
-		}
-		return &result, nil
-	case *ReplicationControllerList:
-		items := make([]v1beta1.ReplicationController, len(cObj.Items))
-		for ix := range cObj.Items {
-			rc, err := externalize(cObj.Items[ix])
-			if err != nil {
-				return nil, err
-			}
-			items[ix] = rc.(v1beta1.ReplicationController)
-		}
-		result := v1beta1.ReplicationControllerList{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			Items:    items,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *ReplicationController:
-		desired, err := externalize(cObj.DesiredState)
-		if err != nil {
-			return nil, err
-		}
-		result := v1beta1.ReplicationController{
-			JSONBase:     v1beta1.JSONBase(cObj.JSONBase),
-			DesiredState: desired.(v1beta1.ReplicationControllerState),
-			Labels:       cObj.Labels,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *ReplicationControllerState:
-		template, err := externalize(cObj.PodTemplate)
-		if err != nil {
-			return nil, err
-		}
-		result := v1beta1.ReplicationControllerState{
-			Replicas:        cObj.Replicas,
-			ReplicaSelector: cObj.ReplicaSelector,
-			PodTemplate:     template.(v1beta1.PodTemplate),
-		}
-		return &result, nil
-	case *PodTemplate:
-		desired, err := externalize(cObj.DesiredState)
-		if err != nil {
-			return nil, err
-		}
-		return &v1beta1.PodTemplate{
-			DesiredState: desired.(v1beta1.PodState),
-			Labels:       cObj.Labels,
-		}, nil
-	case *ServiceList:
-		services := make([]v1beta1.Service, len(cObj.Items))
-		for ix := range cObj.Items {
-			s, err := externalize(cObj.Items[ix])
-			if err != nil {
-				return nil, err
-			}
-			services[ix] = s.(v1beta1.Service)
-		}
-		result := v1beta1.ServiceList{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			Items:    services,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *Service:
-		result := v1beta1.Service{
-			JSONBase:                   v1beta1.JSONBase(cObj.JSONBase),
-			Port:                       cObj.Port,
-			Labels:                     cObj.Labels,
-			Selector:                   cObj.Selector,
-			CreateExternalLoadBalancer: cObj.CreateExternalLoadBalancer,
-			ContainerPort:              cObj.ContainerPort,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *MinionList:
-		minions := make([]v1beta1.Minion, len(cObj.Items))
-		for ix := range cObj.Items {
-			m, err := externalize(cObj.Items[ix])
-			if err != nil {
-				return nil, err
-			}
-			minions[ix] = m.(v1beta1.Minion)
-		}
-		result := v1beta1.MinionList{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			Items:    minions,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *Minion:
-		result := v1beta1.Minion{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			HostIP:   cObj.HostIP,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *Status:
-		result := v1beta1.Status{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			Status:   cObj.Status,
-			Details:  cObj.Details,
-			Code:     cObj.Code,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *ServerOpList:
-		ops := make([]v1beta1.ServerOp, len(cObj.Items))
-		for ix := range cObj.Items {
-			o, err := externalize(cObj.Items[ix])
-			if err != nil {
-				return nil, err
-			}
-			ops[ix] = o.(v1beta1.ServerOp)
-		}
-		result := v1beta1.ServerOpList{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-			Items:    ops,
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	case *ServerOp:
-		result := v1beta1.ServerOp{
-			JSONBase: v1beta1.JSONBase(cObj.JSONBase),
-		}
-		result.APIVersion = "v1beta1"
-		return &result, nil
-	default:
-		fn, ok := externalFuncs[reflect.ValueOf(cObj).Elem().Type().Name()]
-		if !ok {
-			panic(fmt.Sprintf("Unknown object to externalize: %#v %s", cObj, reflect.ValueOf(cObj).Type().Name()))
-		}
-		return fn(cObj)
+	if fn, ok := conversionFuncs[typeTuple{objVersion, "v1beta1", objKind}]; ok {
+		return fn(obj)
 	}
-	panic(fmt.Sprintf("This should never happen %#v", obj))
-	return obj, nil
+	return nil, fmt.Errorf("No conversion handler that knows how to convert a '%v' from '%v' to '%v'",
+		objKind, objVersion, "v1beta1")
 }
