@@ -74,6 +74,7 @@ type delegateHandler struct {
 func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if h.delegate != nil {
 		h.delegate.ServeHTTP(w, req)
+		return
 	}
 	w.WriteHeader(http.StatusNotFound)
 }
