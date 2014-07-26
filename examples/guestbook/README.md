@@ -140,7 +140,7 @@ redisSlaveController   brendanburns/redis-slave   name=redisslave     2
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment.  In particular, the redis slave is started with the following command:
 
 ```shell
-redis-server --slaveof $SERVICE_HOST $REDISMASTER_SERVICE_PORT
+redis-server --slaveof $REDISMASTER_SERVICE_HOST $REDISMASTER_SERVICE_PORT
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
