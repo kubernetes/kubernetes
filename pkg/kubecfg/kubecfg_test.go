@@ -17,7 +17,8 @@ limitations under the License.
 package kubecfg
 
 import (
-	"encoding/json"
+	"bytes"
+	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -256,35 +257,55 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 }
 
 func TestLoadAuthInfo(t *testing.T) {
-	testAuthInfo := &client.AuthInfo{
-		User:     "TestUser",
-		Password: "TestPassword",
+	loadAuthInfoTests := []struct {
+		authData string
+		authInfo *client.AuthInfo
+		r        io.Reader
+	}{
+		{
+			`{"user": "user", "password": "pass"}`,
+			&client.AuthInfo{User: "user", Password: "pass"},
+			nil,
+		},
+		{
+			"", nil, nil,
+		},
+		{
+			"missing",
+			&client.AuthInfo{User: "user", Password: "pass"},
+			bytes.NewBufferString("user\npass"),
+		},
 	}
-	aifile, err := ioutil.TempFile("", "testAuthInfo")
-	if err != nil {
-		t.Error("Could not open temp file")
-	}
-	defer os.Remove(aifile.Name())
-	defer aifile.Close()
-
-	ai, err := LoadAuthInfo(aifile.Name())
-	if err == nil {
-		t.Error("LoadAuthInfo didn't fail on empty file")
-	}
-	data, err := json.Marshal(testAuthInfo)
-	if err != nil {
-		t.Fatal("Unexpected JSON marshal error")
-	}
-	_, err = aifile.Write(data)
-	if err != nil {
-		t.Fatal("Unexpected error in writing test file")
-	}
-	ai, err = LoadAuthInfo(aifile.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if *testAuthInfo != *ai {
-		t.Error("Test data and loaded data are not equal")
+	for _, loadAuthInfoTest := range loadAuthInfoTests {
+		tt := loadAuthInfoTest
+		aifile, err := ioutil.TempFile("", "testAuthInfo")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if tt.authData != "missing" {
+			defer os.Remove(aifile.Name())
+			defer aifile.Close()
+			_, err = aifile.WriteString(tt.authData)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		} else {
+			aifile.Close()
+			os.Remove(aifile.Name())
+		}
+		authInfo, err := LoadAuthInfo(aifile.Name(), tt.r)
+		if len(tt.authData) == 0 && tt.authData != "missing" {
+			if err == nil {
+				t.Error("LoadAuthInfo didn't fail on empty file")
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(authInfo, tt.authInfo) {
+			t.Errorf("Expected %v, got %v", tt.authInfo, authInfo)
+		}
 	}
 }
 

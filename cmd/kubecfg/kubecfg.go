@@ -130,7 +130,7 @@ func main() {
 
 	var auth *kube_client.AuthInfo
 	if secure {
-		auth, err = kubecfg.LoadAuthInfo(*authConfig)
+		auth, err = kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
 		}

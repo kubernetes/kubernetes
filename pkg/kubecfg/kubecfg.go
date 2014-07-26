@@ -19,6 +19,7 @@ package kubecfg
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -32,19 +33,19 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-func promptForString(field string) string {
+func promptForString(field string, r io.Reader) string {
 	fmt.Printf("Please enter %s: ", field)
 	var result string
-	fmt.Scan(&result)
+	fmt.Fscan(r, &result)
 	return result
 }
 
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
-func LoadAuthInfo(path string) (*client.AuthInfo, error) {
+func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
 	var auth client.AuthInfo
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		auth.User = promptForString("Username")
-		auth.Password = promptForString("Password")
+		auth.User = promptForString("Username", r)
+		auth.Password = promptForString("Password", r)
 		data, err := json.Marshal(auth)
 		if err != nil {
 			return &auth, err
