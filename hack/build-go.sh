@@ -31,4 +31,7 @@ if [ $# -gt 0 ]; then
   BINARIES="$@"
 fi
 
-go build $(for b in $BINARIES; do echo "${KUBE_GO_PACKAGE}"/${b}; done)
+for b in ${BINARIES}; do
+  echo "+++ Building ${b}"
+  go build "${KUBE_GO_PACKAGE}/${b}"
+done
