@@ -132,3 +132,23 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 		return []byte{}, fmt.Errorf("impossible IntOrString.Kind")
 	}
 }
+
+// StringDiff diffs a and b and returns a human readable diff.
+func StringDiff(a, b string) string {
+	ba := []byte(a)
+	bb := []byte(b)
+	out := []byte{}
+	i := 0
+	for ; i < len(ba) && i < len(bb); i++ {
+		if ba[i] != bb[i] {
+			break
+		}
+		out = append(out, ba[i])
+	}
+	out = append(out, []byte("\n\nA: ")...)
+	out = append(out, ba[i:]...)
+	out = append(out, []byte("\n\nB: ")...)
+	out = append(out, bb[i:]...)
+	out = append(out, []byte("\n\n")...)
+	return string(out)
+}
