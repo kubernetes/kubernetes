@@ -24,20 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 )
 
-// TODO: remove this
-func expectError(t *testing.T, err error) {
-	if err == nil {
-		t.Errorf("Expected error, Got %v", err)
-	}
-}
-
-// TODO: remove this
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Expected no error, Got %v", err)
-	}
-}
-
 func expectEmptyChannel(t *testing.T, ch <-chan interface{}) {
 	select {
 	case update := <-ch:

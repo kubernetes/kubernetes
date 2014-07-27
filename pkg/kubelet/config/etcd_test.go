@@ -64,7 +64,9 @@ func TestGetEtcdNoData(t *testing.T) {
 	}
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	_, err := c.fetchNextState(0)
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 	expectEmptyChannel(t, ch)
 }
 
@@ -82,7 +84,9 @@ func TestGetEtcd(t *testing.T) {
 	}
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	lastIndex, err := c.fetchNextState(0)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if lastIndex != 2 {
 		t.Errorf("Expected %#v, Got %#v", 2, lastIndex)
 	}
@@ -107,7 +111,9 @@ func TestWatchEtcd(t *testing.T) {
 	}
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	lastIndex, err := c.fetchNextState(1)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	if lastIndex != 3 {
 		t.Errorf("Expected %d, Got %d", 3, lastIndex)
 	}
@@ -127,7 +133,9 @@ func TestGetEtcdNotFound(t *testing.T) {
 	}
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	_, err := c.fetchNextState(0)
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 	expectEmptyChannel(t, ch)
 }
 
@@ -142,6 +150,8 @@ func TestGetEtcdError(t *testing.T) {
 	}
 	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
 	_, err := c.fetchNextState(0)
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 	expectEmptyChannel(t, ch)
 }
