@@ -19,7 +19,7 @@
 source $(dirname $0)/kube-env.sh
 source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
-CLOUDCFG=$(dirname $0)/../output/go/kubecfg
+CLOUDCFG=$(dirname $0)/../output/go/bin/kubecfg
 if [ ! -x $CLOUDCFG ]; then
   echo "Could not find kubecfg binary. Run hack/build-go.sh to build it."
   exit 1

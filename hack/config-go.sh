@@ -61,4 +61,7 @@ KUBE_GO_PACKAGE_DIR="${GOPATH}/src/${KUBE_GO_PACKAGE}"
   rm "${KUBE_GO_PACKAGE_DIR}" >/dev/null 2>&1 || true
   ln -s "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
 )
+
+# unset GOBIN in case it already exsit in the current session
+unset GOBIN
 export GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/third_party"
