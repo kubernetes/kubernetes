@@ -36,6 +36,8 @@ type FakeDockerClient struct {
 }
 
 func (f *FakeDockerClient) clearCalls() {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	f.called = []string{}
 }
 
