@@ -46,14 +46,15 @@ sleep 5
 # Shut down anyway if there's an error.
 set +e
 
-API_PORT=8080
-KUBELET_PORT=10250
+API_PORT=${API_PORT:-8080}
+API_HOST=${API_HOST:-127.0.0.1}
+KUBELET_PORT=${KUBELET_PORT:-10250}
 
 GO_OUT=$(dirname $0)/../output/go
 
 APISERVER_LOG=/tmp/apiserver.log
 ${GO_OUT}/apiserver \
-  --address="127.0.0.1" \
+  --address="${API_HOST}" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
   --machines="127.0.0.1" &> ${APISERVER_LOG} &
@@ -62,7 +63,7 @@ APISERVER_PID=$!
 CTLRMGR_LOG=/tmp/controller-manager.log
 ${GO_OUT}/controller-manager \
   --etcd_servers="http://127.0.0.1:4001" \
-  --master="127.0.0.1:${API_PORT}" &> ${CTLRMGR_LOG} &
+  --master="${API_HOST}:${API_PORT}" &> ${CTLRMGR_LOG} &
 CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
