@@ -19,6 +19,12 @@ if [ "$(which etcd)" == "" ]; then
 	exit 1
 fi
 
+running_etcd=$(ps -ef | grep etcd | grep -c name)
+if [ "$running_etcd" != "0" ]; then
+	echo "etcd appears to already be running on this machine, please kill and restart the test."
+	exit 1
+fi
+
 # Stop right away if the build fails
 set -e
 
