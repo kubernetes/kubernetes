@@ -24,16 +24,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// All volume types are expected to implement this interface
+var ErrUnsupportedVolumeType = errors.New("unsupported volume type")
+
+// Interface is a directory used by pods or hosts. Interface implementations
+// must be idempotent.
 type Interface interface {
-	// Prepares and mounts/unpacks the volume to a directory path.
-	// This procedure must be idempotent.
-	// TODO(jonesdl) SetUp should return an error if it fails.
+	// SetUp prepares and mounts/unpacks the volume to a directory path.
 	SetUp() error
-	// Returns the directory path the volume is mounted to.
+
+	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
-	// Unmounts the volume and removes traces of the SetUp procedure.
-	// This procedure must be idempotent.
+
+	// TearDown unmounts the volume and removes traces of the SetUp procedure.
 	TearDown() error
 }
 
@@ -112,7 +114,7 @@ func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, 
 	} else if source.EmptyDirectory != nil {
 		vol = createEmptyDirectory(volume, podID, rootDir)
 	} else {
-		return nil, errors.New("Unsupported volume type.")
+		return nil, ErrUnsupportedVolumeType
 	}
 	return vol, nil
 }
