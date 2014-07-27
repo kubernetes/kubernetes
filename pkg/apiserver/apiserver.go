@@ -356,7 +356,7 @@ func (server *APIServer) write(statusCode int, object interface{}, w http.Respon
 }
 
 func (server *APIServer) error(err error, w http.ResponseWriter) {
-	w.WriteHeader(500)
+	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "Internal Error: %#v", err)
 }
 
