@@ -83,9 +83,23 @@ func main() {
 
 	var m *master.Master
 	if len(etcdServerList) > 0 {
-		m = master.New(etcdServerList, machineList, podInfoGetter, cloud, *minionRegexp, client, *healthCheckMinions, *minionCacheTTL)
+		m = master.New(&master.Config{
+			Client:             client,
+			Cloud:              cloud,
+			EtcdServers:        etcdServerList,
+			HealthCheckMinions: *healthCheckMinions,
+			Minions:            machineList,
+			MinionCacheTTL:     *minionCacheTTL,
+			MinionRegexp:       *minionRegexp,
+			PodInfoGetter:      podInfoGetter,
+		})
 	} else {
-		m = master.NewMemoryServer(machineList, podInfoGetter, cloud, client)
+		m = master.NewMemoryServer(&master.Config{
+			Client:        client,
+			Cloud:         cloud,
+			Minions:       machineList,
+			PodInfoGetter: podInfoGetter,
+		})
 	}
 
 	glog.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))
