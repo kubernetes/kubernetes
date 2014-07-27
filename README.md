@@ -266,7 +266,7 @@ If this is your first time creating the cluster, the kubelet on each minion sche
 
 #### I changed Kubernetes code, but its not running!
 
-Are you sure there was no build error?  After running $ vagrant provison , scroll up and ensure that each Salt state was completed successfully on each box in the cluster.  Its very likely you see a build error due to an error in your source files!
+Are you sure there was no build error?  After running $ vagrant provision, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.  Its very likely you see a build error due to an error in your source files!
 
 ## Running locally
 In a separate tab of your terminal, run:
