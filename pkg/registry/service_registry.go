@@ -147,8 +147,7 @@ func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
 
 func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(api.Service)
-	errs := api.ValidateService(&srv)
-	if len(errs) > 0 {
+	if errs := api.ValidateService(&srv); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
@@ -186,6 +185,9 @@ func (sr *ServiceRegistryStorage) Update(obj interface{}) (<-chan interface{}, e
 	srv := obj.(api.Service)
 	if srv.ID == "" {
 		return nil, fmt.Errorf("ID should not be empty: %#v", srv)
+	}
+	if errs := api.ValidateService(&srv); len(errs) > 0 {
+		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: check to see if external load balancer status changed

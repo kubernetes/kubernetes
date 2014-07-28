@@ -49,6 +49,60 @@ func TestServiceRegistry(t *testing.T) {
 	}
 }
 
+func TestServiceStorageValidatesCreate(t *testing.T) {
+	memory := MakeMemoryRegistry()
+	storage := MakeServiceRegistryStorage(memory, nil, nil)
+
+	failureCases := map[string]api.Service{
+		"empty ID": api.Service{
+			JSONBase: api.JSONBase{ID: ""},
+			Selector: map[string]string{"bar": "baz"},
+		},
+		"empty selector": api.Service{
+			JSONBase: api.JSONBase{ID: "foo"},
+			Selector: map[string]string{},
+		},
+	}
+	for _, failureCase := range failureCases {
+		c, err := storage.Create(failureCase)
+		if c != nil {
+			t.Errorf("Expected nil channel")
+		}
+		if err == nil {
+			t.Errorf("Expected to get an error")
+		}
+	}
+}
+
+func TestServiceStorageValidatesUpdate(t *testing.T) {
+	memory := MakeMemoryRegistry()
+	memory.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz"},
+	})
+	storage := MakeServiceRegistryStorage(memory, nil, nil)
+
+	failureCases := map[string]api.Service{
+		"empty ID": api.Service{
+			JSONBase: api.JSONBase{ID: ""},
+			Selector: map[string]string{"bar": "baz"},
+		},
+		"empty selector": api.Service{
+			JSONBase: api.JSONBase{ID: "foo"},
+			Selector: map[string]string{},
+		},
+	}
+	for _, failureCase := range failureCases {
+		c, err := storage.Update(failureCase)
+		if c != nil {
+			t.Errorf("Expected nil channel")
+		}
+		if err == nil {
+			t.Errorf("Expected to get an error")
+		}
+	}
+}
+
 func TestServiceRegistryExternalService(t *testing.T) {
 	memory := MakeMemoryRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{}

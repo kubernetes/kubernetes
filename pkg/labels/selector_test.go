@@ -84,6 +84,9 @@ func TestEverything(t *testing.T) {
 	if !Everything().Matches(Set{"x": "y"}) {
 		t.Errorf("Nil selector didn't match")
 	}
+	if !Everything().Empty() {
+		t.Errorf("Everything was not empty")
+	}
 }
 
 func TestSelectorMatches(t *testing.T) {
@@ -131,4 +134,32 @@ func TestSetMatches(t *testing.T) {
 	expectNoMatchDirect(t, Set{"foo": "=blah"}, labelset)
 	expectNoMatchDirect(t, Set{"baz": "=bar"}, labelset)
 	expectNoMatchDirect(t, Set{"foo": "=bar", "foobar": "bar", "baz": "blah"}, labelset)
+}
+
+func TestNilMapIsValid(t *testing.T) {
+	selector := Set(nil).AsSelector()
+	if selector == nil {
+		t.Errorf("Selector for nil set should be Everything")
+	}
+	if !selector.Empty() {
+		t.Errorf("Selector for nil set should be Empty")
+	}
+}
+
+func TestSetIsEmpty(t *testing.T) {
+	if !(Set{}).AsSelector().Empty() {
+		t.Errorf("Empty set should be empty")
+	}
+	if !(andTerm(nil)).Empty() {
+		t.Errorf("Nil andTerm should be empty")
+	}
+	if (&hasTerm{}).Empty() {
+		t.Errorf("hasTerm should not be empty")
+	}
+	if !(andTerm{andTerm{}}).Empty() {
+		t.Errorf("Nested andTerm should be empty")
+	}
+	if (andTerm{&hasTerm{"a", "b"}}).Empty() {
+		t.Errorf("Nested andTerm should not be empty")
+	}
 }
