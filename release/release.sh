@@ -26,8 +26,7 @@ set -e
 SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
 source $SCRIPT_DIR/config.sh
-
-KUBE_REPO_ROOT="$(realpath "$(dirname $0)/..")"
+KUBE_REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
 
 source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
 source $(dirname ${BASH_SOURCE})/../cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG_FILE-"config-default.sh"}
