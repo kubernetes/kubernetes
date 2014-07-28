@@ -40,7 +40,7 @@ function verify-prereqs {
 
 # Instantiate a kubernetes cluster
 function kube-up {
-	vagrant up
+	vagrant up --provider virtualbox
 }
 
 # Delete a kubernetes cluster

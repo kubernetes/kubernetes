@@ -53,7 +53,12 @@ EOF
   # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
   #
   # -M installs the master
-  curl -L http://bootstrap.saltstack.com | sh -s -- -M
+  #curl -L http://bootstrap.saltstack.com | sh -s -- -M
+  yum -y install salt-master salt-minion
+  systemctl enable salt-master.service
+  systemctl enable salt-minion.service
+  systemctl restart salt-master
+  systemctl restart salt-minion
 
   mkdir -p /srv/salt/nginx
   echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
