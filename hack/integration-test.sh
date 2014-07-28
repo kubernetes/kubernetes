@@ -38,6 +38,6 @@ ETCD_PID=$!
 
 sleep 5
 
-$(dirname $0)/../output/go/integration
+$(dirname $0)/../output/go/bin/integration
 
 kill $ETCD_PID
