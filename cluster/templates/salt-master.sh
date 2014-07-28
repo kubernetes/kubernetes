@@ -50,6 +50,8 @@ echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
 #
 # -M installs the master
+set +x
 curl -L http://bootstrap.saltstack.com | sh -s -- -M -X
+set -x
 
 echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
