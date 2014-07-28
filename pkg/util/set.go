@@ -62,7 +62,7 @@ func (s StringSet) HasAll(items ...string) bool {
 
 // IsSuperset returns true iff s1 is a superset of s2.
 func (s1 StringSet) IsSuperset(s2 StringSet) bool {
-	for item, _ := range s2 {
+	for item := range s2 {
 		if !s1.Has(item) {
 			return false
 		}
