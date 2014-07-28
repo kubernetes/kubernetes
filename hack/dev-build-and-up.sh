@@ -19,6 +19,10 @@
 
 # First build a release
 $(dirname $0)/../release/release.sh
+if [ "$?" != "0" ]; then
+      echo "Building the release failed!"
+      exit 1
+fi
 
 # Now bring a new cluster up with that release.
 $(dirname $0)/../cluster/kube-up.sh
