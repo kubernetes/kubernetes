@@ -58,18 +58,4 @@ server {
           # Disable retry
           proxy_next_upstream off;
         }
-        location /etcd/ {
-          auth_basic            "Restricted";
-          auth_basic_user_file  /usr/share/nginx/htpasswd;
-
-          # Proxy settings
-          proxy_pass http://localhost:4001/;
-          proxy_connect_timeout 159s;
-          proxy_send_timeout   600s;
-          proxy_read_timeout   600s;
-          proxy_buffer_size    64k;
-          proxy_buffers     16 32k;
-          proxy_busy_buffers_size 64k;
-          proxy_temp_file_write_size 64k;
-        }
 }
