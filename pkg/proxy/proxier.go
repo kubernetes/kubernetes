@@ -121,7 +121,7 @@ func (proxier Proxier) addServiceCommon(service string, l net.Listener) {
 	go proxier.AcceptHandler(service, l)
 }
 
-// OnUpdate recieves update notices for the updated services and start listening newly added services.
+// OnUpdate receives update notices for the updated services and start listening newly added services.
 // It implements "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config".ServiceConfigHandler.OnUpdate.
 func (proxier Proxier) OnUpdate(services []api.Service) {
 	glog.Infof("Received update notice: %+v", services)
