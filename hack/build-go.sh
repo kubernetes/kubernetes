@@ -25,7 +25,7 @@ source $(dirname $0)/config-go.sh
 
 cd "${KUBE_TARGET}"
 
-BINARIES="cmd/proxy cmd/integration cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg"
+BINARIES="cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg"
 
 if [ $# -gt 0 ]; then
   BINARIES="$@"
