@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -113,11 +114,12 @@ func TestFuzz_structptr(t *testing.T) {
 	checkFailed(t, failed)
 }
 
-// Try fuzzing up to 20 times. Fail if check() never passes.
-func tryFuzz(t *testing.T, obj interface{}, check func() (stage int, passed bool)) {
+// tryFuzz tries fuzzing up to 20 times. Fail if check() never passes, report the highest
+// stage it ever got to.
+func tryFuzz(t *testing.T, f *Fuzzer, obj interface{}, check func() (stage int, passed bool)) {
 	maxStage := 0
 	for i := 0; i < 20; i++ {
-		NewFuzzer().Fuzz(obj)
+		f.Fuzz(obj)
 		stage, passed := check()
 		if stage > maxStage {
 			maxStage = stage
@@ -139,7 +141,7 @@ func TestFuzz_structmap(t *testing.T) {
 		B map[string]string
 	}{}
 
-	tryFuzz(t, obj, func() (int, bool) {
+	tryFuzz(t, NewFuzzer(), obj, func() (int, bool) {
 		if obj.A == nil {
 			return 1, false
 		}
@@ -181,7 +183,7 @@ func TestFuzz_structslice(t *testing.T) {
 		B []string
 	}{}
 
-	tryFuzz(t, obj, func() (int, bool) {
+	tryFuzz(t, NewFuzzer(), obj, func() (int, bool) {
 		if obj.A == nil {
 			return 1, false
 		}
@@ -213,17 +215,40 @@ func TestFuzz_custom(t *testing.T) {
 	obj := &struct {
 		A string
 		B *string
+		C map[string]string
+		D *map[string]string
 	}{}
 
 	testPhrase := "gotcalled"
-	NewFuzzer(func(s *string) { *s = testPhrase }).Fuzz(obj)
-	if obj.A != testPhrase {
-		t.Errorf("A not set")
-	}
-	if obj.B == nil {
-		t.Fatalf("B is nil")
-	}
-	if *obj.B != testPhrase {
-		t.Errorf("B not set")
-	}
+	testMap := map[string]string{"C": "D"}
+	f := NewFuzzer(
+		func(s *string) {
+			*s = testPhrase
+		},
+		func(m map[string]string) {
+			m["C"] = "D"
+		},
+	)
+
+	tryFuzz(t, f, obj, func() (int, bool) {
+		if obj.A != testPhrase {
+			return 1, false
+		}
+		if obj.B == nil {
+			return 2, false
+		}
+		if *obj.B != testPhrase {
+			return 3, false
+		}
+		if e, a := testMap, obj.C; !reflect.DeepEqual(e, a) {
+			return 4, false
+		}
+		if obj.D == nil {
+			return 5, false
+		}
+		if e, a := testMap, *obj.D; !reflect.DeepEqual(e, a) {
+			return 6, false
+		}
+		return 7, true
+	})
 }

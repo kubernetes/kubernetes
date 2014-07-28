@@ -28,12 +28,21 @@ type Fuzzer struct {
 }
 
 // NewFuzzer returns a new Fuzzer with the given custom fuzzing functions.
+//
 // Each entry in fuzzFuncs must be a function with one parameter, which will
 // be the variable we wish that function to fill with random data. For this
-// to be effective, the variable type should be either a pointer, map, slice,
-// etc. These functions are called sensibly, e.g., if you wanted custom string
+// to be effective, the variable type should be either a pointer or a map.
+//
+// These functions are called sensibly, e.g., if you wanted custom string
 // fuzzing, the function `func(s *string)` would get called and passed the
-// address of strings.
+// address of strings. Maps and pointers will be made/new'd for you. For
+// slices, it doesn't make much sense to pre-create them--Fuzzer doesn't
+// know how long you want your slice--so take a pointer to a slice, and
+// make it yourself. (If you don't want your map/pointer type pre-made,
+// take a pointer to it, and make it yourself.)
+//
+// TODO: Take a source of randomness for deterministic, repeatable fuzzing.
+// TODO: Make probability of getting a nil customizable.
 func NewFuzzer(fuzzFuncs ...interface{}) *Fuzzer {
 	f := &Fuzzer{
 		map[reflect.Type]func(reflect.Value){},
@@ -48,7 +57,11 @@ func NewFuzzer(fuzzFuncs ...interface{}) *Fuzzer {
 			panic("Need 1 in and 0 out params!")
 		}
 		argT := t.In(0)
-		// fmt.Printf("Making entry for thing with '%v' type\n", argT)
+		switch argT.Kind() {
+		case reflect.Ptr, reflect.Map:
+		default:
+			panic("fuzzFunc must take pointer or map type")
+		}
 		f.customFuzz[argT] = func(toFuzz reflect.Value) {
 			if toFuzz.Type().AssignableTo(argT) {
 				v.Call([]reflect.Value{toFuzz})
@@ -96,9 +109,6 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 	case reflect.Map:
 		if rand.Intn(5) > 0 {
 			v.Set(reflect.MakeMap(v.Type()))
-			if f.tryCustom(v) {
-				return
-			}
 			n := 1 + rand.Intn(10)
 			for i := 0; i < n; i++ {
 				key := reflect.New(v.Type().Key()).Elem()
@@ -121,9 +131,6 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 		if rand.Intn(5) > 0 {
 			n := 1 + rand.Intn(10)
 			v.Set(reflect.MakeSlice(v.Type(), n, n))
-			if f.tryCustom(v) {
-				return
-			}
 			for i := 0; i < n; i++ {
 				f.doFuzz(v.Index(i))
 			}
@@ -147,15 +154,15 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 	}
 }
 
-// tryCustom searches for custom handlers and Randomizer implementations, and
-// returns true if it finds a match and successfully randomizes v.
+// tryCustom searches for custom handlers, and returns true iff it finds a match
+// and successfully randomizes v.
 func (f Fuzzer) tryCustom(v reflect.Value) bool {
-	// fmt.Printf("Trying thing with '%v' type\n", v.Type())
+	doCustom, ok := f.customFuzz[v.Type()]
+	if !ok {
+		return false
+	}
+
 	switch v.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Slice:
-		if v.IsNil() {
-			return false
-		}
 	case reflect.Ptr:
 		if v.IsNil() {
 			if !v.CanSet() {
@@ -170,12 +177,12 @@ func (f Fuzzer) tryCustom(v reflect.Value) bool {
 			}
 			v.Set(reflect.MakeMap(v.Type()))
 		}
+	default:
+		return false
 	}
-	if f, ok := f.customFuzz[v.Type()]; ok {
-		f(v)
-		return true
-	}
-	return false
+
+	doCustom(v)
+	return true
 }
 
 func fuzzInt(v reflect.Value) {
