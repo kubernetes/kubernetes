@@ -36,11 +36,11 @@ func (s *APIServer) operationPrefix() string {
 
 func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 	opPrefix := s.operationPrefix()
-	if !strings.HasPrefix(req.URL.Path, opPrefix) {
+	if !strings.HasPrefix(req.RequestURI, opPrefix) {
 		notFound(w, req)
 		return
 	}
-	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
+	trimmed := strings.TrimLeft(getRawPath(req)[len(opPrefix):], "/")
 	parts := strings.Split(trimmed, "/")
 	if len(parts) > 1 {
 		notFound(w, req)
@@ -57,7 +57,7 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	op := s.ops.Get(parts[0])
+	op := s.ops.Get(decodeRawPathSegment(parts[0]))
 	if op == nil {
 		notFound(w, req)
 		return

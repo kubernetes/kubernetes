@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -127,7 +128,7 @@ func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
 		notFound(w, req)
 		return
 	}
-	requestParts := strings.Split(req.URL.Path[len(s.prefix):], "/")[1:]
+	requestParts := strings.Split(getRawPath(req)[len(s.prefix):], "/")[1:]
 	if len(requestParts) < 1 {
 		notFound(w, req)
 		return
@@ -174,7 +175,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			}
 			writeJSON(http.StatusOK, list, w)
 		case 2:
-			item, err := storage.Get(parts[1])
+			item, err := storage.Get(decodeRawPathSegment(parts[1]))
 			if IsNotFound(err) {
 				notFound(w, req)
 				return
@@ -224,7 +225,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			notFound(w, req)
 			return
 		}
-		out, err := storage.Delete(parts[1])
+		out, err := storage.Delete(decodeRawPathSegment(parts[1]))
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -309,6 +310,18 @@ func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
 	} else {
 		writeJSON(http.StatusAccepted, obj, w)
 	}
+}
+
+func decodeRawPathSegment(segment string) string {
+	url, err := url.ParseRequestURI("/" + segment)
+	if err != nil {
+		return segment
+	}
+	return url.Path[1:]
+}
+
+func getRawPath(req *http.Request) string {
+	return strings.SplitN(req.RequestURI, "?", 2)[0]
 }
 
 // writeJSON renders an object as JSON to the response
