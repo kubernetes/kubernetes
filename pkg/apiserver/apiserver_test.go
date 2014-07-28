@@ -82,7 +82,7 @@ type SimpleRESTStorage struct {
 	requestedID string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
-	// obj recieves the original input to the update, delete, or create call.
+	// obj receives the original input to the update, delete, or create call.
 	injectedFunction func(obj interface{}) (returnObj interface{}, err error)
 }
 

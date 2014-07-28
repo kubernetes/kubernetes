@@ -366,7 +366,7 @@ func (server *APIServer) readBody(req *http.Request) ([]byte, error) {
 }
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
-// Operation to recieve the result and returning its ID down the writer.
+// Operation to receive the result and returning its ID down the writer.
 func (server *APIServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
 	op := server.ops.NewOperation(out)
 	if sync {
