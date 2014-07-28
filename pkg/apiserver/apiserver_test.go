@@ -44,10 +44,6 @@ func convert(obj interface{}) (interface{}, error) {
 func init() {
 	api.AddKnownTypes("", Simple{}, SimpleList{})
 	api.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
-	api.AddExternalConversion("Simple", convert)
-	api.AddInternalConversion("Simple", convert)
-	api.AddExternalConversion("SimpleList", convert)
-	api.AddInternalConversion("SimpleList", convert)
 }
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
