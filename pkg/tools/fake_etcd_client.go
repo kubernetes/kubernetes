@@ -18,7 +18,6 @@ package tools
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -28,13 +27,19 @@ type EtcdResponseWithError struct {
 	E error
 }
 
+// TestLogger is a type passed to Test functions to support formatted test logs.
+type TestLogger interface {
+	Errorf(format string, args ...interface{})
+	Logf(format string, args ...interface{})
+}
+
 type FakeEtcdClient struct {
 	watchCompletedChan chan bool
 
 	Data        map[string]EtcdResponseWithError
 	DeletedKeys []string
 	Err         error
-	t           *testing.T
+	t           TestLogger
 	Ix          int
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
@@ -45,7 +50,7 @@ type FakeEtcdClient struct {
 	WatchStop        chan<- bool
 }
 
-func MakeFakeEtcdClient(t *testing.T) *FakeEtcdClient {
+func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	ret := &FakeEtcdClient{
 		t:    t,
 		Data: map[string]EtcdResponseWithError{},

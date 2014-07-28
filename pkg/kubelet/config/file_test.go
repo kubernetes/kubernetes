@@ -34,7 +34,9 @@ func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	c := SourceFile{"/some/fake/file", ch}
 	err := c.extractFromPath()
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 }
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
@@ -94,7 +96,9 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	c := SourceFile{file.Name(), ch}
 	err := c.extractFromPath()
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 	expectEmptyChannel(t, ch)
 }
 
@@ -102,15 +106,18 @@ func TestExtractFromValidDataFile(t *testing.T) {
 	manifest := api.ContainerManifest{ID: ""}
 
 	text, err := json.Marshal(manifest)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{}, 1)
 	c := SourceFile{file.Name(), ch}
 	err = c.extractFromPath()
-	expectNoError(t, err)
-
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: simpleSubdomainSafeHash(file.Name()), Manifest: manifest})
 	if !reflect.DeepEqual(expected, update) {
@@ -120,13 +127,17 @@ func TestExtractFromValidDataFile(t *testing.T) {
 
 func TestExtractFromEmptyDir(t *testing.T) {
 	dirName, err := ioutil.TempDir("", "foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
 	c := SourceFile{dirName, ch}
 	err = c.extractFromPath()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET)
@@ -143,15 +154,23 @@ func TestExtractFromDir(t *testing.T) {
 	files := make([]*os.File, len(manifests))
 
 	dirName, err := ioutil.TempDir("", "foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	for i, manifest := range manifests {
 		data, err := json.Marshal(manifest)
-		expectNoError(t, err)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 		file, err := ioutil.TempFile(dirName, manifest.ID)
-		expectNoError(t, err)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 		name := file.Name()
-		expectNoError(t, file.Close())
+		if err := file.Close(); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 		ioutil.WriteFile(name, data, 0755)
 		files[i] = file
 	}
@@ -159,7 +178,9 @@ func TestExtractFromDir(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	c := SourceFile{dirName, ch}
 	err = c.extractFromPath()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(

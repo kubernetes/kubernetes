@@ -42,7 +42,9 @@ func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	c := SourceURL{"http://localhost:49575/_not_found_", ch}
 	err := c.extractFromURL()
-	expectError(t, err)
+	if err == nil {
+		t.Errorf("Expected error")
+	}
 	expectEmptyChannel(t, ch)
 }
 
@@ -63,7 +65,9 @@ func TestExtractFromHttpSingle(t *testing.T) {
 	c := SourceURL{testServer.URL, ch}
 
 	err = c.extractFromURL()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: manifests[0]})
 	if !reflect.DeepEqual(expected, update) {
@@ -90,7 +94,9 @@ func TestExtractFromHttpMultiple(t *testing.T) {
 	c := SourceURL{testServer.URL, ch}
 
 	err = c.extractFromURL()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "1", Manifest: manifests[0]}, kubelet.Pod{Name: "bar", Manifest: manifests[1]})
@@ -115,7 +121,9 @@ func TestExtractFromHttpEmptyArray(t *testing.T) {
 	c := SourceURL{testServer.URL, ch}
 
 	err = c.extractFromURL()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET)
 	if !reflect.DeepEqual(expected, update) {
