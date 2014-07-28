@@ -231,6 +231,15 @@ type minionTransport struct{}
 func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := http.DefaultTransport.RoundTrip(req)
 
+	if err != nil && strings.Contains(err.Error(), "connection refused") {
+		message := fmt.Sprintf("Failed to connect to minion:%s", req.URL.Host)
+		resp = &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       ioutil.NopCloser(strings.NewReader(message)),
+		}
+		return resp, nil
+	}
+
 	if strings.Contains(resp.Header.Get("Content-Type"), "text/plain") {
 		// Do nothing, simply pass through
 		return resp, err
