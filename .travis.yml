@@ -15,6 +15,7 @@ install:
 
 script:
   - ./hack/test-go.sh
+  - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/integration-test.sh
 
 notifications:
