@@ -183,7 +183,7 @@ func buildDockerName(pod *Pod, container *api.Container) string {
 // construct the docker name. If the docker name isn't one we created, we may return empty strings.
 func parseDockerName(name string) (podFullName, containerName string) {
 	// For some reason docker appears to be appending '/' to names.
-	// If its there, strip it.
+	// If it's there, strip it.
 	if name[0] == '/' {
 		name = name[1:]
 	}
