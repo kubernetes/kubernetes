@@ -31,6 +31,18 @@ import (
 	"github.com/golang/glog"
 )
 
+// Config is a structure used to configure a Master.
+type Config struct {
+	Client             *client.Client
+	Cloud              cloudprovider.Interface
+	EtcdServers        []string
+	HealthCheckMinions bool
+	Minions            []string
+	MinionCacheTTL     time.Duration
+	MinionRegexp       string
+	PodInfoGetter      client.PodInfoGetter
+}
+
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	podRegistry        registry.PodRegistry
@@ -42,50 +54,50 @@ type Master struct {
 }
 
 // NewMemoryServer returns a new instance of Master backed with memory (not etcd).
-func NewMemoryServer(minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, client *client.Client) *Master {
+func NewMemoryServer(c *Config) *Master {
 	m := &Master{
 		podRegistry:        registry.MakeMemoryRegistry(),
 		controllerRegistry: registry.MakeMemoryRegistry(),
 		serviceRegistry:    registry.MakeMemoryRegistry(),
-		minionRegistry:     registry.MakeMinionRegistry(minions),
-		client:             client,
+		minionRegistry:     registry.MakeMinionRegistry(c.Minions),
+		client:             c.Client,
 	}
-	m.init(cloud, podInfoGetter)
+	m.init(c.Cloud, c.PodInfoGetter)
 	return m
 }
 
 // New returns a new instance of Master connected to the given etcdServer.
-func New(etcdServers, minions []string, podInfoGetter client.PodInfoGetter, cloud cloudprovider.Interface, minionRegexp string, client *client.Client, healthCheckMinions bool, cacheMinionsTTL time.Duration) *Master {
-	etcdClient := etcd.NewClient(etcdServers)
-	minionRegistry := minionRegistryMaker(minions, cloud, minionRegexp, healthCheckMinions, cacheMinionsTTL)
+func New(c *Config) *Master {
+	etcdClient := etcd.NewClient(c.EtcdServers)
+	minionRegistry := minionRegistryMaker(c)
 	m := &Master{
 		podRegistry:        registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		serviceRegistry:    registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
-		client:             client,
+		client:             c.Client,
 	}
-	m.init(cloud, podInfoGetter)
+	m.init(c.Cloud, c.PodInfoGetter)
 	return m
 }
 
-func minionRegistryMaker(minions []string, cloud cloudprovider.Interface, minionRegexp string, healthCheck bool, cacheTTL time.Duration) registry.MinionRegistry {
+func minionRegistryMaker(c *Config) registry.MinionRegistry {
 	var minionRegistry registry.MinionRegistry
-	if cloud != nil && len(minionRegexp) > 0 {
+	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
 		var err error
-		minionRegistry, err = registry.MakeCloudMinionRegistry(cloud, minionRegexp)
+		minionRegistry, err = registry.MakeCloudMinionRegistry(c.Cloud, c.MinionRegexp)
 		if err != nil {
 			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
 		}
 	}
 	if minionRegistry == nil {
-		minionRegistry = registry.MakeMinionRegistry(minions)
+		minionRegistry = registry.MakeMinionRegistry(c.Minions)
 	}
-	if healthCheck {
+	if c.HealthCheckMinions {
 		minionRegistry = registry.NewHealthyMinionRegistry(minionRegistry, &http.Client{})
 	}
-	if cacheTTL > 0 {
-		cachingMinionRegistry, err := registry.NewCachingMinionRegistry(minionRegistry, cacheTTL)
+	if c.MinionCacheTTL > 0 {
+		cachingMinionRegistry, err := registry.NewCachingMinionRegistry(minionRegistry, c.MinionCacheTTL)
 		if err != nil {
 			glog.Errorf("Failed to initialize caching layer, ignoring cache.")
 		} else {
