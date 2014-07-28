@@ -163,7 +163,7 @@ func prepareEncode(obj interface{}) (*JSONBase, error) {
 	}
 	knownTypes, found := versionMap[jsonBase.APIVersion]
 	if !found {
-		return nil, fmt.Errorf("struct %s, %v won't be unmarshalable because its not in known versions", jsonBase.APIVersion, obj)
+		return nil, fmt.Errorf("struct %s, %v won't be unmarshalable because it's not in known versions", jsonBase.APIVersion, obj)
 	}
 	if _, contains := knownTypes[name]; !contains {
 		return nil, fmt.Errorf("struct %s won't be unmarshalable because it's not in knownTypes", name)

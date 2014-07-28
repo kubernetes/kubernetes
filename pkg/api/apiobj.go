@@ -65,7 +65,7 @@ func (a *APIObject) SetYAML(tag string, value interface{}) bool {
 	// into an API object.
 	b, err := yaml.Marshal(value)
 	if err != nil {
-		panic("yaml can't reverse it's own object")
+		panic("yaml can't reverse its own object")
 	}
 	obj, err := Decode(b)
 	if err != nil {
