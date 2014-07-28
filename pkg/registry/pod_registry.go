@@ -19,6 +19,7 @@ package registry
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -40,6 +41,7 @@ type PodRegistryStorage struct {
 	minionLister  scheduler.MinionLister
 	cloud         cloudprovider.Interface
 	podPollPeriod time.Duration
+	lock          sync.Mutex
 }
 
 // MakePodRegistryStorage makes a RESTStorage object for a pod registry.
@@ -193,6 +195,17 @@ func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
 	return pod, err
 }
 
+func (storage *PodRegistryStorage) scheduleAndCreatePod(pod api.Pod) error {
+	storage.lock.Lock()
+	defer storage.lock.Unlock()
+	// TODO(lavalamp): Separate scheduler more cleanly.
+	machine, err := storage.scheduler.Schedule(pod, storage.minionLister)
+	if err != nil {
+		return err
+	}
+	return storage.registry.CreatePod(machine, pod)
+}
+
 func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	pod := obj.(api.Pod)
 	if len(pod.ID) == 0 {
@@ -201,12 +214,7 @@ func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 	pod.DesiredState.Manifest.ID = pod.ID
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		// TODO(lavalamp): Separate scheduler more cleanly.
-		machine, err := storage.scheduler.Schedule(pod, storage.minionLister)
-		if err != nil {
-			return nil, err
-		}
-		err = storage.registry.CreatePod(machine, pod)
+		err := storage.scheduleAndCreatePod(pod)
 		if err != nil {
 			return nil, err
 		}
