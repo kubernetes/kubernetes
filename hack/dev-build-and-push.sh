@@ -18,6 +18,10 @@
 
 # First build a release
 $(dirname $0)/../release/release.sh
+if [ "$?" != "0" ]; then
+       echo "Building a release failed!"
+       exit 1
+fi
 
 # Now push this out to the cluster
 $(dirname $0)/../cluster/kube-push.sh
