@@ -18,6 +18,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 * [Getting started with a Vagrant cluster on your host](#getting-started-with-a-vagrant-cluster-on-your-host)
 * [Running a local cluster on your host](#running-locally)
 * [Running on CoreOS](#running-on-coreos)
+* [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Discussion and Community Support](#community-discussion-and-support)
 * [Hacking on Kubernetes](#development)
 
