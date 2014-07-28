@@ -65,6 +65,22 @@ type AuthInfo struct {
 	Password string
 }
 
+type FuncPollFactory func() FuncPollPeriod
+type FuncPollPeriod func() time.Duration
+
+func gracefulPollBackoff(start, max time.Duration) FuncPollFactory {
+	return func() FuncPollPeriod {
+		current := start
+		return func() time.Duration {
+			next := current * 2
+			if next > max {
+				next = max
+			}
+			return next
+		}
+	}
+}
+
 // Client is the actual implementation of a Kubernetes client.
 // Host is the http://... base for the URL
 type Client struct {
@@ -72,7 +88,7 @@ type Client struct {
 	auth       *AuthInfo
 	httpClient *http.Client
 	Sync       bool
-	PollPeriod time.Duration
+	PollFunc   FuncPollFactory
 	Timeout    time.Duration
 }
 
@@ -88,9 +104,9 @@ func New(host string, auth *AuthInfo) *Client {
 				},
 			},
 		},
-		Sync:       false,
-		PollPeriod: time.Second * 20,
-		Timeout:    time.Second * 20,
+		Sync:     false,
+		PollFunc: gracefulPollBackoff(time.Second/10, time.Second*20),
+		Timeout:  time.Second * 20,
 	}
 }
 

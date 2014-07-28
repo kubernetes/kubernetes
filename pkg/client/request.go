@@ -52,7 +52,7 @@ func (c *Client) Verb(verb string) *Request {
 		path:       "/api/v1beta1",
 		sync:       c.Sync,
 		timeout:    c.Timeout,
-		pollPeriod: c.PollPeriod,
+		pollPeriod: c.PollFunc(),
 	}
 }
 
@@ -78,7 +78,7 @@ func (c *Client) Delete() *Request {
 
 // PollFor makes a request to do a single poll of the completion of the given operation.
 func (c *Client) PollFor(operationID string) *Request {
-	return c.Get().Path("operations").Path(operationID).Sync(false).PollPeriod(0)
+	return c.Get().Path("operations").Path(operationID).Sync(false).PollPeriod(nil)
 }
 
 // Request allows for building up a request to a server in a chained fashion.
@@ -93,7 +93,7 @@ type Request struct {
 	selector   labels.Selector
 	timeout    time.Duration
 	sync       bool
-	pollPeriod time.Duration
+	pollPeriod FuncPollPeriod
 }
 
 // Path appends an item to the request path. You must call Path at least once.
@@ -185,12 +185,12 @@ func (r *Request) Body(obj interface{}) *Request {
 // If the server sends back a "working" status message, then repeatedly poll the server
 // to see if the operation has completed yet, waiting 'd' between each poll.
 // If you want to handle the "working" status yourself (it'll be delivered as StatusErr),
-// set d to 0 to turn off this behavior.
-func (r *Request) PollPeriod(d time.Duration) *Request {
+// set f to nil to turn off this behavior.
+func (r *Request) PollPeriod(f FuncPollPeriod) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.pollPeriod = d
+	r.pollPeriod = f
 	return r
 }
 
@@ -245,9 +245,10 @@ func (r *Request) Do() Result {
 		respBody, err := r.c.doRequest(req)
 		if err != nil {
 			if statusErr, ok := err.(*StatusErr); ok {
-				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != 0 {
+				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != nil {
+					interval := r.pollPeriod()
 					glog.Infof("Waiting for completion of /operations/%s", statusErr.Status.Details)
-					time.Sleep(r.pollPeriod)
+					time.Sleep(interval)
 					// Make a poll request
 					pollOp := r.c.PollFor(statusErr.Status.Details).PollPeriod(r.pollPeriod)
 					// Could also say "return r.Do()" but this way doesn't grow the callstack.

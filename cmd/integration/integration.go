@@ -91,7 +91,6 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	etcdClient := etcd.NewClient(servers)
 
 	cl := client.New(apiserver.URL, nil)
-	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 
 	// Master
