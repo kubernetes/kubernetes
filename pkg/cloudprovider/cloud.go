@@ -26,6 +26,8 @@ type Interface interface {
 	TCPLoadBalancer() (TCPLoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 	Instances() (Instances, bool)
+	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
+	Zones() (Zones, bool)
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
@@ -47,4 +49,10 @@ type Instances interface {
 	IPAddress(name string) (net.IP, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
+}
+
+// Zones is an abstract, pluggable interface for zone enumeration.
+type Zones interface {
+	// GetZone returns the name of the current failure zone that the program is running in
+	GetZone() (string, error)
 }

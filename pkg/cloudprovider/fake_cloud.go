@@ -28,6 +28,7 @@ type FakeCloud struct {
 	Calls    []string
 	IP       net.IP
 	Machines []string
+	Zone     string
 }
 
 func (f *FakeCloud) addCall(desc string) {
@@ -50,6 +51,10 @@ func (f *FakeCloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
 //
 // Actually it just returns f itself.
 func (f *FakeCloud) Instances() (Instances, bool) {
+	return f, true
+}
+
+func (f *FakeCloud) Zones() (Zones, bool) {
 	return f, true
 }
 
@@ -97,4 +102,9 @@ func (f *FakeCloud) List(filter string) ([]string, error) {
 		}
 	}
 	return result, f.Err
+}
+
+func (f *FakeCloud) GetZone() (string, error) {
+	f.addCall("get-zone")
+	return f.Zone, f.Err
 }

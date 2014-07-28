@@ -54,11 +54,11 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	storage := MakeServiceRegistryStorage(memory, nil, nil)
 
 	failureCases := map[string]api.Service{
-		"empty ID": api.Service{
+		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
 			Selector: map[string]string{"bar": "baz"},
 		},
-		"empty selector": api.Service{
+		"empty selector": {
 			JSONBase: api.JSONBase{ID: "foo"},
 			Selector: map[string]string{},
 		},
@@ -83,11 +83,11 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	storage := MakeServiceRegistryStorage(memory, nil, nil)
 
 	failureCases := map[string]api.Service{
-		"empty ID": api.Service{
+		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
 			Selector: map[string]string{"bar": "baz"},
 		},
-		"empty selector": api.Service{
+		"empty selector": {
 			JSONBase: api.JSONBase{ID: "foo"},
 			Selector: map[string]string{},
 		},
@@ -118,7 +118,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	c, _ := storage.Create(svc)
 	<-c
 
-	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "create" {
+	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService(svc.ID)
@@ -145,7 +145,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 	c, _ := storage.Create(svc)
 	<-c
 
-	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "create" {
+	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "get-zone" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService("foo")
