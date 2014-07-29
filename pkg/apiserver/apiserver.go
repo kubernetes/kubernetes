@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -36,8 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
@@ -86,40 +85,6 @@ type RESTStorage interface {
 type ResourceWatcher interface {
 	WatchAll() (watch.Interface, error)
 	WatchSingle(id string) (watch.Interface, error)
-}
-
-// WorkFunc is used to perform any time consuming work for an api call, after
-// the input has been validated. Pass one of these to MakeAsync to create an
-// appropriate return value for the Update, Delete, and Create methods.
-type WorkFunc func() (result interface{}, err error)
-
-// MakeAsync takes a function and executes it, delivering the result in the way required
-// by RESTStorage's Update, Delete, and Create methods.
-func MakeAsync(fn WorkFunc) <-chan interface{} {
-	channel := make(chan interface{})
-	go func() {
-		defer util.HandleCrash()
-		obj, err := fn()
-		if err != nil {
-			status := http.StatusInternalServerError
-			switch {
-			case tools.IsEtcdConflict(err):
-				status = http.StatusConflict
-			}
-			channel <- &api.Status{
-				Status:  api.StatusFailure,
-				Details: err.Error(),
-				Code:    status,
-			}
-		} else {
-			channel <- obj
-		}
-		// 'close' is used to signal that no further values will
-		// be written to the channel. Not strictly necessary, but
-		// also won't hurt.
-		close(channel)
-	}()
-	return channel
 }
 
 // APIServer is an HTTPHandler that delegates to RESTStorage objects.
