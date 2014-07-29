@@ -80,7 +80,7 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	}
 
 	s.mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
-	s.mux.HandleFunc(s.prefix+"/", s.ServeREST)
+	s.mux.HandleFunc(s.prefix+"/", s.handleREST)
 	healthz.InstallHandler(s.mux)
 
 	s.mux.HandleFunc("/version", s.handleVersionReq)
@@ -124,8 +124,8 @@ func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.mux.ServeHTTP(w, req)
 }
 
-// ServeREST handles requests to all our RESTStorage objects.
-func (s *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
+// handleREST handles requests to all our RESTStorage objects.
+func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
 	if !strings.HasPrefix(req.URL.Path, s.prefix) {
 		notFound(w, req)
 		return
@@ -142,7 +142,7 @@ func (s *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	s.handleREST(requestParts, req, w, storage)
+	s.handleRESTStorage(requestParts, req, w, storage)
 }
 
 // write writes an API object in wire format.
@@ -196,18 +196,7 @@ func (s *APIServer) finishReq(out <-chan interface{}, sync bool, timeout time.Du
 	}
 }
 
-func parseTimeout(str string) time.Duration {
-	if str != "" {
-		timeout, err := time.ParseDuration(str)
-		if err == nil {
-			return timeout
-		}
-		glog.Errorf("Failed to parse: %#v '%s'", err, str)
-	}
-	return 30 * time.Second
-}
-
-// handleREST is the main dispatcher for a storage object.  It switches on the HTTP method, and then
+// handleRESTStorage is the main dispatcher for a storage object.  It switches on the HTTP method, and then
 // on path length, according to the following table:
 //   Method     Path          Action
 //   GET        /foo          list
@@ -220,7 +209,7 @@ func parseTimeout(str string) time.Duration {
 //    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
-func (s *APIServer) handleREST(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {
@@ -414,6 +403,17 @@ func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 	}
 
 	notFound(w, req)
+}
+
+func parseTimeout(str string) time.Duration {
+	if str != "" {
+		timeout, err := time.ParseDuration(str)
+		if err == nil {
+			return timeout
+		}
+		glog.Errorf("Failed to parse: %#v '%s'", err, str)
+	}
+	return 30 * time.Second
 }
 
 func readBody(req *http.Request) ([]byte, error) {
