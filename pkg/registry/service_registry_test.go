@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestServiceRegistry(t *testing.T) {
@@ -213,6 +214,20 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 			t.Errorf("memory.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
 		} else {
 			t.Errorf("memory.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
+		}
+	}
+}
+
+func TestServiceRegistryMakeLinkVariables(t *testing.T) {
+	service := api.Service {
+		JSONBase:	api.JSONBase{ID: "foo"},
+		Selector:	map[string]string{"bar": "baz"},
+		ContainerPort:	util.IntOrString { Kind: util.IntstrString, StrVal: "a-b-c" },
+	}
+	vars := makeLinkVariables(service, "mars")
+	for _, v := range vars {
+		if !util.IsCIdentifier(v.Name) {
+			t.Errorf("Environment variable name is not valid: %v", v.Name)
 		}
 	}
 }
