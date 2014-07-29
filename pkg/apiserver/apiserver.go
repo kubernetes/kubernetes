@@ -59,10 +59,11 @@ func NewNotFoundErr(kind, name string) error {
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIServer struct {
-	prefix  string
-	storage map[string]RESTStorage
-	ops     *Operations
-	mux     *http.ServeMux
+	prefix      string
+	storage     map[string]RESTStorage
+	ops         *Operations
+	mux         *http.ServeMux
+	asyncOpWait time.Duration
 }
 
 // New creates a new APIServer object.
@@ -74,6 +75,8 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 		prefix:  strings.TrimRight(prefix, "/"),
 		ops:     NewOperations(),
 		mux:     http.NewServeMux(),
+		// Delay just long enough to handle most simple write operations
+		asyncOpWait: time.Millisecond * 25,
 	}
 
 	// Primary API methods
@@ -279,6 +282,8 @@ func (s *APIServer) createOperation(out <-chan interface{}, sync bool, timeout t
 	op := s.ops.NewOperation(out)
 	if sync {
 		op.WaitFor(timeout)
+	} else if s.asyncOpWait != 0 {
+		op.WaitFor(s.asyncOpWait)
 	}
 	return op
 }

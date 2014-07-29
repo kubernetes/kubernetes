@@ -400,6 +400,7 @@ func TestCreate(t *testing.T) {
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, "/prefix/version")
+	handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
