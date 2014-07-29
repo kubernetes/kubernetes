@@ -19,12 +19,60 @@ package apiserver
 import (
 	"encoding/json"
 	"net/http"
+	"path"
+	"strings"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
+
+func (s *APIServer) watchPrefix() string {
+	return path.Join(s.prefix, "watch")
+}
+
+// handleWatch processes a watch request
+func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
+	prefix := s.watchPrefix()
+	if !strings.HasPrefix(req.URL.Path, prefix) {
+		notFound(w, req)
+		return
+	}
+	parts := strings.Split(req.URL.Path[len(prefix):], "/")[1:]
+	if req.Method != "GET" || len(parts) < 1 {
+		notFound(w, req)
+	}
+	storage := s.storage[parts[0]]
+	if storage == nil {
+		notFound(w, req)
+	}
+	if watcher, ok := storage.(ResourceWatcher); ok {
+		var watching watch.Interface
+		var err error
+		if id := req.URL.Query().Get("id"); id != "" {
+			watching, err = watcher.WatchSingle(id)
+		} else {
+			watching, err = watcher.WatchAll()
+		}
+		if err != nil {
+			internalError(err, w)
+			return
+		}
+
+		// TODO: This is one watch per connection. We want to multiplex, so that
+		// multiple watches of the same thing don't create two watches downstream.
+		watchServer := &WatchServer{watching}
+		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
+			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
+		} else {
+			watchServer.ServeHTTP(w, req)
+		}
+		return
+	}
+
+	notFound(w, req)
+}
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
