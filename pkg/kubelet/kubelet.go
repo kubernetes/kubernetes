@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -456,7 +458,7 @@ func determineValidVolumes(pods []Pod) map[string]api.Volume {
 	validVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Manifest.Volumes {
-			identifier := pod.Manifest.ID + "/" + volume.Name
+			identifier := path.Join(pod.Manifest.ID, volume.Name)
 			validVolumes[identifier] = volume
 		}
 	}
@@ -467,30 +469,29 @@ func determineValidVolumes(pods []Pod) map[string]api.Volume {
 // active and mounted. Builds their respective Cleaner type in case they need to be deleted.
 func (kl *Kubelet) determineActiveVolumes() map[string]volume.Cleaner {
 	activeVolumes := make(map[string]volume.Cleaner)
-	filepath.Walk(kl.rootDirectory, func(path string, info os.FileInfo, err error) error {
-		// Search for volume dir structure : $ROOTDIR/$PODID/volumes/$VOLUMETYPE/$VOLUMENAME
-		var name string
-		var podID string
-		// Extract volume type for dir structure
-		dir := getDir(path)
-		glog.Infof("Traversing filepath %s", path)
-		// Handle emptyDirectory types.
-		if dir == "empty" {
-			name = info.Name()
-			// Retrieve podID from dir structure
-			podID = getDir(filepath.Dir(filepath.Dir(path)))
-			glog.Infof("Found active volume %s of pod %s", name, podID)
-			identifier := podID + "/" + name
-			activeVolumes[identifier] = &volume.EmptyDirectoryCleaner{path}
+	filepath.Walk(kl.rootDirectory, func(fullPath string, info os.FileInfo, err error) error {
+		// Search for volume dir structure : (ROOT_DIR)/(POD_ID)/volumes/(VOLUME_KIND)/(VOLUME_NAME)
+		podIDRegex := "(?P<podID>[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)"
+		volumeNameRegex := "(?P<volumeName>[a-z0-9]([-a-z0-9]*[a-z0-9])?)"
+		kindRegex := "(?P<volumeKind>(empty))"
+		regex := path.Join(kl.rootDirectory, podIDRegex, "volumes", kindRegex, volumeNameRegex)
+		regexMatcher, _ := regexp.Compile(regex)
+		if regexMatcher.MatchString(fullPath) {
+			// Extract info from the directory structure.
+			result := make(map[string]string)
+			substrings := regexMatcher.FindStringSubmatch(fullPath)
+			for i, label := range regexMatcher.SubexpNames() {
+				result[label] = substrings[i]
+			}
+			kind := result["volumeKind"]
+			name := result["volumeName"]
+			podID := result["podID"]
+			identifier := path.Join(podID, name)
+			activeVolumes[identifier], err = volume.CreateVolumeCleaner(kind, fullPath)
 		}
 		return nil
 	})
 	return activeVolumes
-}
-
-// Utility function to extract only the directory name.
-func getDir(path string) string {
-	return filepath.Base(filepath.Dir(path))
 }
 
 // Compares the map of active volumes to the map of valid volumes.
@@ -503,7 +504,10 @@ func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
 	for name, volume := range activeVolumes {
 		if _, ok := validVolumes[name]; !ok {
 			glog.Infof("Orphaned volume %s found, tearing down volume", name)
-			volume.TearDown()
+			err := volume.TearDown()
+			if err != nil {
+				glog.Errorf("Could not tear down volume %s", name)
+			}
 		}
 	}
 	return nil

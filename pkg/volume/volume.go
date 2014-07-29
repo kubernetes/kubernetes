@@ -44,7 +44,6 @@ type Builder interface {
 
 // The Cleaner interface provides the method to cleanup/unmount the volumes.
 type Cleaner interface {
-	Interface
 	// TearDown unmounts the volume and removes traces of the SetUp procedure.
 	TearDown() error
 }
@@ -98,11 +97,7 @@ type EmptyDirectoryCleaner struct {
 
 // Simply delete everything in the directory.
 func (emptyDir *EmptyDirectoryCleaner) TearDown() error {
-	return os.RemoveAll(emptyDir.GetPath())
-}
-
-func (emptyDir *EmptyDirectoryCleaner) GetPath() string {
-	return emptyDir.Path
+	return os.RemoveAll(emptyDir.Path)
 }
 
 // Interprets API volume as a HostDirectory
@@ -113,6 +108,10 @@ func CreateHostDirectoryBuilder(volume *api.Volume) *HostDirectory {
 // Interprets API volume as an EmptyDirectoryBuilder
 func CreateEmptyDirectoryBuilder(volume *api.Volume, podID string, rootDir string) *EmptyDirectoryBuilder {
 	return &EmptyDirectoryBuilder{volume.Name, podID, rootDir}
+}
+
+func CreateEmptyDirectoryCleaner(path string) *EmptyDirectoryCleaner {
+	return &EmptyDirectoryCleaner{path}
 }
 
 // CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
@@ -135,4 +134,13 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 		return nil, ErrUnsupportedVolumeType
 	}
 	return vol, nil
+}
+
+func CreateVolumeCleaner(kind string, path string) (Cleaner, error) {
+	switch kind {
+	case "empty":
+		return CreateEmptyDirectoryCleaner(path), nil
+	default:
+		return nil, ErrUnsupportedVolumeType
+	}
 }

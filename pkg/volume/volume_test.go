@@ -108,3 +108,27 @@ func TestCreateVolumeBuilders(t *testing.T) {
 		}
 	}
 }
+func TestEmptySetUpAndTearDown(t *testing.T) {
+	volumes := []api.Volume{
+		{
+			Name: "empty-dir",
+			Source: &api.VolumeSource{
+				EmptyDirectory: &api.EmptyDirectory{},
+			},
+		},
+	}
+	expectedPath := "/tmp/kubelet/fakeID/volumes/empty/empty-dir"
+	for _, volume := range volumes {
+		volumeBuilder, _ := CreateVolumeBuilder(&volume, "fakeID", "/tmp/kubelet")
+		volumeBuilder.SetUp()
+		if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
+			t.Errorf("Mount directory %v does not exist after SetUp", expectedPath)
+		}
+		volumeCleaner, _ := CreateVolumeCleaner("empty", expectedPath)
+		volumeCleaner.TearDown()
+		if _, err := os.Stat(expectedPath); !os.IsNotExist(err) {
+			t.Errorf("Mount directory %v still exists after TearDown", expectedPath)
+		}
+	}
+	os.RemoveAll("/tmp/kubelet")
+}
