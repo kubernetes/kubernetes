@@ -61,32 +61,6 @@ func NewNotFoundErr(kind, name string) error {
 	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
 }
 
-// RESTStorage is a generic interface for RESTful storage services
-// Resources which are exported to the RESTful API of apiserver need to implement this interface.
-type RESTStorage interface {
-	// List selects resources in the storage which match to the selector.
-	List(labels.Selector) (interface{}, error)
-
-	// Get finds a resource in the storage by id and returns it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
-	Get(id string) (interface{}, error)
-
-	// Delete finds a resource in the storage and deletes it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
-	Delete(id string) (<-chan interface{}, error)
-
-	Extract(body []byte) (interface{}, error)
-	Create(interface{}) (<-chan interface{}, error)
-	Update(interface{}) (<-chan interface{}, error)
-}
-
-// ResourceWatcher should be implemented by all RESTStorage objects that
-// want to offer the ability to watch for changes through the watch api.
-type ResourceWatcher interface {
-	WatchAll() (watch.Interface, error)
-	WatchSingle(id string) (watch.Interface, error)
-}
-
 // APIServer is an HTTPHandler that delegates to RESTStorage objects.
 // It handles URLs of the form:
 // ${prefix}/${storage_key}[/${object_name}]
