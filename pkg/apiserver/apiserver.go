@@ -115,8 +115,8 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	s.mux.HandleFunc(s.prefix+"/", s.ServeREST)
 	healthz.InstallHandler(s.mux)
 
-	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/version", s.handleVersionReq)
+	s.mux.HandleFunc("/", handleIndex)
 
 	// Handle both operations and operations/* with the same handler
 	s.mux.HandleFunc(s.operationPrefix(), s.handleOperationRequest)
@@ -137,17 +137,6 @@ func (server *APIServer) watchPrefix() string {
 	return path.Join(server.prefix, "watch")
 }
 
-func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/" && req.URL.Path != "/index.html" {
-		server.notFound(w, req)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	// TODO: serve this out of a file?
-	data := "<html><body>Welcome to Kubernetes</body></html>"
-	fmt.Fprint(w, data)
-}
-
 // handleVersionReq writes the server's version information.
 func (server *APIServer) handleVersionReq(w http.ResponseWriter, req *http.Request) {
 	server.writeRawJSON(http.StatusOK, version.Get(), w)
@@ -156,7 +145,7 @@ func (server *APIServer) handleVersionReq(w http.ResponseWriter, req *http.Reque
 func (server *APIServer) handleMinionReq(w http.ResponseWriter, req *http.Request) {
 	minionPrefix := "/proxy/minion/"
 	if !strings.HasPrefix(req.URL.Path, minionPrefix) {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 
@@ -301,27 +290,22 @@ func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // ServeREST handles requests to all our RESTStorage objects.
 func (server *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
 	if !strings.HasPrefix(req.URL.Path, server.prefix) {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 	requestParts := strings.Split(req.URL.Path[len(server.prefix):], "/")[1:]
 	if len(requestParts) < 1 {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 	storage := server.storage[requestParts[0]]
 	if storage == nil {
 		httplog.LogOf(w).Addf("'%v' has no storage object", requestParts[0])
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 
 	server.handleREST(requestParts, req, w, storage)
-}
-
-func (server *APIServer) notFound(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, "Not Found: %#v", req)
 }
 
 // write writes an API object in wire format.
@@ -430,7 +414,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		case 2:
 			item, err := storage.Get(parts[1])
 			if IsNotFound(err) {
-				server.notFound(w, req)
+				notFound(w, req)
 				return
 			}
 			if err != nil {
@@ -439,11 +423,11 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			}
 			server.write(http.StatusOK, item, w)
 		default:
-			server.notFound(w, req)
+			notFound(w, req)
 		}
 	case "POST":
 		if len(parts) != 1 {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		body, err := server.readBody(req)
@@ -453,7 +437,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		}
 		obj, err := storage.Extract(body)
 		if IsNotFound(err) {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		if err != nil {
@@ -462,7 +446,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		}
 		out, err := storage.Create(obj)
 		if IsNotFound(err) {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		if err != nil {
@@ -472,12 +456,12 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		server.finishReq(out, sync, timeout, w)
 	case "DELETE":
 		if len(parts) != 2 {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		out, err := storage.Delete(parts[1])
 		if IsNotFound(err) {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		if err != nil {
@@ -487,7 +471,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		server.finishReq(out, sync, timeout, w)
 	case "PUT":
 		if len(parts) != 2 {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		body, err := server.readBody(req)
@@ -497,7 +481,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		}
 		obj, err := storage.Extract(body)
 		if IsNotFound(err) {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		if err != nil {
@@ -506,7 +490,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		}
 		out, err := storage.Update(obj)
 		if IsNotFound(err) {
-			server.notFound(w, req)
+			notFound(w, req)
 			return
 		}
 		if err != nil {
@@ -515,24 +499,24 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		}
 		server.finishReq(out, sync, timeout, w)
 	default:
-		server.notFound(w, req)
+		notFound(w, req)
 	}
 }
 
 func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Request) {
 	opPrefix := server.operationPrefix()
 	if !strings.HasPrefix(req.URL.Path, opPrefix) {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
 	parts := strings.Split(trimmed, "/")
 	if len(parts) > 1 {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 	if req.Method != "GET" {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 	if len(parts) == 0 {
@@ -544,7 +528,7 @@ func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http
 
 	op := server.ops.Get(parts[0])
 	if op == nil {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 
@@ -559,16 +543,16 @@ func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http
 func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 	prefix := server.watchPrefix()
 	if !strings.HasPrefix(req.URL.Path, prefix) {
-		server.notFound(w, req)
+		notFound(w, req)
 		return
 	}
 	parts := strings.Split(req.URL.Path[len(prefix):], "/")[1:]
 	if req.Method != "GET" || len(parts) < 1 {
-		server.notFound(w, req)
+		notFound(w, req)
 	}
 	storage := server.storage[parts[0]]
 	if storage == nil {
-		server.notFound(w, req)
+		notFound(w, req)
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
 		var watching watch.Interface
@@ -594,5 +578,5 @@ func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	server.notFound(w, req)
+	notFound(w, req)
 }
