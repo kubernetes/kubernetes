@@ -65,7 +65,12 @@ func TestCreatePodRegistryError(t *testing.T) {
 		scheduler: &MockScheduler{},
 		registry:  mockRegistry,
 	}
-	pod := api.Pod{}
+	desiredState := api.PodState{
+		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
+		},
+	}
+	pod := api.Pod{DesiredState: desiredState}
 	ch, err := storage.Create(pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
@@ -91,7 +96,12 @@ func TestCreatePodSchedulerError(t *testing.T) {
 	storage := PodRegistryStorage{
 		scheduler: &mockScheduler,
 	}
-	pod := api.Pod{}
+	desiredState := api.PodState{
+		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
+		},
+	}
+	pod := api.Pod{DesiredState: desiredState}
 	ch, err := storage.Create(pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
@@ -118,7 +128,12 @@ func TestCreatePodSetsIds(t *testing.T) {
 		scheduler: &MockScheduler{machine: "test"},
 		registry:  mockRegistry,
 	}
-	pod := api.Pod{}
+	desiredState := api.PodState{
+		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
+		},
+	}
+	pod := api.Pod{DesiredState: desiredState}
 	ch, err := storage.Create(pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
@@ -254,6 +269,7 @@ func TestGetPodCloud(t *testing.T) {
 func TestMakePodStatus(t *testing.T) {
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
 			Containers: []api.Container{
 				{Name: "containerA"},
 				{Name: "containerB"},
@@ -337,6 +353,43 @@ func TestMakePodStatus(t *testing.T) {
 	}
 }
 
+
+func TestPodStorageValidatesCreate(t *testing.T) {
+	mockRegistry := &MockPodStorageRegistry{
+		MockPodRegistry: MockPodRegistry{err: fmt.Errorf("test error")},
+	}
+	storage := PodRegistryStorage{
+		scheduler: &MockScheduler{machine: "test"},
+		registry:  mockRegistry,
+	}
+	pod := api.Pod{}
+	c, err := storage.Create(pod)
+	if c != nil {
+		t.Errorf("Expected nil channel")
+	}
+	if err == nil {
+		t.Errorf("Expected to get an error")
+	}
+}
+
+func TestPodStorageValidatesUpdate(t *testing.T) {
+	mockRegistry := &MockPodStorageRegistry{
+		MockPodRegistry: MockPodRegistry{err: fmt.Errorf("test error")},
+	}
+	storage := PodRegistryStorage{
+		scheduler: &MockScheduler{machine: "test"},
+		registry:  mockRegistry,
+	}
+	pod := api.Pod{}
+	c, err := storage.Update(pod)
+	if c != nil {
+		t.Errorf("Expected nil channel")
+	}
+	if err == nil {
+		t.Errorf("Expected to get an error")
+	}
+}
+
 func TestCreatePod(t *testing.T) {
 	mockRegistry := MockPodRegistry{
 		pod: &api.Pod{
@@ -352,8 +405,14 @@ func TestCreatePod(t *testing.T) {
 		scheduler:     scheduler.MakeRoundRobinScheduler(),
 		minionLister:  MakeMinionRegistry([]string{"machine"}),
 	}
+	desiredState := api.PodState{
+		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
+		},
+	}
 	pod := api.Pod{
 		JSONBase: api.JSONBase{ID: "foo"},
+		DesiredState: desiredState,
 	}
 	channel, err := storage.Create(pod)
 	expectNoError(t, err)

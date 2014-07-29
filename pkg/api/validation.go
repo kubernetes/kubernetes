@@ -280,6 +280,16 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	return []error(allErrs)
 }
 
+// Pod tests if required fields in the pod are set.
+func ValidatePod(pod *Pod) []error {
+	allErrs := errorList{}
+	if pod.ID == "" {
+		allErrs.Append(makeInvalidError("Pod.ID", pod.ID))
+	}
+	allErrs.Append(ValidateManifest(&pod.DesiredState.Manifest)...)
+	return []error(allErrs)
+}
+
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *Service) []error {
 	allErrs := errorList{}
