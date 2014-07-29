@@ -97,14 +97,6 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	return s
 }
 
-func (server *APIServer) operationPrefix() string {
-	return path.Join(server.prefix, "operations")
-}
-
-func (server *APIServer) watchPrefix() string {
-	return path.Join(server.prefix, "watch")
-}
-
 // handleVersionReq writes the server's version information.
 func (server *APIServer) handleVersionReq(w http.ResponseWriter, req *http.Request) {
 	server.writeRawJSON(http.StatusOK, version.Get(), w)
@@ -157,7 +149,7 @@ func (s *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
 func (s *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := api.Encode(object)
 	if err != nil {
-		s.error(err, w)
+		internalError(err, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -338,6 +330,10 @@ func (s *APIServer) handleREST(parts []string, req *http.Request, w http.Respons
 	}
 }
 
+func (s *APIServer) operationPrefix() string {
+	return path.Join(s.prefix, "operations")
+}
+
 func (s *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Request) {
 	opPrefix := s.operationPrefix()
 	if !strings.HasPrefix(req.URL.Path, opPrefix) {
@@ -373,6 +369,10 @@ func (s *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Requ
 	} else {
 		s.write(http.StatusAccepted, obj, w)
 	}
+}
+
+func (s *APIServer) watchPrefix() string {
+	return path.Join(s.prefix, "watch")
 }
 
 func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
