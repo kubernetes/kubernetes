@@ -213,6 +213,10 @@ func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 	}
 	pod.DesiredState.Manifest.ID = pod.ID
 
+	if errs := api.ValidatePod(&pod); len(errs) > 0 {
+		return nil, fmt.Errorf("Validation errors: %v", errs)
+	}
+
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		err := storage.scheduleAndCreatePod(pod)
 		if err != nil {
@@ -224,10 +228,9 @@ func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, 
 
 func (storage *PodRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	pod := obj.(api.Pod)
-	if len(pod.ID) == 0 {
-		return nil, fmt.Errorf("ID should not be empty: %#v", pod)
+	if errs := api.ValidatePod(&pod); len(errs) > 0 {
+		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
-
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		err := storage.registry.UpdatePod(pod)
 		if err != nil {
