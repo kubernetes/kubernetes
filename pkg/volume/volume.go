@@ -31,7 +31,6 @@ var ErrUnsupportedVolumeType = errors.New("unsupported volume type")
 type Interface interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
-
 }
 
 // The Builder interface provides the method to set up/mount the volume.
@@ -39,7 +38,6 @@ type Builder interface {
 	Interface
 	// SetUp prepares and mounts/unpacks the volume to a directory path.
 	SetUp() error
-
 }
 
 // The Cleaner interface provides the method to cleanup/unmount the volumes.
@@ -90,7 +88,7 @@ func (emptyDir *EmptyDirectoryBuilder) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
-// EmptyDirectoryCleaners only need to know what path the are cleaning
+// EmptyDirectoryCleaners only need to know what path they are cleaning
 type EmptyDirectoryCleaner struct {
 	Path string
 }
@@ -108,10 +106,6 @@ func CreateHostDirectoryBuilder(volume *api.Volume) *HostDirectory {
 // Interprets API volume as an EmptyDirectoryBuilder
 func CreateEmptyDirectoryBuilder(volume *api.Volume, podID string, rootDir string) *EmptyDirectoryBuilder {
 	return &EmptyDirectoryBuilder{volume.Name, podID, rootDir}
-}
-
-func CreateEmptyDirectoryCleaner(path string) *EmptyDirectoryCleaner {
-	return &EmptyDirectoryCleaner{path}
 }
 
 // CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
@@ -136,10 +130,11 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 	return vol, nil
 }
 
+// CreateVolumeCleaner returns a Cleaner capable of tearing down a volume.
 func CreateVolumeCleaner(kind string, path string) (Cleaner, error) {
 	switch kind {
 	case "empty":
-		return CreateEmptyDirectoryCleaner(path), nil
+		return &EmptyDirectoryCleaner{path}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}

@@ -93,7 +93,7 @@ kubelet:
     - system: True
     - gid_from_name: True
     - shell: /sbin/nologin
-    - home: /var/lib/kubelet
+    - home: /var/kubelet
     - groups:
       - docker
     - require:

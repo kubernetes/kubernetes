@@ -46,7 +46,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			},
 			"/dir/path",
 			"my-id",
-			"host",
+			"",
 		},
 		{
 			api.Volume{
@@ -59,7 +59,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			"my-id",
 			"empty",
 		},
-		{api.Volume{}, "", ""},
+		{api.Volume{}, "", "", ""},
 		{
 			api.Volume{
 				Name:   "empty-dir",
@@ -72,9 +72,9 @@ func TestCreateVolumeBuilders(t *testing.T) {
 	}
 	for _, createVolumesTest := range createVolumesTests {
 		tt := createVolumesTest
-		v, err := CreateVolumeBuilder(&tt.volume, tt.podID, tempDir)
+		vb, err := CreateVolumeBuilder(&tt.volume, tt.podID, tempDir)
 		if tt.volume.Source == nil {
-			if v != nil {
+			if vb != nil {
 				t.Errorf("Expected volume to be nil")
 			}
 			continue
@@ -88,47 +88,24 @@ func TestCreateVolumeBuilders(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		err = v.SetUp()
+		err = vb.SetUp()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		path := v.GetPath()
+		path := vb.GetPath()
 		if path != tt.path {
 			t.Errorf("Unexpected bind path. Expected %v, got %v", tt.path, path)
 		}
-		v, err = CreateVolumeCleaner(tt.kind)
+		vc, err := CreateVolumeCleaner(tt.kind, vb.GetPath())
 		if tt.kind == "" {
 			if err != ErrUnsupportedVolumeType {
 				t.Errorf("Unexpected error: %v", err)
 			}
+			continue
 		}
-		err = v.TearDown()
+		err = vc.TearDown()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	}
-}
-func TestEmptySetUpAndTearDown(t *testing.T) {
-	volumes := []api.Volume{
-		{
-			Name: "empty-dir",
-			Source: &api.VolumeSource{
-				EmptyDirectory: &api.EmptyDirectory{},
-			},
-		},
-	}
-	expectedPath := "/tmp/kubelet/fakeID/volumes/empty/empty-dir"
-	for _, volume := range volumes {
-		volumeBuilder, _ := CreateVolumeBuilder(&volume, "fakeID", "/tmp/kubelet")
-		volumeBuilder.SetUp()
-		if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
-			t.Errorf("Mount directory %v does not exist after SetUp", expectedPath)
-		}
-		volumeCleaner, _ := CreateVolumeCleaner("empty", expectedPath)
-		volumeCleaner.TearDown()
-		if _, err := os.Stat(expectedPath); !os.IsNotExist(err) {
-			t.Errorf("Mount directory %v still exists after TearDown", expectedPath)
-		}
-	}
-	os.RemoveAll("/tmp/kubelet")
 }

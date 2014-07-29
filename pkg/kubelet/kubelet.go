@@ -487,7 +487,13 @@ func (kl *Kubelet) determineActiveVolumes() map[string]volume.Cleaner {
 			name := result["volumeName"]
 			podID := result["podID"]
 			identifier := path.Join(podID, name)
-			activeVolumes[identifier], err = volume.CreateVolumeCleaner(kind, fullPath)
+			cleaner, err := volume.CreateVolumeCleaner(kind, fullPath)
+			if err != nil {
+				glog.Errorf("Could not create cleaner for volume %v.", identifier)
+			}
+			if cleaner != nil {
+				activeVolumes[identifier] = cleaner
+			}
 		}
 		return nil
 	})
