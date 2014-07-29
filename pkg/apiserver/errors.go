@@ -21,6 +21,7 @@ import (
 	"net/http"
 )
 
+// internalError renders a generic error to the response
 func internalError(err error, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "Internal Error: %#v", err)
