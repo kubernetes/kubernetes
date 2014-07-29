@@ -52,12 +52,19 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 
 GO_OUT=$(dirname $0)/../output/go/bin
 
+# If you want to use Kubernetes services, you'll need to use an IP that
+# containers can route to, as Kubernetes creates environment
+# variables using the minion's name so containers can access services.
+#
+# This will default to 127.0.0.1 if not otherwise specified in the environment.
+MINION_IP=${MINION_IP:-127.0.0.1}
+
 APISERVER_LOG=/tmp/apiserver.log
 ${GO_OUT}/apiserver \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
-  --machines="127.0.0.1" &> ${APISERVER_LOG} &
+  --machines="${MINION_IP}" &> ${APISERVER_LOG} &
 APISERVER_PID=$!
 
 CTLRMGR_LOG=/tmp/controller-manager.log
@@ -74,8 +81,8 @@ BLDMGR_PID=$!
 KUBELET_LOG=/tmp/kubelet.log
 ${GO_OUT}/kubelet \
   --etcd_servers="http://127.0.0.1:4001" \
-  --hostname_override="127.0.0.1" \
-  --address="127.0.0.1" \
+  --hostname_override="${MINION_IP}" \
+  --address="${MINION_IP}" \
   --port="$KUBELET_PORT" &> ${KUBELET_LOG} &
 KUBELET_PID=$!
 
@@ -105,7 +112,7 @@ cleanup()
     rm -rf ${ETCD_DIR}
     exit 0
 }
- 
+
 trap cleanup EXIT
 
 while true; do read x; done
