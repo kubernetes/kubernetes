@@ -286,7 +286,9 @@ If you are running both a remote kubernetes cluster and the local cluster, you c
 The folks at [CoreOS](http://coreos.com) have [instructions for running Kubernetes on CoreOS](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-1/)
 
 ## Where to go next?
-[Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
+[Detailed example application on GCE](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
+
+[Detailed example application on Local Cluster](blob/master/examples/guestbook/README_LOCAL.md)
 
 [Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
 

@@ -17,5 +17,5 @@
 # Set provider independent environment variables
 
 # Set provider of Kubernetes cluster to know where to load provider-specific scripts, values: gce, vagrant, etc.
-KUBERNETES_PROVIDER="gce"
-#KUBERNETES_PROVIDER="vagrant"
+
+KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-"gce"}
