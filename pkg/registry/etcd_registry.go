@@ -274,6 +274,10 @@ func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	return &svc, nil
 }
 
+func makeServiceEndpointsKey(name string) string {
+	return "/registry/services/endpoints/" + name
+}
+
 // DeleteService deletes a Service specified by its name.
 func (registry *EtcdRegistry) DeleteService(name string) error {
 	key := makeServiceKey(name)
@@ -284,9 +288,12 @@ func (registry *EtcdRegistry) DeleteService(name string) error {
 	if err != nil {
 		return err
 	}
-	key = "/registry/services/endpoints/" + name
+	key = makeServiceEndpointsKey(name)
 	_, err = registry.etcdClient.Delete(key, true)
-	return err
+	if !tools.IsEtcdNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 // UpdateService replaces an existing Service.
