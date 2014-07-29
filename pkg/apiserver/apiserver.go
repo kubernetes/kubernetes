@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -631,90 +630,4 @@ func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 	}
 
 	server.notFound(w, req)
-}
-
-// WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
-type WatchServer struct {
-	watching watch.Interface
-}
-
-// HandleWS implements a websocket handler.
-func (w *WatchServer) HandleWS(ws *websocket.Conn) {
-	done := make(chan struct{})
-	go func() {
-		var unused interface{}
-		// Expect this to block until the connection is closed. Client should not
-		// send anything.
-		websocket.JSON.Receive(ws, &unused)
-		close(done)
-	}()
-	for {
-		select {
-		case <-done:
-			w.watching.Stop()
-			return
-		case event, ok := <-w.watching.ResultChan():
-			if !ok {
-				// End of results.
-				return
-			}
-			err := websocket.JSON.Send(ws, &api.WatchEvent{
-				Type:   event.Type,
-				Object: api.APIObject{event.Object},
-			})
-			if err != nil {
-				// Client disconnect.
-				w.watching.Stop()
-				return
-			}
-		}
-	}
-}
-
-// ServeHTTP serves a series of JSON encoded events via straight HTTP with
-// Transfer-Encoding: chunked.
-func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	loggedW := httplog.LogOf(w)
-	w = httplog.Unlogged(w)
-
-	cn, ok := w.(http.CloseNotifier)
-	if !ok {
-		loggedW.Addf("unable to get CloseNotifier")
-		http.NotFound(loggedW, req)
-		return
-	}
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		loggedW.Addf("unable to get Flusher")
-		http.NotFound(loggedW, req)
-		return
-	}
-
-	loggedW.Header().Set("Transfer-Encoding", "chunked")
-	loggedW.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	encoder := json.NewEncoder(w)
-	for {
-		select {
-		case <-cn.CloseNotify():
-			self.watching.Stop()
-			return
-		case event, ok := <-self.watching.ResultChan():
-			if !ok {
-				// End of results.
-				return
-			}
-			err := encoder.Encode(&api.WatchEvent{
-				Type:   event.Type,
-				Object: api.APIObject{event.Object},
-			})
-			if err != nil {
-				// Client disconnect.
-				self.watching.Stop()
-				return
-			}
-			flusher.Flush()
-		}
-	}
 }
