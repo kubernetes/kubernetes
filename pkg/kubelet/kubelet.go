@@ -242,6 +242,10 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 }
 
 func milliCPUToShares(milliCPU int) int {
+	if milliCPU == 0 {
+		// zero milliCPU means unset. Use kernel default.
+		return 0
+	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
 	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
 	if shares < minShares {
