@@ -26,11 +26,17 @@ set -e
 source $(dirname $0)/kube-env.sh
 source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
-echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
+detect-minions > /dev/null
 
-verify-prereqs
-kube-up
+MINIONS_FILE=/tmp/minions
+$(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
-source $(dirname $0)/validate-cluster.sh
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE})
+    if [ "$count" == "0" ]; then
+	echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
+        exit 1
+    fi
+done
+echo "Cluster validation succeeded"
 
-echo "Done"

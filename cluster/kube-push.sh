@@ -30,4 +30,6 @@ echo "Updating cluster using provider: $KUBERNETES_PROVIDER"
 verify-prereqs
 kube-push
 
+source $(dirname $0)/validate-cluster.sh
+
 echo "Done"
