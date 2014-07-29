@@ -21,6 +21,11 @@ import (
 	"net/http"
 )
 
+func internalError(err error, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, "Internal Error: %#v", err)
+}
+
 // notFound renders a simple not found error
 func notFound(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
