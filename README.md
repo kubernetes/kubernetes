@@ -288,7 +288,7 @@ The folks at [CoreOS](http://coreos.com) have [instructions for running Kubernet
 ## Where to go next?
 [Detailed example application on GCE](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
 
-[Detailed example application on Local Cluster](blob/master/examples/guestbook/README_LOCAL.md)
+[Detailed example application on Local Cluster](examples/guestbook/README_LOCAL.md)
 
 [Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
 
