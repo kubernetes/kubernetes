@@ -111,7 +111,7 @@ func (server *APIServer) handleVersionReq(w http.ResponseWriter, req *http.Reque
 }
 
 // HTTP Handler interface
-func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if x := recover(); x != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -129,35 +129,35 @@ func (server *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	).Log()
 
 	// Dispatch via our mux.
-	server.mux.ServeHTTP(w, req)
+	s.mux.ServeHTTP(w, req)
 }
 
 // ServeREST handles requests to all our RESTStorage objects.
-func (server *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
-	if !strings.HasPrefix(req.URL.Path, server.prefix) {
+func (s *APIServer) ServeREST(w http.ResponseWriter, req *http.Request) {
+	if !strings.HasPrefix(req.URL.Path, s.prefix) {
 		notFound(w, req)
 		return
 	}
-	requestParts := strings.Split(req.URL.Path[len(server.prefix):], "/")[1:]
+	requestParts := strings.Split(req.URL.Path[len(s.prefix):], "/")[1:]
 	if len(requestParts) < 1 {
 		notFound(w, req)
 		return
 	}
-	storage := server.storage[requestParts[0]]
+	storage := s.storage[requestParts[0]]
 	if storage == nil {
 		httplog.LogOf(w).Addf("'%v' has no storage object", requestParts[0])
 		notFound(w, req)
 		return
 	}
 
-	server.handleREST(requestParts, req, w, storage)
+	s.handleREST(requestParts, req, w, storage)
 }
 
 // write writes an API object in wire format.
-func (server *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
+func (s *APIServer) write(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := api.Encode(object)
 	if err != nil {
-		server.error(err, w)
+		s.error(err, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -166,10 +166,10 @@ func (server *APIServer) write(statusCode int, object interface{}, w http.Respon
 }
 
 // writeRawJSON writes a non-API object in JSON.
-func (server *APIServer) writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
+func (s *APIServer) writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := json.Marshal(object)
 	if err != nil {
-		server.error(err, w)
+		s.error(err, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -177,20 +177,20 @@ func (server *APIServer) writeRawJSON(statusCode int, object interface{}, w http
 	w.Write(output)
 }
 
-func (server *APIServer) error(err error, w http.ResponseWriter) {
+func (s *APIServer) error(err error, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "Internal Error: %#v", err)
 }
 
-func (server *APIServer) readBody(req *http.Request) ([]byte, error) {
+func (s *APIServer) readBody(req *http.Request) ([]byte, error) {
 	defer req.Body.Close()
 	return ioutil.ReadAll(req.Body)
 }
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to receive the result and returning its ID down the writer.
-func (server *APIServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
-	op := server.ops.NewOperation(out)
+func (s *APIServer) finishReq(out <-chan interface{}, sync bool, timeout time.Duration, w http.ResponseWriter) {
+	op := s.ops.NewOperation(out)
 	if sync {
 		op.WaitFor(timeout)
 	}
@@ -208,9 +208,9 @@ func (server *APIServer) finishReq(out <-chan interface{}, sync bool, timeout ti
 				status = stat.Code
 			}
 		}
-		server.write(status, obj, w)
+		s.write(status, obj, w)
 	} else {
-		server.write(http.StatusAccepted, obj, w)
+		s.write(http.StatusAccepted, obj, w)
 	}
 }
 
@@ -225,7 +225,7 @@ func parseTimeout(str string) time.Duration {
 	return 30 * time.Second
 }
 
-// handleREST is the main dispatcher for the server.  It switches on the HTTP method, and then
+// handleREST is the main dispatcher for a storage object.  It switches on the HTTP method, and then
 // on path length, according to the following table:
 //   Method     Path          Action
 //   GET        /foo          list
@@ -234,11 +234,11 @@ func parseTimeout(str string) time.Duration {
 //   PUT        /foo/bar      update 'bar'
 //   DELETE     /foo/bar      delete 'bar'
 // Returns 404 if the method/pattern doesn't match one of these entries
-// The server accepts several query parameters:
+// The s accepts several query parameters:
 //    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
-func (server *APIServer) handleREST(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+func (s *APIServer) handleREST(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {
@@ -247,15 +247,15 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 		case 1:
 			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
 			if err != nil {
-				server.error(err, w)
+				s.error(err, w)
 				return
 			}
 			list, err := storage.List(selector)
 			if err != nil {
-				server.error(err, w)
+				s.error(err, w)
 				return
 			}
-			server.write(http.StatusOK, list, w)
+			s.write(http.StatusOK, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
 			if IsNotFound(err) {
@@ -263,10 +263,10 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 				return
 			}
 			if err != nil {
-				server.error(err, w)
+				s.error(err, w)
 				return
 			}
-			server.write(http.StatusOK, item, w)
+			s.write(http.StatusOK, item, w)
 		default:
 			notFound(w, req)
 		}
@@ -275,9 +275,9 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			notFound(w, req)
 			return
 		}
-		body, err := server.readBody(req)
+		body, err := s.readBody(req)
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
 		obj, err := storage.Extract(body)
@@ -286,7 +286,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
 		out, err := storage.Create(obj)
@@ -295,10 +295,10 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
-		server.finishReq(out, sync, timeout, w)
+		s.finishReq(out, sync, timeout, w)
 	case "DELETE":
 		if len(parts) != 2 {
 			notFound(w, req)
@@ -310,18 +310,18 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
-		server.finishReq(out, sync, timeout, w)
+		s.finishReq(out, sync, timeout, w)
 	case "PUT":
 		if len(parts) != 2 {
 			notFound(w, req)
 			return
 		}
-		body, err := server.readBody(req)
+		body, err := s.readBody(req)
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
 		obj, err := storage.Extract(body)
@@ -330,7 +330,7 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
 		out, err := storage.Update(obj)
@@ -339,17 +339,17 @@ func (server *APIServer) handleREST(parts []string, req *http.Request, w http.Re
 			return
 		}
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
-		server.finishReq(out, sync, timeout, w)
+		s.finishReq(out, sync, timeout, w)
 	default:
 		notFound(w, req)
 	}
 }
 
-func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Request) {
-	opPrefix := server.operationPrefix()
+func (s *APIServer) handleOperationRequest(w http.ResponseWriter, req *http.Request) {
+	opPrefix := s.operationPrefix()
 	if !strings.HasPrefix(req.URL.Path, opPrefix) {
 		notFound(w, req)
 		return
@@ -366,12 +366,12 @@ func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http
 	}
 	if len(parts) == 0 {
 		// List outstanding operations.
-		list := server.ops.List()
-		server.write(http.StatusOK, list, w)
+		list := s.ops.List()
+		s.write(http.StatusOK, list, w)
 		return
 	}
 
-	op := server.ops.Get(parts[0])
+	op := s.ops.Get(parts[0])
 	if op == nil {
 		notFound(w, req)
 		return
@@ -379,14 +379,14 @@ func (server *APIServer) handleOperationRequest(w http.ResponseWriter, req *http
 
 	obj, complete := op.StatusOrResult()
 	if complete {
-		server.write(http.StatusOK, obj, w)
+		s.write(http.StatusOK, obj, w)
 	} else {
-		server.write(http.StatusAccepted, obj, w)
+		s.write(http.StatusAccepted, obj, w)
 	}
 }
 
-func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
-	prefix := server.watchPrefix()
+func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
+	prefix := s.watchPrefix()
 	if !strings.HasPrefix(req.URL.Path, prefix) {
 		notFound(w, req)
 		return
@@ -395,7 +395,7 @@ func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 	if req.Method != "GET" || len(parts) < 1 {
 		notFound(w, req)
 	}
-	storage := server.storage[parts[0]]
+	storage := s.storage[parts[0]]
 	if storage == nil {
 		notFound(w, req)
 	}
@@ -408,7 +408,7 @@ func (server *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 			watching, err = watcher.WatchAll()
 		}
 		if err != nil {
-			server.error(err, w)
+			s.error(err, w)
 			return
 		}
 
