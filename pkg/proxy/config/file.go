@@ -34,6 +34,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"time"
@@ -77,13 +78,22 @@ func (s ConfigSourceFile) Run() {
 	var lastEndpoints []api.Endpoints
 
 	sleep := 5 * time.Second
+	// Used to avoid spamming the error log file, makes error logging edge triggered.
+	hadSuccess := true
 	for {
 		data, err := ioutil.ReadFile(s.filename)
 		if err != nil {
-			glog.Errorf("Couldn't read file: %s : %v", s.filename, err)
+			msg := fmt.Sprintf("Couldn't read file: %s : %v", s.filename, err)
+			if hadSuccess {
+				glog.Error(msg)
+			} else {
+				glog.V(1).Info(msg)
+			}
+			hadSuccess = false
 			time.Sleep(sleep)
 			continue
 		}
+		hadSuccess = true
 
 		if bytes.Equal(lastData, data) {
 			time.Sleep(sleep)
