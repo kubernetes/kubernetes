@@ -155,16 +155,24 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, e
 		// correctly no matter what http operations happen.
 		if srv.CreateExternalLoadBalancer {
 			var balancer cloudprovider.TCPLoadBalancer
+			var zones cloudprovider.Zones
 			var ok bool
 			if sr.cloud != nil {
 				balancer, ok = sr.cloud.TCPLoadBalancer()
+				if ok {
+					zones, ok = sr.cloud.Zones()
+				}
 			}
-			if ok && balancer != nil {
+			if ok && balancer != nil && zones != nil {
 				hosts, err := sr.machines.List()
 				if err != nil {
 					return nil, err
 				}
-				err = balancer.CreateTCPLoadBalancer(srv.ID, "us-central1", srv.Port, hosts)
+				zone, err := zones.GetZone()
+				if err != nil {
+					return nil, err
+				}
+				err = balancer.CreateTCPLoadBalancer(srv.ID, zone, srv.Port, hosts)
 				if err != nil {
 					return nil, err
 				}

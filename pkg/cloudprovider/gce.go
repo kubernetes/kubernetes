@@ -93,6 +93,11 @@ func (gce *GCECloud) Instances() (Instances, bool) {
 	return gce, true
 }
 
+// Zones returns an implementation of Zones for Google Compute Engine.
+func (gce *GCECloud) Zones() (Zones, bool) {
+	return gce, true
+}
+
 func makeHostLink(projectID, zone, host string) string {
 	ix := strings.Index(host, ".")
 	if ix != -1 {
@@ -230,4 +235,8 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 		instances = append(instances, instance.Name+suffix)
 	}
 	return instances, nil
+}
+
+func (gce *GCECloud) GetZone() (string, error) {
+	return gce.zone, nil
 }
