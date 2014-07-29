@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
+	"github.com/golang/glog"
 )
 
 type HealthyMinionRegistry struct {
@@ -50,7 +51,8 @@ func (h *HealthyMinionRegistry) List() (currentMinions []string, err error) {
 	for _, minion := range list {
 		status, err := health.Check(h.makeMinionURL(minion), h.client)
 		if err != nil {
-			return result, err
+			glog.Errorf("%s failed health check with error: %s", minion, err)
+			continue
 		}
 		if status == health.Healthy {
 			result = append(result, minion)
