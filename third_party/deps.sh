@@ -5,8 +5,7 @@ TOP_PACKAGES="
   code.google.com/p/goauth2/compute/serviceaccount
   code.google.com/p/goauth2/oauth
   code.google.com/p/google-api-go-client/compute/v1
-  github.com/google/cadvisor/info
-  github.com/google/cadvisor/client
+  github.com/google/cadvisor
 "
 
 DEP_PACKAGES="

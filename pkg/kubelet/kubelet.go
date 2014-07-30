@@ -289,7 +289,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 			ExposedPorts: exposedPorts,
 			Hostname:     container.Name,
 			Image:        container.Image,
-			Memory:       uint64(container.Memory),
+			Memory:       int64(container.Memory),
 			CpuShares:    int64(milliCPUToShares(container.CPU)),
 			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
@@ -545,7 +545,7 @@ func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.Conta
 	ret := &info.ContainerInfoRequest{
 		NumStats:               req.NumStats,
 		CpuUsagePercentiles:    req.CpuUsagePercentiles,
-		MemoryUsagePercentages: req.MemoryUsagePercentages,
+		MemoryUsagePercentiles: req.MemoryUsagePercentiles,
 	}
 	return ret
 }
