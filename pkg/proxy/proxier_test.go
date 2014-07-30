@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
@@ -45,6 +47,24 @@ func echoServer(t *testing.T, addr string) (string, error) {
 	return port, err
 }
 
+func testEchoConnection(t *testing.T, address, port string) {
+	conn, err := net.Dial("tcp", net.JoinHostPort(address, port))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	magic := "aaaaa"
+	if _, err := conn.Write([]byte(magic)); err != nil {
+		t.Fatalf("error writing to proxy: %v", err)
+	}
+	buf := make([]byte, 5)
+	if _, err := conn.Read(buf); err != nil {
+		t.Fatalf("error reading from proxy: %v", err)
+	}
+	if string(buf) != magic {
+		t.Fatalf("bad echo from proxy: got: %q, expected %q", string(buf), magic)
+	}
+}
+
 func TestProxy(t *testing.T) {
 	port, err := echoServer(t, "127.0.0.1:0")
 	if err != nil {
@@ -61,19 +81,100 @@ func TestProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
+	testEchoConnection(t, "127.0.0.1", proxyPort)
+}
+
+func TestProxyStop(t *testing.T) {
+	port, err := echoServer(t, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+
+	p := NewProxier(lb)
+
+	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
 	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
 	if err != nil {
 		t.Fatalf("error connecting to proxy: %v", err)
 	}
-	magic := "aaaaa"
-	if _, err := conn.Write([]byte(magic)); err != nil {
-		t.Fatalf("error writing to proxy: %v", err)
+	conn.Close()
+
+	p.StopProxy("echo")
+	// Wait for the port to really close.
+	time.Sleep(2 * time.Second)
+	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	if err == nil {
+		t.Fatalf("Unexpected non-error.")
 	}
-	buf := make([]byte, 5)
-	if _, err := conn.Read(buf); err != nil {
-		t.Fatalf("error reading from proxy: %v", err)
+}
+
+func TestProxyUpdateDelete(t *testing.T) {
+	port, err := echoServer(t, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if string(buf) != magic {
-		t.Fatalf("bad echo from proxy: got: %q, expected %q", string(buf), magic)
+
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+
+	p := NewProxier(lb)
+
+	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
 	}
+	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	conn.Close()
+
+	p.OnUpdate([]api.Service{})
+	// Wait for the port to close.
+	time.Sleep(2 * time.Second)
+	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	if err == nil {
+		t.Fatalf("Unexpected non-error.")
+	}
+}
+
+func TestProxyUpdatePort(t *testing.T) {
+	port, err := echoServer(t, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+
+	p := NewProxier(lb)
+
+	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+
+	// add a new dummy listener in order to get a port that is free
+	l, _ := net.Listen("tcp", ":0")
+	_, port, _ = net.SplitHostPort(l.Addr().String())
+	portNum, _ := strconv.Atoi(port)
+	l.Close()
+
+	// Wait for the socket to actually get free.
+	time.Sleep(2 * time.Second)
+	p.OnUpdate([]api.Service{
+		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
+	})
+	time.Sleep(2 * time.Second)
+	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	if err == nil {
+		t.Fatalf("Unexpected non-error.")
+	}
+	testEchoConnection(t, "127.0.0.1", port)
 }
