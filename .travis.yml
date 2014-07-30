@@ -1,11 +1,17 @@
 language: go
 
+os:
+  - linux
+  - osx
+
 go:
   - 1.3
   - 1.2
+  - 1.3
   - tip
 
 install: 
+  - ./hack/ci.sh
   - go get code.google.com/p/go.tools/cmd/cover
   - go get github.com/coreos/etcd
   - ./hack/verify-gofmt.sh

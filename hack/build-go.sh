@@ -31,4 +31,7 @@ if [ $# -gt 0 ]; then
   BINARIES="$@"
 fi
 
-go install $(for b in $BINARIES; do echo "${KUBE_GO_PACKAGE}"/${b}; done)
+# Don't try to build on OS X + Travis, it doesn't have Go.
+if [ "$TRAVIS" == "true" ] && [ "$CI" == "true" ] && [ "$(uname)" != "Darwin" ]; then
+  go install $(for b in $BINARIES; do echo "${KUBE_GO_PACKAGE}"/${b}; done)
+fi
