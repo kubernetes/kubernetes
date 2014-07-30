@@ -16,6 +16,21 @@ limitations under the License.
 
 package version
 
-func Get() (major, minor, gitCommit string) {
-	return "v1beta", "1", commitFromGit
+// Info contains versioning information.
+// TODO: Add []string of api versions supported? It's still unclear
+// how we'll want to distribute that information.
+type Info struct {
+	Major     string `json:"major" yaml:"major"`
+	Minor     string `json:"minor" yaml:"minor"`
+	GitCommit string `json:"gitCommit" yaml:"gitCommit"`
+}
+
+// Get returns the overall codebase version. It's for detecting
+// what code a binary was built from.
+func Get() Info {
+	return Info{
+		Major:     "0",
+		Minor:     "1",
+		GitCommit: commitFromGit,
+	}
 }

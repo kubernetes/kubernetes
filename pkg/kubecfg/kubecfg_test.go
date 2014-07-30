@@ -317,9 +317,9 @@ func TestMakePorts(t *testing.T) {
 		{
 			"8080:80,8081:8081,443:444",
 			[]api.Port{
-				api.Port{HostPort: 8080, ContainerPort: 80},
-				api.Port{HostPort: 8081, ContainerPort: 8081},
-				api.Port{HostPort: 443, ContainerPort: 444},
+				{HostPort: 8080, ContainerPort: 80},
+				{HostPort: 8081, ContainerPort: 8081},
+				{HostPort: 443, ContainerPort: 444},
 			},
 		},
 	}

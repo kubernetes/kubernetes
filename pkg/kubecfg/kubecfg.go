@@ -29,9 +29,23 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
+
+func GetServerVersion(client *client.Client) (*version.Info, error) {
+	body, err := client.Get().AbsPath("/version").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("Got '%s': %v", string(body), err)
+	}
+	return &info, nil
+}
 
 func promptForString(field string, r io.Reader) string {
 	fmt.Printf("Please enter %s: ", field)

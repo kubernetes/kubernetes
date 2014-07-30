@@ -106,7 +106,7 @@ APISERVER_PID=$!
 
 wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
-KUBE_CMD="${GO_OUT}/kubecfg -h http://127.0.0.1:${API_PORT}"
+KUBE_CMD="${GO_OUT}/kubecfg -h http://127.0.0.1:${API_PORT} -expect_version_match"
 
 ${KUBE_CMD} list pods
 echo "kubecfg(pods): ok"

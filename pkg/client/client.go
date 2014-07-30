@@ -18,6 +18,7 @@ package client
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
 
@@ -237,4 +239,18 @@ func (c *Client) UpdateService(svc api.Service) (result api.Service, err error) 
 // DeleteService deletes an existing service.
 func (c *Client) DeleteService(name string) error {
 	return c.Delete().Path("services").Path(name).Do().Error()
+}
+
+// ServerVersion retrieves and parses the server's version.
+func (c *Client) ServerVersion() (*version.Info, error) {
+	body, err := c.Get().AbsPath("/version").Do().Raw()
+	if err != nil {
+		return nil, err
+	}
+	var info version.Info
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		return nil, fmt.Errorf("Got '%s': %v", string(body), err)
+	}
+	return &info, nil
 }

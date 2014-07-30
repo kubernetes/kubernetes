@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -31,28 +32,28 @@ import (
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
 
-// AppVersion is the current version of kubecfg.
-const AppVersion = "0.1"
-
 var (
-	versionFlag  = flag.Bool("V", false, "Print the version number.")
-	httpServer   = flag.String("h", "", "The host to connect to.")
-	config       = flag.String("c", "", "Path to the config file.")
-	selector     = flag.String("l", "", "Selector (label query) to use for listing")
-	updatePeriod = flag.Duration("u", 60*time.Second, "Update interval period")
-	portSpec     = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
-	servicePort  = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
-	authConfig   = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
-	json         = flag.Bool("json", false, "If true, print raw JSON for responses")
-	yaml         = flag.Bool("yaml", false, "If true, print raw YAML for responses")
-	verbose      = flag.Bool("verbose", false, "If true, print extra information")
-	proxy        = flag.Bool("proxy", false, "If true, run a proxy to the api server")
-	www          = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
-	templateFile = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
-	templateStr  = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
+	versionFlag   = flag.Bool("V", false, "Print the version number.")
+	serverVersion = flag.Bool("server_version", false, "Print the server's version number.")
+	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
+	httpServer    = flag.String("h", "", "The host to connect to.")
+	config        = flag.String("c", "", "Path to the config file.")
+	selector      = flag.String("l", "", "Selector (label query) to use for listing")
+	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
+	portSpec      = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
+	servicePort   = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
+	authConfig    = flag.String("auth", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file.  If missing, prompt the user.  Only used if doing https.")
+	json          = flag.Bool("json", false, "If true, print raw JSON for responses")
+	yaml          = flag.Bool("yaml", false, "If true, print raw YAML for responses")
+	verbose       = flag.Bool("verbose", false, "If true, print extra information")
+	proxy         = flag.Bool("proxy", false, "If true, run a proxy to the api server")
+	www           = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
+	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
+	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 )
 
 func usage() {
@@ -107,7 +108,7 @@ func main() {
 	defer util.FlushLogs()
 
 	if *versionFlag {
-		fmt.Println("Version:", AppVersion)
+		fmt.Printf("Version: %#v\n", version.Get())
 		os.Exit(0)
 	}
 
@@ -136,6 +137,30 @@ func main() {
 		}
 	}
 
+	client := kube_client.New(masterServer, auth)
+
+	if *serverVersion {
+		got, err := client.ServerVersion()
+		if err != nil {
+			fmt.Printf("Couldn't read version from server: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Server Version: %#v\n", got)
+		os.Exit(0)
+	}
+
+	if *preventSkew {
+		got, err := client.ServerVersion()
+		if err != nil {
+			fmt.Printf("Couldn't read version from server: %v\n", err)
+			os.Exit(1)
+		}
+		if c, s := version.Get(), *got; !reflect.DeepEqual(c, s) {
+			fmt.Printf("Server version (%#v) differs from client version (%#v)!\n", s, c)
+			os.Exit(1)
+		}
+	}
+
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
 		server := kubecfg.NewProxyServer(*www, masterServer, auth)
@@ -147,8 +172,6 @@ func main() {
 		os.Exit(1)
 	}
 	method := flag.Arg(0)
-
-	client := kube_client.New(masterServer, auth)
 
 	matchFound := executeAPIRequest(method, client) || executeControllerRequest(method, client)
 	if matchFound == false {
