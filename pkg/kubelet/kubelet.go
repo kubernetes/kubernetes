@@ -21,10 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -453,66 +450,33 @@ type podContainer struct {
 	containerName string
 }
 
-// Stores all volumes defined by the set of pods in a map.
-func determineValidVolumes(pods []Pod) map[string]api.Volume {
-	validVolumes := make(map[string]api.Volume)
+// Stores all volumes defined by the set of pods into a map.
+// Keys for each entry are in the format (POD_ID)/(VOLUME_NAME)
+func getDesiredVolumes(pods []Pod) map[string]api.Volume {
+	desiredVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Manifest.Volumes {
 			identifier := path.Join(pod.Manifest.ID, volume.Name)
-			validVolumes[identifier] = volume
+			desiredVolumes[identifier] = volume
 		}
 	}
-	return validVolumes
+	return desiredVolumes
 }
 
-// Examines directory structure to determine volumes that are presently
-// active and mounted. Builds their respective Cleaner type in case they need to be deleted.
-func (kl *Kubelet) determineActiveVolumes() map[string]volume.Cleaner {
-	activeVolumes := make(map[string]volume.Cleaner)
-	filepath.Walk(kl.rootDirectory, func(fullPath string, info os.FileInfo, err error) error {
-		// Search for volume dir structure : (ROOT_DIR)/(POD_ID)/volumes/(VOLUME_KIND)/(VOLUME_NAME)
-		podIDRegex := "(?P<podID>[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)"
-		volumeNameRegex := "(?P<volumeName>[a-z0-9]([-a-z0-9]*[a-z0-9])?)"
-		kindRegex := "(?P<volumeKind>(empty))"
-		regex := path.Join(kl.rootDirectory, podIDRegex, "volumes", kindRegex, volumeNameRegex)
-		regexMatcher, _ := regexp.Compile(regex)
-		if regexMatcher.MatchString(fullPath) {
-			// Extract info from the directory structure.
-			result := make(map[string]string)
-			substrings := regexMatcher.FindStringSubmatch(fullPath)
-			for i, label := range regexMatcher.SubexpNames() {
-				result[label] = substrings[i]
-			}
-			kind := result["volumeKind"]
-			name := result["volumeName"]
-			podID := result["podID"]
-			identifier := path.Join(podID, name)
-			cleaner, err := volume.CreateVolumeCleaner(kind, fullPath)
-			if err != nil {
-				glog.Errorf("Could not create cleaner for volume %v.", identifier)
-			}
-			if cleaner != nil {
-				activeVolumes[identifier] = cleaner
-			}
-		}
-		return nil
-	})
-	return activeVolumes
-}
-
-// Compares the map of active volumes to the map of valid volumes.
-// If an active volume does not have a respective valid volume, clean it up.
+// Compares the map of current volumes to the map of desired volumes.
+// If an active volume does not have a respective desired volume, clean it up.
 func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
-	validVolumes := determineValidVolumes(pods)
-	activeVolumes := kl.determineActiveVolumes()
-	glog.Infof("ValidVolumes: %v", validVolumes)
-	glog.Infof("ActiveVolumes: %v", activeVolumes)
-	for name, volume := range activeVolumes {
-		if _, ok := validVolumes[name]; !ok {
+	desiredVolumes := getDesiredVolumes(pods)
+	currentVolumes := volume.GetCurrentVolumes(kl.rootDirectory)
+	for name, vol := range currentVolumes {
+		if _, ok := desiredVolumes[name]; !ok {
+			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
+			//to be deleted and volumes that are leftover after a crash.
 			glog.Infof("Orphaned volume %s found, tearing down volume", name)
-			err := volume.TearDown()
+			//TODO (jonesdl) This should not block other kubelet synchronization procedures
+			err := vol.TearDown()
 			if err != nil {
-				glog.Errorf("Could not tear down volume %s", name)
+				glog.Infof("Could not tear down volume %s (%s)", name, err)
 			}
 		}
 	}
@@ -551,9 +515,6 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 		})
 	}
 
-	// Remove any orphaned volumes.
-	kl.reconcileVolumes(pods)
-
 	// Kill any containers we don't need
 	existingContainers, err := getKubeletDockerContainers(kl.dockerClient)
 	if err != nil {
@@ -570,6 +531,10 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 			}
 		}
 	}
+
+	// Remove any orphaned volumes.
+	kl.reconcileVolumes(pods)
+
 	return err
 }
 

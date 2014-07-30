@@ -512,7 +512,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 
 	podVolumes := make(volumeMap)
 	podVolumes["disk4"] = &volume.HostDirectory{"/mnt/host"}
-	podVolumes["disk5"] = &volume.EmptyDirectoryBuilder{"disk5", "podID", "/var/lib/kubelet"}
+	podVolumes["disk5"] = &volume.EmptyDirectory{"disk5", "podID", "/var/lib/kubelet"}
 
 	volumes, binds := makeVolumesAndBinds(&pod, &container, podVolumes)
 

@@ -18,16 +18,18 @@ package volume
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 var ErrUnsupportedVolumeType = errors.New("unsupported volume type")
 
-// Interface is a directory used by pods or hosts. All volume interface implementations
-// must be idempotent.
+// Interface is a directory used by pods or hosts.
+// All method implementations of methods in the volume interface must be idempotent
 type Interface interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
@@ -35,6 +37,7 @@ type Interface interface {
 
 // The Builder interface provides the method to set up/mount the volume.
 type Builder interface {
+	// Uses Interface to provide the path for Docker binds.
 	Interface
 	// SetUp prepares and mounts/unpacks the volume to a directory path.
 	SetUp() error
@@ -58,24 +61,20 @@ func (hostVol *HostDirectory) SetUp() error {
 	return nil
 }
 
-func (hostVol *HostDirectory) TearDown() error {
-	return nil
-}
-
 func (hostVol *HostDirectory) GetPath() string {
 	return hostVol.Path
 }
 
 // EmptyDirectory volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
-type EmptyDirectoryBuilder struct {
+type EmptyDirectory struct {
 	Name    string
 	PodID   string
 	RootDir string
 }
 
 // SetUp creates the new directory.
-func (emptyDir *EmptyDirectoryBuilder) SetUp() error {
+func (emptyDir *EmptyDirectory) SetUp() error {
 	path := emptyDir.GetPath()
 	err := os.MkdirAll(path, 0750)
 	if err != nil {
@@ -84,28 +83,44 @@ func (emptyDir *EmptyDirectoryBuilder) SetUp() error {
 	return nil
 }
 
-func (emptyDir *EmptyDirectoryBuilder) GetPath() string {
+func (emptyDir *EmptyDirectory) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
-// EmptyDirectoryCleaners only need to know what path they are cleaning
-type EmptyDirectoryCleaner struct {
-	Path string
+func (emptyDir *EmptyDirectory) renameDirectory() (string, error) {
+	oldPath := emptyDir.GetPath()
+	newPath, err := ioutil.TempDir(path.Dir(oldPath), emptyDir.Name+".deleting~")
+	if err != nil {
+		return "", err
+	}
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		return "", err
+	}
+	return newPath, nil
 }
 
 // Simply delete everything in the directory.
-func (emptyDir *EmptyDirectoryCleaner) TearDown() error {
-	return os.RemoveAll(emptyDir.Path)
+func (emptyDir *EmptyDirectory) TearDown() error {
+	tmpDir, err := emptyDir.renameDirectory()
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Interprets API volume as a HostDirectory
-func CreateHostDirectoryBuilder(volume *api.Volume) *HostDirectory {
+func createHostDirectory(volume *api.Volume) *HostDirectory {
 	return &HostDirectory{volume.Source.HostDirectory.Path}
 }
 
-// Interprets API volume as an EmptyDirectoryBuilder
-func CreateEmptyDirectoryBuilder(volume *api.Volume, podID string, rootDir string) *EmptyDirectoryBuilder {
-	return &EmptyDirectoryBuilder{volume.Name, podID, rootDir}
+// Interprets API volume as an EmptyDirectory
+func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
+	return &EmptyDirectory{volume.Name, podID, rootDir}
 }
 
 // CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
@@ -121,9 +136,9 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 	// TODO(jonesdl) We should probably not check every pointer and directly
 	// resolve these types instead.
 	if source.HostDirectory != nil {
-		vol = CreateHostDirectoryBuilder(volume)
+		vol = createHostDirectory(volume)
 	} else if source.EmptyDirectory != nil {
-		vol = CreateEmptyDirectoryBuilder(volume, podID, rootDir)
+		vol = createEmptyDirectory(volume, podID, rootDir)
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -131,11 +146,52 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 }
 
 // CreateVolumeCleaner returns a Cleaner capable of tearing down a volume.
-func CreateVolumeCleaner(kind string, path string) (Cleaner, error) {
+func CreateVolumeCleaner(kind string, name string, podID string, rootDir string) (Cleaner, error) {
 	switch kind {
 	case "empty":
-		return &EmptyDirectoryCleaner{path}, nil
+		return &EmptyDirectory{name, podID, rootDir}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}
+}
+
+// Examines directory structure to determine volumes that are presently
+// active and mounted. Returns a map of Cleaner types.
+func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
+	currentVolumes := make(map[string]Cleaner)
+	mountPath := rootDirectory
+	podIDDirs, err := ioutil.ReadDir(mountPath)
+	if err != nil {
+		glog.Errorf("Could not read directory: %s, (%s)", mountPath, err)
+	}
+	// Volume information is extracted from the directory structure:
+	// (ROOT_DIR)/(POD_ID)/volumes/(VOLUME_KIND)/(VOLUME_NAME)
+	for _, podIDDir := range podIDDirs {
+		podID := podIDDir.Name()
+		podIDPath := path.Join(mountPath, podID, "volumes")
+		volumeKindDirs, err := ioutil.ReadDir(podIDPath)
+		if err != nil {
+			glog.Errorf("Could not read directory: %s, (%s)", podIDPath, err)
+		}
+		for _, volumeKindDir := range volumeKindDirs {
+			volumeKind := volumeKindDir.Name()
+			volumeKindPath := path.Join(podIDPath, volumeKind)
+			volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
+			if err != nil {
+				glog.Errorf("Could not read directory: %s, (%s)", volumeKindPath, err)
+			}
+			for _, volumeNameDir := range volumeNameDirs {
+				volumeName := volumeNameDir.Name()
+				identifier := path.Join(podID, volumeName)
+				// TODO(thockin) This should instead return a reference to an extant volume object
+				cleaner, err := CreateVolumeCleaner(volumeKind, volumeName, podID, rootDirectory)
+				if err != nil {
+					glog.Errorf("Could not create volume cleaner: %s, (%s)", volumeNameDirs, err)
+					continue
+				}
+				currentVolumes[identifier] = cleaner
+			}
+		}
+	}
+	return currentVolumes
 }
