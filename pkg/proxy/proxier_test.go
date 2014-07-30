@@ -91,7 +91,7 @@ func TestProxyStop(t *testing.T) {
 	}
 
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{"echo", []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
 	p := NewProxier(lb)
 
@@ -106,6 +106,7 @@ func TestProxyStop(t *testing.T) {
 	conn.Close()
 
 	p.StopProxy("echo")
+	// Wait for the port to really close.
 	time.Sleep(2 * time.Second)
 	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
 	if err == nil {
@@ -120,7 +121,7 @@ func TestProxyUpdateDelete(t *testing.T) {
 	}
 
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{"echo", []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
 	p := NewProxier(lb)
 
@@ -149,7 +150,7 @@ func TestProxyUpdatePort(t *testing.T) {
 	}
 
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{"echo", []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
 	p := NewProxier(lb)
 
@@ -157,11 +158,6 @@ func TestProxyUpdatePort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
-	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
-	if err != nil {
-		t.Fatalf("error connecting to proxy: %v", err)
-	}
-	conn.Close()
 
 	// add a new dummy listener in order to get a port that is free
 	l, _ := net.Listen("tcp", ":0")
@@ -169,6 +165,8 @@ func TestProxyUpdatePort(t *testing.T) {
 	portNum, _ := strconv.Atoi(port)
 	l.Close()
 
+	// Wait for the socket to actually get free.
+	time.Sleep(2 * time.Second)
 	p.OnUpdate([]api.Service{
 		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
 	})

@@ -156,9 +156,14 @@ func (proxier *Proxier) addService(service string, port int) (net.Listener, erro
 	return l, nil
 }
 
+// used to globally lock around unused ports.  Only used in testing.
+var unusedPortLock sync.Mutex
+
 // addService starts listening for a new service, returning the port it's using.
 // For testing on a system with unknown ports used.
 func (proxier *Proxier) addServiceOnUnusedPort(service string) (string, error) {
+	unusedPortLock.Lock()
+	defer unusedPortLock.Unlock()
 	// Make sure we can start listening on the port before saying all's well.
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
