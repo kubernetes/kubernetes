@@ -18,20 +18,16 @@ package apiserver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -535,204 +531,5 @@ func TestSyncCreateTimeout(t *testing.T) {
 	}
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, 202, response)
-	}
-}
-
-func TestOpGet(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, "/prefix/version")
-	server := httptest.NewServer(handler)
-	client := http.Client{}
-
-	simple := Simple{
-		Name: "foo",
-	}
-	data, err := api.Encode(simple)
-	t.Log(string(data))
-	expectNoError(t, err)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
-	expectNoError(t, err)
-	response, err := client.Do(request)
-	expectNoError(t, err)
-	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
-	}
-
-	var itemOut api.Status
-	body, err := extractBody(response, &itemOut)
-	expectNoError(t, err)
-	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
-		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
-	}
-
-	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details, nil)
-	expectNoError(t, err)
-	_, err = client.Do(req2)
-	expectNoError(t, err)
-	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
-	}
-}
-
-var watchTestTable = []struct {
-	t   watch.EventType
-	obj interface{}
-}{
-	{watch.Added, &Simple{Name: "A Name"}},
-	{watch.Modified, &Simple{Name: "Another Name"}},
-	{watch.Deleted, &Simple{Name: "Another Name"}},
-}
-
-func TestWatchWebsocket(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, "/prefix/version")
-	server := httptest.NewServer(handler)
-
-	dest, _ := url.Parse(server.URL)
-	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
-	dest.Path = "/prefix/version/watch/foo"
-	dest.RawQuery = "id=myID"
-
-	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
-	expectNoError(t, err)
-
-	if a, e := simpleStorage.requestedID, "myID"; a != e {
-		t.Fatalf("Expected %v, got %v", e, a)
-	}
-
-	try := func(action watch.EventType, object interface{}) {
-		// Send
-		simpleStorage.fakeWatch.Action(action, object)
-		// Test receive
-		var got api.WatchEvent
-		err := websocket.JSON.Receive(ws, &got)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if got.Type != action {
-			t.Errorf("Unexpected type: %v", got.Type)
-		}
-		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-	}
-
-	for _, item := range watchTestTable {
-		try(item.t, item.obj)
-	}
-	simpleStorage.fakeWatch.Stop()
-
-	var got api.WatchEvent
-	err = websocket.JSON.Receive(ws, &got)
-	if err == nil {
-		t.Errorf("Unexpected non-error")
-	}
-}
-
-func TestWatchHTTP(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, "/prefix/version")
-	server := httptest.NewServer(handler)
-	client := http.Client{}
-
-	dest, _ := url.Parse(server.URL)
-	dest.Path = "/prefix/version/watch/foo"
-	dest.RawQuery = "id=myID"
-
-	request, err := http.NewRequest("GET", dest.String(), nil)
-	expectNoError(t, err)
-	response, err := client.Do(request)
-	expectNoError(t, err)
-	if response.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected response %#v", response)
-	}
-
-	if a, e := simpleStorage.requestedID, "myID"; a != e {
-		t.Fatalf("Expected %v, got %v", e, a)
-	}
-
-	decoder := json.NewDecoder(response.Body)
-
-	try := func(action watch.EventType, object interface{}) {
-		// Send
-		simpleStorage.fakeWatch.Action(action, object)
-		// Test receive
-		var got api.WatchEvent
-		err := decoder.Decode(&got)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if got.Type != action {
-			t.Errorf("Unexpected type: %v", got.Type)
-		}
-		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-	}
-
-	for _, item := range watchTestTable {
-		try(item.t, item.obj)
-	}
-	simpleStorage.fakeWatch.Stop()
-
-	var got api.WatchEvent
-	err = decoder.Decode(&got)
-	if err == nil {
-		t.Errorf("Unexpected non-error")
-	}
-}
-
-func TestMinionTransport(t *testing.T) {
-	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
-	transport := &minionTransport{}
-
-	// Test /logs/
-	request := &http.Request{
-		Method: "GET",
-		URL: &url.URL{
-			Scheme: "http",
-			Host:   "minion1:10250",
-			Path:   "/logs/",
-		},
-	}
-	response := &http.Response{
-		Status:     "200 OK",
-		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader(content)),
-		Close:      true,
-	}
-	updated_resp, _ := transport.ProcessResponse(request, response)
-	body, _ := ioutil.ReadAll(updated_resp.Body)
-	expected := string(`<pre><a href="/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="/proxy/minion/minion1:10250/logs/google.log">google.log</a></pre>`)
-	if !strings.Contains(string(body), expected) {
-		t.Errorf("Received wrong content: %s", string(body))
-	}
-
-	// Test subdir under /logs/
-	request = &http.Request{
-		Method: "GET",
-		URL: &url.URL{
-			Scheme: "http",
-			Host:   "minion1:8080",
-			Path:   "/whatever/apt/",
-		},
-	}
-	response = &http.Response{
-		Status:     "200 OK",
-		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(strings.NewReader(content)),
-		Close:      true,
-	}
-	updated_resp, _ = transport.ProcessResponse(request, response)
-	body, _ = ioutil.ReadAll(updated_resp.Body)
-	expected = string(`<pre><a href="/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a></pre>`)
-	if !strings.Contains(string(body), expected) {
-		t.Errorf("Received wrong content: %s", string(body))
 	}
 }

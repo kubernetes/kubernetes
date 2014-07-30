@@ -17,9 +17,14 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func TestOperation(t *testing.T) {
@@ -82,5 +87,43 @@ func TestOperation(t *testing.T) {
 
 	if op.result.(string) != "All done" {
 		t.Errorf("Got unexpected result: %#v", op.result)
+	}
+}
+
+func TestOpGet(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	simple := Simple{
+		Name: "foo",
+	}
+	data, err := api.Encode(simple)
+	t.Log(string(data))
+	expectNoError(t, err)
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
+	expectNoError(t, err)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusAccepted {
+		t.Errorf("Unexpected response %#v", response)
+	}
+
+	var itemOut api.Status
+	body, err := extractBody(response, &itemOut)
+	expectNoError(t, err)
+	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
+		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
+	}
+
+	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details, nil)
+	expectNoError(t, err)
+	_, err = client.Do(req2)
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusAccepted {
+		t.Errorf("Unexpected response %#v", response)
 	}
 }
