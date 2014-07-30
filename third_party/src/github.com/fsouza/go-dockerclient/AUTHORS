@@ -1,5 +1,6 @@
 # This is the official list of go-dockerclient authors for copyright purposes.
 
+Andreas Jaekle <andreas@jaekle.net>
 Andrews Medina <andrewsmedina@gmail.com>
 Andy Goldstein <andy.goldstein@redhat.com>
 Ben McCann <benmccann.com>
@@ -8,6 +9,7 @@ Cheah Chu Yeow <chuyeow@gmail.com>
 cheneydeng <cheneydeng@qq.com>
 Ed <edrocksit@gmail.com>
 Eric Anderson <anderson@copperegg.com>
+Fabio Rehm <fgrehm@gmail.com>
 Flavia Missi <flaviamissi@gmail.com>
 Francisco Souza <f@souza.cc>
 Jari Kolehmainen <jari.kolehmainen@digia.com>
@@ -15,6 +17,8 @@ Jason Wilder <jwilder@litl.com>
 Jean-Baptiste Dalido <jeanbaptiste@appgratis.com>
 Jeff Mitchell <jeffrey.mitchell@gmail.com>
 Jeffrey Hulten <jhulten@gmail.com>
+Johan Euphrosine <proppy@google.com>
+Karan Misra <kidoman@gmail.com>
 Lucas Clemente <lucas@clemente.io>
 Omeid Matten <public@omeid.me>
 Paul Morie <pmorie@gmail.com>

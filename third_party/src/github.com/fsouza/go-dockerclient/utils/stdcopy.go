@@ -109,7 +109,6 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 			// Write on stderr
 			out = dsterr
 		default:
-			Debugf("Error selecting output fd: (%d)", buf[StdWriterFdIndex])
 			return 0, ErrInvalidStdHeader
 		}
 
@@ -119,7 +118,6 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 		// Check if the buffer is big enough to read the frame.
 		// Extend it if necessary.
 		if frameSize+StdWriterPrefixLen > bufLen {
-			Debugf("Extending buffer cap.")
 			buf = append(buf, make([]byte, frameSize+StdWriterPrefixLen-len(buf)+1)...)
 			bufLen = len(buf)
 		}
@@ -135,7 +133,6 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 				nr += nr2
 				break
 			} else if er != nil {
-				Debugf("Error reading frame: %s", er)
 				return 0, er
 			}
 			nr += nr2
@@ -151,12 +148,10 @@ func StdCopy(dstout, dsterr io.Writer, src io.Reader) (written int64, err error)
 			written += int64(nw)
 		}
 		if ew != nil {
-			Debugf("Error writing frame: %s", ew)
 			return 0, ew
 		}
 		// If the frame has not been fully written: error
 		if nw != frameSize {
-			Debugf("Error Short Write: (%d on %d)", nw, frameSize)
 			return written, io.ErrShortWrite
 		}
 

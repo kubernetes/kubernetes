@@ -780,7 +780,7 @@ func addImages(server *DockerServer, n int, repo bool) {
 
 func TestListImages(t *testing.T) {
 	server := DockerServer{}
-	addImages(&server, 2, false)
+	addImages(&server, 2, true)
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
 	request, _ := http.NewRequest("GET", "/images/json?all=1", nil)
@@ -791,8 +791,9 @@ func TestListImages(t *testing.T) {
 	expected := make([]docker.APIImages, 2)
 	for i, image := range server.images {
 		expected[i] = docker.APIImages{
-			ID:      image.ID,
-			Created: image.Created.Unix(),
+			ID:       image.ID,
+			Created:  image.Created.Unix(),
+			RepoTags: []string{"docker/python-" + image.ID},
 		}
 	}
 	var got []docker.APIImages
@@ -826,7 +827,8 @@ func TestRemoveImageByName(t *testing.T) {
 	addImages(&server, 1, true)
 	server.buildMuxer()
 	recorder := httptest.NewRecorder()
-	path := "/images/docker/python-" + server.images[0].ID
+	imgName := "docker/python-" + server.images[0].ID
+	path := "/images/" + imgName
 	request, _ := http.NewRequest("DELETE", path, nil)
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusNoContent {
@@ -834,6 +836,10 @@ func TestRemoveImageByName(t *testing.T) {
 	}
 	if len(server.images) > 0 {
 		t.Error("RemoveImage: did not remove the image.")
+	}
+	_, ok := server.imgIDs[imgName]
+	if ok {
+		t.Error("RemoveImage: did not remove image tag name.")
 	}
 }
 
@@ -943,5 +949,16 @@ func TestPing(t *testing.T) {
 	}
 	if recorder.Code != http.StatusOK {
 		t.Errorf("Ping: Expected code %d, got: %d", http.StatusOK, recorder.Code)
+	}
+}
+
+func TestDefaultHandler(t *testing.T) {
+	server, err := NewServer("127.0.0.1:0", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.listener.Close()
+	if server.mux != server.DefaultHandler() {
+		t.Fatalf("DefaultHandler: Expected to return server.mux, got: %#v", server.DefaultHandler())
 	}
 }

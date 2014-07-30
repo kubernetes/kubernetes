@@ -24,10 +24,9 @@ func TestNewAPIClient(t *testing.T) {
 	if client.endpoint != endpoint {
 		t.Errorf("Expected endpoint %s. Got %s.", endpoint, client.endpoint)
 	}
-	if client.client != http.DefaultClient {
-		t.Errorf("Expected http.Client %#v. Got %#v.", http.DefaultClient, client.client)
+	if client.HTTPClient != http.DefaultClient {
+		t.Errorf("Expected http.Client %#v. Got %#v.", http.DefaultClient, client.HTTPClient)
 	}
-
 	// test unix socket endpoints
 	endpoint = "unix:///var/run/docker.sock"
 	client, err = NewClient(endpoint)
@@ -54,8 +53,8 @@ func TestNewVersionedClient(t *testing.T) {
 	if client.endpoint != endpoint {
 		t.Errorf("Expected endpoint %s. Got %s.", endpoint, client.endpoint)
 	}
-	if client.client != http.DefaultClient {
-		t.Errorf("Expected http.Client %#v. Got %#v.", http.DefaultClient, client.client)
+	if client.HTTPClient != http.DefaultClient {
+		t.Errorf("Expected http.Client %#v. Got %#v.", http.DefaultClient, client.HTTPClient)
 	}
 	if reqVersion := client.requestedApiVersion.String(); reqVersion != "1.12" {
 		t.Errorf("Wrong requestApiVersion. Want %q. Got %q.", "1.12", reqVersion)
