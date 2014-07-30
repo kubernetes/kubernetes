@@ -16,6 +16,7 @@
       "items": {
         "type": "object",
         "required": [
+          "name", 
           "image"
         ],
         "properties": {
