@@ -77,7 +77,7 @@ func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
 }
 
-// MakeReplicationManager craetes a new ReplicationManager.
+// MakeReplicationManager creates a new ReplicationManager.
 func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Interface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
