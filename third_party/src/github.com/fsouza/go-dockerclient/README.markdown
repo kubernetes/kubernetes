@@ -11,27 +11,29 @@ For more details, check the [remote API documentation](http://docs.docker.io/en/
 
 ## Example
 
-    package main
+```go
+package main
 
-    import (
-            "fmt"
-            "github.com/fsouza/go-dockerclient"
-    )
+import (
+        "fmt"
+        "github.com/fsouza/go-dockerclient"
+)
 
-    func main() {
-            endpoint := "unix:///var/run/docker.sock"
-            client, _ := docker.NewClient(endpoint)
-            imgs, _ := client.ListImages(true)
-            for _, img := range imgs {
-                    fmt.Println("ID: ", img.ID)
-                    fmt.Println("RepoTags: ", img.RepoTags)
-                    fmt.Println("Created: ", img.Created)
-                    fmt.Println("Size: ", img.Size)
-                    fmt.Println("VirtualSize: ", img.VirtualSize)
-                    fmt.Println("ParentId: ", img.ParentId)
-                    fmt.Println("Repository: ", img.Repository)
-            }
-    }
+func main() {
+        endpoint := "unix:///var/run/docker.sock"
+        client, _ := docker.NewClient(endpoint)
+        imgs, _ := client.ListImages(true)
+        for _, img := range imgs {
+                fmt.Println("ID: ", img.ID)
+                fmt.Println("RepoTags: ", img.RepoTags)
+                fmt.Println("Created: ", img.Created)
+                fmt.Println("Size: ", img.Size)
+                fmt.Println("VirtualSize: ", img.VirtualSize)
+                fmt.Println("ParentId: ", img.ParentId)
+                fmt.Println("Repository: ", img.Repository)
+        }
+}
+```
 
 ## Developing
 

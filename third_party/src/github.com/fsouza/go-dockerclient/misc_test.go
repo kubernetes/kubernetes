@@ -10,8 +10,6 @@ import (
 	"reflect"
 	"sort"
 	"testing"
-
-	"github.com/fsouza/go-dockerclient/engine"
 )
 
 type DockerVersion struct {
@@ -81,7 +79,7 @@ func TestInfo(t *testing.T) {
 }`
 	fakeRT := FakeRoundTripper{message: body, status: http.StatusOK}
 	client := newTestClient(&fakeRT)
-	expected := engine.Env{}
+	expected := Env{}
 	expected.SetInt("Containers", 11)
 	expected.SetInt("Images", 16)
 	expected.SetBool("Debug", false)

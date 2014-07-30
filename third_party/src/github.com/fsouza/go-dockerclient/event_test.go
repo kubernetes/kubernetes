@@ -53,7 +53,7 @@ func TestEventListeners(t *testing.T) {
 	for {
 		select {
 		case msg := <-listener:
-			t.Logf("Received: %s", *msg)
+			t.Logf("Recieved: %s", *msg)
 			count++
 			err = checkEvent(count, msg)
 			if err != nil {

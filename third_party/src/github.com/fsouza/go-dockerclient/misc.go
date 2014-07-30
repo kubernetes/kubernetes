@@ -6,39 +6,32 @@ package docker
 
 import (
 	"bytes"
-	"io"
-
-	"github.com/fsouza/go-dockerclient/engine"
 )
 
 // Version returns version information about the docker server.
 //
 // See http://goo.gl/IqKNRE for more details.
-func (c *Client) Version() (*engine.Env, error) {
+func (c *Client) Version() (*Env, error) {
 	body, _, err := c.do("GET", "/version", nil)
 	if err != nil {
 		return nil, err
 	}
-	out := engine.NewOutput()
-	remoteVersion, err := out.AddEnv()
-	if err != nil {
+	var env Env
+	if err := env.Decode(bytes.NewReader(body)); err != nil {
 		return nil, err
 	}
-	if _, err := io.Copy(out, bytes.NewReader(body)); err != nil {
-		return nil, err
-	}
-	return remoteVersion, nil
+	return &env, nil
 }
 
 // Info returns system-wide information, like the number of running containers.
 //
 // See http://goo.gl/LOmySw for more details.
-func (c *Client) Info() (*engine.Env, error) {
+func (c *Client) Info() (*Env, error) {
 	body, _, err := c.do("GET", "/info", nil)
 	if err != nil {
 		return nil, err
 	}
-	var info engine.Env
+	var info Env
 	err = info.Decode(bytes.NewReader(body))
 	if err != nil {
 		return nil, err

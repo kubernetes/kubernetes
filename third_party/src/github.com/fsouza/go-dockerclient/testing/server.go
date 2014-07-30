@@ -170,6 +170,12 @@ func (s *DockerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Returns default http.Handler mux, it allows customHandlers to call the
+// default behavior if wanted.
+func (s *DockerServer) DefaultHandler() http.Handler {
+	return s.mux
+}
+
 func (s *DockerServer) handlerWrapper(f func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		for errorID, urlRegexp := range s.failures {
@@ -217,6 +223,11 @@ func (s *DockerServer) listImages(w http.ResponseWriter, r *http.Request) {
 		result[i] = docker.APIImages{
 			ID:      image.ID,
 			Created: image.Created.Unix(),
+		}
+		for tag, id := range s.imgIDs {
+			if id == image.ID {
+				result[i].RepoTags = append(result[i].RepoTags, tag)
+			}
 		}
 	}
 	s.cMut.RUnlock()
@@ -563,8 +574,9 @@ func (s *DockerServer) pushImage(w http.ResponseWriter, r *http.Request) {
 func (s *DockerServer) removeImage(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	s.iMut.RLock()
+	var tag string
 	if img, ok := s.imgIDs[id]; ok {
-		id = img
+		id, tag = img, id
 	}
 	s.iMut.RUnlock()
 	_, index, err := s.findImageByID(id)
@@ -577,6 +589,9 @@ func (s *DockerServer) removeImage(w http.ResponseWriter, r *http.Request) {
 	defer s.iMut.Unlock()
 	s.images[index] = s.images[len(s.images)-1]
 	s.images = s.images[:len(s.images)-1]
+	if tag != "" {
+		delete(s.imgIDs, tag)
+	}
 }
 
 func (s *DockerServer) inspectImage(w http.ResponseWriter, r *http.Request) {
