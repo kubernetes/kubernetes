@@ -163,12 +163,12 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	return s
 }
 
-func (s *APIServer) operationPrefix() string {
-	return path.Join(s.prefix, "operations")
+func (server *APIServer) operationPrefix() string {
+	return path.Join(server.prefix, "operations")
 }
 
-func (s *APIServer) watchPrefix() string {
-	return path.Join(s.prefix, "watch")
+func (server *APIServer) watchPrefix() string {
+	return path.Join(server.prefix, "watch")
 }
 
 func (server *APIServer) handleIndex(w http.ResponseWriter, req *http.Request) {
