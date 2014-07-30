@@ -17,7 +17,9 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-if [[ "$(which go)" == "" ]]; then
+# Only test for the presence of go outside of CI systems.  OS X on Travis doesn't
+# support Go, but we still want to test the scripts.
+if [[ "$(which go)" == "" ]] && [ "$TRAVIS" != "true" ]; then
 	echo "Can't find 'go' in PATH, please fix and retry."
 	echo "See http://golang.org/doc/install for installation instructions."
 	exit 1

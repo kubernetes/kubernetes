@@ -14,35 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For now, skip integration testing on Darwin.
+# Travis doesn't currently support go on OS X
 if [ "$TRAVIS" == "true" ] && [ "$CI" == "true" ] && [ "$(uname)" == "Darwin" ]; then
-        exit 0
+	exit 0
 fi
 
-if [ "$(which etcd)" == "" ]; then
-	echo "etcd must be in your PATH"
-	exit 1
-fi
-
-running_etcd=$(ps -ef | grep etcd | grep -c name)
-if [ "$running_etcd" != "0" ]; then
-	echo "etcd appears to already be running on this machine, please kill and restart the test."
-	exit 1
-fi
-
-# Stop right away if the build fails
-set -e
-
-$(dirname $0)/build-go.sh cmd/integration
-
-ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
-trap "rm -rf ${ETCD_DIR}" EXIT
-
-(etcd -name test -data-dir ${ETCD_DIR} > /tmp/etcd.log) &
-ETCD_PID=$!
-
-sleep 5
-
-$(dirname $0)/../output/go/bin/integration
-
-kill $ETCD_PID
+go get code.google.com/p/go.tools/cmd/cover
+go get github.com/coreos/etcd
