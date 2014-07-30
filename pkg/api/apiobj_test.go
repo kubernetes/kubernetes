@@ -28,11 +28,8 @@ func TestAPIObject(t *testing.T) {
 		Object      APIObject `yaml:"object,omitempty" json:"object,omitempty"`
 		EmptyObject APIObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 	}
-	convert := func(obj interface{}) (interface{}, error) { return obj, nil }
 	AddKnownTypes("", EmbeddedTest{})
 	AddKnownTypes("v1beta1", EmbeddedTest{})
-	AddExternalConversion("EmbeddedTest", convert)
-	AddInternalConversion("EmbeddedTest", convert)
 
 	outer := &EmbeddedTest{
 		JSONBase: JSONBase{ID: "outer"},

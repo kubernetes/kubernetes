@@ -161,14 +161,7 @@ func validateEnv(vars []EnvVar) errorList {
 	for i := range vars {
 		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 {
-			// Backwards compat.
-			if len(ev.Key) == 0 {
-				allErrs.Append(makeInvalidError("EnvVar.Name", ev.Name))
-			} else {
-				glog.Warning("DEPRECATED: EnvVar.Key has been replaced by EnvVar.Name")
-				ev.Name = ev.Key
-				ev.Key = ""
-			}
+			allErrs.Append(makeInvalidError("EnvVar.Name", ev.Name))
 		}
 		if !util.IsCIdentifier(ev.Name) {
 			allErrs.Append(makeInvalidError("EnvVar.Name", ev.Name))

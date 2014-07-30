@@ -25,33 +25,18 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
+// versionMap allows one to figure out the go type of an object with
+// the given version and name.
 var versionMap = map[string]map[string]reflect.Type{}
 
-// typeNamePath records go's name and path of a go struct.
-type typeNamePath struct {
-	typeName string
-	typePath string
-}
+// typeToVersion allows one to figure out the version for a given go object.
+// The reflect.Type we index by should *not* be a pointer. If the same type
+// is registered for multiple versions, the last one wins.
+var typeToVersion = map[reflect.Type]string{}
 
-// typeNamePathToVersion allows one to figure out the version for a
-// given go object.
-var typeNamePathToVersion = map[typeNamePath]string{}
-
-// ConversionFunc knows how to translate a type from one api version to another.
-type ConversionFunc func(input interface{}) (output interface{}, err error)
-
-// typeTuple indexes a conversionFunc by source and dest version, and
-// the name of the type it operates on.
-type typeTuple struct {
-	sourceVersion string
-	destVersion   string
-
-	// Go name of this type.
-	typeName string
-}
-
-// conversionFuncs is a map of all known conversion functions.
-var conversionFuncs = map[typeTuple]ConversionFunc{}
+// theConverter stores all registered conversion functions. It also has
+// default coverting behavior.
+var theConverter = NewConverter()
 
 func init() {
 	AddKnownTypes("",
@@ -85,24 +70,29 @@ func init() {
 		v1beta1.Endpoints{},
 	)
 
-	defaultCopyList := []string{
-		"PodList",
-		"Pod",
-		"ReplicationControllerList",
-		"ReplicationController",
-		"ServiceList",
-		"Service",
-		"MinionList",
-		"Minion",
-		"Status",
-		"ServerOpList",
-		"ServerOp",
-		"ContainerManifestList",
-		"Endpoints",
-	}
-
-	AddDefaultCopy("", "v1beta1", defaultCopyList...)
-	AddDefaultCopy("v1beta1", "", defaultCopyList...)
+	// TODO: when we get more of this stuff, move to its own file. This is not a
+	// good home for lots of conversion functions.
+	// TODO: Consider inverting dependency chain-- imagine v1beta1 package
+	// registering all of these functions. Then, if you want to be able to understand
+	// v1beta1 objects, you just import that package for its side effects.
+	AddConversionFuncs(
+		// EnvVar's Name is depricated in favor of Key.
+		func(in *EnvVar, out *v1beta1.EnvVar) error {
+			out.Value = in.Value
+			out.Key = in.Name
+			out.Name = in.Name
+			return nil
+		},
+		func(in *v1beta1.EnvVar, out *EnvVar) error {
+			out.Value = in.Value
+			if in.Name != "" {
+				out.Name = in.Name
+			} else {
+				out.Name = in.Key
+			}
+			return nil
+		},
+	)
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
@@ -119,10 +109,7 @@ func AddKnownTypes(version string, types ...interface{}) {
 			panic("All types must be structs.")
 		}
 		knownTypes[t.Name()] = t
-		typeNamePathToVersion[typeNamePath{
-			typeName: t.Name(),
-			typePath: t.PkgPath(),
-		}] = version
+		typeToVersion[t] = version
 	}
 }
 
@@ -138,41 +125,33 @@ func New(versionName, typeName string) (interface{}, error) {
 	return nil, fmt.Errorf("No version '%v'", versionName)
 }
 
-// AddExternalConversion adds a function to the list of conversion functions. The given
-// function should know how to convert the internal representation of 'typeName' to the
-// external, versioned representation ("v1beta1").
-// TODO: When we make the next api version, this function will have to add a destination
-// version parameter.
-func AddExternalConversion(typeName string, fn ConversionFunc) {
-	conversionFuncs[typeTuple{"", "v1beta1", typeName}] = fn
-}
-
-// AddInternalConversion adds a function to the list of conversion functions. The given
-// function should know how to convert the external, versioned representation of 'typeName'
-// to the internal representation.
-// TODO: When we make the next api version, this function will have to add a source
-// version parameter.
-func AddInternalConversion(typeName string, fn ConversionFunc) {
-	conversionFuncs[typeTuple{"v1beta1", "", typeName}] = fn
-}
-
-// AddDefaultCopy registers a general copying function for turning objects of version
-// sourceVersion into the same object of version destVersion.
-func AddDefaultCopy(sourceVersion, destVersion string, types ...string) {
-	for i := range types {
-		t := types[i]
-		conversionFuncs[typeTuple{sourceVersion, destVersion, t}] = func(in interface{}) (interface{}, error) {
-			out, err := New(destVersion, t)
-			if err != nil {
-				return nil, err
-			}
-			err = DefaultCopy(in, out)
-			if err != nil {
-				return nil, err
-			}
-			return out, nil
+// AddConversionFuncs adds a function to the list of conversion functions. The given
+// function should know how to convert between two API objects. We deduce how to call
+// it from the types of its two parameters; see the comment for Converter.Register.
+//
+// Note that, if you need to copy sub-objects that didn't change, it's safe to call
+// Convert() inside your conversionFuncs, as long as you don't start a conversion
+// chain that's infinitely recursive.
+//
+// Also note that the default behavior, if you don't add a conversion function, is to
+// sanely copy fields that have the same names. It's OK if the destination type has
+// extra fields, but it must not remove any. So you only need to add a conversion
+// function for things with changed/removed fields.
+func AddConversionFuncs(conversionFuncs ...interface{}) error {
+	for _, f := range conversionFuncs {
+		err := theConverter.Register(f)
+		if err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+// Convert will attempt to convert in into out. Both must be pointers to API objects.
+// For easy testing of conversion functions. Returns an error if the conversion isn't
+// possible.
+func Convert(in, out interface{}) error {
+	return theConverter.Convert(in, out)
 }
 
 // FindJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
@@ -288,12 +267,8 @@ func objAPIVersionAndName(obj interface{}) (apiVersion, name string, err error) 
 		return "", "", err
 	}
 	t := v.Type()
-	key := typeNamePath{
-		typeName: t.Name(),
-		typePath: t.PkgPath(),
-	}
-	if version, ok := typeNamePathToVersion[key]; !ok {
-		return "", "", fmt.Errorf("Unregistered type: %#v", key)
+	if version, ok := typeToVersion[t]; !ok {
+		return "", "", fmt.Errorf("Unregistered type: %v", t)
 	} else {
 		return version, t.Name(), nil
 	}
@@ -490,25 +465,33 @@ func DecodeInto(data []byte, obj interface{}) error {
 }
 
 func internalize(obj interface{}) (interface{}, error) {
-	objVersion, objKind, err := objAPIVersionAndName(obj)
+	_, objKind, err := objAPIVersionAndName(obj)
 	if err != nil {
 		return nil, err
 	}
-	if fn, ok := conversionFuncs[typeTuple{objVersion, "", objKind}]; ok {
-		return fn(obj)
+	objOut, err := New("", objKind)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("No conversion handler that knows how to convert a '%v' from '%v'",
-		objKind, objVersion)
+	err = theConverter.Convert(obj, objOut)
+	if err != nil {
+		return nil, err
+	}
+	return objOut, nil
 }
 
 func externalize(obj interface{}) (interface{}, error) {
-	objVersion, objKind, err := objAPIVersionAndName(obj)
+	_, objKind, err := objAPIVersionAndName(obj)
 	if err != nil {
 		return nil, err
 	}
-	if fn, ok := conversionFuncs[typeTuple{objVersion, "v1beta1", objKind}]; ok {
-		return fn(obj)
+	objOut, err := New("v1beta1", objKind)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("No conversion handler that knows how to convert a '%v' from '%v' to '%v'",
-		objKind, objVersion, "v1beta1")
+	err = theConverter.Convert(obj, objOut)
+	if err != nil {
+		return nil, err
+	}
+	return objOut, nil
 }

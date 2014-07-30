@@ -17,9 +17,11 @@ limitations under the License.
 package api
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -105,16 +107,6 @@ func TestValidateEnv(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	nonCanonicalCase := []EnvVar{
-		{Key: "EV"},
-	}
-	if errs := validateEnv(nonCanonicalCase); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-	if nonCanonicalCase[0].Name != "EV" || nonCanonicalCase[0].Value != "" {
-		t.Errorf("expected default values: %+v", nonCanonicalCase[0])
-	}
-
 	errorCases := map[string][]EnvVar{
 		"zero-length name":        {{Name: ""}},
 		"name not a C identifier": {{Name: "a.b.c"}},
@@ -122,6 +114,42 @@ func TestValidateEnv(t *testing.T) {
 	for k, v := range errorCases {
 		if errs := validateEnv(v); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
+
+func TestEnvConversion(t *testing.T) {
+	nonCanonical := []v1beta1.EnvVar{
+		{Key: "EV"},
+		{Key: "EV", Name: "EX"},
+	}
+	canonical := []EnvVar{
+		{Name: "EV"},
+		{Name: "EX"},
+	}
+	for i := range nonCanonical {
+		var got EnvVar
+		err := Convert(&nonCanonical[i], &got)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if e, a := canonical[i], got; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+
+	// Test conversion the other way, too.
+	for i := range canonical {
+		var got v1beta1.EnvVar
+		err := Convert(&canonical[i], &got)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if e, a := canonical[i].Name, got.Key; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := canonical[i].Name, got.Name; e != a {
+			t.Errorf("expected %v, got %v", e, a)
 		}
 	}
 }
@@ -225,7 +253,7 @@ func TestValidateManifest(t *testing.T) {
 					Env: []EnvVar{
 						{Name: "ev1", Value: "val1"},
 						{Name: "ev2", Value: "val2"},
-						{Key: "EV3", Value: "val3"},
+						{Name: "EV3", Value: "val3"},
 					},
 					VolumeMounts: []VolumeMount{
 						{Name: "vol1", MountPath: "/foo"},
