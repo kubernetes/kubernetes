@@ -37,7 +37,6 @@ import (
 )
 
 var (
-	versionFlag   = flag.Bool("V", false, "Print the version number.")
 	serverVersion = flag.Bool("server_version", false, "Print the server's version number.")
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
 	httpServer    = flag.String("h", "", "The host to connect to.")
@@ -107,10 +106,7 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	if *versionFlag {
-		fmt.Printf("Version: %#v\n", version.Get())
-		os.Exit(0)
-	}
+	version.PrintAndExitIfRequested()
 
 	secure := true
 	var masterServer string
