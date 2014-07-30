@@ -123,7 +123,7 @@ func TestEnvConversion(t *testing.T) {
 		{Key: "EV"},
 		{Key: "EV", Name: "EX"},
 	}
-	cannonical := []EnvVar{
+	canonical := []EnvVar{
 		{Name: "EV"},
 		{Name: "EX"},
 	}
@@ -133,7 +133,22 @@ func TestEnvConversion(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if e, a := cannonical[i], got; !reflect.DeepEqual(e, a) {
+		if e, a := canonical[i], got; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+
+	// Test conversion the other way, too.
+	for i := range canonical {
+		var got v1beta1.EnvVar
+		err := Convert(&canonical[i], &got)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if e, a := canonical[i].Name, got.Key; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		if e, a := canonical[i].Name, got.Name; e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 	}
