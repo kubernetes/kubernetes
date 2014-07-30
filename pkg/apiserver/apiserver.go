@@ -64,7 +64,7 @@ func NewNotFoundErr(kind, name string) error {
 }
 
 // RESTStorage is a generic interface for RESTful storage services
-// Resources whicih are exported to the RESTful API of apiserver need to implement this interface.
+// Resources which are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
 	// List selects resources in the storage which match to the selector.
 	List(labels.Selector) (interface{}, error)
