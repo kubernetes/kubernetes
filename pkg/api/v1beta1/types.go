@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/fsouza/go-dockerclient"
+	"github.com/fsouza/go-dockerclient-copiedstructs"
 )
 
 // Common string formats
@@ -237,7 +237,8 @@ type PodState struct {
 	// The key of this map is the *name* of the container within the manifest; it has one
 	// entry per container in the manifest. The value of this map is currently the output
 	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon.
+	// upon. To allow marshalling/unmarshalling, we copied the client's structs and added
+	// json/yaml tags.
 	// TODO: Make real decisions about what our info should look like.
 	Info          PodInfo       `json:"info,omitempty" yaml:"info,omitempty"`
 	RestartPolicy RestartPolicy `json:"restartpolicy,omitempty" yaml:"restartpolicy,omitempty"`

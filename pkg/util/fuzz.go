@@ -109,7 +109,7 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 	case reflect.Map:
 		if rand.Intn(5) > 0 {
 			v.Set(reflect.MakeMap(v.Type()))
-			n := 1 + rand.Intn(10)
+			n := 1 + rand.Intn(2)
 			for i := 0; i < n; i++ {
 				key := reflect.New(v.Type().Key()).Elem()
 				f.doFuzz(key)
@@ -129,7 +129,7 @@ func (f *Fuzzer) doFuzz(v reflect.Value) {
 		v.Set(reflect.Zero(v.Type()))
 	case reflect.Slice:
 		if rand.Intn(5) > 0 {
-			n := 1 + rand.Intn(10)
+			n := 1 + rand.Intn(2)
 			v.Set(reflect.MakeSlice(v.Type(), n, n))
 			for i := 0; i < n; i++ {
 				f.doFuzz(v.Index(i))

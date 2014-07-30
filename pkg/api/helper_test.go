@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/fsouza/go-dockerclient"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 3, "How many fuzzing iterations to do.")
@@ -55,23 +56,28 @@ var apiObjectFuzzer = util.NewFuzzer(
 			intstr.StrVal = util.RandString()
 		}
 	},
-	func(p *PodInfo) {
-		// The docker container type doesn't survive fuzzing.
-		// TODO: fix this.
-		*p = nil
+	func(u64 *uint64) {
+		// TODO: uint64's are NOT handled right.
+		*u64 = util.RandUint64() >> 8
+	},
+	func(pb map[docker.Port][]docker.PortBinding) {
+		// This is necessary because keys with nil values get omitted.
+		// TODO: Is this a bug?
+		pb[docker.Port(util.RandString())] = []docker.PortBinding{
+			{util.RandString(), util.RandString()},
+			{util.RandString(), util.RandString()},
+		}
+	},
+	func(pm map[string]docker.PortMapping) {
+		// This is necessary because keys with nil values get omitted.
+		// TODO: Is this a bug?
+		pm[util.RandString()] = docker.PortMapping{
+			util.RandString(): util.RandString(),
+		}
 	},
 )
 
 func objDiff(a, b interface{}) string {
-
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
-	return util.StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
-	)
-
 	ab, err := json.Marshal(a)
 	if err != nil {
 		panic("a")
@@ -81,6 +87,14 @@ func objDiff(a, b interface{}) string {
 		panic("b")
 	}
 	return util.StringDiff(string(ab), string(bb))
+
+	// An alternate diff attempt, in case json isn't showing you
+	// the difference. (reflect.DeepEqual makes a distinction between
+	// nil and empty slices, for example.)
+	return util.StringDiff(
+		fmt.Sprintf("%#v", a),
+		fmt.Sprintf("%#v", b),
+	)
 }
 
 func runTest(t *testing.T, source interface{}) {
