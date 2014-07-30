@@ -136,6 +136,7 @@ func TestProxyUpdateDelete(t *testing.T) {
 	conn.Close()
 
 	p.OnUpdate([]api.Service{})
+	// Wait for the port to close.
 	time.Sleep(2 * time.Second)
 	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
 	if err == nil {
