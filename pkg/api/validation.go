@@ -274,13 +274,26 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 	return []error(allErrs)
 }
 
+func ValidatePodState(podState *PodState) []error {
+	allErrs := errorList(ValidateManifest(&podState.Manifest))
+	if podState.RestartPolicy.Type == "" {
+		podState.RestartPolicy.Type = RestartAlways
+	} else if podState.RestartPolicy.Type != RestartAlways &&
+		podState.RestartPolicy.Type != RestartOnFailure &&
+		podState.RestartPolicy.Type != RestartNever {
+		allErrs.Append(makeNotSupportedError("PodState.RestartPolicy.Type", podState.RestartPolicy.Type))
+	}
+
+	return []error(allErrs)
+}
+
 // Pod tests if required fields in the pod are set.
 func ValidatePod(pod *Pod) []error {
 	allErrs := errorList{}
 	if pod.ID == "" {
 		allErrs.Append(makeInvalidError("Pod.ID", pod.ID))
 	}
-	allErrs.Append(ValidateManifest(&pod.DesiredState.Manifest)...)
+	allErrs.Append(ValidatePodState(&pod.DesiredState)...)
 	return []error(allErrs)
 }
 
