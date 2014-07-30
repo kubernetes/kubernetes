@@ -79,3 +79,32 @@ func TestConverter(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 }
+
+func anonymousEmptyTypeNamedA() interface{} {
+	type A struct{}
+	return &A{}
+}
+
+func TestCopyConvertor(t *testing.T) {
+	type A struct {
+		Bar string
+	}
+	type B struct {
+		Bar string
+	}
+	c := NewConverter()
+	err := c.Convert(anonymousEmptyTypeNamedA(), &A{})
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	err = c.Convert(&A{}, anonymousEmptyTypeNamedA())
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	err = c.Convert(&B{}, &A{})
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
