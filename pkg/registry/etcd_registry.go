@@ -112,9 +112,10 @@ func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	}
 
 	contKey := makeContainerKey(machine)
-	err = registry.helper().AtomicUpdate(contKey, &[]api.ContainerManifest{}, func(in interface{}) (interface{}, error) {
-		manifests := *in.(*[]api.ContainerManifest)
-		return append(manifests, manifest), nil
+	err = registry.helper().AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
+		manifests := *in.(*api.ContainerManifestList)
+		manifests.Items = append(manifests.Items, manifest)
+		return manifests, nil
 	})
 	if err != nil {
 		// Don't strand stuff.
@@ -153,11 +154,11 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 
 	// Next, remove the pod from the machine atomically.
 	contKey := makeContainerKey(machine)
-	return registry.helper().AtomicUpdate(contKey, &[]api.ContainerManifest{}, func(in interface{}) (interface{}, error) {
-		manifests := *in.(*[]api.ContainerManifest)
-		newManifests := make([]api.ContainerManifest, 0, len(manifests))
+	return registry.helper().AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
+		manifests := in.(*api.ContainerManifestList)
+		newManifests := make([]api.ContainerManifest, 0, len(manifests.Items))
 		found := false
-		for _, manifest := range manifests {
+		for _, manifest := range manifests.Items {
 			if manifest.ID != podID {
 				newManifests = append(newManifests, manifest)
 			} else {
@@ -170,7 +171,8 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 			// However it is "deleted" so log it and move on
 			glog.Infof("Couldn't find: %s in %#v", podID, manifests)
 		}
-		return newManifests, nil
+		manifests.Items = newManifests
+		return manifests, nil
 	})
 }
 
@@ -304,5 +306,5 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
-	return registry.helper().SetObj("/registry/services/endpoints/"+e.Name, e)
+	return registry.helper().SetObj("/registry/services/endpoints/"+e.ID, e)
 }

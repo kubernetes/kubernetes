@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -70,7 +69,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{}), 0)
+	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.CreatePod("machine", api.Pod{
 		JSONBase: api.JSONBase{
@@ -88,18 +87,20 @@ func TestEtcdCreatePod(t *testing.T) {
 	})
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
 	var pod api.Pod
-	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
+	err = api.DecodeInto([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var manifests []api.ContainerManifest
+	var manifests api.ContainerManifestList
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
-	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
-	if len(manifests) != 1 || manifests[0].ID != "foo" {
+	err = api.DecodeInto([]byte(resp.Node.Value), &manifests)
+	if len(manifests.Items) != 1 || manifests.Items[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
 }
@@ -189,18 +190,20 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	})
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
 	var pod api.Pod
-	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
+	err = api.DecodeInto([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var manifests []api.ContainerManifest
+	var manifests api.ContainerManifestList
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
-	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
-	if len(manifests) != 1 || manifests[0].ID != "foo" {
+	err = api.DecodeInto([]byte(resp.Node.Value), &manifests)
+	if len(manifests.Items) != 1 || manifests.Items[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
 }
@@ -213,9 +216,9 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
-		{
-			ID: "bar",
+	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(api.ContainerManifestList{
+		Items: []api.ContainerManifest{
+			{ID: "bar"},
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
@@ -236,18 +239,20 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	})
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
 	var pod api.Pod
-	err = json.Unmarshal([]byte(resp.Node.Value), &pod)
+	err = api.DecodeInto([]byte(resp.Node.Value), &pod)
 	expectNoError(t, err)
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
-	var manifests []api.ContainerManifest
+	var manifests api.ContainerManifestList
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
 	expectNoError(t, err)
-	err = json.Unmarshal([]byte(resp.Node.Value), &manifests)
-	if len(manifests) != 2 || manifests[1].ID != "foo" {
+	err = api.DecodeInto([]byte(resp.Node.Value), &manifests)
+	if len(manifests.Items) != 2 || manifests.Items[1].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
 }
@@ -256,9 +261,9 @@ func TestEtcdDeletePod(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
-		{
-			ID: "foo",
+	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{
+		Items: []api.ContainerManifest{
+			{ID: "foo"},
 		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
@@ -269,8 +274,13 @@ func TestEtcdDeletePod(t *testing.T) {
 	} else if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
-	response, _ := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
-	if response.Node.Value != "[]" {
+	response, err := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	var manifests api.ContainerManifestList
+	api.DecodeInto([]byte(response.Node.Value), &manifests)
+	if len(manifests.Items) != 0 {
 		t.Errorf("Unexpected container set: %s, expected empty", response.Node.Value)
 	}
 }
@@ -279,9 +289,11 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
-	fakeClient.Set("/registry/hosts/machine/kubelet", util.MakeJSONString([]api.ContainerManifest{
-		{ID: "foo"},
-		{ID: "bar"},
+	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{
+		Items: []api.ContainerManifest{
+			{ID: "foo"},
+			{ID: "bar"},
+		},
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
@@ -292,13 +304,16 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
-	response, _ := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
-	var manifests []api.ContainerManifest
-	json.Unmarshal([]byte(response.Node.Value), &manifests)
-	if len(manifests) != 1 {
-		t.Errorf("Unexpected manifest set: %#v, expected empty", manifests)
+	response, err := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
 	}
-	if manifests[0].ID != "bar" {
+	var manifests api.ContainerManifestList
+	api.DecodeInto([]byte(response.Node.Value), &manifests)
+	if len(manifests.Items) != 1 {
+		t.Fatalf("Unexpected manifest set: %#v, expected empty", manifests)
+	}
+	if manifests.Items[0].ID != "bar" {
 		t.Errorf("Deleted wrong manifest: %#v", manifests)
 	}
 }
@@ -476,9 +491,11 @@ func TestEtcdCreateController(t *testing.T) {
 	})
 	expectNoError(t, err)
 	resp, err := fakeClient.Get("/registry/controllers/foo", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
 	var ctrl api.ReplicationController
-	err = json.Unmarshal([]byte(resp.Node.Value), &ctrl)
+	err = api.DecodeInto([]byte(resp.Node.Value), &ctrl)
 	expectNoError(t, err)
 	if ctrl.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", ctrl, resp.Node.Value)
@@ -544,7 +561,7 @@ func TestEtcdCreateService(t *testing.T) {
 	resp, err := fakeClient.Get("/registry/services/specs/foo", false, false)
 	expectNoError(t, err)
 	var service api.Service
-	err = json.Unmarshal([]byte(resp.Node.Value), &service)
+	err = api.DecodeInto([]byte(resp.Node.Value), &service)
 	expectNoError(t, err)
 	if service.ID != "foo" {
 		t.Errorf("Unexpected service: %#v %s", service, resp.Node.Value)
@@ -621,15 +638,17 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	endpoints := api.Endpoints{
-		Name:      "foo",
+		JSONBase:  api.JSONBase{ID: "foo"},
 		Endpoints: []string{"baz", "bar"},
 	}
 	err := registry.UpdateEndpoints(endpoints)
 	expectNoError(t, err)
 	response, err := fakeClient.Get("/registry/services/endpoints/foo", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
 	var endpointsOut api.Endpoints
-	err = json.Unmarshal([]byte(response.Node.Value), &endpointsOut)
+	err = api.DecodeInto([]byte(response.Node.Value), &endpointsOut)
 	if !reflect.DeepEqual(endpoints, endpointsOut) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", endpointsOut, endpoints)
 	}

@@ -89,15 +89,15 @@ func (impl LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	defer impl.lock.Unlock()
 	// First update / add all new endpoints for services.
 	for _, value := range endpoints {
-		existingEndpoints, exists := impl.endpointsMap[value.Name]
+		existingEndpoints, exists := impl.endpointsMap[value.ID]
 		validEndpoints := impl.filterValidEndpoints(value.Endpoints)
 		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
-			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", value.Name, value.Endpoints)
-			impl.endpointsMap[value.Name] = validEndpoints
+			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", value.ID, value.Endpoints)
+			impl.endpointsMap[value.ID] = validEndpoints
 			// Start RR from the beginning if added or updated.
-			impl.rrIndex[value.Name] = 0
+			impl.rrIndex[value.ID] = 0
 		}
-		tmp[value.Name] = true
+		tmp[value.ID] = true
 	}
 	// Then remove any endpoints no longer relevant
 	for key, value := range impl.endpointsMap {

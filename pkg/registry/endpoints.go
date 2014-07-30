@@ -88,7 +88,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
 		}
 		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
-			Name:      service.ID,
+			JSONBase:  api.JSONBase{ID: service.ID},
 			Endpoints: endpoints,
 		})
 		if err != nil {

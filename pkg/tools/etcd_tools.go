@@ -112,7 +112,7 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 	v := pv.Elem()
 	for _, node := range nodes {
 		obj := reflect.New(v.Type().Elem())
-		err = json.Unmarshal([]byte(node.Value), obj.Interface())
+		err = api.DecodeInto([]byte(node.Value), obj.Interface())
 		if err != nil {
 			return err
 		}
@@ -146,9 +146,9 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 		return "", 0, fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
 	}
 	body = response.Node.Value
-	err = json.Unmarshal([]byte(body), objPtr)
+	err = api.DecodeInto([]byte(body), objPtr)
 	if jsonBase, err := api.FindJSONBase(objPtr); err == nil {
-		jsonBase.ResourceVersion = response.Node.ModifiedIndex
+		jsonBase.SetResourceVersion(response.Node.ModifiedIndex)
 		// Note that err shadows the err returned below, so we won't
 		// return an error just because we failed to find a JSONBase.
 		// This is intentional.
@@ -159,7 +159,7 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 // SetObj marshals obj via json, and stores under key. Will do an
 // atomic update if obj's ResourceVersion field is set.
 func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
-	data, err := json.Marshal(obj)
+	data, err := api.Encode(obj)
 	if err != nil {
 		return err
 	}

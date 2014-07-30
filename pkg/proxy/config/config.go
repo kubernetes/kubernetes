@@ -127,19 +127,19 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	case ADD:
 		glog.Infof("Adding new endpoint from source %s : %v", source, update.Endpoints)
 		for _, value := range update.Endpoints {
-			endpoints[value.Name] = value
+			endpoints[value.ID] = value
 		}
 	case REMOVE:
 		glog.Infof("Removing an endpoint %v", update)
 		for _, value := range update.Endpoints {
-			delete(endpoints, value.Name)
+			delete(endpoints, value.ID)
 		}
 	case SET:
 		glog.Infof("Setting endpoints %v", update)
 		// Clear the old map entries by just creating a new map
 		endpoints = make(map[string]api.Endpoints)
 		for _, value := range update.Endpoints {
-			endpoints[value.Name] = value
+			endpoints[value.ID] = value
 		}
 	default:
 		glog.Infof("Received invalid update type: %v", update)

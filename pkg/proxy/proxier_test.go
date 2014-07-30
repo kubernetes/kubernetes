@@ -52,7 +52,8 @@ func TestProxy(t *testing.T) {
 	}
 
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{"echo", []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
 	p := NewProxier(lb)
 

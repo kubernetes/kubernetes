@@ -83,7 +83,7 @@ func (s sortedEndpoints) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 func (s sortedEndpoints) Less(i, j int) bool {
-	return s[i].Name < s[j].Name
+	return s[i].ID < s[j].ID
 }
 
 type EndpointsHandlerMock struct {
@@ -216,8 +216,14 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{Name: "foo", Endpoints: []string{"endpoint1", "endpoint2"}})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{Name: "bar", Endpoints: []string{"endpoint3", "endpoint4"}})
+	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint1", "endpoint2"},
+	})
+	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "bar"},
+		Endpoints: []string{"endpoint3", "endpoint4"},
+	})
 	handler.Wait(2)
 	handler2.Wait(2)
 	channelOne <- endpointsUpdate1
@@ -236,8 +242,14 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2 := NewEndpointsHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{Name: "foo", Endpoints: []string{"endpoint1", "endpoint2"}})
-	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{Name: "bar", Endpoints: []string{"endpoint3", "endpoint4"}})
+	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint1", "endpoint2"},
+	})
+	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "bar"},
+		Endpoints: []string{"endpoint3", "endpoint4"},
+	})
 	handler.Wait(2)
 	handler2.Wait(2)
 	channelOne <- endpointsUpdate1
@@ -248,7 +260,10 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Add one more
-	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{Name: "foobar", Endpoints: []string{"endpoint5", "endpoint6"}})
+	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foobar"},
+		Endpoints: []string{"endpoint5", "endpoint6"},
+	})
 	handler.Wait(1)
 	handler2.Wait(1)
 	channelTwo <- endpointsUpdate3
@@ -257,7 +272,10 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Update the "foo" service with new endpoints
-	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{Name: "foo", Endpoints: []string{"endpoint77"}})
+	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"endpoint77"},
+	})
 	handler.Wait(1)
 	handler2.Wait(1)
 	channelOne <- endpointsUpdate1
@@ -266,7 +284,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Remove "bar" service
-	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{Name: "bar"})
+	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{JSONBase: api.JSONBase{ID: "bar"}})
 	handler.Wait(1)
 	handler2.Wait(1)
 	channelTwo <- endpointsUpdate2

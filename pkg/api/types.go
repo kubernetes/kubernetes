@@ -38,7 +38,7 @@ import (
 //     by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?
 //
-//  DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
+// DNS_SUBDOMAIN:  This is a string, no more than 253 characters long, that conforms
 //      to the definition of a "subdomain" in RFCs 1035 and 1123.  This is captured
 //      by the following regex:
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
@@ -56,6 +56,12 @@ type ContainerManifest struct {
 	ID         string      `yaml:"id" json:"id"`
 	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
 	Containers []Container `yaml:"containers" json:"containers"`
+}
+
+// ContainerManifestList is used to communicate container manifests to kubelet.
+type ContainerManifestList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
@@ -217,7 +223,8 @@ type PodState struct {
 	// entry per container in the manifest. The value of this map is currently the output
 	// of `docker inspect`. This output format is *not* final and should not be relied
 	// upon.
-	// TODO: Make real decisions about what our info should look like.
+	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
+	// when we have done this.
 	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
@@ -289,8 +296,8 @@ type Service struct {
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	Name      string
-	Endpoints []string
+	JSONBase  `json:",inline" yaml:",inline"`
+	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }
 
 // Minion is a worker node in Kubernetenes.
