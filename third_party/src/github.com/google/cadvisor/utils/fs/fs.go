@@ -12,21 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package interference
+package fs
 
-import "github.com/google/cadvisor/info"
+import (
+	"io"
+	"os"
+)
 
-// InterferenceDectector detects if there's a container which
-// interferences with a set of containers. The detector tracks
-// a set of containers and find the victims and antagonist.
-type InterferenceDetector interface {
-	// Tracks the behavior of the container.
-	AddContainer(ref info.ContainerReference)
+type osFS struct{}
 
-	// Returns a list of possible interferences. The upper layer may take action
-	// based on the interference.
-	Detect() ([]*info.Interference, error)
+func (osFS) Open(name string) (File, error)        { return os.Open(name) }
+func (osFS) Stat(name string) (os.FileInfo, error) { return os.Stat(name) }
 
-	// The name of the detector.
-	Name() string
+var fs FileSystem = osFS{}
+
+type FileSystem interface {
+	Open(name string) (File, error)
+}
+
+type File interface {
+	io.ReadWriteCloser
+}
+
+// Useful for tests. Not thread safe.
+func ChangeFileSystem(filesystem FileSystem) {
+	fs = filesystem
+}
+
+func Open(name string) (File, error) {
+	return fs.Open(name)
 }

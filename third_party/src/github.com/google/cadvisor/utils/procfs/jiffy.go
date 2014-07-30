@@ -12,21 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package interference
+package procfs
 
-import "github.com/google/cadvisor/info"
+/*
+#include <unistd.h>
+*/
+import "C"
+import "time"
 
-// InterferenceDectector detects if there's a container which
-// interferences with a set of containers. The detector tracks
-// a set of containers and find the victims and antagonist.
-type InterferenceDetector interface {
-	// Tracks the behavior of the container.
-	AddContainer(ref info.ContainerReference)
+var userHz uint64
 
-	// Returns a list of possible interferences. The upper layer may take action
-	// based on the interference.
-	Detect() ([]*info.Interference, error)
+func init() {
+	userHzLong := C.sysconf(C._SC_CLK_TCK)
+	userHz = uint64(userHzLong)
+}
 
-	// The name of the detector.
-	Name() string
+func JiffiesToDuration(jiffies uint64) time.Duration {
+	d := jiffies * 1000000000 / userHz
+	return time.Duration(d)
 }

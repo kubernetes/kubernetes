@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/cadvisor/api"
 	"github.com/google/cadvisor/container/docker"
-	"github.com/google/cadvisor/container/lmctfy"
+	"github.com/google/cadvisor/container/raw"
 	"github.com/google/cadvisor/info"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/pages"
@@ -30,7 +30,6 @@ import (
 )
 
 var argPort = flag.Int("port", 8080, "port to listen")
-var argAllowLmctfy = flag.Bool("allow_lmctfy", true, "whether to allow lmctfy as a container handler")
 
 var argDbDriver = flag.String("storage_driver", "memory", "storage driver to use. Options are: memory (default) and influxdb")
 
@@ -47,30 +46,14 @@ func main() {
 		log.Fatalf("Failed to create a Container Manager: %s", err)
 	}
 
-	// Register lmctfy for the root if allowed and available.
-	registeredRoot := false
-	if *argAllowLmctfy {
-		if err := lmctfy.Register("/"); err != nil {
-			log.Printf("lmctfy registration failed: %v.", err)
-			log.Print("Running in docker only mode.")
-		} else {
-			registeredRoot = true
-		}
-	}
-
-	// Register Docker for root if we were unable to register lmctfy.
-	if !registeredRoot {
-		if err := docker.Register(containerManager, "/"); err != nil {
-			log.Printf("Docker registration failed: %v.", err)
-			log.Fatalf("Unable to continue without root handler.")
-		}
-	}
-
-	// Register Docker for all Docker containers.
-	if err := docker.Register(containerManager, "/docker"); err != nil {
-		// Ignore this error because we should work with lmctfy only
+	// Register Docker.
+	if err := docker.Register(containerManager); err != nil {
 		log.Printf("Docker registration failed: %v.", err)
-		log.Print("Running in lmctfy only mode.")
+	}
+
+	// Register the raw driver.
+	if err := raw.Register(containerManager); err != nil {
+		log.Fatalf("raw registration failed: %v.", err)
 	}
 
 	// Handler for static content.
@@ -100,11 +83,14 @@ func main() {
 		}
 	})
 
-	go containerManager.Start()
+	go func() {
+		log.Fatal(containerManager.Start())
+	}()
 
 	log.Printf("Starting cAdvisor version: %q", info.VERSION)
 	log.Print("About to serve on port ", *argPort)
 
 	addr := fmt.Sprintf(":%v", *argPort)
+
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

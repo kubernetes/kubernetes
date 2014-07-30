@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memory
+package cache
 
 import (
 	"testing"
 
 	"github.com/google/cadvisor/storage"
+	"github.com/google/cadvisor/storage/memory"
 	"github.com/google/cadvisor/storage/test"
 )
 
@@ -26,7 +27,8 @@ func runStorageTest(f func(storage.StorageDriver, *testing.T), t *testing.T) {
 
 	var driver storage.StorageDriver
 	for N := 10; N < maxSize; N += 10 {
-		driver = New(N, N)
+		backend := memory.New(N*2, N*2)
+		driver = MemoryCache(N, N, backend)
 		f(driver, t)
 	}
 
@@ -50,7 +52,8 @@ func TestPercentilesWithoutSample(t *testing.T) {
 
 func TestPercentiles(t *testing.T) {
 	N := 100
-	driver := New(N, N)
+	backend := memory.New(N*2, N*2)
+	driver := MemoryCache(N, N, backend)
 	test.StorageDriverTestPercentiles(driver, t)
 }
 
@@ -72,12 +75,4 @@ func TestNoSamples(t *testing.T) {
 
 func TestPercentilesWithoutStats(t *testing.T) {
 	runStorageTest(test.StorageDriverTestPercentilesWithoutStats, t)
-}
-
-func TestRetrieveZeroStats(t *testing.T) {
-	runStorageTest(test.StorageDriverTestRetrieveZeroRecentStats, t)
-}
-
-func TestRetrieveZeroSamples(t *testing.T) {
-	runStorageTest(test.StorageDriverTestRetrieveZeroSamples, t)
 }

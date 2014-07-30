@@ -21,14 +21,10 @@ import (
 	"time"
 )
 
-type CpuSpecMask struct {
-	Data []uint64 `json:"data,omitempty"`
-}
-
 type CpuSpec struct {
-	Limit    uint64      `json:"limit"`
-	MaxLimit uint64      `json:"max_limit"`
-	Mask     CpuSpecMask `json:"mask,omitempty"`
+	Limit    uint64 `json:"limit"`
+	MaxLimit uint64 `json:"max_limit"`
+	Mask     string `json:"mask,omitempty"`
 }
 
 type MemorySpec struct {
@@ -69,27 +65,7 @@ type ContainerInfoRequest struct {
 	// Different percentiles of CPU usage within a period. The values must be within [0, 100]
 	CpuUsagePercentiles []int `json:"cpu_usage_percentiles,omitempty"`
 	// Different percentiles of memory usage within a period. The values must be within [0, 100]
-	MemoryUsagePercentages []int `json:"memory_usage_percentiles,omitempty"`
-}
-
-func (self *ContainerInfoRequest) FillDefaults() *ContainerInfoRequest {
-	ret := self
-	if ret == nil {
-		ret = new(ContainerInfoRequest)
-	}
-	if ret.NumStats <= 0 {
-		ret.NumStats = 1024
-	}
-	if ret.NumSamples <= 0 {
-		ret.NumSamples = 1024
-	}
-	if len(ret.CpuUsagePercentiles) == 0 {
-		ret.CpuUsagePercentiles = []int{50, 80, 90, 99}
-	}
-	if len(ret.MemoryUsagePercentages) == 0 {
-		ret.MemoryUsagePercentages = []int{50, 80, 90, 99}
-	}
-	return ret
+	MemoryUsagePercentiles []int `json:"memory_usage_percentiles,omitempty"`
 }
 
 type ContainerInfo struct {
@@ -239,11 +215,31 @@ type MemoryStatsMemoryData struct {
 	Pgmajfault uint64 `json:"pgmajfault,omitempty"`
 }
 
+type NetworkStats struct {
+	// Cumulative count of bytes received.
+	RxBytes uint64 `json:"rx_bytes"`
+	// Cumulative count of packets received.
+	RxPackets uint64 `json:"rx_packets"`
+	// Cumulative count of receive errors encountered.
+	RxErrors uint64 `json:"rx_errors"`
+	// Cumulative count of packets dropped while receiving.
+	RxDropped uint64 `json:"rx_dropped"`
+	// Cumulative count of bytes transmitted.
+	TxBytes uint64 `json:"tx_bytes"`
+	// Cumulative count of packets transmitted.
+	TxPackets uint64 `json:"tx_packets"`
+	// Cumulative count of transmit errors encountered.
+	TxErrors uint64 `json:"tx_errors"`
+	// Cumulative count of packets dropped while transmitting.
+	TxDropped uint64 `json:"tx_dropped"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
-	Timestamp time.Time    `json:"timestamp"`
-	Cpu       *CpuStats    `json:"cpu,omitempty"`
-	Memory    *MemoryStats `json:"memory,omitempty"`
+	Timestamp time.Time     `json:"timestamp"`
+	Cpu       *CpuStats     `json:"cpu,omitempty"`
+	Memory    *MemoryStats  `json:"memory,omitempty"`
+	Network   *NetworkStats `json:"network,omitempty"`
 }
 
 // Makes a deep copy of the ContainerStats and returns a pointer to the new

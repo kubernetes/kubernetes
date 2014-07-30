@@ -71,6 +71,11 @@ func HandleRequest(m manager.Manager, w http.ResponseWriter, r *http.Request) er
 		log.Printf("Api - Container(%s)", containerName)
 
 		var query info.ContainerInfoRequest
+
+		// If a user does not specify number of stats/samples he wants,
+		// it's 64 by default
+		query.NumStats = 64
+		query.NumSamples = 64
 		decoder := json.NewDecoder(r.Body)
 		err := decoder.Decode(&query)
 		if err != nil && err != io.EOF {

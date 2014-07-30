@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/container"
-	ctest "github.com/google/cadvisor/container/test"
 	"github.com/google/cadvisor/info"
 	itest "github.com/google/cadvisor/info/test"
 	stest "github.com/google/cadvisor/storage/test"
@@ -31,15 +30,15 @@ import (
 func createManagerAndAddContainers(
 	driver *stest.MockStorageDriver,
 	containers []string,
-	f func(*ctest.MockContainerHandler),
+	f func(*container.MockContainerHandler),
 	t *testing.T,
 ) *manager {
 	if driver == nil {
 		driver = &stest.MockStorageDriver{}
 	}
-	factory := &ctest.FactoryForMockContainerHandler{
+	factory := &container.FactoryForMockContainerHandler{
 		Name: "factoryForManager",
-		PrepareContainerHandlerFunc: func(name string, handler *ctest.MockContainerHandler) {
+		PrepareContainerHandlerFunc: func(name string, handler *container.MockContainerHandler) {
 			handler.Name = name
 			found := false
 			for _, c := range containers {
@@ -53,7 +52,8 @@ func createManagerAndAddContainers(
 			f(handler)
 		},
 	}
-	container.RegisterContainerHandlerFactory("/", factory)
+	container.ClearContainerHandlerFactories()
+	container.RegisterContainerHandlerFactory(factory)
 	mif, err := New(driver)
 	if err != nil {
 		t.Fatal(err)
@@ -81,11 +81,11 @@ func TestGetContainerInfo(t *testing.T) {
 		NumStats:               256,
 		NumSamples:             128,
 		CpuUsagePercentiles:    []int{10, 50, 90},
-		MemoryUsagePercentages: []int{10, 80, 90},
+		MemoryUsagePercentiles: []int{10, 80, 90},
 	}
 
 	infosMap := make(map[string]*info.ContainerInfo, len(containers))
-	handlerMap := make(map[string]*ctest.MockContainerHandler, len(containers))
+	handlerMap := make(map[string]*container.MockContainerHandler, len(containers))
 
 	for _, container := range containers {
 		infosMap[container] = itest.GenerateRandomContainerInfo(container, 4, query, 1*time.Second)
@@ -95,7 +95,7 @@ func TestGetContainerInfo(t *testing.T) {
 	m := createManagerAndAddContainers(
 		driver,
 		containers,
-		func(h *ctest.MockContainerHandler) {
+		func(h *container.MockContainerHandler) {
 			cinfo := infosMap[h.Name]
 			stats := cinfo.Stats
 			samples := cinfo.Samples
@@ -105,7 +105,7 @@ func TestGetContainerInfo(t *testing.T) {
 				"Percentiles",
 				h.Name,
 				query.CpuUsagePercentiles,
-				query.MemoryUsagePercentages,
+				query.MemoryUsagePercentiles,
 			).Return(
 				percentiles,
 				nil,
@@ -146,95 +146,6 @@ func TestGetContainerInfo(t *testing.T) {
 
 	for _, container := range containers {
 		cinfo, err := m.GetContainerInfo(container, query)
-		if err != nil {
-			t.Fatalf("Unable to get info for container %v: %v", container, err)
-		}
-		returnedInfos[container] = cinfo
-	}
-
-	for container, handler := range handlerMap {
-		handler.AssertExpectations(t)
-		returned := returnedInfos[container]
-		expected := infosMap[container]
-		if !reflect.DeepEqual(returned, expected) {
-			t.Errorf("returned unexpected info for container %v; returned %+v; expected %+v", container, returned, expected)
-		}
-	}
-
-}
-
-func TestGetContainerInfoWithDefaultValue(t *testing.T) {
-	containers := []string{
-		"/c1",
-		"/c2",
-	}
-
-	var query *info.ContainerInfoRequest
-	query = query.FillDefaults()
-
-	infosMap := make(map[string]*info.ContainerInfo, len(containers))
-	handlerMap := make(map[string]*ctest.MockContainerHandler, len(containers))
-
-	for _, container := range containers {
-		infosMap[container] = itest.GenerateRandomContainerInfo(container, 4, query, 1*time.Second)
-	}
-
-	driver := &stest.MockStorageDriver{}
-	m := createManagerAndAddContainers(
-		driver,
-		containers,
-		func(h *ctest.MockContainerHandler) {
-			cinfo := infosMap[h.Name]
-			stats := cinfo.Stats
-			samples := cinfo.Samples
-			percentiles := cinfo.StatsPercentiles
-			spec := cinfo.Spec
-			driver.On(
-				"Percentiles",
-				h.Name,
-				query.CpuUsagePercentiles,
-				query.MemoryUsagePercentages,
-			).Return(
-				percentiles,
-				nil,
-			)
-
-			driver.On(
-				"Samples",
-				h.Name,
-				query.NumSamples,
-			).Return(
-				samples,
-				nil,
-			)
-
-			driver.On(
-				"RecentStats",
-				h.Name,
-				query.NumStats,
-			).Return(
-				stats,
-				nil,
-			)
-
-			h.On("ListContainers", container.LIST_SELF).Return(
-				[]info.ContainerReference(nil),
-				nil,
-			)
-			h.On("GetSpec").Return(
-				spec,
-				nil,
-			)
-			handlerMap[h.Name] = h
-		},
-		t,
-	)
-
-	returnedInfos := make(map[string]*info.ContainerInfo, len(containers))
-
-	for _, container := range containers {
-		// nil should give us default values
-		cinfo, err := m.GetContainerInfo(container, nil)
 		if err != nil {
 			t.Fatalf("Unable to get info for container %v: %v", container, err)
 		}

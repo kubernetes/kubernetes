@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/cadvisor/info"
 	"github.com/google/cadvisor/storage"
-	"github.com/influxdb/influxdb-go"
+	influxdb "github.com/influxdb/influxdb/client"
 )
 
 type influxdbStorage struct {
@@ -320,6 +320,9 @@ func (self *influxdbStorage) AddStats(ref info.ContainerReference, stats *info.C
 }
 
 func (self *influxdbStorage) RecentStats(containerName string, numStats int) ([]*info.ContainerStats, error) {
+	if numStats == 0 {
+		return nil, nil
+	}
 	// TODO(dengnan): select only columns that we need
 	// TODO(dengnan): escape names
 	query := fmt.Sprintf("select * from %v where %v='%v' and %v='%v'", self.tableName, colContainerName, containerName, colMachineName, self.machineName)
@@ -352,6 +355,9 @@ func (self *influxdbStorage) RecentStats(containerName string, numStats int) ([]
 }
 
 func (self *influxdbStorage) Samples(containerName string, numSamples int) ([]*info.ContainerStatsSample, error) {
+	if numSamples == 0 {
+		return nil, nil
+	}
 	// TODO(dengnan): select only columns that we need
 	// TODO(dengnan): escape names
 	query := fmt.Sprintf("select * from %v where %v='%v' and %v='%v'", self.tableName, colContainerName, containerName, colMachineName, self.machineName)

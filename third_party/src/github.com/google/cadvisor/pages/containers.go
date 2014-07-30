@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"path"
@@ -36,6 +37,7 @@ var funcMap = template.FuncMap{
 	"containerLink":         containerLink,
 	"printMask":             printMask,
 	"printCores":            printCores,
+	"printShares":           printShares,
 	"printMegabytes":        printMegabytes,
 	"getMemoryUsage":        getMemoryUsage,
 	"getMemoryUsagePercent": getMemoryUsagePercent,
@@ -57,6 +59,7 @@ type pageData struct {
 	ResourcesAvailable bool
 	CpuAvailable       bool
 	MemoryAvailable    bool
+	NetworkAvailable   bool
 }
 
 func init() {
@@ -87,18 +90,12 @@ func containerLink(container info.ContainerReference, basenameOnly bool, cssClas
 	return template.HTML(fmt.Sprintf("<a class=\"%s\" href=\"%s%s\">%s</a>", cssClasses, ContainersPage[:len(ContainersPage)-1], containerName, displayName))
 }
 
-func printMask(mask *info.CpuSpecMask, numCores int) interface{} {
-	// TODO(vmarmol): Detect this correctly.
-	// TODO(vmarmol): Support more than 64 cores.
-	rawMask := uint64(0)
-	if len(mask.Data) > 0 {
-		rawMask = mask.Data[0]
-	}
+func printMask(mask string, numCores int) interface{} {
 	masks := make([]string, numCores)
-	for i := uint(0); i < uint(numCores); i++ {
+	activeCores := getActiveCores(mask)
+	for i := 0; i < numCores; i++ {
 		coreClass := "inactive-cpu"
-		// by default, all cores are active
-		if ((0x1<<i)&rawMask) != 0 || len(mask.Data) == 0 {
+		if activeCores[i] {
 			coreClass = "active-cpu"
 		}
 		masks[i] = fmt.Sprintf("<span class=\"%s\">%d</span>", coreClass, i)
@@ -106,13 +103,41 @@ func printMask(mask *info.CpuSpecMask, numCores int) interface{} {
 	return template.HTML(strings.Join(masks, "&nbsp;"))
 }
 
-func printCores(millicores *uint64) string {
-	// TODO(vmarmol): Detect this correctly
-	if *millicores > 1024*1000 {
-		return "unlimited"
+func getActiveCores(mask string) map[int]bool {
+	activeCores := make(map[int]bool)
+	for _, corebits := range strings.Split(mask, ",") {
+		cores := strings.Split(corebits, "-")
+		if len(cores) == 1 {
+			index, err := strconv.Atoi(cores[0])
+			if err != nil {
+				// Ignore malformed strings.
+				continue
+			}
+			activeCores[index] = true
+		} else if len(cores) == 2 {
+			start, err := strconv.Atoi(cores[0])
+			if err != nil {
+				continue
+			}
+			end, err := strconv.Atoi(cores[1])
+			if err != nil {
+				continue
+			}
+			for i := start; i <= end; i++ {
+				activeCores[i] = true
+			}
+		}
 	}
+	return activeCores
+}
+
+func printCores(millicores *uint64) string {
 	cores := float64(*millicores) / 1000
 	return strconv.FormatFloat(cores, 'f', 3, 64)
+}
+
+func printShares(shares *uint64) string {
+	return fmt.Sprintf("%d", *shares)
 }
 
 func toMegabytes(bytes uint64) float64 {
@@ -120,8 +145,7 @@ func toMegabytes(bytes uint64) float64 {
 }
 
 func printMegabytes(bytes uint64) string {
-	// TODO(vmarmol): Detect this correctly
-	if bytes > (100 << 30) {
+	if bytes >= math.MaxInt64 {
 		return "unlimited"
 	}
 	megabytes := toMegabytes(bytes)
@@ -139,18 +163,30 @@ func toMemoryPercent(usage uint64, spec *info.ContainerSpec, machine *info.Machi
 }
 
 func getMemoryUsage(stats []*info.ContainerStats) string {
+	if len(stats) == 0 {
+		return "0.0"
+	}
 	return strconv.FormatFloat(toMegabytes((stats[len(stats)-1].Memory.Usage)), 'f', 2, 64)
 }
 
 func getMemoryUsagePercent(spec *info.ContainerSpec, stats []*info.ContainerStats, machine *info.MachineInfo) int {
+	if len(stats) == 0 {
+		return 0
+	}
 	return toMemoryPercent((stats[len(stats)-1].Memory.Usage), spec, machine)
 }
 
 func getHotMemoryPercent(spec *info.ContainerSpec, stats []*info.ContainerStats, machine *info.MachineInfo) int {
+	if len(stats) == 0 {
+		return 0
+	}
 	return toMemoryPercent((stats[len(stats)-1].Memory.WorkingSet), spec, machine)
 }
 
 func getColdMemoryPercent(spec *info.ContainerSpec, stats []*info.ContainerStats, machine *info.MachineInfo) int {
+	if len(stats) == 0 {
+		return 0
+	}
 	latestStats := stats[len(stats)-1].Memory
 	return toMemoryPercent((latestStats.Usage)-(latestStats.WorkingSet), spec, machine)
 }
@@ -204,6 +240,14 @@ func ServerContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) 
 		}
 	}
 
+	networkStatsAvailable := false
+	for _, stat := range cont.Stats {
+		if stat.Network != nil {
+			networkStatsAvailable = true
+			break
+		}
+	}
+
 	data := &pageData{
 		ContainerName: displayName,
 		// TODO(vmarmol): Only use strings for this.
@@ -215,6 +259,7 @@ func ServerContainersPage(m manager.Manager, w http.ResponseWriter, u *url.URL) 
 		ResourcesAvailable: cont.Spec.Cpu != nil || cont.Spec.Memory != nil,
 		CpuAvailable:       cont.Spec.Cpu != nil,
 		MemoryAvailable:    cont.Spec.Memory != nil,
+		NetworkAvailable:   networkStatsAvailable,
 	}
 	err = pageTemplate.Execute(w, data)
 	if err != nil {

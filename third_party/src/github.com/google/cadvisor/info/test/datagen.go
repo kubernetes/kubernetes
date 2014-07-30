@@ -16,7 +16,6 @@ package test
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"time"
 
@@ -59,12 +58,7 @@ func GenerateRandomContainerSpec(numCores int) *info.ContainerSpec {
 	}
 	ret.Cpu.Limit = uint64(1000 + rand.Int63n(2000))
 	ret.Cpu.MaxLimit = uint64(1000 + rand.Int63n(2000))
-	n := (numCores + 63) / 64
-	ret.Cpu.Mask.Data = make([]uint64, n)
-	for i := 0; i < n; i++ {
-		ret.Cpu.Mask.Data[i] = math.MaxUint64
-	}
-
+	ret.Cpu.Mask = fmt.Sprintf("0-%d", numCores-1)
 	ret.Memory.Limit = uint64(4096 + rand.Int63n(4096))
 	return ret
 }
@@ -83,8 +77,8 @@ func GenerateRandomContainerInfo(containerName string, numCores int, query *info
 		percentile := info.Percentile{p, uint64(rand.Int63n(1000))}
 		cpuPercentiles = append(cpuPercentiles, percentile)
 	}
-	memPercentiles := make([]info.Percentile, 0, len(query.MemoryUsagePercentages))
-	for _, p := range query.MemoryUsagePercentages {
+	memPercentiles := make([]info.Percentile, 0, len(query.MemoryUsagePercentiles))
+	for _, p := range query.MemoryUsagePercentiles {
 		percentile := info.Percentile{p, uint64(rand.Int63n(1000))}
 		memPercentiles = append(memPercentiles, percentile)
 	}

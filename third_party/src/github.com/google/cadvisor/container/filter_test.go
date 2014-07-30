@@ -60,9 +60,9 @@ func TestWhiteListContainerFilter(t *testing.T) {
 	mockc := &mockContainerHandler{}
 	mockc.On("ListContainers", LIST_RECURSIVE).Return(
 		[]info.ContainerReference{
-			info.ContainerReference{Name: "/docker/ee0103"},
-			info.ContainerReference{Name: "/container/created/by/lmctfy"},
-			info.ContainerReference{Name: "/user/something"},
+			{Name: "/docker/ee0103"},
+			{Name: "/container/created/by/lmctfy"},
+			{Name: "/user/something"},
 		},
 		nil,
 	)
@@ -95,9 +95,9 @@ func TestBlackListContainerFilter(t *testing.T) {
 	mockc := &mockContainerHandler{}
 	mockc.On("ListContainers", LIST_RECURSIVE).Return(
 		[]info.ContainerReference{
-			info.ContainerReference{Name: "/docker/ee0103"},
-			info.ContainerReference{Name: "/container/created/by/lmctfy"},
-			info.ContainerReference{Name: "/user/something"},
+			{Name: "/docker/ee0103"},
+			{Name: "/container/created/by/lmctfy"},
+			{Name: "/user/something"},
 		},
 		nil,
 	)
