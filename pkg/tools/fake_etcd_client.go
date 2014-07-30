@@ -41,6 +41,7 @@ type FakeEtcdClient struct {
 	Err         error
 	t           TestLogger
 	Ix          int
+	ChangeIndex uint64
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -70,6 +71,11 @@ func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	return ret
 }
 
+func (f *FakeEtcdClient) generateIndex() uint64 {
+	f.ChangeIndex++
+	return f.ChangeIndex
+}
+
 func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
 	f.Ix = f.Ix + 1
 	return f.Set(fmt.Sprintf("%s/%d", key, f.Ix), data, ttl)
@@ -86,10 +92,29 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 }
 
 func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
+	i := f.generateIndex()
+
+	if prevResult, ok := f.Data[key]; ok && prevResult.R != nil && prevResult.R.Node != nil {
+		createdIndex := prevResult.R.Node.CreatedIndex
+		result := EtcdResponseWithError{
+			R: &etcd.Response{
+				Node: &etcd.Node{
+					Value:         value,
+					CreatedIndex:  createdIndex,
+					ModifiedIndex: i,
+				},
+			},
+		}
+		f.Data[key] = result
+		return result.R, f.Err
+	}
+
 	result := EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: value,
+				Value:         value,
+				CreatedIndex:  i,
+				ModifiedIndex: i,
 			},
 		},
 	}
