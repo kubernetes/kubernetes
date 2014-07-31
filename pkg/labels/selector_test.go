@@ -163,3 +163,57 @@ func TestSetIsEmpty(t *testing.T) {
 		t.Errorf("Nested andTerm should not be empty")
 	}
 }
+
+func expectMatchRequirement(t *testing.T, req Requirement, ls Set) {
+	if !req.Matches(ls) {
+		t.Errorf("Wanted '%+v' to match '%s', but it did not.\n", req, ls)
+	}
+}
+
+func expectNoMatchRequirement(t *testing.T, req Requirement, ls Set) {
+	if req.Matches(ls) {
+		t.Errorf("Wanted '%+v' to not match '%s', but it did.", req, ls)
+	}
+}
+
+func TestRequirementMatches(t *testing.T) {
+	s := Set{"x": "foo", "y": "baz"}
+	a := Requirement{key: "x", comparator: IN, strValues: []string{"foo"}}
+	b := Requirement{key: "x", comparator: NOT_IN, strValues: []string{"beta"}}
+	c := Requirement{key: "y", comparator: IN, strValues: nil}
+	d := Requirement{key: "y", strValues: []string{"foo"}}
+	expectMatchRequirement(t, a, s)
+	expectMatchRequirement(t, b, s)
+	expectNoMatchRequirement(t, c, s)
+	expectNoMatchRequirement(t, d, s)
+}
+
+func expectMatchLabSelector(t *testing.T, lsel LabelSelector, s Set) {
+	if !lsel.Matches(s) {
+		t.Errorf("Wanted '%+v' to match '%s', but it did not.\n", lsel, s)
+	}
+}
+
+func expectNoMatchLabSelector(t *testing.T, lsel LabelSelector, s Set) {
+	if lsel.Matches(s) {
+		t.Errorf("Wanted '%+v' to not match '%s', but it did.\n", lsel, s)
+	}
+}
+
+func TestLabelSelectorMatches(t *testing.T) {
+	s := Set{"x": "foo", "y": "baz"}
+	allMatch := LabelSelector{
+		Requirements: []Requirement{
+			{key: "x", comparator: IN, strValues: []string{"foo"}},
+			{key: "y", comparator: NOT_IN, strValues: []string{"alpha"}},
+		},
+	}
+	singleNonMatch := LabelSelector{
+		Requirements: []Requirement{
+			{key: "x", comparator: IN, strValues: []string{"foo"}},
+			{key: "y", comparator: IN, strValues: []string{"alpha"}},
+		},
+	}
+	expectMatchLabSelector(t, allMatch, s)
+	expectNoMatchLabSelector(t, singleNonMatch, s)
+}

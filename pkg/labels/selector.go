@@ -105,6 +105,54 @@ func (t andTerm) String() string {
 	return strings.Join(terms, ",")
 }
 
+type Comparator int
+
+const (
+	IN Comparator = iota + 1
+	NOT_IN
+)
+
+// only not named 'Selector' due to name
+// conflict until Selector is deprecated
+type LabelSelector struct {
+	Requirements []Requirement
+}
+
+type Requirement struct {
+	key        string
+	comparator Comparator
+	strValues  []string
+}
+
+func (r *Requirement) containsStr(value string) bool {
+	for _, x := range r.strValues {
+		if value == x {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Requirement) Matches(ls Labels) bool {
+	switch r.comparator {
+	case IN:
+		return r.containsStr(ls.Get(r.key))
+	case NOT_IN:
+		return !r.containsStr(ls.Get(r.key))
+	default:
+		return false
+	}
+}
+
+func (sg *LabelSelector) Matches(ls Labels) bool {
+	for _, req := range sg.Requirements {
+		if sat := req.Matches(ls); !sat {
+			return false
+		}
+	}
+	return true
+}
+
 func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 	pieces := strings.Split(selectorPiece, op)
 	if len(pieces) == 2 {
