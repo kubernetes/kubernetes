@@ -374,39 +374,14 @@ type WatchEvent struct {
 	Object APIObject
 }
 
-// Job is a task that can be scheduled.
-type Job struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Status   JobStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Success  bool      `json:"success,omitempty" yaml:"success,omitempty"`
-	Pod      Pod       `json:"pod,omitempty" yaml:"pod,omitempty"`
-	PodID    string    `json:"podID,omitempty" yaml:"podID,omitempty"`
-}
-
-// JobStatus represents the status of a Job at a point in time.
-type JobStatus string
-
-const (
-	JobNew      JobStatus = "new"
-	JobPending  JobStatus = "pending"
-	JobRunning  JobStatus = "running"
-	JobComplete JobStatus = "complete"
-)
-
-// JobList is a collection of Jobs.
-type JobList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Job `json:"items,omitempty" yaml:"items,omitempty"`
-}
-
 // Build encapsulates the inputs needed to produce a new deployable image, as well as
 // the status of the operation and a reference to the Job which runs the build.
 type Build struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Context  map[string]string `json:"context,omitempty" yaml:"context,omitempty"`
-	Status   BuildStatus       `json:"status,omitempty" yaml:"status,omitempty"`
-	Success  bool              `json:"success,omitempty" yaml:"success,omitempty"`
-	JobID    string            `json:"jobID,omitempty" yaml:"jobID,omitempty"`
+	JSONBase    `json:",inline" yaml:",inline"`
+	BuildConfig BuildConfig
+	Status      BuildStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Pod         Pod         `json:"pod,omitempty" yaml:"pod,omitempty"`
+	PodID       string      `json:"podID,omitempty" yaml:"podID,omitempty"`
 }
 
 // BuildStatus represents the status of a Build at a point in time.
@@ -417,7 +392,15 @@ const (
 	BuildPending  BuildStatus = "pending"
 	BuildRunning  BuildStatus = "running"
 	BuildComplete BuildStatus = "complete"
+	BuildFailed   BuildStatus = "failed"
 )
+
+type BuildConfig struct {
+	Type      BuildType
+	SourceURI string
+}
+
+type BuildType string
 
 // BuildList is a collection of Builds.
 type BuildList struct {
