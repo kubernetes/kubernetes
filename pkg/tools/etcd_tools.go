@@ -17,7 +17,6 @@ limitations under the License.
 package tools
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -225,7 +224,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 			return h.SetObj(key, ret)
 		}
 
-		data, err := json.Marshal(ret)
+		data, err := api.Encode(ret)
 		if err != nil {
 			return err
 		}
