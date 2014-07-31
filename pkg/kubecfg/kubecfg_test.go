@@ -65,6 +65,11 @@ func (client *FakeKubeClient) UpdatePod(pod api.Pod) (api.Pod, error) {
 	return api.Pod{}, nil
 }
 
+func (client *FakeKubeClient) ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error) {
+	client.actions = append(client.actions, Action{action: "list-controllers"})
+	return api.ReplicationControllerList{}, nil
+}
+
 func (client *FakeKubeClient) GetReplicationController(name string) (api.ReplicationController, error) {
 	client.actions = append(client.actions, Action{action: "get-controller", value: name})
 	return client.ctrl, nil
