@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/container"
-	ctest "github.com/google/cadvisor/container/test"
 	"github.com/google/cadvisor/info"
 	itest "github.com/google/cadvisor/info/test"
 	"github.com/google/cadvisor/storage"
@@ -32,17 +31,18 @@ import (
 
 func createContainerDataAndSetHandler(
 	driver storage.StorageDriver,
-	f func(*ctest.MockContainerHandler),
+	f func(*container.MockContainerHandler),
 	t *testing.T,
 ) *containerData {
-	factory := &ctest.FactoryForMockContainerHandler{
+	factory := &container.FactoryForMockContainerHandler{
 		Name: "factoryForMockContainer",
-		PrepareContainerHandlerFunc: func(name string, handler *ctest.MockContainerHandler) {
+		PrepareContainerHandlerFunc: func(name string, handler *container.MockContainerHandler) {
 			handler.Name = name
 			f(handler)
 		},
 	}
-	container.RegisterContainerHandlerFactory("/", factory)
+	container.ClearContainerHandlerFactories()
+	container.RegisterContainerHandlerFactory(factory)
 
 	if driver == nil {
 		driver = &stest.MockStorageDriver{}
@@ -56,7 +56,7 @@ func createContainerDataAndSetHandler(
 }
 
 func TestContainerUpdateSubcontainers(t *testing.T) {
-	var handler *ctest.MockContainerHandler
+	var handler *container.MockContainerHandler
 	subcontainers := []info.ContainerReference{
 		{Name: "/container/ee0103"},
 		{Name: "/container/abcd"},
@@ -64,7 +64,7 @@ func TestContainerUpdateSubcontainers(t *testing.T) {
 	}
 	cd := createContainerDataAndSetHandler(
 		nil,
-		func(h *ctest.MockContainerHandler) {
+		func(h *container.MockContainerHandler) {
 			h.On("ListContainers", container.LIST_SELF).Return(
 				subcontainers,
 				nil,
@@ -99,10 +99,10 @@ func TestContainerUpdateSubcontainers(t *testing.T) {
 }
 
 func TestContainerUpdateSubcontainersWithError(t *testing.T) {
-	var handler *ctest.MockContainerHandler
+	var handler *container.MockContainerHandler
 	cd := createContainerDataAndSetHandler(
 		nil,
-		func(h *ctest.MockContainerHandler) {
+		func(h *container.MockContainerHandler) {
 			h.On("ListContainers", container.LIST_SELF).Return(
 				[]info.ContainerReference{},
 				fmt.Errorf("some error"),
@@ -124,7 +124,7 @@ func TestContainerUpdateSubcontainersWithError(t *testing.T) {
 }
 
 func TestContainerUpdateStats(t *testing.T) {
-	var handler *ctest.MockContainerHandler
+	var handler *container.MockContainerHandler
 	var ref info.ContainerReference
 
 	driver := &stest.MockStorageDriver{}
@@ -134,7 +134,7 @@ func TestContainerUpdateStats(t *testing.T) {
 
 	cd := createContainerDataAndSetHandler(
 		driver,
-		func(h *ctest.MockContainerHandler) {
+		func(h *container.MockContainerHandler) {
 			h.On("GetStats").Return(
 				stats,
 				nil,
@@ -156,11 +156,11 @@ func TestContainerUpdateStats(t *testing.T) {
 }
 
 func TestContainerUpdateSpec(t *testing.T) {
-	var handler *ctest.MockContainerHandler
+	var handler *container.MockContainerHandler
 	spec := itest.GenerateRandomContainerSpec(4)
 	cd := createContainerDataAndSetHandler(
 		nil,
-		func(h *ctest.MockContainerHandler) {
+		func(h *container.MockContainerHandler) {
 			h.On("GetSpec").Return(
 				spec,
 				nil,
@@ -179,7 +179,7 @@ func TestContainerUpdateSpec(t *testing.T) {
 }
 
 func TestContainerGetInfo(t *testing.T) {
-	var handler *ctest.MockContainerHandler
+	var handler *container.MockContainerHandler
 	spec := itest.GenerateRandomContainerSpec(4)
 	subcontainers := []info.ContainerReference{
 		{Name: "/container/ee0103"},
@@ -189,7 +189,7 @@ func TestContainerGetInfo(t *testing.T) {
 	aliases := []string{"a1", "a2"}
 	cd := createContainerDataAndSetHandler(
 		nil,
-		func(h *ctest.MockContainerHandler) {
+		func(h *container.MockContainerHandler) {
 			h.On("GetSpec").Return(
 				spec,
 				nil,

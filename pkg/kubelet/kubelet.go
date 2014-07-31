@@ -545,7 +545,7 @@ func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.Conta
 	ret := &info.ContainerInfoRequest{
 		NumStats:               req.NumStats,
 		CpuUsagePercentiles:    req.CpuUsagePercentiles,
-		MemoryUsagePercentages: req.MemoryUsagePercentages,
+		MemoryUsagePercentiles: req.MemoryUsagePercentiles,
 	}
 	return ret
 }

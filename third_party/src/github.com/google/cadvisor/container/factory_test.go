@@ -15,7 +15,6 @@
 package container
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -23,11 +22,16 @@ import (
 
 type mockContainerHandlerFactory struct {
 	mock.Mock
-	Name string
+	Name           string
+	CanHandleValue bool
 }
 
 func (self *mockContainerHandlerFactory) String() string {
 	return self.Name
+}
+
+func (self *mockContainerHandlerFactory) CanHandle(name string) bool {
+	return self.CanHandleValue
 }
 
 func (self *mockContainerHandlerFactory) NewContainerHandler(name string) (ContainerHandler, error) {
@@ -35,42 +39,84 @@ func (self *mockContainerHandlerFactory) NewContainerHandler(name string) (Conta
 	return args.Get(0).(ContainerHandler), args.Error(1)
 }
 
-func testExpectedFactory(root *factoryTreeNode, path, expectedFactory string, t *testing.T) {
-	elems := dropEmptyString(strings.Split(path, "/")...)
-	factory := root.find(elems...)
-	if factory.String() != expectedFactory {
-		t.Errorf("factory %v should be used to create container %v. but %v is selected",
-			expectedFactory,
-			path,
-			factory)
+const testContainerName = "/test"
+
+var mockFactory FactoryForMockContainerHandler
+
+func TestNewContainerHandler_FirstMatches(t *testing.T) {
+	ClearContainerHandlerFactories()
+
+	// Register one allways yes factory.
+	allwaysYes := &mockContainerHandlerFactory{
+		Name:           "yes",
+		CanHandleValue: true,
+	}
+	RegisterContainerHandlerFactory(allwaysYes)
+
+	// The yes factory should be asked to create the ContainerHandler.
+	mockContainer, err := mockFactory.NewContainerHandler(testContainerName)
+	if err != nil {
+		t.Error(err)
+	}
+	allwaysYes.On("NewContainerHandler", testContainerName).Return(mockContainer, nil)
+
+	cont, err := NewContainerHandler(testContainerName)
+	if err != nil {
+		t.Error(err)
+	}
+	if cont == nil {
+		t.Error("Expected container to not be nil")
 	}
 }
 
-func testAddFactory(root *factoryTreeNode, path string) *factoryTreeNode {
-	elems := dropEmptyString(strings.Split(path, "/")...)
-	if root == nil {
-		root = &factoryTreeNode{
-			defaultFactory: nil,
-		}
+func TestNewContainerHandler_SecondMatches(t *testing.T) {
+	ClearContainerHandlerFactories()
+
+	// Register one allways no and one always yes factory.
+	allwaysNo := &mockContainerHandlerFactory{
+		Name:           "no",
+		CanHandleValue: false,
 	}
-	f := &mockContainerHandlerFactory{
-		Name: path,
+	RegisterContainerHandlerFactory(allwaysNo)
+	allwaysYes := &mockContainerHandlerFactory{
+		Name:           "yes",
+		CanHandleValue: true,
 	}
-	root.add(f, elems...)
-	return root
+	RegisterContainerHandlerFactory(allwaysYes)
+
+	// The yes factory should be asked to create the ContainerHandler.
+	mockContainer, err := mockFactory.NewContainerHandler(testContainerName)
+	if err != nil {
+		t.Error(err)
+	}
+	allwaysYes.On("NewContainerHandler", testContainerName).Return(mockContainer, nil)
+
+	cont, err := NewContainerHandler(testContainerName)
+	if err != nil {
+		t.Error(err)
+	}
+	if cont == nil {
+		t.Error("Expected container to not be nil")
+	}
 }
 
-func TestFactoryTree(t *testing.T) {
-	root := testAddFactory(nil, "/")
-	root = testAddFactory(root, "/docker")
-	root = testAddFactory(root, "/user")
-	root = testAddFactory(root, "/user/special/containers")
+func TestNewContainerHandler_NoneMatch(t *testing.T) {
+	ClearContainerHandlerFactories()
 
-	testExpectedFactory(root, "/docker/container", "/docker", t)
-	testExpectedFactory(root, "/docker", "/docker", t)
-	testExpectedFactory(root, "/", "/", t)
-	testExpectedFactory(root, "/user/deep/level/container", "/user", t)
-	testExpectedFactory(root, "/user/special/containers", "/user/special/containers", t)
-	testExpectedFactory(root, "/user/special/containers/container", "/user/special/containers", t)
-	testExpectedFactory(root, "/other", "/", t)
+	// Register two allways no factories.
+	allwaysNo1 := &mockContainerHandlerFactory{
+		Name:           "no",
+		CanHandleValue: false,
+	}
+	RegisterContainerHandlerFactory(allwaysNo1)
+	allwaysNo2 := &mockContainerHandlerFactory{
+		Name:           "no",
+		CanHandleValue: false,
+	}
+	RegisterContainerHandlerFactory(allwaysNo2)
+
+	_, err := NewContainerHandler(testContainerName)
+	if err == nil {
+		t.Error("Expected NewContainerHandler to fail")
+	}
 }

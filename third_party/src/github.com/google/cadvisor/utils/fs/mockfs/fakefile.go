@@ -12,21 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package interference
+package mockfs
 
-import "github.com/google/cadvisor/info"
+import "bytes"
 
-// InterferenceDectector detects if there's a container which
-// interferences with a set of containers. The detector tracks
-// a set of containers and find the victims and antagonist.
-type InterferenceDetector interface {
-	// Tracks the behavior of the container.
-	AddContainer(ref info.ContainerReference)
+type FakeFile struct {
+	bytes.Buffer
+	Name string
+}
 
-	// Returns a list of possible interferences. The upper layer may take action
-	// based on the interference.
-	Detect() ([]*info.Interference, error)
+func (self *FakeFile) Close() error {
+	return nil
+}
 
-	// The name of the detector.
-	Name() string
+func AddTextFile(mockfs *MockFileSystem, name, content string) *FakeFile {
+	f := &FakeFile{
+		Name:   name,
+		Buffer: *bytes.NewBufferString(content),
+	}
+	mockfs.EXPECT().Open(name).Return(f, nil).AnyTimes()
+	return f
 }

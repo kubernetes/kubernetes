@@ -17,113 +17,56 @@ package container
 import (
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 )
 
 type ContainerHandlerFactory interface {
+	// Create a new ContainerHandler using this factory. CanHandle() must have returned true.
 	NewContainerHandler(name string) (ContainerHandler, error)
 
-	// for testability
+	// Returns whether this factory can handle the specified container.
+	CanHandle(name string) bool
+
+	// Name of the factory.
 	String() string
 }
 
-type factoryTreeNode struct {
-	defaultFactory ContainerHandlerFactory
-	children       map[string]*factoryTreeNode
+// TODO(vmarmol): Consider not making this global.
+// Global list of factories.
+var (
+	factories     []ContainerHandlerFactory
+	factoriesLock sync.RWMutex
+)
+
+// Register a ContainerHandlerFactory. These should be registered from least general to most general
+// as they will be asked in order whether they can handle a particular container.
+func RegisterContainerHandlerFactory(factory ContainerHandlerFactory) {
+	factoriesLock.Lock()
+	defer factoriesLock.Unlock()
+
+	factories = append(factories, factory)
 }
 
-func (self *factoryTreeNode) find(elems ...string) ContainerHandlerFactory {
-	node := self
-	for _, elem := range elems {
-		if len(node.children) == 0 {
-			break
-		}
-		if child, ok := node.children[elem]; ok {
-			node = child
-		} else {
-			return node.defaultFactory
-		}
-	}
+// Create a new ContainerHandler for the specified container.
+func NewContainerHandler(name string) (ContainerHandler, error) {
+	factoriesLock.RLock()
+	defer factoriesLock.RUnlock()
 
-	return node.defaultFactory
-}
-
-func (self *factoryTreeNode) add(factory ContainerHandlerFactory, elems ...string) {
-	node := self
-	for _, elem := range elems {
-		if node.children == nil {
-			node.children = make(map[string]*factoryTreeNode, 16)
-		}
-		child, ok := self.children[elem]
-		if !ok {
-			child = &factoryTreeNode{
-				defaultFactory: node.defaultFactory,
-				children:       make(map[string]*factoryTreeNode, 16),
-			}
-			node.children[elem] = child
-		}
-		node = child
-	}
-	node.defaultFactory = factory
-}
-
-type factoryManager struct {
-	root *factoryTreeNode
-	lock sync.RWMutex
-}
-
-func dropEmptyString(elems ...string) []string {
-	ret := make([]string, 0, len(elems))
-	for _, e := range elems {
-		if len(e) > 0 {
-			ret = append(ret, e)
-		}
-	}
-	return ret
-}
-
-// Must register factory for root container!
-func (self *factoryManager) Register(path string, factory ContainerHandlerFactory) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	if self.root == nil {
-		self.root = &factoryTreeNode{
-			defaultFactory: nil,
-			children:       make(map[string]*factoryTreeNode, 10),
+	// Create the ContainerHandler with the first factory that supports it.
+	for _, factory := range factories {
+		if factory.CanHandle(name) {
+			log.Printf("Using factory %q for container %q", factory.String(), name)
+			return factory.NewContainerHandler(name)
 		}
 	}
 
-	elems := dropEmptyString(strings.Split(path, "/")...)
-	self.root.add(factory, elems...)
+	return nil, fmt.Errorf("no known factory can handle creation of container")
 }
 
-func (self *factoryManager) NewContainerHandler(path string) (ContainerHandler, error) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
+// Clear the known factories.
+func ClearContainerHandlerFactories() {
+	factoriesLock.Lock()
+	defer factoriesLock.Unlock()
 
-	if self.root == nil {
-		err := fmt.Errorf("nil factory for container %v: no factory registered", path)
-		return nil, err
-	}
-
-	elems := dropEmptyString(strings.Split(path, "/")...)
-	factory := self.root.find(elems...)
-	if factory == nil {
-		err := fmt.Errorf("nil factory for container %v", path)
-		return nil, err
-	}
-	log.Printf("Container handler factory for %v is %v\n", path, factory)
-	return factory.NewContainerHandler(path)
-}
-
-var globalFactoryManager factoryManager
-
-func RegisterContainerHandlerFactory(path string, factory ContainerHandlerFactory) {
-	globalFactoryManager.Register(path, factory)
-}
-
-func NewContainerHandler(path string) (ContainerHandler, error) {
-	return globalFactoryManager.NewContainerHandler(path)
+	factories = make([]ContainerHandlerFactory, 0, 4)
 }

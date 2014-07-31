@@ -62,7 +62,6 @@ func testHTTPContainerInfoGetter(
 		// So changing req after Get*Info would be a race.
 		expectedReq := req
 		// Fill any empty fields with default value
-		expectedReq = expectedReq.FillDefaults()
 		if !reflect.DeepEqual(expectedReq, &receivedReq) {
 			t.Errorf("received wrong request")
 		}
@@ -110,10 +109,11 @@ func testHTTPContainerInfoGetter(
 
 func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:   10,
-		NumSamples: 10,
+		NumStats:               10,
+		NumSamples:             10,
+		CpuUsagePercentiles:    []int{20, 30},
+		MemoryUsagePercentiles: []int{40, 50},
 	}
-	req = req.FillDefaults()
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
@@ -125,10 +125,11 @@ func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 
 func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:   10,
-		NumSamples: 10,
+		NumStats:               10,
+		NumSamples:             10,
+		CpuUsagePercentiles:    []int{20, 30},
+		MemoryUsagePercentiles: []int{40, 50},
 	}
-	req = req.FillDefaults()
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
@@ -140,10 +141,11 @@ func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
 
 func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:   10,
-		NumSamples: 10,
+		NumStats:               10,
+		NumSamples:             10,
+		CpuUsagePercentiles:    []int{20, 30},
+		MemoryUsagePercentiles: []int{40, 50},
 	}
-	req = req.FillDefaults()
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores
@@ -155,10 +157,11 @@ func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 
 func TestHTTPContainerInfoGetterGetRootInfoWithError(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:   10,
-		NumSamples: 10,
+		NumStats:               10,
+		NumSamples:             10,
+		CpuUsagePercentiles:    []int{20, 30},
+		MemoryUsagePercentiles: []int{40, 50},
 	}
-	req = req.FillDefaults()
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
 		2, // Number of cores

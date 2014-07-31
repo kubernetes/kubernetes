@@ -482,3 +482,61 @@ func StorageDriverTestPercentilesWithoutStats(driver storage.StorageDriver, t *t
 		}
 	}
 }
+
+func StorageDriverTestRetrieveZeroRecentStats(driver storage.StorageDriver, t *testing.T) {
+	defer driver.Close()
+	N := 100
+	memTrace := make([]uint64, N)
+	cpuTrace := make([]uint64, N)
+	for i := 0; i < N; i++ {
+		memTrace[i] = uint64(i + 1)
+		cpuTrace[i] = uint64(1)
+	}
+
+	ref := info.ContainerReference{
+		Name: "container",
+	}
+
+	trace := buildTrace(cpuTrace, memTrace, 1*time.Second)
+
+	for _, stats := range trace {
+		driver.AddStats(ref, stats)
+	}
+
+	recentStats, err := driver.RecentStats(ref.Name, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recentStats) > 0 {
+		t.Errorf("RecentStats() returns %v stats when requests for 0 stats", len(recentStats))
+	}
+}
+
+func StorageDriverTestRetrieveZeroSamples(driver storage.StorageDriver, t *testing.T) {
+	defer driver.Close()
+	N := 100
+	memTrace := make([]uint64, N)
+	cpuTrace := make([]uint64, N)
+	for i := 0; i < N; i++ {
+		memTrace[i] = uint64(i + 1)
+		cpuTrace[i] = uint64(1)
+	}
+
+	ref := info.ContainerReference{
+		Name: "container",
+	}
+
+	trace := buildTrace(cpuTrace, memTrace, 1*time.Second)
+
+	for _, stats := range trace {
+		driver.AddStats(ref, stats)
+	}
+
+	samples, err := driver.Samples(ref.Name, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(samples) > 0 {
+		t.Errorf("RecentStats() returns %v stats when requests for 0 stats", len(samples))
+	}
+}

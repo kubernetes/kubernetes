@@ -17,11 +17,15 @@ package docker
 import (
 	"flag"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
+	"strings"
 
+	"github.com/docker/libcontainer/cgroups/systemd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/info"
 )
 
@@ -29,6 +33,11 @@ var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "do
 
 type dockerFactory struct {
 	machineInfoFactory info.MachineInfoFactory
+
+	// Whether this system is using systemd.
+	useSystemd bool
+
+	client *docker.Client
 }
 
 func (self *dockerFactory) String() string {
@@ -44,8 +53,40 @@ func (self *dockerFactory) NewContainerHandler(name string) (handler container.C
 		client,
 		name,
 		self.machineInfoFactory,
+		self.useSystemd,
 	)
 	return
+}
+
+// Docker handles all containers under /docker
+// TODO(vishh): Change the CanHandle interface to be able to return errors.
+func (self *dockerFactory) CanHandle(name string) bool {
+	// In systemd systems the containers are: /system.slice/docker-{ID}
+	if self.useSystemd {
+		if !strings.HasPrefix(name, "/system.slice/docker-") {
+			return false
+		}
+	} else if name == "/" {
+		return false
+	} else if name == "/docker" {
+		// We need the docker driver to handle /docker. Otherwise the aggregation at the API level will break.
+		return true
+	} else if !strings.HasPrefix(name, "/docker/") {
+		return false
+	}
+	// Check if the container is known to docker and it is active.
+	_, id, err := libcontainer.SplitName(name)
+	if err != nil {
+		return false
+	}
+	ctnr, err := self.client.InspectContainer(id)
+	// We assume that if Inspect fails then the container is not known to docker.
+	// TODO(vishh): Detect lxc containers and avoid handling them.
+	if err != nil || !ctnr.State.Running {
+		return false
+	}
+
+	return true
 }
 
 func parseDockerVersion(full_version_string string) ([]int, error) {
@@ -68,7 +109,7 @@ func parseDockerVersion(full_version_string string) ([]int, error) {
 }
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory, paths ...string) error {
+func Register(factory info.MachineInfoFactory) error {
 	client, err := docker.NewClient(*ArgDockerEndpoint)
 	if err != nil {
 		return fmt.Errorf("unable to communicate with docker daemon: %v", err)
@@ -92,12 +133,13 @@ func Register(factory info.MachineInfoFactory, paths ...string) error {
 	}
 	f := &dockerFactory{
 		machineInfoFactory: factory,
+		useSystemd:         systemd.UseSystemd(),
+		client:             client,
 	}
-	for _, p := range paths {
-		if p != "/" && p != "/docker" {
-			return fmt.Errorf("%v cannot be managed by docker", p)
-		}
-		container.RegisterContainerHandlerFactory(p, f)
+	if f.useSystemd {
+		log.Printf("System is using systemd")
 	}
+	log.Printf("Registering Docker factory")
+	container.RegisterContainerHandlerFactory(f)
 	return nil
 }

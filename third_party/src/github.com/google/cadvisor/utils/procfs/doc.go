@@ -12,21 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package interference
-
-import "github.com/google/cadvisor/info"
-
-// InterferenceDectector detects if there's a container which
-// interferences with a set of containers. The detector tracks
-// a set of containers and find the victims and antagonist.
-type InterferenceDetector interface {
-	// Tracks the behavior of the container.
-	AddContainer(ref info.ContainerReference)
-
-	// Returns a list of possible interferences. The upper layer may take action
-	// based on the interference.
-	Detect() ([]*info.Interference, error)
-
-	// The name of the detector.
-	Name() string
-}
+// procfs contains several low level functions to read information from /proc
+// filesystem, and also provides some utility functions like JiffiesToDuration.
+package procfs

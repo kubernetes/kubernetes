@@ -130,11 +130,10 @@ func (m *manager) GetContainerInfo(containerName string, query *info.ContainerIn
 	var percentiles *info.ContainerStatsPercentiles
 	var samples []*info.ContainerStatsSample
 	var stats []*info.ContainerStats
-	query = query.FillDefaults()
 	percentiles, err = m.storageDriver.Percentiles(
 		cinfo.Name,
 		query.CpuUsagePercentiles,
-		query.MemoryUsagePercentages,
+		query.MemoryUsagePercentiles,
 	)
 	if err != nil {
 		return nil, err
@@ -281,18 +280,18 @@ func (m *manager) detectContainers() error {
 	}
 
 	// Add the new containers.
-	for _, container := range added {
-		_, err = m.createContainer(container.Name)
+	for _, cont := range added {
+		_, err = m.createContainer(cont.Name)
 		if err != nil {
-			return fmt.Errorf("Failed to create existing container: %s: %s", container.Name, err)
+			log.Printf("failed to create existing container: %s: %s", cont.Name, err)
 		}
 	}
 
 	// Remove the old containers.
-	for _, container := range removed {
-		err = m.destroyContainer(container.Name)
+	for _, cont := range removed {
+		err = m.destroyContainer(cont.Name)
 		if err != nil {
-			return fmt.Errorf("Failed to destroy existing container: %s: %s", container.Name, err)
+			log.Printf("failed to destroy existing container: %s: %s", cont.Name, err)
 		}
 	}
 
