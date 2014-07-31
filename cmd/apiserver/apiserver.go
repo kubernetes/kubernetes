@@ -50,16 +50,25 @@ func init() {
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 }
 
+func verifyMinionFlags() {
+	if *cloudProvider == "" || *minionRegexp == "" {
+		if len(machineList) == 0 {
+			glog.Fatal("No machines specified!")
+		}
+		return
+	}
+	if len(machineList) != 0 {
+		glog.Info("-machines is overwritten by -minion_regexp")
+	}
+}
+
 func main() {
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
 
 	version.PrintAndExitIfRequested()
-
-	if len(machineList) == 0 {
-		glog.Fatal("No machines specified!")
-	}
+	verifyMinionFlags()
 
 	var cloud cloudprovider.Interface
 	switch *cloudProvider {
