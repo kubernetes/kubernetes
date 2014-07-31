@@ -52,7 +52,8 @@ func (bc *BuildController) synchronize() {
 	}
 }
 
-// Sync loop brings the build state into sync with its corresponding job.
+// Determine the next status of a build given its current state and the state
+// of its associated pod.
 // TODO: improve handling of illegal state transitions
 func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 	glog.Infof("Syncing build %#v", build)
