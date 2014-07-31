@@ -258,10 +258,10 @@ func TestSetPollPeriod(t *testing.T) {
 
 func TestPolling(t *testing.T) {
 	objects := []interface{}{
-		&api.Status{Status: api.StatusWorking, Details: "1234"},
-		&api.Status{Status: api.StatusWorking, Details: "1234"},
-		&api.Status{Status: api.StatusWorking, Details: "1234"},
-		&api.Status{Status: api.StatusWorking, Details: "1234"},
+		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
+		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
+		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
+		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
 		&api.Status{Status: api.StatusSuccess},
 	}
 

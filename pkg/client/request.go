@@ -246,13 +246,18 @@ func (r *Request) Do() Result {
 		if err != nil {
 			if statusErr, ok := err.(*StatusErr); ok {
 				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != 0 {
-					glog.Infof("Waiting for completion of /operations/%s", statusErr.Status.Details)
-					time.Sleep(r.pollPeriod)
-					// Make a poll request
-					pollOp := r.c.PollFor(statusErr.Status.Details).PollPeriod(r.pollPeriod)
-					// Could also say "return r.Do()" but this way doesn't grow the callstack.
-					r = pollOp
-					continue
+					if statusErr.Status.Details != nil {
+						id := statusErr.Status.Details.ID
+						if len(id) > 0 {
+							glog.Infof("Waiting for completion of /operations/%s", id)
+							time.Sleep(r.pollPeriod)
+							// Make a poll request
+							pollOp := r.c.PollFor(id).PollPeriod(r.pollPeriod)
+							// Could also say "return r.Do()" but this way doesn't grow the callstack.
+							r = pollOp
+							continue
+						}
+					}
 				}
 			}
 		}
