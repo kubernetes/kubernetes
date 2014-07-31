@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -433,26 +434,6 @@ func TestUpdateMissing(t *testing.T) {
 	}
 }
 
-func TestBadPath(t *testing.T) {
-	handler := New(map[string]RESTStorage{}, codec, "/prefix/version")
-	server := httptest.NewServer(handler)
-	client := http.Client{}
-
-	request, err := http.NewRequest("GET", server.URL+"/foobar", nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
-}
-
 func TestCreate(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
@@ -588,33 +569,64 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *a
 	}
 	response, err := client.Do(request)
 	if err != nil {
-		t.Fatalf("unexpected error %#v", err)
+		t.Fatalf("unexpected error on %s %s: %v", method, url, err)
 		return nil
 	}
 	var status api.Status
 	_, err = extractBody(response, &status)
 	if err != nil {
-		t.Fatalf("unexpected error %#v", err)
+		t.Fatalf("unexpected error on %s %s: %v", method, url, err)
 		return nil
 	}
 	if code != response.StatusCode {
-		t.Fatalf("Expected %d, Got %d", code, response.StatusCode)
+		t.Fatalf("Expected %s %s to return %d, Got %d", method, url, code, response.StatusCode)
 	}
 	return &status
+}
+
+func TestErrorsToAPIStatus(t *testing.T) {
+	cases := map[error]api.Status{
+		NewAlreadyExistsErr("foo", "bar"): api.Status{
+			Status:  api.StatusFailure,
+			Code:    http.StatusConflict,
+			Reason:  "already_exists",
+			Message: "foo \"bar\" already exists",
+			Details: &api.StatusDetails{
+				Kind: "foo",
+				ID:   "bar",
+			},
+		},
+		NewConflictErr("foo", "bar", errors.New("failure")): api.Status{
+			Status:  api.StatusFailure,
+			Code:    http.StatusConflict,
+			Reason:  "conflict",
+			Message: "foo \"bar\" cannot be updated: failure",
+			Details: &api.StatusDetails{
+				Kind: "foo",
+				ID:   "bar",
+			},
+		},
+	}
+	for k, v := range cases {
+		actual := errToAPIStatus(k)
+		if !reflect.DeepEqual(actual, &v) {
+			t.Errorf("Expected %#v, Got %#v", v, actual)
+		}
+	}
 }
 
 func TestAsyncDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			return nil, errors.New("error")
+			return nil, NewAlreadyExistsErr("foo", "bar")
 		},
 	}
 	handler := New(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
 	handler.asyncOpWait = time.Millisecond / 2
 	server := httptest.NewServer(handler)
 
-	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusInternalServerError)
-	if status.Status != api.StatusFailure || status.Message != "error" || status.Details != nil {
+	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusConflict)
+	if status.Status != api.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != api.ReasonTypeAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
 }
@@ -624,7 +636,7 @@ func TestAsyncCreateError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
 			<-ch
-			return nil, errors.New("error")
+			return nil, NewAlreadyExistsErr("foo", "bar")
 		},
 	}
 	handler := New(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
@@ -648,13 +660,22 @@ func TestAsyncCreateError(t *testing.T) {
 	time.Sleep(time.Millisecond)
 
 	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details.ID), []byte{}, http.StatusOK)
+	expectedErr := NewAlreadyExistsErr("foo", "bar")
 	expectedStatus := &api.Status{
-		Code:    http.StatusInternalServerError,
-		Message: "error",
 		Status:  api.StatusFailure,
+		Code:    http.StatusConflict,
+		Reason:  "already_exists",
+		Message: expectedErr.Error(),
+		Details: &api.StatusDetails{
+			Kind: "foo",
+			ID:   "bar",
+		},
 	}
 	if !reflect.DeepEqual(expectedStatus, finalStatus) {
 		t.Errorf("Expected %#v, Got %#v", expectedStatus, finalStatus)
+		if finalStatus.Details != nil {
+			t.Logf("Details %#v, Got %#v", *expectedStatus.Details, *finalStatus.Details)
+		}
 	}
 }
 
@@ -665,14 +686,12 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		}
 		writeJSON(http.StatusOK, api.Codec, &T{"Undecodable"}, w)
 	}))
-	client := http.Client{}
-	resp, err := client.Get(server.URL)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
+	if status.Reason != api.ReasonTypeUnknown {
+		t.Errorf("unexpected reason %#v", status)
 	}
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("unexpected status code %d", resp.StatusCode)
+	if !strings.Contains(status.Message, "type apiserver.T is not registered") {
+		t.Errorf("unexpected message %#v", status)
 	}
 }
 

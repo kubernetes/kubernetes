@@ -17,10 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"net/http"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -37,16 +33,7 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 		defer util.HandleCrash()
 		obj, err := fn()
 		if err != nil {
-			status := http.StatusInternalServerError
-			switch {
-			case tools.IsEtcdTestFailed(err):
-				status = http.StatusConflict
-			}
-			channel <- &api.Status{
-				Status:  api.StatusFailure,
-				Message: err.Error(),
-				Code:    status,
-			}
+			channel <- errToAPIStatus(err)
 		} else {
 			channel <- obj
 		}

@@ -31,6 +31,7 @@ import (
 
 type WatchHandler struct {
 	storage map[string]RESTStorage
+	codec   Codec
 }
 
 func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion uint64) {
@@ -64,7 +65,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		label, field, resourceVersion := getWatchParams(req.URL.Query())
 		watching, err := watcher.Watch(label, field, resourceVersion)
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, h.codec, w)
 			return
 		}
 
