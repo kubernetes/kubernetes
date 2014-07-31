@@ -40,6 +40,7 @@ type Interface interface {
 	CreatePod(api.Pod) (api.Pod, error)
 	UpdatePod(api.Pod) (api.Pod, error)
 
+	ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error)
 	GetReplicationController(name string) (api.ReplicationController, error)
 	CreateReplicationController(api.ReplicationController) (api.ReplicationController, error)
 	UpdateReplicationController(api.ReplicationController) (api.ReplicationController, error)
@@ -192,6 +193,12 @@ func (c *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs
 func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
 	err = c.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(&result)
+	return
+}
+
+// ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector
+func (c *Client) ListReplicationControllers(selector labels.Selector) (result api.ReplicationControllerList, err error) {
+	err = c.Get().Path("replicationControllers").Selector(selector).Do().Into(&result)
 	return
 }
 
