@@ -141,11 +141,11 @@ func (c *Converter) convert(sv, dv reflect.Value) error {
 	case reflect.Struct:
 		for i := 0; i < dt.NumField(); i++ {
 			f := dv.Type().Field(i)
-			df := dv.FieldByName(f.Name)
 			sf := sv.FieldByName(f.Name)
-			if !df.IsValid() || !sf.IsValid() {
-				return fmt.Errorf("%v not present in source and dest.", f.Name)
+			if !sf.IsValid() {
+				return fmt.Errorf("%v not present in source %v for dest %v", f.Name, sv.Type(), dv.Type())
 			}
+			df := dv.Field(i)
 			if err := c.convert(sf, df); err != nil {
 				return err
 			}
