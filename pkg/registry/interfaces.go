@@ -54,15 +54,6 @@ type ServiceRegistry interface {
 	UpdateEndpoints(e api.Endpoints) error
 }
 
-// JobRegistry is an interface for things that know how to store Jobs.
-type JobRegistry interface {
-	ListJobs() (api.JobList, error)
-	GetJob(jobID string) (*api.Job, error)
-	CreateJob(job api.Job) error
-	UpdateJob(job api.Job) error
-	DeleteJob(jobID string) error
-}
-
 // BuildRegistry is an interface for things that know how to store Builds.
 type BuildRegistry interface {
 	ListBuilds() (api.BuildList, error)

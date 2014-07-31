@@ -28,7 +28,6 @@ type MemoryRegistry struct {
 	podData        map[string]api.Pod
 	controllerData map[string]api.ReplicationController
 	serviceData    map[string]api.Service
-	jobData        map[string]api.Job
 	buildData      map[string]api.Build
 }
 
@@ -37,7 +36,6 @@ func MakeMemoryRegistry() *MemoryRegistry {
 		podData:        map[string]api.Pod{},
 		controllerData: map[string]api.ReplicationController{},
 		serviceData:    map[string]api.Service{},
-		jobData:        map[string]api.Job{},
 		buildData:      map[string]api.Build{},
 	}
 }
@@ -158,44 +156,6 @@ func (registry *MemoryRegistry) UpdateService(svc api.Service) error {
 }
 
 func (registry *MemoryRegistry) UpdateEndpoints(e api.Endpoints) error {
-	return nil
-}
-
-func (registry *MemoryRegistry) ListJobs() (api.JobList, error) {
-	result := []api.Job{}
-	for _, value := range registry.jobData {
-		result = append(result, value)
-	}
-	return api.JobList{Items: result}, nil
-}
-
-func (registry *MemoryRegistry) GetJob(jobID string) (*api.Job, error) {
-	job, found := registry.jobData[jobID]
-	if found {
-		return &job, nil
-	} else {
-		return nil, apiserver.NewNotFoundErr("job", jobID)
-	}
-}
-
-func (registry *MemoryRegistry) CreateJob(job api.Job) error {
-	registry.jobData[job.ID] = job
-	return nil
-}
-
-func (registry *MemoryRegistry) DeleteJob(jobID string) error {
-	if _, ok := registry.jobData[jobID]; !ok {
-		return apiserver.NewNotFoundErr("job", jobID)
-	}
-	delete(registry.jobData, jobID)
-	return nil
-}
-
-func (registry *MemoryRegistry) UpdateJob(job api.Job) error {
-	if _, ok := registry.jobData[job.ID]; !ok {
-		return apiserver.NewNotFoundErr("job", job.ID)
-	}
-	registry.jobData[job.ID] = job
 	return nil
 }
 

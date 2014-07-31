@@ -28,7 +28,6 @@ var storageToType = map[string]reflect.Type{
 	"services":               reflect.TypeOf(api.Service{}),
 	"replicationControllers": reflect.TypeOf(api.ReplicationController{}),
 	"minions":                reflect.TypeOf(api.Minion{}),
-	"jobs":                   reflect.TypeOf(api.Job{}),
 	"builds":                 reflect.TypeOf(api.Build{}),
 }
 

@@ -375,13 +375,12 @@ type WatchEvent struct {
 }
 
 // Build encapsulates the inputs needed to produce a new deployable image, as well as
-// the status of the operation and a reference to the Job which runs the build.
+// the status of the operation and a reference to the Pod which runs the build.
 type Build struct {
-	JSONBase    `json:",inline" yaml:",inline"`
-	BuildConfig BuildConfig
-	Status      BuildStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	Pod         Pod         `json:"pod,omitempty" yaml:"pod,omitempty"`
-	PodID       string      `json:"podID,omitempty" yaml:"podID,omitempty"`
+	JSONBase `json:",inline" yaml:",inline"`
+	Config   BuildConfig `json:"config,omitempty" yaml:"config,omitempty"`
+	Status   BuildStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	PodID    string      `json:"podID,omitempty" yaml:"podID,omitempty"`
 }
 
 // BuildStatus represents the status of a Build at a point in time.
@@ -396,8 +395,8 @@ const (
 )
 
 type BuildConfig struct {
-	Type      BuildType
-	SourceURI string
+	Type      BuildType `json:"type,omitempty" yaml:"type,omitempty"`
+	SourceURI string    `json:"sourceUri,omitempty" yaml:"sourceUri,omitempty"`
 }
 
 type BuildType string

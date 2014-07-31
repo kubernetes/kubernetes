@@ -29,8 +29,7 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// EtcdRegistry implements PodRegistry, ControllerRegistry, ServiceRegistry, JobRegistry, and
-// BuildRegistry backed by etcd.
+// EtcdRegistry implements PodRegistry, ControllerRegistry, ServiceRegistry, and BuildRegistry backed by etcd.
 type EtcdRegistry struct {
 	etcdClient      tools.EtcdClient
 	machines        MinionRegistry
@@ -308,50 +307,6 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
 	return registry.helper().SetObj("/registry/services/endpoints/"+e.ID, e)
-}
-
-func makeJobKey(id string) string {
-	return "/jobs/" + id
-}
-
-// ListJobs obtains a list of Jobs.
-func (registry *EtcdRegistry) ListJobs() (api.JobList, error) {
-	var list api.JobList
-	err := registry.helper().ExtractList("/jobs", &list.Items)
-	return list, err
-}
-
-// GetJob gets a specific Job specified by its ID.
-func (registry *EtcdRegistry) GetJob(jobID string) (*api.Job, error) {
-	var job *api.Job
-	err := registry.helper().ExtractObj(makeJobKey(jobID), &job, false)
-	if tools.IsEtcdNotFound(err) {
-		return nil, apiserver.NewNotFoundErr("job", jobID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return job, nil
-}
-
-// CreateJob creates a new Job.
-func (registry *EtcdRegistry) CreateJob(job api.Job) error {
-	return registry.UpdateJob(job)
-}
-
-// UpdateJob replaces an existing Job.
-func (registry *EtcdRegistry) UpdateJob(job api.Job) error {
-	return registry.helper().SetObj(makeJobKey(job.ID), job)
-}
-
-// DeleteJob deletes a Job specified by its ID.
-func (registry *EtcdRegistry) DeleteJob(jobID string) error {
-	key := makeJobKey(jobID)
-	_, err := registry.etcdClient.Delete(key, true)
-	if tools.IsEtcdNotFound(err) {
-		return apiserver.NewNotFoundErr("job", jobID)
-	}
-	return err
 }
 
 func makeBuildKey(id string) string {

@@ -22,7 +22,7 @@ func main() {
 	defer util.FlushLogs()
 
 	if len(*master) == 0 {
-		glog.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
+		glog.Fatal("usage: build-controller -master <master>")
 	}
 
 	buildController := build.MakeBuildController(client.New("http://"+*master, nil))

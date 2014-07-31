@@ -1,6 +1,7 @@
 package build
 
 import (
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -37,7 +38,7 @@ func (bc *BuildController) synchronize() {
 	}
 
 	for _, build := range builds.Items {
-		nextStatus, err = bc.process(build)
+		nextStatus, err := bc.process(&build)
 		if err != nil {
 			glog.Errorf("Error processing build ID %v: %#v", build.ID, err)
 		}
@@ -58,17 +59,18 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 
 	switch build.Status {
 	case api.BuildNew:
-		build.PodID = "build-" + build.BuildConfig.Type // TODO: better naming
+		build.PodID = "build-" + string(build.Config.Type) // TODO: better naming
 		return api.BuildPending, nil
 	case api.BuildPending:
 		podSpec := bc.buildPodSpec(build)
-		_, err := r.kubeClient.CreatePod(podSpec)
+		_, err := bc.kubeClient.CreatePod(podSpec)
 
 		// TODO: strongly typed error checking
-		switch {
-		case err == "pod_exists":
-			return build.Status, err // no transition, already handled by someone else
-		case err != nil:
+		if err != nil {
+			if strings.Index(err.Error(), "already exists") != -1 {
+				return build.Status, err // no transition, already handled by someone else
+			}
+
 			return api.BuildFailed, err
 		}
 
@@ -95,9 +97,11 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 	return build.Status, nil
 }
 
-func (bc *BuildController) buildPodSpec(build api.Build) api.Pod {
+func (bc *BuildController) buildPodSpec(build *api.Build) api.Pod {
 	return api.Pod{
-		ID:     build.PodID,
+		JSONBase: api.JSONBase{
+			ID: build.PodID,
+		},
 		Labels: map[string]string{},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
@@ -108,6 +112,10 @@ func (bc *BuildController) buildPodSpec(build api.Build) api.Pod {
 						Image:         "ironcladlou/openshift-docker-builder",
 						Privileged:    true,
 						RestartPolicy: "runOnce",
+						Env: []api.EnvVar{
+							{Name: "BUILD_TAG", Value: "temp"},
+							{Name: "DOCKER_CONTEXT_URL", Value: build.Config.SourceURI},
+						},
 					},
 				},
 			},

@@ -71,11 +71,6 @@ ${GO_OUT}/build-controller \
   --master="127.0.0.1:${API_PORT}" &> ${BLDMGR_LOG} &
 BLDMGR_PID=$!
 
-JOBCTR_LOG=/tmp/job-controller.log
-${GO_OUT}/job-controller \
-  --master="127.0.0.1:${API_PORT}" &> ${JOBCTR_LOG} &
-JOBCTR_PID=$!
-
 KUBELET_LOG=/tmp/kubelet.log
 ${GO_OUT}/kubelet \
   --etcd_servers="http://127.0.0.1:4001" \
@@ -94,7 +89,6 @@ echo "Logs: "
 echo "  ${APISERVER_LOG}"
 echo "  ${CTLRMGR_LOG}"
 echo "  ${BLDMGR_LOG}"
-echo "  ${JOBCTR_LOG}"
 echo "  ${KUBELET_LOG}"
 echo "  ${PROXY_LOG}"
 
@@ -104,7 +98,6 @@ cleanup()
     kill ${APISERVER_PID}
     kill ${CTLRMGR_PID}
     kill ${BLDMGR_PID}
-    kill ${JOBCTR_PID}
     kill ${KUBELET_PID}
     kill ${PROXY_PID}
 
