@@ -97,6 +97,10 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 }
 
 func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
 	i := f.generateIndex()
 
 	if prevResult, ok := f.Data[key]; ok && prevResult.R != nil && prevResult.R.Node != nil {
@@ -111,7 +115,7 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 			},
 		}
 		f.Data[key] = result
-		return result.R, f.Err
+		return result.R, nil
 	}
 
 	result := EtcdResponseWithError{
@@ -124,7 +128,7 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 		},
 	}
 	f.Data[key] = result
-	return result.R, f.Err
+	return result.R, nil
 }
 
 func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
@@ -136,6 +140,10 @@ func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, 
 	return f.Set(key, value, ttl)
 }
 func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
+	if f.Err != nil {
+		return f.Err
+	}
+
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -144,7 +152,7 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 	}
 
 	f.DeletedKeys = append(f.DeletedKeys, key)
-	return &etcd.Response{}, f.Err
+	return &etcd.Response{}, nil
 }
 
 func (f *FakeEtcdClient) WaitForWatchCompletion() {
