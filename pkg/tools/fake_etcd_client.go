@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -96,6 +97,11 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 	return result.R, result.E
 }
 
+func (f *FakeEtcdClient) nodeExists(key string) bool {
+	result, ok := f.Data[key]
+	return ok && result.R != nil && result.R.Node != nil
+}
+
 func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
 	if f.Err != nil {
 		return nil, f.Err
@@ -103,7 +109,8 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 
 	i := f.generateIndex()
 
-	if prevResult, ok := f.Data[key]; ok && prevResult.R != nil && prevResult.R.Node != nil {
+	if f.nodeExists(key) {
+		prevResult := f.Data[key]
 		createdIndex := prevResult.R.Node.CreatedIndex
 		result := EtcdResponseWithError{
 			R: &etcd.Response{
@@ -132,12 +139,38 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 }
 
 func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
-	// TODO: Maybe actually implement compare and swap here?
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
+	if !f.TestIndex {
+		f.t.Errorf("Enable TestIndex for test involving CompareAndSwap")
+		return nil, errors.New("Enable TestIndex for test involving CompareAndSwap")
+	}
+
+	if prevValue == "" && prevIndex == 0 {
+		return nil, errors.New("Either prevValue or prevIndex must be specified.")
+	}
+
+	if !f.nodeExists(key) {
+		return nil, EtcdErrorNotFound
+	}
+
+	prevNode := f.Data[key].R.Node
+
+	if prevValue != "" && prevValue != prevNode.Value {
+		return nil, EtcdErrorTestFailed
+	}
+
+	if prevIndex != 0 && prevIndex != prevNode.ModifiedIndex {
+		return nil, EtcdErrorTestFailed
+	}
+
 	return f.Set(key, value, ttl)
 }
 
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
-	if prevResult, ok := f.Data[key]; ok && prevResult.R != nil && prevResult.R.Node != nil {
+	if f.nodeExists(key) {
 		return nil, EtcdErrorNodeExist
 	}
 
