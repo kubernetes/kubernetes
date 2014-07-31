@@ -16,6 +16,16 @@ limitations under the License.
 
 package version
 
+import (
+	"flag"
+	"fmt"
+	"os"
+)
+
+var (
+	versionFlag = flag.Bool("version", false, "Print version information and quit")
+)
+
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
@@ -32,5 +42,19 @@ func Get() Info {
 		Major:     "0",
 		Minor:     "1",
 		GitCommit: commitFromGit,
+	}
+}
+
+// String returns info as a human-friendly version string.
+func (info Info) String() string {
+	return fmt.Sprintf("version %s.%s, build %s", info.Major, info.Minor, info.GitCommit)
+}
+
+// PrintAndExitIfRequested will check if the -version flag was passed
+// and, if so, print the version and exit.
+func PrintAndExitIfRequested() {
+	if *versionFlag {
+		fmt.Printf("Kubernetes %s\n", Get())
+		os.Exit(0)
 	}
 }

@@ -82,7 +82,7 @@ wait_for_url "http://localhost:4001/version" "etcd: "
 
 
 # Check kubecfg
-out=$(${GO_OUT}/kubecfg -V)
+out=$(${GO_OUT}/kubecfg -version)
 echo kubecfg: $out
 
 # Start kubelet

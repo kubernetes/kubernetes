@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
 
@@ -53,6 +54,8 @@ func main() {
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
+
+	version.PrintAndExitIfRequested()
 
 	if len(machineList) == 0 {
 		glog.Fatal("No machines specified!")

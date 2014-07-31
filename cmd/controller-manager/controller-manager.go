@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -45,6 +46,8 @@ func main() {
 	flag.Parse()
 	util.InitLogs()
 	defer util.FlushLogs()
+
+	version.PrintAndExitIfRequested()
 
 	if len(etcdServerList) == 0 || len(*master) == 0 {
 		glog.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
