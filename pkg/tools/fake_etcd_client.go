@@ -37,13 +37,14 @@ type TestLogger interface {
 type FakeEtcdClient struct {
 	watchCompletedChan chan bool
 
-	Data        map[string]EtcdResponseWithError
-	DeletedKeys []string
-	Err         error
-	t           TestLogger
-	Ix          int
-	TestIndex   bool
-	ChangeIndex uint64
+	Data                 map[string]EtcdResponseWithError
+	DeletedKeys          []string
+	expectNotFoundGetSet map[string]struct{}
+	Err                  error
+	t                    TestLogger
+	Ix                   int
+	TestIndex            bool
+	ChangeIndex          uint64
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -55,8 +56,9 @@ type FakeEtcdClient struct {
 
 func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	ret := &FakeEtcdClient{
-		t:    t,
-		Data: map[string]EtcdResponseWithError{},
+		t:                    t,
+		expectNotFoundGetSet: map[string]struct{}{},
+		Data:                 map[string]EtcdResponseWithError{},
 	}
 	// There are three publicly accessible channels in FakeEtcdClient:
 	//  - WatchResponse
@@ -71,6 +73,10 @@ func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	// WatchResponse, WatchInjectError and WatchStop are ready to read/write.
 	ret.watchCompletedChan = make(chan bool)
 	return ret
+}
+
+func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {
+	f.expectNotFoundGetSet[key] = struct{}{}
 }
 
 func (f *FakeEtcdClient) generateIndex() uint64 {
@@ -90,7 +96,9 @@ func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response,
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
 	result := f.Data[key]
 	if result.R == nil {
-		f.t.Errorf("Unexpected get for %s", key)
+		if _, ok := f.expectNotFoundGetSet[key]; !ok {
+			f.t.Errorf("Unexpected get for %s", key)
+		}
 		return &etcd.Response{}, EtcdErrorNotFound
 	}
 	f.t.Logf("returning %v: %v %#v", key, result.R, result.E)
