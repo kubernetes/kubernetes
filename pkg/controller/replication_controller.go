@@ -17,8 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -27,13 +25,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/coreos/go-etcd/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored in etcd
 // with actual running pods.
-// TODO: Remove the etcd dependency and re-factor in terms of a generic watch interface
+// TODO: Allow choice of switching between etcd/apiserver watching, or remove etcd references
+// from this file completely.
 type ReplicationManager struct {
 	etcdClient tools.EtcdClient
 	kubeClient client.Interface
@@ -42,6 +41,9 @@ type ReplicationManager struct {
 
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(controllerSpec api.ReplicationController) error
+
+	// To allow injection of watch creation.
+	watchMaker func() (watch.Interface, error)
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods
@@ -60,6 +62,7 @@ type RealPodControl struct {
 
 func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) {
 	labels := controllerSpec.DesiredState.PodTemplate.Labels
+	// TODO: don't fail to set this label just because the map isn't created.
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
@@ -86,9 +89,8 @@ func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Inter
 			kubeClient: kubeClient,
 		},
 	}
-	rm.syncHandler = func(controllerSpec api.ReplicationController) error {
-		return rm.syncReplicationController(controllerSpec)
-	}
+	rm.syncHandler = rm.syncReplicationController
+	rm.watchMaker = rm.makeAPIWatch
 	return rm
 }
 
@@ -98,69 +100,49 @@ func (rm *ReplicationManager) Run(period time.Duration) {
 	go util.Forever(func() { rm.watchControllers() }, period)
 }
 
-func (rm *ReplicationManager) watchControllers() {
-	watchChannel := make(chan *etcd.Response)
-	stop := make(chan bool)
-	// Ensure that the call to watch ends.
-	defer close(stop)
+// makeEtcdWatch starts watching via etcd.
+func (rm *ReplicationManager) makeEtcdWatch() (watch.Interface, error) {
+	helper := tools.EtcdHelper{rm.etcdClient}
+	return helper.WatchList("/registry/controllers", tools.Everything)
+}
 
-	go func() {
-		defer util.HandleCrash()
-		_, err := rm.etcdClient.Watch("/registry/controllers", 0, true, watchChannel, stop)
-		if err == etcd.ErrWatchStoppedByUser {
-			close(watchChannel)
-		} else {
-			glog.Errorf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
-		}
-	}()
+// makeAPIWatch starts watching via the apiserver.
+func (rm *ReplicationManager) makeAPIWatch() (watch.Interface, error) {
+	// TODO: Fix this ugly type assertion.
+	return rm.kubeClient.(*client.Client).
+		Get().
+		Path("watch").
+		Path("replicationControllers").
+		Watch()
+}
+
+func (rm *ReplicationManager) watchControllers() {
+	watching, err := rm.watchMaker()
+	if err != nil {
+		glog.Errorf("Unexpected failure to watch: %v", err)
+		time.Sleep(5 * time.Second)
+		return
+	}
 
 	for {
 		select {
 		case <-rm.syncTime:
 			rm.synchronize()
-		case watchResponse, open := <-watchChannel:
-			if !open || watchResponse == nil {
+		case event, open := <-watching.ResultChan():
+			if !open {
 				// watchChannel has been closed, or something else went
 				// wrong with our etcd watch call. Let the util.Forever()
 				// that called us call us again.
 				return
 			}
-			glog.Infof("Got watch: %#v", watchResponse)
-			controller, err := rm.handleWatchResponse(watchResponse)
-			if err != nil {
-				glog.Errorf("Error handling data: %#v, %#v", err, watchResponse)
-				continue
+			glog.Infof("Got watch: %#v", event)
+			if rc, ok := event.Object.(*api.ReplicationController); !ok {
+				glog.Errorf("unexpected object: %#v", event.Object)
+			} else {
+				rm.syncHandler(*rc)
 			}
-			rm.syncHandler(*controller)
 		}
 	}
-}
-
-func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api.ReplicationController, error) {
-	switch response.Action {
-	case "set":
-		if response.Node == nil {
-			return nil, fmt.Errorf("response node is null %#v", response)
-		}
-		var controllerSpec api.ReplicationController
-		if err := json.Unmarshal([]byte(response.Node.Value), &controllerSpec); err != nil {
-			return nil, err
-		}
-		return &controllerSpec, nil
-	case "delete":
-		// Ensure that the final state of a replication controller is applied before it is deleted.
-		// Otherwise, a replication controller could be modified and then deleted (for example, from 3 to 0
-		// replicas), and it would be non-deterministic which of its pods continued to exist.
-		if response.PrevNode == nil {
-			return nil, fmt.Errorf("previous node is null %#v", response)
-		}
-		var controllerSpec api.ReplicationController
-		if err := json.Unmarshal([]byte(response.PrevNode.Value), &controllerSpec); err != nil {
-			return nil, err
-		}
-		return &controllerSpec, nil
-	}
-	return nil, nil
 }
 
 func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {

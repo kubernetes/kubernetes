@@ -43,6 +43,7 @@ type RESTStorage interface {
 // ResourceWatcher should be implemented by all RESTStorage objects that
 // want to offer the ability to watch for changes through the watch api.
 type ResourceWatcher interface {
+	// TODO: take a query, like List, to filter out unwanted events.
 	WatchAll() (watch.Interface, error)
 	WatchSingle(id string) (watch.Interface, error)
 }

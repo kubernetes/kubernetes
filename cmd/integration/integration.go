@@ -104,7 +104,10 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	handler.delegate = m.ConstructHandler("/api/v1beta1")
 
 	controllerManager := controller.MakeReplicationManager(etcdClient, cl)
-	controllerManager.Run(1 * time.Second)
+
+	// Prove that controllerManager's watch works by making it not sync until after this
+	// test is over. (Hopefully we don't take 10 minutes!)
+	controllerManager.Run(10 * time.Minute)
 
 	// Kubelet (localhost)
 	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
@@ -192,7 +195,12 @@ func runAtomicPutTest(c *client.Client) {
 			for {
 				glog.Infof("Starting to update (%s, %s)", l, v)
 				var tmpSvc api.Service
-				err := c.Get().Path("services").Path(svc.ID).Do().Into(&tmpSvc)
+				err := c.Get().
+					Path("services").
+					Path(svc.ID).
+					PollPeriod(100 * time.Millisecond).
+					Do().
+					Into(&tmpSvc)
 				if err != nil {
 					glog.Errorf("Error getting atomicService: %v", err)
 					continue

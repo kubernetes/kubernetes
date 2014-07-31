@@ -19,6 +19,7 @@ package tools
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -267,23 +268,31 @@ type etcdWatcher struct {
 	list   bool // If we're doing a recursive watch, should be true.
 	filter FilterFunc
 
-	etcdIncoming chan *etcd.Response
-	etcdStop     chan bool
+	etcdIncoming  chan *etcd.Response
+	etcdStop      chan bool
+	etcdCallEnded chan struct{}
 
 	outgoing chan watch.Event
 	userStop chan struct{}
+	stopped  bool
+	stopLock sync.Mutex
+
+	// Injectable for testing. Send the event down the outgoing channel.
+	emit func(watch.Event)
 }
 
 // Returns a new etcdWatcher; if list is true, watch sub-nodes.
 func newEtcdWatcher(list bool, filter FilterFunc) *etcdWatcher {
 	w := &etcdWatcher{
-		list:         list,
-		filter:       filter,
-		etcdIncoming: make(chan *etcd.Response),
-		etcdStop:     make(chan bool),
-		outgoing:     make(chan watch.Event),
-		userStop:     make(chan struct{}),
+		list:          list,
+		filter:        filter,
+		etcdIncoming:  make(chan *etcd.Response),
+		etcdStop:      make(chan bool),
+		etcdCallEnded: make(chan struct{}),
+		outgoing:      make(chan watch.Event),
+		userStop:      make(chan struct{}),
 	}
+	w.emit = func(e watch.Event) { w.outgoing <- e }
 	go w.translate()
 	return w
 }
@@ -292,11 +301,9 @@ func newEtcdWatcher(list bool, filter FilterFunc) *etcdWatcher {
 // as a goroutine.
 func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string) {
 	defer util.HandleCrash()
+	defer close(w.etcdCallEnded)
 	_, err := client.Watch(key, 0, w.list, w.etcdIncoming, w.etcdStop)
-	if err == etcd.ErrWatchStoppedByUser {
-		// etcd doesn't close the channel in this case.
-		close(w.etcdIncoming)
-	} else {
+	if err != etcd.ErrWatchStoppedByUser {
 		glog.Errorf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
 	}
 }
@@ -309,6 +316,8 @@ func (w *etcdWatcher) translate() {
 
 	for {
 		select {
+		case <-w.etcdCallEnded:
+			return
 		case <-w.userStop:
 			w.etcdStop <- true
 			return
@@ -324,7 +333,6 @@ func (w *etcdWatcher) translate() {
 func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	var action watch.EventType
 	var data []byte
-	var nodes etcd.Nodes
 	switch res.Action {
 	case "set":
 		if res.Node == nil {
@@ -332,7 +340,6 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 			return
 		}
 		data = []byte(res.Node.Value)
-		nodes = res.Node.Nodes
 		// TODO: Is this conditional correct?
 		if res.EtcdIndex > 0 {
 			action = watch.Modified
@@ -345,38 +352,23 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 			return
 		}
 		data = []byte(res.PrevNode.Value)
-		nodes = res.PrevNode.Nodes
 		action = watch.Deleted
-	}
-
-	// If listing, we're interested in sub-nodes.
-	if w.list {
-		for _, n := range nodes {
-			obj, err := api.Decode([]byte(n.Value))
-			if err != nil {
-				glog.Errorf("failure to decode api object: %#v", res)
-				continue
-			}
-			if w.filter != nil && !w.filter(obj) {
-				continue
-			}
-			w.outgoing <- watch.Event{
-				Type:   action,
-				Object: obj,
-			}
-		}
+	default:
+		glog.Errorf("unknown action: %v", res.Action)
 		return
 	}
 
 	obj, err := api.Decode(data)
 	if err != nil {
-		glog.Errorf("failure to decode api object: %#v", res)
+		glog.Errorf("failure to decode api object: '%v' from %#v", string(data), res)
+		// TODO: expose an error through watch.Interface?
+		w.Stop()
 		return
 	}
-	w.outgoing <- watch.Event{
+	w.emit(watch.Event{
 		Type:   action,
 		Object: obj,
-	}
+	})
 }
 
 // ResultChannel implements watch.Interface.
@@ -386,5 +378,11 @@ func (w *etcdWatcher) ResultChan() <-chan watch.Event {
 
 // Stop implements watch.Interface.
 func (w *etcdWatcher) Stop() {
-	close(w.userStop)
+	w.stopLock.Lock()
+	defer w.stopLock.Unlock()
+	// Prevent double channel closes.
+	if !w.stopped {
+		w.stopped = true
+		close(w.userStop)
+	}
 }

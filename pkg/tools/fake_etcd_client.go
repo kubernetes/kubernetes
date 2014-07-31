@@ -215,6 +215,9 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 
 	if receiver == nil {
 		return f.Get(prefix, false, recursive)
+	} else {
+		// Emulate etcd's behavior. (I think.)
+		defer close(receiver)
 	}
 
 	f.watchCompletedChan <- true
@@ -222,8 +225,6 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	case <-stop:
 		return nil, etcd.ErrWatchStoppedByUser
 	case err := <-injectedError:
-		// Emulate etcd's behavior.
-		close(receiver)
 		return nil, err
 	}
 	// Never get here.

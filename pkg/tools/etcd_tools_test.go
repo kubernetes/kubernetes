@@ -220,71 +220,7 @@ func TestAtomicUpdate(t *testing.T) {
 }
 
 func TestWatchInterpretation_ListAdd(t *testing.T) {
-	called := false
 	w := newEtcdWatcher(true, func(interface{}) bool {
-		called = true
-		return true
-	})
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := api.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Nodes: etcd.Nodes{
-				{
-					Value: string(podBytes),
-				},
-			},
-		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Added, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if !called {
-		t.Errorf("filter never called")
-	}
-}
-
-func TestWatchInterpretation_ListDelete(t *testing.T) {
-	called := false
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		called = true
-		return true
-	})
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := api.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "delete",
-		PrevNode: &etcd.Node{
-			Nodes: etcd.Nodes{
-				{
-					Value: string(podBytes),
-				},
-			},
-		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Deleted, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if !called {
-		t.Errorf("filter never called")
-	}
-}
-
-func TestWatchInterpretation_SingleAdd(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
 	})
@@ -307,8 +243,8 @@ func TestWatchInterpretation_SingleAdd(t *testing.T) {
 	}
 }
 
-func TestWatchInterpretation_SingleDelete(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
+func TestWatchInterpretation_Delete(t *testing.T) {
+	w := newEtcdWatcher(true, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
 	})
@@ -329,6 +265,49 @@ func TestWatchInterpretation_SingleDelete(t *testing.T) {
 	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
+}
+
+func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
+	w := newEtcdWatcher(false, func(interface{}) bool {
+		t.Errorf("unexpected filter call")
+		return true
+	})
+	w.emit = func(e watch.Event) {
+		t.Errorf("Unexpected emit: %v", e)
+	}
+
+	w.sendResult(&etcd.Response{
+		Action: "update",
+	})
+}
+
+func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
+	w := newEtcdWatcher(false, func(interface{}) bool {
+		t.Errorf("unexpected filter call")
+		return true
+	})
+	w.emit = func(e watch.Event) {
+		t.Errorf("Unexpected emit: %v", e)
+	}
+	w.sendResult(&etcd.Response{
+		Action: "set",
+	})
+}
+
+func TestWatchInterpretation_ResponseBadData(t *testing.T) {
+	w := newEtcdWatcher(false, func(interface{}) bool {
+		t.Errorf("unexpected filter call")
+		return true
+	})
+	w.emit = func(e watch.Event) {
+		t.Errorf("Unexpected emit: %v", e)
+	}
+	w.sendResult(&etcd.Response{
+		Action: "set",
+		Node: &etcd.Node{
+			Value: "foobar",
+		},
+	})
 }
 
 func TestWatch(t *testing.T) {

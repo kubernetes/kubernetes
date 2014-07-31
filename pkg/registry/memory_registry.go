@@ -17,9 +17,12 @@ limitations under the License.
 package registry
 
 import (
+	"errors"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // An implementation of PodRegistry and ControllerRegistry that is backed by memory
@@ -84,6 +87,10 @@ func (registry *MemoryRegistry) ListControllers() ([]api.ReplicationController, 
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func (registry *MemoryRegistry) WatchControllers() (watch.Interface, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func (registry *MemoryRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
