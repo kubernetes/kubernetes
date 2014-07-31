@@ -74,8 +74,21 @@ ${GO_OUT}/controller-manager \
 CTLRMGR_PID=$!
 
 BLDMGR_LOG=/tmp/build-controller.log
+
+DOCKER_BUILDER_IMAGE_OPTION=""
+if [ -n "$DOCKER_BUILDER_IMAGE" ]; then
+  DOCKER_BUILDER_IMAGE_OPTION="--docker_builder_image=${DOCKER_BUILDER_IMAGE}"
+fi
+
+DOCKER_REGISTRY_OPTION=""
+if [ -n "$DOCKER_REGISTRY" ]; then
+  DOCKER_REGISTRY_OPTION="--docker_registry=${DOCKER_REGISTRY}"
+fi
+
 ${GO_OUT}/build-controller \
-  --master="127.0.0.1:${API_PORT}" &> ${BLDMGR_LOG} &
+  --master="127.0.0.1:${API_PORT}" \
+  $DOCKER_BUILDER_IMAGE_OPTION \
+  $DOCKER_REGISTRY_OPTION &> ${BLDMGR_LOG} &
 BLDMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
