@@ -105,7 +105,7 @@ func main() {
 		glog.Fatal("Couldn't connect to docker.")
 	}
 
-	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:5000")
+	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:4194")
 	if err != nil {
 		glog.Errorf("Error on creating cadvisor client: %v", err)
 	}
