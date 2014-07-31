@@ -137,11 +137,16 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 }
 
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
+	if prevResult, ok := f.Data[key]; ok && prevResult.R != nil && prevResult.R.Node != nil {
+		return nil, EtcdErrorNodeExist
+	}
+
 	return f.Set(key, value, ttl)
 }
+
 func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
 	if f.Err != nil {
-		return f.Err
+		return nil, f.Err
 	}
 
 	f.Data[key] = EtcdResponseWithError{

@@ -30,11 +30,13 @@ import (
 
 const (
 	EtcdErrorCodeNotFound      = 100
+	EtcdErrorCodeNodeExist     = 105
 	EtcdErrorCodeValueRequired = 200
 )
 
 var (
 	EtcdErrorNotFound      = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNotFound}
+	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
 	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
 )
 
