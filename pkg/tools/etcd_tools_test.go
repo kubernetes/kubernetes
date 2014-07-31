@@ -33,6 +33,16 @@ type fakeEtcdGetSet struct {
 	set func(key, value string, ttl uint64) (*etcd.Response, error)
 }
 
+type TestResource struct {
+	api.JSONBase `json:",inline" yaml:",inline"`
+	Value        int `json:"value" yaml:"value,omitempty"`
+}
+
+func init() {
+	api.AddKnownTypes("", TestResource{})
+	api.AddKnownTypes("v1beta1", TestResource{})
+}
+
 func TestIsNotFoundErr(t *testing.T) {
 	try := func(err error, isNotFound bool) {
 		if IsEtcdNotFound(err) != isNotFound {
@@ -151,6 +161,61 @@ func TestSetObj(t *testing.T) {
 	got := fakeClient.Data["/some/key"].R.Node.Value
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+}
+
+func TestAtomicUpdate(t *testing.T) {
+	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	helper := EtcdHelper{fakeClient}
+
+	// Create a new node.
+	fakeClient.ExpectNotFoundGet("/some/key")
+	obj := TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 1}
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+		return obj, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err := api.Encode(obj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expect := string(data)
+	got := fakeClient.Data["/some/key"].R.Node.Value
+	if expect != got {
+		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+	return
+
+	// Update an existing node.
+	callbackCalled := false
+	objUpdate := &TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 2}
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+		callbackCalled = true
+
+		if in.(*TestResource).Value != 1 {
+			t.Errorf("Callback input was not current set value")
+		}
+
+		return objUpdate, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err = api.Encode(objUpdate)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expect = string(data)
+	got = fakeClient.Data["/some/key"].R.Node.Value
+	if expect != got {
+		t.Errorf("Wanted %v, got %v", expect, got)
+	}
+
+	if !callbackCalled {
+		t.Errorf("tryUpdate callback should have been called.")
 	}
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -36,11 +37,14 @@ type TestLogger interface {
 type FakeEtcdClient struct {
 	watchCompletedChan chan bool
 
-	Data        map[string]EtcdResponseWithError
-	DeletedKeys []string
-	Err         error
-	t           TestLogger
-	Ix          int
+	Data                 map[string]EtcdResponseWithError
+	DeletedKeys          []string
+	expectNotFoundGetSet map[string]struct{}
+	Err                  error
+	t                    TestLogger
+	Ix                   int
+	TestIndex            bool
+	ChangeIndex          uint64
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -52,8 +56,9 @@ type FakeEtcdClient struct {
 
 func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	ret := &FakeEtcdClient{
-		t:    t,
-		Data: map[string]EtcdResponseWithError{},
+		t:                    t,
+		expectNotFoundGetSet: map[string]struct{}{},
+		Data:                 map[string]EtcdResponseWithError{},
 	}
 	// There are three publicly accessible channels in FakeEtcdClient:
 	//  - WatchResponse
@@ -70,6 +75,19 @@ func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	return ret
 }
 
+func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {
+	f.expectNotFoundGetSet[key] = struct{}{}
+}
+
+func (f *FakeEtcdClient) generateIndex() uint64 {
+	if !f.TestIndex {
+		return 0
+	}
+
+	f.ChangeIndex++
+	return f.ChangeIndex
+}
+
 func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
 	f.Ix = f.Ix + 1
 	return f.Set(fmt.Sprintf("%s/%d", key, f.Ix), data, ttl)
@@ -78,34 +96,100 @@ func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response,
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
 	result := f.Data[key]
 	if result.R == nil {
-		f.t.Errorf("Unexpected get for %s", key)
+		if _, ok := f.expectNotFoundGetSet[key]; !ok {
+			f.t.Errorf("Unexpected get for %s", key)
+		}
 		return &etcd.Response{}, EtcdErrorNotFound
 	}
 	f.t.Logf("returning %v: %v %#v", key, result.R, result.E)
 	return result.R, result.E
 }
 
+func (f *FakeEtcdClient) nodeExists(key string) bool {
+	result, ok := f.Data[key]
+	return ok && result.R != nil && result.R.Node != nil
+}
+
 func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
+	i := f.generateIndex()
+
+	if f.nodeExists(key) {
+		prevResult := f.Data[key]
+		createdIndex := prevResult.R.Node.CreatedIndex
+		result := EtcdResponseWithError{
+			R: &etcd.Response{
+				Node: &etcd.Node{
+					Value:         value,
+					CreatedIndex:  createdIndex,
+					ModifiedIndex: i,
+				},
+			},
+		}
+		f.Data[key] = result
+		return result.R, nil
+	}
+
 	result := EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: value,
+				Value:         value,
+				CreatedIndex:  i,
+				ModifiedIndex: i,
 			},
 		},
 	}
 	f.Data[key] = result
-	return result.R, f.Err
+	return result.R, nil
 }
 
 func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
-	// TODO: Maybe actually implement compare and swap here?
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
+	if !f.TestIndex {
+		f.t.Errorf("Enable TestIndex for test involving CompareAndSwap")
+		return nil, errors.New("Enable TestIndex for test involving CompareAndSwap")
+	}
+
+	if prevValue == "" && prevIndex == 0 {
+		return nil, errors.New("Either prevValue or prevIndex must be specified.")
+	}
+
+	if !f.nodeExists(key) {
+		return nil, EtcdErrorNotFound
+	}
+
+	prevNode := f.Data[key].R.Node
+
+	if prevValue != "" && prevValue != prevNode.Value {
+		return nil, EtcdErrorTestFailed
+	}
+
+	if prevIndex != 0 && prevIndex != prevNode.ModifiedIndex {
+		return nil, EtcdErrorTestFailed
+	}
+
 	return f.Set(key, value, ttl)
 }
 
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
+	if f.nodeExists(key) {
+		return nil, EtcdErrorNodeExist
+	}
+
 	return f.Set(key, value, ttl)
 }
+
 func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, error) {
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -114,7 +198,7 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 	}
 
 	f.DeletedKeys = append(f.DeletedKeys, key)
-	return &etcd.Response{}, f.Err
+	return &etcd.Response{}, nil
 }
 
 func (f *FakeEtcdClient) WaitForWatchCompletion() {

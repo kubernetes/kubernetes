@@ -17,7 +17,6 @@ limitations under the License.
 package tools
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -30,11 +29,15 @@ import (
 
 const (
 	EtcdErrorCodeNotFound      = 100
+	EtcdErrorCodeTestFailed    = 101
+	EtcdErrorCodeNodeExist     = 105
 	EtcdErrorCodeValueRequired = 200
 )
 
 var (
 	EtcdErrorNotFound      = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNotFound}
+	EtcdErrorTestFailed    = &etcd.EtcdError{ErrorCode: EtcdErrorCodeTestFailed}
+	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
 	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
 )
 
@@ -221,7 +224,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 			return h.SetObj(key, ret)
 		}
 
-		data, err := json.Marshal(ret)
+		data, err := api.Encode(ret)
 		if err != nil {
 			return err
 		}
