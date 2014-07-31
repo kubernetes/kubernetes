@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -156,7 +155,6 @@ func (storage *SimpleRESTStorage) WatchSingle(id string) (watch.Interface, error
 func extractBody(response *http.Response, object interface{}) (string, error) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
-	log.Printf("FOO: %s", body)
 	if err != nil {
 		return string(body), err
 	}
