@@ -16,19 +16,29 @@
 
 # This script sets up a go workspace locally and builds all go components.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
+
+hackdir=$(dirname "$0")
+
+# Set the environment variables required by the build.
+. "${hackdir}/config-go.sh"
+
+# Go to the top of the tree.
+cd "${KUBE_REPO_ROOT}"
 
 # Update the version.
-$(dirname $0)/version-gen.sh
+"${hackdir}/version-gen.sh"
 
-source $(dirname $0)/config-go.sh
-
-cd "${KUBE_TARGET}"
-
-BINARIES="cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg"
-
-if [ $# -gt 0 ]; then
-  BINARIES="$@"
+if [[ $# == 0 ]]; then
+  # Update $@ with the default list of targets to build.
+  set -- cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg
 fi
 
-go install $(for b in $BINARIES; do echo "${KUBE_GO_PACKAGE}"/${b}; done)
+binaries=()
+for arg; do
+  binaries+=("${KUBE_GO_PACKAGE}/${arg}")
+done
+
+go install "${binaries[@]}"
