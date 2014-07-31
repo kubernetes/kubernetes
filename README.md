@@ -283,7 +283,11 @@ If you are running both a remote kubernetes cluster and the local cluster, you c
 
 
 ## Running on [CoreOS](http://coreos.com)
-The folks at [CoreOS](http://coreos.com) have [instructions for running Kubernetes on CoreOS](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-1/)
+There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com):
+
+[Single Kubernetes example in any environment](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-1/)
+
+[Multiple host example using VMware Fusion](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-2/)
 
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
