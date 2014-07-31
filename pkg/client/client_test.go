@@ -171,6 +171,31 @@ func TestUpdatePod(t *testing.T) {
 	c.Validate(t, receivedPod, err)
 }
 
+func TestListControllers(t *testing.T) {
+	c := &testClient{
+		Request: testRequest{Method: "GET", Path: "/replicationControllers"},
+		Response: Response{StatusCode: 200,
+			Body: api.ReplicationControllerList{
+				Items: []api.ReplicationController{
+					{
+						JSONBase: api.JSONBase{ID: "foo"},
+						DesiredState: api.ReplicationControllerState{
+							Replicas: 2,
+						},
+						Labels: map[string]string{
+							"foo":  "bar",
+							"name": "baz",
+						},
+					},
+				},
+			},
+		},
+	}
+	receivedControllerList, err := c.Setup().ListReplicationControllers(nil)
+	c.Validate(t, receivedControllerList, err)
+
+}
+
 func TestGetController(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/replicationControllers/foo"},
