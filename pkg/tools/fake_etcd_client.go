@@ -41,6 +41,7 @@ type FakeEtcdClient struct {
 	Err         error
 	t           TestLogger
 	Ix          int
+	TestIndex   bool
 	ChangeIndex uint64
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
@@ -72,6 +73,10 @@ func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 }
 
 func (f *FakeEtcdClient) generateIndex() uint64 {
+	if !f.TestIndex {
+		return 0
+	}
+
 	f.ChangeIndex++
 	return f.ChangeIndex
 }
