@@ -67,6 +67,8 @@ func makeTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *FakeDocker
 }
 
 func verifyCalls(t *testing.T, fakeDocker *FakeDockerClient, calls []string) {
+	fakeDocker.lock.Lock()
+	defer fakeDocker.lock.Unlock()
 	verifyStringArrayEquals(t, fakeDocker.called, calls)
 }
 
@@ -318,7 +320,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 		},
 	}, dockerContainers)
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop"})
 
 	// Expect one of the duplicates to be killed.
 	if len(fakeDocker.stopped) != 1 || (len(fakeDocker.stopped) != 0 && fakeDocker.stopped[0] != "1234" && fakeDocker.stopped[0] != "4567") {
@@ -328,7 +330,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 
 type FalseHealthChecker struct{}
 
-func (f *FalseHealthChecker) HealthCheck(container api.Container) (health.Status, error) {
+func (f *FalseHealthChecker) HealthCheck(state api.PodState, container api.Container) (health.Status, error) {
 	return health.Unhealthy, nil
 }
 
@@ -363,7 +365,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		},
 	}, dockerContainers)
 	expectNoError(t, err)
-	verifyCalls(t, fakeDocker, []string{"stop", "create", "start"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.

@@ -376,6 +376,16 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 		return err
 	}
 
+	podState := api.PodState{}
+	info, err := kl.GetPodInfo(podFullName)
+	if err != nil {
+		glog.Errorf("Unable to get pod info, health checks may be invalid.")
+	}
+	netInfo, found := info[networkContainerName]
+	if found && netInfo.NetworkSettings != nil {
+		podState.PodIP = netInfo.NetworkSettings.IPAddress
+	}
+
 	for _, container := range pod.Manifest.Containers {
 		if dockerContainer, found := dockerContainers.FindPodContainer(podFullName, container.Name); found {
 			containerID := DockerID(dockerContainer.ID)
@@ -383,7 +393,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 			glog.V(1).Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
 
 			// TODO: This should probably be separated out into a separate goroutine.
-			healthy, err := kl.healthy(container, dockerContainer)
+			healthy, err := kl.healthy(podState, container, dockerContainer)
 			if err != nil {
 				glog.V(1).Infof("health check errored: %v", err)
 				continue
@@ -592,7 +602,7 @@ func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
 	return kl.cadvisorClient.MachineInfo()
 }
 
-func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
+func (kl *Kubelet) healthy(currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
 		return health.Healthy, nil
@@ -603,7 +613,7 @@ func (kl *Kubelet) healthy(container api.Container, dockerContainer *docker.APIC
 	if kl.healthChecker == nil {
 		return health.Healthy, nil
 	}
-	return kl.healthChecker.HealthCheck(container)
+	return kl.healthChecker.HealthCheck(currentState, container)
 }
 
 // Returns logs of current machine.

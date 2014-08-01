@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -66,7 +67,7 @@ func TestHealthChecker(t *testing.T) {
 			},
 		}
 		hc := NewHealthChecker()
-		health, err := hc.HealthCheck(container)
+		health, err := hc.HealthCheck(api.PodState{}, container)
 		if err != nil && tt.health != Unknown {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -139,7 +140,7 @@ func TestHTTPHealthChecker(t *testing.T) {
 				params.Host = host
 			}
 		}
-		health, err := hc.HealthCheck(container)
+		health, err := hc.HealthCheck(api.PodState{PodIP: host}, container)
 		if tt.health == Unknown && err == nil {
 			t.Errorf("Expected error")
 		}
@@ -148,6 +149,47 @@ func TestHTTPHealthChecker(t *testing.T) {
 		}
 		if health != tt.health {
 			t.Errorf("Expected %v, got %v", tt.health, health)
+		}
+	}
+}
+
+func TestTcpHealthChecker(t *testing.T) {
+	type tcpHealthTest struct {
+		probe          *api.LivenessProbe
+		expectedStatus Status
+		expectError    bool
+	}
+
+	checker := &TCPHealthChecker{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	host, port, err := net.SplitHostPort(u.Host)
+	portNum, _ := strconv.Atoi(port)
+
+	tests := []tcpHealthTest{
+		{&api.LivenessProbe{TCPSocket: &api.TCPSocketProbe{Port: portNum}}, Healthy, false},
+		{&api.LivenessProbe{TCPSocket: &api.TCPSocketProbe{Port: 100000}}, Unhealthy, false},
+		{&api.LivenessProbe{}, Unknown, true},
+	}
+	for _, test := range tests {
+		probe := test.probe
+		container := api.Container{
+			LivenessProbe: probe,
+		}
+		status, err := checker.HealthCheck(api.PodState{PodIP: host}, container)
+		if status != test.expectedStatus {
+			t.Errorf("expected: %v, got: %v", test.expectedStatus, status)
+		}
+		if err != nil && !test.expectError {
+			t.Errorf("unexpected error: %#v", err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("unexpected non-error.")
 		}
 	}
 }
@@ -188,7 +230,7 @@ func TestMuxHealthChecker(t *testing.T) {
 		container.LivenessProbe.Type = tt.probeType
 		container.LivenessProbe.HTTPGet.Port = port
 		container.LivenessProbe.HTTPGet.Host = host
-		health, err := mc.HealthCheck(container)
+		health, err := mc.HealthCheck(api.PodState{}, container)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
