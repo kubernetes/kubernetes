@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Selector represents a label selector.
@@ -105,40 +107,34 @@ func (t andTerm) String() string {
 	return strings.Join(terms, ",")
 }
 
-type Comparator int
+// Operator represents a key's relationship
+// to a set of values in a Requirement.
+// TODO: Should also represent key's existence.
+type Operator int
 
 const (
-	IN Comparator = iota + 1
+	IN Operator = iota + 1
 	NOT_IN
 )
 
-// only not named 'Selector' due to name
-// conflict until Selector is deprecated
+// LabelSelector only not named 'Selector' due
+// to name conflict until Selector is deprecated.
 type LabelSelector struct {
 	Requirements []Requirement
 }
 
 type Requirement struct {
-	key        string
-	comparator Comparator
-	strValues  []string
-}
-
-func (r *Requirement) containsStr(value string) bool {
-	for _, x := range r.strValues {
-		if value == x {
-			return true
-		}
-	}
-	return false
+	key       string
+	operator  Operator
+	strValues util.StringSet
 }
 
 func (r *Requirement) Matches(ls Labels) bool {
-	switch r.comparator {
+	switch r.operator {
 	case IN:
-		return r.containsStr(ls.Get(r.key))
+		return r.strValues.Has(ls.Get(r.key))
 	case NOT_IN:
-		return !r.containsStr(ls.Get(r.key))
+		return !r.strValues.Has(ls.Get(r.key))
 	default:
 		return false
 	}
@@ -146,7 +142,7 @@ func (r *Requirement) Matches(ls Labels) bool {
 
 func (sg *LabelSelector) Matches(ls Labels) bool {
 	for _, req := range sg.Requirements {
-		if sat := req.Matches(ls); !sat {
+		if !req.Matches(ls) {
 			return false
 		}
 	}

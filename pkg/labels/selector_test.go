@@ -18,6 +18,8 @@ package labels
 
 import (
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestSelectorParse(t *testing.T) {
@@ -178,10 +180,10 @@ func expectNoMatchRequirement(t *testing.T, req Requirement, ls Set) {
 
 func TestRequirementMatches(t *testing.T) {
 	s := Set{"x": "foo", "y": "baz"}
-	a := Requirement{key: "x", comparator: IN, strValues: []string{"foo"}}
-	b := Requirement{key: "x", comparator: NOT_IN, strValues: []string{"beta"}}
-	c := Requirement{key: "y", comparator: IN, strValues: nil}
-	d := Requirement{key: "y", strValues: []string{"foo"}}
+	a := Requirement{key: "x", operator: IN, strValues: util.NewStringSet("foo")}
+	b := Requirement{key: "x", operator: NOT_IN, strValues: util.NewStringSet("beta")}
+	c := Requirement{key: "y", operator: IN, strValues: nil}
+	d := Requirement{key: "y", strValues: util.NewStringSet("foo")}
 	expectMatchRequirement(t, a, s)
 	expectMatchRequirement(t, b, s)
 	expectNoMatchRequirement(t, c, s)
@@ -204,14 +206,14 @@ func TestLabelSelectorMatches(t *testing.T) {
 	s := Set{"x": "foo", "y": "baz"}
 	allMatch := LabelSelector{
 		Requirements: []Requirement{
-			{key: "x", comparator: IN, strValues: []string{"foo"}},
-			{key: "y", comparator: NOT_IN, strValues: []string{"alpha"}},
+			{key: "x", operator: IN, strValues: util.NewStringSet("foo")},
+			{key: "y", operator: NOT_IN, strValues: util.NewStringSet("alpha")},
 		},
 	}
 	singleNonMatch := LabelSelector{
 		Requirements: []Requirement{
-			{key: "x", comparator: IN, strValues: []string{"foo"}},
-			{key: "y", comparator: IN, strValues: []string{"alpha"}},
+			{key: "x", operator: IN, strValues: util.NewStringSet("foo")},
+			{key: "y", operator: IN, strValues: util.NewStringSet("alpha")},
 		},
 	}
 	expectMatchLabSelector(t, allMatch, s)
