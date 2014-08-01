@@ -29,6 +29,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -202,6 +203,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	validStorage := checkStorage(storage)
 	verb := ""
 	setBody := false
+	var version uint64
 	switch method {
 	case "get":
 		verb = "GET"
@@ -225,6 +227,15 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>", method, prettyWireStorage())
 		}
 	case "update":
+		obj, err := s.Verb("GET").Path(path).Do().Get()
+		if err != nil {
+			glog.Fatalf("error obtaining resource version for update: %v", err)
+		}
+		jsonBase, err := api.FindJSONBase(obj)
+		if err != nil {
+			glog.Fatalf("error finding json base for update: %v", err)
+		}
+		version = jsonBase.ResourceVersion()
 		verb = "PUT"
 		setBody = true
 		if !validStorage || !hasSuffix {
@@ -238,7 +249,25 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 		Path(path).
 		ParseSelector(*selector)
 	if setBody {
-		r.Body(readConfig(storage))
+		if version != 0 {
+			data := readConfig(storage)
+			obj, err := api.Decode(data)
+			if err != nil {
+				glog.Fatalf("error setting resource version: %v", err)
+			}
+			jsonBase, err := api.FindJSONBase(obj)
+			if err != nil {
+				glog.Fatalf("error setting resource version: %v", err)
+			}
+			jsonBase.SetResourceVersion(version)
+			data, err = api.Encode(obj)
+			if err != nil {
+				glog.Fatalf("error setting resource version: %v", err)
+			}
+			r.Body(data)
+		} else {
+			r.Body(readConfig(storage))
+		}
 	}
 	result := r.Do()
 	obj, err := result.Get()
