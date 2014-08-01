@@ -17,51 +17,50 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-if [[ "$(which go)" == "" ]]; then
-	echo "Can't find 'go' in PATH, please fix and retry."
-	echo "See http://golang.org/doc/install for installation instructions."
-	exit 1
+if [[ -z "$(which go)" ]]; then
+  echo "Can't find 'go' in PATH, please fix and retry." >&2
+  echo "See http://golang.org/doc/install for installation instructions." >&2
+  exit 1
 fi
 
 # Travis continuous build uses a head go release that doesn't report
 # a version number, so we skip this check on Travis.  Its unnecessary
 # there anyway.
-if [ "${TRAVIS}" != "true" ]; then
+if [[ "${TRAVIS:-}" != "true" ]]; then
   GO_VERSION=($(go version))
-
-  if [[ ${GO_VERSION[2]} < "go1.2" ]]; then
-    echo "Detected go version: ${GO_VERSION}."
-    echo "Kubernetes requires go version 1.2 or greater."
-    echo "Please install Go version 1.2 or later"
+  if [[ "${GO_VERSION[2]}" < "go1.2" ]]; then
+    echo "Detected go version: ${GO_VERSION[*]}." >&2
+    echo "Kubernetes requires go version 1.2 or greater." >&2
+    echo "Please install Go version 1.2 or later" >&2
     exit 1
   fi
 fi
 
-if [[ "$OSTYPE" == *darwin* ]]; then
-  KUBE_REPO_ROOT="${PWD}/$(dirname ${BASH_SOURCE:-$0})/.."
+KUBE_REPO_ROOT=$(dirname "${BASH_SOURCE:-$0}")/..
+if [[ "${OSTYPE:-}" == *darwin* ]]; then
+  # Make the path absolute if it is not.
+  if [[ "${KUBE_REPO_ROOT}" != /* ]]; then
+    KUBE_REPO_ROOT=${PWD}/${KUBE_REPO_ROOT}
+  fi
 else
-  KUBE_REPO_REL_ROOT="$(dirname ${BASH_SOURCE:-$0})/.."
-  KUBE_REPO_ROOT="$(readlink -f ${KUBE_REPO_REL_ROOT})"
+  # Resolve symlinks.
+  KUBE_REPO_ROOT=$(readlink -f "${KUBE_REPO_ROOT}")
 fi
 
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
-
 mkdir -p "${KUBE_TARGET}"
 
 KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
-export GOPATH="${KUBE_TARGET}"
-KUBE_GO_PACKAGE_DIR="${GOPATH}/src/${KUBE_GO_PACKAGE}"
+KUBE_GO_PACKAGE_DIR="${KUBE_TARGET}/src/${KUBE_GO_PACKAGE}"
 
-(
-  PACKAGE_BASE=$(dirname "${KUBE_GO_PACKAGE_DIR}")
-  if [ ! -d "${PACKAGE_BASE}" ]; then
-    mkdir -p "${PACKAGE_BASE}"
-  fi
+KUBE_GO_PACKAGE_BASEDIR=$(dirname "${KUBE_GO_PACKAGE_DIR}")
+mkdir -p "${KUBE_GO_PACKAGE_BASEDIR}"
 
-  rm "${KUBE_GO_PACKAGE_DIR}" >/dev/null 2>&1 || true
-  ln -s "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
-)
+# Create symlink under output/go/src.
+ln -snf "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
 
-# unset GOBIN in case it already exsit in the current session
+GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/third_party"
+export GOPATH
+
+# Unset GOBIN in case it already exsits in the current session.
 unset GOBIN
-export GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/third_party"
