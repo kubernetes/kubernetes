@@ -18,6 +18,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 * [Getting started with a Vagrant cluster on your host](#getting-started-with-a-vagrant-cluster-on-your-host)
 * [Running a local cluster on your host](#running-locally)
 * [Running on CoreOS](#running-on-coreos)
+* [Running on Fedora](#running-on-fedora)
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Discussion and Community Support](#community-discussion-and-support)
 * [Hacking on Kubernetes](#development)
@@ -288,6 +289,9 @@ There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com)
 [Single Kubernetes example in any environment](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-1/)
 
 [Multiple host example using VMware Fusion](http://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-2/)
+
+## Running on [Fedora](http://fedoraproject.org)
+[Getting Started with Kubernetes / Docker on Fedora](http://developerblog.redhat.com/2014/07/31/getting-started-with-kubernetes-docker-on-fedora/)
 
 ## Where to go next?
 [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
