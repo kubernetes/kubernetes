@@ -17,28 +17,21 @@ limitations under the License.
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"gopkg.in/v1/yaml"
 )
 
-// versionMap allows one to figure out the go type of an object with
-// the given version and name.
-var versionMap = map[string]map[string]reflect.Type{}
-
-// typeToVersion allows one to figure out the version for a given go object.
-// The reflect.Type we index by should *not* be a pointer. If the same type
-// is registered for multiple versions, the last one wins.
-var typeToVersion = map[reflect.Type]string{}
-
-// theConverter stores all registered conversion functions. It also has
-// default coverting behavior.
-var theConverter = NewConverter()
+var conversionScheme *conversion.Scheme
 
 func init() {
+	conversionScheme = conversion.NewScheme()
+	conversionScheme.InternalVersion = ""
+	conversionScheme.ExternalVersion = "v1beta1"
+	conversionScheme.MetaInsertionFactory = metaInsertion{}
 	AddKnownTypes("",
 		PodList{},
 		Pod{},
@@ -98,31 +91,13 @@ func init() {
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
 // Encode() refuses the object unless its type is registered with AddKnownTypes.
 func AddKnownTypes(version string, types ...interface{}) {
-	knownTypes, found := versionMap[version]
-	if !found {
-		knownTypes = map[string]reflect.Type{}
-		versionMap[version] = knownTypes
-	}
-	for _, obj := range types {
-		t := reflect.TypeOf(obj)
-		if t.Kind() != reflect.Struct {
-			panic("All types must be structs.")
-		}
-		knownTypes[t.Name()] = t
-		typeToVersion[t] = version
-	}
+	conversionScheme.AddKnownTypes(version, types...)
 }
 
 // New returns a new API object of the given version ("" for internal
 // representation) and name, or an error if it hasn't been registered.
 func New(versionName, typeName string) (interface{}, error) {
-	if types, ok := versionMap[versionName]; ok {
-		if t, ok := types[typeName]; ok {
-			return reflect.New(t).Interface(), nil
-		}
-		return nil, fmt.Errorf("No type '%v' for version '%v'", typeName, versionName)
-	}
-	return nil, fmt.Errorf("No version '%v'", versionName)
+	return conversionScheme.NewObject(versionName, typeName)
 }
 
 // AddConversionFuncs adds a function to the list of conversion functions. The given
@@ -138,20 +113,14 @@ func New(versionName, typeName string) (interface{}, error) {
 // extra fields, but it must not remove any. So you only need to add a conversion
 // function for things with changed/removed fields.
 func AddConversionFuncs(conversionFuncs ...interface{}) error {
-	for _, f := range conversionFuncs {
-		err := theConverter.Register(f)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return conversionScheme.AddConversionFuncs(conversionFuncs...)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers to API objects.
 // For easy testing of conversion functions. Returns an error if the conversion isn't
 // possible.
 func Convert(in, out interface{}) error {
-	return theConverter.Convert(in, out)
+	return conversionScheme.Convert(in, out)
 }
 
 // FindJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
@@ -196,11 +165,7 @@ func FindJSONBaseRO(obj interface{}) (JSONBase, error) {
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
 func EncodeOrDie(obj interface{}) string {
-	bytes, err := Encode(obj)
-	if err != nil {
-		panic(err)
-	}
-	return string(bytes)
+	return conversionScheme.EncodeOrDie(obj)
 }
 
 // Encode turns the given api object into an appropriate JSON string.
@@ -238,93 +203,7 @@ func EncodeOrDie(obj interface{}) string {
 // upgraded.
 //
 func Encode(obj interface{}) (data []byte, err error) {
-	obj = maybeCopy(obj)
-	obj, err = maybeExternalize(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	jsonBase, err := prepareEncode(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err = json.MarshalIndent(obj, "", "	")
-	if err != nil {
-		return nil, err
-	}
-	// Leave these blank in memory.
-	jsonBase.SetKind("")
-	jsonBase.SetAPIVersion("")
-	return data, err
-}
-
-// Returns the API version of the go object, or an error if it's not a
-// pointer or is unregistered.
-func objAPIVersionAndName(obj interface{}) (apiVersion, name string, err error) {
-	v, err := enforcePtr(obj)
-	if err != nil {
-		return "", "", err
-	}
-	t := v.Type()
-	if version, ok := typeToVersion[t]; !ok {
-		return "", "", fmt.Errorf("Unregistered type: %v", t)
-	} else {
-		return version, t.Name(), nil
-	}
-}
-
-// maybeExternalize converts obj to an external object if it isn't one already.
-// obj must be a pointer.
-func maybeExternalize(obj interface{}) (interface{}, error) {
-	version, _, err := objAPIVersionAndName(obj)
-	if err != nil {
-		return nil, err
-	}
-	if version != "" {
-		// Object is already of an external versioned type.
-		return obj, nil
-	}
-	return externalize(obj)
-}
-
-// maybeCopy copies obj if it is not a pointer, to get a settable/addressable
-// object. Guaranteed to return a pointer.
-func maybeCopy(obj interface{}) interface{} {
-	v := reflect.ValueOf(obj)
-	if v.Kind() == reflect.Ptr {
-		return obj
-	}
-	v2 := reflect.New(v.Type())
-	v2.Elem().Set(v)
-	return v2.Interface()
-}
-
-// prepareEncode sets the APIVersion and Kind fields to match the go type in obj.
-// Returns an error if the (version, name) pair isn't registered for the type or
-// if the type is an internal, non-versioned object.
-func prepareEncode(obj interface{}) (JSONBaseInterface, error) {
-	version, name, err := objAPIVersionAndName(obj)
-	if err != nil {
-		return nil, err
-	}
-	if version == "" {
-		return nil, fmt.Errorf("No version for '%v' (%#v); extremely inadvisable to write it in wire format.", name, obj)
-	}
-	jsonBase, err := FindJSONBase(obj)
-	if err != nil {
-		return nil, err
-	}
-	knownTypes, found := versionMap[version]
-	if !found {
-		return nil, fmt.Errorf("struct %s, %s won't be unmarshalable because it's not in known versions", version, name)
-	}
-	if _, contains := knownTypes[name]; !contains {
-		return nil, fmt.Errorf("struct %s, %s won't be unmarshalable because it's not in knownTypes", version, name)
-	}
-	jsonBase.SetAPIVersion(version)
-	jsonBase.SetKind(name)
-	return jsonBase, nil
+	return conversionScheme.Encode(obj)
 }
 
 // Ensures that obj is a pointer of some sort. Returns a reflect.Value of the
@@ -359,35 +238,7 @@ func VersionAndKind(data []byte) (version, kind string, err error) {
 // by Encode. Only versioned objects (APIVersion != "") are accepted. The object
 // will be converted into the in-memory unversioned type before being returned.
 func Decode(data []byte) (interface{}, error) {
-	version, kind, err := VersionAndKind(data)
-	if err != nil {
-		return nil, err
-	}
-	if version == "" {
-		return nil, fmt.Errorf("API Version not set in '%s'", string(data))
-	}
-	obj, err := New(version, kind)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to create new object of type ('%s', '%s')", version, kind)
-	}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, obj)
-	if err != nil {
-		return nil, err
-	}
-	obj, err = internalize(obj)
-	if err != nil {
-		return nil, err
-	}
-	jsonBase, err := FindJSONBase(obj)
-	if err != nil {
-		return nil, err
-	}
-	// Don't leave these set. Type and version info is deducible from go's type.
-	jsonBase.SetKind("")
-	jsonBase.SetAPIVersion("")
-	return obj, nil
+	return conversionScheme.Decode(data)
 }
 
 // DecodeInto parses a YAML or JSON string and stores it in obj. Returns an error
@@ -396,102 +247,30 @@ func Decode(data []byte) (interface{}, error) {
 // If obj's APIVersion doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
 func DecodeInto(data []byte, obj interface{}) error {
-	dataVersion, dataKind, err := VersionAndKind(data)
-	if err != nil {
-		return err
-	}
-	objVersion, objKind, err := objAPIVersionAndName(obj)
-	if err != nil {
-		return err
-	}
-	if dataKind == "" {
-		// Assume objects with unset Kind fields are being unmarshalled into the
-		// correct type.
-		dataKind = objKind
-	}
-	if dataKind != objKind {
-		return fmt.Errorf("data of kind '%v', obj of type '%v'", dataKind, objKind)
-	}
-	if dataVersion == "" {
-		// Assume objects with unset Version fields are being unmarshalled into the
-		// correct type.
-		dataVersion = objVersion
-	}
-
-	if objVersion == dataVersion {
-		// Easy case!
-		err = yaml.Unmarshal(data, obj)
-		if err != nil {
-			return err
-		}
-	} else {
-		// TODO: look up in our map to see if we can do this dataVersion -> objVersion
-		// conversion.
-		if objVersion != "" || dataVersion != "v1beta1" {
-			return fmt.Errorf("Can't convert from '%v' to '%v' for type '%v'", dataVersion, objVersion, dataKind)
-		}
-
-		external, err := New(dataVersion, dataKind)
-		if err != nil {
-			return fmt.Errorf("Unable to create new object of type ('%s', '%s')", dataVersion, dataKind)
-		}
-		// yaml is a superset of json, so we use it to decode here. That way,
-		// we understand both.
-		err = yaml.Unmarshal(data, external)
-		if err != nil {
-			return err
-		}
-		internal, err := internalize(external)
-		if err != nil {
-			return err
-		}
-		// Copy to the provided object.
-		vObj := reflect.ValueOf(obj)
-		vInternal := reflect.ValueOf(internal)
-		if !vInternal.Type().AssignableTo(vObj.Type()) {
-			return fmt.Errorf("%s is not assignable to %s", vInternal.Type(), vObj.Type())
-		}
-		vObj.Elem().Set(vInternal.Elem())
-	}
-
-	jsonBase, err := FindJSONBase(obj)
-	if err != nil {
-		return err
-	}
-	// Don't leave these set. Type and version info is deducible from go's type.
-	jsonBase.SetKind("")
-	jsonBase.SetAPIVersion("")
-	return nil
+	return conversionScheme.DecodeInto(data, obj)
 }
 
-func internalize(obj interface{}) (interface{}, error) {
-	_, objKind, err := objAPIVersionAndName(obj)
-	if err != nil {
-		return nil, err
-	}
-	objOut, err := New("", objKind)
-	if err != nil {
-		return nil, err
-	}
-	err = theConverter.Convert(obj, objOut)
-	if err != nil {
-		return nil, err
-	}
-	return objOut, nil
+// metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
+// package figure out how to encode our object's types and versions. These fields are
+// located in our JSONBase.
+type metaInsertion struct {
+	JSONBase struct {
+		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	} `json:",inline" yaml:",inline"`
 }
 
-func externalize(obj interface{}) (interface{}, error) {
-	_, objKind, err := objAPIVersionAndName(obj)
-	if err != nil {
-		return nil, err
-	}
-	objOut, err := New("v1beta1", objKind)
-	if err != nil {
-		return nil, err
-	}
-	err = theConverter.Convert(obj, objOut)
-	if err != nil {
-		return nil, err
-	}
-	return objOut, nil
+// Create returns a new metaInsertion with the version and kind fields set.
+func (metaInsertion) Create(version, kind string) interface{} {
+	m := metaInsertion{}
+	m.JSONBase.APIVersion = version
+	m.JSONBase.Kind = kind
+	return &m
+}
+
+// Interpret returns the version and kind information from in, which must be
+// a metaInsertion pointer object.
+func (metaInsertion) Interpret(in interface{}) (version, kind string) {
+	m := in.(*metaInsertion)
+	return m.JSONBase.APIVersion, m.JSONBase.Kind
 }
