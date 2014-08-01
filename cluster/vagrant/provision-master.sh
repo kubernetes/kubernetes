@@ -59,7 +59,7 @@ EOF
   # Merge is here: https://github.com/saltstack/salt/pull/13554
   # Fedora git repository is here: http://pkgs.fedoraproject.org/cgit/salt.git/
   # (a new service file needs to be added for salt-api)
-  curl -L https://raw.githubusercontent.com/saltstack/salt-bootstrap/v2014.06.30/bootstrap-salt.sh | sh -s -- -M
+  curl -sS -L https://raw.githubusercontent.com/saltstack/salt-bootstrap/v2014.06.30/bootstrap-salt.sh | sh -s -- -M
 
   mkdir -p /srv/salt/nginx
   echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
