@@ -17,7 +17,6 @@ limitations under the License.
 package conversion
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -37,17 +36,17 @@ func (s *Scheme) EncodeOrDie(obj interface{}) string {
 // struct. The type must have been registered.
 //
 // Memory/wire format differences:
-//  * Having to keep track of the Kind and APIVersion fields makes tests
+//  * Having to keep track of the Kind and Version fields makes tests
 //    very annoying, so the rule is that they are set only in wire format
 //    (json), not when in native (memory) format. This is possible because
 //    both pieces of information are implicit in the go typed object.
 //     * An exception: note that, if there are embedded API objects of known
 //       type, for example, PodList{... Items []Pod ...}, these embedded
 //       objects must be of the same version of the object they are embedded
-//       within, and their APIVersion and Kind must both be empty.
-//     * Note that the exception does not apply to the APIObject type, which
-//       recursively does Encode()/Decode(), and is capable of expressing any
-//       API object.
+//       within, and their Version and Kind must both be empty.
+//     * Note that the exception does not apply to a generic APIObject type
+//       which recursively does Encode()/Decode(), and is capable of
+//       expressing any API object.
 //  * Only versioned objects should be encoded. This means that, if you pass
 //    a native object, Encode will convert it to a versioned object. For
 //    example, an api.Pod will get converted to a v1beta1.Pod. However, if
@@ -71,7 +70,7 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		return nil, fmt.Errorf("type %v is not registered and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type())
 	}
 
-	objVersion, objKind, err := s.ObjectAPIVersionAndKind(obj)
+	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +89,7 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	}
 
 	// Version and Kind should be set on the wire.
-	setVersionAndKind := s.MetaInsertionFactory.Create(destVersion, objKind)
-	err = s.converter.Convert(setVersionAndKind, obj, SourceToDest|IgnoreMissingFields|AllowDifferentFieldNames)
+	err = s.SetVersionAndKind(destVersion, objKind, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -102,35 +100,12 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		return nil, err
 	}
 
-	// Version and Kind should be blank in memory.
-	blankVersionAndKind := s.MetaInsertionFactory.Create("", "")
-	err = s.converter.Convert(blankVersionAndKind, obj, SourceToDest|IgnoreMissingFields|AllowDifferentFieldNames)
+	// Version and Kind should be blank in memory. Reset them, since it's
+	// possible that we modified a user object and not a copy above.
+	err = s.SetVersionAndKind("", "", obj)
 	if err != nil {
 		return nil, err
 	}
 
 	return data, nil
-
-	meta, err := json.Marshal(s.MetaInsertionFactory.Create(destVersion, objKind))
-	if err != nil {
-		return nil, err
-	}
-	// Stick these together, omitting the last } from meta and the first { from
-	// data. Add a comma to meta if necessary.
-	metaN := len(meta)
-	if len(data) > 2 {
-		meta[metaN-1] = ',' // Add comma
-	} else {
-		meta = meta[:metaN-1] // Just remove }
-	}
-	together := append(meta, data[1:]...)
-	if s.Indent {
-		var out bytes.Buffer
-		err := json.Indent(&out, together, "", "	")
-		if err != nil {
-			return nil, err
-		}
-		return out.Bytes(), nil
-	}
-	return together, nil
 }

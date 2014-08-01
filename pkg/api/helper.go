@@ -31,6 +31,7 @@ func init() {
 	conversionScheme = conversion.NewScheme()
 	conversionScheme.InternalVersion = ""
 	conversionScheme.ExternalVersion = "v1beta1"
+	conversionScheme.MetaInsertionFactory = metaInsertion{}
 	AddKnownTypes("",
 		PodList{},
 		Pod{},
@@ -247,4 +248,29 @@ func Decode(data []byte) (interface{}, error) {
 // data into obj's version.
 func DecodeInto(data []byte, obj interface{}) error {
 	return conversionScheme.DecodeInto(data, obj)
+}
+
+// metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
+// package figure out how to encode our object's types and versions. These fields are
+// located in our JSONBase.
+type metaInsertion struct {
+	JSONBase struct {
+		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	} `json:",inline" yaml:",inline"`
+}
+
+// Create returns a new metaInsertion with the version and kind fields set.
+func (metaInsertion) Create(version, kind string) interface{} {
+	m := metaInsertion{}
+	m.JSONBase.APIVersion = version
+	m.JSONBase.Kind = kind
+	return &m
+}
+
+// Interpret returns the version and kind information from in, which must be
+// a metaInsertion pointer object.
+func (metaInsertion) Interpret(in interface{}) (version, kind string) {
+	m := in.(*metaInsertion)
+	return m.JSONBase.APIVersion, m.JSONBase.Kind
 }

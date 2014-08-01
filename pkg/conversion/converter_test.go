@@ -18,10 +18,13 @@ package conversion
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestConverter(t *testing.T) {
+func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type A struct {
 		Foo string
 	}
@@ -77,5 +80,130 @@ func TestConverter(t *testing.T) {
 	err = c.Convert(&A{}, &C{}, 0)
 	if err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestConverter_fuzz(t *testing.T) {
+	newAnonType := func() interface{} {
+		return reflect.New(reflect.TypeOf(externalTypeReturn())).Interface()
+	}
+	// Use the same types from the scheme test.
+	table := []struct {
+		from, to, check interface{}
+	}{
+		{&TestType1{}, newAnonType(), &TestType1{}},
+		{newAnonType(), &TestType1{}, newAnonType()},
+	}
+
+	f := util.NewFuzzer()
+	c := NewConverter()
+
+	for i, item := range table {
+		for j := 0; j < *fuzzIters; j++ {
+			f.Fuzz(item.from)
+			err := c.Convert(item.from, item.to, 0)
+			if err != nil {
+				t.Errorf("(%v, %v): unexpected error: %v", i, j, err)
+				continue
+			}
+			err = c.Convert(item.to, item.check, 0)
+			if err != nil {
+				t.Errorf("(%v, %v): unexpected error: %v", i, j, err)
+				continue
+			}
+			if e, a := item.from, item.check; !reflect.DeepEqual(e, a) {
+				t.Errorf("(%v, %v): unexpected diff: %v", i, j, objDiff(e, a))
+			}
+		}
+	}
+}
+
+func TestConverter_flags(t *testing.T) {
+	type Foo struct{ A string }
+	type Bar struct{ A string }
+	table := []struct {
+		from, to      interface{}
+		flags         FieldMatchingFlags
+		shouldSucceed bool
+	}{
+		// Check that DestFromSource allows extra fields only in source.
+		{
+			from:          &struct{ A string }{},
+			to:            &struct{ A, B string }{},
+			flags:         DestFromSource,
+			shouldSucceed: false,
+		}, {
+			from:          &struct{ A, B string }{},
+			to:            &struct{ A string }{},
+			flags:         DestFromSource,
+			shouldSucceed: true,
+		},
+
+		// Check that SourceToDest allows for extra fields only in dest.
+		{
+			from:          &struct{ A string }{},
+			to:            &struct{ A, B string }{},
+			flags:         SourceToDest,
+			shouldSucceed: true,
+		}, {
+			from:          &struct{ A, B string }{},
+			to:            &struct{ A string }{},
+			flags:         SourceToDest,
+			shouldSucceed: false,
+		},
+
+		// Check that IgnoreMissingFields makes the above failure cases pass.
+		{
+			from:          &struct{ A string }{},
+			to:            &struct{ A, B string }{},
+			flags:         DestFromSource | IgnoreMissingFields,
+			shouldSucceed: true,
+		}, {
+			from:          &struct{ A, B string }{},
+			to:            &struct{ A string }{},
+			flags:         SourceToDest | IgnoreMissingFields,
+			shouldSucceed: true,
+		},
+
+		// Check that the field type name must match unless
+		// AllowDifferentFieldTypeNames is specified.
+		{
+			from:          &struct{ A, B Foo }{},
+			to:            &struct{ A Bar }{},
+			flags:         DestFromSource,
+			shouldSucceed: false,
+		}, {
+			from:          &struct{ A Foo }{},
+			to:            &struct{ A, B Bar }{},
+			flags:         SourceToDest,
+			shouldSucceed: false,
+		}, {
+			from:          &struct{ A, B Foo }{},
+			to:            &struct{ A Bar }{},
+			flags:         DestFromSource | AllowDifferentFieldTypeNames,
+			shouldSucceed: true,
+		}, {
+			from:          &struct{ A Foo }{},
+			to:            &struct{ A, B Bar }{},
+			flags:         SourceToDest | AllowDifferentFieldTypeNames,
+			shouldSucceed: true,
+		},
+	}
+	f := util.NewFuzzer()
+	c := NewConverter()
+
+	for i, item := range table {
+		for j := 0; j < *fuzzIters; j++ {
+			f.Fuzz(item.from)
+			err := c.Convert(item.from, item.to, item.flags)
+			if item.shouldSucceed && err != nil {
+				t.Errorf("(%v, %v): unexpected error: %v", i, j, err)
+				continue
+			}
+			if !item.shouldSucceed && err == nil {
+				t.Errorf("(%v, %v): unexpected non-error", i, j)
+				continue
+			}
+		}
 	}
 }

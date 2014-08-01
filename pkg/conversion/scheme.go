@@ -25,7 +25,7 @@ import (
 
 // MetaInsertionFactory is used to create an object to store and retrieve
 // the version and kind information for all objects. The default uses the
-// keys "apiVersion" and "kind" respectively. The object produced by this
+// keys "version" and "kind" respectively. The object produced by this
 // factory is used to clear the version and kind fields in memory, so it
 // must match the layout of your actual api structs. (E.g., if you have your
 // version and kind field inside an inlined struct, this must produce an
@@ -34,14 +34,11 @@ type MetaInsertionFactory interface {
 	// Create should make a new object with two fields.
 	// This object will be used to encode this metadata along with your
 	// API objects, so the tags on the fields you use shouldn't conflict.
-	Create(apiVersion, kind string) interface{}
+	Create(version, kind string) interface{}
 	// Interpret should take the same type of object that Create creates.
 	// It should return the version and kind information from this object.
-	Interpret(interface{}) (apiVersion, kind string)
+	Interpret(interface{}) (version, kind string)
 }
-
-// Default is a global scheme.
-var Default = NewScheme()
 
 // Scheme defines an entire encoding and decoding scheme.
 type Scheme struct {
@@ -70,7 +67,7 @@ type Scheme struct {
 
 	// MetaInsertionFactory is used to create an object to store and retrieve
 	// the version and kind information for all objects. The default uses the
-	// keys "apiVersion" and "kind" respectively.
+	// keys "version" and "kind" respectively.
 	MetaInsertionFactory MetaInsertionFactory
 }
 
@@ -86,8 +83,10 @@ func NewScheme() *Scheme {
 	}
 }
 
-// AddKnownTypes registers the types of the arguments to the marshaller of the package api.
-// Encode() refuses the object unless its type is registered with AddKnownTypes.
+// AddKnownTypes registers all types passed in 'types' as being members of version 'version.
+// Encode() will refuse objects unless their type has been registered with AddKnownTypes.
+// All objects passed to types should be structs, not pointers to structs. The name that go
+// reports for the struct becomes the "kind" field when encoding.
 func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 	knownTypes, found := s.versionMap[version]
 	if !found {
@@ -117,17 +116,18 @@ func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given
-// functions should know how to convert between two API objects. We deduce how to call
-// it from the types of its two parameters; see the comment for Converter.Register.
+// functions should know how to convert between two of your API objects, or their
+// sub-objects. We deduce how to call these functions from the types of their two
+// parameters; see the comment for Converter.Register.
 //
 // Note that, if you need to copy sub-objects that didn't change, it's safe to call
-// Convert() inside your conversionFuncs, as long as you don't start a conversion
+// s.Convert() inside your conversionFuncs, as long as you don't start a conversion
 // chain that's infinitely recursive.
 //
 // Also note that the default behavior, if you don't add a conversion function, is to
-// sanely copy fields that have the same names. It's OK if the destination type has
-// extra fields, but it must not remove any. So you only need to add a conversion
-// function for things with changed/removed fields.
+// sanely copy fields that have the same names and same type names. It's OK if the
+// destination type has extra fields, but it must not remove any. So you only need to
+// add conversion functions for things with changed/removed fields.
 func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	for _, f := range conversionFuncs {
 		err := s.converter.Register(f)
@@ -138,8 +138,8 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return nil
 }
 
-// Convert will attempt to convert in into out. Both must be pointers.
-// For easy testing of conversion functions. Returns an error if the conversion isn't
+// Convert will attempt to convert in into out. Both must be pointers. For easy
+// testing of conversion functions. Returns an error if the conversion isn't
 // possible.
 func (s *Scheme) Convert(in, out interface{}) error {
 	return s.converter.Convert(in, out, 0)
@@ -147,32 +147,30 @@ func (s *Scheme) Convert(in, out interface{}) error {
 
 // metaInsertion provides a default implementation of MetaInsertionFactory.
 type metaInsertion struct {
-	JSONBase struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	} `json:",inline" yaml:",inline"`
+	Version string `json:"version,omitempty" yaml:"version,omitempty"`
+	Kind    string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
 // Create should make a new object with two fields.
 // This object will be used to encode this metadata along with your
 // API objects, so the tags on the fields you use shouldn't conflict.
-func (metaInsertion) Create(apiVersion, kind string) interface{} {
+func (metaInsertion) Create(version, kind string) interface{} {
 	m := metaInsertion{}
-	m.JSONBase.APIVersion = apiVersion
-	m.JSONBase.Kind = kind
+	m.Version = version
+	m.Kind = kind
 	return &m
 }
 
 // Interpret should take the same type of object that Create creates.
 // It should return the version and kind information from this object.
-func (metaInsertion) Interpret(in interface{}) (apiVersion, kind string) {
+func (metaInsertion) Interpret(in interface{}) (version, kind string) {
 	m := in.(*metaInsertion)
-	return m.JSONBase.APIVersion, m.JSONBase.Kind
+	return m.Version, m.Kind
 }
 
 // DataAPIVersionAndKind will return the APIVersion and Kind of the given wire-format
 // enconding of an API Object, or an error.
-func (s *Scheme) DataAPIVersionAndKind(data []byte) (apiVersion, kind string, err error) {
+func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
 	findKind := s.MetaInsertionFactory.Create("", "")
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.
@@ -180,13 +178,13 @@ func (s *Scheme) DataAPIVersionAndKind(data []byte) (apiVersion, kind string, er
 	if err != nil {
 		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
 	}
-	apiVersion, kind = s.MetaInsertionFactory.Interpret(findKind)
-	return apiVersion, kind, nil
+	version, kind = s.MetaInsertionFactory.Interpret(findKind)
+	return version, kind, nil
 }
 
 // ObjectVersionAndKind returns the API version and kind of the go object,
 // or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectAPIVersionAndKind(obj interface{}) (apiVersion, kind string, err error) {
+func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string, err error) {
 	v, err := enforcePtr(obj)
 	if err != nil {
 		return "", "", err
@@ -197,6 +195,14 @@ func (s *Scheme) ObjectAPIVersionAndKind(obj interface{}) (apiVersion, kind stri
 	} else {
 		return version, t.Name(), nil
 	}
+}
+
+// SetVersionAndKind sets the version and kind fields (with help from
+// MetaInsertionFactory). Returns an error if this isn't possible. obj
+// must be a pointer.
+func (s *Scheme) SetVersionAndKind(version, kind string, obj interface{}) error {
+	versionAndKind := s.MetaInsertionFactory.Create(version, kind)
+	return s.converter.Convert(versionAndKind, obj, SourceToDest|IgnoreMissingFields|AllowDifferentFieldTypeNames)
 }
 
 // maybeCopy copies obj if it is not a pointer, to get a settable/addressable

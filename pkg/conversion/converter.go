@@ -88,21 +88,21 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 type FieldMatchingFlags int
 
 const (
-	// Loop through source fields, search for matching dest field
-	// to copy it into. Destination fields with no corresponding
-	// source field will be ignored.
-	SourceToDest FieldMatchingFlags = 1 << iota
 	// Loop through destiation fields, search for matching source
 	// field to copy it from. Source fields with no corresponding
 	// destination field will be ignored. If SourceToDest is
 	// specified, this flag is ignored. If niether is specified,
-	// this flag is the default.
-	DestFromSource
+	// or no flags are passed, this flag is the default.
+	DestFromSource FieldMatchingFlags = 0
+	// Loop through source fields, search for matching dest field
+	// to copy it into. Destination fields with no corresponding
+	// source field will be ignored.
+	SourceToDest FieldMatchingFlags = 1 << iota
 	// Don't treat it as an error if the corresponding source or
 	// dest field can't be found.
 	IgnoreMissingFields
 	// Don't require type names to match.
-	AllowDifferentFieldNames
+	AllowDifferentFieldTypeNames
 )
 
 // Returns true if the given flag or combination of flags is set.
@@ -147,7 +147,7 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 		return ret.(error)
 	}
 
-	if !flags.IsSet(AllowDifferentFieldNames) && dt.Name() != st.Name() {
+	if !flags.IsSet(AllowDifferentFieldTypeNames) && dt.Name() != st.Name() {
 		return fmt.Errorf("Can't convert %v to %v because type names don't match.", st, dt)
 	}
 
