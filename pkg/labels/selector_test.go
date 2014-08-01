@@ -18,6 +18,8 @@ package labels
 
 import (
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestSelectorParse(t *testing.T) {
@@ -162,4 +164,58 @@ func TestSetIsEmpty(t *testing.T) {
 	if (andTerm{&hasTerm{"a", "b"}}).Empty() {
 		t.Errorf("Nested andTerm should not be empty")
 	}
+}
+
+func expectMatchRequirement(t *testing.T, req Requirement, ls Set) {
+	if !req.Matches(ls) {
+		t.Errorf("Wanted '%+v' to match '%s', but it did not.\n", req, ls)
+	}
+}
+
+func expectNoMatchRequirement(t *testing.T, req Requirement, ls Set) {
+	if req.Matches(ls) {
+		t.Errorf("Wanted '%+v' to not match '%s', but it did.", req, ls)
+	}
+}
+
+func TestRequirementMatches(t *testing.T) {
+	s := Set{"x": "foo", "y": "baz"}
+	a := Requirement{key: "x", operator: IN, strValues: util.NewStringSet("foo")}
+	b := Requirement{key: "x", operator: NOT_IN, strValues: util.NewStringSet("beta")}
+	c := Requirement{key: "y", operator: IN, strValues: nil}
+	d := Requirement{key: "y", strValues: util.NewStringSet("foo")}
+	expectMatchRequirement(t, a, s)
+	expectMatchRequirement(t, b, s)
+	expectNoMatchRequirement(t, c, s)
+	expectNoMatchRequirement(t, d, s)
+}
+
+func expectMatchLabSelector(t *testing.T, lsel LabelSelector, s Set) {
+	if !lsel.Matches(s) {
+		t.Errorf("Wanted '%+v' to match '%s', but it did not.\n", lsel, s)
+	}
+}
+
+func expectNoMatchLabSelector(t *testing.T, lsel LabelSelector, s Set) {
+	if lsel.Matches(s) {
+		t.Errorf("Wanted '%+v' to not match '%s', but it did.\n", lsel, s)
+	}
+}
+
+func TestLabelSelectorMatches(t *testing.T) {
+	s := Set{"x": "foo", "y": "baz"}
+	allMatch := LabelSelector{
+		Requirements: []Requirement{
+			{key: "x", operator: IN, strValues: util.NewStringSet("foo")},
+			{key: "y", operator: NOT_IN, strValues: util.NewStringSet("alpha")},
+		},
+	}
+	singleNonMatch := LabelSelector{
+		Requirements: []Requirement{
+			{key: "x", operator: IN, strValues: util.NewStringSet("foo")},
+			{key: "y", operator: IN, strValues: util.NewStringSet("alpha")},
+		},
+	}
+	expectMatchLabSelector(t, allMatch, s)
+	expectNoMatchLabSelector(t, singleNonMatch, s)
 }

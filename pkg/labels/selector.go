@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Selector represents a label selector.
@@ -103,6 +105,48 @@ func (t andTerm) String() string {
 		terms = append(terms, q.String())
 	}
 	return strings.Join(terms, ",")
+}
+
+// Operator represents a key's relationship
+// to a set of values in a Requirement.
+// TODO: Should also represent key's existence.
+type Operator int
+
+const (
+	IN Operator = iota + 1
+	NOT_IN
+)
+
+// LabelSelector only not named 'Selector' due
+// to name conflict until Selector is deprecated.
+type LabelSelector struct {
+	Requirements []Requirement
+}
+
+type Requirement struct {
+	key       string
+	operator  Operator
+	strValues util.StringSet
+}
+
+func (r *Requirement) Matches(ls Labels) bool {
+	switch r.operator {
+	case IN:
+		return r.strValues.Has(ls.Get(r.key))
+	case NOT_IN:
+		return !r.strValues.Has(ls.Get(r.key))
+	default:
+		return false
+	}
+}
+
+func (sg *LabelSelector) Matches(ls Labels) bool {
+	for _, req := range sg.Requirements {
+		if !req.Matches(ls) {
+			return false
+		}
+	}
+	return true
 }
 
 func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
