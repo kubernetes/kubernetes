@@ -52,12 +52,19 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 
 GO_OUT=$(dirname $0)/../output/go/bin
 
+# If you want to use Kubernetes services, you'll need to use an IP that
+# containers can route to, as Kubernetes creates environment
+# variables using the minion's name so containers can access services.
+#
+# This will default to 127.0.0.1 if not otherwise specified in the environment.
+MINION_IP=${MINION_IP:-127.0.0.1}
+
 APISERVER_LOG=/tmp/apiserver.log
 ${GO_OUT}/apiserver \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
-  --machines="127.0.0.1" &> ${APISERVER_LOG} &
+  --machines="${MINION_IP}" &> ${APISERVER_LOG} &
 APISERVER_PID=$!
 
 CTLRMGR_LOG=/tmp/controller-manager.log
@@ -66,11 +73,29 @@ ${GO_OUT}/controller-manager \
   --master="${API_HOST}:${API_PORT}" &> ${CTLRMGR_LOG} &
 CTLRMGR_PID=$!
 
+BLDMGR_LOG=/tmp/build-controller.log
+
+DOCKER_BUILDER_IMAGE_OPTION=""
+if [ -n "$DOCKER_BUILDER_IMAGE" ]; then
+  DOCKER_BUILDER_IMAGE_OPTION="--docker_builder_image=${DOCKER_BUILDER_IMAGE}"
+fi
+
+DOCKER_REGISTRY_OPTION=""
+if [ -n "$DOCKER_REGISTRY" ]; then
+  DOCKER_REGISTRY_OPTION="--docker_registry=${DOCKER_REGISTRY}"
+fi
+
+${GO_OUT}/build-controller \
+  --master="127.0.0.1:${API_PORT}" \
+  $DOCKER_BUILDER_IMAGE_OPTION \
+  $DOCKER_REGISTRY_OPTION &> ${BLDMGR_LOG} &
+BLDMGR_PID=$!
+
 KUBELET_LOG=/tmp/kubelet.log
 ${GO_OUT}/kubelet \
   --etcd_servers="http://127.0.0.1:4001" \
-  --hostname_override="127.0.0.1" \
-  --address="127.0.0.1" \
+  --hostname_override="${MINION_IP}" \
+  --address="${MINION_IP}" \
   --port="$KUBELET_PORT" &> ${KUBELET_LOG} &
 KUBELET_PID=$!
 
@@ -83,6 +108,7 @@ echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
 echo "Logs: "
 echo "  ${APISERVER_LOG}"
 echo "  ${CTLRMGR_LOG}"
+echo "  ${BLDMGR_LOG}"
 echo "  ${KUBELET_LOG}"
 echo "  ${PROXY_LOG}"
 
@@ -91,6 +117,7 @@ cleanup()
     echo "Cleaning up..."
     kill ${APISERVER_PID}
     kill ${CTLRMGR_PID}
+    kill ${BLDMGR_PID}
     kill ${KUBELET_PID}
     kill ${PROXY_PID}
 
@@ -98,7 +125,7 @@ cleanup()
     rm -rf ${ETCD_DIR}
     exit 0
 }
- 
+
 trap cleanup EXIT
 
 while true; do read x; done

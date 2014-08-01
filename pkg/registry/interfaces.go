@@ -55,3 +55,12 @@ type ServiceRegistry interface {
 	UpdateService(svc api.Service) error
 	UpdateEndpoints(e api.Endpoints) error
 }
+
+// BuildRegistry is an interface for things that know how to store Builds.
+type BuildRegistry interface {
+	ListBuilds() (api.BuildList, error)
+	GetBuild(buildID string) (*api.Build, error)
+	CreateBuild(build api.Build) error
+	UpdateBuild(build api.Build) error
+	DeleteBuild(buildID string) error
+}

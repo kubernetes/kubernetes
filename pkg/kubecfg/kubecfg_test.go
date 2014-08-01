@@ -38,6 +38,7 @@ type FakeKubeClient struct {
 	actions []Action
 	pods    api.PodList
 	ctrl    api.ReplicationController
+	builds  api.BuildList
 }
 
 func (client *FakeKubeClient) ListPods(selector labels.Selector) (api.PodList, error) {
@@ -108,6 +109,16 @@ func (client *FakeKubeClient) UpdateService(controller api.Service) (api.Service
 func (client *FakeKubeClient) DeleteService(controller string) error {
 	client.actions = append(client.actions, Action{action: "delete-service", value: controller})
 	return nil
+}
+
+func (client *FakeKubeClient) ListBuilds() (api.BuildList, error) {
+	client.actions = append(client.actions, Action{action: "list-builds"})
+	return client.builds, nil
+}
+
+func (client *FakeKubeClient) UpdateBuild(build api.Build) (api.Build, error) {
+	client.actions = append(client.actions, Action{action: "update-build", value: build.ID})
+	return api.Build{}, nil
 }
 
 func validateAction(expectedAction, actualAction Action, t *testing.T) {

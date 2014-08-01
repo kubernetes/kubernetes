@@ -41,6 +41,7 @@ type DockerInterface interface {
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
+	RemoveContainer(opts docker.RemoveContainerOptions) error
 }
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
@@ -106,7 +107,7 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 // GetKubeletDockerContainers returns a map of docker containers that we manage. The map key is the docker container ID
 func getKubeletDockerContainers(client DockerInterface) (DockerContainers, error) {
 	result := make(DockerContainers)
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,7 @@ var ErrNoContainersInPod = errors.New("no containers exist for this pod")
 func getDockerPodInfo(client DockerInterface, podFullName string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}

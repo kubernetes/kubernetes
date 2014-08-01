@@ -176,6 +176,9 @@ type Container struct {
 	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty"`
 	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
+	// Optional: Default to false.
+	Privileged    bool   `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	RestartPolicy string `yaml:"restartPolicy,omitempty" json:"restartPolicy,omitempty"`
 }
 
 // Event is the representation of an event logged to etcd backends
@@ -371,6 +374,40 @@ type WatchEvent struct {
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
 	Object APIObject
+}
+
+// Build encapsulates the inputs needed to produce a new deployable image, as well as
+// the status of the operation and a reference to the Pod which runs the build.
+type Build struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Config   BuildConfig `json:"config,omitempty" yaml:"config,omitempty"`
+	Status   BuildStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	PodID    string      `json:"podID,omitempty" yaml:"podID,omitempty"`
+}
+
+// BuildStatus represents the status of a Build at a point in time.
+type BuildStatus string
+
+const (
+	BuildNew      BuildStatus = "new"
+	BuildPending  BuildStatus = "pending"
+	BuildRunning  BuildStatus = "running"
+	BuildComplete BuildStatus = "complete"
+	BuildFailed   BuildStatus = "failed"
+)
+
+type BuildConfig struct {
+	Type      BuildType `json:"type,omitempty" yaml:"type,omitempty"`
+	SourceURI string    `json:"sourceUri,omitempty" yaml:"sourceUri,omitempty"`
+	ImageTag  string    `json:"imageTag,omitempty" yaml:"imageTag,omitempty"`
+}
+
+type BuildType string
+
+// BuildList is a collection of Builds.
+type BuildList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Build `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 // APIObject has appropriate encoder and decoder functions, such that on the wire, it's

@@ -99,6 +99,10 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	return f.err
 }
 
+func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
+	return nil
+}
+
 // PullImage is a test-spy implementation of DockerInterface.StopContainer.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
