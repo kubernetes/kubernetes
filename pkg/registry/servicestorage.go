@@ -28,12 +28,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+// ServiceRegistryStorage adapts a service registry into apiserver's RESTStorage model.
 type ServiceRegistryStorage struct {
 	registry ServiceRegistry
 	cloud    cloudprovider.Interface
 	machines MinionRegistry
 }
 
+// MakeServiceRegistryStorage makes a new ServiceRegistryStorage.
 func MakeServiceRegistryStorage(registry ServiceRegistry, cloud cloudprovider.Interface, machines MinionRegistry) apiserver.RESTStorage {
 	return &ServiceRegistryStorage{
 		registry: registry,
@@ -50,7 +52,7 @@ func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
 	} else {
 		port = strconv.Itoa(service.ContainerPort.IntVal)
 	}
-	portPrefix := prefix + "_PORT_" + strings.ToUpper(strings.Replace(port,"-","_",-1)) + "_TCP"
+	portPrefix := prefix + "_PORT_" + strings.ToUpper(strings.Replace(port, "-", "_", -1)) + "_TCP"
 	return []api.EnvVar{
 		{
 			Name:  prefix + "_PORT",

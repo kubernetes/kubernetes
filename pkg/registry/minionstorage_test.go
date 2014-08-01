@@ -24,41 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-func TestMinionRegistry(t *testing.T) {
-	m := MakeMinionRegistry([]string{"foo", "bar"})
-	if has, err := m.Contains("foo"); !has || err != nil {
-		t.Errorf("missing expected object")
-	}
-	if has, err := m.Contains("bar"); !has || err != nil {
-		t.Errorf("missing expected object")
-	}
-	if has, err := m.Contains("baz"); has || err != nil {
-		t.Errorf("has unexpected object")
-	}
-
-	if err := m.Insert("baz"); err != nil {
-		t.Errorf("insert failed")
-	}
-	if has, err := m.Contains("baz"); !has || err != nil {
-		t.Errorf("insert didn't actually insert")
-	}
-
-	if err := m.Delete("bar"); err != nil {
-		t.Errorf("delete failed")
-	}
-	if has, err := m.Contains("bar"); has || err != nil {
-		t.Errorf("delete didn't actually delete")
-	}
-
-	list, err := m.List()
-	if err != nil {
-		t.Errorf("got error calling List")
-	}
-	if !reflect.DeepEqual(list, []string{"baz", "foo"}) {
-		t.Errorf("Unexpected list value: %#v", list)
-	}
-}
-
 func TestMinionRegistryStorage(t *testing.T) {
 	m := MakeMinionRegistry([]string{"foo", "bar"})
 	ms := MakeMinionRegistryStorage(m)
