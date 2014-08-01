@@ -219,10 +219,10 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 }
 
 func TestServiceRegistryMakeLinkVariables(t *testing.T) {
-	service := api.Service {
-		JSONBase:	api.JSONBase{ID: "foo"},
-		Selector:	map[string]string{"bar": "baz"},
-		ContainerPort:	util.IntOrString { Kind: util.IntstrString, StrVal: "a-b-c" },
+	service := api.Service{
+		JSONBase:      api.JSONBase{ID: "foo"},
+		Selector:      map[string]string{"bar": "baz"},
+		ContainerPort: util.IntOrString{Kind: util.IntstrString, StrVal: "a-b-c"},
 	}
 	vars := makeLinkVariables(service, "mars")
 	for _, v := range vars {

@@ -353,7 +353,6 @@ func TestMakePodStatus(t *testing.T) {
 	}
 }
 
-
 func TestPodStorageValidatesCreate(t *testing.T) {
 	mockRegistry := &MockPodStorageRegistry{
 		MockPodRegistry: MockPodRegistry{err: fmt.Errorf("test error")},
@@ -411,7 +410,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	pod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase:     api.JSONBase{ID: "foo"},
 		DesiredState: desiredState,
 	}
 	channel, err := storage.Create(pod)
