@@ -22,7 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -41,7 +41,7 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	version.PrintAndExitIfRequested()
+	verflag.PrintAndExitIfRequested()
 
 	// Set up logger for etcd client
 	etcd.SetLogger(util.NewLogger("etcd "))
