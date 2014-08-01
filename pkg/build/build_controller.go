@@ -1,6 +1,7 @@
 package build
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,9 +11,12 @@ import (
 	"github.com/golang/glog"
 )
 
+type buildTypeStrategy func(api.Build) api.Pod
+
 type BuildController struct {
 	kubeClient         client.Interface
 	syncTime           <-chan time.Time
+	typeStrategies     map[api.BuildType]buildTypeStrategy
 	dockerBuilderImage string
 	dockerRegistry     string
 }
@@ -23,6 +27,10 @@ func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, docker
 		kubeClient:         kubeClient,
 		dockerBuilderImage: dockerBuilderImage,
 		dockerRegistry:     dockerRegistry,
+	}
+
+	bc.typeStrategies = map[api.BuildType]buildTypeStrategy{
+		api.BuildType("docker"): bc.dockerBuildStrategy,
 	}
 
 	return bc
@@ -68,7 +76,12 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 		build.PodID = "build-" + string(build.Config.Type) // TODO: better naming
 		return api.BuildPending, nil
 	case api.BuildPending:
-		podSpec := bc.buildPodSpec(build)
+		makePodSpec, ok := bc.typeStrategies[build.Config.Type]
+		if !ok {
+			return build.Status, fmt.Errorf("No build type for %s")
+		}
+
+		podSpec := makePodSpec(*build)
 		_, err := bc.kubeClient.CreatePod(podSpec)
 
 		// TODO: strongly typed error checking
@@ -103,7 +116,7 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 	return build.Status, nil
 }
 
-func (bc *BuildController) buildPodSpec(build *api.Build) api.Pod {
+func (bc BuildController) dockerBuildStrategy(build api.Build) api.Pod {
 	return api.Pod{
 		JSONBase: api.JSONBase{
 			ID: build.PodID,
