@@ -192,6 +192,12 @@ func (c *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs
 func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
+	var prev api.Pod
+	err = c.Get().Path("pod").Path(pod.ID).Do().Into(&prev)
+	if err != nil {
+		return
+	}
+	pod.ResourceVersion = prev.ResourceVersion
 	err = c.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(&result)
 	return
 }
@@ -216,6 +222,12 @@ func (c *Client) CreateReplicationController(controller api.ReplicationControlle
 
 // UpdateReplicationController updates an existing replication controller
 func (c *Client) UpdateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
+	var prev api.ReplicationController
+	err = c.Get().Path("replicationControllers").Path(controller.ID).Do().Into(&prev)
+	if err != nil {
+		return
+	}
+	controller.ResourceVersion = prev.ResourceVersion
 	err = c.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(&result)
 	return
 }
@@ -239,6 +251,12 @@ func (c *Client) CreateService(svc api.Service) (result api.Service, err error) 
 
 // UpdateService updates an existing service.
 func (c *Client) UpdateService(svc api.Service) (result api.Service, err error) {
+	var prev api.Service
+	err = c.Get().Path("services").Path(svc.ID).Do().Into(&prev)
+	if err != nil {
+		return
+	}
+	svc.ResourceVersion = prev.ResourceVersion
 	err = c.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(&result)
 	return
 }

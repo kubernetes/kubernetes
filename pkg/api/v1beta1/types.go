@@ -147,12 +147,20 @@ type HTTPGetProbe struct {
 	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 }
 
+// TCPSocketProbe describes a liveness probe based on opening a socket
+type TCPSocketProbe struct {
+	// Port is the port to connect to. Required.
+	Port int `yaml:"port,omitempty" json:"port,omitempty"`
+}
+
 // LivenessProbe describes a liveness probe to be examined to the container.
 type LivenessProbe struct {
-	// Type of liveness probe.  Current legal values "http"
+	// Type of liveness probe.  Current legal values "http", "tcp"
 	Type string `yaml:"type,omitempty" json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'http'
 	HTTPGet *HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+	// TCPSocketProbe parameter, required if Type == 'tcp'
+	TCPSocket *TCPSocketProbe `yaml:"tcpSocket,omitempty" json:"tcpSocket,omitempty"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
 }
