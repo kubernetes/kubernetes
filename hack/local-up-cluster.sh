@@ -85,6 +85,8 @@ if [ -n "$DOCKER_REGISTRY" ]; then
   DOCKER_REGISTRY_OPTION="--docker_registry=${DOCKER_REGISTRY}"
 fi
 
+export BUILD_POD_CLEANUP_ENABLED=${BUILD_POD_CLEANUP_ENABLED:-true}
+
 ${GO_OUT}/build-controller \
   --master="127.0.0.1:${API_PORT}" \
   $DOCKER_BUILDER_IMAGE_OPTION \
