@@ -14,11 +14,13 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
 ### Step One: Turn up the redis master.
 
-Create a file named `redis-master.json` describing a single pod, which runs a redis key-value server in a container.
+Use the file `examples/guestbook/redis-master.json` which describes a single podrunning a redis key-value server in a container.
 
 ```javascript
 {
   "id": "redis-master-2",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
   "desiredState": {
     "manifest": {
       "version": "v1beta1",
@@ -39,7 +41,7 @@ Create a file named `redis-master.json` describing a single pod, which runs a re
 }
 ```
 
-Once you have that pod file, you can create the redis pod in your Kubernetes cluster using the `kubecfg` CLI:
+Create the redis pod in your Kubernetes cluster using the `kubecfg` CLI:
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/redis-master.json create pods
@@ -75,11 +77,13 @@ CONTAINER ID  IMAGE  COMMAND  CREATED  STATUS  PORTS  NAMES
 ### Step Two: Turn up the master service.
 A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables. Services find the containers to load balance based on pod labels.
 
-The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines which pods will receive the traffic sent to the service.  Create a file named `redis-master-service.json` that contains:
+The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines which pods will receive the traffic sent to the service.  Use the file `examples/guestbook/redis-master-service.json`
 
 ```js
 {
   "id": "redismaster",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
   "port": 10000,
   "selector": {
     "name": "redis-master"
@@ -87,48 +91,51 @@ The pod that you created in Step One has the label `name=redis-master`. The sele
 }
 ```
 
-This will cause all pods to see the redis master apparently running on localhost:10000.
-
-Once you have that service description, you can create the service with the `kubecfg` cli:
+to create the service with the `kubecfg` cli:
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/redis-master-service.json create services
-Name                Label Query         Port
-----------          ----------          ----------
-redismaster         name=redis-master   10000
+Name                Labels              Selector            Port
+----------          ----------          ----------          ----------
+redismaster                             name=redis-master   10000
 ```
+
+This will cause all pods to see the redis master apparently running on localhost:10000.
 
 Once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 10000).
 
 ### Step Three: Turn up the replicated slave pods.
 Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.
 
-Create a file named `redis-slave-controller.json` that contains:
+Use the file `examples/guestbook/redis-slave-controller.json`
 
 ```js
-  {
-    "id": "redisSlaveController",
-    "desiredState": {
-      "replicas": 2,
-      "replicaSelector": {"name": "redis-slave"},
-      "podTemplate": {
-        "desiredState": {
-           "manifest": {
-             "version": "v1beta1",
-             "id": "redisSlaveController",
-             "containers": [{
-               "image": "brendanburns/redis-slave",
-               "ports": [{"containerPort": 6379, "hostPort": 6380}]
-             }]
-           }
-         },
-         "labels": {"name": "redis-slave"}
-        }},
-    "labels": {"name": "redis-slave"}
-  }
+{ 
+  "id": "redisSlaveController",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 2,
+    "replicaSelector": {"name": "redisslave"},
+    "podTemplate": {
+      "desiredState": {
+         "manifest": {
+           "version": "v1beta1",
+           "id": "redisSlaveController",
+           "containers": [{
+             "name": "slave",
+             "image": "brendanburns/redis-slave",
+             "ports": [{"containerPort": 6379, "hostPort": 6380}]
+           }]
+         }
+       },
+       "labels": {"name": "redisslave"}
+      }},
+  "labels": {"name": "redisslave"}
+}
 ```
 
-Then you can create the service by running:
+to create the service by running:
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/redis-slave-controller.json create replicationControllers
@@ -158,17 +165,19 @@ You will see a single redis master pod and two redis slave pods.
 
 ### Step Four: Create the redis slave service.
 
-Just like the master, we want to have a service to proxy connections to the read slaves.  In this case, in addition to discovery, the slave service provides transparent load balancing to clients.  As before, create a service specification:
+Just like the master, we want to have a service to proxy connections to the read slaves.  In this case, in addition to discovery, the slave service provides transparent load balancing to clients.  The service specification for the slaves is in `examples/guestbook/redis-slave-service.json`
 
 ```js
 {
   "id": "redisslave",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
   "port": 10001,
   "labels": {
-    "name": "redis-slave"
+    "name": "redisslave"
   },
   "selector": {
-    "name": "redis-slave"
+    "name": "redisslave"
   }
 }
 ```
@@ -179,20 +188,22 @@ Now that you have created the service specification, create it in your cluster w
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/redis-slave-service.json create services
-Name                Label Query         Port
-----------          ----------          ----------
-redisslave          name=redisslave     10001
+Name                Labels              Selector            Port
+----------          ----------          ----------          ----------
+redisslave          name=redisslave     name=redisslave     10001
 ```
 
 ### Step Five: Create the frontend pod.
 
 This is a simple PHP server that is configured to talk to either the slave or master services depending on whether the request is a read or a write. It exposes a simple AJAX interface, and serves an angular-based UX. Like the redis read slaves it is a replicated service instantiated by a replication controller.
 
-Create a file named `frontend-controller.json`:
+The pod is described in the file `examples/guestbook/frontend-controller.json`:
 
 ```js
 {
   "id": "frontendController",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
   "desiredState": {
     "replicas": 3,
     "replicaSelector": {"name": "frontend"},
@@ -202,6 +213,7 @@ Create a file named `frontend-controller.json`:
            "version": "v1beta1",
            "id": "frontendController",
            "containers": [{
+             "name": "php-redis",
              "image": "brendanburns/php-redis",
              "ports": [{"containerPort": 80, "hostPort": 8000}]
            }]
@@ -213,7 +225,7 @@ Create a file named `frontend-controller.json`:
 }
 ```
 
-With this file, you can turn up your frontend with:
+Using this file, you can turn up your frontend with:
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/frontend-controller.json create replicationControllers
