@@ -311,5 +311,6 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
-	return registry.helper.SetObj("/registry/services/endpoints/"+e.ID, e)
+	updateFunc := func(interface{}) (interface{}, error) { return e, nil }
+	return registry.helper.AtomicUpdate("/registry/services/endpoints/"+e.ID, &api.Endpoints{}, updateFunc)
 }

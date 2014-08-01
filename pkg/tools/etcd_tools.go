@@ -69,6 +69,7 @@ type EtcdClient interface {
 type EtcdGetSet interface {
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
+	Create(key, value string, ttl uint64) (*etcd.Response, error)
 	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
@@ -185,8 +186,8 @@ func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 		}
 	}
 
-	// TODO: when client supports atomic creation, integrate this with the above.
-	_, err = h.Client.Set(key, string(data), 0)
+	// Create will fail if a key already exists.
+	_, err = h.Client.Create(key, string(data), 0)
 	return err
 }
 
@@ -232,8 +233,6 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 		}
 
 		// First time this key has been used, just set.
-		// TODO: This is racy. Fix when our client supports prevExist. See:
-		// https://github.com/coreos/etcd/blob/master/Documentation/api.md#atomic-compare-and-swap
 		if index == 0 {
 			return h.SetObj(key, ret)
 		}
@@ -350,7 +349,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	var action watch.EventType
 	var data []byte
 	switch res.Action {
-	case "set":
+	case "create", "set":
 		if res.Node == nil {
 			glog.Errorf("unexpected nil node: %#v", res)
 			return
@@ -376,7 +375,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 
 	obj, err := w.encoding.Decode(data)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v", string(data), res)
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(data), res, res.Node)
 		// TODO: expose an error through watch.Interface?
 		w.Stop()
 		return
