@@ -29,7 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
 	"github.com/golang/glog"
 )
 
@@ -67,7 +67,7 @@ func main() {
 	util.InitLogs()
 	defer util.FlushLogs()
 
-	version.PrintAndExitIfRequested()
+	verflag.PrintAndExitIfRequested()
 	verifyMinionFlags()
 
 	var cloud cloudprovider.Interface

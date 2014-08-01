@@ -35,7 +35,7 @@ import (
 	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -96,7 +96,7 @@ func main() {
 	defer util.FlushLogs()
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	version.PrintAndExitIfRequested()
+	verflag.PrintAndExitIfRequested()
 
 	etcd.SetLogger(util.NewLogger("etcd "))
 
