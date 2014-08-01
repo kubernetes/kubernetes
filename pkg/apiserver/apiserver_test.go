@@ -18,9 +18,10 @@ package apiserver
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -156,12 +158,62 @@ func (storage *SimpleRESTStorage) WatchSingle(id string) (watch.Interface, error
 func extractBody(response *http.Response, object interface{}) (string, error) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
-	log.Printf("FOO: %s", body)
 	if err != nil {
 		return string(body), err
 	}
 	err = api.DecodeInto(body, object)
 	return string(body), err
+}
+
+func TestNotFound(t *testing.T) {
+	type T struct {
+		Method string
+		Path   string
+	}
+	cases := map[string]T{
+		"PATCH method":                 T{"PATCH", "/prefix/version/foo"},
+		"GET long prefix":              T{"GET", "/prefix/"},
+		"GET missing storage":          T{"GET", "/prefix/version/blah"},
+		"GET with extra segment":       T{"GET", "/prefix/version/foo/bar/baz"},
+		"POST with extra segment":      T{"POST", "/prefix/version/foo/bar"},
+		"DELETE without extra segment": T{"DELETE", "/prefix/version/foo"},
+		"DELETE with extra segment":    T{"DELETE", "/prefix/version/foo/bar/baz"},
+		"PUT without extra segment":    T{"PUT", "/prefix/version/foo"},
+		"PUT with extra segment":       T{"PUT", "/prefix/version/foo/bar/baz"},
+		"watch missing storage":        T{"GET", "/prefix/version/watch/"},
+		"watch with bad method":        T{"POST", "/prefix/version/watch/foo/bar"},
+	}
+	handler := New(map[string]RESTStorage{
+		"foo": &SimpleRESTStorage{},
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+	for k, v := range cases {
+		request, err := http.NewRequest(v.Method, server.URL+v.Path, nil)
+		expectNoError(t, err)
+		response, err := client.Do(request)
+		expectNoError(t, err)
+		if response.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected %d for %s (%s), Got %#v", http.StatusNotFound, v, k, response)
+		}
+	}
+}
+
+func TestVersion(t *testing.T) {
+	handler := New(map[string]RESTStorage{}, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	request, err := http.NewRequest("GET", server.URL+"/version", nil)
+	expectNoError(t, err)
+	response, err := client.Do(request)
+	expectNoError(t, err)
+	var info version.Info
+	err = json.NewDecoder(response.Body).Decode(&info)
+	expectNoError(t, err)
+	if !reflect.DeepEqual(version.Get(), info) {
+		t.Errorf("Expected %#v, Got %#v", version.Get(), info)
+	}
 }
 
 func TestSimpleList(t *testing.T) {
@@ -361,36 +413,6 @@ func TestBadPath(t *testing.T) {
 	}
 }
 
-func TestMissingPath(t *testing.T) {
-	handler := New(map[string]RESTStorage{}, "/prefix/version")
-	server := httptest.NewServer(handler)
-	client := http.Client{}
-
-	request, err := http.NewRequest("GET", server.URL+"/prefix/version", nil)
-	expectNoError(t, err)
-	response, err := client.Do(request)
-	expectNoError(t, err)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
-}
-
-func TestMissingStorage(t *testing.T) {
-	handler := New(map[string]RESTStorage{
-		"foo": &SimpleRESTStorage{},
-	}, "/prefix/version")
-	server := httptest.NewServer(handler)
-	client := http.Client{}
-
-	request, err := http.NewRequest("GET", server.URL+"/prefix/version/foobar", nil)
-	expectNoError(t, err)
-	response, err := client.Do(request)
-	expectNoError(t, err)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
-}
-
 func TestCreate(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
@@ -421,20 +443,19 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateNotFound(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{
-		// storage.Create can fail with not found error in theory.
-		// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
-		errors: map[string]error{"create": NewNotFoundErr("simple", "id")},
-	}
 	handler := New(map[string]RESTStorage{
-		"foo": simpleStorage,
+		"simple": &SimpleRESTStorage{
+			// storage.Create can fail with not found error in theory.
+			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
+			errors: map[string]error{"create": NewNotFoundErr("simple", "id")},
+		},
 	}, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
 	simple := Simple{Name: "foo"}
 	data, _ := api.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
+	request, err := http.NewRequest("POST", server.URL+"/prefix/version/simple", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	response, err := client.Do(request)
 	expectNoError(t, err)
@@ -458,7 +479,7 @@ func TestParseTimeout(t *testing.T) {
 func TestSyncCreate(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 			return obj, nil
 		},
 	}
@@ -494,10 +515,124 @@ func TestSyncCreate(t *testing.T) {
 	}
 }
 
+func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *api.Status {
+	client := http.Client{}
+	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
+	if err != nil {
+		t.Fatalf("unexpected error %#v", err)
+		return nil
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error %#v", err)
+		return nil
+	}
+	var status api.Status
+	_, err = extractBody(response, &status)
+	if err != nil {
+		t.Fatalf("unexpected error %#v", err)
+		return nil
+	}
+	if code != response.StatusCode {
+		t.Fatalf("Expected %d, Got %d", code, response.StatusCode)
+	}
+	return &status
+}
+
+func TestAsyncDelayReturnsError(t *testing.T) {
+	storage := SimpleRESTStorage{
+		injectedFunction: func(obj interface{}) (interface{}, error) {
+			return nil, errors.New("error")
+		},
+	}
+	handler := New(map[string]RESTStorage{"foo": &storage}, "/prefix/version")
+	handler.asyncOpWait = time.Millisecond / 2
+	server := httptest.NewServer(handler)
+
+	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusInternalServerError)
+	if status.Status != api.StatusFailure || status.Details == "" {
+		t.Errorf("Unexpected status %#v", status)
+	}
+}
+
+func TestAsyncCreateError(t *testing.T) {
+	ch := make(chan struct{})
+	storage := SimpleRESTStorage{
+		injectedFunction: func(obj interface{}) (interface{}, error) {
+			<-ch
+			return nil, errors.New("error")
+		},
+	}
+	handler := New(map[string]RESTStorage{"foo": &storage}, "/prefix/version")
+	handler.asyncOpWait = 0
+	server := httptest.NewServer(handler)
+
+	simple := Simple{Name: "foo"}
+	data, _ := api.Encode(simple)
+
+	status := expectApiStatus(t, "POST", fmt.Sprintf("%s/prefix/version/foo", server.URL), data, http.StatusAccepted)
+	if status.Status != api.StatusWorking || status.Details == "" {
+		t.Errorf("Unexpected status %#v", status)
+	}
+
+	otherStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s", server.URL, status.Details), []byte{}, http.StatusAccepted)
+	if !reflect.DeepEqual(status, otherStatus) {
+		t.Errorf("Expected %#v, Got %#v", status, otherStatus)
+	}
+
+	ch <- struct{}{}
+	time.Sleep(time.Millisecond)
+
+	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details), []byte{}, http.StatusOK)
+	expectedStatus := &api.Status{
+		Code:    http.StatusInternalServerError,
+		Details: "error",
+		Status:  api.StatusFailure,
+	}
+	if !reflect.DeepEqual(expectedStatus, finalStatus) {
+		t.Errorf("Expected %#v, Got %#v", expectedStatus, finalStatus)
+	}
+}
+
+func TestWriteJSONDecodeError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		type T struct {
+			Value string
+		}
+		writeJSON(http.StatusOK, &T{"Undecodable"}, w)
+	}))
+	client := http.Client{}
+	resp, err := client.Get(server.URL)
+	expectNoError(t, err)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+}
+
+type marshalError struct {
+	err error
+}
+
+func (m *marshalError) MarshalJSON() ([]byte, error) {
+	return []byte{}, m.err
+}
+
+func TestWriteRAWJSONMarshalError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
+	}))
+	client := http.Client{}
+	resp, err := client.Get(server.URL)
+	expectNoError(t, err)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+}
+
 func TestSyncCreateTimeout(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			time.Sleep(400 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 			return obj, nil
 		},
 	}
@@ -505,28 +640,11 @@ func TestSyncCreateTimeout(t *testing.T) {
 		"foo": &storage,
 	}, "/prefix/version")
 	server := httptest.NewServer(handler)
-	client := http.Client{}
 
 	simple := Simple{Name: "foo"}
 	data, _ := api.Encode(simple)
-	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true&timeout=200ms", bytes.NewBuffer(data))
-	expectNoError(t, err)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	expectNoError(t, err)
-	var itemOut api.Status
-	_, err = extractBody(response, &itemOut)
-	expectNoError(t, err)
+	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
 	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
 		t.Errorf("Unexpected status %#v", itemOut)
-	}
-	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, 202, response)
 	}
 }
