@@ -2,6 +2,7 @@ package build
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -69,11 +70,11 @@ func (bc *BuildController) synchronize() {
 // of its associated pod.
 // TODO: improve handling of illegal state transitions
 func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
-	glog.Infof("Syncing build %#v", build)
+	glog.Infof("Syncing build %s", build.ID)
 
 	switch build.Status {
 	case api.BuildNew:
-		build.PodID = "build-" + string(build.Config.Type) // TODO: better naming
+		build.PodID = "build-" + string(build.Config.Type) + "-" + build.ID // TODO: better naming
 		return api.BuildPending, nil
 	case api.BuildPending:
 		makePodSpec, ok := bc.typeStrategies[build.Config.Type]
@@ -82,6 +83,9 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 		}
 
 		podSpec := makePodSpec(*build)
+		bc.setupDockerSocket(&podSpec)
+
+		glog.Infof("Attempting to create pod: %#v", podSpec)
 		_, err := bc.kubeClient.CreatePod(podSpec)
 
 		// TODO: strongly typed error checking
@@ -116,6 +120,37 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 	return build.Status, nil
 }
 
+// setupDockerSocket configures the pod to support either the host's Docker socket
+// or a Docker-in-Docker socket where Docker runs in the container itself.
+//
+// This currently assumes that the first container in the pod is the container
+// that will be running Docker.
+//
+// Use of the host socket or Docker-in-Docker is controlled via the
+// USE_HOST_DOCKER_SOCKET environment variable.
+func (bc BuildController) setupDockerSocket(podSpec *api.Pod) {
+	if len(os.Getenv("USE_HOST_DOCKER_SOCKET")) == 0 {
+		podSpec.DesiredState.Manifest.Containers[0].Privileged = true
+	} else {
+		dockerSocketVolume := api.Volume{
+			Name: "docker-socket",
+			Source: &api.VolumeSource{
+				HostDirectory: &api.HostDirectory{
+					Path: "/var/run/docker.sock",
+				},
+			},
+		}
+
+		dockerSocketVolumeMount := api.VolumeMount{
+			Name:      "docker-socket",
+			MountPath: "/var/run/docker.sock",
+		}
+
+		podSpec.DesiredState.Manifest.Volumes = append(podSpec.DesiredState.Manifest.Volumes, dockerSocketVolume)
+		podSpec.DesiredState.Manifest.Containers[0].VolumeMounts = append(podSpec.DesiredState.Manifest.Containers[0].VolumeMounts, dockerSocketVolumeMount)
+	}
+}
+
 func (bc BuildController) dockerBuildStrategy(build api.Build) api.Pod {
 	return api.Pod{
 		JSONBase: api.JSONBase{
@@ -128,7 +163,6 @@ func (bc BuildController) dockerBuildStrategy(build api.Build) api.Pod {
 					{
 						Name:          "docker-build",
 						Image:         bc.dockerBuilderImage,
-						Privileged:    true,
 						RestartPolicy: "runOnce",
 						Env: []api.EnvVar{
 							{Name: "BUILD_TAG", Value: build.Config.ImageTag},
