@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -97,23 +98,36 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 	case api.BuildRunning:
 		pod, err := bc.kubeClient.GetPod(build.PodID)
 		if err != nil {
-			glog.Errorf("Error retrieving pod for build ID %v: %#v", build.ID, err)
-			return build.Status, err
+			return build.Status, fmt.Errorf("Error retrieving pod for build ID %v: %#v", build.ID, err)
 		}
+
+		// pod is still running
+		if pod.CurrentState.Status != api.PodStopped {
+			return build.Status, nil
+		}
+
+		var nextStatus = api.BuildComplete
 
 		// check the exit codes of all the containers in the pod
-		if pod.CurrentState.Status == api.PodStopped {
-			for _, info := range pod.CurrentState.Info {
-				if info.State.ExitCode != 0 {
-					return api.BuildFailed, nil
-				}
+		for _, info := range pod.CurrentState.Info {
+			if info.State.ExitCode != 0 {
+				nextStatus = api.BuildFailed
 			}
-
-			return api.BuildComplete, nil
 		}
-	}
 
-	return build.Status, nil
+		// Attempt to clean up the pod before the terminal transition.
+		// TODO: Pod cleanup in general is a larger problem - this is a quick
+		// hack to facilitate development.
+		if os.Getenv("BUILD_POD_CLEANUP_ENABLED") == "true" {
+			if err := bc.kubeClient.DeletePod(build.PodID); err != nil {
+				return nextStatus, fmt.Errorf("Error deleting pod for build ID %v: %#v", build.ID, err)
+			}
+		}
+
+		return nextStatus, nil
+	default:
+		return build.Status, nil
+	}
 }
 
 func (bc BuildController) dockerBuildStrategy(build api.Build) api.Pod {
