@@ -13,7 +13,9 @@ import (
 )
 
 var (
-	master = flag.String("master", "", "The address of the Kubernetes API server")
+	master             = flag.String("master", "", "The address of the Kubernetes API server")
+	dockerBuilderImage = flag.String("docker_builder_image", "ironcladlou/openshift-docker-builder", "Image to use when running 'docker build' builds")
+	dockerRegistry     = flag.String("docker_registry", "", "The address of the Docker registry that hosts built images")
 )
 
 func main() {
@@ -25,7 +27,7 @@ func main() {
 		glog.Fatal("usage: build-controller -master <master>")
 	}
 
-	buildController := build.MakeBuildController(client.New("http://"+*master, nil))
+	buildController := build.MakeBuildController(client.New("http://"+*master, nil), *dockerBuilderImage, *dockerRegistry)
 
 	buildController.Run(10 * time.Second)
 	select {}

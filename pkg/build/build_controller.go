@@ -11,13 +11,18 @@ import (
 )
 
 type BuildController struct {
-	kubeClient client.Interface
-	syncTime   <-chan time.Time
+	kubeClient         client.Interface
+	syncTime           <-chan time.Time
+	dockerBuilderImage string
+	dockerRegistry     string
 }
 
-func MakeBuildController(kubeClient client.Interface) *BuildController {
+func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, dockerRegistry string) *BuildController {
+	glog.Infof("Creating build controller with dockerBuilderImage=%s, dockerRegistry=%s", dockerBuilderImage, dockerRegistry)
 	bc := &BuildController{
-		kubeClient: kubeClient,
+		kubeClient:         kubeClient,
+		dockerBuilderImage: dockerBuilderImage,
+		dockerRegistry:     dockerRegistry,
 	}
 
 	return bc
@@ -103,19 +108,19 @@ func (bc *BuildController) buildPodSpec(build *api.Build) api.Pod {
 		JSONBase: api.JSONBase{
 			ID: build.PodID,
 		},
-		Labels: map[string]string{},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 				Containers: []api.Container{
 					{
 						Name:          "docker-build",
-						Image:         "ironcladlou/openshift-docker-builder",
+						Image:         bc.dockerBuilderImage,
 						Privileged:    true,
 						RestartPolicy: "runOnce",
 						Env: []api.EnvVar{
-							{Name: "BUILD_TAG", Value: "temp"},
+							{Name: "BUILD_TAG", Value: build.Config.ImageTag},
 							{Name: "DOCKER_CONTEXT_URL", Value: build.Config.SourceURI},
+							{Name: "DOCKER_REGISTRY", Value: bc.dockerRegistry},
 						},
 					},
 				},
