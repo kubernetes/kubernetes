@@ -27,8 +27,8 @@ limitations under the License.
 // representing that service at:
 // /registry/services/<service>/endpoint
 // and the format is:
-// '[ { "machine": <host>, "name": <name", "port": <port> },
-//    { "machine": <host2>, "name": <name2", "port": <port2> }
+// '[ { "machine": <host>, "name": <name>, "port": <port> },
+//    { "machine": <host2>, "name": <name2>, "port": <port2> }
 //  ]',
 
 package config
