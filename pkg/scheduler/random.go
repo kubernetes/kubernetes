@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 // RandomScheduler chooses machines uniformly at random.

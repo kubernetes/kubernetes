@@ -29,7 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -39,9 +40,15 @@ func convert(obj interface{}) (interface{}, error) {
 	return obj, nil
 }
 
+var scheme *conversion.Scheme
+
 func init() {
-	api.AddKnownTypes("", Simple{}, SimpleList{})
-	api.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
+	scheme = conversion.NewScheme()
+	scheme.ExternalVersion = "v1beta1"
+	scheme.AddKnownTypes("", Simple{}, SimpleList{})
+	scheme.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
+	scheme.AddKnownTypes("", api.Status{})
+	scheme.AddKnownTypes("v1beta1", api.Status{})
 }
 
 // TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
@@ -104,10 +111,14 @@ func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) 
 	}), nil
 }
 
-func (storage *SimpleRESTStorage) Extract(body []byte) (interface{}, error) {
+func (storage *SimpleRESTStorage) Decode(body []byte) (interface{}, error) {
 	var item Simple
-	api.DecodeInto(body, &item)
+	scheme.DecodeInto(body, &item)
 	return item, storage.errors["extract"]
+}
+
+func (storage *SimpleRESTStorage) Encode(obj interface{}) ([]byte, error) {
+	return scheme.Encode(obj)
 }
 
 func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, error) {
@@ -161,7 +172,7 @@ func extractBody(response *http.Response, object interface{}) (string, error) {
 	if err != nil {
 		return string(body), err
 	}
-	err = api.DecodeInto(body, object)
+	err = scheme.DecodeInto(body, object)
 	return string(body), err
 }
 
@@ -364,7 +375,7 @@ func TestUpdate(t *testing.T) {
 	item := Simple{
 		Name: "bar",
 	}
-	body, err := api.Encode(item)
+	body, err := scheme.Encode(item)
 	expectNoError(t, err)
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
@@ -388,7 +399,7 @@ func TestUpdateMissing(t *testing.T) {
 	item := Simple{
 		Name: "bar",
 	}
-	body, err := api.Encode(item)
+	body, err := scheme.Encode(item)
 	expectNoError(t, err)
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
@@ -425,7 +436,7 @@ func TestCreate(t *testing.T) {
 	simple := Simple{
 		Name: "foo",
 	}
-	data, _ := api.Encode(simple)
+	data, _ := scheme.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	response, err := client.Do(request)
@@ -454,7 +465,7 @@ func TestCreateNotFound(t *testing.T) {
 	client := http.Client{}
 
 	simple := Simple{Name: "foo"}
-	data, _ := api.Encode(simple)
+	data, _ := scheme.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/simple", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	response, err := client.Do(request)
@@ -492,7 +503,7 @@ func TestSyncCreate(t *testing.T) {
 	simple := Simple{
 		Name: "foo",
 	}
-	data, _ := api.Encode(simple)
+	data, _ := scheme.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
 	expectNoError(t, err)
 	wg := sync.WaitGroup{}
@@ -568,7 +579,7 @@ func TestAsyncCreateError(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	simple := Simple{Name: "foo"}
-	data, _ := api.Encode(simple)
+	data, _ := scheme.Encode(simple)
 
 	status := expectApiStatus(t, "POST", fmt.Sprintf("%s/prefix/version/foo", server.URL), data, http.StatusAccepted)
 	if status.Status != api.StatusWorking || status.Details == "" {
@@ -585,9 +596,10 @@ func TestAsyncCreateError(t *testing.T) {
 
 	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details), []byte{}, http.StatusOK)
 	expectedStatus := &api.Status{
-		Code:    http.StatusInternalServerError,
-		Details: "error",
-		Status:  api.StatusFailure,
+		JSONBase: finalStatus.JSONBase,
+		Code:     http.StatusInternalServerError,
+		Details:  "error",
+		Status:   api.StatusFailure,
 	}
 	if !reflect.DeepEqual(expectedStatus, finalStatus) {
 		t.Errorf("Expected %#v, Got %#v", expectedStatus, finalStatus)
@@ -599,7 +611,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		type T struct {
 			Value string
 		}
-		writeJSON(http.StatusOK, &T{"Undecodable"}, w)
+		writeJSON(http.StatusOK, scheme, &T{"Undecodable"}, w)
 	}))
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
@@ -642,7 +654,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	simple := Simple{Name: "foo"}
-	data, _ := api.Encode(simple)
+	data, _ := scheme.Encode(simple)
 	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
 	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
 		t.Errorf("Unexpected status %#v", itemOut)

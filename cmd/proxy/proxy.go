@@ -19,6 +19,8 @@ package main
 import (
 	"flag"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -54,6 +56,7 @@ func main() {
 	// Create a configuration source that handles configuration from etcd.
 	etcdClient := etcd.NewClient(etcdServerList)
 	config.NewConfigSourceEtcd(etcdClient,
+		api.New("", internal.AddTypes),
 		serviceConfig.Channel("etcd"),
 		endpointsConfig.Channel("etcd"))
 

@@ -26,9 +26,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
@@ -171,7 +170,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = obj.(io.Reader)
 	default:
-		data, err := api.Encode(obj)
+		data, err := r.c.encoding.Encode(obj)
 		if err != nil {
 			r.err = err
 			return r
@@ -229,7 +228,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Got status: %v", response.StatusCode)
 	}
-	return watch.NewStreamWatcher(tools.NewAPIEventDecoder(response.Body)), nil
+	return watch.NewStreamWatcher(apiserver.NewAPIEventDecoder(response.Body)), nil
 }
 
 // Do formats and executes the request. Returns the API object received, or an error.
@@ -245,7 +244,7 @@ func (r *Request) Do() Result {
 		respBody, err := r.c.doRequest(req)
 		if err != nil {
 			if statusErr, ok := err.(*StatusErr); ok {
-				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != 0 {
+				if statusErr.Status.Status == apiserver.StatusWorking && r.pollPeriod != 0 {
 					glog.Infof("Waiting for completion of /operations/%s", statusErr.Status.Details)
 					time.Sleep(r.pollPeriod)
 					// Make a poll request
@@ -256,14 +255,15 @@ func (r *Request) Do() Result {
 				}
 			}
 		}
-		return Result{respBody, err}
+		return Result{r.c.encoding, respBody, err}
 	}
 }
 
 // Result contains the result of calling Request.Do().
 type Result struct {
-	body []byte
-	err  error
+	encoding Encoding
+	body     []byte
+	err      error
 }
 
 // Raw returns the raw result.
@@ -276,7 +276,7 @@ func (r Result) Get() (interface{}, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return api.Decode(r.body)
+	return r.encoding.Decode(r.body)
 }
 
 // Into stores the result into obj, if possible..
@@ -284,7 +284,7 @@ func (r Result) Into(obj interface{}) error {
 	if r.err != nil {
 		return r.err
 	}
-	return api.DecodeInto(r.body, obj)
+	return r.encoding.DecodeInto(r.body, obj)
 }
 
 // Returns the error executing the request, nil if no error occurred.

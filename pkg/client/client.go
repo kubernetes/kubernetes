@@ -25,7 +25,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	apiserver "github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
@@ -52,10 +53,16 @@ type Interface interface {
 	DeleteService(string) error
 }
 
+type Encoding interface {
+	Encode(obj interface{}) (data []byte, err error)
+	Decode(data []byte) (interface{}, error)
+	DecodeInto(data []byte, obj interface{}) error
+}
+
 // StatusErr might get returned from an api call if your request is still being processed
 // and hence the expected return data is not available yet.
 type StatusErr struct {
-	Status api.Status
+	Status apiserver.Status
 }
 
 func (s *StatusErr) Error() string {
@@ -71,6 +78,7 @@ type AuthInfo struct {
 // Client is the actual implementation of a Kubernetes client.
 // Host is the http://... base for the URL
 type Client struct {
+	encoding   Encoding
 	host       string
 	auth       *AuthInfo
 	httpClient *http.Client
@@ -114,8 +122,8 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 
 	// Did the server give us a status response?
 	isStatusResponse := false
-	var status api.Status
-	if err := api.DecodeInto(body, &status); err == nil && status.Status != "" {
+	var status apiserver.Status
+	if err := c.encoding.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
 
@@ -131,7 +139,7 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 	}
 
 	// If the server gave us a status back, look at what it was.
-	if isStatusResponse && status.Status != api.StatusSuccess {
+	if isStatusResponse && status.Status != apiserver.StatusSuccess {
 		// "Working" requests need to be handled specially.
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
 		return nil, &StatusErr{status}
@@ -154,7 +162,7 @@ func (c *Client) rawRequest(method, path string, requestBody io.Reader, target i
 		return body, err
 	}
 	if target != nil {
-		err = api.DecodeInto(body, target)
+		err = c.encoding.DecodeInto(body, target)
 	}
 	if err != nil {
 		glog.Infof("Failed to parse: %s\n", string(body))

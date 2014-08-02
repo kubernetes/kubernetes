@@ -19,7 +19,7 @@ package proxy
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 func TestLoadBalanceValidateWorks(t *testing.T) {

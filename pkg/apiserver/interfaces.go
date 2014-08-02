@@ -21,6 +21,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+type Encoding interface {
+	// Encode attempts to write a REST object to wire format.
+	Encode(interface{}) ([]byte, error)
+
+	// Decode attempts to read a REST object from its serialized form.  Must reverse a successful Encode() call.
+	Decode(body []byte) (interface{}, error)
+}
+
 // RESTStorage is a generic interface for RESTful storage services
 // Resources which are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
@@ -35,7 +43,6 @@ type RESTStorage interface {
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
 	Delete(id string) (<-chan interface{}, error)
 
-	Extract(body []byte) (interface{}, error)
 	Create(interface{}) (<-chan interface{}, error)
 	Update(interface{}) (<-chan interface{}, error)
 }

@@ -21,15 +21,6 @@ import (
 	"fmt"
 )
 
-// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func (s *Scheme) EncodeOrDie(obj interface{}) string {
-	bytes, err := s.Encode(obj)
-	if err != nil {
-		panic(err)
-	}
-	return string(bytes)
-}
-
 // Encode turns the given api object into an appropriate JSON string.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
 // will be made, therefore it's recommended to pass a pointer to a

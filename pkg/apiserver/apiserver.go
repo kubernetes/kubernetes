@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -59,8 +58,11 @@ func NewNotFoundErr(kind, name string) error {
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIServer struct {
+	storage map[string]RESTStorage
+	// TODO: would become a map of types when multiple serialization formats were supported
+	// TODO: also, there's no way to request new API behavior but encode on the old response format
+	encoding    Encoding
 	prefix      string
-	storage     map[string]RESTStorage
 	ops         *Operations
 	mux         *http.ServeMux
 	asyncOpWait time.Duration
@@ -69,12 +71,13 @@ type APIServer struct {
 // New creates a new APIServer object.
 // 'storage' contains a map of handlers.
 // 'prefix' is the hosting path prefix.
-func New(storage map[string]RESTStorage, prefix string) *APIServer {
+func New(storage map[string]RESTStorage, encoding Encoding, prefix string) *APIServer {
 	s := &APIServer{
-		storage: storage,
-		prefix:  strings.TrimRight(prefix, "/"),
-		ops:     NewOperations(),
-		mux:     http.NewServeMux(),
+		storage:  storage,
+		encoding: encoding,
+		prefix:   strings.TrimRight(prefix, "/"),
+		ops:      NewOperations(),
+		mux:      http.NewServeMux(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
 	}
@@ -172,7 +175,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 				internalError(err, w)
 				return
 			}
-			writeJSON(http.StatusOK, list, w)
+			writeJSON(http.StatusOK, s.encoding, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
 			if IsNotFound(err) {
@@ -183,7 +186,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 				internalError(err, w)
 				return
 			}
-			writeJSON(http.StatusOK, item, w)
+			writeJSON(http.StatusOK, s.encoding, item, w)
 		default:
 			notFound(w, req)
 		}
@@ -198,7 +201,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			internalError(err, w)
 			return
 		}
-		obj, err := storage.Extract(body)
+		obj, err := s.encoding.Decode(body)
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -217,7 +220,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
+		s.finishReq(op, storage, w)
 
 	case "DELETE":
 		if len(parts) != 2 {
@@ -234,7 +237,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
+		s.finishReq(op, storage, w)
 
 	case "PUT":
 		if len(parts) != 2 {
@@ -246,7 +249,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			internalError(err, w)
 			return
 		}
-		obj, err := storage.Extract(body)
+		obj, err := s.encoding.Decode(body)
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -265,7 +268,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
+		s.finishReq(op, storage, w)
 
 	default:
 		notFound(w, req)
@@ -290,30 +293,31 @@ func (s *APIServer) createOperation(out <-chan interface{}, sync bool, timeout t
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to receive the result and returning its ID down the writer.
-func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
+func (s *APIServer) finishReq(op *Operation, storage RESTStorage, w http.ResponseWriter) {
 	obj, complete := op.StatusOrResult()
-	if complete {
-		status := http.StatusOK
-		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		case *api.Status:
-			if stat.Code != 0 {
-				status = stat.Code
-			}
+
+	status := http.StatusOK
+	switch stat := obj.(type) {
+	case Status:
+		httplog.LogOf(w).Addf("programmer error: use *Status as a result, not Status.")
+		if stat.Code != 0 {
+			status = stat.Code
 		}
-		writeJSON(status, obj, w)
-	} else {
-		writeJSON(http.StatusAccepted, obj, w)
+	case *Status:
+		if stat.Code != 0 {
+			status = stat.Code
+		}
 	}
+
+	if !complete {
+		status = http.StatusAccepted
+	}
+	writeJSON(status, s.encoding, obj, w)
 }
 
 // writeJSON renders an object as JSON to the response
-func writeJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	output, err := api.Encode(object)
+func writeJSON(statusCode int, encoding Encoding, object interface{}, w http.ResponseWriter) {
+	output, err := encoding.Encode(object)
 	if err != nil {
 		internalError(err, w)
 		return

@@ -19,7 +19,6 @@ package apiserver
 import (
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -42,8 +41,8 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 			case tools.IsEtcdConflict(err):
 				status = http.StatusConflict
 			}
-			channel <- &api.Status{
-				Status:  api.StatusFailure,
+			channel <- &Status{
+				Status:  StatusFailure,
 				Details: err.Error(),
 				Code:    status,
 			}

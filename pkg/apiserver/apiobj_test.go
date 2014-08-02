@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package apiserver
 
 import (
 	"encoding/json"
@@ -28,8 +28,8 @@ func TestAPIObject(t *testing.T) {
 		Object      APIObject `yaml:"object,omitempty" json:"object,omitempty"`
 		EmptyObject APIObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 	}
-	AddKnownTypes("", EmbeddedTest{})
-	AddKnownTypes("v1beta1", EmbeddedTest{})
+	conversionScheme.AddKnownTypes("", EmbeddedTest{})
+	conversionScheme.AddKnownTypes("v1beta1", EmbeddedTest{})
 
 	outer := &EmbeddedTest{
 		JSONBase: JSONBase{ID: "outer"},

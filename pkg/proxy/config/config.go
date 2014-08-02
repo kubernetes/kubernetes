@@ -19,7 +19,7 @@ package config
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	"github.com/golang/glog"
 )
@@ -52,6 +52,12 @@ type ServiceUpdate struct {
 type EndpointsUpdate struct {
 	Endpoints []api.Endpoints
 	Op        Operation
+}
+
+// Interface for decoding configuration
+type Decoding interface {
+	Decode(data []byte) (interface{}, error)
+	DecodeInto(data []byte, obj interface{}) error
 }
 
 // ServiceConfigHandler is an abstract interface of objects which receive update notifications for the set of services.

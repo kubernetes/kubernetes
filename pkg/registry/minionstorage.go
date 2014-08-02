@@ -19,7 +19,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -59,12 +59,6 @@ func (storage *MinionRegistryStorage) Get(id string) (interface{}, error) {
 	return storage.toApiMinion(id), err
 }
 
-func (storage *MinionRegistryStorage) Extract(body []byte) (interface{}, error) {
-	var minion api.Minion
-	err := api.DecodeInto(body, &minion)
-	return minion, err
-}
-
 func (storage *MinionRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	minion, ok := obj.(api.Minion)
 	if !ok {
@@ -102,6 +96,6 @@ func (storage *MinionRegistryStorage) Delete(id string) (<-chan interface{}, err
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, storage.registry.Delete(id)
+		return apiserver.Status{Status: apiserver.StatusSuccess}, storage.registry.Delete(id)
 	}), nil
 }

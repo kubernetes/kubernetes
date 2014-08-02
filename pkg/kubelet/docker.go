@@ -22,7 +22,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/fsouza/go-dockerclient"
 )
 

@@ -22,7 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
@@ -38,9 +39,13 @@ type TestResource struct {
 	Value        int `json:"value" yaml:"value,omitempty"`
 }
 
+var scheme *conversion.Scheme
+
 func init() {
-	api.AddKnownTypes("", TestResource{})
-	api.AddKnownTypes("v1beta1", TestResource{})
+	scheme = conversions.NewScheme()
+	scheme.ExternalVersion = "v1beta1"
+	scheme.AddKnownTypes("", TestResource{})
+	scheme.AddKnownTypes("v1beta1", TestResource{})
 }
 
 func TestIsNotFoundErr(t *testing.T) {

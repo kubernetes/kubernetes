@@ -24,7 +24,7 @@ import (
 	"text/tabwriter"
 	"text/template"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"gopkg.in/v1/yaml"
 )

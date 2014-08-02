@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -70,15 +70,8 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 // Delete asynchronously deletes the ReplicationController specified by its id.
 func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, storage.registry.DeleteController(id)
+		return apiserver.Status{Status: apiserver.StatusSuccess}, storage.registry.DeleteController(id)
 	}), nil
-}
-
-// Extract deserializes user provided data into an api.ReplicationController.
-func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, error) {
-	result := api.ReplicationController{}
-	err := api.DecodeInto(body, &result)
-	return result, err
 }
 
 // Create registers a given new ReplicationController instance to storage.registry.

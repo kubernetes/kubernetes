@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -55,7 +55,7 @@ func TestMinionRegistryStorage(t *testing.T) {
 		t.Errorf("delete failed")
 	}
 	obj = <-c
-	if s, ok := obj.(api.Status); !ok || s.Status != api.StatusSuccess {
+	if s, ok := obj.(apiserver.Status); !ok || s.Status != apiserver.StatusSuccess {
 		t.Errorf("delete return value was weird: %#v", obj)
 	}
 	if _, err := ms.Get("bar"); err != ErrDoesNotExist {
