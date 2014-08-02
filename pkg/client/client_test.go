@@ -154,7 +154,7 @@ func TestCreatePod(t *testing.T) {
 
 func TestUpdatePod(t *testing.T) {
 	requestPod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1},
 		CurrentState: api.PodState{
 			Status: "Foobar",
 		},
@@ -219,7 +219,7 @@ func TestGetController(t *testing.T) {
 
 func TestUpdateController(t *testing.T) {
 	requestController := api.ReplicationController{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: "/replicationControllers/foo"},
@@ -388,11 +388,12 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestUpdateService(t *testing.T) {
+	svc := api.Service{JSONBase: api.JSONBase{ID: "service-1", ResourceVersion: 1}}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
-		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
+		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: &svc},
+		Response: Response{StatusCode: 200, Body: &svc},
 	}
-	response, err := c.Setup().UpdateService(api.Service{JSONBase: api.JSONBase{ID: "service-1"}})
+	response, err := c.Setup().UpdateService(svc)
 	c.Validate(t, &response, err)
 }
 
