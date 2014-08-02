@@ -37,9 +37,9 @@ func expectNoError(t *testing.T, err error) {
 
 func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
 	out := <-ch
-	status, ok := out.(*api.Status)
+	status, ok := out.(*apiserver.Status)
 	if !ok {
-		t.Errorf("Expected an api.Status object, was %#v", out)
+		t.Errorf("Expected an apiserver.Status object, was %#v", out)
 		return
 	}
 	if msg != status.Details {
@@ -220,7 +220,7 @@ func TestExtractJson(t *testing.T) {
 	}
 	body, err := api.Encode(&pod)
 	expectNoError(t, err)
-	podOut, err := storage.Decode(body)
+	podOut, err := storage.Extract(body)
 	expectNoError(t, err)
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)

@@ -61,7 +61,7 @@ func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 
 		// TODO: This is one watch per connection. We want to multiplex, so that
 		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching, storage}
+		watchServer := &WatchServer{watching, s.encoding}
 		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
 			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
 		} else {
@@ -75,8 +75,8 @@ func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
-	watching   watch.Interface
-	serializer WatchSerializer
+	watching watch.Interface
+	encoding Encoding
 }
 
 // HandleWS implements a websocket handler.
@@ -101,7 +101,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 			}
 			err := websocket.JSON.Send(ws, &WatchEvent{
 				Type:   event.Type,
-				Object: APIObject{event.Object, w.serializer},
+				Object: APIObject{event.Object, w.encoding},
 			})
 			if err != nil {
 				// Client disconnect.
@@ -135,7 +135,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	loggedW.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	encoder := json.NewEncoder(w)
+	encoding := json.NewEncoder(w)
 	for {
 		select {
 		case <-cn.CloseNotify():
@@ -147,9 +147,9 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			// TODO: this is not safe unless all objects are in a common API namespace
-			err := encoder.Encode(&WatchEvent{
+			err := encoding.Encode(&WatchEvent{
 				Type:   event.Type,
-				Object: APIObject{event.Object, self.serializer},
+				Object: APIObject{event.Object, self.encoding},
 			})
 			if err != nil {
 				// Client disconnect.

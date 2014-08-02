@@ -66,14 +66,14 @@ type WatchEvent struct {
 	Object APIObject
 }
 
-// APIObject has appropriate encoder and decoder functions, such that on the wire, it's
+// APIObject has appropriate encoding and decoder functions, such that on the wire, it's
 // stored as a []byte, but in memory, the contained object is accessable as an interface{}
 // via the Get() function. Only objects having a JSONBase may be stored via APIObject.
 // The purpose of this is to allow an API object of type known only at runtime to be
 // embedded within other API objects.
 type APIObject struct {
-	Object     interface{}
-	serializer WatchSerializer
+	Object   interface{}
+	Encoding Encoding
 }
 
 // AddTypes adds the types in this package to a conversion scheme

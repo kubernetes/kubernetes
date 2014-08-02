@@ -70,19 +70,8 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 // Delete asynchronously deletes the ReplicationController specified by its id.
 func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, storage.registry.DeleteController(id)
+		return apiserver.Status{Status: apiserver.StatusSuccess}, storage.registry.DeleteController(id)
 	}), nil
-}
-
-// Decode deserializes user provided data into an api.ReplicationController.
-func (storage *ControllerRegistryStorage) Decode(body []byte) (interface{}, error) {
-	result := api.ReplicationController{}
-	err := api.DecodeInto(body, &result)
-	return result, err
-}
-
-func (storage *ControllerRegistryStorage) Encode(obj interface{}) ([]byte, error) {
-	return api.Encode(obj)
 }
 
 // Create registers a given new ReplicationController instance to storage.registry.

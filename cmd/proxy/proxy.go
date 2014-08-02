@@ -20,6 +20,7 @@ import (
 	"flag"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"

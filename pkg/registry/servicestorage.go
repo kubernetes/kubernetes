@@ -137,18 +137,8 @@ func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) 
 				}
 			}
 		}
-		return api.Status{Status: api.StatusSuccess}, sr.registry.DeleteService(id)
+		return apiserver.Status{Status: apiserver.StatusSuccess}, sr.registry.DeleteService(id)
 	}), nil
-}
-
-func (sr *ServiceRegistryStorage) Decode(body []byte) (interface{}, error) {
-	var svc api.Service
-	err := api.DecodeInto(body, &svc)
-	return svc, err
-}
-
-func (storage *ServiceRegistryStorage) Encode(obj interface{}) ([]byte, error) {
-	return api.Encode(obj)
 }
 
 func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {

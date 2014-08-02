@@ -53,7 +53,7 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 	if len(parts) == 0 {
 		// List outstanding operations.
 		list := s.ops.List()
-		writeJSON(http.StatusOK, types, list, w)
+		writeJSON(http.StatusOK, s.encoding, list, w)
 		return
 	}
 
@@ -65,9 +65,9 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 
 	obj, complete := op.StatusOrResult()
 	if complete {
-		writeJSON(http.StatusOK, types, obj, w)
+		writeJSON(http.StatusOK, s.encoding, obj, w)
 	} else {
-		writeJSON(http.StatusAccepted, types, obj, w)
+		writeJSON(http.StatusAccepted, s.encoding, obj, w)
 	}
 }
 

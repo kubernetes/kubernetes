@@ -59,16 +59,6 @@ func (storage *MinionRegistryStorage) Get(id string) (interface{}, error) {
 	return storage.toApiMinion(id), err
 }
 
-func (storage *MinionRegistryStorage) Decode(body []byte) (interface{}, error) {
-	var minion api.Minion
-	err := api.DecodeInto(body, &minion)
-	return minion, err
-}
-
-func (storage *MinionRegistryStorage) Encode(obj interface{}) ([]byte, error) {
-	return api.Encode(obj)
-}
-
 func (storage *MinionRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	minion, ok := obj.(api.Minion)
 	if !ok {
@@ -106,6 +96,6 @@ func (storage *MinionRegistryStorage) Delete(id string) (<-chan interface{}, err
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, storage.registry.Delete(id)
+		return apiserver.Status{Status: apiserver.StatusSuccess}, storage.registry.Delete(id)
 	}), nil
 }

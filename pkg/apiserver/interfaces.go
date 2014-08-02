@@ -21,14 +21,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-type JSONSerializer interface {
-	// Encode attempts to write a REST object to JSON.
-	Encode(interface{}) ([]byte, error)
-}
-
-// WatchSerializer is a generic interface for converting a REST object to and from bytes.
-type WatchSerializer interface {
-	// Encode attempts to write a REST object to its serialized form.  Must reverse a successful Decode() call.
+type Encoding interface {
+	// Encode attempts to write a REST object to wire format.
 	Encode(interface{}) ([]byte, error)
 
 	// Decode attempts to read a REST object from its serialized form.  Must reverse a successful Encode() call.
@@ -38,13 +32,6 @@ type WatchSerializer interface {
 // RESTStorage is a generic interface for RESTful storage services
 // Resources which are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
-	// Encode attempts to write a REST object to a response
-	// TODO: I may not belong here, I might belong as arguments to apiserver.New()
-	Encode(interface{}) ([]byte, error)
-
-	// Decode attempts to read a REST object from a request.
-	Decode(body []byte) (interface{}, error)
-
 	// List selects resources in the storage which match to the selector.
 	List(labels.Selector) (interface{}, error)
 
