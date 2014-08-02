@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -53,7 +53,7 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 	if len(parts) == 0 {
 		// List outstanding operations.
 		list := s.ops.List()
-		writeJSON(http.StatusOK, list, w)
+		writeJSON(http.StatusOK, types, list, w)
 		return
 	}
 
@@ -65,9 +65,9 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 
 	obj, complete := op.StatusOrResult()
 	if complete {
-		writeJSON(http.StatusOK, obj, w)
+		writeJSON(http.StatusOK, types, obj, w)
 	} else {
-		writeJSON(http.StatusAccepted, obj, w)
+		writeJSON(http.StatusAccepted, types, obj, w)
 	}
 }
 
@@ -121,7 +121,7 @@ func (ops *Operations) insert(op *Operation) {
 }
 
 // List operations for an API client.
-func (ops *Operations) List() api.ServerOpList {
+func (ops *Operations) List() ServerOpList {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 
@@ -130,9 +130,9 @@ func (ops *Operations) List() api.ServerOpList {
 		ids = append(ids, id)
 	}
 	sort.StringSlice(ids).Sort()
-	ol := api.ServerOpList{}
+	ol := ServerOpList{}
 	for _, id := range ids {
-		ol.Items = append(ol.Items, api.ServerOp{JSONBase: api.JSONBase{ID: id}})
+		ol.Items = append(ol.Items, ServerOp{JSONBase: api.JSONBase{ID: id}})
 	}
 	return ol
 }
@@ -201,8 +201,8 @@ func (op *Operation) StatusOrResult() (description interface{}, finished bool) {
 	defer op.lock.Unlock()
 
 	if op.finished == nil {
-		return api.Status{
-			Status:  api.StatusWorking,
+		return Status{
+			Status:  StatusWorking,
 			Details: op.ID,
 		}, false
 	}

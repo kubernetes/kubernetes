@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package apiserver
 
 import (
 	"gopkg.in/v1/yaml"
@@ -33,7 +33,7 @@ func (a *APIObject) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	obj, err := Decode(b)
+	obj, err := a.serializer.Decode(b)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (a APIObject) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return Encode(a.Object)
+	return a.serializer.Encode(a.Object)
 }
 
 // SetYAML implements the yaml.Setter interface.
@@ -67,7 +67,7 @@ func (a *APIObject) SetYAML(tag string, value interface{}) bool {
 	if err != nil {
 		panic("yaml can't reverse its own object")
 	}
-	obj, err := Decode(b)
+	obj, err := a.serializer.Decode(b)
 	if err != nil {
 		return false
 	}
@@ -82,7 +82,7 @@ func (a APIObject) GetYAML() (tag string, value interface{}) {
 		return
 	}
 	// Encode returns JSON, which is conveniently a subset of YAML.
-	v, err := Encode(a.Object)
+	v, err := a.serializer.Encode(a.Object)
 	if err != nil {
 		panic("impossible to encode API object!")
 	}

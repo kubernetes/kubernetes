@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/golang/glog"
 )
 

@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package internal
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -333,57 +332,4 @@ type Minion struct {
 type MinionList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
-}
-
-// Status is a return value for calls that don't return other objects.
-// Arguably, this could go in apiserver, but I'm including it here so clients needn't
-// import both.
-type Status struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	// One of: "success", "failure", "working" (for operations not yet completed)
-	// TODO: if "working", include an operation identifier so final status can be
-	// checked.
-	Status string `json:"status,omitempty" yaml:"status,omitempty"`
-	// Details about the status. May be an error description or an
-	// operation number for later polling.
-	Details string `json:"details,omitempty" yaml:"details,omitempty"`
-	// Suggested HTTP return code for this status, 0 if not set.
-	Code int `json:"code,omitempty" yaml:"code,omitempty"`
-}
-
-// Values of Status.Status
-const (
-	StatusSuccess = "success"
-	StatusFailure = "failure"
-	StatusWorking = "working"
-)
-
-// ServerOp is an operation delivered to API clients.
-type ServerOp struct {
-	JSONBase `yaml:",inline" json:",inline"`
-}
-
-// ServerOpList is a list of operations, as delivered to API clients.
-type ServerOpList struct {
-	JSONBase `yaml:",inline" json:",inline"`
-	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
-}
-
-// WatchEvent objects are streamed from the api server in response to a watch request.
-type WatchEvent struct {
-	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType
-
-	// For added or modified objects, this is the new object; for deleted objects,
-	// it's the state of the object immediately prior to its deletion.
-	Object APIObject
-}
-
-// APIObject has appropriate encoder and decoder functions, such that on the wire, it's
-// stored as a []byte, but in memory, the contained object is accessable as an interface{}
-// via the Get() function. Only objects having a JSONBase may be stored via APIObject.
-// The purpose of this is to allow an API object of type known only at runtime to be
-// embedded within other API objects.
-type APIObject struct {
-	Object interface{}
 }

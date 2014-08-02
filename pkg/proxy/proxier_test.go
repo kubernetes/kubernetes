@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 // a simple echoServer that only accepts one connection. Returns port actually

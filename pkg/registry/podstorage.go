@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -189,10 +189,14 @@ func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error)
 	}), nil
 }
 
-func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
+func (storage *PodRegistryStorage) Decode(body []byte) (interface{}, error) {
 	pod := api.Pod{}
 	err := api.DecodeInto(body, &pod)
 	return pod, err
+}
+
+func (storage *PodRegistryStorage) Encode(obj interface{}) ([]byte, error) {
+	return api.Encode(obj)
 }
 
 func (storage *PodRegistryStorage) scheduleAndCreatePod(pod api.Pod) error {

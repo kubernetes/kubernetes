@@ -21,7 +21,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 var ErrUnsupportedVolumeType = errors.New("unsupported volume type")

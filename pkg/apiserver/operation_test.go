@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 func TestOperation(t *testing.T) {
@@ -102,7 +102,7 @@ func TestOpGet(t *testing.T) {
 	simple := Simple{
 		Name: "foo",
 	}
-	data, err := api.Encode(simple)
+	data, err := scheme.Encode(simple)
 	t.Log(string(data))
 	expectNoError(t, err)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))

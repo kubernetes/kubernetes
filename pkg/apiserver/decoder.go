@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package apiserver
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -43,7 +42,7 @@ func NewAPIEventDecoder(stream io.ReadCloser) *APIEventDecoder {
 // Decode blocks until it can return the next object in the stream. Returns an error
 // if the stream is closed or an object can't be decoded.
 func (d *APIEventDecoder) Decode() (action watch.EventType, object interface{}, err error) {
-	var got api.WatchEvent
+	var got WatchEvent
 	err = d.decoder.Decode(&got)
 	if err != nil {
 		return action, nil, err

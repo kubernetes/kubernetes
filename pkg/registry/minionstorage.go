@@ -19,7 +19,7 @@ package registry
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -59,10 +59,14 @@ func (storage *MinionRegistryStorage) Get(id string) (interface{}, error) {
 	return storage.toApiMinion(id), err
 }
 
-func (storage *MinionRegistryStorage) Extract(body []byte) (interface{}, error) {
+func (storage *MinionRegistryStorage) Decode(body []byte) (interface{}, error) {
 	var minion api.Minion
 	err := api.DecodeInto(body, &minion)
 	return minion, err
+}
+
+func (storage *MinionRegistryStorage) Encode(obj interface{}) ([]byte, error) {
+	return api.Encode(obj)
 }
 
 func (storage *MinionRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
@@ -220,7 +220,7 @@ func TestExtractJson(t *testing.T) {
 	}
 	body, err := api.Encode(&pod)
 	expectNoError(t, err)
-	podOut, err := storage.Extract(body)
+	podOut, err := storage.Decode(body)
 	expectNoError(t, err)
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)

@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 // Pod represents the structure of a pod on the Kubelet, distinct from the apiserver

@@ -52,6 +52,12 @@ func NewNotFoundErr(kind, name string) error {
 	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
 }
 
+var types api.Interface
+
+func init() {
+	types = api.New("", AddTypes)
+}
+
 // APIServer is an HTTPHandler that delegates to RESTStorage objects.
 // It handles URLs of the form:
 // ${prefix}/${storage_key}[/${object_name}]
@@ -61,6 +67,7 @@ func NewNotFoundErr(kind, name string) error {
 type APIServer struct {
 	prefix      string
 	storage     map[string]RESTStorage
+	serializer  JSONSerializer
 	ops         *Operations
 	mux         *http.ServeMux
 	asyncOpWait time.Duration
@@ -172,7 +179,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 				internalError(err, w)
 				return
 			}
-			writeJSON(http.StatusOK, list, w)
+			writeJSON(http.StatusOK, storage, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
 			if IsNotFound(err) {
@@ -183,7 +190,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 				internalError(err, w)
 				return
 			}
-			writeJSON(http.StatusOK, item, w)
+			writeJSON(http.StatusOK, storage, item, w)
 		default:
 			notFound(w, req)
 		}
@@ -198,7 +205,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			internalError(err, w)
 			return
 		}
-		obj, err := storage.Extract(body)
+		obj, err := storage.Decode(body)
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -217,7 +224,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
+		s.finishReq(op, storage, w)
 
 	case "DELETE":
 		if len(parts) != 2 {
@@ -234,7 +241,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
+		s.finishReq(op, storage, w)
 
 	case "PUT":
 		if len(parts) != 2 {
@@ -246,7 +253,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			internalError(err, w)
 			return
 		}
-		obj, err := storage.Extract(body)
+		obj, err := storage.Decode(body)
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -265,7 +272,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
+		s.finishReq(op, storage, w)
 
 	default:
 		notFound(w, req)
@@ -290,30 +297,37 @@ func (s *APIServer) createOperation(out <-chan interface{}, sync bool, timeout t
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to receive the result and returning its ID down the writer.
-func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
+func (s *APIServer) finishReq(op *Operation, storage RESTStorage, w http.ResponseWriter) {
 	obj, complete := op.StatusOrResult()
-	if complete {
-		status := http.StatusOK
-		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		case *api.Status:
-			if stat.Code != 0 {
-				status = stat.Code
-			}
+
+	status := http.StatusOK
+	var encoder JSONSerializer
+	switch stat := obj.(type) {
+	case Status:
+		httplog.LogOf(w).Addf("programmer error: use *Status as a result, not Status.")
+		if stat.Code != 0 {
+			status = stat.Code
 		}
-		writeJSON(status, obj, w)
-	} else {
-		writeJSON(http.StatusAccepted, obj, w)
+		// TODO: Status really belongs to apiserver
+		encoder = types
+	case *Status:
+		if stat.Code != 0 {
+			status = stat.Code
+		}
+		encoder = types
+	default:
+		encoder = storage
 	}
+
+	if !complete {
+		status = http.StatusAccepted
+	}
+	writeJSON(status, encoder, obj, w)
 }
 
 // writeJSON renders an object as JSON to the response
-func writeJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	output, err := api.Encode(object)
+func writeJSON(statusCode int, serializer JSONSerializer, object interface{}, w http.ResponseWriter) {
+	output, err := serializer.Encode(object)
 	if err != nil {
 		internalError(err, w)
 		return

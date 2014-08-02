@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 // ErrPodInfoNotAvailable may be returned when the requested pod info is not available

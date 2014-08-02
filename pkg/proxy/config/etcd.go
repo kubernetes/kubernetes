@@ -38,7 +38,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -48,15 +48,18 @@ const registryRoot = "registry/services"
 
 // ConfigSourceEtcd communicates with a etcd via the client, and sends the change notification of services and endpoints to the specified channels.
 type ConfigSourceEtcd struct {
+	//TODO: this would become the etcd client abstraction for decoding
 	client           *etcd.Client
+	decoding         Decoding
 	serviceChannel   chan ServiceUpdate
 	endpointsChannel chan EndpointsUpdate
 }
 
 // NewConfigSourceEtcd creates a new ConfigSourceEtcd and immediately runs the created ConfigSourceEtcd in a goroutine.
-func NewConfigSourceEtcd(client *etcd.Client, serviceChannel chan ServiceUpdate, endpointsChannel chan EndpointsUpdate) ConfigSourceEtcd {
+func NewConfigSourceEtcd(client *etcd.Client, decoding Decoding, serviceChannel chan ServiceUpdate, endpointsChannel chan EndpointsUpdate) ConfigSourceEtcd {
 	config := ConfigSourceEtcd{
 		client:           client,
+		decoding:         decoding,
 		serviceChannel:   serviceChannel,
 		endpointsChannel: endpointsChannel,
 	}
@@ -126,7 +129,7 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 		// and create a Service entry for it.
 		for i, node := range response.Node.Nodes {
 			var svc api.Service
-			err = api.DecodeInto([]byte(node.Value), &svc)
+			err = s.decoding.DecodeInto([]byte(node.Value), &svc)
 			if err != nil {
 				glog.Errorf("Failed to load Service: %s (%#v)", node.Value, err)
 				continue
@@ -154,17 +157,17 @@ func (s ConfigSourceEtcd) GetEndpoints(service string) (api.Endpoints, error) {
 	}
 	// Parse all the endpoint specifications in this value.
 	var e api.Endpoints
-	err = api.DecodeInto([]byte(response.Node.Value), &e)
+	err = s.decoding.DecodeInto([]byte(response.Node.Value), &e)
 	return e, err
 }
 
 // etcdResponseToService takes an etcd response and pulls it apart to find service.
-func etcdResponseToService(response *etcd.Response) (*api.Service, error) {
+func etcdResponseToService(decoding Decoding, response *etcd.Response) (*api.Service, error) {
 	if response.Node == nil {
 		return nil, fmt.Errorf("invalid response from etcd: %#v", response)
 	}
 	var svc api.Service
-	err := api.DecodeInto([]byte(response.Node.Value), &svc)
+	err := decoding.DecodeInto([]byte(response.Node.Value), &svc)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +192,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	if strings.Contains(response.Node.Key, "/endpoints/") {
 		s.ProcessEndpointResponse(response)
 	} else if response.Action == "set" {
-		service, err := etcdResponseToService(response)
+		service, err := etcdResponseToService(s.decoding, response)
 		if err != nil {
 			glog.Errorf("Failed to parse %s Port: %s", response, err)
 			return
@@ -215,7 +218,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 func (s ConfigSourceEtcd) ProcessEndpointResponse(response *etcd.Response) {
 	glog.Infof("Processing a change in endpoint configuration... %s", *response)
 	var endpoints api.Endpoints
-	err := api.DecodeInto([]byte(response.Node.Value), &endpoints)
+	err := s.decoding.DecodeInto([]byte(response.Node.Value), &endpoints)
 	if err != nil {
 		glog.Errorf("Failed to parse service out of etcd key: %v : %+v", response.Node.Value, err)
 		return

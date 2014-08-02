@@ -17,7 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 // RoundRobinScheduler chooses machines in order.

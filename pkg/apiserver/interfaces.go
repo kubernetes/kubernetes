@@ -21,9 +21,30 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+type JSONSerializer interface {
+	// Encode attempts to write a REST object to JSON.
+	Encode(interface{}) ([]byte, error)
+}
+
+// WatchSerializer is a generic interface for converting a REST object to and from bytes.
+type WatchSerializer interface {
+	// Encode attempts to write a REST object to its serialized form.  Must reverse a successful Decode() call.
+	Encode(interface{}) ([]byte, error)
+
+	// Decode attempts to read a REST object from its serialized form.  Must reverse a successful Encode() call.
+	Decode(body []byte) (interface{}, error)
+}
+
 // RESTStorage is a generic interface for RESTful storage services
 // Resources which are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
+	// Encode attempts to write a REST object to a response
+	// TODO: I may not belong here, I might belong as arguments to apiserver.New()
+	Encode(interface{}) ([]byte, error)
+
+	// Decode attempts to read a REST object from a request.
+	Decode(body []byte) (interface{}, error)
+
 	// List selects resources in the storage which match to the selector.
 	List(labels.Selector) (interface{}, error)
 
@@ -35,7 +56,6 @@ type RESTStorage interface {
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
 	Delete(id string) (<-chan interface{}, error)
 
-	Extract(body []byte) (interface{}, error)
 	Create(interface{}) (<-chan interface{}, error)
 	Update(interface{}) (<-chan interface{}, error)
 }

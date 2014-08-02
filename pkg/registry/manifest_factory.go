@@ -17,7 +17,7 @@ limitations under the License.
 package registry
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	api "github.com/GoogleCloudPlatform/kubernetes/pkg/api/internal"
 )
 
 type ManifestFactory interface {
