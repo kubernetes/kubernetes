@@ -243,7 +243,6 @@ func TestAtomicUpdate(t *testing.T) {
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
 	}
-	return
 
 	// Update an existing node.
 	callbackCalled := false
