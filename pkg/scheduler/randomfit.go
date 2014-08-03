@@ -57,6 +57,7 @@ func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (s
 		return "", err
 	}
 	machineToPods := map[string][]api.Pod{}
+	// TODO: perform more targeted query...
 	pods, err := s.podLister.ListPods(labels.Everything())
 	if err != nil {
 		return "", err

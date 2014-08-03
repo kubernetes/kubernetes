@@ -36,6 +36,7 @@ func (f FakeMinionLister) List() ([]string, error) {
 
 // PodLister interface represents anything that can list pods for a scheduler
 type PodLister interface {
+	// TODO: make this exactly the same as client's ListPods() method...
 	ListPods(labels.Selector) ([]api.Pod, error)
 }
 
