@@ -232,8 +232,11 @@ func (registry *EtcdRegistry) GetController(controllerID string) (*api.Replicati
 
 // CreateController creates a new ReplicationController.
 func (registry *EtcdRegistry) CreateController(controller api.ReplicationController) error {
-	// TODO : check for existence here and error.
-	return registry.UpdateController(controller)
+	err := registry.helper.CreateObj(makeControllerKey(controller.ID), controller)
+	if tools.IsEtcdNodeExist(err) {
+		return apiserver.NewAlreadyExistsErr("replicationController", controller.ID)
+	}
+	return err
 }
 
 // UpdateController replaces an existing ReplicationController.
@@ -264,7 +267,11 @@ func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
 
 // CreateService creates a new Service.
 func (registry *EtcdRegistry) CreateService(svc api.Service) error {
-	return registry.helper.SetObj(makeServiceKey(svc.ID), svc)
+	err := registry.helper.CreateObj(makeServiceKey(svc.ID), svc)
+	if tools.IsEtcdNodeExist(err) {
+		return apiserver.NewAlreadyExistsErr("service", svc.ID)
+	}
+	return err
 }
 
 // GetService obtains a Service specified by its name.
@@ -305,12 +312,11 @@ func (registry *EtcdRegistry) DeleteService(name string) error {
 
 // UpdateService replaces an existing Service.
 func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
-	// TODO : check for existence here and error.
-	return registry.CreateService(svc)
+	return registry.helper.SetObj(makeServiceKey(svc.ID), svc)
 }
 
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
 	updateFunc := func(interface{}) (interface{}, error) { return e, nil }
-	return registry.helper.AtomicUpdate("/registry/services/endpoints/"+e.ID, &api.Endpoints{}, updateFunc)
+	return registry.helper.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{}, updateFunc)
 }
