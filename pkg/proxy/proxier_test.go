@@ -68,9 +68,8 @@ func testEchoConnection(t *testing.T, address, port string) {
 func TestProxy(t *testing.T) {
 	port, err := echoServer(t, "127.0.0.1:0")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
-
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})

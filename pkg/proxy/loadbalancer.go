@@ -14,19 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Loadbalancer interface. Implementations use loadbalancer_<strategy> naming.
-
 package proxy
 
 import (
 	"net"
 )
 
-// LoadBalancer represents a load balancer that decides where to route
-// the incoming services for a particular service to.
+// A LoadBalancer distributes incoming requests to service endpoints.
 type LoadBalancer interface {
-	// LoadBalance takes an incoming request and figures out where to route it to.
-	// Determination is based on destination service (for example, 'mysql') as
-	// well as the source making the connection.
-	LoadBalance(service string, srcAddr net.Addr) (string, error)
+	// NextEndpoint returns the endpoint to handle a request for the given
+	// service and source address.
+	NextEndpoint(service string, srcAddr net.Addr) (string, error)
 }

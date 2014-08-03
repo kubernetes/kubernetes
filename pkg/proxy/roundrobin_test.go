@@ -61,7 +61,7 @@ func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
 	var endpoints []api.Endpoints
 	loadBalancer.OnUpdate(endpoints)
-	endpoint, err := loadBalancer.LoadBalance("foo", nil)
+	endpoint, err := loadBalancer.NextEndpoint("foo", nil)
 	if err == nil {
 		t.Errorf("Didn't fail with non-existent service")
 	}
@@ -71,7 +71,7 @@ func TestLoadBalanceFailsWithNoEndpoints(t *testing.T) {
 }
 
 func expectEndpoint(t *testing.T, loadBalancer *LoadBalancerRR, service string, expected string) {
-	endpoint, err := loadBalancer.LoadBalance(service, nil)
+	endpoint, err := loadBalancer.NextEndpoint(service, nil)
 	if err != nil {
 		t.Errorf("Didn't find a service for %s, expected %s, failed with: %v", service, expected, err)
 	}
@@ -82,7 +82,7 @@ func expectEndpoint(t *testing.T, loadBalancer *LoadBalancerRR, service string, 
 
 func TestLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	endpoint, err := loadBalancer.LoadBalance("foo", nil)
+	endpoint, err := loadBalancer.NextEndpoint("foo", nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
@@ -100,7 +100,7 @@ func TestLoadBalanceWorksWithSingleEndpoint(t *testing.T) {
 
 func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	endpoint, err := loadBalancer.LoadBalance("foo", nil)
+	endpoint, err := loadBalancer.NextEndpoint("foo", nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
@@ -118,7 +118,7 @@ func TestLoadBalanceWorksWithMultipleEndpoints(t *testing.T) {
 
 func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	endpoint, err := loadBalancer.LoadBalance("foo", nil)
+	endpoint, err := loadBalancer.NextEndpoint("foo", nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
@@ -147,7 +147,7 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 	endpoints[0] = api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}}
 	loadBalancer.OnUpdate(endpoints)
 
-	endpoint, err = loadBalancer.LoadBalance("foo", nil)
+	endpoint, err = loadBalancer.NextEndpoint("foo", nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
@@ -155,7 +155,7 @@ func TestLoadBalanceWorksWithMultipleEndpointsAndUpdates(t *testing.T) {
 
 func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 	loadBalancer := NewLoadBalancerRR()
-	endpoint, err := loadBalancer.LoadBalance("foo", nil)
+	endpoint, err := loadBalancer.NextEndpoint("foo", nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
@@ -183,7 +183,7 @@ func TestLoadBalanceWorksWithServiceRemoval(t *testing.T) {
 
 	// Then update the configuration by removing foo
 	loadBalancer.OnUpdate(endpoints[1:])
-	endpoint, err = loadBalancer.LoadBalance("foo", nil)
+	endpoint, err = loadBalancer.NextEndpoint("foo", nil)
 	if err == nil || len(endpoint) != 0 {
 		t.Errorf("Didn't fail with non-existent service")
 	}
