@@ -118,7 +118,7 @@ func responseToPods(response *etcd.Response) ([]kubelet.Pod, error) {
 	for i, manifest := range manifests.Items {
 		name := manifest.ID
 		if name == "" {
-			name = fmt.Sprintf("_%d", i+1)
+			name = fmt.Sprintf("%d", i+1)
 		}
 		pods = append(pods, kubelet.Pod{Name: name, Manifest: manifest})
 	}

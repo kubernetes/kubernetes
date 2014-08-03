@@ -77,8 +77,8 @@ func TestExtractFromHttpSingle(t *testing.T) {
 
 func TestExtractFromHttpMultiple(t *testing.T) {
 	manifests := []api.ContainerManifest{
-		{Version: "v1beta1", ID: ""},
-		{Version: "v1beta1", ID: "bar"},
+		{Version: "v1beta1", ID: "", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+		{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
 	}
 	data, err := json.Marshal(manifests)
 	if err != nil {
@@ -102,6 +102,11 @@ func TestExtractFromHttpMultiple(t *testing.T) {
 	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "1", Manifest: manifests[0]}, kubelet.Pod{Name: "bar", Manifest: manifests[1]})
 	if !reflect.DeepEqual(expected, update) {
 		t.Errorf("Expected: %#v, Got: %#v", expected, update)
+	}
+	for i := range update.Pods {
+		if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
+		}
 	}
 }
 
