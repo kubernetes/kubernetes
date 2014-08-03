@@ -29,12 +29,6 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-}
-
 func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
 	out := <-ch
 	status, ok := out.(*api.Status)
@@ -170,7 +164,10 @@ func TestListEmptyPodList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	pods, err := storage.List(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods.(api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
 	}
@@ -196,7 +193,10 @@ func TestListPodList(t *testing.T) {
 	}
 	podsObj, err := storage.List(labels.Everything())
 	pods := podsObj.(api.PodList)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods.Items) != 2 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
@@ -219,9 +219,15 @@ func TestExtractJson(t *testing.T) {
 		},
 	}
 	body, err := api.Encode(&pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	podOut, err := storage.Extract(body)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("Expected %#v, found %#v", pod, podOut)
 	}
@@ -238,7 +244,10 @@ func TestGetPod(t *testing.T) {
 	}
 	obj, err := storage.Get("foo")
 	pod := obj.(*api.Pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(*mockRegistry.pod, *pod) {
 		t.Errorf("Unexpected pod.  Expected %#v, Got %#v", *mockRegistry.pod, *pod)
 	}
@@ -257,7 +266,10 @@ func TestGetPodCloud(t *testing.T) {
 	}
 	obj, err := storage.Get("foo")
 	pod := obj.(*api.Pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(*mockRegistry.pod, *pod) {
 		t.Errorf("Unexpected pod.  Expected %#v, Got %#v", *mockRegistry.pod, *pod)
 	}
@@ -414,7 +426,10 @@ func TestCreatePod(t *testing.T) {
 		DesiredState: desiredState,
 	}
 	channel, err := storage.Create(pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	select {
 	case <-time.After(time.Millisecond * 100):
 		// Do nothing, this is expected.

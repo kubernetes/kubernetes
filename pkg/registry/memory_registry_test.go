@@ -27,7 +27,10 @@ import (
 func TestListPodsEmpty(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	pods, err := registry.ListPods(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
@@ -37,7 +40,10 @@ func TestMemoryListPods(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	registry.CreatePod("machine", api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
 	pods, err := registry.ListPods(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods) != 1 || pods[0].ID != "foo" {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
@@ -60,7 +66,10 @@ func TestMemorySetGetPods(t *testing.T) {
 	expectedPod := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreatePod("machine", expectedPod)
 	pod, err := registry.GetPod("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if expectedPod.ID != pod.ID {
 		t.Errorf("Unexpected pod, expected %#v, actual %#v", expectedPod, pod)
 	}
@@ -100,7 +109,10 @@ func TestMemorySetUpdateGetPods(t *testing.T) {
 	registry.CreatePod("machine", oldPod)
 	registry.UpdatePod(expectedPod)
 	pod, err := registry.GetPod("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if expectedPod.ID != pod.ID || pod.DesiredState.Host != expectedPod.DesiredState.Host {
 		t.Errorf("Unexpected pod, expected %#v, actual %#v", expectedPod, pod)
 	}
@@ -136,7 +148,10 @@ func TestMemorySetDeleteGetPods(t *testing.T) {
 func TestListControllersEmpty(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	ctls, err := registry.ListControllers()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(ctls) != 0 {
 		t.Errorf("Unexpected controller list: %#v", ctls)
 	}
@@ -146,7 +161,10 @@ func TestMemoryListControllers(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	registry.CreateController(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}})
 	ctls, err := registry.ListControllers()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(ctls) != 1 || ctls[0].ID != "foo" {
 		t.Errorf("Unexpected controller list: %#v", ctls)
 	}
@@ -169,7 +187,10 @@ func TestMemorySetGetControllers(t *testing.T) {
 	expectedController := api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreateController(expectedController)
 	ctl, err := registry.GetController("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if expectedController.ID != ctl.ID {
 		t.Errorf("Unexpected controller, expected %#v, actual %#v", expectedController, ctl)
 	}
@@ -209,7 +230,10 @@ func TestMemorySetUpdateGetControllers(t *testing.T) {
 	registry.CreateController(oldController)
 	registry.UpdateController(expectedController)
 	ctl, err := registry.GetController("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if expectedController.ID != ctl.ID || ctl.DesiredState.Replicas != expectedController.DesiredState.Replicas {
 		t.Errorf("Unexpected controller, expected %#v, actual %#v", expectedController, ctl)
 	}
@@ -245,7 +269,10 @@ func TestMemorySetDeleteGetControllers(t *testing.T) {
 func TestListServicesEmpty(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	svcs, err := registry.ListServices()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(svcs.Items) != 0 {
 		t.Errorf("Unexpected service list: %#v", svcs)
 	}
@@ -255,7 +282,10 @@ func TestMemoryListServices(t *testing.T) {
 	registry := MakeMemoryRegistry()
 	registry.CreateService(api.Service{JSONBase: api.JSONBase{ID: "foo"}})
 	svcs, err := registry.ListServices()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(svcs.Items) != 1 || svcs.Items[0].ID != "foo" {
 		t.Errorf("Unexpected service list: %#v", svcs)
 	}
@@ -278,7 +308,10 @@ func TestMemorySetGetServices(t *testing.T) {
 	expectedService := api.Service{JSONBase: api.JSONBase{ID: "foo"}}
 	registry.CreateService(expectedService)
 	svc, err := registry.GetService("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if expectedService.ID != svc.ID {
 		t.Errorf("Unexpected service, expected %#v, actual %#v", expectedService, svc)
 	}
@@ -314,7 +347,10 @@ func TestMemorySetUpdateGetServices(t *testing.T) {
 	registry.CreateService(oldService)
 	registry.UpdateService(expectedService)
 	svc, err := registry.GetService("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if expectedService.ID != svc.ID || svc.Port != expectedService.Port {
 		t.Errorf("Unexpected service, expected %#v, actual %#v", expectedService, svc)
 	}

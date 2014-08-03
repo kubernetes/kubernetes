@@ -42,7 +42,10 @@ func TestMakeManifestNoServices(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	container := manifest.Containers[0]
 	if len(container.Env) != 1 ||
 		container.Env[0].Name != "SERVICE_HOST" ||
@@ -84,7 +87,10 @@ func TestMakeManifestServices(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	container := manifest.Containers[0]
 	envs := []api.EnvVar{
 		{
@@ -162,7 +168,10 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	container := manifest.Containers[0]
 
 	envs := []api.EnvVar{

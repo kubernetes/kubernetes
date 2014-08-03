@@ -44,7 +44,9 @@ func TestCachingHit(t *testing.T) {
 		minions:    expected,
 	}
 	list, err := cache.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	if !reflect.DeepEqual(list, expected) {
 		t.Errorf("expected: %v, got %v", expected, list)
 	}
@@ -65,7 +67,10 @@ func TestCachingMiss(t *testing.T) {
 	}
 	fakeClock.now = time.Unix(3, 0)
 	list, err := cache.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(list, fakeRegistry.minions) {
 		t.Errorf("expected: %v, got %v", fakeRegistry.minions, list)
 	}
@@ -85,9 +90,15 @@ func TestCachingInsert(t *testing.T) {
 		minions:    expected,
 	}
 	err := cache.Insert("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	list, err := cache.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(list, fakeRegistry.minions) {
 		t.Errorf("expected: %v, got %v", fakeRegistry.minions, list)
 	}
@@ -107,9 +118,15 @@ func TestCachingDelete(t *testing.T) {
 		minions:    expected,
 	}
 	err := cache.Delete("m2")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	list, err := cache.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(list, fakeRegistry.minions) {
 		t.Errorf("expected: %v, got %v", fakeRegistry.minions, list)
 	}

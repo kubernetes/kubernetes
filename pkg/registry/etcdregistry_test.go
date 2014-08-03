@@ -40,7 +40,10 @@ func TestEtcdGetPod(t *testing.T) {
 	fakeClient.Set("/registry/hosts/machine/pods/foo", util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pod, err := registry.GetPod("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v", pod)
 	}
@@ -85,20 +88,29 @@ func TestEtcdCreatePod(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
 	err = api.DecodeInto([]byte(resp.Node.Value), &pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	err = api.DecodeInto([]byte(resp.Node.Value), &manifests)
 	if len(manifests.Items) != 1 || manifests.Items[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
@@ -188,20 +200,29 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
 	err = api.DecodeInto([]byte(resp.Node.Value), &pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	err = api.DecodeInto([]byte(resp.Node.Value), &manifests)
 	if len(manifests.Items) != 1 || manifests.Items[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
@@ -237,20 +258,29 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	resp, err := fakeClient.Get("/registry/hosts/machine/pods/foo", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
 	err = api.DecodeInto([]byte(resp.Node.Value), &pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if pod.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
 	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	err = api.DecodeInto([]byte(resp.Node.Value), &manifests)
 	if len(manifests.Items) != 2 || manifests.Items[1].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
@@ -268,7 +298,10 @@ func TestEtcdDeletePod(t *testing.T) {
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	} else if fakeClient.DeletedKeys[0] != key {
@@ -297,7 +330,10 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeletePod("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
@@ -331,7 +367,10 @@ func TestEtcdEmptyListPods(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pods, err := registry.ListPods(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
@@ -346,7 +385,10 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pods, err := registry.ListPods(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
@@ -372,7 +414,10 @@ func TestEtcdListPods(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	pods, err := registry.ListPods(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(pods) != 2 || pods[0].ID != "foo" || pods[1].ID != "bar" {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
@@ -391,7 +436,10 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	controllers, err := registry.ListControllers()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(controllers) != 0 {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
@@ -406,7 +454,10 @@ func TestEtcdListServicesNotFound(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	services, err := registry.ListServices()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(services.Items) != 0 {
 		t.Errorf("Unexpected controller list: %#v", services)
 	}
@@ -432,7 +483,10 @@ func TestEtcdListControllers(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	controllers, err := registry.ListControllers()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(controllers) != 2 || controllers[0].ID != "foo" || controllers[1].ID != "bar" {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
@@ -443,7 +497,10 @@ func TestEtcdGetController(t *testing.T) {
 	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	ctrl, err := registry.GetController("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if ctrl.ID != "foo" {
 		t.Errorf("Unexpected controller: %#v", ctrl)
 	}
@@ -471,7 +528,10 @@ func TestEtcdDeleteController(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeleteController("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
@@ -489,14 +549,20 @@ func TestEtcdCreateController(t *testing.T) {
 			ID: "foo",
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	resp, err := fakeClient.Get("/registry/controllers/foo", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var ctrl api.ReplicationController
 	err = api.DecodeInto([]byte(resp.Node.Value), &ctrl)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if ctrl.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", ctrl, resp.Node.Value)
 	}
@@ -512,7 +578,10 @@ func TestEtcdUpdateController(t *testing.T) {
 			Replicas: 2,
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	ctrl, err := registry.GetController("foo")
 	if ctrl.DesiredState.Replicas != 2 {
 		t.Errorf("Unexpected controller: %#v", ctrl)
@@ -539,7 +608,10 @@ func TestEtcdListServices(t *testing.T) {
 	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	services, err := registry.ListServices()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(services.Items) != 2 || services.Items[0].ID != "foo" || services.Items[1].ID != "bar" {
 		t.Errorf("Unexpected pod list: %#v", services)
 	}
@@ -557,12 +629,21 @@ func TestEtcdCreateService(t *testing.T) {
 	err := registry.CreateService(api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	resp, err := fakeClient.Get("/registry/services/specs/foo", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	var service api.Service
 	err = api.DecodeInto([]byte(resp.Node.Value), &service)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if service.ID != "foo" {
 		t.Errorf("Unexpected service: %#v %s", service, resp.Node.Value)
 	}
@@ -573,7 +654,10 @@ func TestEtcdGetService(t *testing.T) {
 	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	service, err := registry.GetService("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if service.ID != "foo" {
 		t.Errorf("Unexpected pod: %#v", service)
 	}
@@ -598,7 +682,10 @@ func TestEtcdDeleteService(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.DeleteService("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(fakeClient.DeletedKeys) != 2 {
 		t.Errorf("Expected 2 delete, found %#v", fakeClient.DeletedKeys)
 	}
@@ -626,9 +713,15 @@ func TestEtcdUpdateService(t *testing.T) {
 		},
 	}
 	err := registry.UpdateService(testService)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	svc, err := registry.GetService("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(*svc, testService) {
 		t.Errorf("Unexpected service: got %#v, wanted %#v", svc, testService)
 	}
@@ -642,7 +735,10 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 		Endpoints: []string{"baz", "bar"},
 	}
 	err := registry.UpdateEndpoints(endpoints)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := fakeClient.Get("/registry/services/endpoints/foo", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)

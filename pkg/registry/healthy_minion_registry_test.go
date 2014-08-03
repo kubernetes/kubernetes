@@ -47,21 +47,32 @@ func TestBasicDelegation(t *testing.T) {
 	}
 
 	list, err := healthy.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(list, mockMinionRegistry.minions) {
 		t.Errorf("Expected %v, Got %v", mockMinionRegistry.minions, list)
 	}
 	err = healthy.Insert("foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	ok, err := healthy.Contains("m1")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !ok {
 		t.Errorf("Unexpected absence of 'm1'")
 	}
 
 	ok, err = healthy.Contains("m5")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if ok {
 		t.Errorf("Unexpected presence of 'm5'")
 	}
@@ -91,12 +102,18 @@ func TestFiltering(t *testing.T) {
 
 	expected := []string{"m2", "m3"}
 	list, err := healthy.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(list, expected) {
 		t.Errorf("Expected %v, Got %v", expected, list)
 	}
 	ok, err := healthy.Contains("m1")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if ok {
 		t.Errorf("Unexpected presence of 'm1'")
 	}

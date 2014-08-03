@@ -79,7 +79,10 @@ func TestListEmptyControllerList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	controllers, err := storage.List(labels.Everything())
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(controllers.(api.ReplicationControllerList).Items) != 0 {
 		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
 	}
@@ -105,7 +108,10 @@ func TestListControllerList(t *testing.T) {
 	}
 	controllersObj, err := storage.List(labels.Everything())
 	controllers := controllersObj.(api.ReplicationControllerList)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(controllers.Items) != 2 {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
@@ -128,9 +134,15 @@ func TestExtractControllerJson(t *testing.T) {
 		},
 	}
 	body, err := api.Encode(&controller)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	controllerOut, err := storage.Extract(body)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(controller, controllerOut) {
 		t.Errorf("Expected %#v, found %#v", controller, controllerOut)
 	}
@@ -173,18 +185,35 @@ func TestControllerParsing(t *testing.T) {
 	}
 	file, err := ioutil.TempFile("", "controller")
 	fileName := file.Name()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	data, err := json.Marshal(expectedController)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	_, err = file.Write(data)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	err = file.Close()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	data, err = ioutil.ReadFile(fileName)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	var controller api.ReplicationController
 	err = json.Unmarshal(data, &controller)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	if !reflect.DeepEqual(controller, expectedController) {
 		t.Errorf("Parsing failed: %s %#v %#v", string(data), controller, expectedController)
@@ -232,7 +261,9 @@ func TestCreateController(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	select {
 	case <-time.After(time.Millisecond * 100):
