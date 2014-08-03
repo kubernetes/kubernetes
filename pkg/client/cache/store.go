@@ -47,6 +47,7 @@ func (c *cache) Delete(ID string, obj interface{}) {
 }
 
 // List returns a list of all the items.
+// List is completely threadsafe as long as you treat all items as immutable.
 func (c *cache) List() []interface{} {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -58,6 +59,7 @@ func (c *cache) List() []interface{} {
 }
 
 // Get returns the requested item, or sets exists=false.
+// Get is completely threadsafe as long as you treat all items as immutable.
 func (c *cache) Get(ID string) (item interface{}, exists bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

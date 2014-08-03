@@ -20,6 +20,11 @@ import (
 	"sync"
 )
 
+// FIFO recieves adds and updates from a Reflector, and puts them in a queue for
+// FIFO order processing. If multiple adds/updates of a single item happen while
+// an item is in the queue before it has been processed, it will only be
+// processed once, and when it is processed, the most recent version will be
+// processed. This can't be done with a channel.
 type FIFO struct {
 	lock  sync.RWMutex
 	cond  sync.Cond
@@ -91,13 +96,14 @@ func (f *FIFO) Pop() interface{} {
 			// Item may have been deleted subsequently.
 			continue
 		}
+		delete(f.items, id)
 		return item
 	}
 }
 
-// NewFIFOStore returns a Store which can be used to queue up items to
+// NewFIFO returns a Store which can be used to queue up items to
 // process.
-func NewFIFOStore() *FIFO {
+func NewFIFO() *FIFO {
 	f := &FIFO{
 		items: map[string]interface{}{},
 		queue: []string{},

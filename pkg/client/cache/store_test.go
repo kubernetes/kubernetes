@@ -62,3 +62,7 @@ func doTestStore(t *testing.T, store Store) {
 func TestCache(t *testing.T) {
 	doTestStore(t, NewStore())
 }
+
+func TestFIFOCache(t *testing.T) {
+	doTestStore(t, NewFIFO())
+}

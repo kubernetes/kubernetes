@@ -123,20 +123,16 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 // Returns an error if this isn't the case.
 func newGenericJSONBase(v reflect.Value) (genericJSONBase, error) {
 	g := genericJSONBase{}
-	err := fieldPtr(v, "ID", &g.id)
-	if err != nil {
+	if err := fieldPtr(v, "ID", &g.id); err != nil {
 		return g, err
 	}
-	err = fieldPtr(v, "APIVersion", &g.apiVersion)
-	if err != nil {
+	if err := fieldPtr(v, "APIVersion", &g.apiVersion); err != nil {
 		return g, err
 	}
-	err = fieldPtr(v, "Kind", &g.kind)
-	if err != nil {
+	if err := fieldPtr(v, "Kind", &g.kind); err != nil {
 		return g, err
 	}
-	err = fieldPtr(v, "ResourceVersion", &g.resourceVersion)
-	if err != nil {
+	if err := fieldPtr(v, "ResourceVersion", &g.resourceVersion); err != nil {
 		return g, err
 	}
 	return g, nil

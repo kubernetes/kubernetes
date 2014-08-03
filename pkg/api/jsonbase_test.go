@@ -23,6 +23,7 @@ import (
 
 func TestGenericJSONBase(t *testing.T) {
 	j := JSONBase{
+		ID:              "foo",
 		APIVersion:      "a",
 		Kind:            "b",
 		ResourceVersion: 1,
@@ -31,8 +32,11 @@ func TestGenericJSONBase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}
-	// Proove g supports JSONBaseInterface.
+	// Prove g supports JSONBaseInterface.
 	jbi := JSONBaseInterface(g)
+	if e, a := "foo", jbi.ID(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	if e, a := "a", jbi.APIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -43,10 +47,15 @@ func TestGenericJSONBase(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	jbi.SetID("bar")
 	jbi.SetAPIVersion("c")
 	jbi.SetKind("d")
 	jbi.SetResourceVersion(2)
 
+	// Prove that jbi changes the original object.
+	if e, a := "bar", j.ID; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	if e, a := "c", j.APIVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
