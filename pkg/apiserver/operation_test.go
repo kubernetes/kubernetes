@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -87,6 +88,44 @@ func TestOperation(t *testing.T) {
 
 	if op.result.(string) != "All done" {
 		t.Errorf("Got unexpected result: %#v", op.result)
+	}
+}
+
+func TestOperationsList(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	handler.asyncOpWait = 0
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	simple := Simple{
+		Name: "foo",
+	}
+	data, err := api.Encode(simple)
+	expectNoError(t, err)
+	response, err := client.Post(server.URL+"/prefix/version/foo", "application/json", bytes.NewBuffer(data))
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusAccepted {
+		t.Errorf("Unexpected response %#v", response)
+	}
+
+	response, err = client.Get(server.URL + "/prefix/version/operations")
+	expectNoError(t, err)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected status code %#v", response)
+	}
+	body, err := ioutil.ReadAll(response.Body)
+	expectNoError(t, err)
+	obj, err := api.Decode(body)
+	expectNoError(t, err)
+	oplist, ok := obj.(*api.ServerOpList)
+	if !ok {
+		t.Fatalf("expected ServerOpList, got %#v", obj)
+	}
+	if len(oplist.Items) != 1 {
+		t.Errorf("expected 1 operation, got %#v", obj)
 	}
 }
 
