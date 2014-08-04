@@ -32,25 +32,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-}
-
-func verifyNoError(t *testing.T, e error) {
-	if e != nil {
-		t.Errorf("Expected no error, found %#v", e)
-	}
-}
-
-func verifyError(t *testing.T, e error) {
-	if e == nil {
-		t.Errorf("Expected error, found nil")
-	}
-}
-
 func makeTestKubelet(t *testing.T) (*Kubelet, *tools.FakeEtcdClient, *FakeDockerClient) {
 	fakeEtcdClient := tools.MakeFakeEtcdClient(t)
 	fakeDocker := &FakeDockerClient{
@@ -166,7 +147,9 @@ func TestKillContainerWithError(t *testing.T) {
 	kubelet, _, _ := makeTestKubelet(t)
 	kubelet.dockerClient = fakeDocker
 	err := kubelet.killContainer(fakeDocker.containerList[0])
-	verifyError(t, err)
+	if err == nil {
+		t.Errorf("expected error, found nil")
+	}
 	verifyCalls(t, fakeDocker, []string{"stop"})
 }
 
@@ -187,7 +170,9 @@ func TestKillContainer(t *testing.T) {
 	}
 
 	err := kubelet.killContainer(fakeDocker.containerList[0])
-	verifyNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	verifyCalls(t, fakeDocker, []string{"stop"})
 }
 
@@ -246,7 +231,10 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			},
 		},
 	})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	verifyCalls(t, fakeDocker, []string{"list", "list"})
 }
 
@@ -269,7 +257,10 @@ func TestSyncPodsDeletes(t *testing.T) {
 		},
 	}
 	err := kubelet.SyncPods([]Pod{})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	verifyCalls(t, fakeDocker, []string{"list", "list", "stop", "stop"})
 
 	// A map iteration is used to delete containers, so must not depend on
@@ -319,7 +310,10 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 			},
 		},
 	}, dockerContainers)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	verifyCalls(t, fakeDocker, []string{"list", "stop"})
 
 	// Expect one of the duplicates to be killed.
@@ -364,7 +358,10 @@ func TestSyncPodUnhealthy(t *testing.T) {
 			},
 		},
 	}, dockerContainers)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
@@ -387,15 +384,24 @@ func TestEventWriting(t *testing.T) {
 		},
 	}
 	err := kubelet.LogEvent(&expectedEvent)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if fakeEtcd.Ix != 1 {
 		t.Errorf("Unexpected number of children added: %d, expected 1", fakeEtcd.Ix)
 	}
 	response, err := fakeEtcd.Get("/events/foo/1", false, false)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	var event api.Event
 	err = json.Unmarshal([]byte(response.Node.Value), &event)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if event.Event != expectedEvent.Event ||
 		event.Container.Name != expectedEvent.Container.Name {
 		t.Errorf("Event's don't match.  Expected: %#v Saw: %#v", expectedEvent, event)

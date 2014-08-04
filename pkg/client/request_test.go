@@ -153,11 +153,19 @@ func TestDoRequestNewWayObj(t *testing.T) {
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	reqBodyExpected, err := api.Encode(reqObj)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	file, err := ioutil.TempFile("", "foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	_, err = file.Write(reqBodyExpected)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	expectedObj := &api.Service{Port: 12345}
 	expectedBody, _ := api.Encode(expectedObj)

@@ -30,19 +30,15 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-}
-
 func TestHTTPPodInfoGetter(t *testing.T) {
 	expectObj := api.PodInfo{
 		"myID": docker.Container{ID: "myID"},
 	}
 	body, err := json.Marshal(expectObj)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -50,17 +46,25 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 
 	hostURL, err := url.Parse(testServer.URL)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	parts := strings.Split(hostURL.Host, ":")
 
 	port, err := strconv.Atoi(parts[1])
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	podInfoGetter := &HTTPPodInfoGetter{
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
 	gotObj, err := podInfoGetter.GetPodInfo(parts[0], "foo")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
 	if len(gotObj) != len(expectObj) || expectObj["myID"].ID != gotObj["myID"].ID {
@@ -73,7 +77,10 @@ func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 		"myID": docker.Container{ID: "myID"},
 	}
 	_, err := json.Marshal(expectObj)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	fakeHandler := util.FakeHandler{
 		StatusCode:   404,
 		ResponseBody: "Pod not found",
@@ -81,11 +88,17 @@ func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 
 	hostURL, err := url.Parse(testServer.URL)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	parts := strings.Split(hostURL.Host, ":")
 
 	port, err := strconv.Atoi(parts[1])
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	podInfoGetter := &HTTPPodInfoGetter{
 		Client: http.DefaultClient,
 		Port:   uint(port),

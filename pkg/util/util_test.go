@@ -47,7 +47,10 @@ func TestMakeJSONString(t *testing.T) {
 	body := MakeJSONString(pod)
 
 	expectedBody, err := json.Marshal(pod)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if string(expectedBody) != body {
 		t.Errorf("JSON doesn't match.  Expected %s, saw %s", expectedBody, body)
 	}
