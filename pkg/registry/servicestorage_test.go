@@ -211,7 +211,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	c, _ := storage.Delete(svc.ID)
 	<-c
 
-	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "delete" {
+	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService(svc.ID)
