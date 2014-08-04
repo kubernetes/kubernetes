@@ -39,7 +39,7 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 		if err != nil {
 			status := http.StatusInternalServerError
 			switch {
-			case tools.IsEtcdConflict(err):
+			case tools.IsEtcdTestFailed(err):
 				status = http.StatusConflict
 			}
 			channel <- &api.Status{

@@ -82,14 +82,14 @@ type EtcdHelper struct {
 	Versioning Versioning
 }
 
-// Returns true iff err is an etcd not found error.
+// IsEtcdNotFound returns true iff err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
-	return isEtcdErrorNum(err, 100)
+	return isEtcdErrorNum(err, EtcdErrorCodeNotFound)
 }
 
-// Returns true iff err is an etcd write conflict.
-func IsEtcdConflict(err error) bool {
-	return isEtcdErrorNum(err, 101)
+// IsEtcdTestFailed returns true iff err is an etcd write conflict.
+func IsEtcdTestFailed(err error) bool {
+	return isEtcdErrorNum(err, EtcdErrorCodeTestFailed)
 }
 
 // IsEtcdWatchStoppedByUser returns true iff err is a client triggered stop.
@@ -242,7 +242,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 			return err
 		}
 		_, err = h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
-		if IsEtcdConflict(err) {
+		if IsEtcdTestFailed(err) {
 			continue
 		}
 		return err
