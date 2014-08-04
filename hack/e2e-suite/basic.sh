@@ -33,17 +33,25 @@ function remove-quotes() {
   echo $stripped
 }
 
+function teardown() {
+  echo "Cleaning up test artifacts"
+  $CLOUDCFG stop myNginx
+  $CLOUDCFG rm myNginx
+}
+
+trap "teardown" EXIT
+
 POD_ID_LIST=$($CLOUDCFG -json -l name=myNginx list pods | jq ".items[].id")
 # Container turn up on a clean cluster can take a while for the docker image pull.
-ALL_RUNNING=false
-while [[ $ALL_RUNNING -ne "true" ]]; do
-  echo "Waiting for containers to come up."
+ALL_RUNNING=0
+while [ $ALL_RUNNING -ne 1 ]; do
+  echo "Waiting for all containers in pod to come up."
   sleep 5
-  ALL_RUNNING=true
+  ALL_RUNNING=1
   for id in $POD_ID_LIST; do
-    CURRENT_STATUS=$(remove-quotes $($CLOUDCFG -json get "pods/$(remove-quotes ${id})" | jq '.currentState.status'))
-    if [[ $CURRENT_STATUS -ne "Running" ]]; then
-      ALL_RUNNING=false
+    CURRENT_STATUS=$(remove-quotes $($CLOUDCFG -json get "pods/$(remove-quotes ${id})" | jq '.currentState.info["mynginx"].State.Running and .currentState.info["net"].State.Running'))
+    if [ "$CURRENT_STATUS" != "true" ]; then
+      ALL_RUNNING=0
     fi
   done
 done
@@ -51,14 +59,15 @@ done
 # Get minion IP addresses
 detect-minions
 
+# let images stabilize
+echo "Letting images stabilize"
+sleep 5
+
 # Verify that something is listening (nginx should give us a 404)
 for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
   IP_ADDRESS=${KUBE_MINION_IP_ADDRESSES[$i]}
   echo "Trying to reach nginx instance that should be running at ${IP_ADDRESS}:8080..."
   curl "http://${IP_ADDRESS}:8080"
 done
-
-$CLOUDCFG stop myNginx
-$CLOUDCFG rm myNginx
 
 exit 0
