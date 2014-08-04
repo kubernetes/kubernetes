@@ -42,6 +42,9 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 	}
 	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
 	parts := strings.Split(trimmed, "/")
+	if trimmed == "" {
+		parts = []string{}
+	}
 	if len(parts) > 1 {
 		notFound(w, req)
 		return
