@@ -19,6 +19,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"sync"
@@ -116,7 +117,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, client)
+	manager := MakeReplicationManager(client)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(2)
@@ -136,7 +137,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, client)
+	manager := MakeReplicationManager(client)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(1)
@@ -156,7 +157,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(nil, client)
+	manager := MakeReplicationManager(client)
 	manager.podControl = &fakePodControl
 
 	controllerSpec := makeReplicationController(2)
@@ -282,14 +283,31 @@ func TestSyncronize(t *testing.T) {
 		},
 	}
 
-	fakeHandler := util.FakeHandler{
+	fakePodHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: "{\"apiVersion\": \"v1beta1\", \"kind\": \"PodList\"}",
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	fakeControllerHandler := util.FakeHandler{
+		StatusCode: 200,
+		ResponseBody: api.EncodeOrDie(&api.ReplicationControllerList{
+			Items: []api.ReplicationController{
+				controllerSpec1,
+				controllerSpec2,
+			},
+		}),
+		T: t,
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1beta1/pods/", &fakePodHandler)
+	mux.Handle("/api/v1beta1/replicationControllers/", &fakeControllerHandler)
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		t.Errorf("Unexpected request for %v", req.RequestURI)
+	})
+	testServer := httptest.NewTLSServer(mux)
 	client := client.New(testServer.URL, nil)
-	manager := MakeReplicationManager(fakeEtcd, client)
+	manager := MakeReplicationManager(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
 
@@ -299,9 +317,8 @@ func TestSyncronize(t *testing.T) {
 }
 
 func TestWatchControllers(t *testing.T) {
-	fakeEtcd := tools.MakeFakeEtcdClient(t)
 	fakeWatcher := watch.NewFake()
-	manager := MakeReplicationManager(fakeEtcd, nil)
+	manager := MakeReplicationManager(nil)
 	manager.watchMaker = func() (watch.Interface, error) {
 		return fakeWatcher, nil
 	}

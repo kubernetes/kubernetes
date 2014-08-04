@@ -103,7 +103,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	})
 	handler.delegate = m.ConstructHandler("/api/v1beta1")
 
-	controllerManager := controller.MakeReplicationManager(etcdClient, cl)
+	controllerManager := controller.MakeReplicationManager(cl)
 
 	// Prove that controllerManager's watch works by making it not sync until after this
 	// test is over. (Hopefully we don't take 10 minutes!)
