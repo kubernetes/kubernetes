@@ -19,12 +19,14 @@ package config
 
 import (
 	"crypto/sha1"
-	"encoding/base64"
+	"encoding/base32"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -134,16 +136,16 @@ func extractFromFile(name string) (kubelet.Pod, error) {
 	return pod, nil
 }
 
-var simpleSubdomainSafeEncoding = base64.NewEncoding("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678900")
+var simpleSubdomainSafeEncoding = base32.NewEncoding("0123456789abcdefghijklmnopqrstuv")
+var unsafeDNSLabelReplacement = regexp.MustCompile("[^a-z0-9]+")
 
-// simpleSubdomainSafeHash generates a compact hash of the input that uses characters
-// only in the range a-zA-Z0-9, making it suitable for DNS subdomain labels
-func simpleSubdomainSafeHash(s string) string {
+// simpleSubdomainSafeHash generates a pod name for the given path that is
+// suitable as a subdomain label.
+func simpleSubdomainSafeHash(path string) string {
+	name := strings.ToLower(filepath.Base(path))
+	name = unsafeDNSLabelReplacement.ReplaceAllString(name, "")
 	hasher := sha1.New()
-	hasher.Write([]byte(s))
+	hasher.Write([]byte(path))
 	sha := simpleSubdomainSafeEncoding.EncodeToString(hasher.Sum(nil))
-	if len(sha) > 20 {
-		sha = sha[:20]
-	}
-	return sha
+	return fmt.Sprintf("%.15s%.30s", name, sha)
 }

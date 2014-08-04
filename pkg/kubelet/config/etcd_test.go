@@ -74,11 +74,12 @@ func TestGetEtcdNoData(t *testing.T) {
 func TestGetEtcd(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	ch := make(chan interface{}, 1)
+	manifest := api.ContainerManifest{ID: "foo", Version: "v1beta1", Containers: []api.Container{{Name: "1", Image: "foo"}}}
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Value: api.EncodeOrDie(&api.ContainerManifestList{
-					Items: []api.ContainerManifest{{ID: "foo"}},
+					Items: []api.ContainerManifest{manifest},
 				}),
 				ModifiedIndex: 1,
 			},
@@ -94,9 +95,14 @@ func TestGetEtcd(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", 2, lastIndex)
 	}
 	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}})
+	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: manifest})
 	if !reflect.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
+	}
+	for i := range update.Pods {
+		if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
+		}
 	}
 }
 

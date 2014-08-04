@@ -148,8 +148,8 @@ func TestExtractFromEmptyDir(t *testing.T) {
 
 func TestExtractFromDir(t *testing.T) {
 	manifests := []api.ContainerManifest{
-		{ID: "", Containers: []api.Container{{Image: "foo"}}},
-		{ID: "", Containers: []api.Container{{Image: "bar"}}},
+		{Version: "v1beta1", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+		{Version: "v1beta1", Containers: []api.Container{{Name: "2", Image: "bar"}}},
 	}
 	files := make([]*os.File, len(manifests))
 
@@ -192,6 +192,32 @@ func TestExtractFromDir(t *testing.T) {
 	sort.Sort(sortedPods(expected.Pods))
 	if !reflect.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
+	}
+	for i := range update.Pods {
+		if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
+		}
+	}
+}
+
+func TestSubdomainSafeName(t *testing.T) {
+	type Case struct {
+		Input    string
+		Expected string
+	}
+	testCases := []Case{
+		{"/some/path/invalidUPPERCASE", "invaliduppercasa6hlenc0vpqbbdtt26ghneqsq3pvud"},
+		{"/some/path/_-!%$#&@^&*(){}", "nvhc03p016m60huaiv3avts372rl2p"},
+	}
+	for _, testCase := range testCases {
+		value := simpleSubdomainSafeHash(testCase.Input)
+		if value != testCase.Expected {
+			t.Errorf("Expected %s, Got %s", testCase.Expected, value)
+		}
+		value2 := simpleSubdomainSafeHash(testCase.Input)
+		if value != value2 {
+			t.Errorf("Value for %s was not stable across runs: %s %s", testCase.Input, value, value2)
+		}
 	}
 }
 
