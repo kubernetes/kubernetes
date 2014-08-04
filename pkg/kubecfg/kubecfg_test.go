@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -38,7 +39,7 @@ type FakeKubeClient struct {
 	actions []Action
 	pods    api.PodList
 	ctrl    api.ReplicationController
-	builds  api.BuildList
+	builds  buildapi.BuildList
 }
 
 func (client *FakeKubeClient) ListPods(selector labels.Selector) (api.PodList, error) {
@@ -106,14 +107,14 @@ func (client *FakeKubeClient) DeleteService(controller string) error {
 	return nil
 }
 
-func (client *FakeKubeClient) ListBuilds() (api.BuildList, error) {
+func (client *FakeKubeClient) ListBuilds() (buildapi.BuildList, error) {
 	client.actions = append(client.actions, Action{action: "list-builds"})
 	return client.builds, nil
 }
 
-func (client *FakeKubeClient) UpdateBuild(build api.Build) (api.Build, error) {
+func (client *FakeKubeClient) UpdateBuild(build buildapi.Build) (buildapi.Build, error) {
 	client.actions = append(client.actions, Action{action: "update-build", value: build.ID})
-	return api.Build{}, nil
+	return buildapi.Build{}, nil
 }
 
 func validateAction(expectedAction, actualAction Action, t *testing.T) {

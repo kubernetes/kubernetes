@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
@@ -50,8 +51,8 @@ type Interface interface {
 	UpdateService(api.Service) (api.Service, error)
 	DeleteService(string) error
 
-	ListBuilds() (api.BuildList, error)
-	UpdateBuild(api.Build) (api.Build, error)
+	ListBuilds() (buildapi.BuildList, error)
+	UpdateBuild(buildapi.Build) (buildapi.Build, error)
 }
 
 // StatusErr might get returned from an api call if your request is still being processed
@@ -259,13 +260,13 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 }
 
 // ListBuilds returns a list of builds.
-func (c *Client) ListBuilds() (result api.BuildList, err error) {
+func (c *Client) ListBuilds() (result buildapi.BuildList, err error) {
 	err = c.Get().Path("builds").Do().Into(&result)
 	return
 }
 
 // UpdateBuild updates an existing build.
-func (c *Client) UpdateBuild(build api.Build) (result api.Build, err error) {
+func (c *Client) UpdateBuild(build buildapi.Build) (result buildapi.Build, err error) {
 	err = c.Put().Path("builds").Path(build.ID).Body(build).Do().Into(&result)
 	return
 }

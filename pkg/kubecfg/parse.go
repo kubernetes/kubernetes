@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
 )
 
 var storageToType = map[string]reflect.Type{
@@ -28,7 +29,7 @@ var storageToType = map[string]reflect.Type{
 	"services":               reflect.TypeOf(api.Service{}),
 	"replicationControllers": reflect.TypeOf(api.ReplicationController{}),
 	"minions":                reflect.TypeOf(api.Minion{}),
-	"builds":                 reflect.TypeOf(api.Build{}),
+	"builds":                 reflect.TypeOf(buildapi.Build{}),
 }
 
 // ToWireFormat takes input 'data' as either json or yaml, checks that it parses as the

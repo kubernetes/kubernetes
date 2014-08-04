@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
@@ -49,7 +50,7 @@ type Master struct {
 	controllerRegistry registry.ControllerRegistry
 	serviceRegistry    registry.ServiceRegistry
 	minionRegistry     registry.MinionRegistry
-	buildRegistry      registry.BuildRegistry
+	buildRegistry      build.BuildRegistry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 }
@@ -61,7 +62,7 @@ func NewMemoryServer(c *Config) *Master {
 		controllerRegistry: registry.MakeMemoryRegistry(),
 		serviceRegistry:    registry.MakeMemoryRegistry(),
 		minionRegistry:     registry.MakeMinionRegistry(c.Minions),
-		buildRegistry:      registry.MakeMemoryRegistry(),
+		buildRegistry:      build.MakeMemoryRegistry(),
 		client:             c.Client,
 	}
 	m.init(c.Cloud, c.PodInfoGetter)
@@ -77,7 +78,7 @@ func New(c *Config) *Master {
 		controllerRegistry: registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		serviceRegistry:    registry.MakeEtcdRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
-		buildRegistry:      registry.MakeEtcdRegistry(etcdClient, minionRegistry),
+		buildRegistry:      build.MakeEtcdRegistry(etcdClient),
 		client:             c.Client,
 	}
 	m.init(c.Cloud, c.PodInfoGetter)
@@ -120,7 +121,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 		"replicationControllers": registry.NewControllerRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               registry.MakeServiceRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
 		"minions":                registry.MakeMinionRegistryStorage(m.minionRegistry),
-		"builds":                 registry.NewBuildRegistryStorage(m.buildRegistry),
+		"builds":                 build.NewBuildRegistryStorage(m.buildRegistry),
 	}
 }
 
