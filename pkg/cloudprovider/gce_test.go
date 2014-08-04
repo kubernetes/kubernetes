@@ -26,13 +26,13 @@ func TestGetRegion(t *testing.T) {
 	}
 	zones, ok := gce.Zones()
 	if !ok {
-		t.Errorf("Unexpected missing zones impl")
+		t.Fatalf("Unexpected missing zones impl")
 	}
-	region, err := zones.GetRegion()
+	zone, err := zones.GetZone()
 	if err != nil {
-		t.Errorf("unexpected error %v (%#v)", err)
+		t.Fatalf("unexpected error %v", err)
 	}
-	if region != "us-central1" {
-		t.Errorf("Unexpected region: %s", region)
+	if zone.Region != "us-central1" {
+		t.Errorf("Unexpected region: %s", zone.Region)
 	}
 }

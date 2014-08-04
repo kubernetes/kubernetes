@@ -237,6 +237,24 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	return instances, nil
 }
 
-func (gce *GCECloud) GetZone() (string, error) {
-	return gce.zone, nil
+func (gce *GCECloud) GetZone() (Zone, error) {
+	region, err := getGceRegion(gce.zone)
+	if err != nil {
+		return Zone{}, err
+	}
+	return Zone{
+		FailureDomain: gce.zone,
+		Region:        region,
+	}, nil
+}
+
+// gce zone names are of the form: ${region-name}-${ix}.
+// For example "us-central1-b" has a region of "us-central1".
+// So we look for the last '-' and trim to just before that.
+func getGceRegion(zone string) (string, error) {
+	ix := strings.LastIndex(zone, "-")
+	if ix == -1 {
+		return "", fmt.Errorf("unexpected zone: %s", zone)
+	}
+	return zone[:ix], nil
 }
