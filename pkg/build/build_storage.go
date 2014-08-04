@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package registry
+package build
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -38,7 +39,7 @@ func NewBuildRegistryStorage(registry BuildRegistry) apiserver.RESTStorage {
 
 // List obtains a list of Builds that match selector.
 func (storage *BuildRegistryStorage) List(selector labels.Selector) (interface{}, error) {
-	result := api.BuildList{}
+	result := buildapi.BuildList{}
 	builds, err := storage.registry.ListBuilds()
 	if err == nil {
 		for _, build := range builds.Items {
@@ -64,16 +65,16 @@ func (storage *BuildRegistryStorage) Delete(id string) (<-chan interface{}, erro
 	}), nil
 }
 
-// Extract deserializes user provided data into an api.Build.
+// Extract deserializes user provided data into an buildapi.Build.
 func (storage *BuildRegistryStorage) Extract(body []byte) (interface{}, error) {
-	result := api.Build{}
+	result := buildapi.Build{}
 	err := api.DecodeInto(body, &result)
 	return result, err
 }
 
 // Create registers a given new Build instance to storage.registry.
 func (storage *BuildRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
-	build, ok := obj.(api.Build)
+	build, ok := obj.(buildapi.Build)
 	if !ok {
 		return nil, fmt.Errorf("not a build: %#v", obj)
 	}
@@ -81,7 +82,7 @@ func (storage *BuildRegistryStorage) Create(obj interface{}) (<-chan interface{}
 		build.ID = uuid.NewUUID().String()
 	}
 	if len(build.Status) == 0 {
-		build.Status = api.BuildNew
+		build.Status = buildapi.BuildNew
 	}
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
@@ -95,7 +96,7 @@ func (storage *BuildRegistryStorage) Create(obj interface{}) (<-chan interface{}
 
 // Update replaces a given Build instance with an existing instance in storage.registry.
 func (storage *BuildRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
-	build, ok := obj.(api.Build)
+	build, ok := obj.(buildapi.Build)
 	if !ok {
 		return nil, fmt.Errorf("not a build: %#v", obj)
 	}

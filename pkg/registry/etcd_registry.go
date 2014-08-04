@@ -29,7 +29,7 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// EtcdRegistry implements PodRegistry, ControllerRegistry, ServiceRegistry, and BuildRegistry backed by etcd.
+// EtcdRegistry implements PodRegistry, ControllerRegistry and ServiceRegistry backed by etcd.
 type EtcdRegistry struct {
 	etcdClient      tools.EtcdClient
 	machines        MinionRegistry
@@ -307,48 +307,4 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
 	return registry.helper().SetObj("/registry/services/endpoints/"+e.ID, e)
-}
-
-func makeBuildKey(id string) string {
-	return "/builds/" + id
-}
-
-// ListBuilds obtains a list of Builds.
-func (registry *EtcdRegistry) ListBuilds() (api.BuildList, error) {
-	var list api.BuildList
-	err := registry.helper().ExtractList("/builds", &list.Items)
-	return list, err
-}
-
-// GetBuild gets a specific Build specified by its ID.
-func (registry *EtcdRegistry) GetBuild(buildID string) (*api.Build, error) {
-	var build *api.Build
-	err := registry.helper().ExtractObj(makeBuildKey(buildID), &build, false)
-	if tools.IsEtcdNotFound(err) {
-		return nil, apiserver.NewNotFoundErr("build", buildID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return build, nil
-}
-
-// CreateBuild creates a new Build.
-func (registry *EtcdRegistry) CreateBuild(build api.Build) error {
-	return registry.UpdateBuild(build)
-}
-
-// UpdateBuild replaces an existing Build.
-func (registry *EtcdRegistry) UpdateBuild(build api.Build) error {
-	return registry.helper().SetObj(makeBuildKey(build.ID), build)
-}
-
-// DeleteBuild deletes a Build specified by its ID.
-func (registry *EtcdRegistry) DeleteBuild(buildID string) error {
-	key := makeBuildKey(buildID)
-	_, err := registry.etcdClient.Delete(key, true)
-	if tools.IsEtcdNotFound(err) {
-		return apiserver.NewNotFoundErr("build", buildID)
-	}
-	return err
 }

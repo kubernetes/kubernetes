@@ -5,20 +5,20 @@ import (
 	"os"
 	"strings"
 	"time"
-	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
-type buildTypeStrategy func(api.Build) api.Pod
+type buildTypeStrategy func(buildapi.Build) api.Pod
 
 type BuildController struct {
 	kubeClient         client.Interface
 	syncTime           <-chan time.Time
-	typeStrategies     map[api.BuildType]buildTypeStrategy
+	typeStrategies     map[buildapi.BuildType]buildTypeStrategy
 	dockerBuilderImage string
 	dockerRegistry     string
 }
@@ -31,8 +31,8 @@ func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, docker
 		dockerRegistry:     dockerRegistry,
 	}
 
-	bc.typeStrategies = map[api.BuildType]buildTypeStrategy{
-		api.BuildType("docker"): bc.dockerBuildStrategy,
+	bc.typeStrategies = map[buildapi.BuildType]buildTypeStrategy{
+		buildapi.BuildType("docker"): bc.dockerBuildStrategy,
 	}
 
 	return bc
@@ -70,14 +70,14 @@ func (bc *BuildController) synchronize() {
 // Determine the next status of a build given its current state and the state
 // of its associated pod.
 // TODO: improve handling of illegal state transitions
-func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
+func (bc *BuildController) process(build *buildapi.Build) (buildapi.BuildStatus, error) {
 	glog.Infof("Syncing build %s", build.ID)
 
 	switch build.Status {
-	case api.BuildNew:
+	case buildapi.BuildNew:
 		build.PodID = "build-" + string(build.Config.Type) + "-" + build.ID // TODO: better naming
-		return api.BuildPending, nil
-	case api.BuildPending:
+		return buildapi.BuildPending, nil
+	case buildapi.BuildPending:
 		makePodSpec, ok := bc.typeStrategies[build.Config.Type]
 		if !ok {
 			return build.Status, fmt.Errorf("No build type for %s")
@@ -95,11 +95,11 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 				return build.Status, err // no transition, already handled by someone else
 			}
 
-			return api.BuildFailed, err
+			return buildapi.BuildFailed, err
 		}
 
-		return api.BuildRunning, nil
-	case api.BuildRunning:
+		return buildapi.BuildRunning, nil
+	case buildapi.BuildRunning:
 		pod, err := bc.kubeClient.GetPod(build.PodID)
 		if err != nil {
 			return build.Status, fmt.Errorf("Error retrieving pod for build ID %v: %#v", build.ID, err)
@@ -110,12 +110,12 @@ func (bc *BuildController) process(build *api.Build) (api.BuildStatus, error) {
 			return build.Status, nil
 		}
 
-		var nextStatus = api.BuildComplete
+		var nextStatus = buildapi.BuildComplete
 
 		// check the exit codes of all the containers in the pod
 		for _, info := range pod.CurrentState.Info {
 			if info.State.ExitCode != 0 {
-				nextStatus = api.BuildFailed
+				nextStatus = buildapi.BuildFailed
 			}
 		}
 
@@ -165,7 +165,7 @@ func (bc BuildController) setupDockerSocket(podSpec *api.Pod) {
 	}
 }
 
-func (bc BuildController) dockerBuildStrategy(build api.Build) api.Pod {
+func (bc BuildController) dockerBuildStrategy(build buildapi.Build) api.Pod {
 	return api.Pod{
 		JSONBase: api.JSONBase{
 			ID: build.PodID,

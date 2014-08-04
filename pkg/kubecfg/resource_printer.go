@@ -25,6 +25,7 @@ import (
 	"text/template"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"gopkg.in/v1/yaml"
 )
@@ -131,12 +132,12 @@ func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer) e
 	return nil
 }
 
-func (h *HumanReadablePrinter) printBuild(build *api.Build, w io.Writer) error {
+func (h *HumanReadablePrinter) printBuild(build *buildapi.Build, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", build.ID, build.Status, build.PodID)
 	return err
 }
 
-func (h *HumanReadablePrinter) printBuildList(buildList *api.BuildList, w io.Writer) error {
+func (h *HumanReadablePrinter) printBuildList(buildList *buildapi.BuildList, w io.Writer) error {
 	for _, build := range buildList.Items {
 		if err := h.printBuild(&build, w); err != nil {
 			return err
@@ -246,10 +247,10 @@ func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error
 		return h.printMinionList(o, w)
 	case *api.Status:
 		return h.printStatus(o, w)
-	case *api.Build:
+	case *buildapi.Build:
 		h.printHeader(buildColumns, w)
 		return h.printBuild(o, w)
-	case *api.BuildList:
+	case *buildapi.BuildList:
 		h.printHeader(buildColumns, w)
 		return h.printBuildList(o, w)
 	default:
