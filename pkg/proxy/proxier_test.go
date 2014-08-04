@@ -27,6 +27,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
+func waitForClosedPort(p *Proxier, proxyPort string) error {
+	for i := 0; i < 50; i++ {
+		_, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+		if err != nil {
+			return nil
+		}
+		time.Sleep(1 * time.Millisecond)
+	}
+	return fmt.Errorf("port %s still open", proxyPort)
+}
+
 // a simple echoServer that only accepts one connection. Returns port actually
 // being listened on, or an error.
 func echoServer(t *testing.T, addr string) (string, error) {
@@ -107,10 +118,8 @@ func TestProxyStop(t *testing.T) {
 
 	p.StopProxy("echo")
 	// Wait for the port to really close.
-	time.Sleep(2 * time.Second)
-	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
-	if err == nil {
-		t.Fatalf("Unexpected non-error.")
+	if err := waitForClosedPort(p, proxyPort); err != nil {
+		t.Fatalf(err.Error())
 	}
 }
 
@@ -136,11 +145,8 @@ func TestProxyUpdateDelete(t *testing.T) {
 	conn.Close()
 
 	p.OnUpdate([]api.Service{})
-	// Wait for the port to close.
-	time.Sleep(2 * time.Second)
-	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
-	if err == nil {
-		t.Fatalf("Unexpected non-error.")
+	if err := waitForClosedPort(p, proxyPort); err != nil {
+		t.Fatalf(err.Error())
 	}
 }
 
@@ -167,14 +173,14 @@ func TestProxyUpdatePort(t *testing.T) {
 	l.Close()
 
 	// Wait for the socket to actually get free.
-	time.Sleep(2 * time.Second)
+	if err := waitForClosedPort(p, port); err != nil {
+		t.Fatalf(err.Error())
+	}
 	p.OnUpdate([]api.Service{
 		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
 	})
-	time.Sleep(2 * time.Second)
-	_, err = net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
-	if err == nil {
-		t.Fatalf("Unexpected non-error.")
+	if err := waitForClosedPort(p, proxyPort); err != nil {
+		t.Fatalf(err.Error())
 	}
 	testEchoConnection(t, "127.0.0.1", port)
 }
