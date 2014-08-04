@@ -417,6 +417,13 @@ func TestValidateReplicationController(t *testing.T) {
 				ReplicaSelector: validSelector,
 			},
 		},
+		"negative_replicas": {
+			JSONBase: JSONBase{ID: "abc"},
+			DesiredState: ReplicationControllerState{
+				Replicas: -1,
+				ReplicaSelector: validSelector,
+			},
+		},
 	}
 	for k, v := range errorCases {
 		if errs := ValidateReplicationController(&v); len(errs) == 0 {
