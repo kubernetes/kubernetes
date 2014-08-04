@@ -118,25 +118,44 @@ func (sr *ServiceRegistryStorage) Get(id string) (interface{}, error) {
 	return service, err
 }
 
+func (sr *ServiceRegistryStorage) deleteExternalLoadBalancer(service *api.Service) error {
+	if !service.CreateExternalLoadBalancer || sr.cloud == nil {
+		return nil
+	}
+
+	zones, ok := sr.cloud.Zones()
+	if !ok {
+		// We failed to get zone enumerator.
+		// As this should have failed when we tried in "create" too,
+		// assume external load balancer was never created.
+		return nil
+	}
+
+	balancer, ok := sr.cloud.TCPLoadBalancer()
+	if !ok {
+		// See comment above.
+		return nil
+	}
+
+	zone, err := zones.GetZone()
+	if err != nil {
+		return err
+	}
+
+	if err := balancer.DeleteTCPLoadBalancer(service.JSONBase.ID, zone); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	service, err := sr.registry.GetService(id)
 	if err != nil {
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		if service.CreateExternalLoadBalancer {
-			var balancer cloudprovider.TCPLoadBalancer
-			var ok bool
-			if sr.cloud != nil {
-				balancer, ok = sr.cloud.TCPLoadBalancer()
-			}
-			if ok && balancer != nil {
-				err = balancer.DeleteTCPLoadBalancer(id, "us-central1")
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
+		sr.deleteExternalLoadBalancer(service)
 		return api.Status{Status: api.StatusSuccess}, sr.registry.DeleteService(id)
 	}), nil
 }
