@@ -21,14 +21,16 @@ type BuildController struct {
 	typeStrategies     map[buildapi.BuildType]buildTypeStrategy
 	dockerBuilderImage string
 	dockerRegistry     string
+	timeout            int
 }
 
-func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, dockerRegistry string) *BuildController {
-	glog.Infof("Creating build controller with dockerBuilderImage=%s, dockerRegistry=%s", dockerBuilderImage, dockerRegistry)
+func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, dockerRegistry string, timeout int) *BuildController {
+	glog.Infof("Creating build controller with dockerBuilderImage=%s, dockerRegistry=%s, timeout=%v", dockerBuilderImage, dockerRegistry, timeout)
 	bc := &BuildController{
 		kubeClient:         kubeClient,
 		dockerBuilderImage: dockerBuilderImage,
 		dockerRegistry:     dockerRegistry,
+		timeout:            timeout,
 	}
 
 	bc.typeStrategies = map[buildapi.BuildType]buildTypeStrategy{
@@ -67,6 +69,20 @@ func (bc *BuildController) synchronize() {
 	}
 }
 
+func (bc BuildController) hasTimeoutElapsed(build *buildapi.Build) (bool, error) {
+	timestamp, err := time.Parse(time.UnixDate, build.CreationTimestamp)
+	if err != nil {
+		return false, err
+	}
+
+	elapsed := time.Since(timestamp)
+	if int(elapsed.Seconds()) > bc.timeout {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // Determine the next status of a build given its current state and the state
 // of its associated pod.
 // TODO: improve handling of illegal state transitions
@@ -100,6 +116,14 @@ func (bc *BuildController) process(build *buildapi.Build) (buildapi.BuildStatus,
 
 		return buildapi.BuildRunning, nil
 	case buildapi.BuildRunning:
+		timedOut, err := bc.hasTimeoutElapsed(build)
+		if err != nil {
+			return buildapi.BuildFailed, err
+		}
+		if timedOut {
+			return buildapi.BuildFailed, fmt.Errorf("Build timed out")
+		}
+
 		pod, err := bc.kubeClient.GetPod(build.PodID)
 		if err != nil {
 			return build.Status, fmt.Errorf("Error retrieving pod for build ID %v: %#v", build.ID, err)
