@@ -156,30 +156,28 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, e
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
 		if srv.CreateExternalLoadBalancer {
-			var balancer cloudprovider.TCPLoadBalancer
-			var zones cloudprovider.Zones
-			var ok bool
-			if sr.cloud != nil {
-				balancer, ok = sr.cloud.TCPLoadBalancer()
-				if ok {
-					zones, ok = sr.cloud.Zones()
-				}
-			}
-			if ok && balancer != nil && zones != nil {
-				hosts, err := sr.machines.List()
-				if err != nil {
-					return nil, err
-				}
-				zone, err := zones.GetZone()
-				if err != nil {
-					return nil, err
-				}
-				err = balancer.CreateTCPLoadBalancer(srv.ID, zone, srv.Port, hosts)
-				if err != nil {
-					return nil, err
-				}
-			} else {
+			if sr.cloud == nil {
 				return nil, fmt.Errorf("requested an external service, but no cloud provider supplied.")
+			}
+			balancer, ok := sr.cloud.TCPLoadBalancer()
+			if !ok {
+				return nil, fmt.Errorf("The cloud provider does not support external TCP load balancers.")
+			}
+			zones, ok := sr.cloud.Zones()
+			if !ok {
+				return nil, fmt.Errorf("The cloud provider does not support zone enumeration.")
+			}
+			hosts, err := sr.machines.List()
+			if err != nil {
+				return nil, err
+			}
+			zone, err := zones.GetZone()
+			if err != nil {
+				return nil, err
+			}
+			err = balancer.CreateTCPLoadBalancer(srv.ID, zone, srv.Port, hosts)
+			if err != nil {
+				return nil, err
 			}
 		}
 		// TODO actually wait for the object to be fully created here.

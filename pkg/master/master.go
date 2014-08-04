@@ -110,6 +110,10 @@ func minionRegistryMaker(c *Config) registry.MinionRegistry {
 func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
 	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
 	go podCache.Loop()
+
+	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.client)
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+
 	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
 	s := scheduler.NewRandomFitScheduler(m.podRegistry, random)
 	m.storage = map[string]apiserver.RESTStorage{
@@ -122,12 +126,9 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 
 // Run begins serving the Kubernetes API. It never returns.
 func (m *Master) Run(myAddress, apiPrefix string) error {
-	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.client)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
-
 	s := &http.Server{
 		Addr:           myAddress,
-		Handler:        apiserver.New(m.storage, apiPrefix),
+		Handler:        m.ConstructHandler(apiPrefix),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -139,8 +140,5 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 // Instead of calling Run, you can call this function to get a handler for your own server.
 // It is intended for testing. Only call once.
 func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
-	endpoints := registry.MakeEndpointController(m.serviceRegistry, m.client)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
-
 	return apiserver.New(m.storage, apiPrefix)
 }
