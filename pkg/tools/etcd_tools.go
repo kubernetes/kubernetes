@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
@@ -41,6 +40,17 @@ var (
 	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
 	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
 )
+
+type Encoding interface {
+	Encode(obj interface{}) (data []byte, err error)
+	Decode(data []byte) (interface{}, error)
+	DecodeInto(data []byte, obj interface{}) error
+}
+
+type Versioning interface {
+	SetResourceVersion(obj interface{}, version uint64) error
+	ResourceVersion(obj interface{}) (uint64, error)
+}
 
 // EtcdClient is an injectable interface for testing.
 type EtcdClient interface {
@@ -65,7 +75,10 @@ type EtcdGetSet interface {
 
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
-	Client EtcdGetSet
+	Client   EtcdGetSet
+	Encoding Encoding
+	// optional
+	Versioning Versioning
 }
 
 // Returns true iff err is an etcd not found error.
@@ -116,7 +129,7 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 	v := pv.Elem()
 	for _, node := range nodes {
 		obj := reflect.New(v.Type().Elem())
-		err = api.DecodeInto([]byte(node.Value), obj.Interface())
+		err = h.Encoding.DecodeInto([]byte(node.Value), obj.Interface())
 		if err != nil {
 			return err
 		}
@@ -150,12 +163,10 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 		return "", 0, fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
 	}
 	body = response.Node.Value
-	err = api.DecodeInto([]byte(body), objPtr)
-	if jsonBase, err := api.FindJSONBase(objPtr); err == nil {
-		jsonBase.SetResourceVersion(response.Node.ModifiedIndex)
-		// Note that err shadows the err returned below, so we won't
-		// return an error just because we failed to find a JSONBase.
-		// This is intentional.
+	err = h.Encoding.DecodeInto([]byte(body), objPtr)
+	if h.Versioning != nil {
+		_ = h.Versioning.SetResourceVersion(objPtr, response.Node.ModifiedIndex)
+		// being unable to set the version does not prevent the object from being extracted
 	}
 	return body, response.Node.ModifiedIndex, err
 }
@@ -163,13 +174,15 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 // SetObj marshals obj via json, and stores under key. Will do an
 // atomic update if obj's ResourceVersion field is set.
 func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
-	data, err := api.Encode(obj)
+	data, err := h.Encoding.Encode(obj)
 	if err != nil {
 		return err
 	}
-	if jsonBase, err := api.FindJSONBaseRO(obj); err == nil && jsonBase.ResourceVersion != 0 {
-		_, err = h.Client.CompareAndSwap(key, string(data), 0, "", jsonBase.ResourceVersion)
-		return err // err is shadowed!
+	if h.Versioning != nil {
+		if version, err := h.Versioning.ResourceVersion(obj); err == nil && version != 0 {
+			_, err = h.Client.CompareAndSwap(key, string(data), 0, "", version)
+			return err // err is shadowed!
+		}
 	}
 
 	// TODO: when client supports atomic creation, integrate this with the above.
@@ -186,7 +199,7 @@ type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
 //
 // Example:
 //
-// h := &util.EtcdHelper{client}
+// h := &util.EtcdHelper{client, encoding, versioning}
 // err := h.AtomicUpdate("myKey", &MyType{}, func(input interface{}) (interface{}, error) {
 //	// Before this function is called, currentObj has been reset to etcd's current
 //	// contents for "myKey".
@@ -225,7 +238,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 			return h.SetObj(key, ret)
 		}
 
-		data, err := api.Encode(ret)
+		data, err := h.Encoding.Encode(ret)
 		if err != nil {
 			return err
 		}
@@ -250,7 +263,7 @@ func Everything(interface{}) bool {
 // API objects, and any items passing 'filter' are sent down the returned
 // watch.Interface.
 func (h *EtcdHelper) WatchList(key string, filter FilterFunc) (watch.Interface, error) {
-	w := newEtcdWatcher(true, filter)
+	w := newEtcdWatcher(true, filter, h.Encoding)
 	go w.etcdWatch(h.Client, key)
 	return w, nil
 }
@@ -258,13 +271,15 @@ func (h *EtcdHelper) WatchList(key string, filter FilterFunc) (watch.Interface, 
 // Watch begins watching the specified key. Events are decoded into
 // API objects and sent down the returned watch.Interface.
 func (h *EtcdHelper) Watch(key string) (watch.Interface, error) {
-	w := newEtcdWatcher(false, nil)
+	w := newEtcdWatcher(false, nil, h.Encoding)
 	go w.etcdWatch(h.Client, key)
 	return w, nil
 }
 
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
+	encoding Encoding
+
 	list   bool // If we're doing a recursive watch, should be true.
 	filter FilterFunc
 
@@ -282,8 +297,9 @@ type etcdWatcher struct {
 }
 
 // Returns a new etcdWatcher; if list is true, watch sub-nodes.
-func newEtcdWatcher(list bool, filter FilterFunc) *etcdWatcher {
+func newEtcdWatcher(list bool, filter FilterFunc, encoding Encoding) *etcdWatcher {
 	w := &etcdWatcher{
+		encoding:      encoding,
 		list:          list,
 		filter:        filter,
 		etcdIncoming:  make(chan *etcd.Response),
@@ -358,7 +374,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 		return
 	}
 
-	obj, err := api.Decode(data)
+	obj, err := w.encoding.Decode(data)
 	if err != nil {
 		glog.Errorf("failure to decode api object: '%v' from %#v", string(data), res)
 		// TODO: expose an error through watch.Interface?

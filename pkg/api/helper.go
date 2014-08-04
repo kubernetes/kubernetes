@@ -25,6 +25,20 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
+type EncodingInterface interface {
+	Encode(obj interface{}) (data []byte, err error)
+	Decode(data []byte) (interface{}, error)
+	DecodeInto(data []byte, obj interface{}) error
+}
+
+type VersioningInterface interface {
+	SetResourceVersion(obj interface{}, version uint64) error
+	ResourceVersion(obj interface{}) (uint64, error)
+}
+
+var Encoding EncodingInterface
+var Versioning VersioningInterface
+
 var conversionScheme *conversion.Scheme
 
 func init() {
@@ -86,6 +100,9 @@ func init() {
 			return nil
 		},
 	)
+
+	Encoding = conversionScheme
+	Versioning = JSONBaseVersioning{}
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.

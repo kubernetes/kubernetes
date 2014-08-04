@@ -57,3 +57,35 @@ func TestGenericJSONBase(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
+
+func TestVersioningOfAPI(t *testing.T) {
+	type T struct {
+		Object   interface{}
+		Expected uint64
+	}
+	testCases := map[string]T{
+		"empty api object":                   {Service{}, 0},
+		"api object with version":            {Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+		"pointer to api object with version": {&Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+	}
+	versioning := JSONBaseVersioning{}
+	for key, testCase := range testCases {
+		actual, err := versioning.ResourceVersion(testCase.Object)
+		if err != nil {
+			t.Errorf("%s: unexpected error %#v", key, err)
+		}
+		if actual != testCase.Expected {
+			t.Errorf("%s: expected %d, got %d", key, testCase.Expected, actual)
+		}
+	}
+
+	failingCases := map[string]T{
+		"not a valid object to try": {JSONBase{ResourceVersion: 1}, 1},
+	}
+	for key, testCase := range failingCases {
+		_, err := versioning.ResourceVersion(testCase.Object)
+		if err == nil {
+			t.Errorf("%s: expected error, got nil", key)
+		}
+	}
+}

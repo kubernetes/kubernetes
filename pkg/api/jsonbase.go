@@ -21,6 +21,26 @@ import (
 	"reflect"
 )
 
+// versionedJSONBase allows access to the version state of a JSONBase object
+type JSONBaseVersioning struct{}
+
+func (v JSONBaseVersioning) ResourceVersion(obj interface{}) (uint64, error) {
+	json, err := FindJSONBaseRO(obj)
+	if err != nil {
+		return 0, err
+	}
+	return json.ResourceVersion, nil
+}
+
+func (v JSONBaseVersioning) SetResourceVersion(obj interface{}, version uint64) error {
+	json, err := FindJSONBase(obj)
+	if err != nil {
+		return err
+	}
+	json.SetResourceVersion(version)
+	return nil
+}
+
 // JSONBase lets you work with a JSONBase from any of the versioned or
 // internal APIObjects.
 type JSONBaseInterface interface {
