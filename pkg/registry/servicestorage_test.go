@@ -44,7 +44,10 @@ func TestServiceRegistry(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService(svc.ID)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.ID)
 	}
@@ -123,7 +126,10 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := memory.GetService(svc.ID)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.ID)
 	}

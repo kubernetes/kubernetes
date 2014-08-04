@@ -29,10 +29,15 @@ func TestCloudList(t *testing.T) {
 		Machines: instances,
 	}
 	registry, err := MakeCloudMinionRegistry(&fakeCloud, ".*")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	list, err := registry.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(list, instances) {
 		t.Errorf("Unexpected inequality: %#v, %#v", list, instances)
 	}
@@ -44,16 +49,24 @@ func TestCloudContains(t *testing.T) {
 		Machines: instances,
 	}
 	registry, err := MakeCloudMinionRegistry(&fakeCloud, ".*")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	contains, err := registry.Contains("m1")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !contains {
 		t.Errorf("Unexpected !contains")
 	}
 
 	contains, err = registry.Contains("m100")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if contains {
 		t.Errorf("Unexpected contains")
 	}
@@ -65,10 +78,15 @@ func TestCloudListRegexp(t *testing.T) {
 		Machines: instances,
 	}
 	registry, err := MakeCloudMinionRegistry(&fakeCloud, "m[0-9]+")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	list, err := registry.List()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	expectedList := []string{"m1", "m2"}
 	if !reflect.DeepEqual(list, expectedList) {
 		t.Errorf("Unexpected inequality: %#v, %#v", list, expectedList)

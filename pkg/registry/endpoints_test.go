@@ -79,12 +79,18 @@ func TestFindPort(t *testing.T) {
 		},
 	}
 	port, err := findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "foo"})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if port != 8080 {
 		t.Errorf("Expected 8080, Got %d", port)
 	}
 	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "bar"})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if port != 8000 {
 		t.Errorf("Expected 8000, Got %d", port)
 	}
@@ -101,12 +107,18 @@ func TestFindPort(t *testing.T) {
 		t.Error("unexpected non-error")
 	}
 	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: ""})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if port != 8080 {
 		t.Errorf("Expected 8080, Got %d", port)
 	}
 	port, err = findPort(&manifest, util.IntOrString{})
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if port != 8080 {
 		t.Errorf("Expected 8080, Got %d", port)
 	}
@@ -125,7 +137,10 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 
 	endpoints := MakeEndpointController(&serviceRegistry, client)
 	err := endpoints.SyncServiceEndpoints()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 }
 
 func TestSyncEndpointsError(t *testing.T) {
@@ -171,7 +186,10 @@ func TestSyncEndpointsItems(t *testing.T) {
 
 	endpoints := MakeEndpointController(&serviceRegistry, client)
 	err := endpoints.SyncServiceEndpoints()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(serviceRegistry.endpoints.Endpoints) != 1 {
 		t.Errorf("Unexpected endpoints update: %#v", serviceRegistry.endpoints)
 	}
