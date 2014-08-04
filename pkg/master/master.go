@@ -128,7 +128,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 func (m *Master) Run(myAddress, apiPrefix string) error {
 	s := &http.Server{
 		Addr:           myAddress,
-		Handler:        apiserver.New(m.storage, apiPrefix),
+		Handler:        m.ConstructHandler(apiPrefix),
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
