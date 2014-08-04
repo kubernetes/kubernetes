@@ -50,7 +50,7 @@ func init() {
 	scheme.AddKnownTypes("v1beta1", TestResource{})
 }
 
-func TestIsNotFoundErr(t *testing.T) {
+func TestIsEtcdNotFound(t *testing.T) {
 	try := func(err error, isNotFound bool) {
 		if IsEtcdNotFound(err) != isNotFound {
 			t.Errorf("Expected %#v to return %v, but it did not", err, isNotFound)
