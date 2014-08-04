@@ -58,3 +58,13 @@ func IsCIdentifier(value string) bool {
 func IsValidPortNum(port int) bool {
 	return 0 < port && port < 65536
 }
+
+const dns952IdentifierFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+
+var dns952Regexp = regexp.MustCompile("^" + dns952IdentifierFmt + "$")
+
+const dns952MaxLength = 24
+
+func IsDNS952Label(value string) bool {
+	return len(value) <= dns952MaxLength && dns952Regexp.MatchString(value)
+}
