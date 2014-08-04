@@ -104,26 +104,44 @@ func TestOpGet(t *testing.T) {
 	}
 	data, err := api.Encode(simple)
 	t.Log(string(data))
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
 	var itemOut api.Status
 	body, err := extractBody(response, &itemOut)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
 		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
 	}
 
 	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details, nil)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	_, err = client.Do(req2)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
 	}
