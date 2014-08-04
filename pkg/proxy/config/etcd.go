@@ -51,6 +51,7 @@ type ConfigSourceEtcd struct {
 	client           *etcd.Client
 	serviceChannel   chan ServiceUpdate
 	endpointsChannel chan EndpointsUpdate
+	interval         time.Duration
 }
 
 // NewConfigSourceEtcd creates a new ConfigSourceEtcd and immediately runs the created ConfigSourceEtcd in a goroutine.
@@ -59,6 +60,7 @@ func NewConfigSourceEtcd(client *etcd.Client, serviceChannel chan ServiceUpdate,
 		client:           client,
 		serviceChannel:   serviceChannel,
 		endpointsChannel: endpointsChannel,
+		interval:         2 * time.Second,
 	}
 	go config.Run()
 	return config
@@ -76,7 +78,7 @@ func (s ConfigSourceEtcd) Run() {
 			break
 		}
 		glog.Errorf("Failed to get any services: %v", err)
-		time.Sleep(2 * time.Second)
+		time.Sleep(s.interval)
 	}
 
 	if len(services) > 0 {
