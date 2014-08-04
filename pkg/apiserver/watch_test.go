@@ -51,7 +51,9 @@ func TestWatchWebsocket(t *testing.T) {
 	dest.RawQuery = "id=myID"
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	if a, e := simpleStorage.requestedID, "myID"; a != e {
 		t.Fatalf("Expected %v, got %v", e, a)
@@ -99,9 +101,15 @@ func TestWatchHTTP(t *testing.T) {
 	dest.RawQuery = "id=myID"
 
 	request, err := http.NewRequest("GET", dest.String(), nil)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
 	}

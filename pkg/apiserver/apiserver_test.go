@@ -44,13 +44,6 @@ func init() {
 	api.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
 }
 
-// TODO: This doesn't reduce typing enough to make it worth the less readable errors. Remove.
-func expectNoError(t *testing.T, err error) {
-	if err != nil {
-		t.Errorf("Unexpected error: %#v", err)
-	}
-}
-
 type Simple struct {
 	api.JSONBase `yaml:",inline" json:",inline"`
 	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
@@ -190,9 +183,15 @@ func TestNotFound(t *testing.T) {
 	client := http.Client{}
 	for k, v := range cases {
 		request, err := http.NewRequest(v.Method, server.URL+v.Path, nil)
-		expectNoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
 		response, err := client.Do(request)
-		expectNoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
 		if response.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected %d for %s (%s), Got %#v", http.StatusNotFound, v, k, response)
 		}
@@ -205,12 +204,21 @@ func TestVersion(t *testing.T) {
 	client := http.Client{}
 
 	request, err := http.NewRequest("GET", server.URL+"/version", nil)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	var info version.Info
 	err = json.NewDecoder(response.Body).Decode(&info)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(version.Get(), info) {
 		t.Errorf("Expected %#v, Got %#v", version.Get(), info)
 	}
@@ -224,7 +232,9 @@ func TestSimpleList(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
@@ -241,7 +251,9 @@ func TestErrorList(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
@@ -263,7 +275,9 @@ func TestNonEmptyList(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
@@ -271,7 +285,10 @@ func TestNonEmptyList(t *testing.T) {
 
 	var listOut SimpleList
 	body, err := extractBody(resp, &listOut)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if len(listOut.Items) != 1 {
 		t.Errorf("Unexpected response: %#v", listOut)
 		return
@@ -295,7 +312,10 @@ func TestGet(t *testing.T) {
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
 	var itemOut Simple
 	body, err := extractBody(resp, &itemOut)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 	}
@@ -311,7 +331,10 @@ func TestGetMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", resp)
 	}
@@ -328,7 +351,10 @@ func TestDelete(t *testing.T) {
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
 	_, err = client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
@@ -347,7 +373,10 @@ func TestDeleteMissing(t *testing.T) {
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
@@ -365,11 +394,17 @@ func TestUpdate(t *testing.T) {
 		Name: "bar",
 	}
 	body, err := api.Encode(item)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
 	_, err = client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if simpleStorage.updated.Name != item.Name {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
 	}
@@ -389,11 +424,17 @@ func TestUpdateMissing(t *testing.T) {
 		Name: "bar",
 	}
 	body, err := api.Encode(item)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	client := http.Client{}
 	request, err := http.NewRequest("PUT", server.URL+"/prefix/version/simple/"+ID, bytes.NewReader(body))
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
@@ -405,9 +446,15 @@ func TestBadPath(t *testing.T) {
 	client := http.Client{}
 
 	request, err := http.NewRequest("GET", server.URL+"/foobar", nil)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
@@ -427,16 +474,25 @@ func TestCreate(t *testing.T) {
 	}
 	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
 	var itemOut api.Status
 	body, err := extractBody(response, &itemOut)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
 		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
 	}
@@ -456,9 +512,15 @@ func TestCreateNotFound(t *testing.T) {
 	simple := Simple{Name: "foo"}
 	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/simple", bytes.NewBuffer(data))
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	response, err := client.Do(request)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
 	}
@@ -494,7 +556,10 @@ func TestSyncCreate(t *testing.T) {
 	}
 	data, _ := api.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	var response *http.Response
@@ -503,10 +568,16 @@ func TestSyncCreate(t *testing.T) {
 		wg.Done()
 	}()
 	wg.Wait()
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	var itemOut Simple
 	body, err := extractBody(response, &itemOut)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if !reflect.DeepEqual(itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
@@ -603,7 +674,10 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	}))
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("unexpected status code %d", resp.StatusCode)
 	}
@@ -623,7 +697,10 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	}))
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("unexpected status code %d", resp.StatusCode)
 	}
