@@ -66,6 +66,7 @@ func TestEtcdGetPodNotFound(t *testing.T) {
 
 func TestEtcdCreatePod(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
 	fakeClient.Data["/registry/hosts/machine/pods/foo"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -231,6 +232,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 
 func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
 	fakeClient.Data["/registry/hosts/machine/pods/foo"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -289,6 +291,8 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 
 func TestEtcdDeletePod(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{
@@ -320,6 +324,8 @@ func TestEtcdDeletePod(t *testing.T) {
 
 func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+
 	key := "/registry/hosts/machine/pods/foo"
 	fakeClient.Set(key, util.MakeJSONString(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{
@@ -570,10 +576,12 @@ func TestEtcdCreateController(t *testing.T) {
 
 func TestEtcdUpdateController(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.TestIndex = true
+
+	resp, _ := fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.UpdateController(api.ReplicationController{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
@@ -701,10 +709,12 @@ func TestEtcdDeleteService(t *testing.T) {
 
 func TestEtcdUpdateService(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.TestIndex = true
+
+	resp, _ := fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	testService := api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
 		Labels: map[string]string{
 			"baz": "bar",
 		},
@@ -722,18 +732,25 @@ func TestEtcdUpdateService(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
+	// Clear modified indices before the equality test.
+	svc.ResourceVersion = 0
+	testService.ResourceVersion = 0
 	if !reflect.DeepEqual(*svc, testService) {
-		t.Errorf("Unexpected service: got %#v, wanted %#v", svc, testService)
+		t.Errorf("Unexpected service: got\n %#v\n, wanted\n %#v", svc, testService)
 	}
 }
 
 func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	endpoints := api.Endpoints{
 		JSONBase:  api.JSONBase{ID: "foo"},
 		Endpoints: []string{"baz", "bar"},
 	}
+
+	fakeClient.Set("/registry/services/endpoints/foo", util.MakeJSONString(api.Endpoints{}), 0)
+
 	err := registry.UpdateEndpoints(endpoints)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
