@@ -21,30 +21,26 @@ source $(dirname $0)/config-go.sh
 
 
 find_test_dirs() {
-  (
-    cd src/${KUBE_GO_PACKAGE}
-    find . -not \( \
-        \( \
-          -wholename './third_party' \
-          -o -wholename './release' \
-          -o -wholename './target' \
-          -o -wholename '*/third_party/*' \
-          -o -wholename '*/output/*' \
-        \) -prune \
-      \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u
-  )
+  cd src/${KUBE_GO_PACKAGE}
+  find . -not \( \
+      \( \
+        -wholename './third_party' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/output/*' \
+      \) -prune \
+    \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
 }
 
 # -covermode=atomic becomes default with -race in Go >=1.3
-KUBE_COVER="-cover -covermode=atomic -coverprofile=tmp.out"
+KUBE_COVER="-cover -covermode=atomic"
 
 cd "${KUBE_TARGET}"
 
 if [ "$1" != "" ]; then
-  go test -race -timeout 30s $KUBE_COVER "$KUBE_GO_PACKAGE/$1" "${@:2}"
+  go test -race -timeout 30s $KUBE_COVER -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1" "${@:2}"
   exit 0
 fi
 
-for package in $(find_test_dirs); do
-  go test -race -timeout 30s $KUBE_COVER "${KUBE_GO_PACKAGE}/${package}" "${@:2}"
-done
+find_test_dirs | xargs go test -race -timeout 30s $KUBE_COVER "${@:2}"
