@@ -91,14 +91,14 @@ func IsEtcdNotFound(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeNotFound)
 }
 
-// IsEtcdTestFailed returns true iff err is an etcd write conflict.
-func IsEtcdTestFailed(err error) bool {
-	return isEtcdErrorNum(err, EtcdErrorCodeTestFailed)
-}
-
 // IsEtcdNodeExist returns true iff err is an etcd node aleady exist error.
 func IsEtcdNodeExist(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeNodeExist)
+}
+
+// IsEtcdTestFailed returns true iff err is an etcd write conflict.
+func IsEtcdTestFailed(err error) bool {
+	return isEtcdErrorNum(err, EtcdErrorCodeTestFailed)
 }
 
 // IsEtcdWatchStoppedByUser returns true iff err is a client triggered stop.
