@@ -104,22 +104,32 @@ func TestOperationsList(t *testing.T) {
 		Name: "foo",
 	}
 	data, err := api.Encode(simple)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	response, err := client.Post(server.URL+"/prefix/version/foo", "application/json", bytes.NewBuffer(data))
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
 	response, err = client.Get(server.URL + "/prefix/version/operations")
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status code %#v", response)
 	}
 	body, err := ioutil.ReadAll(response.Body)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	obj, err := api.Decode(body)
-	expectNoError(t, err)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	oplist, ok := obj.(*api.ServerOpList)
 	if !ok {
 		t.Fatalf("expected ServerOpList, got %#v", obj)
