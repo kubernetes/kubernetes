@@ -34,7 +34,7 @@ import (
 // TODO: Allow choice of switching between etcd/apiserver watching, or remove etcd references
 // from this file completely.
 type ReplicationManager struct {
-	etcdClient tools.EtcdClient
+	etcdHelper tools.EtcdHelper
 	kubeClient client.Interface
 	podControl PodControlInterface
 	syncTime   <-chan time.Time
@@ -84,7 +84,7 @@ func (r RealPodControl) deletePod(podID string) error {
 func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Interface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
-		etcdClient: etcdClient,
+		etcdHelper: tools.EtcdHelper{etcdClient, api.Encoding, api.Versioning},
 		podControl: RealPodControl{
 			kubeClient: kubeClient,
 		},
@@ -102,8 +102,7 @@ func (rm *ReplicationManager) Run(period time.Duration) {
 
 // makeEtcdWatch starts watching via etcd.
 func (rm *ReplicationManager) makeEtcdWatch() (watch.Interface, error) {
-	helper := tools.EtcdHelper{rm.etcdClient}
-	return helper.WatchList("/registry/controllers", tools.Everything)
+	return rm.etcdHelper.WatchList("/registry/controllers", tools.Everything)
 }
 
 // makeAPIWatch starts watching via the apiserver.
@@ -192,8 +191,7 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 
 func (rm *ReplicationManager) synchronize() {
 	var controllerSpecs []api.ReplicationController
-	helper := tools.EtcdHelper{rm.etcdClient}
-	err := helper.ExtractList("/registry/controllers", &controllerSpecs)
+	err := rm.etcdHelper.ExtractList("/registry/controllers", &controllerSpecs)
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 		return

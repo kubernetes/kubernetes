@@ -32,7 +32,8 @@ import (
 
 // EtcdRegistry implements PodRegistry, ControllerRegistry and ServiceRegistry with backed by etcd.
 type EtcdRegistry struct {
-	etcdClient      tools.EtcdClient
+	client          tools.EtcdClient
+	helper          tools.EtcdHelper
 	machines        MinionRegistry
 	manifestFactory ManifestFactory
 }
@@ -43,8 +44,9 @@ type EtcdRegistry struct {
 // 'scheduler' is the scheduling algorithm to use.
 func MakeEtcdRegistry(client tools.EtcdClient, machines MinionRegistry) *EtcdRegistry {
 	registry := &EtcdRegistry{
-		etcdClient: client,
-		machines:   machines,
+		client:   client,
+		helper:   tools.EtcdHelper{client, api.Encoding, api.Versioning},
+		machines: machines,
 	}
 	registry.manifestFactory = &BasicManifestFactory{
 		serviceRegistry: registry,
@@ -56,10 +58,6 @@ func makePodKey(machine, podID string) string {
 	return "/registry/hosts/" + machine + "/pods/" + podID
 }
 
-func (registry *EtcdRegistry) helper() *tools.EtcdHelper {
-	return &tools.EtcdHelper{registry.etcdClient}
-}
-
 // ListPods obtains a list of pods that match selector.
 func (registry *EtcdRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	pods := []api.Pod{}
@@ -69,7 +67,7 @@ func (registry *EtcdRegistry) ListPods(selector labels.Selector) ([]api.Pod, err
 	}
 	for _, machine := range machines {
 		var machinePods []api.Pod
-		err := registry.helper().ExtractList("/registry/hosts/"+machine+"/pods", &machinePods)
+		err := registry.helper.ExtractList("/registry/hosts/"+machine+"/pods", &machinePods)
 		if err != nil {
 			return pods, err
 		}
@@ -105,7 +103,7 @@ func (registry *EtcdRegistry) CreatePod(machineIn string, pod api.Pod) error {
 
 func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	podKey := makePodKey(machine, pod.ID)
-	err := registry.helper().SetObj(podKey, pod)
+	err := registry.helper.SetObj(podKey, pod)
 
 	manifest, err := registry.manifestFactory.MakeManifest(machine, pod)
 	if err != nil {
@@ -113,14 +111,14 @@ func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	}
 
 	contKey := makeContainerKey(machine)
-	err = registry.helper().AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
+	err = registry.helper.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
 		manifests := *in.(*api.ContainerManifestList)
 		manifests.Items = append(manifests.Items, manifest)
 		return manifests, nil
 	})
 	if err != nil {
 		// Don't strand stuff.
-		_, err2 := registry.etcdClient.Delete(podKey, false)
+		_, err2 := registry.client.Delete(podKey, false)
 		if err2 != nil {
 			glog.Errorf("Probably stranding a pod, couldn't delete %v: %#v", podKey, err2)
 		}
@@ -145,7 +143,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 	// First delete the pod, so a scheduler doesn't notice it getting removed from the
 	// machine and attempt to put it somewhere.
 	podKey := makePodKey(machine, podID)
-	_, err := registry.etcdClient.Delete(podKey, true)
+	_, err := registry.client.Delete(podKey, true)
 	if tools.IsEtcdNotFound(err) {
 		return apiserver.NewNotFoundErr("pod", podID)
 	}
@@ -155,7 +153,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 
 	// Next, remove the pod from the machine atomically.
 	contKey := makeContainerKey(machine)
-	return registry.helper().AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
+	return registry.helper.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
 		manifests := in.(*api.ContainerManifestList)
 		newManifests := make([]api.ContainerManifest, 0, len(manifests.Items))
 		found := false
@@ -179,7 +177,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 
 func (registry *EtcdRegistry) getPodForMachine(machine, podID string) (pod api.Pod, err error) {
 	key := makePodKey(machine, podID)
-	err = registry.helper().ExtractObj(key, &pod, false)
+	err = registry.helper.ExtractObj(key, &pod, false)
 	if err != nil {
 		return
 	}
@@ -204,14 +202,14 @@ func (registry *EtcdRegistry) findPod(podID string) (api.Pod, string, error) {
 // ListControllers obtains a list of ReplicationControllers.
 func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, error) {
 	var controllers []api.ReplicationController
-	err := registry.helper().ExtractList("/registry/controllers", &controllers)
+	err := registry.helper.ExtractList("/registry/controllers", &controllers)
 	return controllers, err
 }
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
 // TODO: Add id/selector parameters?
 func (registry *EtcdRegistry) WatchControllers() (watch.Interface, error) {
-	return registry.helper().WatchList("/registry/controllers", tools.Everything)
+	return registry.helper.WatchList("/registry/controllers", tools.Everything)
 }
 
 func makeControllerKey(id string) string {
@@ -222,7 +220,7 @@ func makeControllerKey(id string) string {
 func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
-	err := registry.helper().ExtractObj(key, &controller, false)
+	err := registry.helper.ExtractObj(key, &controller, false)
 	if tools.IsEtcdNotFound(err) {
 		return nil, apiserver.NewNotFoundErr("replicationController", controllerID)
 	}
@@ -240,13 +238,13 @@ func (registry *EtcdRegistry) CreateController(controller api.ReplicationControl
 
 // UpdateController replaces an existing ReplicationController.
 func (registry *EtcdRegistry) UpdateController(controller api.ReplicationController) error {
-	return registry.helper().SetObj(makeControllerKey(controller.ID), controller)
+	return registry.helper.SetObj(makeControllerKey(controller.ID), controller)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
 func (registry *EtcdRegistry) DeleteController(controllerID string) error {
 	key := makeControllerKey(controllerID)
-	_, err := registry.etcdClient.Delete(key, false)
+	_, err := registry.client.Delete(key, false)
 	if tools.IsEtcdNotFound(err) {
 		return apiserver.NewNotFoundErr("replicationController", controllerID)
 	}
@@ -260,20 +258,20 @@ func makeServiceKey(name string) string {
 // ListServices obtains a list of Services.
 func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
 	var list api.ServiceList
-	err := registry.helper().ExtractList("/registry/services/specs", &list.Items)
+	err := registry.helper.ExtractList("/registry/services/specs", &list.Items)
 	return list, err
 }
 
 // CreateService creates a new Service.
 func (registry *EtcdRegistry) CreateService(svc api.Service) error {
-	return registry.helper().SetObj(makeServiceKey(svc.ID), svc)
+	return registry.helper.SetObj(makeServiceKey(svc.ID), svc)
 }
 
 // GetService obtains a Service specified by its name.
 func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
-	err := registry.helper().ExtractObj(key, &svc, false)
+	err := registry.helper.ExtractObj(key, &svc, false)
 	if tools.IsEtcdNotFound(err) {
 		return nil, apiserver.NewNotFoundErr("service", name)
 	}
@@ -290,7 +288,7 @@ func makeServiceEndpointsKey(name string) string {
 // DeleteService deletes a Service specified by its name.
 func (registry *EtcdRegistry) DeleteService(name string) error {
 	key := makeServiceKey(name)
-	_, err := registry.etcdClient.Delete(key, true)
+	_, err := registry.client.Delete(key, true)
 	if tools.IsEtcdNotFound(err) {
 		return apiserver.NewNotFoundErr("service", name)
 	}
@@ -298,7 +296,7 @@ func (registry *EtcdRegistry) DeleteService(name string) error {
 		return err
 	}
 	key = makeServiceEndpointsKey(name)
-	_, err = registry.etcdClient.Delete(key, true)
+	_, err = registry.client.Delete(key, true)
 	if !tools.IsEtcdNotFound(err) {
 		return err
 	}
@@ -313,5 +311,5 @@ func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 
 // UpdateEndpoints update Endpoints of a Service.
 func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
-	return registry.helper().SetObj("/registry/services/endpoints/"+e.ID, e)
+	return registry.helper.SetObj("/registry/services/endpoints/"+e.ID, e)
 }
