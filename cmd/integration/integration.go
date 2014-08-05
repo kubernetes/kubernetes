@@ -141,12 +141,12 @@ func runReplicationControllerTest(kubeClient *client.Client) {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	var controllerRequest api.ReplicationController
-	if err = json.Unmarshal(data, &controllerRequest); err != nil {
+	if err := json.Unmarshal(data, &controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err = kubeClient.CreateReplicationController(controllerRequest); err != nil {
+	if _, err := kubeClient.CreateReplicationController(controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
@@ -230,8 +230,7 @@ func runAtomicPutTest(c *client.Client) {
 		}(label, value)
 	}
 	wg.Wait()
-	err = c.Get().Path("services").Path(svc.ID).Do().Into(&svc)
-	if err != nil {
+	if err := c.Get().Path("services").Path(svc.ID).Do().Into(&svc); err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
 	if !reflect.DeepEqual(testLabels, labels.Set(svc.Selector)) {
@@ -321,8 +320,8 @@ func ServeCachedManifestFile() (servingAddress string) {
 const (
 	// This is copied from, and should be kept in sync with:
 	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
-	testManifestFile = `version: v1beta1
-id: web-test
+	testManifestFile = `version: v1beta2
+id: container-vm-guestbook
 containers:
   - name: redis
     image: dockerfile/redis
