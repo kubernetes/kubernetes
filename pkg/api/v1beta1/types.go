@@ -86,6 +86,11 @@ type VolumeSource struct {
 	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
 	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
 	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
+	// GCEPersistentDisk represents aPersistent Disk resource in Google Compute Engine that will
+	// be attached to a kubelet's host machine and then exposed to the pod.
+	// The GCEPD specified must already exist in same project and zone as the kubernetes cluster.
+	// This resource can only be used when running in a GCE environment.
+	GCEPersistentDisk *GCEPersistentDisk `yaml:"gcePD" json:"gcePD"`
 }
 
 // HostDirectory represents bare host directory volume.
@@ -95,7 +100,18 @@ type HostDirectory struct {
 
 type EmptyDirectory struct{}
 
-// Port represents a network port in a single container.
+// Google Compute Engine Persistent Disk resource.
+type GCEPersistentDisk struct {
+	// Unique name of the PD resource in GCE.
+	PDName string `yaml:"pdName" json:"pdName"`
+	// Optional: Specifies the filesystem on the disk.
+	FSType string `yaml:"fsType,omitempty" json:"fsType,omitempty"`
+	// Optional: Defaults to false (read-write). ReadOnly here will override
+	// the ReadOnly flag in VolumeMounts
+	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+}
+
+// Port represents a network port in a single container
 type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.

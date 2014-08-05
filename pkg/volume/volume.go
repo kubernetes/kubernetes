@@ -151,6 +151,14 @@ func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *Emp
 	return &EmptyDirectory{volume.Name, podID, rootDir}
 }
 
+// Interprets API volume as a GCEPersistentDisk
+func createGCEPersistentDisk(volume *api.Volume, podID string, rootDir string) *GCEPersistentDisk {
+	PDName := volume.Source.GCEPersistentDisk.PDName
+	FSType := volume.Source.GCEPersistentDisk.FSType
+	readOnly := volume.Source.GCEPersistentDisk.ReadOnly
+	return &GCEPersistentDisk{volume.Name, podID, rootDir, PDName, FSType, readOnly}
+}
+
 // CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
 // *api.Volume, or an error.
 func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Builder, error) {
@@ -167,6 +175,8 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 		vol = createHostDirectory(volume)
 	} else if source.EmptyDirectory != nil {
 		vol = createEmptyDirectory(volume, podID, rootDir)
+	} else if source.GCEPersistentDisk != nil {
+		vol = createGCEPersistentDisk(volume, podID, rootDir)
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}

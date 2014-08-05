@@ -36,15 +36,16 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
-		{Name: "123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path2"}}},
-		{Name: "abc-123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path3"}}},
-		{Name: "empty", Source: &api.VolumeSource{EmptyDirectory: &api.EmptyDirectory{}}},
+		{Name: "123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path2"}}},
+		{Name: "abc-123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path3"}}},
+		{Name: "empty", Source: &VolumeSource{EmptyDirectory: &EmptyDirectory{}}},
+		{Name: "gcepd", Source: &VolumeSource{GCEPersistentDisk: &GCEPersistentDisk{"my-PD", "ext4", false}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != 4 || !names.HasAll("abc", "123", "abc-123", "empty") {
+	if len(names) != 5 || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd") {
 		t.Errorf("wrong names result: %v", names)
 	}
 

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # TODO(jbeda): Provide a way to override project
-ZONE=us-central1-b
+ZONE=us-central1-a
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
 NUM_MINIONS=4

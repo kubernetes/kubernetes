@@ -63,6 +63,10 @@ func validateSource(source *api.VolumeSource) errs.ErrorList {
 		numVolumes++
 		//EmptyDirs have nothing to validate
 	}
+	if source.GCEPersistentDisk != nil {
+		numVolumes++
+		allErrs.Append(validateGCEPersistentDisk(source.GCEPersistentDisk)...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewInvalid("", source))
 	}
@@ -73,6 +77,14 @@ func validateHostDir(hostDir *api.HostDirectory) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if hostDir.Path == "" {
 		allErrs = append(allErrs, errs.NewNotFound("path", hostDir.Path))
+	}
+	return allErrs
+}
+
+func validateGCEPersistentDisk(GCEPD *GCEPersistentDisk) errorList {
+	allErrs := errorList{}
+	if GCEPD.PDName == "" {
+		allErrs.Append(makeNotFoundError("GCEPD.PDName", GCEPD.PDName))
 	}
 	return allErrs
 }

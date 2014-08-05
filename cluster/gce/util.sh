@@ -151,7 +151,7 @@ function kube-up {
     --target_tags ${MASTER_TAG} \
     --allowed tcp:443 &
 
-  gcutil addinstance ${MASTER_NAME}\
+  /usr/bin/gcutil addinstance ${MASTER_NAME}\
     --norespect_terminal_width \
     --project ${PROJECT} \
     --zone ${ZONE} \
@@ -186,7 +186,7 @@ function kube-up {
       --image ${IMAGE} \
       --tags ${MINION_TAG} \
       --network ${NETWORK} \
-      --service_account_scopes=${MINION_SCOPES} \
+      --service_account_scopes="storage-ro,compute-rw" \
       --automatic_restart \
       --can_ip_forward \
       --metadata_from_file startup-script:${KUBE_TEMP}/minion-start-${i}.sh &
