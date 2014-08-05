@@ -88,14 +88,14 @@ func IsEtcdNotFound(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeNotFound)
 }
 
-// Returns true iff err is an etcd key node exists error.
-func IsEtcdNodeExist(err error) bool {
-	return isEtcdErrorNum(err, EtcdErrorCodeNodeExist)
-}
-
 // IsEtcdTestFailed returns true iff err is an etcd write conflict.
 func IsEtcdTestFailed(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeTestFailed)
+}
+
+// IsEtcdNodeExist returns true iff err is an etcd node aleady exist error.
+func IsEtcdNodeExist(err error) bool {
+	return isEtcdErrorNum(err, EtcdErrorCodeNodeExist)
 }
 
 // IsEtcdWatchStoppedByUser returns true iff err is a client triggered stop.
@@ -253,15 +253,20 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 			return err
 		}
 
-		// First time this key has been used, just set.
-		if index == 0 {
-			return h.SetObj(key, ret)
-		}
-
 		data, err := h.Encoding.Encode(ret)
 		if err != nil {
 			return err
 		}
+
+		// First time this key has been used, try creating new value.
+		if index == 0 {
+			_, err = h.Client.Create(key, string(data), 0)
+			if IsEtcdNodeExist(err) {
+				continue
+			}
+			return err
+		}
+
 		_, err = h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
 		if IsEtcdTestFailed(err) {
 			continue
