@@ -88,11 +88,6 @@ func IsEtcdNotFound(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeNotFound)
 }
 
-// Returns true iff err is an etcd key node exists error.
-func IsEtcdNodeExist(err error) bool {
-	return isEtcdErrorNum(err, EtcdErrorCodeNodeExist)
-}
-
 // IsEtcdTestFailed returns true iff err is an etcd write conflict.
 func IsEtcdTestFailed(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeTestFailed)
