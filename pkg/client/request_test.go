@@ -43,7 +43,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
 	s := New(testServer.URL, &auth)
 	obj, err := s.Verb("POST").
@@ -81,7 +81,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
 	s := New(testServer.URL, &auth)
 	obj, err := s.Verb("POST").
@@ -121,7 +121,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
 	s := New(testServer.URL, &auth)
 	obj, err := s.Verb("POST").
@@ -174,7 +174,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
 	s := New(testServer.URL, &auth)
 	obj, err := s.Verb("POST").
@@ -266,7 +266,7 @@ func TestPolling(t *testing.T) {
 	}
 
 	callNumber := 0
-	testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, err := api.Encode(objects[callNumber])
 		if err != nil {
 			t.Errorf("Unexpected encode error")
@@ -360,7 +360,7 @@ func TestWatch(t *testing.T) {
 	}
 
 	auth := AuthInfo{User: "user", Password: "pass"}
-	testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		checkAuth(t, auth, r)
 		flusher, ok := w.(http.Flusher)
 		if !ok {

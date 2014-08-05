@@ -320,7 +320,7 @@ func (c *testClient) Setup() *testClient {
 	if responseBody := body(c.Response.Body, c.Response.RawBody); responseBody != nil {
 		c.handler.ResponseBody = *responseBody
 	}
-	c.server = httptest.NewTLSServer(c.handler)
+	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
 		c.Client = New("", nil)
 	}
@@ -430,7 +430,7 @@ func TestDoRequestAccepted(t *testing.T) {
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	testServer := httptest.NewServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := AuthInfo{User: "user", Password: "pass"}
 	c := New(testServer.URL, &auth)
@@ -464,7 +464,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
-	testServer := httptest.NewTLSServer(&fakeHandler)
+	testServer := httptest.NewServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := AuthInfo{User: "user", Password: "pass"}
 	c := New(testServer.URL, &auth)
