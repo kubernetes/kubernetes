@@ -35,15 +35,15 @@ func (s *APIServer) watchPrefix() string {
 // handleWatch processes a watch request
 func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
 	prefix := s.watchPrefix()
-	if !strings.HasPrefix(req.URL.Path, prefix) {
+	if !strings.HasPrefix(req.RequestURI, prefix) {
 		notFound(w, req)
 		return
 	}
-	parts := strings.Split(req.URL.Path[len(prefix):], "/")[1:]
+	parts := strings.Split(getRawPath(req)[len(prefix):], "/")[1:]
 	if req.Method != "GET" || len(parts) < 1 {
 		notFound(w, req)
 	}
-	storage := s.storage[parts[0]]
+	storage := s.storage[decodeRawPathSegment(parts[0])]
 	if storage == nil {
 		notFound(w, req)
 	}

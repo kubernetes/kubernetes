@@ -21,6 +21,21 @@ import (
 	"net/http"
 )
 
+type errAlreadyExists string
+
+func (err errAlreadyExists) Error() string {
+	return string(err)
+}
+
+func IsAlreadyExists(err error) bool {
+	_, ok := err.(errAlreadyExists)
+	return ok
+}
+
+func NewAlreadyExistsErr(kind, name string) error {
+	return errAlreadyExists(fmt.Sprintf("%s %q already exists", kind, name))
+}
+
 // internalError renders a generic error to the response
 func internalError(err error, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
