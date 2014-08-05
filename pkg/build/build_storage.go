@@ -18,6 +18,7 @@ package build
 
 import (
 	"fmt"
+	"time"
 
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -83,6 +84,10 @@ func (storage *BuildRegistryStorage) Create(obj interface{}) (<-chan interface{}
 	}
 	if len(build.Status) == 0 {
 		build.Status = buildapi.BuildNew
+	}
+
+	if build.CreationTimestamp == "" {
+		build.CreationTimestamp = time.Now().Format(time.UnixDate)
 	}
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
