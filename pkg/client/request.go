@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -33,18 +34,19 @@ import (
 	"github.com/golang/glog"
 )
 
-// Server contains info locating a kubernetes api server.
-// Example usage:
+// Verb begins a request with a verb (GET, POST, PUT, DELETE)
+//
+// Example usage of Client's request building interface:
 // auth, err := LoadAuth(filename)
 // c := New(url, auth)
 // resp, err := c.Verb("GET").
 //	Path("pods").
-//	Selector("area=staging").
+//	SelectorParam("labels", "area=staging").
 //	Timeout(10*time.Second).
 //	Do()
-// list, ok := resp.(api.PodList)
-
-// Verb begins a request with a verb (GET, POST, PUT, DELETE)
+// if err != nil { ... }
+// list, ok := resp.(*api.PodList)
+//
 func (c *Client) Verb(verb string) *Request {
 	return &Request{
 		verb:       verb,
@@ -52,26 +54,27 @@ func (c *Client) Verb(verb string) *Request {
 		path:       "/api/v1beta1",
 		sync:       c.Sync,
 		timeout:    c.Timeout,
+		params:     map[string]string{},
 		pollPeriod: c.PollPeriod,
 	}
 }
 
-// Post begins a POST request.
+// Post begins a POST request. Short for c.Verb("POST").
 func (c *Client) Post() *Request {
 	return c.Verb("POST")
 }
 
-// Put begins a PUT request.
+// Put begins a PUT request. Short for c.Verb("PUT").
 func (c *Client) Put() *Request {
 	return c.Verb("PUT")
 }
 
-// Get begins a GET request.
+// Get begins a GET request. Short for c.Verb("GET").
 func (c *Client) Get() *Request {
 	return c.Verb("GET")
 }
 
-// Delete begins a DELETE request.
+// Delete begins a DELETE request. Short for c.Verb("DELETE").
 func (c *Client) Delete() *Request {
 	return c.Verb("DELETE")
 }
@@ -90,6 +93,7 @@ type Request struct {
 	verb       string
 	path       string
 	body       io.Reader
+	params     map[string]string
 	selector   labels.Selector
 	timeout    time.Duration
 	sync       bool
@@ -105,7 +109,7 @@ func (r *Request) Path(item string) *Request {
 	return r
 }
 
-// Sync sets sync/async call status.
+// Sync sets sync/async call status by setting the "sync" parameter to "true"/"false"
 func (r *Request) Sync(sync bool) *Request {
 	if r.err != nil {
 		return r
@@ -123,25 +127,41 @@ func (r *Request) AbsPath(path string) *Request {
 	return r
 }
 
-// ParseSelector parses the given string as a resource label selector. Optional.
-func (r *Request) ParseSelector(item string) *Request {
+// ParseSelectorParam parses the given string as a resource label selector.
+// This is a convenience function so you don't have to first check that it's a
+// validly formatted selector.
+func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.selector, r.err = labels.ParseSelector(item)
+	if sel, err := labels.ParseSelector(item); err != nil {
+		r.err = err
+	} else {
+		r.params[paramName] = sel.String()
+	}
 	return r
 }
 
-// Selector makes the request use the given selector.
-func (r *Request) Selector(s labels.Selector) *Request {
+// SelectorParam adds the given selector as a query parameter with the name paramName.
+func (r *Request) SelectorParam(paramName string, s labels.Selector) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.selector = s
+	r.params[paramName] = s.String()
 	return r
 }
 
-// Timeout makes the request use the given duration as a timeout. Optional.
+// UintParam creates a query parameter with the given value.
+func (r *Request) UintParam(paramName string, u uint64) *Request {
+	if r.err != nil {
+		return r
+	}
+	r.params[paramName] = strconv.FormatUint(u, 10)
+	return r
+}
+
+// Timeout makes the request use the given duration as a timeout. Sets the "timeout"
+// parameter. Ignored if sync=false.
 func (r *Request) Timeout(d time.Duration) *Request {
 	if r.err != nil {
 		return r
@@ -153,6 +173,7 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // Body makes the request use obj as the body. Optional.
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.
+// If obj is an io.Reader, use it directly.
 // Otherwise, assume obj is an api type and marshall it correctly.
 func (r *Request) Body(obj interface{}) *Request {
 	if r.err != nil {
@@ -160,23 +181,21 @@ func (r *Request) Body(obj interface{}) *Request {
 	}
 	switch t := obj.(type) {
 	case string:
-		data, err := ioutil.ReadFile(t)
-		if err != nil {
+		if data, err := ioutil.ReadFile(t); err != nil {
 			r.err = err
-			return r
+		} else {
+			r.body = bytes.NewBuffer(data)
 		}
-		r.body = bytes.NewBuffer(data)
 	case []byte:
 		r.body = bytes.NewBuffer(t)
 	case io.Reader:
-		r.body = obj.(io.Reader)
+		r.body = t
 	default:
-		data, err := api.Encode(obj)
-		if err != nil {
+		if data, err := api.Encode(obj); err != nil {
 			r.err = err
-			return r
+		} else {
+			r.body = bytes.NewBuffer(data)
 		}
-		r.body = bytes.NewBuffer(data)
 	}
 	return r
 }
@@ -197,9 +216,11 @@ func (r *Request) PollPeriod(d time.Duration) *Request {
 func (r *Request) finalURL() string {
 	finalURL := r.c.host + r.path
 	query := url.Values{}
-	if r.selector != nil {
-		query.Add("labels", r.selector.String())
+	for key, value := range r.params {
+		query.Add(key, value)
 	}
+	// sync and timeout are handled specially here, to allow setting them
+	// in any order.
 	if r.sync {
 		query.Add("sync", "true")
 		if r.timeout != 0 {

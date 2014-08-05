@@ -42,7 +42,7 @@ func TestListEmptyPods(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200, Body: api.PodList{}},
 	}
-	podList, err := c.Setup().ListPods(nil)
+	podList, err := c.Setup().ListPods(labels.Everything())
 	c.Validate(t, podList, err)
 }
 
@@ -65,7 +65,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup().ListPods(nil)
+	receivedPodList, err := c.Setup().ListPods(labels.Everything())
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -191,7 +191,7 @@ func TestListControllers(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup().ListReplicationControllers(nil)
+	receivedControllerList, err := c.Setup().ListReplicationControllers(labels.Everything())
 	c.Validate(t, receivedControllerList, err)
 
 }

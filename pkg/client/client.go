@@ -169,7 +169,7 @@ func (c *Client) makeURL(path string) string {
 
 // ListPods takes a selector, and returns the list of pods that match that selector
 func (c *Client) ListPods(selector labels.Selector) (result api.PodList, err error) {
-	err = c.Get().Path("pods").Selector(selector).Do().Into(&result)
+	err = c.Get().Path("pods").SelectorParam("labels", selector).Do().Into(&result)
 	return
 }
 
@@ -202,7 +202,7 @@ func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
 
 // ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector
 func (c *Client) ListReplicationControllers(selector labels.Selector) (result api.ReplicationControllerList, err error) {
-	err = c.Get().Path("replicationControllers").Selector(selector).Do().Into(&result)
+	err = c.Get().Path("replicationControllers").SelectorParam("labels", selector).Do().Into(&result)
 	return
 }
 
