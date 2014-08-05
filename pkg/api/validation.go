@@ -302,6 +302,8 @@ func ValidateService(service *Service) []error {
 	allErrs := errorList{}
 	if service.ID == "" {
 		allErrs.Append(makeInvalidError("Service.ID", service.ID))
+	} else if !util.IsDNS952Label(service.ID) {
+		allErrs.Append(makeInvalidError("Service.ID", service.ID))
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs.Append(makeInvalidError("Service.Selector", service.Selector))

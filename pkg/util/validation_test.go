@@ -100,6 +100,7 @@ func TestIsCIdentifier(t *testing.T) {
 		"-", "a-", "-a", "1-", "-1", "1_", "1_2",
 		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
 		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
+		"#a#",
 	}
 	for _, val := range badValues {
 		if IsCIdentifier(val) {
@@ -120,6 +121,29 @@ func TestIsValidPortNum(t *testing.T) {
 	for _, val := range badValues {
 		if IsValidPortNum(val) {
 			t.Errorf("expected false for '%d'", val)
+		}
+	}
+}
+
+func TestIsDNS952(t *testing.T) {
+	goodValues := []string{
+		"a", "ab", "abc", "a1", "a-b", "a-1", "a-1-2-b", "abc-123",
+	}
+	for _, val := range goodValues {
+		if !IsDNS952Label(val) {
+			t.Errorf("expected true for '%s'", val)
+		}
+	}
+
+	badValues := []string{
+		"", "1", "123", "1a",
+		"-", "a-", "-a", "1-", "-1", "1-2",
+		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
+		"A", "AB", "AbC", "A1", "A-B", "A-1", "A-1-2-B",
+	}
+	for _, val := range badValues {
+		if IsDNS952Label(val) {
+			t.Errorf("expected false for '%s'", val)
 		}
 	}
 }
