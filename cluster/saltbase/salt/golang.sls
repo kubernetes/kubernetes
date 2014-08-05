@@ -1,9 +1,8 @@
-{% set go_version = '1.2' %}
+{% set go_version = '1.2.2' %}
 {% set go_arch = 'linux-amd64' %}
 {% set go_archive = 'go%s.%s.tar.gz' | format(go_version, go_arch) %}
-{% set go_url = 'https://go.googlecode.com/files/' + go_archive %}
-{% set go_hash = 'md5=68901bbf8a04e71e0b30aa19c3946b21' %}
-
+{% set go_url = 'http://golang.org/dl/' + go_archive %}
+{% set go_hash = 'sha1=6bd151ca49c435462c8bf019477a6244b958ebb5' %}
 
 get-golang:
   file.managed:
