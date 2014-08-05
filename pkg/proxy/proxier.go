@@ -193,7 +193,7 @@ func (proxier *Proxier) addServiceCommon(service string, l net.Listener) {
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
-func (proxier Proxier) OnUpdate(services []api.Service) {
+func (proxier *Proxier) OnUpdate(services []api.Service) {
 	glog.Infof("Received update notice: %+v", services)
 	activeServices := util.StringSet{}
 	for _, service := range services {
