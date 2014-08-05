@@ -20,7 +20,7 @@ import (
 	"sync"
 )
 
-// FIFO recieves adds and updates from a Reflector, and puts them in a queue for
+// FIFO receives adds and updates from a Reflector, and puts them in a queue for
 // FIFO order processing. If multiple adds/updates of a single item happen while
 // an item is in the queue before it has been processed, it will only be
 // processed once, and when it is processed, the most recent version will be
