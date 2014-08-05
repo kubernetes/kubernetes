@@ -14,7 +14,7 @@ install:
   - ./hack/build-go.sh
 
 script:
-  - ./hack/test-go.sh
+  - ./hack/test-go.sh "" -v
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/integration-test.sh
 
