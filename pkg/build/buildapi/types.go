@@ -39,9 +39,11 @@ const (
 )
 
 type BuildConfig struct {
-	Type      BuildType `json:"type,omitempty" yaml:"type,omitempty"`
-	SourceURI string    `json:"sourceUri,omitempty" yaml:"sourceUri,omitempty"`
-	ImageTag  string    `json:"imageTag,omitempty" yaml:"imageTag,omitempty"`
+	Type         BuildType `json:"type,omitempty" yaml:"type,omitempty"`
+	SourceURI    string    `json:"sourceUri,omitempty" yaml:"sourceUri,omitempty"`
+	ImageTag     string    `json:"imageTag,omitempty" yaml:"imageTag,omitempty"`
+	BuilderImage string    `json:"builderImage,omitempty" yaml:"builderImage,omitempty"`
+	SourceRef    string    `json:"sourceRef,omitempty" yaml:"sourceRef,omitempty"`
 }
 
 type BuildType string

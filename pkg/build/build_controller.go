@@ -21,20 +21,23 @@ type BuildController struct {
 	typeStrategies     map[buildapi.BuildType]buildTypeStrategy
 	dockerBuilderImage string
 	dockerRegistry     string
+	stiBuilderImage    string
 	timeout            int
 }
 
-func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, dockerRegistry string, timeout int) *BuildController {
-	glog.Infof("Creating build controller with dockerBuilderImage=%s, dockerRegistry=%s, timeout=%v", dockerBuilderImage, dockerRegistry, timeout)
+func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, dockerRegistry, stiBuilderImage string, timeout int) *BuildController {
+	glog.Infof("Creating build controller with dockerBuilderImage=%s, dockerRegistry=%s, stiBuilderImage=%s, timeout=%d", dockerBuilderImage, dockerRegistry, stiBuilderImage, timeout)
 	bc := &BuildController{
 		kubeClient:         kubeClient,
 		dockerBuilderImage: dockerBuilderImage,
 		dockerRegistry:     dockerRegistry,
+		stiBuilderImage:    stiBuilderImage,
 		timeout:            timeout,
 	}
 
 	bc.typeStrategies = map[buildapi.BuildType]buildTypeStrategy{
 		buildapi.BuildType("docker"): bc.dockerBuildStrategy,
+		buildapi.BuildType("sti"):    bc.stiBuildStrategy,
 	}
 
 	return bc
@@ -206,6 +209,33 @@ func (bc BuildController) dockerBuildStrategy(build buildapi.Build) api.Pod {
 							{Name: "BUILD_TAG", Value: build.Config.ImageTag},
 							{Name: "DOCKER_CONTEXT_URL", Value: build.Config.SourceURI},
 							{Name: "DOCKER_REGISTRY", Value: bc.dockerRegistry},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (bc BuildController) stiBuildStrategy(build buildapi.Build) api.Pod {
+	return api.Pod{
+		JSONBase: api.JSONBase{
+			ID: build.PodID,
+		},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				Containers: []api.Container{
+					{
+						Name:          "sti-build",
+						Image:         bc.stiBuilderImage,
+						RestartPolicy: "runOnce",
+						Env: []api.EnvVar{
+							{Name: "BUILD_TAG", Value: build.Config.ImageTag},
+							{Name: "DOCKER_REGISTRY", Value: bc.dockerRegistry},
+							{Name: "SOURCE_URI", Value: build.Config.SourceURI},
+							{Name: "SOURCE_REF", Value: build.Config.SourceRef},
+							{Name: "BUILDER_IMAGE", Value: build.Config.BuilderImage},
 						},
 					},
 				},
