@@ -28,7 +28,7 @@ type FakeCloud struct {
 	Calls    []string
 	IP       net.IP
 	Machines []string
-	Zone     string
+	Zone
 }
 
 func (f *FakeCloud) addCall(desc string) {
@@ -104,7 +104,7 @@ func (f *FakeCloud) List(filter string) ([]string, error) {
 	return result, f.Err
 }
 
-func (f *FakeCloud) GetZone() (string, error) {
+func (f *FakeCloud) GetZone() (Zone, error) {
 	f.addCall("get-zone")
 	return f.Zone, f.Err
 }

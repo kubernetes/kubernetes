@@ -142,7 +142,7 @@ func (sr *ServiceRegistryStorage) deleteExternalLoadBalancer(service *api.Servic
 		return err
 	}
 
-	if err := balancer.DeleteTCPLoadBalancer(service.JSONBase.ID, zone); err != nil {
+	if err := balancer.DeleteTCPLoadBalancer(service.JSONBase.ID, zone.Region); err != nil {
 		return err
 	}
 
@@ -194,7 +194,7 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, e
 			if err != nil {
 				return nil, err
 			}
-			err = balancer.CreateTCPLoadBalancer(srv.ID, zone, srv.Port, hosts)
+			err = balancer.CreateTCPLoadBalancer(srv.ID, zone.Region, srv.Port, hosts)
 			if err != nil {
 				return nil, err
 			}

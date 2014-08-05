@@ -51,8 +51,14 @@ type Instances interface {
 	List(filter string) ([]string, error)
 }
 
+// Zone represents the location of a particular machine
+type Zone struct {
+	FailureDomain string
+	Region        string
+}
+
 // Zones is an abstract, pluggable interface for zone enumeration.
 type Zones interface {
-	// GetZone returns the name of the current failure zone that the program is running in
-	GetZone() (string, error)
+	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+	GetZone() (Zone, error)
 }
