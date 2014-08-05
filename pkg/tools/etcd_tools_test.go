@@ -19,6 +19,7 @@ package tools
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -226,7 +227,7 @@ func TestAtomicUpdate(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
-	obj := TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 1}
+	obj := &TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 1}
 	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
 		return obj, nil
 	})
@@ -242,7 +243,6 @@ func TestAtomicUpdate(t *testing.T) {
 	if expect != got {
 		t.Errorf("Wanted %v, got %v", expect, got)
 	}
-	return
 
 	// Update an existing node.
 	callbackCalled := false
@@ -271,6 +271,57 @@ func TestAtomicUpdate(t *testing.T) {
 
 	if !callbackCalled {
 		t.Errorf("tryUpdate callback should have been called.")
+	}
+}
+
+func TestAtomicUpdate_CreateCollision(t *testing.T) {
+	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	encoding := scheme
+	helper := EtcdHelper{fakeClient, encoding, api.JSONBaseVersioning{}}
+
+	fakeClient.ExpectNotFoundGet("/some/key")
+
+	const concurrency = 10
+	var wgDone sync.WaitGroup
+	var wgForceCollision sync.WaitGroup
+	wgDone.Add(concurrency)
+	wgForceCollision.Add(concurrency)
+
+	for i := 0; i < concurrency; i++ {
+		// Increment TestResource.Value by 1
+		go func() {
+			defer wgDone.Done()
+
+			firstCall := true
+			err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+				defer func() { firstCall = false }()
+
+				if firstCall {
+					// Force collision by joining all concurrent AtomicUpdate operations here.
+					wgForceCollision.Done()
+					wgForceCollision.Wait()
+				}
+
+				currValue := in.(*TestResource).Value
+				obj := TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: currValue + 1}
+				return obj, nil
+			})
+			if err != nil {
+				t.Errorf("Unexpected error %#v", err)
+			}
+		}()
+	}
+	wgDone.Wait()
+
+	// Check that stored TestResource has received all updates.
+	body := fakeClient.Data["/some/key"].R.Node.Value
+	stored := &TestResource{}
+	if err := encoding.DecodeInto([]byte(body), stored); err != nil {
+		t.Errorf("Error decoding stored value: %v", body)
+	}
+	if stored.Value != concurrency {
+		t.Errorf("Some of the writes were lost. Stored value: %d", stored.Value)
 	}
 }
 
