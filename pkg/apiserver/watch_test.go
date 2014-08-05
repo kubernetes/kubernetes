@@ -148,3 +148,70 @@ func TestWatchHTTP(t *testing.T) {
 		t.Errorf("Unexpected non-error")
 	}
 }
+
+func TestWatchParamParsing(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := New(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/prefix/version/watch/foo"
+
+	table := []struct {
+		rawQuery        string
+		resourceVersion uint64
+		labelSelector   string
+		fieldSelector   string
+		id              string
+	}{
+		{
+			rawQuery:        "id=myID&resourceVersion=1234",
+			resourceVersion: 1234,
+			labelSelector:   "",
+			fieldSelector:   "",
+			id:              "myID",
+		}, {
+			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			resourceVersion: 314159,
+			labelSelector:   "name=foo",
+			fieldSelector:   "Host=",
+			id:              "",
+		}, {
+			rawQuery:        "",
+			resourceVersion: 0,
+			labelSelector:   "",
+			fieldSelector:   "",
+			id:              "",
+		},
+	}
+
+	for _, item := range table {
+		simpleStorage.requestedLabelSelector = nil
+		simpleStorage.requestedFieldSelector = nil
+		simpleStorage.requestedResourceVersion = 5 // Prove this is set in all cases
+		simpleStorage.requestedID = ""
+		dest.RawQuery = item.rawQuery
+		resp, err := http.Get(dest.String())
+		if err != nil {
+			t.Errorf("%v: unexpected error: %v", item.rawQuery, err)
+			continue
+		}
+		resp.Body.Close()
+		if e, a := item.id, simpleStorage.requestedID; e != a {
+			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+		}
+		if e, a := item.resourceVersion, simpleStorage.requestedResourceVersion; e != a {
+			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+		}
+		if simpleStorage.requestedID == "" {
+			if e, a := item.labelSelector, simpleStorage.requestedLabelSelector.String(); e != a {
+				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+			}
+			if e, a := item.fieldSelector, simpleStorage.requestedFieldSelector.String(); e != a {
+				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+			}
+		}
+	}
+}

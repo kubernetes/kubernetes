@@ -19,15 +19,36 @@ package apiserver
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type WatchHandler struct {
 	storage map[string]RESTStorage
+}
+
+func (s *APIServer) getWatchParams(query url.Values) (id string, label, field labels.Selector, resourceVersion uint64) {
+	id = query.Get("id")
+	if s, err := labels.ParseSelector(query.Get("labels")); err != nil {
+		label = labels.Everything()
+	} else {
+		label = s
+	}
+	if s, err := labels.ParseSelector(query.Get("fields")); err != nil {
+		field = labels.Everything()
+	} else {
+		field = s
+	}
+	if rv, err := strconv.ParseUint(query.Get("resourceVersion"), 10, 64); err == nil {
+		resourceVersion = rv
+	}
+	return id, label, field, resourceVersion
 }
 
 // handleWatch processes a watch request
@@ -43,10 +64,11 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if watcher, ok := storage.(ResourceWatcher); ok {
 		var watching watch.Interface
 		var err error
-		if id := req.URL.Query().Get("id"); id != "" {
-			watching, err = watcher.WatchSingle(id)
+		id, label, field, resourceVersion := s.getWatchParams(req.URL.Query())
+		if id != "" {
+			watching, err = watcher.WatchSingle(id, resourceVersion)
 		} else {
-			watching, err = watcher.WatchAll()
+			watching, err = watcher.WatchAll(label, field, resourceVersion)
 		}
 		if err != nil {
 			internalError(err, w)

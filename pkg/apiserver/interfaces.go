@@ -29,6 +29,7 @@ type RESTStorage interface {
 	New() interface{}
 
 	// List selects resources in the storage which match to the selector.
+	// TODO: add field selector in addition to label selector.
 	List(labels.Selector) (interface{}, error)
 
 	// Get finds a resource in the storage by id and returns it.
@@ -46,7 +47,10 @@ type RESTStorage interface {
 // ResourceWatcher should be implemented by all RESTStorage objects that
 // want to offer the ability to watch for changes through the watch api.
 type ResourceWatcher interface {
-	// TODO: take a query, like List, to filter out unwanted events.
-	WatchAll() (watch.Interface, error)
-	WatchSingle(id string) (watch.Interface, error)
+	// label selects on labels; field selects on the objects fields. Not all fields
+	// are supported; an error will be returned if you try to select for a field that
+	// isn't supported.
+	WatchAll(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	// TODO: Decide if we need to keep WatchSingle?
+	WatchSingle(id string, resourceVersion uint64) (watch.Interface, error)
 }

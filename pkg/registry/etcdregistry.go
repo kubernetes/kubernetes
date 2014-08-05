@@ -205,9 +205,13 @@ func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, er
 }
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
-// TODO: Add id/selector parameters?
-func (registry *EtcdRegistry) WatchControllers() (watch.Interface, error) {
-	return registry.helper.WatchList("/registry/controllers", tools.Everything)
+func (registry *EtcdRegistry) WatchControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	if field.String() != "" {
+		return nil, fmt.Errorf("no field selector implemented for controllers")
+	}
+	return registry.helper.WatchList("/registry/controllers", resourceVersion, func(obj interface{}) bool {
+		return label.Matches(labels.Set(obj.(*api.ReplicationController).Labels))
+	})
 }
 
 func makeControllerKey(id string) string {

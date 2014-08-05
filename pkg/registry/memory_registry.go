@@ -89,7 +89,7 @@ func (registry *MemoryRegistry) ListControllers() ([]api.ReplicationController, 
 	return result, nil
 }
 
-func (registry *MemoryRegistry) WatchControllers() (watch.Interface, error) {
+func (registry *MemoryRegistry) WatchControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return nil, errors.New("unimplemented")
 }
 

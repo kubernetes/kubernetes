@@ -296,18 +296,19 @@ func Everything(interface{}) bool {
 
 // WatchList begins watching the specified key's items. Items are decoded into
 // API objects, and any items passing 'filter' are sent down the returned
-// watch.Interface.
-func (h *EtcdHelper) WatchList(key string, filter FilterFunc) (watch.Interface, error) {
+// watch.Interface. resourceVersion may be used to specify what version to begin
+// watching (e.g., for reconnecting without missing any updateds).
+func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
 	w := newEtcdWatcher(true, filter, h.Codec)
-	go w.etcdWatch(h.Client, key)
+	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
 }
 
 // Watch begins watching the specified key. Events are decoded into
 // API objects and sent down the returned watch.Interface.
-func (h *EtcdHelper) Watch(key string) (watch.Interface, error) {
+func (h *EtcdHelper) Watch(key string, resourceVersion uint64) (watch.Interface, error) {
 	w := newEtcdWatcher(false, nil, h.Codec)
-	go w.etcdWatch(h.Client, key)
+	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
 }
 
@@ -350,10 +351,10 @@ func newEtcdWatcher(list bool, filter FilterFunc, encoding Codec) *etcdWatcher {
 
 // etcdWatch calls etcd's Watch function, and handles any errors. Meant to be called
 // as a goroutine.
-func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string) {
+func (w *etcdWatcher) etcdWatch(client EtcdGetSet, key string, resourceVersion uint64) {
 	defer util.HandleCrash()
 	defer close(w.etcdCallEnded)
-	_, err := client.Watch(key, 0, w.list, w.etcdIncoming, w.etcdStop)
+	_, err := client.Watch(key, resourceVersion, w.list, w.etcdIncoming, w.etcdStop)
 	if err != etcd.ErrWatchStoppedByUser {
 		glog.Errorf("etcd.Watch stopped unexpectedly: %v (%#v)", err, err)
 	}
@@ -385,18 +386,20 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	var action watch.EventType
 	var data []byte
 	switch res.Action {
-	case "create", "set":
+	case "create":
 		if res.Node == nil {
 			glog.Errorf("unexpected nil node: %#v", res)
 			return
 		}
 		data = []byte(res.Node.Value)
-		// TODO: Is this conditional correct?
-		if res.EtcdIndex > 0 {
-			action = watch.Modified
-		} else {
-			action = watch.Added
+		action = watch.Added
+	case "set":
+		if res.Node == nil {
+			glog.Errorf("unexpected nil node: %#v", res)
+			return
 		}
+		data = []byte(res.Node.Value)
+		action = watch.Modified
 	case "delete":
 		if res.PrevNode == nil {
 			glog.Errorf("unexpected nil prev node: %#v", res)
