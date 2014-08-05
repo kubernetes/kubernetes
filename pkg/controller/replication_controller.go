@@ -23,18 +23,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
-// ReplicationManager is responsible for synchronizing ReplicationController objects stored in etcd
-// with actual running pods.
-// TODO: Allow choice of switching between etcd/apiserver watching, or remove etcd references
-// from this file completely.
+// ReplicationManager is responsible for synchronizing ReplicationController objects stored
+// in the system with actual running pods.
 type ReplicationManager struct {
-	etcdHelper tools.EtcdHelper
 	kubeClient client.Interface
 	podControl PodControlInterface
 	syncTime   <-chan time.Time
@@ -81,10 +77,9 @@ func (r RealPodControl) deletePod(podID string) error {
 }
 
 // MakeReplicationManager creates a new ReplicationManager.
-func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Interface) *ReplicationManager {
+func MakeReplicationManager(kubeClient client.Interface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
-		etcdHelper: tools.EtcdHelper{etcdClient, api.Encoding, api.Versioning},
 		podControl: RealPodControl{
 			kubeClient: kubeClient,
 		},
@@ -98,11 +93,6 @@ func MakeReplicationManager(etcdClient tools.EtcdClient, kubeClient client.Inter
 func (rm *ReplicationManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
 	go util.Forever(func() { rm.watchControllers() }, period)
-}
-
-// makeEtcdWatch starts watching via etcd.
-func (rm *ReplicationManager) makeEtcdWatch() (watch.Interface, error) {
-	return rm.etcdHelper.WatchList("/registry/controllers", tools.Everything)
 }
 
 // makeAPIWatch starts watching via the apiserver.
@@ -190,12 +180,15 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 }
 
 func (rm *ReplicationManager) synchronize() {
+	// TODO: remove this method completely and rely on the watch.
+	// Add resource version tracking to watch to make this work.
 	var controllerSpecs []api.ReplicationController
-	err := rm.etcdHelper.ExtractList("/registry/controllers", &controllerSpecs)
+	list, err := rm.kubeClient.ListReplicationControllers(labels.Everything())
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 		return
 	}
+	controllerSpecs = list.Items
 	wg := sync.WaitGroup{}
 	wg.Add(len(controllerSpecs))
 	for ix := range controllerSpecs {

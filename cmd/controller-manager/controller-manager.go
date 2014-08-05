@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// The controller manager is responsible for monitoring replication controllers, and creating corresponding
-// pods to achieve the desired state.  It listens for new controllers in etcd, and it sends requests to the
-// master to create/delete pods.
-//
-// TODO: Refactor the etcd watch code so that it is a pluggable interface.
+// The controller manager is responsible for monitoring replication
+// controllers, and creating corresponding pods to achieve the desired
+// state.  It uses the API to listen for new controllers and to create/delete
+// pods.
 package main
 
 import (
@@ -29,18 +28,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
 var (
-	etcdServerList util.StringList
-	master         = flag.String("master", "", "The address of the Kubernetes API server")
+	master = flag.String("master", "", "The address of the Kubernetes API server")
 )
-
-func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
-}
 
 func main() {
 	flag.Parse()
@@ -49,15 +42,11 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if len(etcdServerList) == 0 || len(*master) == 0 {
-		glog.Fatal("usage: controller-manager -etcd_servers <servers> -master <master>")
+	if len(*master) == 0 {
+		glog.Fatal("usage: controller-manager -master <master>")
 	}
 
-	// Set up logger for etcd client
-	etcd.SetLogger(util.NewLogger("etcd "))
-
 	controllerManager := controller.MakeReplicationManager(
-		etcd.NewClient(etcdServerList),
 		client.New("http://"+*master, nil))
 
 	controllerManager.Run(10 * time.Second)
