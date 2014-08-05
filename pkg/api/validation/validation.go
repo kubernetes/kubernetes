@@ -64,6 +64,10 @@ func validateSource(source *api.VolumeSource) errs.ErrorList {
 		numVolumes++
 		//EmptyDirs have nothing to validate
 	}
+	if source.GCEPersistentDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk)...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source))
 	}
@@ -79,6 +83,20 @@ func validateHostDir(hostDir *api.HostDir) errs.ErrorList {
 }
 
 var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
+
+func validateGCEPersistentDisk(PD *api.GCEPersistentDisk) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	if PD.PDName == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("PD.PDName", PD.PDName))
+	}
+	if PD.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("PD.FSType", PD.FSType))
+	}
+	if PD.Partition < 0 || PD.Partition > 255 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("PD.Partition", PD.Partition))
+	}
+	return allErrs
+}
 
 func validatePorts(ports []api.Port) errs.ErrorList {
 	allErrs := errs.ErrorList{}
@@ -373,5 +391,17 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
 	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
+	allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(state.PodTemplate.DesiredState.Manifest.Volumes).Prefix("podTemplate.desiredState.manifest")...)
+	return allErrs
+}
+func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	for _, vol := range volumes {
+		if vol.Source.GCEPersistentDisk != nil {
+			if vol.Source.GCEPersistentDisk.ReadOnly == false {
+				allErrs = append(allErrs, errs.NewFieldInvalid("GCEPersistentDisk.ReadOnly", false))
+			}
+		}
+	}
 	return allErrs
 }

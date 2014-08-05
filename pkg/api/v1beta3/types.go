@@ -175,6 +175,9 @@ type VolumeSource struct {
 	HostDir *HostDir `json:"hostDir" yaml:"hostDir"`
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDir `json:"emptyDir" yaml:"emptyDir"`
+	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	GCEPersistentDisk *GCEPersistentDisk `yaml:"persistentDisk" json:"persistentDisk"`
 }
 
 // HostDir represents bare host directory volume.
@@ -193,6 +196,27 @@ const (
 	// ProtocolUDP is the UDP protocol.
 	ProtocolUDP Protocol = "UDP"
 )
+
+// GCEPersistent Disk resource.
+// A GCE PD must exist and be formatted before mounting to a container.
+// The disk must also be in the same GCE project and zone as the kubelet.
+// A GCE PD can only be mounted as read/write once.
+type GCEPersistentDisk struct {
+	// Unique name of the PD resource. Used to identify the disk in GCE
+	PDName string `yaml:"pdName" json:"pdName"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `yaml:"fsType,omitempty" json:"fsType,omitempty"`
+	// Optional: Partition on the disk to mount.
+	// If omitted, kubelet will attempt to mount the device name.
+	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
+	Partition int `yaml:"partition,omitempty" json:"partition,omitempty"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+}
 
 // Port represents a network port in a single container.
 type Port struct {
