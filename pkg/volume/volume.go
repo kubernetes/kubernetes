@@ -113,6 +113,34 @@ func (emptyDir *EmptyDirectory) TearDown() error {
 	return nil
 }
 
+// Google Compute Engine Persistent Disks can only be used when running Kubernetes
+// on a GCE cloud. GCEPDs must be created in GCE prior to mounting in Kubernetes.
+// A GCEPD can only be mounted as Read-Write once, but can be mounted
+// as read-only multiple times.
+type GCEPersistentDisk struct {
+	Name    string
+	PodID   string
+	RootDir string
+	// Unique name of the PD,as represented in GCE.
+	PDName string
+	// Filesystem type, optional.
+	FSType string
+	// Specifies whether the disk will be attached as ReadOnly.
+	ReadOnly bool
+}
+
+func (GCEPD *GCEPersistentDisk) GetPath() string {
+	return path.Join(GCEPD.RootDir, GCEPD.PodID, "volumes", "pd", GCEPD.Name)
+}
+
+func (GCEPD *GCEPersistentDisk) SetUp() error {
+	err := GCEAttachDisk(GCEPD)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // createHostDirectory interprets API volume as a HostDirectory.
 func createHostDirectory(volume *api.Volume) *HostDirectory {
 	return &HostDirectory{volume.Source.HostDirectory.Path}
