@@ -206,7 +206,7 @@ func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, er
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
 func (registry *EtcdRegistry) WatchControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	if field.String() != "" {
+	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}
 	return registry.helper.WatchList("/registry/controllers", resourceVersion, func(obj interface{}) bool {

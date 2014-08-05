@@ -85,28 +85,23 @@ func MakeReplicationManager(kubeClient client.Interface) *ReplicationManager {
 		},
 	}
 	rm.syncHandler = rm.syncReplicationController
-	rm.watchMaker = rm.makeAPIWatch
 	return rm
 }
 
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	go util.Forever(func() { rm.watchControllers() }, period)
+	index := uint64(0)
+	go util.Forever(func() { rm.watchControllers(&index) }, period)
 }
 
-// makeAPIWatch starts watching via the apiserver.
-func (rm *ReplicationManager) makeAPIWatch() (watch.Interface, error) {
-	// TODO: Fix this ugly type assertion.
-	return rm.kubeClient.(*client.Client).
-		Get().
-		Path("watch").
-		Path("replicationControllers").
-		Watch()
-}
-
-func (rm *ReplicationManager) watchControllers() {
-	watching, err := rm.watchMaker()
+// index is a pointer to the resource version to use/update.
+func (rm *ReplicationManager) watchControllers(index *uint64) {
+	watching, err := rm.kubeClient.WatchReplicationControllers(
+		labels.Everything(),
+		labels.Everything(),
+		*index,
+	)
 	if err != nil {
 		glog.Errorf("Unexpected failure to watch: %v", err)
 		time.Sleep(5 * time.Second)
@@ -128,6 +123,8 @@ func (rm *ReplicationManager) watchControllers() {
 			if rc, ok := event.Object.(*api.ReplicationController); !ok {
 				glog.Errorf("unexpected object: %#v", event.Object)
 			} else {
+				// If we get disconnected, start where we left off.
+				*index = rc.ResourceVersion + 1
 				rm.syncHandler(*rc)
 			}
 		}
