@@ -44,6 +44,8 @@ func (v JSONBaseVersioning) SetResourceVersion(obj interface{}, version uint64) 
 // JSONBase lets you work with a JSONBase from any of the versioned or
 // internal APIObjects.
 type JSONBaseInterface interface {
+	ID() string
+	SetID(ID string)
 	APIVersion() string
 	SetAPIVersion(version string)
 	Kind() string
@@ -53,9 +55,18 @@ type JSONBaseInterface interface {
 }
 
 type genericJSONBase struct {
+	id              *string
 	apiVersion      *string
 	kind            *string
 	resourceVersion *uint64
+}
+
+func (g genericJSONBase) ID() string {
+	return *g.id
+}
+
+func (g genericJSONBase) SetID(id string) {
+	*g.id = id
 }
 
 func (g genericJSONBase) APIVersion() string {
@@ -112,16 +123,16 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 // Returns an error if this isn't the case.
 func newGenericJSONBase(v reflect.Value) (genericJSONBase, error) {
 	g := genericJSONBase{}
-	err := fieldPtr(v, "APIVersion", &g.apiVersion)
-	if err != nil {
+	if err := fieldPtr(v, "ID", &g.id); err != nil {
 		return g, err
 	}
-	err = fieldPtr(v, "Kind", &g.kind)
-	if err != nil {
+	if err := fieldPtr(v, "APIVersion", &g.apiVersion); err != nil {
 		return g, err
 	}
-	err = fieldPtr(v, "ResourceVersion", &g.resourceVersion)
-	if err != nil {
+	if err := fieldPtr(v, "Kind", &g.kind); err != nil {
+		return g, err
+	}
+	if err := fieldPtr(v, "ResourceVersion", &g.resourceVersion); err != nil {
 		return g, err
 	}
 	return g, nil
