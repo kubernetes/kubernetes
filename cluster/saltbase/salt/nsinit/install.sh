@@ -17,7 +17,7 @@
 export GOPATH=/var/nsinit
 mkdir -p $GOPATH
 apt-get install -y -qq build-essential
-go get github.com/docker/libcontainer/nsinit/nsinit
+go get github.com/docker/docker/vendor/src/github.com/docker/libcontainer/nsinit/nsinit
 if [ ! -e /usr/sbin/nsinit ]; then
   ln -s /var/nsinit/bin/nsinit /usr/sbin/nsinit
 fi
