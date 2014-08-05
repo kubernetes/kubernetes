@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -85,6 +86,11 @@ type EtcdHelper struct {
 // IsEtcdNotFound returns true iff err is an etcd not found error.
 func IsEtcdNotFound(err error) bool {
 	return isEtcdErrorNum(err, EtcdErrorCodeNotFound)
+}
+
+// Returns true iff err is an etcd key node exists error.
+func IsEtcdNodeExist(err error) bool {
+	return isEtcdErrorNum(err, EtcdErrorCodeNodeExist)
 }
 
 // IsEtcdTestFailed returns true iff err is an etcd write conflict.
@@ -170,6 +176,21 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 		// being unable to set the version does not prevent the object from being extracted
 	}
 	return body, response.Node.ModifiedIndex, err
+}
+
+func (h *EtcdHelper) CreateObj(key string, obj interface{}) error {
+	data, err := h.Encoding.Encode(obj)
+	if err != nil {
+		return err
+	}
+	if h.Versioning != nil {
+		if version, err := h.Versioning.ResourceVersion(obj); err == nil && version != 0 {
+			return errors.New("resourceVersion may not be set on objects to be created")
+		}
+	}
+
+	_, err = h.Client.Create(key, string(data), 0)
+	return err
 }
 
 // SetObj marshals obj via json, and stores under key. Will do an

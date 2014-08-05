@@ -33,25 +33,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// errNotFound is an error which indicates that a specified resource is not found.
-type errNotFound string
-
-// Error returns a string representation of the err.
-func (err errNotFound) Error() string {
-	return string(err)
-}
-
-// IsNotFound determines if the err is an error which indicates that a specified resource was not found.
-func IsNotFound(err error) bool {
-	_, ok := err.(errNotFound)
-	return ok
-}
-
-// NewNotFoundErr returns a new error which indicates that the resource of the kind and the name was not found.
-func NewNotFoundErr(kind, name string) error {
-	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
-}
-
 // APIServer is an HTTPHandler that delegates to RESTStorage objects.
 // It handles URLs of the form:
 // ${prefix}/${storage_key}[/${object_name}]

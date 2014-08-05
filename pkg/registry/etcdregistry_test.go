@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -574,6 +575,21 @@ func TestEtcdCreateController(t *testing.T) {
 	}
 }
 
+func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
+	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.Set("/registry/controllers/foo", util.MakeJSONString(api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+
+	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
+	err := registry.CreateController(api.ReplicationController{
+		JSONBase: api.JSONBase{
+			ID: "foo",
+		},
+	})
+	if !apiserver.IsAlreadyExists(err) {
+		t.Errorf("expected already exists err, got %#v", err)
+	}
+}
+
 func TestEtcdUpdateController(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
 	fakeClient.TestIndex = true
@@ -627,12 +643,6 @@ func TestEtcdListServices(t *testing.T) {
 
 func TestEtcdCreateService(t *testing.T) {
 	fakeClient := tools.MakeFakeEtcdClient(t)
-	fakeClient.Data["/registry/services/specs/foo"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: nil,
-		},
-		E: tools.EtcdErrorNotFound,
-	}
 	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
 	err := registry.CreateService(api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
@@ -654,6 +664,18 @@ func TestEtcdCreateService(t *testing.T) {
 
 	if service.ID != "foo" {
 		t.Errorf("Unexpected service: %#v %s", service, resp.Node.Value)
+	}
+}
+
+func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
+	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient.Set("/registry/services/specs/foo", util.MakeJSONString(api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	registry := MakeTestEtcdRegistry(fakeClient, []string{"machine"})
+	err := registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+	})
+	if !apiserver.IsAlreadyExists(err) {
+		t.Errorf("expected already exists err, got %#v", err)
 	}
 }
 

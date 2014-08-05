@@ -21,6 +21,44 @@ import (
 	"net/http"
 )
 
+// errNotFound is an error which indicates that a specified resource is not found.
+type errNotFound string
+
+// Error returns a string representation of the err.
+func (err errNotFound) Error() string {
+	return string(err)
+}
+
+// IsNotFound determines if the err is an error which indicates that a specified resource was not found.
+func IsNotFound(err error) bool {
+	_, ok := err.(errNotFound)
+	return ok
+}
+
+// NewNotFoundErr returns a new error which indicates that the resource of the kind and the name was not found.
+func NewNotFoundErr(kind, name string) error {
+	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
+}
+
+// errAlreadyExists is an error which indicates that a specified resource already exists.
+type errAlreadyExists string
+
+// Error returns a string representation of the err.
+func (err errAlreadyExists) Error() string {
+	return string(err)
+}
+
+// IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
+func IsAlreadyExists(err error) bool {
+	_, ok := err.(errAlreadyExists)
+	return ok
+}
+
+// NewAlreadyExistsErr returns a new error which indicates that the resource of the kind and the name was not found.
+func NewAlreadyExistsErr(kind, name string) error {
+	return errAlreadyExists(fmt.Sprintf("%s %q already exists", kind, name))
+}
+
 // internalError renders a generic error to the response
 func internalError(err error, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
