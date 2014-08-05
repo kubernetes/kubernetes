@@ -336,19 +336,41 @@ type MinionList struct {
 }
 
 // Status is a return value for calls that don't return other objects.
-// Arguably, this could go in apiserver, but I'm including it here so clients needn't
+// TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
 type Status struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	// One of: "success", "failure", "working" (for operations not yet completed)
-	// TODO: if "working", include an operation identifier so final status can be
-	// checked.
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
-	// Details about the status. May be an error description or an
-	// operation number for later polling.
-	Details string `json:"details,omitempty" yaml:"details,omitempty"`
+	// A human readable description of the status of this operation.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	// A machine readable description of why this operation is in the
+	// "failure" or "working" status. If this value is empty there
+	// is no information available. A Reason clarifies an HTTP status
+	// code but does not override it.
+	Reason ReasonType `json:"reason,omitempty" yaml:"reason,omitempty"`
+	// Extended data associated with the reason.  Each reason may define its
+	// own extended details. This field is optional and the data returned
+	// is not guaranteed to conform to any schema except that defined by
+	// the reason type.
+	Details *StatusDetails `json:"details,omitempty" yaml:"details,omitempty"`
 	// Suggested HTTP return code for this status, 0 if not set.
 	Code int `json:"code,omitempty" yaml:"code,omitempty"`
+}
+
+// StatusDetails is a set of additional properties that MAY be set by the
+// server to provide additional information about a response. The Reason
+// field of a Status object defines what attributes will be set. Clients
+// must ignore fields that do not match the defined type of each attribute,
+// and should assume that any attribute may be empty, invalid, or under
+// defined.
+type StatusDetails struct {
+	// The ID attribute of the resource associated with the status ReasonType
+	// (when there is a single ID which can be described).
+	ID string `json:"id,omitempty" yaml:"id,omitempty"`
+	// The kind attribute of the resource associated with the status ReasonType.
+	// On some operations may differ from the requested resource Kind.
+	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
 // Values of Status.Status
@@ -356,6 +378,55 @@ const (
 	StatusSuccess = "success"
 	StatusFailure = "failure"
 	StatusWorking = "working"
+)
+
+// ReasonType is an enumeration of possible failure causes.  Each ReasonType
+// must map to a single HTTP status code, but multiple reasons may map
+// to the same HTTP status code.
+// TODO: move to apiserver
+type ReasonType string
+
+const (
+	// ReasonTypeUnknown means the server has declined to indicate a specific reason.
+	// The details field may contain other information about this error.
+	// Status code 500.
+	ReasonTypeUnknown ReasonType = ""
+
+	// ReasonTypeWorking means the server is processing this request and will complete
+	// at a future time.
+	// Details (optional):
+	//   "kind" string - the name of the resource being referenced ("operation" today)
+	//   "id"   string - the identifier of the Operation resource where updates
+	//                   will be returned
+	// Headers (optional):
+	//   "Location" - HTTP header populated with a URL that can retrieved the final
+	//                status of this operation.
+	// Status code 202
+	ReasonTypeWorking ReasonType = "working"
+
+	// ResourceTypeNotFound means one or more resources required for this operation
+	// could not be found.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the missing resource
+	//                   on some operations may differ from the requested
+	//                   resource.
+	//   "id"   string - the identifier of the missing resource
+	// Status code 404
+	ReasonTypeNotFound ReasonType = "not_found"
+
+	// ReasonTypeAlreadyExists means the resource you are creating already exists.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the conflicting resource
+	//   "id"   string - the identifier of the conflicting resource
+	// Status code 409
+	ReasonTypeAlreadyExists ReasonType = "already_exists"
+
+	// ResourceTypeConflict means the requested update operation cannot be completed
+	// due to a conflict in the operation. The client may need to alter the request.
+	// Each resource may define custom details that indicate the nature of the
+	// conflict.
+	// Status code 409
+	ReasonTypeConflict ReasonType = "conflict"
 )
 
 // ServerOp is an operation delivered to API clients.

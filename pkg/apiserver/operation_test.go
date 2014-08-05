@@ -177,11 +177,11 @@ func TestOpGet(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
-		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
+	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
+		t.Fatalf("Unexpected status: %#v (%s)", itemOut, string(body))
 	}
 
-	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details, nil)
+	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details.ID, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

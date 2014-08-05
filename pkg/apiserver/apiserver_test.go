@@ -493,7 +493,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
+	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
 		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
 	}
 }
@@ -621,7 +621,7 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusInternalServerError)
-	if status.Status != api.StatusFailure || status.Details == "" {
+	if status.Status != api.StatusFailure || status.Message != "error" || status.Details != nil {
 		t.Errorf("Unexpected status %#v", status)
 	}
 }
@@ -642,11 +642,11 @@ func TestAsyncCreateError(t *testing.T) {
 	data, _ := api.Encode(simple)
 
 	status := expectApiStatus(t, "POST", fmt.Sprintf("%s/prefix/version/foo", server.URL), data, http.StatusAccepted)
-	if status.Status != api.StatusWorking || status.Details == "" {
+	if status.Status != api.StatusWorking || status.Details == nil || status.Details.ID == "" {
 		t.Errorf("Unexpected status %#v", status)
 	}
 
-	otherStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s", server.URL, status.Details), []byte{}, http.StatusAccepted)
+	otherStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s", server.URL, status.Details.ID), []byte{}, http.StatusAccepted)
 	if !reflect.DeepEqual(status, otherStatus) {
 		t.Errorf("Expected %#v, Got %#v", status, otherStatus)
 	}
@@ -654,10 +654,10 @@ func TestAsyncCreateError(t *testing.T) {
 	ch <- struct{}{}
 	time.Sleep(time.Millisecond)
 
-	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details), []byte{}, http.StatusOK)
+	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details.ID), []byte{}, http.StatusOK)
 	expectedStatus := &api.Status{
 		Code:    http.StatusInternalServerError,
-		Details: "error",
+		Message: "error",
 		Status:  api.StatusFailure,
 	}
 	if !reflect.DeepEqual(expectedStatus, finalStatus) {
@@ -721,7 +721,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	simple := Simple{Name: "foo"}
 	data, _ := api.Encode(simple)
 	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
-	if itemOut.Status != api.StatusWorking || itemOut.Details == "" {
+	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
 }

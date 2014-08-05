@@ -36,8 +36,8 @@ func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
 		t.Errorf("Expected an api.Status object, was %#v", out)
 		return
 	}
-	if msg != status.Details {
-		t.Errorf("Expected %#v, was %s", msg, status.Details)
+	if msg != status.Message {
+		t.Errorf("Expected %#v, was %s", msg, status.Message)
 	}
 }
 

@@ -58,7 +58,7 @@ func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
 	w.Header().Add("Content-type", "application/json")
 	data, _ := api.Encode(api.Status{
 		Status:  api.StatusFailure,
-		Details: fmt.Sprintf("internal error: %#v", err),
+		Message: fmt.Sprintf("internal error: %#v", err),
 	})
 	w.Write(data)
 }

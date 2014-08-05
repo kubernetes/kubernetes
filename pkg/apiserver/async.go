@@ -44,7 +44,7 @@ func MakeAsync(fn WorkFunc) <-chan interface{} {
 			}
 			channel <- &api.Status{
 				Status:  api.StatusFailure,
-				Details: err.Error(),
+				Message: err.Error(),
 				Code:    status,
 			}
 		} else {
