@@ -51,14 +51,14 @@ kubelet-third-party-go:
     - mode: 644
 
 kubelet-build:
-  cmd.wait:
+  cmd.run:
     - cwd: {{ root }}
     - names:
       - go build {{ package }}/cmd/kubelet
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}
-    - watch:
+    - require:
       - file: {{ package_dir }}
 
 /usr/local/bin/kubelet:

@@ -51,14 +51,14 @@ controller-manager-third-party-go:
     - mode: 644
 
 controller-manager-build:
-  cmd.wait:
+  cmd.run:
     - cwd: {{ root }}
     - names:
       - go build {{ package }}/cmd/controller-manager
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}
-    - watch:
+    - require:
       - file: {{ package_dir }}
 
 /usr/local/bin/controller-manager:

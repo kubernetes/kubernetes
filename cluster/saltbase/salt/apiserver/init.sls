@@ -51,14 +51,14 @@ apiserver-third-party-go:
     - mode: 644
 
 apiserver-build:
-  cmd.wait:
+  cmd.run:
     - cwd: {{ root }}
     - names:
       - go build {{ package }}/cmd/apiserver
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}
-    - watch:
+    - require:
       - file: {{ package_dir }}
 
 /usr/local/bin/apiserver:
