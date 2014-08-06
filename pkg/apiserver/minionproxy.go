@@ -31,14 +31,8 @@ import (
 	"github.com/golang/glog"
 )
 
-func (server *APIServer) handleProxyMinion(w http.ResponseWriter, req *http.Request) {
-	minionPrefix := "/proxy/minion/"
-	if !strings.HasPrefix(req.URL.Path, minionPrefix) {
-		notFound(w, req)
-		return
-	}
-
-	path := req.URL.Path[len(minionPrefix):]
+func handleProxyMinion(w http.ResponseWriter, req *http.Request) {
+	path := strings.TrimLeft(req.URL.Path, "/")
 	rawQuery := req.URL.RawQuery
 
 	// Expect path as: ${minion}/${query_to_minion}
@@ -51,15 +45,19 @@ func (server *APIServer) handleProxyMinion(w http.ResponseWriter, req *http.Requ
 	//
 	// To query logs on a minion, path string can be:
 	// ${minion}/logs/
-	idx := strings.Index(path, "/")
-	minionHost := path[:idx]
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) != 2 {
+		badGatewayError(w, req)
+		return
+	}
+	minionHost := parts[0]
 	_, port, _ := net.SplitHostPort(minionHost)
 	if port == "" {
 		// Couldn't retrieve port information
 		// TODO: Retrieve port info from a common object
 		minionHost += ":10250"
 	}
-	minionPath := path[idx:]
+	minionPath := "/" + parts[1]
 
 	minionURL := &url.URL{
 		Scheme: "http",
@@ -80,13 +78,16 @@ type minionTransport struct{}
 func (t *minionTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := http.DefaultTransport.RoundTrip(req)
 
-	if err != nil && strings.Contains(err.Error(), "connection refused") {
-		message := fmt.Sprintf("Failed to connect to minion:%s", req.URL.Host)
-		resp = &http.Response{
-			StatusCode: http.StatusServiceUnavailable,
-			Body:       ioutil.NopCloser(strings.NewReader(message)),
+	if err != nil {
+		if strings.Contains(err.Error(), "connection refused") {
+			message := fmt.Sprintf("Failed to connect to minion:%s", req.URL.Host)
+			resp = &http.Response{
+				StatusCode: http.StatusServiceUnavailable,
+				Body:       ioutil.NopCloser(strings.NewReader(message)),
+			}
+			return resp, nil
 		}
-		return resp, nil
+		return nil, err
 	}
 
 	if strings.Contains(resp.Header.Get("Content-Type"), "text/plain") {
