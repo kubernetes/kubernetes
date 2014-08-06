@@ -18,7 +18,6 @@ package apiserver
 
 import (
 	"net/http"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,17 +29,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func (s *APIServer) operationPrefix() string {
-	return path.Join(s.prefix, "operations")
+type OperationHandler struct {
+	ops *Operations
 }
 
-func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
-	opPrefix := s.operationPrefix()
-	if !strings.HasPrefix(req.URL.Path, opPrefix) {
-		notFound(w, req)
-		return
-	}
-	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
+func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	trimmed := strings.TrimLeft(req.URL.Path, "/")
 	parts := strings.Split(trimmed, "/")
 	if trimmed == "" {
 		parts = []string{}
@@ -55,12 +49,12 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 	}
 	if len(parts) == 0 {
 		// List outstanding operations.
-		list := s.ops.List()
+		list := h.ops.List()
 		writeJSON(http.StatusOK, list, w)
 		return
 	}
 
-	op := s.ops.Get(parts[0])
+	op := h.ops.Get(parts[0])
 	if op == nil {
 		notFound(w, req)
 		return

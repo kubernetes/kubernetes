@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -40,7 +41,6 @@ import (
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIServer struct {
-	prefix      string
 	storage     map[string]RESTStorage
 	ops         *Operations
 	mux         *http.ServeMux
@@ -53,26 +53,35 @@ type APIServer struct {
 func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	s := &APIServer{
 		storage: storage,
-		prefix:  strings.TrimRight(prefix, "/"),
 		ops:     NewOperations(),
 		mux:     http.NewServeMux(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
 	}
 
-	// Primary API methods
-	s.mux.HandleFunc(s.prefix+"/", s.handleREST)
-	s.mux.HandleFunc(s.watchPrefix()+"/", s.handleWatch)
+	prefix = strings.TrimRight(prefix, "/")
+
+	// Primary API handlers
+	restPrefix := prefix + "/"
+	s.mux.Handle(restPrefix, http.StripPrefix(restPrefix, http.HandlerFunc(s.handleREST)))
+
+	// Watch API handlers
+	watchPrefix := path.Join(prefix, "watch") + "/"
+	s.mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage}))
 
 	// Support services for the apiserver
-	s.mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+	logsPrefix := "/logs/"
+	s.mux.Handle(logsPrefix, http.StripPrefix(logsPrefix, http.FileServer(http.Dir("/var/log/"))))
 	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/version", handleVersion)
 	s.mux.HandleFunc("/", handleIndex)
 
 	// Handle both operations and operations/* with the same handler
-	s.mux.HandleFunc(s.operationPrefix(), s.handleOperation)
-	s.mux.HandleFunc(s.operationPrefix()+"/", s.handleOperation)
+	handler := &OperationHandler{s.ops}
+	operationPrefix := path.Join(prefix, "operations")
+	s.mux.Handle(operationPrefix, http.StripPrefix(operationPrefix, handler))
+	operationsPrefix := operationPrefix + "/"
+	s.mux.Handle(operationsPrefix, http.StripPrefix(operationsPrefix, handler))
 
 	// Proxy minion requests
 	s.mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
@@ -104,11 +113,7 @@ func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // handleREST handles requests to all our RESTStorage objects.
 func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
-	if !strings.HasPrefix(req.URL.Path, s.prefix) {
-		notFound(w, req)
-		return
-	}
-	requestParts := strings.Split(req.URL.Path[len(s.prefix):], "/")[1:]
+	requestParts := strings.Split(req.URL.Path, "/")
 	if len(requestParts) < 1 {
 		notFound(w, req)
 		return
