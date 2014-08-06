@@ -18,23 +18,33 @@ package volume
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/golang/glog"
 )
 
 var ErrUnsupportedVolumeType = errors.New("unsupported volume type")
 
-// Interface is a directory used by pods or hosts. Interface implementations
-// must be idempotent.
+// Interface is a directory used by pods or hosts.
+// All method implementations of methods in the volume interface must be idempotent
 type Interface interface {
-	// SetUp prepares and mounts/unpacks the volume to a directory path.
-	SetUp() error
-
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
+}
 
+// The Builder interface provides the method to set up/mount the volume.
+type Builder interface {
+	// Uses Interface to provide the path for Docker binds.
+	Interface
+	// SetUp prepares and mounts/unpacks the volume to a directory path.
+	SetUp() error
+}
+
+// The Cleaner interface provides the method to cleanup/unmount the volumes.
+type Cleaner interface {
 	// TearDown unmounts the volume and removes traces of the SetUp procedure.
 	TearDown() error
 }
@@ -48,10 +58,6 @@ type HostDirectory struct {
 // Host directory mounts require no setup or cleanup, but still
 // need to fulfill the interface definitions.
 func (hostVol *HostDirectory) SetUp() error {
-	return nil
-}
-
-func (hostVol *HostDirectory) TearDown() error {
 	return nil
 }
 
@@ -77,14 +83,34 @@ func (emptyDir *EmptyDirectory) SetUp() error {
 	return nil
 }
 
-// TODO(jonesdl) when we can properly invoke TearDown(), we should delete
-// the directory created by SetUp.
-func (emptyDir *EmptyDirectory) TearDown() error {
-	return nil
-}
-
 func (emptyDir *EmptyDirectory) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
+}
+
+func (emptyDir *EmptyDirectory) renameDirectory() (string, error) {
+	oldPath := emptyDir.GetPath()
+	newPath, err := ioutil.TempDir(path.Dir(oldPath), emptyDir.Name+".deleting~")
+	if err != nil {
+		return "", err
+	}
+	err = os.Rename(oldPath, newPath)
+	if err != nil {
+		return "", err
+	}
+	return newPath, nil
+}
+
+// Simply delete everything in the directory.
+func (emptyDir *EmptyDirectory) TearDown() error {
+	tmpDir, err := emptyDir.renameDirectory()
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Interprets API volume as a HostDirectory
@@ -97,16 +123,16 @@ func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *Emp
 	return &EmptyDirectory{volume.Name, podID, rootDir}
 }
 
-// CreateVolume returns an Interface capable of mounting a volume described by an
-// *api.Volume and whether or not it is mounted, or an error.
-func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, error) {
+// CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
+// *api.Volume, or an error.
+func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Builder, error) {
 	source := volume.Source
 	// TODO(jonesdl) We will want to throw an error here when we no longer
 	// support the default behavior.
 	if source == nil {
 		return nil, nil
 	}
-	var vol Interface
+	var vol Builder
 	// TODO(jonesdl) We should probably not check every pointer and directly
 	// resolve these types instead.
 	if source.HostDirectory != nil {
@@ -117,4 +143,55 @@ func CreateVolume(volume *api.Volume, podID string, rootDir string) (Interface, 
 		return nil, ErrUnsupportedVolumeType
 	}
 	return vol, nil
+}
+
+// CreateVolumeCleaner returns a Cleaner capable of tearing down a volume.
+func CreateVolumeCleaner(kind string, name string, podID string, rootDir string) (Cleaner, error) {
+	switch kind {
+	case "empty":
+		return &EmptyDirectory{name, podID, rootDir}, nil
+	default:
+		return nil, ErrUnsupportedVolumeType
+	}
+}
+
+// Examines directory structure to determine volumes that are presently
+// active and mounted. Returns a map of Cleaner types.
+func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
+	currentVolumes := make(map[string]Cleaner)
+	mountPath := rootDirectory
+	podIDDirs, err := ioutil.ReadDir(mountPath)
+	if err != nil {
+		glog.Errorf("Could not read directory: %s, (%s)", mountPath, err)
+	}
+	// Volume information is extracted from the directory structure:
+	// (ROOT_DIR)/(POD_ID)/volumes/(VOLUME_KIND)/(VOLUME_NAME)
+	for _, podIDDir := range podIDDirs {
+		podID := podIDDir.Name()
+		podIDPath := path.Join(mountPath, podID, "volumes")
+		volumeKindDirs, err := ioutil.ReadDir(podIDPath)
+		if err != nil {
+			glog.Errorf("Could not read directory: %s, (%s)", podIDPath, err)
+		}
+		for _, volumeKindDir := range volumeKindDirs {
+			volumeKind := volumeKindDir.Name()
+			volumeKindPath := path.Join(podIDPath, volumeKind)
+			volumeNameDirs, err := ioutil.ReadDir(volumeKindPath)
+			if err != nil {
+				glog.Errorf("Could not read directory: %s, (%s)", volumeKindPath, err)
+			}
+			for _, volumeNameDir := range volumeNameDirs {
+				volumeName := volumeNameDir.Name()
+				identifier := path.Join(podID, volumeName)
+				// TODO(thockin) This should instead return a reference to an extant volume object
+				cleaner, err := CreateVolumeCleaner(volumeKind, volumeName, podID, rootDirectory)
+				if err != nil {
+					glog.Errorf("Could not create volume cleaner: %s, (%s)", volumeNameDirs, err)
+					continue
+				}
+				currentVolumes[identifier] = cleaner
+			}
+		}
+	}
+	return currentVolumes
 }

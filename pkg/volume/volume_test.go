@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestCreateVolumes(t *testing.T) {
+func TestCreateVolumeBuilders(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", "CreateVolumes")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -35,6 +35,7 @@ func TestCreateVolumes(t *testing.T) {
 		volume api.Volume
 		path   string
 		podID  string
+		kind   string
 	}{
 		{
 			api.Volume{
@@ -45,6 +46,7 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			"/dir/path",
 			"my-id",
+			"",
 		},
 		{
 			api.Volume{
@@ -55,8 +57,9 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			path.Join(tempDir, "/my-id/volumes/empty/empty-dir"),
 			"my-id",
+			"empty",
 		},
-		{api.Volume{}, "", ""},
+		{api.Volume{}, "", "", ""},
 		{
 			api.Volume{
 				Name:   "empty-dir",
@@ -64,13 +67,14 @@ func TestCreateVolumes(t *testing.T) {
 			},
 			"",
 			"",
+			"",
 		},
 	}
 	for _, createVolumesTest := range createVolumesTests {
 		tt := createVolumesTest
-		v, err := CreateVolume(&tt.volume, tt.podID, tempDir)
+		vb, err := CreateVolumeBuilder(&tt.volume, tt.podID, tempDir)
 		if tt.volume.Source == nil {
-			if v != nil {
+			if vb != nil {
 				t.Errorf("Expected volume to be nil")
 			}
 			continue
@@ -84,17 +88,56 @@ func TestCreateVolumes(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		err = v.SetUp()
+		err = vb.SetUp()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		path := v.GetPath()
+		path := vb.GetPath()
 		if path != tt.path {
 			t.Errorf("Unexpected bind path. Expected %v, got %v", tt.path, path)
 		}
-		err = v.TearDown()
+		vc, err := CreateVolumeCleaner(tt.kind, tt.volume.Name, tt.podID, tempDir)
+		if tt.kind == "" {
+			if err != ErrUnsupportedVolumeType {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			continue
+		}
+		err = vc.TearDown()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
+		}
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("TearDown() failed, original volume path not properly removed: %v", path)
+		}
+	}
+}
+
+func TestGetActiveVolumes(t *testing.T) {
+	tempDir, err := ioutil.TempDir("", "CreateVolumes")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+	getActiveVolumesTests := []struct {
+		name       string
+		podID      string
+		kind       string
+		identifier string
+	}{
+		{"fakeName", "fakeID", "empty", "fakeID/fakeName"},
+		{"fakeName2", "fakeID2", "empty", "fakeID2/fakeName2"},
+	}
+	expectedIdentifiers := []string{}
+	for _, test := range getActiveVolumesTests {
+		volumeDir := path.Join(tempDir, test.podID, "volumes", test.kind, test.name)
+		os.MkdirAll(volumeDir, 0750)
+		expectedIdentifiers = append(expectedIdentifiers, test.identifier)
+	}
+	volumeMap := GetCurrentVolumes(tempDir)
+	for _, name := range expectedIdentifiers {
+		if _, ok := volumeMap[name]; !ok {
+			t.Errorf("Expected volume map entry not found: %v", name)
 		}
 	}
 }

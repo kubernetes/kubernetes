@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -257,7 +258,7 @@ func milliCPUToShares(milliCPU int) int {
 func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volumeMap, error) {
 	podVolumes := make(volumeMap)
 	for _, vol := range manifest.Volumes {
-		extVolume, err := volume.CreateVolume(&vol, manifest.ID, kl.rootDirectory)
+		extVolume, err := volume.CreateVolumeBuilder(&vol, manifest.ID, kl.rootDirectory)
 		if err != nil {
 			return nil, err
 		}
@@ -449,6 +450,39 @@ type podContainer struct {
 	containerName string
 }
 
+// Stores all volumes defined by the set of pods into a map.
+// Keys for each entry are in the format (POD_ID)/(VOLUME_NAME)
+func getDesiredVolumes(pods []Pod) map[string]api.Volume {
+	desiredVolumes := make(map[string]api.Volume)
+	for _, pod := range pods {
+		for _, volume := range pod.Manifest.Volumes {
+			identifier := path.Join(pod.Manifest.ID, volume.Name)
+			desiredVolumes[identifier] = volume
+		}
+	}
+	return desiredVolumes
+}
+
+// Compares the map of current volumes to the map of desired volumes.
+// If an active volume does not have a respective desired volume, clean it up.
+func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
+	desiredVolumes := getDesiredVolumes(pods)
+	currentVolumes := volume.GetCurrentVolumes(kl.rootDirectory)
+	for name, vol := range currentVolumes {
+		if _, ok := desiredVolumes[name]; !ok {
+			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
+			//to be deleted and volumes that are leftover after a crash.
+			glog.Infof("Orphaned volume %s found, tearing down volume", name)
+			//TODO (jonesdl) This should not block other kubelet synchronization procedures
+			err := vol.TearDown()
+			if err != nil {
+				glog.Infof("Could not tear down volume %s (%s)", name, err)
+			}
+		}
+	}
+	return nil
+}
+
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(pods []Pod) error {
 	glog.Infof("Desired [%s]: %+v", kl.hostname, pods)
@@ -497,6 +531,10 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 			}
 		}
 	}
+
+	// Remove any orphaned volumes.
+	kl.reconcileVolumes(pods)
+
 	return err
 }
 
