@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
@@ -134,7 +135,30 @@ func (GCEPD *GCEPersistentDisk) GetPath() string {
 }
 
 func (GCEPD *GCEPersistentDisk) SetUp() error {
-	err := GCEAttachDisk(GCEPD)
+	devicePath, err := GCEAttachDisk(GCEPD)
+	if err != nil {
+		return err
+	}
+	globalPDPath := path.Join(GCEPD.RootDir, "global", "pd", GCEPD.Name)
+	_, err = os.Stat(globalPDPath)
+	glog.Info("blahdoblah")
+	if os.IsNotExist(err) {
+		glog.Info("blahdeblah")
+		err = os.MkdirAll(globalPDPath, 0750)
+		if err != nil {
+			return err
+		}
+		err = syscall.Mount(devicePath, globalPDPath, GCEPD.FSType, 0, "")
+		if err != nil {
+			return err
+		}
+	}
+	//perform a bind mount to the full path.
+	err = os.MkdirAll(GCEPD.GetPath(), 0750)
+	if err != nil {
+		return err
+	}
+	err = syscall.Mount(globalPDPath, GCEPD.GetPath(), "", syscall.MS_BIND, "")
 	if err != nil {
 		return err
 	}
