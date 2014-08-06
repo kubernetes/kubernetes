@@ -75,7 +75,7 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	s.mux.HandleFunc(s.operationPrefix()+"/", s.handleOperation)
 
 	// Proxy minion requests
-	s.mux.HandleFunc("/proxy/minion/", s.handleProxyMinion)
+	s.mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
 
 	return s
 }

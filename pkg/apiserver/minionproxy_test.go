@@ -17,8 +17,11 @@ limitations under the License.
 package apiserver
 
 import (
+	"bufio"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -70,5 +73,72 @@ func TestMinionTransport(t *testing.T) {
 	expected = string(`<pre><a href="/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="/proxy/minion/minion1:8080/whatever/apt/google.log">google.log</a></pre>`)
 	if !strings.Contains(string(body), expected) {
 		t.Errorf("Received wrong content: %s", string(body))
+	}
+}
+
+func TestMinionProxy(t *testing.T) {
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte(req.URL.Path))
+	}))
+	server := httptest.NewServer(http.HandlerFunc(handleProxyMinion))
+	//client := http.Client{}
+	proxy, _ := url.Parse(proxyServer.URL)
+
+	testCases := map[string]string{
+		fmt.Sprintf("/%s/", proxy.Host):     "/",
+		fmt.Sprintf("/%s/test", proxy.Host): "/test",
+	}
+
+	for value, expected := range testCases {
+		resp, err := http.Get(fmt.Sprintf("%s%s", server.URL, value))
+		if err != nil {
+			t.Errorf("unexpected error for %s: %v", value, err)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected successful request for %s: %#v", value, resp)
+			continue
+		}
+		defer resp.Body.Close()
+		actual, _ := bufio.NewReader(resp.Body).ReadString('\n')
+		if actual != expected {
+			t.Errorf("expected %s to become %s, got %s", value, expected, actual)
+		}
+	}
+
+	failureCases := map[string]string{
+		"": "",
+		fmt.Sprintf("/%s", proxy.Host): "/",
+	}
+
+	for value, _ := range failureCases {
+		resp, err := http.Get(fmt.Sprintf("%s%s", server.URL, value))
+		if err != nil {
+			t.Errorf("unexpected error for %s: %v", value, err)
+			continue
+		}
+		if resp.StatusCode != http.StatusBadGateway {
+			t.Errorf("expected bad gateway response for %s: %#v", value, resp)
+		}
+	}
+}
+
+func TestApiServerMinionProxy(t *testing.T) {
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte(req.URL.Path))
+	}))
+	server := httptest.NewServer(New(nil, "/prefix"))
+	proxy, _ := url.Parse(proxyServer.URL)
+	resp, err := http.Get(fmt.Sprintf("%s/proxy/minion/%s%s", server.URL, proxy.Host, "/test"))
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected successful request, got %#v", resp)
+	}
+	defer resp.Body.Close()
+	actual, _ := bufio.NewReader(resp.Body).ReadString('\n')
+	if actual != "/test" {
+		t.Errorf("unexpected response body %s", actual)
 	}
 }
