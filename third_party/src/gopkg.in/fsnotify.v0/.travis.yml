@@ -1,0 +1,13 @@
+language: go
+
+go:
+  - 1.2
+  - tip
+
+# not yet https://github.com/travis-ci/travis-ci/issues/2318
+os:
+  - linux
+  - osx
+
+notifications:
+  email: false
