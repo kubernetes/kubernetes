@@ -40,6 +40,7 @@ var watchTestTable = []struct {
 
 func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
+	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
@@ -48,15 +49,11 @@ func TestWatchWebsocket(t *testing.T) {
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
 	dest.Path = "/prefix/version/watch/foo"
-	dest.RawQuery = "id=myID"
+	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-
-	if a, e := simpleStorage.requestedID, "myID"; a != e {
-		t.Fatalf("Expected %v, got %v", e, a)
 	}
 
 	try := func(action watch.EventType, object interface{}) {
@@ -98,7 +95,7 @@ func TestWatchHTTP(t *testing.T) {
 
 	dest, _ := url.Parse(server.URL)
 	dest.Path = "/prefix/version/watch/foo"
-	dest.RawQuery = "id=myID"
+	dest.RawQuery = ""
 
 	request, err := http.NewRequest("GET", dest.String(), nil)
 	if err != nil {
@@ -112,10 +109,6 @@ func TestWatchHTTP(t *testing.T) {
 
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
-	}
-
-	if a, e := simpleStorage.requestedID, "myID"; a != e {
-		t.Fatalf("Expected %v, got %v", e, a)
 	}
 
 	decoder := json.NewDecoder(response.Body)
@@ -164,26 +157,27 @@ func TestWatchParamParsing(t *testing.T) {
 		resourceVersion uint64
 		labelSelector   string
 		fieldSelector   string
-		id              string
 	}{
 		{
-			rawQuery:        "id=myID&resourceVersion=1234",
+			rawQuery:        "resourceVersion=1234",
 			resourceVersion: 1234,
 			labelSelector:   "",
 			fieldSelector:   "",
-			id:              "myID",
 		}, {
 			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
 			resourceVersion: 314159,
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
-			id:              "",
+		}, {
+			rawQuery:        "fields=ID%3dfoo&resourceVersion=1492",
+			resourceVersion: 1492,
+			labelSelector:   "",
+			fieldSelector:   "ID=foo",
 		}, {
 			rawQuery:        "",
 			resourceVersion: 0,
 			labelSelector:   "",
 			fieldSelector:   "",
-			id:              "",
 		},
 	}
 
@@ -191,7 +185,6 @@ func TestWatchParamParsing(t *testing.T) {
 		simpleStorage.requestedLabelSelector = nil
 		simpleStorage.requestedFieldSelector = nil
 		simpleStorage.requestedResourceVersion = 5 // Prove this is set in all cases
-		simpleStorage.requestedID = ""
 		dest.RawQuery = item.rawQuery
 		resp, err := http.Get(dest.String())
 		if err != nil {
@@ -199,19 +192,14 @@ func TestWatchParamParsing(t *testing.T) {
 			continue
 		}
 		resp.Body.Close()
-		if e, a := item.id, simpleStorage.requestedID; e != a {
-			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-		}
 		if e, a := item.resourceVersion, simpleStorage.requestedResourceVersion; e != a {
 			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
 		}
-		if simpleStorage.requestedID == "" {
-			if e, a := item.labelSelector, simpleStorage.requestedLabelSelector.String(); e != a {
-				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-			}
-			if e, a := item.fieldSelector, simpleStorage.requestedFieldSelector.String(); e != a {
-				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-			}
+		if e, a := item.labelSelector, simpleStorage.requestedLabelSelector.String(); e != a {
+			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+		}
+		if e, a := item.fieldSelector, simpleStorage.requestedFieldSelector.String(); e != a {
+			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
 		}
 	}
 }

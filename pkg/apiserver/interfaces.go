@@ -33,11 +33,13 @@ type RESTStorage interface {
 	List(labels.Selector) (interface{}, error)
 
 	// Get finds a resource in the storage by id and returns it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
+	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
+	// returned error value err when the specified resource is not found.
 	Get(id string) (interface{}, error)
 
 	// Delete finds a resource in the storage and deletes it.
-	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
+	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
+	// returned error value err when the specified resource is not found.
 	Delete(id string) (<-chan interface{}, error)
 
 	Create(interface{}) (<-chan interface{}, error)
@@ -47,10 +49,9 @@ type RESTStorage interface {
 // ResourceWatcher should be implemented by all RESTStorage objects that
 // want to offer the ability to watch for changes through the watch api.
 type ResourceWatcher interface {
-	// label selects on labels; field selects on the objects fields. Not all fields
-	// are supported; an error will be returned if you try to select for a field that
-	// isn't supported.
-	WatchAll(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
-	// TODO: Decide if we need to keep WatchSingle?
-	WatchSingle(id string, resourceVersion uint64) (watch.Interface, error)
+	// 'label' selects on labels; 'field' selects on the object's fields. Not all fields
+	// are supported; an error should be returned if 'field' tries to select on a field that
+	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
+	// particular version.
+	Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }

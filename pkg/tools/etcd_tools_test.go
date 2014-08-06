@@ -329,9 +329,9 @@ func TestWatchInterpretation_ListCreate(t *testing.T) {
 	w := newEtcdWatcher(true, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
-	}, encoding)
+	}, codec)
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := encoding.Encode(pod)
+	podBytes, _ := codec.Encode(pod)
 
 	go w.sendResult(&etcd.Response{
 		Action: "create",

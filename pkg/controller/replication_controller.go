@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
@@ -37,9 +36,6 @@ type ReplicationManager struct {
 
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(controllerSpec api.ReplicationController) error
-
-	// To allow injection of watch creation.
-	watchMaker func() (watch.Interface, error)
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods

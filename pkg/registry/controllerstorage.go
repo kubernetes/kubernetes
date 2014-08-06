@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -138,12 +137,6 @@ func (storage *ControllerRegistryStorage) waitForController(ctrl api.Replication
 
 // WatchAll returns ReplicationController events via a watch.Interface, implementing
 // apiserver.ResourceWatcher.
-func (storage *ControllerRegistryStorage) WatchAll(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (storage *ControllerRegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return storage.registry.WatchControllers(label, field, resourceVersion)
-}
-
-// WatchSingle returns events for a single ReplicationController via a watch.Interface,
-// implementing apiserver.ResourceWatcher.
-func (storage *ControllerRegistryStorage) WatchSingle(id string, resourceVersion uint64) (watch.Interface, error) {
-	return nil, errors.New("unimplemented")
 }

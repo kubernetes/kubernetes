@@ -64,13 +64,8 @@ type SimpleRESTStorage struct {
 	updated *Simple
 	created *Simple
 
-	// Valid if WatchAll or WatchSingle is called
-	fakeWatch *watch.FakeWatcher
-
-	// Set if WatchSingle is called
-	requestedID string
-
-	// Set if WatchAll is called
+	// These are set when Watch is called
+	fakeWatch                *watch.FakeWatcher
 	requestedLabelSelector   labels.Selector
 	requestedFieldSelector   labels.Selector
 	requestedResourceVersion uint64
@@ -135,22 +130,11 @@ func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, e
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) WatchAll(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	storage.requestedLabelSelector = label
 	storage.requestedFieldSelector = field
 	storage.requestedResourceVersion = resourceVersion
-	if err := storage.errors["watchAll"]; err != nil {
-		return nil, err
-	}
-	storage.fakeWatch = watch.NewFake()
-	return storage.fakeWatch, nil
-}
-
-// Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) WatchSingle(id string, resourceVersion uint64) (watch.Interface, error) {
-	storage.requestedID = id
-	storage.requestedResourceVersion = resourceVersion
-	if err := storage.errors["watchSingle"]; err != nil {
+	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
 	storage.fakeWatch = watch.NewFake()
