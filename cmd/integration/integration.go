@@ -115,7 +115,6 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
 	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
-	go util.Forever(cfg1.Sync, 3*time.Second)
 	go util.Forever(func() {
 		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), http.DefaultServeMux, "localhost", 10250)
 	}, 0)
@@ -127,7 +126,6 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, 30*time.Second, cfg2.Channel("etcd"))
 	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
-	go util.Forever(cfg2.Sync, 3*time.Second)
 	go util.Forever(func() {
 		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), http.DefaultServeMux, "localhost", 10251)
 	}, 0)
