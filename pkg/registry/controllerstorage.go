@@ -74,16 +74,14 @@ func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{},
 	}), nil
 }
 
-// Extract deserializes user provided data into an api.ReplicationController.
-func (storage *ControllerRegistryStorage) Extract(body []byte) (interface{}, error) {
-	result := api.ReplicationController{}
-	err := api.DecodeInto(body, &result)
-	return result, err
+// New creates a new ReplicationController for use with Create and Update
+func (storage *ControllerRegistryStorage) New() interface{} {
+	return &api.ReplicationController{}
 }
 
 // Create registers a given new ReplicationController instance to storage.registry.
 func (storage *ControllerRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
-	controller, ok := obj.(api.ReplicationController)
+	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
@@ -93,34 +91,34 @@ func (storage *ControllerRegistryStorage) Create(obj interface{}) (<-chan interf
 	// Pod Manifest ID should be assigned by the pod API
 	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
 
-	if errs := api.ValidateReplicationController(&controller); len(errs) > 0 {
+	if errs := api.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		err := storage.registry.CreateController(controller)
+		err := storage.registry.CreateController(*controller)
 		if err != nil {
 			return nil, err
 		}
-		return storage.waitForController(controller)
+		return storage.waitForController(*controller)
 	}), nil
 }
 
 // Update replaces a given ReplicationController instance with an existing instance in storage.registry.
 func (storage *ControllerRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
-	controller, ok := obj.(api.ReplicationController)
+	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if errs := api.ValidateReplicationController(&controller); len(errs) > 0 {
+	if errs := api.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		err := storage.registry.UpdateController(controller)
+		err := storage.registry.UpdateController(*controller)
 		if err != nil {
 			return nil, err
 		}
-		return storage.waitForController(controller)
+		return storage.waitForController(*controller)
 	}), nil
 }
 

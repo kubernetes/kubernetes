@@ -42,7 +42,7 @@ func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, "/prefix/version")
+	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	dest, _ := url.Parse(server.URL)
@@ -92,7 +92,7 @@ func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, "/prefix/version")
+	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 

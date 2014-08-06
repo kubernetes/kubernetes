@@ -59,14 +59,12 @@ func (storage *MinionRegistryStorage) Get(id string) (interface{}, error) {
 	return storage.toApiMinion(id), err
 }
 
-func (storage *MinionRegistryStorage) Extract(body []byte) (interface{}, error) {
-	var minion api.Minion
-	err := api.DecodeInto(body, &minion)
-	return minion, err
+func (storage *MinionRegistryStorage) New() interface{} {
+	return &api.Minion{}
 }
 
 func (storage *MinionRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
-	minion, ok := obj.(api.Minion)
+	minion, ok := obj.(*api.Minion)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}

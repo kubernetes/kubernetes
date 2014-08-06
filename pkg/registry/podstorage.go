@@ -189,10 +189,8 @@ func (storage *PodRegistryStorage) Delete(id string) (<-chan interface{}, error)
 	}), nil
 }
 
-func (storage *PodRegistryStorage) Extract(body []byte) (interface{}, error) {
-	pod := api.Pod{}
-	err := api.DecodeInto(body, &pod)
-	return pod, err
+func (storage *PodRegistryStorage) New() interface{} {
+	return &api.Pod{}
 }
 
 func (storage *PodRegistryStorage) scheduleAndCreatePod(pod api.Pod) error {
@@ -207,36 +205,36 @@ func (storage *PodRegistryStorage) scheduleAndCreatePod(pod api.Pod) error {
 }
 
 func (storage *PodRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
-	pod := obj.(api.Pod)
+	pod := obj.(*api.Pod)
 	if len(pod.ID) == 0 {
 		pod.ID = uuid.NewUUID().String()
 	}
 	pod.DesiredState.Manifest.ID = pod.ID
 
-	if errs := api.ValidatePod(&pod); len(errs) > 0 {
+	if errs := api.ValidatePod(pod); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		err := storage.scheduleAndCreatePod(pod)
+		err := storage.scheduleAndCreatePod(*pod)
 		if err != nil {
 			return nil, err
 		}
-		return storage.waitForPodRunning(pod)
+		return storage.waitForPodRunning(*pod)
 	}), nil
 }
 
 func (storage *PodRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
-	pod := obj.(api.Pod)
-	if errs := api.ValidatePod(&pod); len(errs) > 0 {
+	pod := obj.(*api.Pod)
+	if errs := api.ValidatePod(pod); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		err := storage.registry.UpdatePod(pod)
+		err := storage.registry.UpdatePod(*pod)
 		if err != nil {
 			return nil, err
 		}
-		return storage.waitForPodRunning(pod)
+		return storage.waitForPodRunning(*pod)
 	}), nil
 }
 

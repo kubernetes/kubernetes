@@ -95,7 +95,7 @@ func TestOperationsList(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, "/prefix/version")
+	}, codec, "/prefix/version")
 	handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
@@ -103,7 +103,7 @@ func TestOperationsList(t *testing.T) {
 	simple := Simple{
 		Name: "foo",
 	}
-	data, err := api.Encode(simple)
+	data, err := codec.Encode(simple)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestOperationsList(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	obj, err := api.Decode(body)
+	obj, err := codec.Decode(body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestOpGet(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, "/prefix/version")
+	}, codec, "/prefix/version")
 	handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
@@ -151,7 +151,7 @@ func TestOpGet(t *testing.T) {
 	simple := Simple{
 		Name: "foo",
 	}
-	data, err := api.Encode(simple)
+	data, err := codec.Encode(simple)
 	t.Log(string(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

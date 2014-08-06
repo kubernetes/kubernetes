@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -140,5 +141,5 @@ func (m *Master) Run(myAddress, apiPrefix string) error {
 // Instead of calling Run, you can call this function to get a handler for your own server.
 // It is intended for testing. Only call once.
 func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
-	return apiserver.New(m.storage, apiPrefix)
+	return apiserver.New(m.storage, api.Codec, apiPrefix)
 }

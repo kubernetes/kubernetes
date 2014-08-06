@@ -160,15 +160,13 @@ func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) 
 	}), nil
 }
 
-func (sr *ServiceRegistryStorage) Extract(body []byte) (interface{}, error) {
-	var svc api.Service
-	err := api.DecodeInto(body, &svc)
-	return svc, err
+func (sr *ServiceRegistryStorage) New() interface{} {
+	return &api.Service{}
 }
 
 func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
-	srv := obj.(api.Service)
-	if errs := api.ValidateService(&srv); len(errs) > 0 {
+	srv := obj.(*api.Service)
+	if errs := api.ValidateService(srv); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
@@ -200,7 +198,7 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, e
 			}
 		}
 		// TODO actually wait for the object to be fully created here.
-		err := sr.registry.CreateService(srv)
+		err := sr.registry.CreateService(*srv)
 		if err != nil {
 			return nil, err
 		}
@@ -209,16 +207,16 @@ func (sr *ServiceRegistryStorage) Create(obj interface{}) (<-chan interface{}, e
 }
 
 func (sr *ServiceRegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
-	srv := obj.(api.Service)
+	srv := obj.(*api.Service)
 	if srv.ID == "" {
 		return nil, fmt.Errorf("ID should not be empty: %#v", srv)
 	}
-	if errs := api.ValidateService(&srv); len(errs) > 0 {
+	if errs := api.ValidateService(srv); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: check to see if external load balancer status changed
-		err := sr.registry.UpdateService(srv)
+		err := sr.registry.UpdateService(*srv)
 		if err != nil {
 			return nil, err
 		}
