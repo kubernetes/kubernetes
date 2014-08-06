@@ -21,10 +21,15 @@ import (
 	"reflect"
 )
 
-// versionedJSONBase allows access to the version state of a JSONBase object
-type JSONBaseVersioning struct{}
+// NewJSONBaseVersioner returns a resourceVersioner that can set or retrieve
+// ResourceVersion on objects derived from JSONBase.
+func NewJSONBaseResourceVersioner() resourceVersioner {
+	return &jsonBaseResourceVersioner{}
+}
 
-func (v JSONBaseVersioning) ResourceVersion(obj interface{}) (uint64, error) {
+type jsonBaseResourceVersioner struct{}
+
+func (v jsonBaseResourceVersioner) ResourceVersion(obj interface{}) (uint64, error) {
 	json, err := FindJSONBaseRO(obj)
 	if err != nil {
 		return 0, err
@@ -32,7 +37,7 @@ func (v JSONBaseVersioning) ResourceVersion(obj interface{}) (uint64, error) {
 	return json.ResourceVersion, nil
 }
 
-func (v JSONBaseVersioning) SetResourceVersion(obj interface{}, version uint64) error {
+func (v jsonBaseResourceVersioner) SetResourceVersion(obj interface{}, version uint64) error {
 	json, err := FindJSONBase(obj)
 	if err != nil {
 		return err

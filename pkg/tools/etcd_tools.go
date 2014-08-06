@@ -42,13 +42,15 @@ var (
 	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
 )
 
-type Encoding interface {
+// Codec provides methods for transforming Etcd values into objects and back
+type Codec interface {
 	Encode(obj interface{}) (data []byte, err error)
 	Decode(data []byte) (interface{}, error)
 	DecodeInto(data []byte, obj interface{}) error
 }
 
-type Versioning interface {
+// ResourceVersioner provides methods for managing object modification tracking
+type ResourceVersioner interface {
 	SetResourceVersion(obj interface{}, version uint64) error
 	ResourceVersion(obj interface{}) (uint64, error)
 }
@@ -71,16 +73,17 @@ type EtcdGetSet interface {
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
 	Create(key, value string, ttl uint64) (*etcd.Response, error)
+	Delete(key string, recursive bool) (*etcd.Response, error)
 	CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error)
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
 
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
-	Client   EtcdGetSet
-	Encoding Encoding
-	// optional
-	Versioning Versioning
+	Client EtcdGetSet
+	Codec  Codec
+	// optional, no atomic operations can be performed without this interface
+	ResourceVersioner ResourceVersioner
 }
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.
@@ -136,7 +139,7 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 	v := pv.Elem()
 	for _, node := range nodes {
 		obj := reflect.New(v.Type().Elem())
-		err = h.Encoding.DecodeInto([]byte(node.Value), obj.Interface())
+		err = h.Codec.DecodeInto([]byte(node.Value), obj.Interface())
 		if err != nil {
 			return err
 		}
@@ -145,7 +148,7 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 	return nil
 }
 
-// Unmarshals json found at key into objPtr. On a not found error, will either return
+// ExtractObj unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
 func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
@@ -170,21 +173,22 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 		return "", 0, fmt.Errorf("key '%v' found no nodes field: %#v", key, response)
 	}
 	body = response.Node.Value
-	err = h.Encoding.DecodeInto([]byte(body), objPtr)
-	if h.Versioning != nil {
-		_ = h.Versioning.SetResourceVersion(objPtr, response.Node.ModifiedIndex)
+	err = h.Codec.DecodeInto([]byte(body), objPtr)
+	if h.ResourceVersioner != nil {
+		_ = h.ResourceVersioner.SetResourceVersion(objPtr, response.Node.ModifiedIndex)
 		// being unable to set the version does not prevent the object from being extracted
 	}
 	return body, response.Node.ModifiedIndex, err
 }
 
+// Create adds a new object at a key unless it already exists
 func (h *EtcdHelper) CreateObj(key string, obj interface{}) error {
-	data, err := h.Encoding.Encode(obj)
+	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
 	}
-	if h.Versioning != nil {
-		if version, err := h.Versioning.ResourceVersion(obj); err == nil && version != 0 {
+	if h.ResourceVersioner != nil {
+		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
 			return errors.New("resourceVersion may not be set on objects to be created")
 		}
 	}
@@ -193,15 +197,21 @@ func (h *EtcdHelper) CreateObj(key string, obj interface{}) error {
 	return err
 }
 
+// Delete removes the specified key
+func (h *EtcdHelper) Delete(key string, recursive bool) error {
+	_, err := h.Client.Delete(key, recursive)
+	return err
+}
+
 // SetObj marshals obj via json, and stores under key. Will do an
 // atomic update if obj's ResourceVersion field is set.
 func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
-	data, err := h.Encoding.Encode(obj)
+	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
 	}
-	if h.Versioning != nil {
-		if version, err := h.Versioning.ResourceVersion(obj); err == nil && version != 0 {
+	if h.ResourceVersioner != nil {
+		if version, err := h.ResourceVersioner.ResourceVersion(obj); err == nil && version != 0 {
 			_, err = h.Client.CompareAndSwap(key, string(data), 0, "", version)
 			return err // err is shadowed!
 		}
@@ -253,7 +263,7 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 			return err
 		}
 
-		data, err := h.Encoding.Encode(ret)
+		data, err := h.Codec.Encode(ret)
 		if err != nil {
 			return err
 		}
@@ -288,7 +298,7 @@ func Everything(interface{}) bool {
 // API objects, and any items passing 'filter' are sent down the returned
 // watch.Interface.
 func (h *EtcdHelper) WatchList(key string, filter FilterFunc) (watch.Interface, error) {
-	w := newEtcdWatcher(true, filter, h.Encoding)
+	w := newEtcdWatcher(true, filter, h.Codec)
 	go w.etcdWatch(h.Client, key)
 	return w, nil
 }
@@ -296,14 +306,14 @@ func (h *EtcdHelper) WatchList(key string, filter FilterFunc) (watch.Interface, 
 // Watch begins watching the specified key. Events are decoded into
 // API objects and sent down the returned watch.Interface.
 func (h *EtcdHelper) Watch(key string) (watch.Interface, error) {
-	w := newEtcdWatcher(false, nil, h.Encoding)
+	w := newEtcdWatcher(false, nil, h.Codec)
 	go w.etcdWatch(h.Client, key)
 	return w, nil
 }
 
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
-	encoding Encoding
+	encoding Codec
 
 	list   bool // If we're doing a recursive watch, should be true.
 	filter FilterFunc
@@ -322,7 +332,7 @@ type etcdWatcher struct {
 }
 
 // Returns a new etcdWatcher; if list is true, watch sub-nodes.
-func newEtcdWatcher(list bool, filter FilterFunc, encoding Encoding) *etcdWatcher {
+func newEtcdWatcher(list bool, filter FilterFunc, encoding Codec) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:      encoding,
 		list:          list,

@@ -32,7 +32,6 @@ import (
 
 // EtcdRegistry implements PodRegistry, ControllerRegistry and ServiceRegistry with backed by etcd.
 type EtcdRegistry struct {
-	client          tools.EtcdClient
 	helper          tools.EtcdHelper
 	machines        MinionRegistry
 	manifestFactory ManifestFactory
@@ -44,8 +43,7 @@ type EtcdRegistry struct {
 // 'scheduler' is the scheduling algorithm to use.
 func MakeEtcdRegistry(client tools.EtcdClient, machines MinionRegistry) *EtcdRegistry {
 	registry := &EtcdRegistry{
-		client:   client,
-		helper:   tools.EtcdHelper{client, api.Encoding, api.Versioning},
+		helper:   tools.EtcdHelper{client, api.Codec, api.ResourceVersioner},
 		machines: machines,
 	}
 	registry.manifestFactory = &BasicManifestFactory{
@@ -118,7 +116,7 @@ func (registry *EtcdRegistry) runPod(pod api.Pod, machine string) error {
 	})
 	if err != nil {
 		// Don't strand stuff.
-		_, err2 := registry.client.Delete(podKey, false)
+		err2 := registry.helper.Delete(podKey, false)
 		if err2 != nil {
 			glog.Errorf("Probably stranding a pod, couldn't delete %v: %#v", podKey, err2)
 		}
@@ -143,7 +141,7 @@ func (registry *EtcdRegistry) deletePodFromMachine(machine, podID string) error 
 	// First delete the pod, so a scheduler doesn't notice it getting removed from the
 	// machine and attempt to put it somewhere.
 	podKey := makePodKey(machine, podID)
-	_, err := registry.client.Delete(podKey, true)
+	err := registry.helper.Delete(podKey, true)
 	if tools.IsEtcdNotFound(err) {
 		return apiserver.NewNotFoundErr("pod", podID)
 	}
@@ -247,7 +245,7 @@ func (registry *EtcdRegistry) UpdateController(controller api.ReplicationControl
 // DeleteController deletes a ReplicationController specified by its ID.
 func (registry *EtcdRegistry) DeleteController(controllerID string) error {
 	key := makeControllerKey(controllerID)
-	_, err := registry.client.Delete(key, false)
+	err := registry.helper.Delete(key, false)
 	if tools.IsEtcdNotFound(err) {
 		return apiserver.NewNotFoundErr("replicationController", controllerID)
 	}
@@ -295,7 +293,7 @@ func makeServiceEndpointsKey(name string) string {
 // DeleteService deletes a Service specified by its name.
 func (registry *EtcdRegistry) DeleteService(name string) error {
 	key := makeServiceKey(name)
-	_, err := registry.client.Delete(key, true)
+	err := registry.helper.Delete(key, true)
 	if tools.IsEtcdNotFound(err) {
 		return apiserver.NewNotFoundErr("service", name)
 	}
@@ -303,7 +301,7 @@ func (registry *EtcdRegistry) DeleteService(name string) error {
 		return err
 	}
 	key = makeServiceEndpointsKey(name)
-	_, err = registry.client.Delete(key, true)
+	err = registry.helper.Delete(key, true)
 	if !tools.IsEtcdNotFound(err) {
 		return err
 	}

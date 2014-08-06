@@ -25,19 +25,23 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-type EncodingInterface interface {
+// codec defines methods for serializing and deserializing API
+// objects
+type codec interface {
 	Encode(obj interface{}) (data []byte, err error)
 	Decode(data []byte) (interface{}, error)
 	DecodeInto(data []byte, obj interface{}) error
 }
 
-type VersioningInterface interface {
+// resourceVersioner provides methods for setting and retrieving
+// the resource version from an API object
+type resourceVersioner interface {
 	SetResourceVersion(obj interface{}, version uint64) error
 	ResourceVersion(obj interface{}) (uint64, error)
 }
 
-var Encoding EncodingInterface
-var Versioning VersioningInterface
+var Codec codec
+var ResourceVersioner resourceVersioner
 
 var conversionScheme *conversion.Scheme
 
@@ -101,8 +105,8 @@ func init() {
 		},
 	)
 
-	Encoding = conversionScheme
-	Versioning = JSONBaseVersioning{}
+	Codec = conversionScheme
+	ResourceVersioner = NewJSONBaseResourceVersioner()
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.

@@ -67,7 +67,7 @@ func TestGenericJSONBase(t *testing.T) {
 	}
 }
 
-func TestVersioningOfAPI(t *testing.T) {
+func TestResourceVersionerOfAPI(t *testing.T) {
 	type T struct {
 		Object   interface{}
 		Expected uint64
@@ -77,7 +77,7 @@ func TestVersioningOfAPI(t *testing.T) {
 		"api object with version":            {Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
 		"pointer to api object with version": {&Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
 	}
-	versioning := JSONBaseVersioning{}
+	versioning := NewJSONBaseResourceVersioner()
 	for key, testCase := range testCases {
 		actual, err := versioning.ResourceVersion(testCase.Object)
 		if err != nil {
