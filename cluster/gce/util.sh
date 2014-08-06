@@ -230,14 +230,14 @@ function kube-up {
       # Make sure docker is installed
       gcutil ssh ${MINION_NAMES[$i]} which docker > /dev/null
       if [ "$?" != "0" ]; then
-          echo "Docker failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+          echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
           echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
           exit 1
       fi
 
     # Make sure the kubelet is healthy
     if [ "$(curl --insecure --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
-        echo "Kubelet failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
     else
@@ -254,7 +254,7 @@ function kube-up {
   echo
   echo "Security note: The server above uses a self signed certificate.  This is"
   echo "    subject to \"Man in the middle\" type attacks."
-  
+
 }
 
 # Delete a kubernetes cluster

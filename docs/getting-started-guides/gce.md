@@ -55,7 +55,8 @@ cluster/kubecfg.sh rm myNginx
 ### Running a container (more complete version)
 
 
-Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`:
+Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`, you
+can create a pod like this:
 
 
 ```
@@ -97,6 +98,18 @@ Where pod.json contains something like:
     "name": "foo"
   }
 }
+```
+
+You can see your cluster's pods:
+
+```
+cluster/kubecfg.sh list pods
+```
+
+and delete the pod you just created:
+
+```
+cluster/kubecfg.sh delete pods/php
 ```
 
 Look in `api/examples/` for more examples

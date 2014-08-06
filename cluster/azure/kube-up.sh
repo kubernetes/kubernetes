@@ -115,7 +115,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Make sure docker is installed
     ssh -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net which docker > /dev/null
     if [ "$?" != "0" ]; then
-        echo "Docker failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
     fi
@@ -123,7 +123,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Make sure the kubelet is running
     ssh -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net /etc/init.d/kubelet status
     if [ "$?" != "0" ]; then
-        echo "Kubelet failed to install on ${MINION_NAMES[$i]} your cluster is unlikely to work correctly"
+        echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
     fi
