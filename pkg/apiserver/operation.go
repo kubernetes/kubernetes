@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,16 +33,8 @@ type OperationHandler struct {
 }
 
 func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	trimmed := strings.TrimLeft(req.URL.Path, "/")
-	parts := strings.Split(trimmed, "/")
-	if trimmed == "" {
-		parts = []string{}
-	}
-	if len(parts) > 1 {
-		notFound(w, req)
-		return
-	}
-	if req.Method != "GET" {
+	parts, err := util.SplitRawPath(req.URL.Path)
+	if err != nil || req.Method != "GET" || len(parts) > 1 {
 		notFound(w, req)
 		return
 	}

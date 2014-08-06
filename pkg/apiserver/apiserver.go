@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
@@ -43,7 +44,7 @@ import (
 type APIServer struct {
 	storage     map[string]RESTStorage
 	ops         *Operations
-	mux         *http.ServeMux
+	handler     http.Handler
 	asyncOpWait time.Duration
 }
 
@@ -54,38 +55,40 @@ func New(storage map[string]RESTStorage, prefix string) *APIServer {
 	s := &APIServer{
 		storage: storage,
 		ops:     NewOperations(),
-		mux:     http.NewServeMux(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
 	}
 
 	prefix = strings.TrimRight(prefix, "/")
+	mux := http.NewServeMux()
 
 	// Primary API handlers
 	restPrefix := prefix + "/"
-	s.mux.Handle(restPrefix, http.StripPrefix(restPrefix, http.HandlerFunc(s.handleREST)))
+	mux.Handle(restPrefix, http.StripPrefix(restPrefix, http.HandlerFunc(s.handleREST)))
 
 	// Watch API handlers
 	watchPrefix := path.Join(prefix, "watch") + "/"
-	s.mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage}))
+	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage}))
 
 	// Support services for the apiserver
 	logsPrefix := "/logs/"
-	s.mux.Handle(logsPrefix, http.StripPrefix(logsPrefix, http.FileServer(http.Dir("/var/log/"))))
-	healthz.InstallHandler(s.mux)
-	s.mux.HandleFunc("/version", handleVersion)
-	s.mux.HandleFunc("/", handleIndex)
+	mux.Handle(logsPrefix, http.StripPrefix(logsPrefix, http.FileServer(http.Dir("/var/log/"))))
+	healthz.InstallHandler(mux)
+	mux.HandleFunc("/version", handleVersion)
+	mux.HandleFunc("/", handleIndex)
 
 	// Handle both operations and operations/* with the same handler
 	handler := &OperationHandler{s.ops}
 	operationPrefix := path.Join(prefix, "operations")
-	s.mux.Handle(operationPrefix, http.StripPrefix(operationPrefix, handler))
+	mux.Handle(operationPrefix, http.StripPrefix(operationPrefix, handler))
 	operationsPrefix := operationPrefix + "/"
-	s.mux.Handle(operationsPrefix, http.StripPrefix(operationsPrefix, handler))
+	mux.Handle(operationsPrefix, http.StripPrefix(operationsPrefix, handler))
 
 	// Proxy minion requests
-	s.mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
+	mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
 
+	// Give us access to req.URL based on the raw segment
+	s.handler = util.RawURL(mux)
 	return s
 }
 
@@ -108,24 +111,24 @@ func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	).Log()
 
 	// Dispatch via our mux.
-	s.mux.ServeHTTP(w, req)
+	s.handler.ServeHTTP(w, req)
 }
 
 // handleREST handles requests to all our RESTStorage objects.
 func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
-	requestParts := strings.Split(req.URL.Path, "/")
-	if len(requestParts) < 1 {
+	parts, err := util.SplitRawPath(req.URL.Path)
+	if err != nil || len(parts) < 1 {
 		notFound(w, req)
 		return
 	}
-	storage := s.storage[requestParts[0]]
+	storage := s.storage[parts[0]]
 	if storage == nil {
-		httplog.LogOf(w).Addf("'%v' has no storage object", requestParts[0])
+		httplog.LogOf(w).Addf("'%v' has no storage object", parts[0])
 		notFound(w, req)
 		return
 	}
 
-	s.handleRESTStorage(requestParts, req, w, storage)
+	s.handleRESTStorage(parts, req, w, storage)
 }
 
 // handleRESTStorage is the main dispatcher for a storage object.  It switches on the HTTP method, and then

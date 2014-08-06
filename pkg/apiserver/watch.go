@@ -19,11 +19,11 @@ package apiserver
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -33,12 +33,12 @@ type WatchHandler struct {
 
 // handleWatch processes a watch request
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	parts := strings.Split(req.URL.Path, "/")
-	if req.Method != "GET" || len(parts) < 1 {
+	parts, err := util.SplitRawPath(req.URL.Path)
+	if err != nil || req.Method != "GET" || len(parts) < 1 {
 		notFound(w, req)
 	}
-	storage := h.storage[parts[0]]
-	if storage == nil {
+	storage, ok := h.storage[parts[0]]
+	if !ok {
 		notFound(w, req)
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
