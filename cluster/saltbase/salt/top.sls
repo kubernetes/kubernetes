@@ -9,6 +9,7 @@ base:
     - kubelet
     - kube-proxy
     - cadvisor
+    - nsinit
 
   'roles:kubernetes-master':
     - match: grain
