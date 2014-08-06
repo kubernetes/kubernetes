@@ -40,8 +40,8 @@ type TestResource struct {
 }
 
 var scheme *conversion.Scheme
-var encoding = api.Encoding
-var versioning = api.Versioning
+var codec = api.Codec
+var versioner = api.ResourceVersioner
 
 func init() {
 	scheme = conversion.NewScheme()
@@ -87,7 +87,7 @@ func TestExtractList(t *testing.T) {
 		{JSONBase: api.JSONBase{ID: "baz"}},
 	}
 	var got []api.Pod
-	helper := EtcdHelper{fakeClient, encoding, versioning}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 	err := helper.ExtractList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
@@ -101,7 +101,7 @@ func TestExtractObj(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	expect := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	fakeClient.Set("/some/key", util.MakeJSONString(expect), 0)
-	helper := EtcdHelper{fakeClient, encoding, versioning}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 	var got api.Pod
 	err := helper.ExtractObj("/some/key", &got, false)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 			},
 		},
 	}
-	helper := EtcdHelper{fakeClient, encoding, versioning}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 	try := func(key string) {
 		var got api.Pod
 		err := helper.ExtractObj(key, &got, false)
@@ -155,12 +155,12 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 func TestSetObj(t *testing.T) {
 	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	fakeClient := MakeFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, encoding, versioning}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := encoding.Encode(obj)
+	data, err := codec.Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -184,12 +184,12 @@ func TestSetObjWithVersion(t *testing.T) {
 		},
 	}
 
-	helper := EtcdHelper{fakeClient, encoding, versioning}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
-	data, err := encoding.Encode(obj)
+	data, err := codec.Encode(obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -200,15 +200,15 @@ func TestSetObjWithVersion(t *testing.T) {
 	}
 }
 
-func TestSetObjWithoutVersioning(t *testing.T) {
+func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	fakeClient := MakeFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, encoding, nil}
+	helper := EtcdHelper{fakeClient, codec, nil}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := encoding.Encode(obj)
+	data, err := codec.Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -222,8 +222,8 @@ func TestSetObjWithoutVersioning(t *testing.T) {
 func TestAtomicUpdate(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	encoding := scheme
-	helper := EtcdHelper{fakeClient, encoding, api.JSONBaseVersioning{}}
+	codec := scheme
+	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -234,7 +234,7 @@ func TestAtomicUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := encoding.Encode(obj)
+	data, err := codec.Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -259,7 +259,7 @@ func TestAtomicUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err = encoding.Encode(objUpdate)
+	data, err = codec.Encode(objUpdate)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -277,8 +277,8 @@ func TestAtomicUpdate(t *testing.T) {
 func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	encoding := scheme
-	helper := EtcdHelper{fakeClient, encoding, api.JSONBaseVersioning{}}
+	codec := scheme
+	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
 
 	fakeClient.ExpectNotFoundGet("/some/key")
 
@@ -317,7 +317,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	// Check that stored TestResource has received all updates.
 	body := fakeClient.Data["/some/key"].R.Node.Value
 	stored := &TestResource{}
-	if err := encoding.DecodeInto([]byte(body), stored); err != nil {
+	if err := codec.DecodeInto([]byte(body), stored); err != nil {
 		t.Errorf("Error decoding stored value: %v", body)
 	}
 	if stored.Value != concurrency {
@@ -329,9 +329,9 @@ func TestWatchInterpretation_ListAdd(t *testing.T) {
 	w := newEtcdWatcher(true, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
-	}, encoding)
+	}, codec)
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := encoding.Encode(pod)
+	podBytes, _ := codec.Encode(pod)
 
 	go w.sendResult(&etcd.Response{
 		Action: "set",
@@ -353,9 +353,9 @@ func TestWatchInterpretation_Delete(t *testing.T) {
 	w := newEtcdWatcher(true, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
-	}, encoding)
+	}, codec)
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := encoding.Encode(pod)
+	podBytes, _ := codec.Encode(pod)
 
 	go w.sendResult(&etcd.Response{
 		Action: "delete",
@@ -377,7 +377,7 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 	w := newEtcdWatcher(false, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
-	}, encoding)
+	}, codec)
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -391,7 +391,7 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 	w := newEtcdWatcher(false, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
-	}, encoding)
+	}, codec)
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -404,7 +404,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	w := newEtcdWatcher(false, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
 		return true
-	}, encoding)
+	}, codec)
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -418,7 +418,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	h := EtcdHelper{fakeClient, encoding, versioning}
+	h := EtcdHelper{fakeClient, codec, versioner}
 
 	watching, err := h.Watch("/some/key")
 	if err != nil {
@@ -429,7 +429,7 @@ func TestWatch(t *testing.T) {
 
 	// Test normal case
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := encoding.Encode(pod)
+	podBytes, _ := codec.Encode(pod)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "set",
 		Node: &etcd.Node{
@@ -459,7 +459,7 @@ func TestWatch(t *testing.T) {
 
 func TestWatchPurposefulShutdown(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
-	h := EtcdHelper{fakeClient, encoding, versioning}
+	h := EtcdHelper{fakeClient, codec, versioner}
 
 	// Test purposeful shutdown
 	watching, err := h.Watch("/some/key")
