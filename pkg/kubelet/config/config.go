@@ -28,20 +28,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// PodConfigListener receives notifications for changes to a configuration.
-type PodConfigListener interface {
-	// OnUpdate is invoked when the kubelet.Pod configuration has been changed by one of
-	// the sources. The update is properly normalized to remove duplicates.
-	OnUpdate(pod kubelet.PodUpdate)
-}
-
-// ListenerFunc implements the PodConfigListener interface
-type ListenerFunc func(update kubelet.PodUpdate)
-
-func (h ListenerFunc) OnUpdate(update kubelet.PodUpdate) {
-	h(update)
-}
-
 // PodConfigNotificationMode describes how changes are sent to the update channel
 type PodConfigNotificationMode int
 
