@@ -132,6 +132,7 @@ hack/e2e-test.sh
 
 If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
-#### I changed Kubernetes code, but its not running!
+#### I changed Kubernetes code, but it's not running!
 
-Are you sure there was no build error?  After running $ vagrant provision, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.  Its very likely you see a build error due to an error in your source files!
+Are you sure there was no build error?  After running $ vagrant provision, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
+It's very likely you see a build error due to an error in your source files!
