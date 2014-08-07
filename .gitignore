@@ -29,6 +29,7 @@ Session.vim
 
 # Vagrant
 .vagrant
+network_closure.sh
 
 # compiled binaries in third_party
 /third_party/pkg

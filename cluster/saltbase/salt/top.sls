@@ -12,6 +12,8 @@ base:
     - nsinit
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn-client
+{% else %}
+    - sdn
 {% endif %}
 
   'roles:kubernetes-master':
