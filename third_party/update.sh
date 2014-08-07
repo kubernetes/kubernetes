@@ -2,8 +2,8 @@
 
 set -e
 
-if (( $(git status --porcelain 2>/dev/null | grep "^M" | wc -l) > 0 )); then
-  echo "You can't have any staged files in git when updating packages."
+if ! git diff-index --quiet HEAD -- || test $(git ls-files --exclude-standard --others third_party/src | wc -l) != 0; then
+  echo "You can't have any staged files or changes in third_party/src/ in git when updating packages."
   echo "Either commit them or unstage them to continue."
   exit 1
 fi
