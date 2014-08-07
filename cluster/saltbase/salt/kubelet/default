@@ -9,9 +9,11 @@
   {% set etcd_servers = "-etcd_servers=http://" + ips[0][0] + ":4001" %}
 {% endif %}
 
+{% set address = "-address=0.0.0.0" %}
+{% set config = "-config=/etc/kubernetes/manifests" %}
 {% set hostname_override = "" %}
 {% if grains.minion_ip is defined %}
   {% set hostname_override = " -hostname_override=" + grains.minion_ip %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}}"
+DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}} {{address}} {{config}}"

@@ -17,7 +17,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="The Kubernetes container manager"
 NAME=kubelet
 DAEMON=/usr/local/bin/kubelet
-DAEMON_ARGS="-config=/etc/kubernetes/manifests -address=0.0.0.0"
+DAEMON_ARGS=""
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
