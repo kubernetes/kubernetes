@@ -91,22 +91,22 @@ func (client *FakeKubeClient) DeleteReplicationController(controller string) err
 }
 
 func (client *FakeKubeClient) GetService(name string) (api.Service, error) {
-	client.actions = append(client.actions, Action{action: "get-controller", value: name})
+	client.actions = append(client.actions, Action{action: "get-service", value: name})
 	return api.Service{}, nil
 }
 
-func (client *FakeKubeClient) CreateService(controller api.Service) (api.Service, error) {
-	client.actions = append(client.actions, Action{action: "create-service", value: controller})
+func (client *FakeKubeClient) CreateService(service api.Service) (api.Service, error) {
+	client.actions = append(client.actions, Action{action: "create-service", value: service})
 	return api.Service{}, nil
 }
 
-func (client *FakeKubeClient) UpdateService(controller api.Service) (api.Service, error) {
-	client.actions = append(client.actions, Action{action: "update-service", value: controller})
+func (client *FakeKubeClient) UpdateService(service api.Service) (api.Service, error) {
+	client.actions = append(client.actions, Action{action: "update-service", value: service})
 	return api.Service{}, nil
 }
 
-func (client *FakeKubeClient) DeleteService(controller string) error {
-	client.actions = append(client.actions, Action{action: "delete-service", value: controller})
+func (client *FakeKubeClient) DeleteService(service string) error {
+	client.actions = append(client.actions, Action{action: "delete-service", value: service})
 	return nil
 }
 
