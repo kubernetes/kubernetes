@@ -8,6 +8,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/build/buildapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/buildconfig/buildconfigapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -18,7 +19,7 @@ type buildTypeStrategy func(buildapi.Build) api.Pod
 type BuildController struct {
 	kubeClient         client.Interface
 	syncTime           <-chan time.Time
-	typeStrategies     map[buildapi.BuildType]buildTypeStrategy
+	typeStrategies     map[buildconfigapi.BuildType]buildTypeStrategy
 	dockerBuilderImage string
 	dockerRegistry     string
 	stiBuilderImage    string
@@ -35,9 +36,9 @@ func MakeBuildController(kubeClient client.Interface, dockerBuilderImage, docker
 		timeout:            timeout,
 	}
 
-	bc.typeStrategies = map[buildapi.BuildType]buildTypeStrategy{
-		buildapi.BuildType("docker"): bc.dockerBuildStrategy,
-		buildapi.BuildType("sti"):    bc.stiBuildStrategy,
+	bc.typeStrategies = map[buildconfigapi.BuildType]buildTypeStrategy{
+		buildconfigapi.BuildType("docker"): bc.dockerBuildStrategy,
+		buildconfigapi.BuildType("sti"):    bc.stiBuildStrategy,
 	}
 
 	return bc

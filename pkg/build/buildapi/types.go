@@ -16,15 +16,18 @@ limitations under the License.
 
 package buildapi
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/buildconfig/buildconfigapi"
+)
 
 // Build encapsulates the inputs needed to produce a new deployable image, as well as
 // the status of the operation and a reference to the Pod which runs the build.
 type Build struct {
 	api.JSONBase `json:",inline" yaml:",inline"`
-	Config       BuildConfig `json:"config,omitempty" yaml:"config,omitempty"`
-	Status       BuildStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	PodID        string      `json:"podID,omitempty" yaml:"podID,omitempty"`
+	Config       buildconfigapi.BuildConfig `json:"config,omitempty" yaml:"config,omitempty"`
+	Status       BuildStatus                `json:"status,omitempty" yaml:"status,omitempty"`
+	PodID        string                     `json:"podID,omitempty" yaml:"podID,omitempty"`
 }
 
 // BuildStatus represents the status of a Build at a point in time.
@@ -37,16 +40,6 @@ const (
 	BuildComplete BuildStatus = "complete"
 	BuildFailed   BuildStatus = "failed"
 )
-
-type BuildConfig struct {
-	Type         BuildType `json:"type,omitempty" yaml:"type,omitempty"`
-	SourceURI    string    `json:"sourceUri,omitempty" yaml:"sourceUri,omitempty"`
-	ImageTag     string    `json:"imageTag,omitempty" yaml:"imageTag,omitempty"`
-	BuilderImage string    `json:"builderImage,omitempty" yaml:"builderImage,omitempty"`
-	SourceRef    string    `json:"sourceRef,omitempty" yaml:"sourceRef,omitempty"`
-}
-
-type BuildType string
 
 // BuildList is a collection of Builds.
 type BuildList struct {
