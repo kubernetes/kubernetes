@@ -62,7 +62,6 @@ APISERVER_PID=$!
 
 CTLRMGR_LOG=/tmp/controller-manager.log
 ${GO_OUT}/controller-manager \
-  --etcd_servers="http://127.0.0.1:4001" \
   --master="${API_HOST}:${API_PORT}" &> ${CTLRMGR_LOG} &
 CTLRMGR_PID=$!
 
