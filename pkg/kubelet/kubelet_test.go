@@ -843,6 +843,86 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
+type fakeContainerCommandRunner struct {
+	Cmd []string
+	ID  string
+	E   error
+}
+
+func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]byte, error) {
+	f.Cmd = cmd
+	f.ID = id
+	return []byte{}, f.E
+}
+
+func TestRunInContainerNoSuchPod(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	fakeDocker.containerList = []docker.APIContainers{}
+	kubelet.runner = &fakeCommandRunner
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+	output, err := kubelet.RunInContainer(
+		&Pod{Name: podName, Namespace: podNamespace},
+		containerName,
+		[]string{"ls"})
+	if output != nil {
+		t.Errorf("unexpected non-nil command: %v", output)
+	}
+	if err == nil {
+		t.Error("unexpected non-error")
+	}
+}
+
+func TestRunInContainer(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	kubelet.runner = &fakeCommandRunner
+
+	containerID := "abc1234"
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			ID:    containerID,
+			Names: []string{"/k8s--" + containerName + "--" + podName + "." + podNamespace + "--1234"},
+		},
+	}
+
+	cmd := []string{"ls"}
+	_, err := kubelet.RunInContainer(
+		&Pod{Name: podName, Namespace: podNamespace},
+		containerName,
+		cmd)
+	if fakeCommandRunner.ID != containerID {
+		t.Errorf("unexected ID: %s", fakeCommandRunner.ID)
+	}
+	if !reflect.DeepEqual(fakeCommandRunner.Cmd, cmd) {
+		t.Errorf("unexpected commnd: %s", fakeCommandRunner.Cmd)
+	}
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestDockerContainerCommand(t *testing.T) {
+	runner := dockerContainerCommandRunner{}
+	containerID := "1234"
+	command := []string{"ls"}
+	cmd, _ := runner.getRunInContainerCommand(containerID, command)
+	if cmd.Dir != "/var/lib/docker/execdriver/native/"+containerID {
+		t.Errorf("unexpected command CWD: %s", cmd.Dir)
+	}
+	if !reflect.DeepEqual(cmd.Args, []string{"/usr/sbin/nsinit", "exec", "ls"}) {
+		t.Errorf("unexpectd command args: %s", cmd.Args)
+	}
+
+}
+
 var parseImageNameTests = []struct {
 	imageName string
 	name      string

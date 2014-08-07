@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os/exec"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -61,6 +62,30 @@ func NewDockerPuller(client DockerInterface) DockerPuller {
 	return dockerPuller{
 		client: client,
 	}
+}
+
+type dockerContainerCommandRunner struct{}
+
+func (d *dockerContainerCommandRunner) getRunInContainerCommand(containerID string, cmd []string) (*exec.Cmd, error) {
+	args := append([]string{"exec"}, cmd...)
+	command := exec.Command("/usr/sbin/nsinit", args...)
+	command.Dir = fmt.Sprintf("/var/lib/docker/execdriver/native/%s", containerID)
+	return command, nil
+}
+
+// RunInContainer uses nsinit to run the command inside the container identified by containerID
+func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+	c, err := d.getRunInContainerCommand(containerID, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return c.CombinedOutput()
+}
+
+// NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
+// inside a container.
+func NewDockerContainerCommandRunner() ContainerCommandRunner {
+	return &dockerContainerCommandRunner{}
 }
 
 func (p dockerPuller) Pull(image string) error {
