@@ -1,6 +1,6 @@
 {% set daemon_args = "$DAEMON_ARGS" %}
 {% if grains['os_family'] == 'RedHat' %}
-	{% set daemon_args = "" %}
+  {% set daemon_args = "" %}
 {% endif %}
 {% if grains.etcd_servers is defined %}
   {% set etcd_servers = "-etcd_servers=http://" + grains.etcd_servers + ":4001" %}
@@ -9,10 +9,9 @@
   {% set etcd_servers = "-etcd_servers=http://" + ips[0][0] + ":4001" %}
 {% endif %}
 
+{% set hostname_override = "" %}
 {% if grains.minion_ip is defined %}
-  {% set address = "-address=" + grains.minion_ip + " -hostname_override=" + grains.minion_ip %}
-{% else %}
-  {% set address = "-address=$HOSTNAME" %}
+  {% set hostname_override = " -hostname_override=" + grains.minion_ip %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{address}} -config=/etc/kubernetes/manifests"
+DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}} -config=/etc/kubernetes/manifests"

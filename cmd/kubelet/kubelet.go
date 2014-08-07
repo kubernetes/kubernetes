@@ -50,7 +50,8 @@ var (
 	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking config files for new data")
 	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
 	manifestURL        = flag.String("manifest_url", "", "URL for accessing the container manifest")
-	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on")
+	enableServer       = flag.Bool("enable_server", true, "Enable the info server")
+	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
@@ -158,7 +159,7 @@ func main() {
 	go util.Forever(cfg.Sync, *syncFrequency)
 
 	// start the kubelet server
-	if *address != "" {
+	if *enableServer {
 		go util.Forever(func() {
 			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), http.DefaultServeMux, *address, *port)
 		}, 0)
