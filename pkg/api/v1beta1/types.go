@@ -86,11 +86,9 @@ type VolumeSource struct {
 	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
 	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
 	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
-	// GCEPersistentDisk represents aPersistent Disk resource in Google Compute Engine that will
-	// be attached to a kubelet's host machine and then exposed to the pod.
-	// The GCEPD specified must already exist in same project and zone as the kubernetes cluster.
-	// This resource can only be used when running in a GCE environment.
-	GCEPersistentDisk *GCEPersistentDisk `yaml:"gcePD" json:"gcePD"`
+	// PersistentDisk represents a Persistent Disk resource that
+	// is attached to a kubelet's host machine and then exposed to the pod.
+	PersistentDisk *PersistentDisk `yaml:"persistentDisk" json:"persistentDisk"`
 }
 
 // HostDirectory represents bare host directory volume.
@@ -100,12 +98,16 @@ type HostDirectory struct {
 
 type EmptyDirectory struct{}
 
-// Google Compute Engine Persistent Disk resource.
-type GCEPersistentDisk struct {
-	// Unique name of the PD resource in GCE.
+// Persistent Disk resource.
+type PersistentDisk struct {
+	// Unique name of the PD resource. Matches the name of the disk in
+	// the specified cloud provider.
 	PDName string `yaml:"pdName" json:"pdName"`
 	// Optional: Specifies the filesystem on the disk.
 	FSType string `yaml:"fsType,omitempty" json:"fsType,omitempty"`
+	// Specifies the cloud platform provider. Must match the platform kubelet is running on.
+	// Currently supports: gce
+	Platform string `yaml:"platform" json:"platform"`
 	// Optional: Defaults to false (read-write). ReadOnly here will override
 	// the ReadOnly flag in VolumeMounts
 	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`

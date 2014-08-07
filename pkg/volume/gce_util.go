@@ -29,67 +29,38 @@ import (
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 )
 
-func GCEAttachDisk(GCEPD *GCEPersistentDisk) (string, error) {
-	client, err := serviceaccount.NewClient(&serviceaccount.Options{})
-	if err != nil {
-		return "", err
-	}
-	project, zone, err := getProjectIDAndZone()
-	if err != nil {
-		return "", err
-	}
-	instance, err := os.Hostname()
-	if err != nil {
-		return "", err
-	}
-	computeService, err := compute.New(client)
-	if err != nil {
-		return "", err
-	}
-	disk, err := computeService.Disks.Get(project, zone, GCEPD.PDName).Do()
-	if err != nil {
-		return "", err
-	}
-	readWrite := "READ_WRITE"
-	if GCEPD.ReadOnly {
-		readWrite = "READ_ONLY"
-	}
-	attachedDisk := convertDiskToAttachedDisk(disk, project, zone, readWrite)
-	_, err = computeService.Instances.AttachDisk(project, zone, instance, attachedDisk).Do()
-	if err != nil {
-		return "", err
-	}
-	success := make(chan struct{})
-	devicePath := path.Join("/dev/disk/by-id/", "google-"+disk.Name)
-	go func() {
-		_, err := os.Stat(devicePath)
-		for os.IsNotExist(err) {
-			_, err = os.Stat(devicePath)
-		}
-		close(success)
-	}()
-	select {
-	case <-success:
-		break
-	case <-time.After(10 * time.Second):
-		return "", errors.New("Could not attach disk: Timeout after 10s")
-	}
-	return devicePath, nil
+type GCEDiskUtil struct {
+	project   string
+	zone      string
+	instance  string
+	service   *compute.Service
+	connected bool
 }
 
-func convertDiskToAttachedDisk(disk *compute.Disk, project string, zone string, readWrite string) *compute.AttachedDisk {
-	return &compute.AttachedDisk{
-		false,
-		false,
-		disk.Name,
-		0,
-		nil,
-		disk.Kind,
-		//		disk.Licenses,
-		readWrite,
-		"https://" + path.Join("www.googleapis.com/compute/v1/projects/", project, "zones", zone, "disks", disk.Name),
-		"PERSISTENT",
+func NewGCEDiskUtil() *GCEDiskUtil {
+	return &GCEDiskUtil{}
+}
+
+func (GCEPD *GCEDiskUtil) Connect() error {
+	var err error
+	GCEPD.project, GCEPD.zone, err = getProjectIDAndZone()
+	if err != nil {
+		return err
 	}
+	GCEPD.instance, err = os.Hostname()
+	if err != nil {
+		return err
+	}
+	client, err := serviceaccount.NewClient(&serviceaccount.Options{})
+	if err != nil {
+		return err
+	}
+	GCEPD.service, err = compute.New(client)
+	if err != nil {
+		return err
+	}
+	GCEPD.connected = true
+	return nil
 }
 
 func getProjectIDAndZone() (string, string, error) {
@@ -108,4 +79,66 @@ func getProjectIDAndZone() (string, string, error) {
 		return "", "", err
 	}
 	return projectID, zone, nil
+}
+
+func (util *GCEDiskUtil) convertDiskToAttachedDisk(disk *compute.Disk, readWrite string) *compute.AttachedDisk {
+	return &compute.AttachedDisk{
+		false,
+		false,
+		disk.Name,
+		0,
+		nil,
+		disk.Kind,
+		//disk.Licenses,
+		readWrite,
+		"https://" + path.Join("www.googleapis.com/compute/v1/projects/", util.project, "zones", util.zone, "disks", disk.Name),
+		"PERSISTENT",
+	}
+}
+func (util *GCEDiskUtil) getDisk(GCEPD *PersistentDisk) (*compute.Disk, error) {
+	return util.service.Disks.Get(util.project, util.zone, GCEPD.PDName).Do()
+}
+
+func (util *GCEDiskUtil) attachDisk(attachedDisk *compute.AttachedDisk) (*compute.Operation, error) {
+	return util.service.Instances.AttachDisk(util.project, util.zone, util.instance, attachedDisk).Do()
+}
+
+func (util *GCEDiskUtil) AttachDisk(GCEPD *PersistentDisk) (string, error) {
+	if !util.connected {
+		return "", errors.New("Not connected to API")
+	}
+	disk, err := util.getDisk(GCEPD)
+	if err != nil {
+		return "", err
+	}
+	readWrite := "READ_WRITE"
+	if GCEPD.ReadOnly {
+		readWrite = "READ_ONLY"
+	}
+	attachedDisk := util.convertDiskToAttachedDisk(disk, readWrite)
+	if _, err := util.attachDisk(attachedDisk); err != nil {
+		return "", err
+	}
+	success := make(chan struct{})
+	devicePath := path.Join("/dev/disk/by-id/", "google-"+disk.Name)
+	go func() {
+		for _, err := os.Stat(devicePath); os.IsNotExist(err); _, err = os.Stat(devicePath) {
+			time.Sleep(time.Second)
+		}
+		close(success)
+	}()
+	select {
+	case <-success:
+		break
+	case <-time.After(10 * time.Second):
+		return "", errors.New("Could not attach disk: Timeout after 10s")
+	}
+	return devicePath, nil
+}
+
+func (util *GCEDiskUtil) DetachDisk(GCEPD *PersistentDisk) error {
+	if !util.connected {
+		return errors.New("Not connected to API")
+	}
+	return nil
 }

@@ -20,10 +20,35 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
+
+type MockDiskUtil struct{}
+
+func (util *MockDiskUtil) Connect() error {
+	return nil
+}
+
+// TODO(jonesdl) To fully test this, we could create a loopback device
+// and mount that instead.
+func (util *MockDiskUtil) AttachDisk(PD *PersistentDisk) (string, error) {
+	err := os.MkdirAll(path.Join(PD.RootDir, "global", "pd", PD.PDName), 0750)
+	if err != nil {
+		return "", err
+	}
+	return "", nil
+}
+
+func (util *MockDiskUtil) DetachDisk(PD *PersistentDisk) error {
+	err := os.RemoveAll(path.Join(PD.RootDir, "global", "pd", PD.Name))
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func TestCreateVolumeBuilders(t *testing.T) {
 	tempDir, err := ioutil.TempDir("", "CreateVolumes")
@@ -45,7 +70,6 @@ func TestCreateVolumeBuilders(t *testing.T) {
 				},
 			},
 			"/dir/path",
-			"my-id",
 			"",
 		},
 		{
@@ -57,15 +81,23 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			},
 			path.Join(tempDir, "/my-id/volumes/empty/empty-dir"),
 			"my-id",
-			"empty",
 		},
-		{api.Volume{}, "", "", ""},
+		{
+			api.Volume{
+				Name: "gce-pd",
+				Source: &api.VolumeSource{
+					PersistentDisk: &api.PersistentDisk{"my-disk", "ext4", "gce", false},
+				},
+			},
+			path.Join(tempDir, "/my-id/volumes/pd/gce-pd"),
+			"my-id",
+		},
+		{api.Volume{}, "", ""},
 		{
 			api.Volume{
 				Name:   "empty-dir",
 				Source: &api.VolumeSource{},
 			},
-			"",
 			"",
 			"",
 		},
@@ -79,16 +111,12 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			}
 			continue
 		}
-		if tt.volume.Source.HostDirectory == nil && tt.volume.Source.EmptyDirectory == nil {
+		if tt.volume.Source.HostDirectory == nil && tt.volume.Source.EmptyDirectory == nil && tt.volume.Source.PersistentDisk == nil {
 			if err != ErrUnsupportedVolumeType {
 				t.Errorf("Unexpected error: %v", err)
 			}
 			continue
 		}
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		err = vb.SetUp()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -96,14 +124,81 @@ func TestCreateVolumeBuilders(t *testing.T) {
 		if path != tt.path {
 			t.Errorf("Unexpected bind path. Expected %v, got %v", tt.path, path)
 		}
-		vc, err := CreateVolumeCleaner(tt.kind, tt.volume.Name, tt.podID, tempDir)
-		if tt.kind == "" {
-			if err != ErrUnsupportedVolumeType {
-				t.Errorf("Unexpected error: %v", err)
-			}
+	}
+}
+
+//		err = vb.SetUp()
+//		if err != nil {
+//			t.Errorf("Unexpected error: %v", err)
+//		}
+//		vc, err := CreateVolumeCleaner(tt.kind, tt.volume.Name, tt.podID, tempDir)
+//		if tt.kind == "" {
+//			if err != ErrUnsupportedVolumeType {
+//				t.Errorf("Unexpected error: %v", err)
+//			}
+//			continue
+//		}
+//		err = vc.TearDown()
+//		if err != nil {
+//			t.Errorf("Unexpected error: %v", err)
+//		}
+//		if _, err := os.Stat(path); !os.IsNotExist(err) {
+//			t.Errorf("TearDown() failed, original volume path not properly removed: %v", path)
+//		}
+//	}
+//}
+
+func TestCreateVolumeCleaners(t *testing.T) {
+	tempDir := "CreateVolumeCleaners"
+	createVolumeCleanerTests := []struct {
+		kind  string
+		name  string
+		podID string
+	}{
+		{"empty", "empty-vol", "my-id"},
+		{"", "", ""},
+	}
+	for _, tt := range createVolumeCleanerTests {
+		vol, err := CreateVolumeCleaner(tt.kind, tt.name, tt.podID, tempDir)
+		if tt.kind == "" && err != nil && vol == nil {
 			continue
 		}
-		err = vc.TearDown()
+		if err != nil {
+			t.Errorf("Unexpected error occured: %s", err)
+		}
+		actualKind := reflect.TypeOf(vol).Elem().Name()
+		if tt.kind == "empty" && actualKind != "EmptyDirectory" {
+			t.Errorf("CreateVolumeCleaner returned invalid type. Expected EmptyDirectory, got %v, %v", tt.kind, actualKind)
+		}
+	}
+}
+
+func TestSetUpAndTearDown(t *testing.T) {
+	tempDir, err := ioutil.TempDir("", "CreateVolumes")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+	fakeID := "my-id"
+	type VolumeTester interface {
+		Builder
+		Cleaner
+	}
+	volumes := []VolumeTester{
+		&EmptyDirectory{"empty", fakeID, tempDir},
+		&PersistentDisk{"pd", fakeID, tempDir, "pd-disk", "ext4", false, &MockDiskUtil{}, &MockMounter{}},
+	}
+
+	for _, vol := range volumes {
+		err = vol.SetUp()
+		path := vol.GetPath()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Errorf("SetUp() failed, volume path not created: %v", path)
+		}
+		err = vol.TearDown()
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

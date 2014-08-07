@@ -39,7 +39,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path2"}}},
 		{Name: "abc-123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path3"}}},
 		{Name: "empty", Source: &VolumeSource{EmptyDirectory: &EmptyDirectory{}}},
-		{Name: "gcepd", Source: &VolumeSource{GCEPersistentDisk: &GCEPersistentDisk{"my-PD", "ext4", false}}},
+		{Name: "gcepd", Source: &VolumeSource{PersistentDisk: &PersistentDisk{"my-PD", "ext4", "gce", false}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
