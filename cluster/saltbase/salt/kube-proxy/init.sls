@@ -43,14 +43,14 @@ third-party-go:
       - mode
 
 kube-proxy-build:
-  cmd.wait:
+  cmd.run:
     - cwd: {{ root }}
     - names:
       - go build {{ package }}/cmd/proxy
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}
-    - watch:
+    - require:
       - file: {{ package_dir }}
 
 /usr/local/bin/kube-proxy:

@@ -47,6 +47,12 @@ reactor:
     - /srv/reactor/start.sls
 EOF
 
+  cat <<EOF >/etc/salt/master.d/salt-output.conf
+# Minimize the amount of output to terminal
+state_verbose: False
+state_output: mixed  
+EOF
+
   # Install Salt
   #
   # We specify -X to avoid a race condition that can cause minion failure to
