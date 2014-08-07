@@ -55,3 +55,6 @@ EOF
   echo "Salt configured" > /var/kube-vagrant-setup
 
 fi
+
+# run the networking setup
+$(dirname $0)/provision-network.sh $@

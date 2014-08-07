@@ -45,7 +45,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       minion_ip = minion_ips[n]
       minion.vm.box = kube_box[kube_os]["name"]
       minion.vm.box_url = kube_box[kube_os]["box_url"]
-      minion.vm.provision "shell", inline: "/vagrant/cluster/vagrant/provision-minion.sh #{master_ip} #{num_minion} #{minion_ips_str} #{minion_ip}"
+      minion.vm.provision "shell", inline: "/vagrant/cluster/vagrant/provision-minion.sh #{master_ip} #{num_minion} #{minion_ips_str} #{minion_ip} #{minion_index}"
       minion.vm.network "private_network", ip: "#{minion_ip}"
       minion.vm.hostname = "kubernetes-minion-#{minion_index}"
     end
