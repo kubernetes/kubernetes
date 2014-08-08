@@ -146,7 +146,7 @@ func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, "/prefix/version")
+	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	dest, _ := url.Parse(server.URL)

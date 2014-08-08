@@ -264,6 +264,25 @@ func TestUintParam(t *testing.T) {
 	}
 }
 
+func TestUnacceptableParamNames(t *testing.T) {
+	table := []struct {
+		name          string
+		testVal       string
+		expectSuccess bool
+	}{
+		{"sync", "foo", false},
+		{"timeout", "42", false},
+	}
+
+	for _, item := range table {
+		c := New("", nil)
+		r := c.Get().setParam(item.name, item.testVal)
+		if e, a := item.expectSuccess, r.err == nil; e != a {
+			t.Errorf("expected %v, got %v (%v)", e, a, r.err)
+		}
+	}
+}
+
 func TestSetPollPeriod(t *testing.T) {
 	c := New("", nil)
 	r := c.Get()

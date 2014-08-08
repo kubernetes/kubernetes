@@ -30,9 +30,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
+
+// specialParams lists parameters that are handled specially and which users of Request
+// are therefore not allowed to set manually.
+var specialParams = util.NewStringSet("sync", "timeout")
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE)
 //
@@ -134,12 +139,12 @@ func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 	if r.err != nil {
 		return r
 	}
-	if sel, err := labels.ParseSelector(item); err != nil {
+	sel, err := labels.ParseSelector(item)
+	if err != nil {
 		r.err = err
-	} else {
-		r.params[paramName] = sel.String()
+		return r
 	}
-	return r
+	return r.setParam(paramName, sel.String())
 }
 
 // SelectorParam adds the given selector as a query parameter with the name paramName.
@@ -147,8 +152,7 @@ func (r *Request) SelectorParam(paramName string, s labels.Selector) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.params[paramName] = s.String()
-	return r
+	return r.setParam(paramName, s.String())
 }
 
 // UintParam creates a query parameter with the given value.
@@ -156,7 +160,15 @@ func (r *Request) UintParam(paramName string, u uint64) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.params[paramName] = strconv.FormatUint(u, 10)
+	return r.setParam(paramName, strconv.FormatUint(u, 10))
+}
+
+func (r *Request) setParam(paramName, value string) *Request {
+	if specialParams.Has(paramName) {
+		r.err = fmt.Errorf("must set %v through the corresponding function, not directly.", paramName)
+		return r
+	}
+	r.params[paramName] = value
 	return r
 }
 
@@ -181,21 +193,23 @@ func (r *Request) Body(obj interface{}) *Request {
 	}
 	switch t := obj.(type) {
 	case string:
-		if data, err := ioutil.ReadFile(t); err != nil {
+		data, err := ioutil.ReadFile(t)
+		if err != nil {
 			r.err = err
-		} else {
-			r.body = bytes.NewBuffer(data)
+			return r
 		}
+		r.body = bytes.NewBuffer(data)
 	case []byte:
 		r.body = bytes.NewBuffer(t)
 	case io.Reader:
 		r.body = t
 	default:
-		if data, err := api.Encode(obj); err != nil {
+		data, err := api.Encode(obj)
+		if err != nil {
 			r.err = err
-		} else {
-			r.body = bytes.NewBuffer(data)
+			return r
 		}
+		r.body = bytes.NewBuffer(data)
 	}
 	return r
 }

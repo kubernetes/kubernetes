@@ -87,16 +87,16 @@ func MakeReplicationManager(kubeClient client.Interface) *ReplicationManager {
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	index := uint64(0)
-	go util.Forever(func() { rm.watchControllers(&index) }, period)
+	resourceVersion := uint64(0)
+	go util.Forever(func() { rm.watchControllers(&resourceVersion) }, period)
 }
 
-// index is a pointer to the resource version to use/update.
-func (rm *ReplicationManager) watchControllers(index *uint64) {
+// resourceVersion is a pointer to the resource version to use/update.
+func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
 	watching, err := rm.kubeClient.WatchReplicationControllers(
 		labels.Everything(),
 		labels.Everything(),
-		*index,
+		*resourceVersion,
 	)
 	if err != nil {
 		glog.Errorf("Unexpected failure to watch: %v", err)
@@ -120,7 +120,7 @@ func (rm *ReplicationManager) watchControllers(index *uint64) {
 				glog.Errorf("unexpected object: %#v", event.Object)
 			} else {
 				// If we get disconnected, start where we left off.
-				*index = rc.ResourceVersion + 1
+				*resourceVersion = rc.ResourceVersion + 1
 				rm.syncHandler(*rc)
 			}
 		}

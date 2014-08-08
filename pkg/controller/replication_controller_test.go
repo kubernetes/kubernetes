@@ -339,8 +339,8 @@ func TestWatchControllers(t *testing.T) {
 		return nil
 	}
 
-	index := uint64(0)
-	go manager.watchControllers(&index)
+	resourceVersion := uint64(0)
+	go manager.watchControllers(&resourceVersion)
 
 	// Test normal case
 	testControllerSpec.ID = "foo"
