@@ -309,7 +309,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 }
 
 // Kill a docker container
-func (kl *Kubelet) killContainer(dockerContainer docker.APIContainers) error {
+func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 	glog.Infof("Killing: %s", dockerContainer.ID)
 	err := kl.dockerClient.StopContainer(dockerContainer.ID, 10)
 	podFullName, containerName := parseDockerName(dockerContainer.Names[0])
@@ -349,6 +349,38 @@ func (kl *Kubelet) createNetworkContainer(pod *Pod) (DockerID, error) {
 	return kl.runContainer(pod, container, nil, "")
 }
 
+// Delete all containers in a pod (except the network container) returns the number of containers deleted
+// and an error if one occurs.
+func (kl *Kubelet) deleteAllContainers(pod *Pod, podFullName string, dockerContainers DockerContainers) (int, error) {
+	count := 0
+	errs := make(chan error, len(pod.Manifest.Containers))
+	wg := sync.WaitGroup{}
+	for _, container := range pod.Manifest.Containers {
+		if dockerContainer, found := dockerContainers.FindPodContainer(podFullName, container.Name); found {
+			count++
+			wg.Add(1)
+			go func() {
+				err := kl.killContainer(dockerContainer)
+				if err != nil {
+					glog.Errorf("Failed to delete container. (%v)  Skipping pod %s", err, podFullName)
+					errs <- err
+				}
+				wg.Done()
+			}()
+		}
+	}
+	wg.Wait()
+	close(errs)
+	if len(errs) > 0 {
+		errList := []error{}
+		for err := range errs {
+			errList = append(errList, err)
+		}
+		return -1, fmt.Errorf("failed to delete containers (%v)", errList)
+	}
+	return count, nil
+}
+
 type empty struct{}
 
 func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
@@ -362,12 +394,24 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 		netID = DockerID(networkDockerContainer.ID)
 	} else {
 		glog.Infof("Network container doesn't exist, creating")
+		count, err := kl.deleteAllContainers(pod, podFullName, dockerContainers)
+		if err != nil {
+			return err
+		}
 		dockerNetworkID, err := kl.createNetworkContainer(pod)
 		if err != nil {
 			glog.Errorf("Failed to introspect network container. (%v)  Skipping pod %s", err, podFullName)
 			return err
 		}
 		netID = dockerNetworkID
+		if count > 0 {
+			// relist everything, otherwise we'll think we're ok
+			dockerContainers, err = getKubeletDockerContainers(kl.dockerClient)
+			if err != nil {
+				glog.Errorf("Error listing containers %#v", dockerContainers)
+				return err
+			}
+		}
 	}
 	containersToKeep[netID] = empty{}
 
@@ -405,7 +449,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 			}
 
 			glog.V(1).Infof("pod %s container %s is unhealthy.", podFullName, container.Name, healthy)
-			if err := kl.killContainer(*dockerContainer); err != nil {
+			if err := kl.killContainer(dockerContainer); err != nil {
 				glog.V(1).Infof("Failed to kill container %s: %v", dockerContainer.ID, err)
 				continue
 			}
@@ -434,7 +478,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 			_, keep := containersToKeep[id]
 			_, killed := killedContainers[id]
 			if !keep && !killed {
-				err = kl.killContainer(*container)
+				err = kl.killContainer(container)
 				if err != nil {
 					glog.Errorf("Error killing container: %v", err)
 				}
@@ -525,7 +569,7 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 		// Don't kill containers that are in the desired pods.
 		podFullName, containerName := parseDockerName(container.Names[0])
 		if _, ok := desiredContainers[podContainer{podFullName, containerName}]; !ok {
-			err = kl.killContainer(*container)
+			err = kl.killContainer(container)
 			if err != nil {
 				glog.Errorf("Error killing container: %v", err)
 			}
