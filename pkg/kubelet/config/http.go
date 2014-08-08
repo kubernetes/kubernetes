@@ -66,23 +66,18 @@ func (s *SourceURL) extractFromURL() error {
 	}
 
 	// First try as if it's a single manifest
-	var pod kubelet.Pod
-	singleErr := yaml.Unmarshal(data, &pod.Manifest)
-	// TODO: replace with validation
-	if singleErr == nil && pod.Manifest.Version == "" {
-		// If data is a []ContainerManifest, trying to put it into a ContainerManifest
-		// will not give an error but also won't set any of the fields.
-		// Our docs say that the version field is mandatory, so using that to judge wether
-		// this was actually successful.
-		singleErr = fmt.Errorf("got blank version field")
-	}
-
+	var manifest api.ContainerManifest
+	singleErr := yaml.Unmarshal(data, &manifest)
 	if singleErr == nil {
-		name := pod.Manifest.ID
-		if name == "" {
-			name = "1"
+		if errs := api.ValidateManifest(&manifest); len(errs) > 0 {
+			singleErr = fmt.Errorf("invalid manifest: %v", errs)
 		}
-		pod.Name = name
+	}
+	if singleErr == nil {
+		pod := kubelet.Pod{Name: manifest.ID, Manifest: manifest}
+		if pod.Name == "" {
+			pod.Name = "1"
+		}
 		s.updates <- kubelet.PodUpdate{[]kubelet.Pod{pod}, kubelet.SET}
 		return nil
 	}
@@ -93,18 +88,21 @@ func (s *SourceURL) extractFromURL() error {
 	// We're not sure if the person reading the logs is going to care about the single or
 	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
 	// done at the end. Hence not returning early here.
-	if multiErr == nil && len(manifests) > 0 && manifests[0].Version == "" {
-		multiErr = fmt.Errorf("got blank version field")
+	if multiErr == nil {
+		for _, manifest := range manifests {
+			if errs := api.ValidateManifest(&manifest); len(errs) > 0 {
+				multiErr = fmt.Errorf("invalid manifest: %v", errs)
+				break
+			}
+		}
 	}
 	if multiErr == nil {
 		pods := []kubelet.Pod{}
-		for i := range manifests {
-			pod := kubelet.Pod{Manifest: manifests[i]}
-			name := pod.Manifest.ID
-			if name == "" {
-				name = fmt.Sprintf("%d", i+1)
+		for i, manifest := range manifests {
+			pod := kubelet.Pod{Name: manifest.ID, Manifest: manifest}
+			if pod.Name == "" {
+				pod.Name = fmt.Sprintf("%d", i+1)
 			}
-			pod.Name = name
 			pods = append(pods, pod)
 		}
 		s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
@@ -113,5 +111,5 @@ func (s *SourceURL) extractFromURL() error {
 
 	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
 		"single manifest (%v: %+v) or as multiple manifests (%v: %+v).\n",
-		s.url, string(data), singleErr, pod.Manifest, multiErr, manifests)
+		s.url, string(data), singleErr, manifest, multiErr, manifests)
 }
