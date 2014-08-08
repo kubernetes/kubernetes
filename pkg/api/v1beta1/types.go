@@ -212,7 +212,7 @@ type PodStatus string
 // These are the valid statuses of pods.
 const (
 	// PodWaiting means that we're waiting for the pod to begin running.
-	PodWaiting = "Waiting"
+	PodWaiting PodStatus = "Waiting"
 	// PodRunning means that the pod is up and running.
 	PodRunning PodStatus = "Running"
 	// PodTerminated means that the pod has stopped.

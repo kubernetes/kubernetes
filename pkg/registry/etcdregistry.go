@@ -86,18 +86,11 @@ func makeContainerKey(machine string) string {
 
 // CreatePod creates a pod based on a specification, schedule it onto a specific machine.
 func (registry *EtcdRegistry) CreatePod(machine string, pod api.Pod) error {
-	// TODO: When our client supports it, switch to atomic creates.
-	var pod2 api.Pod
-	err := registry.helper.ExtractObj(makePodKey(pod.ID), &pod2, false)
-	if err == nil {
-		return fmt.Errorf("a pod named %s already exists (%#v)", pod.ID, pod2)
-	}
-
 	// Set status to "Waiting".
 	pod.CurrentState.Status = api.PodWaiting
 	pod.CurrentState.Host = ""
 
-	err = registry.helper.SetObj(makePodKey(pod.ID), &pod)
+	err := registry.helper.CreateObj(makePodKey(pod.ID), &pod)
 	if err != nil {
 		return err
 	}
