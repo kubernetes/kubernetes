@@ -33,7 +33,7 @@ func TestServiceRegistry(t *testing.T) {
 
 	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
-	svc := api.Service{
+	svc := &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
@@ -68,7 +68,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(failureCase)
+		c, err := storage.Create(&failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -97,7 +97,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(failureCase)
+		c, err := storage.Update(&failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -114,7 +114,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 
 	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
-	svc := api.Service{
+	svc := &api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
@@ -144,7 +144,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 
 	storage := MakeServiceRegistryStorage(memory, fakeCloud, MakeMinionRegistry(machines))
 
-	svc := api.Service{
+	svc := &api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,

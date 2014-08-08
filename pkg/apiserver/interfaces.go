@@ -24,6 +24,10 @@ import (
 // RESTStorage is a generic interface for RESTful storage services
 // Resources which are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
+	// New returns an empty object that can be used with Create and Update after request data has been put into it.
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, interface{})
+	New() interface{}
+
 	// List selects resources in the storage which match to the selector.
 	List(labels.Selector) (interface{}, error)
 
@@ -35,7 +39,6 @@ type RESTStorage interface {
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the returned error value err when the specified resource is not found.
 	Delete(id string) (<-chan interface{}, error)
 
-	Extract(body []byte) (interface{}, error)
 	Create(interface{}) (<-chan interface{}, error)
 	Update(interface{}) (<-chan interface{}, error)
 }

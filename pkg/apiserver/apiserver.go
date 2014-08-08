@@ -33,6 +33,14 @@ import (
 	"github.com/golang/glog"
 )
 
+// Codec defines methods for serializing and deserializing API
+// objects
+type Codec interface {
+	Encode(obj interface{}) (data []byte, err error)
+	Decode(data []byte) (interface{}, error)
+	DecodeInto(data []byte, obj interface{}) error
+}
+
 // APIServer is an HTTPHandler that delegates to RESTStorage objects.
 // It handles URLs of the form:
 // ${prefix}/${storage_key}[/${object_name}]
@@ -42,18 +50,24 @@ import (
 type APIServer struct {
 	prefix      string
 	storage     map[string]RESTStorage
+	codec       Codec
 	ops         *Operations
 	mux         *http.ServeMux
 	asyncOpWait time.Duration
 }
 
-// New creates a new APIServer object.
-// 'storage' contains a map of handlers.
-// 'prefix' is the hosting path prefix.
-func New(storage map[string]RESTStorage, prefix string) *APIServer {
+// New creates a new APIServer object. 'storage' contains a map of handlers. 'codec'
+// is an interface for decoding to and from JSON. 'prefix' is the hosting path prefix.
+//
+// The codec will be used to decode the request body into an object pointer returned by
+// RESTStorage.New().  The Create() and Update() methods should cast their argument to
+// the type returned by New().
+// TODO: add multitype codec serialization
+func New(storage map[string]RESTStorage, codec Codec, prefix string) *APIServer {
 	s := &APIServer{
-		storage: storage,
 		prefix:  strings.TrimRight(prefix, "/"),
+		storage: storage,
+		codec:   codec,
 		ops:     NewOperations(),
 		mux:     http.NewServeMux(),
 		// Delay just long enough to handle most simple write operations
@@ -153,7 +167,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 				internalError(err, w)
 				return
 			}
-			writeJSON(http.StatusOK, list, w)
+			writeJSON(http.StatusOK, s.codec, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
 			if IsNotFound(err) {
@@ -164,7 +178,7 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 				internalError(err, w)
 				return
 			}
-			writeJSON(http.StatusOK, item, w)
+			writeJSON(http.StatusOK, s.codec, item, w)
 		default:
 			notFound(w, req)
 		}
@@ -179,7 +193,8 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			internalError(err, w)
 			return
 		}
-		obj, err := storage.Extract(body)
+		obj := storage.New()
+		err = s.codec.DecodeInto(body, obj)
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -227,7 +242,8 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			internalError(err, w)
 			return
 		}
-		obj, err := storage.Extract(body)
+		obj := storage.New()
+		err = s.codec.DecodeInto(body, obj)
 		if IsNotFound(err) {
 			notFound(w, req)
 			return
@@ -286,15 +302,15 @@ func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
 				status = stat.Code
 			}
 		}
-		writeJSON(status, obj, w)
+		writeJSON(status, s.codec, obj, w)
 	} else {
-		writeJSON(http.StatusAccepted, obj, w)
+		writeJSON(http.StatusAccepted, s.codec, obj, w)
 	}
 }
 
 // writeJSON renders an object as JSON to the response
-func writeJSON(statusCode int, object interface{}, w http.ResponseWriter) {
-	output, err := api.Encode(object)
+func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseWriter) {
+	output, err := codec.Encode(object)
 	if err != nil {
 		internalError(err, w)
 		return

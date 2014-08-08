@@ -123,23 +123,23 @@ func TestListControllerList(t *testing.T) {
 	}
 }
 
-func TestExtractControllerJson(t *testing.T) {
+func TestControllerDecode(t *testing.T) {
 	mockRegistry := MockControllerRegistry{}
 	storage := ControllerRegistryStorage{
 		registry: &mockRegistry,
 	}
-	controller := api.ReplicationController{
+	controller := &api.ReplicationController{
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	}
-	body, err := api.Encode(&controller)
+	body, err := api.Encode(controller)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	controllerOut, err := storage.Extract(body)
-	if err != nil {
+	controllerOut := storage.New()
+	if err := api.DecodeInto(body, controllerOut); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -249,7 +249,7 @@ func TestCreateController(t *testing.T) {
 		podRegistry: &mockPodRegistry,
 		pollPeriod:  time.Millisecond * 1,
 	}
-	controller := api.ReplicationController{
+	controller := &api.ReplicationController{
 		JSONBase: api.JSONBase{ID: "test"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas:        2,
@@ -314,7 +314,7 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(failureCase)
+		c, err := storage.Create(&failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -345,7 +345,7 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(failureCase)
+		c, err := storage.Update(&failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}

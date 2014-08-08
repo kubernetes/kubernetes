@@ -38,7 +38,7 @@ func TestMinionRegistryStorage(t *testing.T) {
 		t.Errorf("has unexpected object")
 	}
 
-	c, err := ms.Create(api.Minion{JSONBase: api.JSONBase{ID: "baz"}})
+	c, err := ms.Create(&api.Minion{JSONBase: api.JSONBase{ID: "baz"}})
 	if err != nil {
 		t.Errorf("insert failed")
 	}
