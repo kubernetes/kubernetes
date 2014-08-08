@@ -24,9 +24,10 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/google/gofuzz"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 10, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
 
 // Test a weird version/kind embedding format.
 type MyWeirdCustomEmbeddedVersionKindField struct {
@@ -98,25 +99,25 @@ type ExternalInternalSame struct {
 }
 
 // TestObjectFuzzer can randomly populate all the above objects.
-var TestObjectFuzzer = util.NewFuzzer(
-	func(j *MyWeirdCustomEmbeddedVersionKindField) {
+var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
+	func(j *MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
 		// We have to customize the randomization of MyWeirdCustomEmbeddedVersionKindFields because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.ObjectKind = ""
-		j.ID = util.RandString()
+		j.ID = c.RandString()
 	},
-	func(u *uint64) {
+	func(u *uint64, c fuzz.Continue) {
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		*u = util.RandUint64() >> 8
+		*u = c.RandUint64() >> 8
 	},
-	func(u *uint) {
+	func(u *uint, c fuzz.Continue) {
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		*u = uint(util.RandUint64() >> 8)
+		*u = uint(c.RandUint64() >> 8)
 	},
 )
 
