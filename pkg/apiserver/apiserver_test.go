@@ -410,6 +410,34 @@ func TestUpdate(t *testing.T) {
 	}
 }
 
+func TestUpdateWithEncodedPath(t *testing.T) {
+	storage := map[string]RESTStorage{}
+	simpleStorage := SimpleRESTStorage{}
+	storage["simple"] = &simpleStorage
+	handler := New(storage, "/prefix/version")
+	server := httptest.NewServer(handler)
+
+	item := Simple{
+		Name: "bar",
+	}
+	body, err := api.Encode(item)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	client := http.Client{}
+	request, err := http.NewRequest("PUT", server.URL, bytes.NewReader(body))
+	request.URL.Path = "/prefix/version/simple/" + "id%2Fsegment"
+	_, err = client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if simpleStorage.updated.Name != item.Name {
+		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
+	}
+}
+
 func TestUpdateMissing(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	ID := "id"

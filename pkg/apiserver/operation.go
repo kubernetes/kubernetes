@@ -18,10 +18,8 @@ package apiserver
 
 import (
 	"net/http"
-	"path"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,37 +28,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func (s *APIServer) operationPrefix() string {
-	return path.Join(s.prefix, "operations")
+type OperationHandler struct {
+	ops *Operations
 }
 
-func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
-	opPrefix := s.operationPrefix()
-	if !strings.HasPrefix(req.URL.Path, opPrefix) {
-		notFound(w, req)
-		return
-	}
-	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
-	parts := strings.Split(trimmed, "/")
-	if trimmed == "" {
-		parts = []string{}
-	}
-	if len(parts) > 1 {
-		notFound(w, req)
-		return
-	}
-	if req.Method != "GET" {
+func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	parts, err := util.SplitRawPath(req.URL.Path)
+	if err != nil || req.Method != "GET" || len(parts) > 1 {
 		notFound(w, req)
 		return
 	}
 	if len(parts) == 0 {
 		// List outstanding operations.
-		list := s.ops.List()
+		list := h.ops.List()
 		writeJSON(http.StatusOK, list, w)
 		return
 	}
 
-	op := s.ops.Get(parts[0])
+	op := h.ops.Get(parts[0])
 	if op == nil {
 		notFound(w, req)
 		return
