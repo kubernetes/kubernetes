@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
@@ -61,6 +60,12 @@ type APIDiskUtil interface {
 	AttachDisk(PD *PersistentDisk) (string, error)
 	// Detaches the disk from the kubelet.
 	DetachDisk(PD *PersistentDisk) error
+}
+
+type Mounter interface {
+	Mount(string, string, string, string, string) error
+	Unmount(string, int) error
+	RefCount(PD *PersistentDisk) (int, error)
 }
 
 // Host Directory volumes represent a bare host directory mount.
@@ -143,6 +148,7 @@ type PersistentDisk struct {
 	// Specifies whether the disk will be attached as ReadOnly.
 	ReadOnly bool
 	util     APIDiskUtil
+	mounter  Mounter
 }
 
 func (PD *PersistentDisk) GetPath() string {
@@ -167,7 +173,7 @@ func (PD *PersistentDisk) SetUp() error {
 		if err != nil {
 			return err
 		}
-		err = syscall.Mount(devicePath, globalPDPath, PD.FSType, 0, "")
+		err = PD.mounter.Mount(devicePath, globalPDPath, PD.FSType, "", "")
 		if err != nil {
 			return err
 		}
@@ -178,7 +184,7 @@ func (PD *PersistentDisk) SetUp() error {
 		if err != nil {
 			return err
 		}
-		err = syscall.Mount(globalPDPath, PD.GetPath(), "", syscall.MS_BIND, "")
+		err = PD.mounter.Mount(globalPDPath, PD.GetPath(), "", "bind", "")
 		if err != nil {
 			return err
 		}
@@ -187,7 +193,7 @@ func (PD *PersistentDisk) SetUp() error {
 }
 
 func (PD *PersistentDisk) TearDown() error {
-	if err := syscall.Unmount(PD.GetPath(), 0); err != nil {
+	if err := PD.mounter.Unmount(PD.GetPath(), 0); err != nil {
 		return err
 	}
 	tmpDir, err := renameDirectory(PD)

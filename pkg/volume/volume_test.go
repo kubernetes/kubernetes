@@ -43,24 +43,33 @@ func (util *MockDiskUtil) AttachDisk(PD *PersistentDisk) (string, error) {
 }
 
 func (util *MockDiskUtil) DetachDisk(PD *PersistentDisk) error {
-	err := os.RemoveAll(path.Join(PD.RootDir, "global", "pd", PD.Name))
+	err := os.RemoveAll(path.Join(PD.RootDir, "global", "pd", PD.PDName))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+type MockMounter struct{}
+
+func (mounter *MockMounter) Mount(source string, target string, fstype string, flags string, data string) error {
+	return nil
+}
+
+func (mounter *MockMounter) Unmount(target string, flags int) error {
+	return nil
+}
+
+func (mounter *MockMounter) RefCount(PD *PersistentDisk) (int, error) {
+	return 0, nil
+}
+
 func TestCreateVolumeBuilders(t *testing.T) {
-	tempDir, err := ioutil.TempDir("", "CreateVolumes")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := "CreateVolumes"
 	createVolumesTests := []struct {
 		volume api.Volume
 		path   string
 		podID  string
-		kind   string
 	}{
 		{
 			api.Volume{
