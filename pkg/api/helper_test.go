@@ -25,54 +25,55 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
+	"github.com/google/gofuzz"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 3, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
 
 // apiObjectFuzzer can randomly populate api objects.
-var apiObjectFuzzer = util.NewFuzzer(
-	func(j *JSONBase) {
+var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
+	func(j *JSONBase, c fuzz.Continue) {
 		// We have to customize the randomization of JSONBases because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
-		j.ID = util.RandString()
+		j.ID = c.RandString()
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = util.RandUint64() >> 8
-		j.SelfLink = util.RandString()
-		j.CreationTimestamp = util.RandString()
+		j.ResourceVersion = c.RandUint64() >> 8
+		j.SelfLink = c.RandString()
+		j.CreationTimestamp = c.RandString()
 	},
-	func(intstr *util.IntOrString) {
+	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
-		if util.RandBool() {
+		if c.RandBool() {
 			intstr.Kind = util.IntstrInt
-			intstr.IntVal = int(util.RandUint64())
+			intstr.IntVal = int(c.RandUint64())
 			intstr.StrVal = ""
 		} else {
 			intstr.Kind = util.IntstrString
 			intstr.IntVal = 0
-			intstr.StrVal = util.RandString()
+			intstr.StrVal = c.RandString()
 		}
 	},
-	func(u64 *uint64) {
+	func(u64 *uint64, c fuzz.Continue) {
 		// TODO: uint64's are NOT handled right.
-		*u64 = util.RandUint64() >> 8
+		*u64 = c.RandUint64() >> 8
 	},
-	func(pb map[docker.Port][]docker.PortBinding) {
+	func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
 		// This is necessary because keys with nil values get omitted.
 		// TODO: Is this a bug?
-		pb[docker.Port(util.RandString())] = []docker.PortBinding{
-			{util.RandString(), util.RandString()},
-			{util.RandString(), util.RandString()},
+		pb[docker.Port(c.RandString())] = []docker.PortBinding{
+			{c.RandString(), c.RandString()},
+			{c.RandString(), c.RandString()},
 		}
 	},
-	func(pm map[string]docker.PortMapping) {
+	func(pm map[string]docker.PortMapping, c fuzz.Continue) {
 		// This is necessary because keys with nil values get omitted.
 		// TODO: Is this a bug?
-		pm[util.RandString()] = docker.PortMapping{
-			util.RandString(): util.RandString(),
+		pm[c.RandString()] = docker.PortMapping{
+			c.RandString(): c.RandString(),
 		}
 	},
 )

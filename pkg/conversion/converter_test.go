@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/google/gofuzz"
 )
 
 func TestConverter_CallsRegisteredFunctions(t *testing.T) {
@@ -95,7 +95,7 @@ func TestConverter_fuzz(t *testing.T) {
 		{newAnonType(), &TestType1{}, newAnonType()},
 	}
 
-	f := util.NewFuzzer()
+	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
 
 	for i, item := range table {
@@ -189,7 +189,7 @@ func TestConverter_flags(t *testing.T) {
 			shouldSucceed: true,
 		},
 	}
-	f := util.NewFuzzer()
+	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
 
 	for i, item := range table {

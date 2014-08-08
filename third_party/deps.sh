@@ -16,6 +16,7 @@ DEP_PACKAGES="
   github.com/coreos/go-log/log
   github.com/coreos/go-systemd/journal
   code.google.com/p/go.net/websocket
+  github.com/google/gofuzz
 "
 
 PACKAGES="$TOP_PACKAGES $DEP_PACKAGES"

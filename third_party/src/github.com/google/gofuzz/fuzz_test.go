@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package fuzz
 
 import (
 	"reflect"
@@ -40,7 +40,7 @@ func TestFuzz_basic(t *testing.T) {
 
 	failed := map[string]int{}
 	for i := 0; i < 10; i++ {
-		NewFuzzer().Fuzz(obj)
+		New().Fuzz(obj)
 
 		if n, v := "i", obj.I; v == 0 {
 			failed[n] = failed[n] + 1
@@ -100,11 +100,15 @@ func TestFuzz_structptr(t *testing.T) {
 		}
 	}{}
 
+	f := New().NilChance(.5)
 	failed := map[string]int{}
 	for i := 0; i < 10; i++ {
-		NewFuzzer().Fuzz(obj)
+		f.Fuzz(obj)
 
-		if n, v := "a", obj.A; v == nil {
+		if n, v := "a not nil", obj.A; v == nil {
+			failed[n] = failed[n] + 1
+		}
+		if n, v := "a nil", obj.A; v != nil {
 			failed[n] = failed[n] + 1
 		}
 		if n, v := "as", obj.A; v == nil || v.S == "" {
@@ -141,7 +145,7 @@ func TestFuzz_structmap(t *testing.T) {
 		B map[string]string
 	}{}
 
-	tryFuzz(t, NewFuzzer(), obj, func() (int, bool) {
+	tryFuzz(t, New(), obj, func() (int, bool) {
 		if obj.A == nil {
 			return 1, false
 		}
@@ -183,7 +187,7 @@ func TestFuzz_structslice(t *testing.T) {
 		B []string
 	}{}
 
-	tryFuzz(t, NewFuzzer(), obj, func() (int, bool) {
+	tryFuzz(t, New(), obj, func() (int, bool) {
 		if obj.A == nil {
 			return 1, false
 		}
@@ -221,11 +225,11 @@ func TestFuzz_custom(t *testing.T) {
 
 	testPhrase := "gotcalled"
 	testMap := map[string]string{"C": "D"}
-	f := NewFuzzer(
-		func(s *string) {
+	f := New().Funcs(
+		func(s *string, c Continue) {
 			*s = testPhrase
 		},
-		func(m map[string]string) {
+		func(m map[string]string, c Continue) {
 			m["C"] = "D"
 		},
 	)
