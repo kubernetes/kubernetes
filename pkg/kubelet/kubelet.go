@@ -322,7 +322,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 	glog.Infof("Killing: %s", dockerContainer.ID)
 	err := kl.dockerClient.StopContainer(dockerContainer.ID, 10)
-	podFullName, containerName := parseDockerName(dockerContainer.Names[0])
+	podFullName, containerName, _ := parseDockerName(dockerContainer.Names[0])
 	kl.LogEvent(&api.Event{
 		Event: "STOP",
 		Manifest: &api.ContainerManifest{
@@ -366,7 +366,7 @@ func (kl *Kubelet) deleteAllContainers(pod *Pod, podFullName string, dockerConta
 	errs := make(chan error, len(pod.Manifest.Containers))
 	wg := sync.WaitGroup{}
 	for _, container := range pod.Manifest.Containers {
-		if dockerContainer, found := dockerContainers.FindPodContainer(podFullName, container.Name); found {
+		if dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, container.Name); found {
 			count++
 			wg.Add(1)
 			go func() {
@@ -400,7 +400,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 
 	// Make sure we have a network container
 	var netID DockerID
-	if networkDockerContainer, found := dockerContainers.FindPodContainer(podFullName, networkContainerName); found {
+	if networkDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, networkContainerName); found {
 		netID = DockerID(networkDockerContainer.ID)
 	} else {
 		glog.Infof("Network container doesn't exist, creating")
@@ -442,23 +442,28 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 	}
 
 	for _, container := range pod.Manifest.Containers {
-		if dockerContainer, found := dockerContainers.FindPodContainer(podFullName, container.Name); found {
+		expectedHash := hashContainer(&container)
+		if dockerContainer, found, hash := dockerContainers.FindPodContainer(podFullName, container.Name); found {
 			containerID := DockerID(dockerContainer.ID)
 			glog.Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
 			glog.V(1).Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
 
-			// TODO: This should probably be separated out into a separate goroutine.
-			healthy, err := kl.healthy(podState, container, dockerContainer)
-			if err != nil {
-				glog.V(1).Infof("health check errored: %v", err)
-				continue
+			// look for changes in the container.
+			if hash == 0 || hash == expectedHash {
+				// TODO: This should probably be separated out into a separate goroutine.
+				healthy, err := kl.healthy(podState, container, dockerContainer)
+				if err != nil {
+					glog.V(1).Infof("health check errored: %v", err)
+					continue
+				}
+				if healthy == health.Healthy {
+					containersToKeep[containerID] = empty{}
+					continue
+				}
+				glog.V(1).Infof("pod %s container %s is unhealthy.", podFullName, container.Name, healthy)
+			} else {
+				glog.V(1).Infof("container hash changed %d vs %d.", hash, expectedHash)
 			}
-			if healthy == health.Healthy {
-				containersToKeep[containerID] = empty{}
-				continue
-			}
-
-			glog.V(1).Infof("pod %s container %s is unhealthy.", podFullName, container.Name, healthy)
 			if err := kl.killContainer(dockerContainer); err != nil {
 				glog.V(1).Infof("Failed to kill container %s: %v", dockerContainer.ID, err)
 				continue
@@ -482,7 +487,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 
 	// Kill any containers in this pod which were not identified above (guards against duplicates).
 	for id, container := range dockerContainers {
-		curPodFullName, _ := parseDockerName(container.Names[0])
+		curPodFullName, _, _ := parseDockerName(container.Names[0])
 		if curPodFullName == podFullName {
 			// Don't kill containers we want to keep or those we already killed.
 			_, keep := containersToKeep[id]
@@ -577,7 +582,7 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 	}
 	for _, container := range existingContainers {
 		// Don't kill containers that are in the desired pods.
-		podFullName, containerName := parseDockerName(container.Names[0])
+		podFullName, containerName, _ := parseDockerName(container.Names[0])
 		if _, ok := desiredContainers[podContainer{podFullName, containerName}]; !ok {
 			err = kl.killContainer(container)
 			if err != nil {
@@ -681,7 +686,7 @@ func (kl *Kubelet) GetContainerInfo(podFullName, containerName string, req *info
 	if err != nil {
 		return nil, err
 	}
-	dockerContainer, found := dockerContainers.FindPodContainer(podFullName, containerName)
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, containerName)
 	if !found {
 		return nil, errors.New("couldn't find container")
 	}
@@ -727,7 +732,7 @@ func (kl *Kubelet) RunInContainer(pod *Pod, container string, cmd []string) ([]b
 	if err != nil {
 		return nil, err
 	}
-	dockerContainer, found := dockerContainers.FindPodContainer(podFullName, container)
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, container)
 	if !found {
 		return nil, fmt.Errorf("container not found (%s)", container)
 	}

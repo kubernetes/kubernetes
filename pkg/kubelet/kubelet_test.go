@@ -19,8 +19,10 @@ package kubelet
 import (
 	"encoding/json"
 	"fmt"
+	"hash/adler32"
 	"reflect"
-	"strings"
+	"regexp"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -70,14 +72,19 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyPackUnpack(t *testing.T, podNamespace, podName, containerName string) {
+	container := &api.Container{Name: containerName}
+	hasher := adler32.New()
+	data := fmt.Sprintf("%#v", *container)
+	hasher.Write([]byte(data))
+	computedHash := uint64(hasher.Sum32())
 	name := buildDockerName(
 		&Pod{Name: podName, Namespace: podNamespace},
-		&api.Container{Name: containerName},
+		container,
 	)
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	returnedPodFullName, returnedContainerName := parseDockerName(name)
-	if podFullName != returnedPodFullName || containerName != returnedContainerName {
-		t.Errorf("For (%s, %s), unpacked (%s, %s)", podFullName, containerName, returnedPodFullName, returnedContainerName)
+	returnedPodFullName, returnedContainerName, hash := parseDockerName(name)
+	if podFullName != returnedPodFullName || containerName != returnedContainerName || computedHash != hash {
+		t.Errorf("For (%s, %s, %d), unpacked (%s, %s, %d)", podFullName, containerName, computedHash, returnedPodFullName, returnedContainerName, hash)
 	}
 }
 
@@ -93,6 +100,17 @@ func TestContainerManifestNaming(t *testing.T) {
 	verifyPackUnpack(t, "file", "--manifest", "__container")
 	verifyPackUnpack(t, "", "m___anifest_", "container-_-")
 	verifyPackUnpack(t, "other", "_m___anifest", "-_-container")
+
+	container := &api.Container{Name: "container"}
+	pod := &Pod{Name: "foo", Namespace: "test"}
+	name := fmt.Sprintf("k8s--%s--%s.%s--12345", container.Name, pod.Name, pod.Namespace)
+
+	podFullName := fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
+	returnedPodFullName, returnedContainerName, hash := parseDockerName(name)
+	if returnedPodFullName != podFullName || returnedContainerName != container.Name || hash != 0 {
+		t.Errorf("unexpected parse: %s %s %d", returnedPodFullName, returnedContainerName, hash)
+	}
+
 }
 
 func TestGetContainerID(t *testing.T) {
@@ -119,13 +137,13 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", fakeDocker.containerList, dockerContainers)
 	}
 	verifyCalls(t, fakeDocker, []string{"list"})
-	dockerContainer, found := dockerContainers.FindPodContainer("qux", "foo")
+	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux", "foo")
 	if dockerContainer == nil || !found {
 		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
 
 	fakeDocker.clearCalls()
-	dockerContainer, found = dockerContainers.FindPodContainer("foobar", "foo")
+	dockerContainer, found, _ = dockerContainers.FindPodContainer("foobar", "foo")
 	verifyCalls(t, fakeDocker, []string{})
 	if dockerContainer != nil || found {
 		t.Errorf("Should not have found container %#v", dockerContainer)
@@ -206,10 +224,11 @@ func (cr *channelReader) GetList() [][]Pod {
 
 func TestSyncPodsDoesNothing(t *testing.T) {
 	kubelet, _, fakeDocker := makeTestKubelet(t)
+	container := api.Container{Name: "bar"}
 	fakeDocker.containerList = []docker.APIContainers{
 		{
 			// format is k8s--<container-id>--<pod-fullname>
-			Names: []string{"/k8s--bar--foo.test"},
+			Names: []string{"/k8s--bar." + strconv.FormatUint(hashContainer(&container), 16) + "--foo.test"},
 			ID:    "1234",
 		},
 		{
@@ -218,9 +237,6 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	fakeDocker.container = &docker.Container{
-		ID: "1234",
-	}
 	err := kubelet.SyncPods([]Pod{
 		{
 			Name:      "foo",
@@ -228,7 +244,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			Manifest: api.ContainerManifest{
 				ID: "foo",
 				Containers: []api.Container{
-					{Name: "bar"},
+					container,
 				},
 			},
 		},
@@ -251,6 +267,14 @@ func (kl *Kubelet) drainWorkers() {
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
+}
+
+func matchString(t *testing.T, pattern, str string) bool {
+	match, err := regexp.MatchString(pattern, str)
+	if err != nil {
+		t.Logf("unexpected error: %v", err)
+	}
+	return match
 }
 
 func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
@@ -278,8 +302,8 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 
 	fakeDocker.lock.Lock()
 	if len(fakeDocker.Created) != 2 ||
-		!strings.HasPrefix(fakeDocker.Created[0], "k8s--net--foo.test--") ||
-		!strings.HasPrefix(fakeDocker.Created[1], "k8s--bar--foo.test--") {
+		!matchString(t, "k8s--net\\.[a-f0-9]+--foo.test--", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s--bar\\.[a-f0-9]+--foo.test--", fakeDocker.Created[1]) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.lock.Unlock()
@@ -316,7 +340,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 
 	fakeDocker.lock.Lock()
 	if len(fakeDocker.Created) != 1 ||
-		!strings.HasPrefix(fakeDocker.Created[0], "k8s--bar--foo.test--") {
+		!matchString(t, "k8s--bar\\.[a-f0-9]+--foo.test--", fakeDocker.Created[0]) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.lock.Unlock()
@@ -451,6 +475,48 @@ type FalseHealthChecker struct{}
 
 func (f *FalseHealthChecker) HealthCheck(state api.PodState, container api.Container) (health.Status, error) {
 	return health.Unhealthy, nil
+}
+
+func TestSyncPodBadHash(t *testing.T) {
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	kubelet.healthChecker = &FalseHealthChecker{}
+	dockerContainers := DockerContainers{
+		"1234": &docker.APIContainers{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s--bar.1234--foo.test"},
+			ID:    "1234",
+		},
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s--net--foo.test--"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.syncPod(&Pod{
+		Name:      "foo",
+		Namespace: "test",
+		Manifest: api.ContainerManifest{
+			ID: "foo",
+			Containers: []api.Container{
+				{Name: "bar"},
+			},
+		},
+	}, dockerContainers)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start"})
+
+	// A map interation is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+	}
+	if len(fakeDocker.stopped) != 1 ||
+		!expectedToStop[fakeDocker.stopped[0]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
+	}
 }
 
 func TestSyncPodUnhealthy(t *testing.T) {
