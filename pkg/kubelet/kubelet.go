@@ -89,6 +89,10 @@ func NewIntegrationTestKubelet(hn string, dc DockerInterface) *Kubelet {
 	}
 }
 
+type ContainerCommandRunner interface {
+	RunInContainer(containerID string, cmd []string) ([]byte, error)
+}
+
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	hostname       string
@@ -107,6 +111,8 @@ type Kubelet struct {
 	dockerPuller DockerPuller
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler
+	// Optional, defaults to simple Docker implementation
+	runner ContainerCommandRunner
 }
 
 // Run starts the kubelet reacting to config updates
@@ -665,4 +671,21 @@ func (kl *Kubelet) healthy(currentState api.PodState, container api.Container, d
 func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	// TODO: whitelist logs we are willing to serve
 	kl.logServer.ServeHTTP(w, req)
+}
+
+// Run a command in a container, returns the combined stdout, stderr as an array of bytes
+func (kl *Kubelet) RunInContainer(pod *Pod, container string, cmd []string) ([]byte, error) {
+	if kl.runner == nil {
+		return nil, fmt.Errorf("no runner specified.")
+	}
+	podFullName := GetPodFullName(pod)
+	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient)
+	if err != nil {
+		return nil, err
+	}
+	dockerContainer, found := dockerContainers.FindPodContainer(podFullName, container)
+	if !found {
+		return nil, fmt.Errorf("container not found (%s)", container)
+	}
+	return kl.runner.RunInContainer(dockerContainer.ID, cmd)
 }
