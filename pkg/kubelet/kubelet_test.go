@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
@@ -146,7 +148,7 @@ func TestKillContainerWithError(t *testing.T) {
 	}
 	kubelet, _, _ := makeTestKubelet(t)
 	kubelet.dockerClient = fakeDocker
-	err := kubelet.killContainer(fakeDocker.containerList[0])
+	err := kubelet.killContainer(&fakeDocker.containerList[0])
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -169,7 +171,7 @@ func TestKillContainer(t *testing.T) {
 		ID: "foobar",
 	}
 
-	err := kubelet.killContainer(fakeDocker.containerList[0])
+	err := kubelet.killContainer(&fakeDocker.containerList[0])
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -236,6 +238,129 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	}
 
 	verifyCalls(t, fakeDocker, []string{"list", "list"})
+}
+
+// drainWorkers waits until all workers are done.  Should only used for testing.
+func (kl *Kubelet) drainWorkers() {
+	for {
+		kl.podWorkers.lock.Lock()
+		length := len(kl.podWorkers.workers)
+		kl.podWorkers.lock.Unlock()
+		if length == 0 {
+			return
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+}
+
+func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	fakeDocker.containerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]Pod{
+		{
+			Name:      "foo",
+			Namespace: "test",
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "create", "start", "list", "inspect", "create", "start"})
+
+	fakeDocker.lock.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!strings.HasPrefix(fakeDocker.Created[0], "k8s--net--foo.test--") ||
+		!strings.HasPrefix(fakeDocker.Created[1], "k8s--bar--foo.test--") {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.lock.Unlock()
+}
+
+func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			// network container
+			Names: []string{"/k8s--net--foo.test--"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.SyncPods([]Pod{
+		{
+			Name:      "foo",
+			Namespace: "test",
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "list", "inspect", "create", "start"})
+
+	fakeDocker.lock.Lock()
+	if len(fakeDocker.Created) != 1 ||
+		!strings.HasPrefix(fakeDocker.Created[0], "k8s--bar--foo.test--") {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.lock.Unlock()
+}
+
+func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
+	kubelet, _, fakeDocker := makeTestKubelet(t)
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			// format is k8s--<container-id>--<pod-fullname>
+			Names: []string{"/k8s--bar--foo.test"},
+			ID:    "1234",
+		},
+	}
+	err := kubelet.SyncPods([]Pod{
+		{
+			Name:      "foo",
+			Namespace: "test",
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "stop", "create", "start", "list", "list", "inspect", "create", "start"})
+
+	// A map iteration is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+	}
+	fakeDocker.lock.Lock()
+	if len(fakeDocker.stopped) != 1 || !expectedToStop[fakeDocker.stopped[0]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
+	}
+	fakeDocker.lock.Unlock()
 }
 
 func TestSyncPodsDeletes(t *testing.T) {
