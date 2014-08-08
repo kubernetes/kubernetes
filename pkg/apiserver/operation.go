@@ -18,10 +18,8 @@ package apiserver
 
 import (
 	"net/http"
-	"path"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,37 +28,25 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func (s *APIServer) operationPrefix() string {
-	return path.Join(s.prefix, "operations")
+type OperationHandler struct {
+	ops   *Operations
+	codec Codec
 }
 
-func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
-	opPrefix := s.operationPrefix()
-	if !strings.HasPrefix(req.URL.Path, opPrefix) {
-		notFound(w, req)
-		return
-	}
-	trimmed := strings.TrimLeft(req.URL.Path[len(opPrefix):], "/")
-	parts := strings.Split(trimmed, "/")
-	if trimmed == "" {
-		parts = []string{}
-	}
-	if len(parts) > 1 {
-		notFound(w, req)
-		return
-	}
-	if req.Method != "GET" {
+func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	parts := splitPath(req.URL.Path)
+	if len(parts) > 1 || req.Method != "GET" {
 		notFound(w, req)
 		return
 	}
 	if len(parts) == 0 {
 		// List outstanding operations.
-		list := s.ops.List()
-		writeJSON(http.StatusOK, s.codec, list, w)
+		list := h.ops.List()
+		writeJSON(http.StatusOK, h.codec, list, w)
 		return
 	}
 
-	op := s.ops.Get(parts[0])
+	op := h.ops.Get(parts[0])
 	if op == nil {
 		notFound(w, req)
 		return
@@ -68,9 +54,9 @@ func (s *APIServer) handleOperation(w http.ResponseWriter, req *http.Request) {
 
 	obj, complete := op.StatusOrResult()
 	if complete {
-		writeJSON(http.StatusOK, s.codec, obj, w)
+		writeJSON(http.StatusOK, h.codec, obj, w)
 	} else {
-		writeJSON(http.StatusAccepted, s.codec, obj, w)
+		writeJSON(http.StatusAccepted, h.codec, obj, w)
 	}
 }
 

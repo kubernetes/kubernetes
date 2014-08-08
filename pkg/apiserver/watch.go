@@ -19,8 +19,6 @@ package apiserver
 import (
 	"encoding/json"
 	"net/http"
-	"path"
-	"strings"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -28,22 +26,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-func (s *APIServer) watchPrefix() string {
-	return path.Join(s.prefix, "watch")
+type WatchHandler struct {
+	storage map[string]RESTStorage
 }
 
 // handleWatch processes a watch request
-func (s *APIServer) handleWatch(w http.ResponseWriter, req *http.Request) {
-	prefix := s.watchPrefix()
-	if !strings.HasPrefix(req.URL.Path, prefix) {
-		notFound(w, req)
-		return
-	}
-	parts := strings.Split(req.URL.Path[len(prefix):], "/")[1:]
-	if req.Method != "GET" || len(parts) < 1 {
+func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	parts := splitPath(req.URL.Path)
+	if len(parts) < 1 || req.Method != "GET" {
 		notFound(w, req)
 	}
-	storage := s.storage[parts[0]]
+	storage := h.storage[parts[0]]
 	if storage == nil {
 		notFound(w, req)
 	}
