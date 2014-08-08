@@ -56,7 +56,7 @@ func (registry *EtcdRegistry) ListBuilds() (buildapi.BuildList, error) {
 
 // GetBuild gets a specific Build specified by its ID.
 func (registry *EtcdRegistry) GetBuild(buildID string) (*buildapi.Build, error) {
-	var build *buildapi.Build
+	var build buildapi.Build
 	err := registry.helper().ExtractObj(makeBuildKey(buildID), &build, false)
 	if tools.IsEtcdNotFound(err) {
 		return nil, apiserver.NewNotFoundErr("build", buildID)
@@ -64,7 +64,7 @@ func (registry *EtcdRegistry) GetBuild(buildID string) (*buildapi.Build, error) 
 	if err != nil {
 		return nil, err
 	}
-	return build, nil
+	return &build, nil
 }
 
 // CreateBuild creates a new Build.
