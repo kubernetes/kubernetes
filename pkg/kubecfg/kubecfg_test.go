@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type Action struct {
@@ -88,6 +89,11 @@ func (client *FakeKubeClient) UpdateReplicationController(controller api.Replica
 func (client *FakeKubeClient) DeleteReplicationController(controller string) error {
 	client.actions = append(client.actions, Action{action: "delete-controller", value: controller})
 	return nil
+}
+
+func (client *FakeKubeClient) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	client.actions = append(client.actions, Action{action: "watch-controllers"})
+	return watch.NewFake(), nil
 }
 
 func (client *FakeKubeClient) GetService(name string) (api.Service, error) {

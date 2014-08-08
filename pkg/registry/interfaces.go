@@ -39,7 +39,7 @@ type PodRegistry interface {
 // ControllerRegistry is an interface for things that know how to store ReplicationControllers.
 type ControllerRegistry interface {
 	ListControllers() ([]api.ReplicationController, error)
-	WatchControllers() (watch.Interface, error)
+	WatchControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 	GetController(controllerID string) (*api.ReplicationController, error)
 	CreateController(controller api.ReplicationController) error
 	UpdateController(controller api.ReplicationController) error

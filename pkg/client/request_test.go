@@ -49,7 +49,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		ParseSelector("name=foo").
+		ParseSelectorParam("labels", "name=foo").
 		Timeout(time.Second).
 		Body([]byte(reqBody)).
 		Do().Get()
@@ -87,7 +87,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		Selector(labels.Set{"name": "foo"}.AsSelector()).
+		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
 		Sync(false).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
@@ -127,7 +127,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		Selector(labels.Set{"name": "foo"}.AsSelector()).
+		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(reqObj).
 		Do().Get()
@@ -180,7 +180,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	obj, err := s.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
-		ParseSelector("name=foo").
+		ParseSelectorParam("labels", "name=foo").
 		Timeout(time.Second).
 		Body(file.Name()).
 		Do().Get()
@@ -241,6 +241,45 @@ func TestSync(t *testing.T) {
 	r.Sync(true)
 	if !r.sync {
 		t.Errorf("'Sync' doesn't work")
+	}
+}
+
+func TestUintParam(t *testing.T) {
+	table := []struct {
+		name      string
+		testVal   uint64
+		expectStr string
+	}{
+		{"foo", 31415, "?foo=31415"},
+		{"bar", 42, "?bar=42"},
+		{"baz", 0, "?baz=0"},
+	}
+
+	for _, item := range table {
+		c := New("", nil)
+		r := c.Get().AbsPath("").UintParam(item.name, item.testVal)
+		if e, a := item.expectStr, r.finalURL(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+}
+
+func TestUnacceptableParamNames(t *testing.T) {
+	table := []struct {
+		name          string
+		testVal       string
+		expectSuccess bool
+	}{
+		{"sync", "foo", false},
+		{"timeout", "42", false},
+	}
+
+	for _, item := range table {
+		c := New("", nil)
+		r := c.Get().setParam(item.name, item.testVal)
+		if e, a := item.expectSuccess, r.err == nil; e != a {
+			t.Errorf("expected %v, got %v (%v)", e, a, r.err)
+		}
 	}
 }
 

@@ -64,11 +64,11 @@ type SimpleRESTStorage struct {
 	updated *Simple
 	created *Simple
 
-	// Valid if WatchAll or WatchSingle is called
-	fakeWatch *watch.FakeWatcher
-
-	// Set if WatchSingle is called
-	requestedID string
+	// These are set when Watch is called
+	fakeWatch                *watch.FakeWatcher
+	requestedLabelSelector   labels.Selector
+	requestedFieldSelector   labels.Selector
+	requestedResourceVersion uint64
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
@@ -95,7 +95,7 @@ func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) 
 		if storage.injectedFunction != nil {
 			return storage.injectedFunction(id)
 		}
-		return api.Status{Status: api.StatusSuccess}, nil
+		return &api.Status{Status: api.StatusSuccess}, nil
 	}), nil
 }
 
@@ -130,18 +130,11 @@ func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, e
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) WatchAll() (watch.Interface, error) {
-	if err := storage.errors["watchAll"]; err != nil {
-		return nil, err
-	}
-	storage.fakeWatch = watch.NewFake()
-	return storage.fakeWatch, nil
-}
-
-// Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) WatchSingle(id string) (watch.Interface, error) {
-	storage.requestedID = id
-	if err := storage.errors["watchSingle"]; err != nil {
+func (storage *SimpleRESTStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	storage.requestedLabelSelector = label
+	storage.requestedFieldSelector = field
+	storage.requestedResourceVersion = resourceVersion
+	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
 	storage.fakeWatch = watch.NewFake()
@@ -164,17 +157,17 @@ func TestNotFound(t *testing.T) {
 		Path   string
 	}
 	cases := map[string]T{
-		"PATCH method":                 T{"PATCH", "/prefix/version/foo"},
-		"GET long prefix":              T{"GET", "/prefix/"},
-		"GET missing storage":          T{"GET", "/prefix/version/blah"},
-		"GET with extra segment":       T{"GET", "/prefix/version/foo/bar/baz"},
-		"POST with extra segment":      T{"POST", "/prefix/version/foo/bar"},
-		"DELETE without extra segment": T{"DELETE", "/prefix/version/foo"},
-		"DELETE with extra segment":    T{"DELETE", "/prefix/version/foo/bar/baz"},
-		"PUT without extra segment":    T{"PUT", "/prefix/version/foo"},
-		"PUT with extra segment":       T{"PUT", "/prefix/version/foo/bar/baz"},
-		"watch missing storage":        T{"GET", "/prefix/version/watch/"},
-		"watch with bad method":        T{"POST", "/prefix/version/watch/foo/bar"},
+		"PATCH method":                 {"PATCH", "/prefix/version/foo"},
+		"GET long prefix":              {"GET", "/prefix/"},
+		"GET missing storage":          {"GET", "/prefix/version/blah"},
+		"GET with extra segment":       {"GET", "/prefix/version/foo/bar/baz"},
+		"POST with extra segment":      {"POST", "/prefix/version/foo/bar"},
+		"DELETE without extra segment": {"DELETE", "/prefix/version/foo"},
+		"DELETE with extra segment":    {"DELETE", "/prefix/version/foo/bar/baz"},
+		"PUT without extra segment":    {"PUT", "/prefix/version/foo"},
+		"PUT with extra segment":       {"PUT", "/prefix/version/foo/bar/baz"},
+		"watch missing storage":        {"GET", "/prefix/version/watch/"},
+		"watch with bad method":        {"POST", "/prefix/version/watch/foo/bar"},
 	}
 	handler := New(map[string]RESTStorage{
 		"foo": &SimpleRESTStorage{},

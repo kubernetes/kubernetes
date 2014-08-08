@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -305,7 +306,7 @@ func TestSyncronize(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 		t.Errorf("Unexpected request for %v", req.RequestURI)
 	})
-	testServer := httptest.NewTLSServer(mux)
+	testServer := httptest.NewServer(mux)
 	client := client.New(testServer.URL, nil)
 	manager := MakeReplicationManager(client)
 	fakePodControl := FakePodControl{}
@@ -316,13 +317,18 @@ func TestSyncronize(t *testing.T) {
 	validateSyncReplication(t, &fakePodControl, 7, 0)
 }
 
-func TestWatchControllers(t *testing.T) {
-	fakeWatcher := watch.NewFake()
-	manager := MakeReplicationManager(nil)
-	manager.watchMaker = func() (watch.Interface, error) {
-		return fakeWatcher, nil
-	}
+type FakeWatcher struct {
+	w *watch.FakeWatcher
+	*client.FakeClient
+}
 
+func (fw FakeWatcher) WatchReplicationControllers(l, f labels.Selector, rv uint64) (watch.Interface, error) {
+	return fw.w, nil
+}
+
+func TestWatchControllers(t *testing.T) {
+	client := FakeWatcher{watch.NewFake(), &client.FakeClient{}}
+	manager := MakeReplicationManager(client)
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})
 	manager.syncHandler = func(controllerSpec api.ReplicationController) error {
@@ -333,11 +339,12 @@ func TestWatchControllers(t *testing.T) {
 		return nil
 	}
 
-	go manager.watchControllers()
+	resourceVersion := uint64(0)
+	go manager.watchControllers(&resourceVersion)
 
 	// Test normal case
 	testControllerSpec.ID = "foo"
-	fakeWatcher.Add(&testControllerSpec)
+	client.w.Add(&testControllerSpec)
 
 	select {
 	case <-received:

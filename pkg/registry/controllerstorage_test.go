@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+// TODO: Why do we have this AND MemoryRegistry?
 type MockControllerRegistry struct {
 	err         error
 	controllers []api.ReplicationController
@@ -49,10 +50,12 @@ func (registry *MockControllerRegistry) CreateController(controller api.Replicat
 func (registry *MockControllerRegistry) UpdateController(controller api.ReplicationController) error {
 	return registry.err
 }
+
 func (registry *MockControllerRegistry) DeleteController(ID string) error {
 	return registry.err
 }
-func (registry *MockControllerRegistry) WatchControllers() (watch.Interface, error) {
+
+func (registry *MockControllerRegistry) WatchControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return nil, registry.err
 }
 

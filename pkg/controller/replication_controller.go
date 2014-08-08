@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
@@ -37,9 +36,6 @@ type ReplicationManager struct {
 
 	// To allow injection of syncReplicationController for testing.
 	syncHandler func(controllerSpec api.ReplicationController) error
-
-	// To allow injection of watch creation.
-	watchMaker func() (watch.Interface, error)
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods
@@ -85,28 +81,23 @@ func MakeReplicationManager(kubeClient client.Interface) *ReplicationManager {
 		},
 	}
 	rm.syncHandler = rm.syncReplicationController
-	rm.watchMaker = rm.makeAPIWatch
 	return rm
 }
 
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	go util.Forever(func() { rm.watchControllers() }, period)
+	resourceVersion := uint64(0)
+	go util.Forever(func() { rm.watchControllers(&resourceVersion) }, period)
 }
 
-// makeAPIWatch starts watching via the apiserver.
-func (rm *ReplicationManager) makeAPIWatch() (watch.Interface, error) {
-	// TODO: Fix this ugly type assertion.
-	return rm.kubeClient.(*client.Client).
-		Get().
-		Path("watch").
-		Path("replicationControllers").
-		Watch()
-}
-
-func (rm *ReplicationManager) watchControllers() {
-	watching, err := rm.watchMaker()
+// resourceVersion is a pointer to the resource version to use/update.
+func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
+	watching, err := rm.kubeClient.WatchReplicationControllers(
+		labels.Everything(),
+		labels.Everything(),
+		*resourceVersion,
+	)
 	if err != nil {
 		glog.Errorf("Unexpected failure to watch: %v", err)
 		time.Sleep(5 * time.Second)
@@ -128,6 +119,8 @@ func (rm *ReplicationManager) watchControllers() {
 			if rc, ok := event.Object.(*api.ReplicationController); !ok {
 				glog.Errorf("unexpected object: %#v", event.Object)
 			} else {
+				// If we get disconnected, start where we left off.
+				*resourceVersion = rc.ResourceVersion + 1
 				rm.syncHandler(*rc)
 			}
 		}

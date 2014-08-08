@@ -247,7 +247,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 
 	r := s.Verb(verb).
 		Path(path).
-		ParseSelector(*selector)
+		ParseSelectorParam("labels", *selector)
 	if setBody {
 		if version != 0 {
 			data := readConfig(storage)

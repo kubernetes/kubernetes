@@ -325,6 +325,30 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	}
 }
 
+func TestWatchInterpretation_ListCreate(t *testing.T) {
+	w := newEtcdWatcher(true, func(interface{}) bool {
+		t.Errorf("unexpected filter call")
+		return true
+	}, codec)
+	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBytes, _ := codec.Encode(pod)
+
+	go w.sendResult(&etcd.Response{
+		Action: "create",
+		Node: &etcd.Node{
+			Value: string(podBytes),
+		},
+	})
+
+	got := <-w.outgoing
+	if e, a := watch.Added, got.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
 func TestWatchInterpretation_ListAdd(t *testing.T) {
 	w := newEtcdWatcher(true, func(interface{}) bool {
 		t.Errorf("unexpected filter call")
@@ -341,7 +365,7 @@ func TestWatchInterpretation_ListAdd(t *testing.T) {
 	})
 
 	got := <-w.outgoing
-	if e, a := watch.Added, got.Type; e != a {
+	if e, a := watch.Modified, got.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
@@ -420,7 +444,7 @@ func TestWatch(t *testing.T) {
 	fakeClient := MakeFakeEtcdClient(t)
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key")
+	watching, err := h.Watch("/some/key", 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -438,7 +462,7 @@ func TestWatch(t *testing.T) {
 	}
 
 	event := <-watching.ResultChan()
-	if e, a := watch.Added, event.Type; e != a {
+	if e, a := watch.Modified, event.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
@@ -462,7 +486,7 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	h := EtcdHelper{fakeClient, codec, versioner}
 
 	// Test purposeful shutdown
-	watching, err := h.Watch("/some/key")
+	watching, err := h.Watch("/some/key", 0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
