@@ -19,50 +19,108 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
-// errNotFound is an error which indicates that a specified resource is not found.
-type errNotFound string
-
-// Error returns a string representation of the err.
-func (err errNotFound) Error() string {
-	return string(err)
+// apiServerError is an error intended for consumption by a REST API server
+type apiServerError struct {
+	api.Status
 }
 
-// IsNotFound determines if the err is an error which indicates that a specified resource was not found.
-func IsNotFound(err error) bool {
-	_, ok := err.(errNotFound)
-	return ok
+// Error implements the Error interface.
+func (e *apiServerError) Error() string {
+	return e.Status.Message
 }
 
 // NewNotFoundErr returns a new error which indicates that the resource of the kind and the name was not found.
 func NewNotFoundErr(kind, name string) error {
-	return errNotFound(fmt.Sprintf("%s %q not found", kind, name))
+	return &apiServerError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusNotFound,
+		Reason: api.ReasonTypeNotFound,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+		},
+		Message: fmt.Sprintf("%s %q not found", kind, name),
+	}}
 }
 
-// errAlreadyExists is an error which indicates that a specified resource already exists.
-type errAlreadyExists string
+// NewAlreadyExistsErr returns an error indicating the item requested exists by that identifier
+func NewAlreadyExistsErr(kind, name string) error {
+	return &apiServerError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusConflict,
+		Reason: api.ReasonTypeAlreadyExists,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+		},
+		Message: fmt.Sprintf("%s %q already exists", kind, name),
+	}}
+}
 
-// Error returns a string representation of the err.
-func (err errAlreadyExists) Error() string {
-	return string(err)
+// NewConflictErr returns an error indicating the item can't be updated as provided.
+func NewConflictErr(kind, name string, err error) error {
+	return &apiServerError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusConflict,
+		Reason: api.ReasonTypeConflict,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+		},
+		Message: fmt.Sprintf("%s %q cannot be updated: %s", kind, name, err),
+	}}
+}
+
+// IsNotFound returns true if the specified error was created by NewNotFoundErr
+func IsNotFound(err error) bool {
+	return reasonForError(err) == api.ReasonTypeNotFound
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
 func IsAlreadyExists(err error) bool {
-	_, ok := err.(errAlreadyExists)
-	return ok
+	return reasonForError(err) == api.ReasonTypeAlreadyExists
 }
 
-// NewAlreadyExistsErr returns a new error which indicates that the resource of the kind and the name was not found.
-func NewAlreadyExistsErr(kind, name string) error {
-	return errAlreadyExists(fmt.Sprintf("%s %q already exists", kind, name))
+// IsConflict determines if the err is an error which indicates the provided update conflicts
+func IsConflict(err error) bool {
+	return reasonForError(err) == api.ReasonTypeConflict
 }
 
-// internalError renders a generic error to the response
-func internalError(err error, w http.ResponseWriter) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Error: %#v", err)
+func reasonForError(err error) api.ReasonType {
+	switch t := err.(type) {
+	case *apiServerError:
+		return t.Status.Reason
+	}
+	return api.ReasonTypeUnknown
+}
+
+// errToAPIStatus converts an error to an api.Status object.
+func errToAPIStatus(err error) *api.Status {
+	switch t := err.(type) {
+	case *apiServerError:
+		status := t.Status
+		status.Status = api.StatusFailure
+		//TODO: check for invalid responses
+		return &status
+	default:
+		status := http.StatusInternalServerError
+		switch {
+		//TODO: replace me with NewUpdateConflictErr
+		case tools.IsEtcdTestFailed(err):
+			status = http.StatusConflict
+		}
+		return &api.Status{
+			Status:  api.StatusFailure,
+			Code:    status,
+			Reason:  api.ReasonTypeUnknown,
+			Message: err.Error(),
+		}
+	}
 }
 
 // notFound renders a simple not found error

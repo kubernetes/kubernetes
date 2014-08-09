@@ -26,10 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
@@ -49,11 +47,9 @@ type Codec interface {
 //
 // TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
 type APIServer struct {
-	storage     map[string]RESTStorage
-	codec       Codec
-	ops         *Operations
-	asyncOpWait time.Duration
-	handler     http.Handler
+	storage map[string]RESTStorage
+	codec   Codec
+	handler http.Handler
 }
 
 // New creates a new APIServer object. 'storage' contains a map of handlers. 'codec'
@@ -64,25 +60,26 @@ type APIServer struct {
 // the type returned by New().
 // TODO: add multitype codec serialization
 func New(storage map[string]RESTStorage, codec Codec, prefix string) *APIServer {
+	ops := NewOperations()
 	s := &APIServer{
 		storage: storage,
 		codec:   codec,
-		ops:     NewOperations(),
-		// Delay just long enough to handle most simple write operations
-		asyncOpWait: time.Millisecond * 25,
 	}
 
 	mux := http.NewServeMux()
-
 	prefix = strings.TrimRight(prefix, "/")
-
-	// Primary API handlers
 	restPrefix := prefix + "/"
-	mux.Handle(restPrefix, http.StripPrefix(restPrefix, http.HandlerFunc(s.handleREST)))
+
+	for name, store := range storage {
+		storagePrefix := path.Join(restPrefix, name)
+		handler := NewRESTHandler(store, codec, ops)
+		mux.Handle(storagePrefix, http.StripPrefix(storagePrefix, handler))
+		mux.Handle(storagePrefix+"/", http.StripPrefix(storagePrefix+"/", handler))
+	}
 
 	// Watch API handlers
 	watchPrefix := path.Join(prefix, "watch") + "/"
-	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage}))
+	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage, codec}))
 
 	// Support services for the apiserver
 	logsPrefix := "/logs/"
@@ -92,7 +89,7 @@ func New(storage map[string]RESTStorage, codec Codec, prefix string) *APIServer 
 	mux.HandleFunc("/", handleIndex)
 
 	// Handle both operations and operations/* with the same handler
-	handler := &OperationHandler{s.ops, s.codec}
+	handler := &OperationHandler{ops, s.codec}
 	operationPrefix := path.Join(prefix, "operations")
 	mux.Handle(operationPrefix, http.StripPrefix(operationPrefix, handler))
 	operationsPrefix := operationPrefix + "/"
@@ -128,199 +125,16 @@ func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.handler.ServeHTTP(w, req)
 }
 
-// handleREST handles requests to all our RESTStorage objects.
-func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
-	parts := splitPath(req.URL.Path)
-	if len(parts) < 1 {
-		notFound(w, req)
-		return
-	}
-	storage := s.storage[parts[0]]
-	if storage == nil {
-		httplog.LogOf(w).Addf("'%v' has no storage object", parts[0])
-		notFound(w, req)
-		return
-	}
-
-	s.handleRESTStorage(parts, req, w, storage)
-}
-
-// handleRESTStorage is the main dispatcher for a storage object.  It switches on the HTTP method, and then
-// on path length, according to the following table:
-//   Method     Path          Action
-//   GET        /foo          list
-//   GET        /foo/bar      get 'bar'
-//   POST       /foo          create
-//   PUT        /foo/bar      update 'bar'
-//   DELETE     /foo/bar      delete 'bar'
-// Returns 404 if the method/pattern doesn't match one of these entries
-// The s accepts several query parameters:
-//    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
-//    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
-//    labels=<label-selector> Used for filtering list operations
-func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	sync := req.URL.Query().Get("sync") == "true"
-	timeout := parseTimeout(req.URL.Query().Get("timeout"))
-	switch req.Method {
-	case "GET":
-		switch len(parts) {
-		case 1:
-			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
-			if err != nil {
-				internalError(err, w)
-				return
-			}
-			list, err := storage.List(selector)
-			if err != nil {
-				internalError(err, w)
-				return
-			}
-			writeJSON(http.StatusOK, s.codec, list, w)
-		case 2:
-			item, err := storage.Get(parts[1])
-			if IsNotFound(err) {
-				notFound(w, req)
-				return
-			}
-			if err != nil {
-				internalError(err, w)
-				return
-			}
-			writeJSON(http.StatusOK, s.codec, item, w)
-		default:
-			notFound(w, req)
-		}
-
-	case "POST":
-		if len(parts) != 1 {
-			notFound(w, req)
-			return
-		}
-		body, err := readBody(req)
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		obj := storage.New()
-		err = s.codec.DecodeInto(body, obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		out, err := storage.Create(obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	case "DELETE":
-		if len(parts) != 2 {
-			notFound(w, req)
-			return
-		}
-		out, err := storage.Delete(parts[1])
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	case "PUT":
-		if len(parts) != 2 {
-			notFound(w, req)
-			return
-		}
-		body, err := readBody(req)
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		obj := storage.New()
-		err = s.codec.DecodeInto(body, obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		out, err := storage.Update(obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
-		if err != nil {
-			internalError(err, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	default:
-		notFound(w, req)
-	}
-}
-
 // handleVersionReq writes the server's version information.
 func handleVersion(w http.ResponseWriter, req *http.Request) {
 	writeRawJSON(http.StatusOK, version.Get(), w)
-}
-
-// createOperation creates an operation to process a channel response
-func (s *APIServer) createOperation(out <-chan interface{}, sync bool, timeout time.Duration) *Operation {
-	op := s.ops.NewOperation(out)
-	if sync {
-		op.WaitFor(timeout)
-	} else if s.asyncOpWait != 0 {
-		op.WaitFor(s.asyncOpWait)
-	}
-	return op
-}
-
-// finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
-// Operation to receive the result and returning its ID down the writer.
-func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
-	obj, complete := op.StatusOrResult()
-	if complete {
-		status := http.StatusOK
-		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		case *api.Status:
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		}
-		writeJSON(status, s.codec, obj, w)
-	} else {
-		writeJSON(http.StatusAccepted, s.codec, obj, w)
-	}
 }
 
 // writeJSON renders an object as JSON to the response
 func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
 	if err != nil {
-		internalError(err, w)
+		errorJSON(err, codec, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -328,11 +142,17 @@ func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseW
 	w.Write(output)
 }
 
+// errorJSON renders an error to the response
+func errorJSON(err error, codec Codec, w http.ResponseWriter) {
+	status := errToAPIStatus(err)
+	writeJSON(status.Code, codec, status, w)
+}
+
 // writeRawJSON writes a non-API object in JSON.
 func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := json.Marshal(object)
 	if err != nil {
-		internalError(err, w)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

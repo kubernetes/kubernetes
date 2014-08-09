@@ -93,13 +93,14 @@ func TestOperation(t *testing.T) {
 
 func TestOperationsList(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	ops := NewOperations()
+	handler := NewRESTHandler(simpleStorage, codec, ops)
+	handler.(*RESTHandler).asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	opServer := httptest.NewServer(&OperationHandler{ops, codec})
 	client := http.Client{}
 
+	// check enqueued into list
 	simple := Simple{
 		Name: "foo",
 	}
@@ -107,35 +108,37 @@ func TestOperationsList(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	response, err := client.Post(server.URL+"/prefix/version/foo", "application/json", bytes.NewBuffer(data))
+	response, err := client.Post(server.URL, "application/json", bytes.NewBuffer(data))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusAccepted {
 		t.Errorf("Unexpected response %#v", response)
 	}
+	if len(ops.List().Items) != 1 {
+		t.Errorf("expected 1 operation, got %#v", ops.List())
+	}
 
-	response, err = client.Get(server.URL + "/prefix/version/operations")
+	// read list
+	response, err = client.Get(opServer.URL)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected status code %#v", response)
+		t.Fatalf("Unexpected response %#v", response)
 	}
+	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := codec.Decode(body)
+	opList, err := codec.Decode(body)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	oplist, ok := obj.(*api.ServerOpList)
-	if !ok {
-		t.Fatalf("expected ServerOpList, got %#v", obj)
-	}
-	if len(oplist.Items) != 1 {
-		t.Errorf("expected 1 operation, got %#v", obj)
+
+	if len(opList.(*api.ServerOpList).Items) != 1 {
+		t.Errorf("expected 1 operation, got %#v", opList)
 	}
 }
 
@@ -144,7 +147,6 @@ func TestOpGet(t *testing.T) {
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
