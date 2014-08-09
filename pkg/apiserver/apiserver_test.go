@@ -439,7 +439,6 @@ func TestCreate(t *testing.T) {
 	handler := New(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -622,7 +621,6 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 		},
 	}
 	handler := New(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
-	handler.asyncOpWait = time.Millisecond / 2
 	server := httptest.NewServer(handler)
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusConflict)
@@ -640,7 +638,6 @@ func TestAsyncCreateError(t *testing.T) {
 		},
 	}
 	handler := New(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 
 	simple := Simple{Name: "foo"}
