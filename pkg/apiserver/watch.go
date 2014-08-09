@@ -55,10 +55,12 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	parts := splitPath(req.URL.Path)
 	if len(parts) < 1 || req.Method != "GET" {
 		notFound(w, req)
+		return
 	}
 	storage := h.storage[parts[0]]
 	if storage == nil {
 		notFound(w, req)
+		return
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
 		label, field, resourceVersion := getWatchParams(req.URL.Query())
