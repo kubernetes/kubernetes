@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -114,5 +115,13 @@ func main() {
 		})
 	}
 
-	glog.Fatal(m.Run(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *apiPrefix))
+	storage, codec := m.API_v1beta1()
+	s := &http.Server{
+		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
+		Handler:        apiserver.Handle(storage, codec, *apiPrefix),
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	glog.Fatal(s.ListenAndServe())
 }

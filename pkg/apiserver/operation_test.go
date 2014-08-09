@@ -93,10 +93,10 @@ func TestOperation(t *testing.T) {
 
 func TestOperationsList(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -105,26 +105,26 @@ func TestOperationsList(t *testing.T) {
 	}
 	data, err := codec.Encode(simple)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	response, err := client.Post(server.URL+"/prefix/version/foo", "application/json", bytes.NewBuffer(data))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
+		t.Fatalf("Unexpected response %#v", response)
 	}
 
 	response, err = client.Get(server.URL + "/prefix/version/operations")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status code %#v", response)
 	}
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := codec.Decode(body)
 	if err != nil {
@@ -149,10 +149,10 @@ func TestOpGet(t *testing.T) {
 			return obj, nil
 		},
 	}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -162,27 +162,27 @@ func TestOpGet(t *testing.T) {
 	data, err := codec.Encode(simple)
 	t.Log(string(data))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	response, err := client.Do(request)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if response.StatusCode != http.StatusAccepted {
-		t.Errorf("Unexpected response %#v", response)
+		t.Fatalf("Unexpected response %#v", response)
 	}
 
 	var itemOut api.Status
 	body, err := extractBody(response, &itemOut)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
@@ -191,12 +191,12 @@ func TestOpGet(t *testing.T) {
 
 	req2, err := http.NewRequest("GET", server.URL+"/prefix/version/operations/"+itemOut.Details.ID, nil)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	_, err = client.Do(req2)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if response.StatusCode != http.StatusAccepted {
