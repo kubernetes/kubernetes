@@ -64,6 +64,10 @@ func (registry *EtcdRegistry) ListPods(selector labels.Selector) ([]api.Pod, err
 	}
 	for _, pod := range allPods {
 		if selector.Matches(labels.Set(pod.Labels)) {
+			// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
+			// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
+			// matches our desires.
+			pod.CurrentState.Host = pod.DesiredState.Host
 			filteredPods = append(filteredPods, pod)
 		}
 	}
@@ -77,6 +81,10 @@ func (registry *EtcdRegistry) GetPod(podID string) (*api.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
+	// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
+	// matches our desires.
+	pod.CurrentState.Host = pod.DesiredState.Host
 	return &pod, nil
 }
 
@@ -86,9 +94,13 @@ func makeContainerKey(machine string) string {
 
 // CreatePod creates a pod based on a specification, schedule it onto a specific machine.
 func (registry *EtcdRegistry) CreatePod(machine string, pod api.Pod) error {
-	// Set status to "Waiting".
+	// Set current status to "Waiting".
 	pod.CurrentState.Status = api.PodWaiting
 	pod.CurrentState.Host = ""
+
+	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
+	pod.DesiredState.Status = api.PodRunning
+	pod.DesiredState.Host = ""
 
 	err := registry.helper.CreateObj(makePodKey(pod.ID), &pod)
 	if err != nil {
@@ -112,8 +124,7 @@ func (registry *EtcdRegistry) AssignPod(podID string, machine string) error {
 			if !ok {
 				return nil, fmt.Errorf("unexpected object: %#v", obj)
 			}
-			pod.CurrentState.Host = machine
-			pod.CurrentState.Status = api.PodWaiting
+			pod.DesiredState.Host = machine
 			finalPod = pod
 			return pod, nil
 		},
@@ -175,7 +186,7 @@ func (registry *EtcdRegistry) DeletePod(podID string) error {
 		return err
 	}
 
-	machine := pod.CurrentState.Host
+	machine := pod.DesiredState.Host
 	if machine == "" {
 		// Pod was never scheduled anywhere, just return.
 		return nil

@@ -298,7 +298,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, api.EncodeOrDie(api.Pod{
 		JSONBase:     api.JSONBase{ID: "foo"},
-		CurrentState: api.PodState{Host: "machine"},
+		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{
 		Items: []api.ContainerManifest{
@@ -334,7 +334,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, api.EncodeOrDie(api.Pod{
 		JSONBase:     api.JSONBase{ID: "foo"},
-		CurrentState: api.PodState{Host: "machine"},
+		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{
 		Items: []api.ContainerManifest{
@@ -418,13 +418,13 @@ func TestEtcdListPods(t *testing.T) {
 					{
 						Value: api.EncodeOrDie(api.Pod{
 							JSONBase:     api.JSONBase{ID: "foo"},
-							CurrentState: api.PodState{Host: "machine"},
+							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
 					{
 						Value: api.EncodeOrDie(api.Pod{
 							JSONBase:     api.JSONBase{ID: "bar"},
-							CurrentState: api.PodState{Host: "machine"},
+							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
 				},
