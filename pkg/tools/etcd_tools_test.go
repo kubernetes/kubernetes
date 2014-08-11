@@ -70,30 +70,37 @@ func TestExtractList(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Value: `{"id":"foo"}`,
+						ModifiedIndex: 1,
 					},
 					{
 						Value: `{"id":"bar"}`,
+						ModifiedIndex: 2,
 					},
 					{
 						Value: `{"id":"baz"}`,
+						ModifiedIndex: 3,
 					},
 				},
 			},
 		},
 	}
 	expect := []api.Pod{
-		{JSONBase: api.JSONBase{ID: "foo"}},
-		{JSONBase: api.JSONBase{ID: "bar"}},
-		{JSONBase: api.JSONBase{ID: "baz"}},
+		{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}},
+		{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 2}},
+		{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 3}},
 	}
+
 	var got []api.Pod
 	helper := EtcdHelper{fakeClient, codec, versioner}
 	err := helper.ExtractList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	if !reflect.DeepEqual(got, expect) {
-		t.Errorf("Wanted %#v, got %#v", expect, got)
+
+	for i := 0; i < len(expect); i++ {
+		if !reflect.DeepEqual(got[i], expect[i]) {
+			t.Errorf("\nWanted:\n%#v\nGot:\n%#v\n", expect[i], got[i])
+		}
 	}
 }
 
