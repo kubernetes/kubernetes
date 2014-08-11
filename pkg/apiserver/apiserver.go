@@ -82,7 +82,7 @@ func New(storage map[string]RESTStorage, codec Codec, prefix string) *APIServer 
 
 	// Watch API handlers
 	watchPrefix := path.Join(prefix, "watch") + "/"
-	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage}))
+	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage, codec}))
 
 	// Support services for the apiserver
 	logsPrefix := "/logs/"
@@ -167,23 +167,19 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 		case 1:
 			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
 			if err != nil {
-				internalError(err, w)
+				errorJSON(err, s.codec, w)
 				return
 			}
 			list, err := storage.List(selector)
 			if err != nil {
-				internalError(err, w)
+				errorJSON(err, s.codec, w)
 				return
 			}
 			writeJSON(http.StatusOK, s.codec, list, w)
 		case 2:
 			item, err := storage.Get(parts[1])
-			if IsNotFound(err) {
-				notFound(w, req)
-				return
-			}
 			if err != nil {
-				internalError(err, w)
+				errorJSON(err, s.codec, w)
 				return
 			}
 			writeJSON(http.StatusOK, s.codec, item, w)
@@ -198,26 +194,18 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 		}
 		body, err := readBody(req)
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		obj := storage.New()
 		err = s.codec.DecodeInto(body, obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		out, err := storage.Create(obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
@@ -229,12 +217,8 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 			return
 		}
 		out, err := storage.Delete(parts[1])
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
@@ -247,26 +231,18 @@ func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.
 		}
 		body, err := readBody(req)
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		obj := storage.New()
 		err = s.codec.DecodeInto(body, obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		out, err := storage.Update(obj)
-		if IsNotFound(err) {
-			notFound(w, req)
-			return
-		}
 		if err != nil {
-			internalError(err, w)
+			errorJSON(err, s.codec, w)
 			return
 		}
 		op := s.createOperation(out, sync, timeout)
@@ -320,7 +296,7 @@ func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
 func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
 	if err != nil {
-		internalError(err, w)
+		errorJSON(err, codec, w)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -328,11 +304,17 @@ func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseW
 	w.Write(output)
 }
 
+// errorJSON renders an error to the response
+func errorJSON(err error, codec Codec, w http.ResponseWriter) {
+	status := errToAPIStatus(err)
+	writeJSON(status.Code, codec, status, w)
+}
+
 // writeRawJSON writes a non-API object in JSON.
 func writeRawJSON(statusCode int, object interface{}, w http.ResponseWriter) {
 	output, err := json.Marshal(object)
 	if err != nil {
-		internalError(err, w)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
