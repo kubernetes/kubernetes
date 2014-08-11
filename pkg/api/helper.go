@@ -89,7 +89,7 @@ func init() {
 	// registering all of these functions. Then, if you want to be able to understand
 	// v1beta1 objects, you just import that package for its side effects.
 	AddConversionFuncs(
-		// EnvVar's Name is depricated in favor of Key.
+		// EnvVar's Key is deprecated in favor of Name.
 		func(in *EnvVar, out *v1beta1.EnvVar) error {
 			out.Value = in.Value
 			out.Key = in.Name
