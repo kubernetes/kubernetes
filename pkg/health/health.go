@@ -36,11 +36,11 @@ type HTTPGetInterface interface {
 	Get(url string) (*http.Response, error)
 }
 
-// Check checks if a GET request to the url succeeds.
+// DoHTTPCheck checks if a GET request to the url succeeds.
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
 // If the HTTP response code is unsuccessful, it returns Unhealthy.
 // It returns Unknown and err if the HTTP communication itself fails.
-func Check(url string, client HTTPGetInterface) (Status, error) {
+func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if err != nil {
 		return Unknown, err

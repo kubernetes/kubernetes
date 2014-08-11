@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -65,29 +66,39 @@ type HTTPHealthChecker struct {
 	client HTTPGetInterface
 }
 
-func (h *HTTPHealthChecker) findPort(container api.Container, portName string) int64 {
+// A helper function to look up a port in a container by name.
+// Returns the HostPort if found, -1 if not found.
+func findPortByName(container api.Container, portName string) int {
 	for _, port := range container.Ports {
 		if port.Name == portName {
-			// TODO This means you can only health check exposed ports
-			return int64(port.HostPort)
+			return port.HostPort
 		}
 	}
 	return -1
 }
 
-// HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
-func (h *HTTPHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
+// Get the components of the target URL.  For testability.
+func getURLParts(currentState api.PodState, container api.Container) (string, int, string, error) {
 	params := container.LivenessProbe.HTTPGet
 	if params == nil {
-		return Unknown, fmt.Errorf("Error, no HTTP parameters specified: %v", container)
+		return "", -1, "", fmt.Errorf("no HTTP parameters specified: %v", container)
 	}
-	port := h.findPort(container, params.Port)
-	if port == -1 {
-		var err error
-		port, err = strconv.ParseInt(params.Port, 10, 0)
-		if err != nil {
-			return Unknown, err
+	port := -1
+	switch params.Port.Kind {
+	case util.IntstrInt:
+		port = params.Port.IntVal
+	case util.IntstrString:
+		port = findPortByName(container, params.Port.StrVal)
+		if port == -1 {
+			// Last ditch effort - maybe it was an int stored as string?
+			var err error
+			if port, err = strconv.Atoi(params.Port.StrVal); err != nil {
+				return "", -1, "", err
+			}
 		}
+	}
+	if port == -1 {
+		return "", -1, "", fmt.Errorf("unknown port: %v", params.Port)
 	}
 	var host string
 	if len(params.Host) > 0 {
@@ -95,8 +106,22 @@ func (h *HTTPHealthChecker) HealthCheck(currentState api.PodState, container api
 	} else {
 		host = currentState.PodIP
 	}
-	url := fmt.Sprintf("http://%s:%d%s", host, port, params.Path)
-	return Check(url, h.client)
+
+	return host, port, params.Path, nil
+}
+
+// Formats a URL from args.  For testability.
+func formatURL(host string, port int, path string) string {
+	return fmt.Sprintf("http://%s:%d%s", host, port, path)
+}
+
+// HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
+func (h *HTTPHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
+	host, port, path, err := getURLParts(currentState, container)
+	if err != nil {
+		return Unknown, err
+	}
+	return DoHTTPCheck(formatURL(host, port, path), h.client)
 }
 
 type TCPHealthChecker struct{}

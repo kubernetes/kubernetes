@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 const statusServerEarlyShutdown = -1
@@ -59,7 +60,7 @@ func TestHealthChecker(t *testing.T) {
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
 				HTTPGet: &api.HTTPGetProbe{
-					Port: port,
+					Port: util.MakeIntOrStringFromString(port),
 					Path: "/foo/bar",
 					Host: host,
 				},
@@ -90,32 +91,91 @@ func TestFindPort(t *testing.T) {
 			},
 		},
 	}
-	checker := HTTPHealthChecker{}
-	want := int64(8080)
-	got := checker.findPort(container, "foo")
+	want := 8080
+	got := findPortByName(container, "foo")
 	if got != want {
 		t.Errorf("Expected %v, got %v", want, got)
 	}
 }
 
+func TestGetURLParts(t *testing.T) {
+	testCases := []struct {
+		probe *api.HTTPGetProbe
+		ok    bool
+		host  string
+		port  int
+		path  string
+	}{
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromInt(-1), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString(""), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("-1"), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("not-found"), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromInt(76), Path: ""}, true, "127.0.0.1", 76, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
+		{&api.HTTPGetProbe{Host: "hostname", Port: util.MakeIntOrStringFromInt(76), Path: "path"}, true, "hostname", 76, "path"},
+	}
+
+	for _, test := range testCases {
+		state := api.PodState{PodIP: "127.0.0.1"}
+		container := api.Container{
+			Ports: []api.Port{{Name: "found", HostPort: 93}},
+			LivenessProbe: &api.LivenessProbe{
+				HTTPGet: test.probe,
+				Type:    "http",
+			},
+		}
+		host, port, path, err := getURLParts(state, container)
+		if !test.ok && err == nil {
+			t.Errorf("Expected error for %+v, got %s:%d/%s", test, host, port, path)
+		}
+		if test.ok && err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if test.ok {
+			if host != test.host || port != test.port || path != test.path {
+				t.Errorf("Expected %s:%d/%s, got %s:%d/%s",
+					test.host, test.port, test.path, host, port, path)
+			}
+		}
+	}
+}
+
+func TestFormatURL(t *testing.T) {
+	testCases := []struct {
+		host   string
+		port   int
+		path   string
+		result string
+	}{
+		{"localhost", 93, "", "http://localhost:93"},
+		{"localhost", 93, "/path", "http://localhost:93/path"},
+	}
+	for _, test := range testCases {
+		url := formatURL(test.host, test.port, test.path)
+		if url != test.result {
+			t.Errorf("Expected %s, got %s", test.result, url)
+		}
+	}
+}
+
 func TestHTTPHealthChecker(t *testing.T) {
-	httpHealthCheckerTests := []struct {
+	testCases := []struct {
 		probe  *api.HTTPGetProbe
 		status int
 		health Status
 	}{
-		{&api.HTTPGetProbe{Host: "httptest"}, http.StatusOK, Healthy},
+		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{&api.HTTPGetProbe{}, http.StatusOK, Healthy},
+		{&api.HTTPGetProbe{}, -1, Unhealthy},
 		{nil, -1, Unknown},
-		{&api.HTTPGetProbe{Port: "-1"}, -1, Unknown},
 	}
 	hc := &HTTPHealthChecker{
 		client: &http.Client{},
 	}
-	for _, httpHealthCheckerTest := range httpHealthCheckerTests {
-		tt := httpHealthCheckerTest
+	for _, test := range testCases {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(tt.status)
+			w.WriteHeader(test.status)
 		}))
 		u, err := url.Parse(ts.URL)
 		if err != nil {
@@ -127,28 +187,24 @@ func TestHTTPHealthChecker(t *testing.T) {
 		}
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: tt.probe,
+				HTTPGet: test.probe,
 				Type:    "http",
 			},
 		}
 		params := container.LivenessProbe.HTTPGet
 		if params != nil {
-			if params.Port == "" {
-				params.Port = port
-			}
-			if params.Host == "httptest" {
-				params.Host = host
-			}
+			params.Port = util.MakeIntOrStringFromString(port)
+			params.Host = host
 		}
 		health, err := hc.HealthCheck(api.PodState{PodIP: host}, container)
-		if tt.health == Unknown && err == nil {
+		if test.health == Unknown && err == nil {
 			t.Errorf("Expected error")
 		}
-		if tt.health != Unknown && err != nil {
+		if test.health != Unknown && err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
-		if health != tt.health {
-			t.Errorf("Expected %v, got %v", tt.health, health)
+		if health != test.health {
+			t.Errorf("Expected %v, got %v", test.health, health)
 		}
 	}
 }
@@ -228,7 +284,7 @@ func TestMuxHealthChecker(t *testing.T) {
 			},
 		}
 		container.LivenessProbe.Type = tt.probeType
-		container.LivenessProbe.HTTPGet.Port = port
+		container.LivenessProbe.HTTPGet.Port = util.MakeIntOrStringFromString(port)
 		container.LivenessProbe.HTTPGet.Host = host
 		health, err := mc.HealthCheck(api.PodState{}, container)
 		if err != nil {

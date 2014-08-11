@@ -139,11 +139,11 @@ type EnvVar struct {
 
 // HTTPGetProbe describes a liveness probe based on HTTP Get requests.
 type HTTPGetProbe struct {
-	// Path to access on the http server
+	// Optional: Path to access on the HTTP server.
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
-	// Name or number of the port to access on the container
-	Port string `yaml:"port,omitempty" json:"port,omitempty"`
-	// Host name to connect to.  Optional, default: "localhost"
+	// Required: Name or number of the port to access on the container.
+	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
+	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 }
 
