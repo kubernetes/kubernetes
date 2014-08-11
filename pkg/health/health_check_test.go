@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -209,11 +208,56 @@ func TestHTTPHealthChecker(t *testing.T) {
 	}
 }
 
+func TestGetTCPAddrParts(t *testing.T) {
+	testCases := []struct {
+		probe *api.TCPSocketProbe
+		ok    bool
+		host  string
+		port  int
+	}{
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromInt(-1)}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("")}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("-1")}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("not-found")}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("found")}, true, "1.2.3.4", 93},
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromInt(76)}, true, "1.2.3.4", 76},
+		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("118")}, true, "1.2.3.4", 118},
+	}
+
+	for _, test := range testCases {
+		state := api.PodState{PodIP: "1.2.3.4"}
+		container := api.Container{
+			Ports: []api.Port{{Name: "found", HostPort: 93}},
+			LivenessProbe: &api.LivenessProbe{
+				TCPSocket: test.probe,
+				Type:      "tcp",
+			},
+		}
+		host, port, err := getTCPAddrParts(state, container)
+		if !test.ok && err == nil {
+			t.Errorf("Expected error for %+v, got %s:%d", test, host, port)
+		}
+		if test.ok && err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if test.ok {
+			if host != test.host || port != test.port {
+				t.Errorf("Expected %s:%d, got %s:%d", test.host, test.port, host, port)
+			}
+		}
+	}
+}
+
 func TestTcpHealthChecker(t *testing.T) {
-	type tcpHealthTest struct {
-		probe          *api.LivenessProbe
+	tests := []struct {
+		probe          *api.TCPSocketProbe
 		expectedStatus Status
 		expectError    bool
+	}{
+		// The probe will be filled in below.  This is primarily testing that a connection is made.
+		{&api.TCPSocketProbe{}, Healthy, false},
+		{&api.TCPSocketProbe{}, Unhealthy, false},
+		{nil, Unknown, true},
 	}
 
 	checker := &TCPHealthChecker{}
@@ -225,17 +269,19 @@ func TestTcpHealthChecker(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	host, port, err := net.SplitHostPort(u.Host)
-	portNum, _ := strconv.Atoi(port)
-
-	tests := []tcpHealthTest{
-		{&api.LivenessProbe{TCPSocket: &api.TCPSocketProbe{Port: portNum}}, Healthy, false},
-		{&api.LivenessProbe{TCPSocket: &api.TCPSocketProbe{Port: 100000}}, Unhealthy, false},
-		{&api.LivenessProbe{}, Unknown, true},
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 	for _, test := range tests {
-		probe := test.probe
 		container := api.Container{
-			LivenessProbe: probe,
+			LivenessProbe: &api.LivenessProbe{
+				TCPSocket: test.probe,
+				Type:      "tcp",
+			},
+		}
+		params := container.LivenessProbe.TCPSocket
+		if params != nil && test.expectedStatus == Healthy {
+			params.Port = util.MakeIntOrStringFromString(port)
 		}
 		status, err := checker.HealthCheck(api.PodState{PodIP: host}, container)
 		if status != test.expectedStatus {

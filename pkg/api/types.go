@@ -146,8 +146,8 @@ type HTTPGetProbe struct {
 
 // TCPSocketProbe describes a liveness probe based on opening a socket
 type TCPSocketProbe struct {
-	// Port is the port to connect to. Required.
-	Port int `yaml:"port,omitempty" json:"port,omitempty"`
+	// Required: Port to connect to.
+	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
 }
 
 // LivenessProbe describes a liveness probe to be examined to the container.
