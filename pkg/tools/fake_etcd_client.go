@@ -88,6 +88,7 @@ func (f *FakeEtcdClient) generateIndex() uint64 {
 	}
 
 	f.ChangeIndex++
+	f.t.Logf("generating index %v", f.ChangeIndex)
 	return f.ChangeIndex
 }
 
@@ -116,7 +117,7 @@ func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, 
 
 func (f *FakeEtcdClient) nodeExists(key string) bool {
 	result, ok := f.Data[key]
-	return ok && result.R != nil && result.R.Node != nil
+	return ok && result.R != nil && result.R.Node != nil && result.E == nil
 }
 
 func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Response, error) {
@@ -129,6 +130,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 	if f.nodeExists(key) {
 		prevResult := f.Data[key]
 		createdIndex := prevResult.R.Node.CreatedIndex
+		f.t.Logf("updating %v, index %v -> %v", key, createdIndex, i)
 		result := EtcdResponseWithError{
 			R: &etcd.Response{
 				Node: &etcd.Node{
@@ -142,6 +144,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 		return result.R, nil
 	}
 
+	f.t.Logf("creating %v, index %v", key, i)
 	result := EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -164,6 +167,7 @@ func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, err
 
 func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue string, prevIndex uint64) (*etcd.Response, error) {
 	if f.Err != nil {
+		f.t.Logf("c&s: returning err %v", f.Err)
 		return nil, f.Err
 	}
 
@@ -180,16 +184,19 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 	defer f.Mutex.Unlock()
 
 	if !f.nodeExists(key) {
+		f.t.Logf("c&s: node doesn't exist")
 		return nil, EtcdErrorNotFound
 	}
 
 	prevNode := f.Data[key].R.Node
 
 	if prevValue != "" && prevValue != prevNode.Value {
+		f.t.Logf("body didn't match")
 		return nil, EtcdErrorTestFailed
 	}
 
 	if prevIndex != 0 && prevIndex != prevNode.ModifiedIndex {
+		f.t.Logf("got index %v but needed %v", prevIndex, prevNode.ModifiedIndex)
 		return nil, EtcdErrorTestFailed
 	}
 

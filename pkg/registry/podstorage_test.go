@@ -288,10 +288,13 @@ func TestMakePodStatus(t *testing.T) {
 			},
 		},
 	}
-	pod := &api.Pod{DesiredState: desiredState}
+	currentState := api.PodState{
+		Host: "machine",
+	}
+	pod := &api.Pod{DesiredState: desiredState, CurrentState: currentState}
 	status := makePodStatus(pod)
-	if status != api.PodPending {
-		t.Errorf("Expected 'Pending', got '%s'", status)
+	if status != api.PodWaiting {
+		t.Errorf("Expected 'Waiting', got '%s'", status)
 	}
 
 	runningState := docker.Container{
@@ -313,6 +316,7 @@ func TestMakePodStatus(t *testing.T) {
 				"containerA": runningState,
 				"containerB": runningState,
 			},
+			Host: "machine",
 		},
 	}
 	status = makePodStatus(pod)
@@ -328,11 +332,12 @@ func TestMakePodStatus(t *testing.T) {
 				"containerA": stoppedState,
 				"containerB": stoppedState,
 			},
+			Host: "machine",
 		},
 	}
 	status = makePodStatus(pod)
-	if status != api.PodStopped {
-		t.Errorf("Expected 'Stopped', got '%s'", status)
+	if status != api.PodTerminated {
+		t.Errorf("Expected 'Terminated', got '%s'", status)
 	}
 
 	// Mixed state.
@@ -343,11 +348,12 @@ func TestMakePodStatus(t *testing.T) {
 				"containerA": runningState,
 				"containerB": stoppedState,
 			},
+			Host: "machine",
 		},
 	}
 	status = makePodStatus(pod)
-	if status != api.PodPending {
-		t.Errorf("Expected 'Pending', got '%s'", status)
+	if status != api.PodWaiting {
+		t.Errorf("Expected 'Waiting', got '%s'", status)
 	}
 
 	// Mixed state.
@@ -357,11 +363,12 @@ func TestMakePodStatus(t *testing.T) {
 			Info: map[string]docker.Container{
 				"containerA": runningState,
 			},
+			Host: "machine",
 		},
 	}
 	status = makePodStatus(pod)
-	if status != api.PodPending {
-		t.Errorf("Expected 'Pending', got '%s'", status)
+	if status != api.PodWaiting {
+		t.Errorf("Expected 'Waiting', got '%s'", status)
 	}
 }
 
@@ -406,7 +413,7 @@ func TestCreatePod(t *testing.T) {
 		pod: &api.Pod{
 			JSONBase: api.JSONBase{ID: "foo"},
 			CurrentState: api.PodState{
-				Status: api.PodPending,
+				Host: "machine",
 			},
 		},
 	}
