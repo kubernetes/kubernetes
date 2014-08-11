@@ -18,6 +18,6 @@
 # You can override the default provider by exporting the KUBERNETES_PROVIDER
 # variable in your bashrc
 #
-# The valid values: 'gce', 'azure' and 'vagrant'
+# The valid values: 'gce', 'azure', 'vagrant', 'local'
 
 KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}

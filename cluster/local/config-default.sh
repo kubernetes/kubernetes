@@ -14,17 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
+## Contains configuration values for interacting with the Vagrant cluster
 
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
+# NUMBER OF MINIONS IN THE CLUSTER
+NUM_MINIONS=1
 
-CLOUDCFG=$(dirname $0)/../output/go/bin/kubecfg
-if [ ! -x $CLOUDCFG ]; then
-  echo "Could not find kubecfg binary. Run hack/build-go.sh to build it."
-  exit 1
-fi
+# IP LOCATIONS FOR INTERACTING WITH THE MASTER
+export KUBE_MASTER_IP="127.0.0.1"
+export KUBERNETES_MASTER="http://127.0.0.1:8080"
 
-detect-master > /dev/null
-
-$CLOUDCFG $@
+# IP LOCATIONS FOR INTERACTING WITH THE MINIONS
+for (( i=0; i <${NUM_MINIONS}; i++)) do
+	KUBE_MINION_IP_ADDRESSES[$i]="127.0.0.1"
+done
