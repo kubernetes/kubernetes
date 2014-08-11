@@ -23,8 +23,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/golang/glog"
 )
 
@@ -32,7 +33,7 @@ import (
 // that cache up to date.
 type PodCache struct {
 	containerInfo client.PodInfoGetter
-	pods          registry.PodRegistry
+	pods          pod.Registry
 	// This is a map of pod id to a map of container name to the
 	podInfo map[string]api.PodInfo
 	period  time.Duration
@@ -40,7 +41,7 @@ type PodCache struct {
 }
 
 // NewPodCache returns a new PodCache which watches container information registered in the given PodRegistry.
-func NewPodCache(info client.PodInfoGetter, pods registry.PodRegistry, period time.Duration) *PodCache {
+func NewPodCache(info client.PodInfoGetter, pods pod.Registry, period time.Duration) *PodCache {
 	return &PodCache{
 		containerInfo: info,
 		pods:          pods,

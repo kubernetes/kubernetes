@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -97,7 +97,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	}
 
 	pods := []api.Pod{pod}
-	mockRegistry := registry.MakeMockPodRegistry(pods)
+	mockRegistry := registrytest.NewPodRegistry(pods)
 
 	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
 	fake := FakePodInfoGetter{
