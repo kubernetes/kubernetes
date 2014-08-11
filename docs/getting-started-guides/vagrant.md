@@ -82,6 +82,9 @@ cd kubernetes
 modify cluster/kube-env.sh:
   KUBERNETES_PROVIDER="vagrant"
 
+## build the binary required by kubecfg.sh
+hack/build-go.sh
+
 cluster/kube-up.sh => brings up a vagrant cluster
 cluster/kube-down.sh => destroys a vagrant cluster
 cluster/kube-push.sh => updates a vagrant cluster
