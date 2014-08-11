@@ -338,6 +338,13 @@ type MinionList struct {
 	Items    []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
 }
 
+// Binding is written by a scheduler to cause a pod to be bound to a host.
+type Binding struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	PodID    string `json:"podID" yaml:"podID"`
+	Host     string `json:"host" yaml:"host"`
+}
+
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.

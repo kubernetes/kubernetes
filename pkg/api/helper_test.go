@@ -152,6 +152,7 @@ func TestTypes(t *testing.T) {
 		&ServerOp{},
 		&ContainerManifestList{},
 		&Endpoints{},
+		&Binding{},
 	}
 	for _, item := range table {
 		// Try a few times, since runTest uses random values.

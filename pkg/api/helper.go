@@ -64,6 +64,7 @@ func init() {
 		ServerOp{},
 		ContainerManifestList{},
 		Endpoints{},
+		Binding{},
 	)
 	AddKnownTypes("v1beta1",
 		v1beta1.PodList{},
@@ -79,6 +80,7 @@ func init() {
 		v1beta1.ServerOp{},
 		v1beta1.ContainerManifestList{},
 		v1beta1.Endpoints{},
+		v1beta1.Binding{},
 	)
 
 	// TODO: when we get more of this stuff, move to its own file. This is not a
