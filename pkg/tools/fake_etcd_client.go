@@ -51,6 +51,7 @@ type FakeEtcdClient struct {
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
 	WatchResponse chan *etcd.Response
+	WatchIndex    uint64
 	// Write to this to prematurely stop a Watch that is running in a goroutine.
 	WatchInjectError chan<- error
 	WatchStop        chan<- bool
@@ -229,6 +230,7 @@ func (f *FakeEtcdClient) WaitForWatchCompletion() {
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
 	f.WatchResponse = receiver
 	f.WatchStop = stop
+	f.WatchIndex = waitIndex
 	injectedError := make(chan error)
 
 	defer close(injectedError)
