@@ -116,7 +116,7 @@ func TestPodInfo(t *testing.T) {
 		"goodpod": api.ContainerStatus{},
 	}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
-		if name == "goodpod.default.etcd" {
+		if name == "goodpod.default.api" {
 			return expected, nil
 		}
 		return nil, fmt.Errorf("bad pod %s", name)

@@ -62,6 +62,7 @@ var (
 	authPath                = flag.String("auth_path", "", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	cAdvisorPort            = flag.Uint("cadvisor_port", 4194, "The port of the localhost cAdvisor endpoint")
 	oomScoreAdj             = flag.Int("oom_score_adj", -900, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
+	useEtcd                 = flag.Bool("use_etcd_for_pods", true, "If true, retrieve pods via etcd, otherwise use the API server.")
 	apiServerList           util.StringList
 	clusterDomain           = flag.String("cluster_domain", "", "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	clusterDNS              = util.IP(nil)
@@ -100,10 +101,13 @@ func main() {
 		glog.Info(err)
 	}
 
+	client, err := standalone.GetAPIServerClient(*authPath, apiServerList)
+	if err != nil {
+		glog.Warningf("No API client: %v", err)
+	}
+
 	kcfg := standalone.KubeletConfig{
 		Address:                 address,
-		AuthPath:                *authPath,
-		ApiServerList:           apiServerList,
 		AllowPrivileged:         *allowPrivileged,
 		HostnameOverride:        *hostnameOverride,
 		RootDirectory:           *rootDirectory,
@@ -125,7 +129,9 @@ func main() {
 		EnableServer:            *enableServer,
 		EnableDebuggingHandlers: *enableDebuggingHandlers,
 		DockerClient:            util.ConnectToDockerOrDie(*dockerEndpoint),
-		EtcdClient:              kubelet.EtcdClientOrDie(etcdServerList, *etcdConfigFile),
+		Client:                  client,
+		PodsFromEtcd:            *useEtcd,
+		PodsFromAPI:             !*useEtcd,
 	}
 
 	standalone.RunKubelet(&kcfg)

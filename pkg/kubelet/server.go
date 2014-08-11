@@ -222,13 +222,24 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request, version
 		ObjectMeta: api.ObjectMeta{
 			Name:        podID,
 			Namespace:   podNamespace,
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
+			Annotations: map[string]string{ConfigSourceAnnotationKey: "api"},
 		},
 	})
 	info, err := s.host.GetPodInfo(podFullName, podUUID)
 	if err == dockertools.ErrNoContainersInPod {
-		http.Error(w, "api.BoundPod does not exist", http.StatusNotFound)
-		return
+		// try under the api source
+		podFullName := GetPodFullName(&api.BoundPod{
+			ObjectMeta: api.ObjectMeta{
+				Name:        podID,
+				Namespace:   podNamespace,
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
+			},
+		})
+		info, err = s.host.GetPodInfo(podFullName, podUUID)
+		if err == dockertools.ErrNoContainersInPod {
+			http.Error(w, "Pod does not exist", http.StatusNotFound)
+			return
+		}
 	}
 	if err != nil {
 		s.error(w, err)

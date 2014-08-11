@@ -36,7 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
@@ -63,7 +62,6 @@ type volumeMap map[string]volume.Interface
 func NewMainKubelet(
 	hn string,
 	dc dockertools.DockerInterface,
-	ec tools.EtcdClient,
 	rd string,
 	ni string,
 	ri time.Duration,
@@ -77,7 +75,6 @@ func NewMainKubelet(
 	return &Kubelet{
 		hostname:              hn,
 		dockerClient:          dc,
-		etcdClient:            ec,
 		rootDirectory:         rd,
 		resyncInterval:        ri,
 		networkContainerImage: ni,
@@ -120,8 +117,6 @@ type Kubelet struct {
 	// TODO: Remove this when (if?) that issue is fixed.
 	pullLock sync.RWMutex
 
-	// Optional, no events will be sent without it
-	etcdClient tools.EtcdClient
 	// Optional, defaults to simple implementaiton
 	healthChecker health.HealthChecker
 	// Optional, defaults to simple Docker implementation

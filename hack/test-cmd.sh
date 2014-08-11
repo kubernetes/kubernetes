@@ -58,6 +58,9 @@ kube::log::status "Starting kubelet"
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
+  --use_etcd_for_pods=false \
+  --api_servers="${API_HOST}:${API_PORT}" \
+  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
   --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
 

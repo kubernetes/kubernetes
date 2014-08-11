@@ -53,6 +53,10 @@ func (c *Fake) Nodes() NodeInterface {
 	return &FakeNodes{Fake: c}
 }
 
+func (c *Fake) BoundPods() BoundPodsInterface {
+	return &FakeBoundPods{Fake: c}
+}
+
 func (c *Fake) Events(namespace string) EventInterface {
 	return &FakeEvents{Fake: c}
 }
