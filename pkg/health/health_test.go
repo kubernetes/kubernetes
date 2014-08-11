@@ -105,7 +105,7 @@ func TestMuxHealthChecker(t *testing.T) {
 		{Healthy, "http"},
 		{Unknown, "ftp"},
 	}
-	mc := &MuxHealthChecker{
+	mc := &muxHealthChecker{
 		checkers: make(map[string]HealthChecker),
 	}
 	hc := &HTTPHealthChecker{

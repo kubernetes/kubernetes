@@ -27,6 +27,7 @@ import (
 )
 
 // HTTPGetInterface is an abstract interface for testability. It abstracts the interface of http.Client.Get.
+// This is exported because some other packages may want to do direct HTTP checks.
 type HTTPGetInterface interface {
 	Get(url string) (*http.Response, error)
 }
@@ -78,6 +79,7 @@ func formatURL(host string, port int, path string) string {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
 // If the HTTP response code is unsuccessful, it returns Unhealthy.
 // It returns Unknown and err if the HTTP communication itself fails.
+// This is exported because some other packages may want to do direct HTTP checks.
 func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if err != nil {

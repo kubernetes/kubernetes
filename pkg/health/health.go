@@ -40,7 +40,7 @@ type HealthChecker interface {
 
 // NewHealthChecker creates a new HealthChecker which supports multiple types of liveness probes.
 func NewHealthChecker() HealthChecker {
-	return &MuxHealthChecker{
+	return &muxHealthChecker{
 		checkers: map[string]HealthChecker{
 			"http": &HTTPHealthChecker{
 				client: &http.Client{},
@@ -50,15 +50,15 @@ func NewHealthChecker() HealthChecker {
 	}
 }
 
-// MuxHealthChecker bundles multiple implementations of HealthChecker of different types.
-type MuxHealthChecker struct {
+// muxHealthChecker bundles multiple implementations of HealthChecker of different types.
+type muxHealthChecker struct {
 	checkers map[string]HealthChecker
 }
 
 // HealthCheck delegates the health-checking of the container to one of the bundled implementations.
 // It chooses an implementation according to container.LivenessProbe.Type.
 // If there is no matching health checker it returns Unknown, nil.
-func (m *MuxHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
+func (m *muxHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
 	checker, ok := m.checkers[container.LivenessProbe.Type]
 	if !ok || checker == nil {
 		glog.Warningf("Failed to find health checker for %s %s", container.Name, container.LivenessProbe.Type)

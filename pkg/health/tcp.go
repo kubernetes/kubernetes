@@ -61,6 +61,7 @@ func getTCPAddrParts(currentState api.PodState, container api.Container) (string
 // DoTCPCheck checks that a TCP socket to the address can be opened.
 // If the socket can be opened, it returns Healthy.
 // If the socket fails to open, it returns Unhealthy.
+// This is exported because some other packages may want to do direct TCP checks.
 func DoTCPCheck(addr string) (Status, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
