@@ -19,12 +19,15 @@ package pod
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // Registry is an interface implemented by things that know how to store Pod objects.
 type Registry interface {
 	// ListPods obtains a list of pods that match selector.
 	ListPods(selector labels.Selector) ([]api.Pod, error)
+	// Watch for new/changed/deleted pods
+	WatchPods(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 	// Get a specific pod
 	GetPod(podID string) (*api.Pod, error)
 	// Create a pod based on a specification, schedule it onto a specific machine.

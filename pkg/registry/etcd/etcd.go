@@ -77,6 +77,19 @@ func (r *Registry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	return filteredPods, nil
 }
 
+// WatchPods begins watching for new, changed, or deleted pods.
+func (r *Registry) WatchPods(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return r.WatchList("/registry/pods", resourceVersion, func(obj interface{}) bool {
+		pod := obj.(*api.Pod)
+		fields := labels.Set{
+			"ID": pod.ID,
+			"CurrentState.Status": string(pod.CurrentState.Status),
+			"CurrentState.Host":   pod.CurrentState.Host,
+		}
+		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+	})
+}
+
 // GetPod gets a specific pod specified by its ID.
 func (r *Registry) GetPod(podID string) (*api.Pod, error) {
 	var pod api.Pod

@@ -17,10 +17,12 @@ limitations under the License.
 package registrytest
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type PodRegistry struct {
@@ -49,6 +51,10 @@ func (r *PodRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 		}
 	}
 	return filtered, nil
+}
+
+func (r *PodRegistry) WatchPods(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return nil, errors.New("unimplemented")
 }
 
 func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {

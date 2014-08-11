@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/golang/glog"
@@ -120,6 +121,11 @@ func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
 		}
 	}
 	return result, err
+}
+
+// Watch begins watching for new, changed, or deleted pods.
+func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return rs.registry.WatchPods(label, field, resourceVersion)
 }
 
 func (rs RegistryStorage) New() interface{} {
