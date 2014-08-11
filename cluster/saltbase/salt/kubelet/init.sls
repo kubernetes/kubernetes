@@ -8,9 +8,6 @@
 {% set environment_file = '/etc/default/kubelet' %}
 {% endif %}
 
-libcap2-bin:
-  pkg.installed
-
 {{ package_dir }}:
   file.recurse:
     - source: salt://kubelet/go

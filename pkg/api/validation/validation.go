@@ -86,11 +86,11 @@ func validatePersistentDisk(PD *PersistentDisk) errorList {
 	if PD.PDName == "" {
 		allErrs.Append(makeNotFoundError("PD.PDName", PD.PDName))
 	}
-	if PD.Platform == "" {
-		allErrs.Append(makeNotFoundError("PD.Platform", PD.PDName))
+	if PD.Provider == "" {
+		allErrs.Append(makeNotFoundError("PD.Provider", PD.PDName))
 	}
-	if PD.Platform != "gce" {
-		allErrs.Append(makeInvalidError("PD.Platform", PD.PDName))
+	if PD.Provider != "gce" {
+		allErrs.Append(makeInvalidError("PD.Provider", PD.PDName))
 	}
 	return allErrs
 }

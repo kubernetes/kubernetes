@@ -18,7 +18,8 @@ limitations under the License.
 
 package volume
 
-import ()
+const MOUNT_MS_BIND = 0
+const MOUNT_MS_RDONLY = 0
 
 type DiskMounter struct{}
 
@@ -30,6 +31,6 @@ func (mounter *DiskMounter) Unmount(target string, flags int) error {
 	return nil
 }
 
-func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (int, error) {
-	return 0, nil
+func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (string, int, error) {
+	return "", 0, nil
 }

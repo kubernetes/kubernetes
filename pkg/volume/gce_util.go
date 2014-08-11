@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,10 +39,8 @@ type GCEDiskUtil struct {
 	connected bool
 }
 
-func NewGCEDiskUtil() *GCEDiskUtil {
-	return &GCEDiskUtil{}
-}
-
+// Establishes a connection to the GCE API and initializes project, zone,
+// and instance members.
 func (GCEPD *GCEDiskUtil) Connect() error {
 	var err error
 	GCEPD.project, GCEPD.zone, err = getProjectIDAndZone()
@@ -63,6 +63,7 @@ func (GCEPD *GCEDiskUtil) Connect() error {
 	return nil
 }
 
+// Acquires zone and project names from the metadata server.
 func getProjectIDAndZone() (string, string, error) {
 	req, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/zone", nil)
 	req.Header.Add("Metadata-Flavor", "Google")
@@ -81,6 +82,7 @@ func getProjectIDAndZone() (string, string, error) {
 	return projectID, zone, nil
 }
 
+// Converts a Disk resource to an AttachedDisk resource.
 func (util *GCEDiskUtil) convertDiskToAttachedDisk(disk *compute.Disk, readWrite string) *compute.AttachedDisk {
 	return &compute.AttachedDisk{
 		false,
@@ -89,38 +91,55 @@ func (util *GCEDiskUtil) convertDiskToAttachedDisk(disk *compute.Disk, readWrite
 		0,
 		nil,
 		disk.Kind,
+		//TODO(jonesdl) The version of go-api-client in kubernetes is out of date.
+		//The recent versions have a licenses member.
 		//disk.Licenses,
 		readWrite,
 		"https://" + path.Join("www.googleapis.com/compute/v1/projects/", util.project, "zones", util.zone, "disks", disk.Name),
 		"PERSISTENT",
 	}
 }
+
+// API call to retrieve a disk
 func (util *GCEDiskUtil) getDisk(GCEPD *PersistentDisk) (*compute.Disk, error) {
 	return util.service.Disks.Get(util.project, util.zone, GCEPD.PDName).Do()
 }
 
+// API call to attach a disk
 func (util *GCEDiskUtil) attachDisk(attachedDisk *compute.AttachedDisk) (*compute.Operation, error) {
 	return util.service.Instances.AttachDisk(util.project, util.zone, util.instance, attachedDisk).Do()
 }
 
-func (util *GCEDiskUtil) AttachDisk(GCEPD *PersistentDisk) (string, error) {
+// API call to detach a disk
+func (util *GCEDiskUtil) detachDisk(devicePath string) (*compute.Operation, error) {
+	return util.service.Instances.DetachDisk(util.project, util.zone, util.instance, devicePath).Do()
+}
+
+// Attaches a disk specified by a volume.PersistentDisk to the current kubelet.
+// Mounts the disk to it's global path.
+func (util *GCEDiskUtil) AttachDisk(GCEPD *PersistentDisk) error {
 	if !util.connected {
-		return "", errors.New("Not connected to API")
+		return errors.New("Not connected to API")
 	}
 	disk, err := util.getDisk(GCEPD)
 	if err != nil {
-		return "", err
+		return err
 	}
 	readWrite := "READ_WRITE"
+	flags := uintptr(0)
 	if GCEPD.ReadOnly {
 		readWrite = "READ_ONLY"
+		flags = MOUNT_MS_RDONLY
 	}
 	attachedDisk := util.convertDiskToAttachedDisk(disk, readWrite)
 	if _, err := util.attachDisk(attachedDisk); err != nil {
-		return "", err
+		return err
 	}
 	success := make(chan struct{})
 	devicePath := path.Join("/dev/disk/by-id/", "google-"+disk.Name)
+	if GCEPD.Partition != "" {
+		devicePath = devicePath + "-part" + GCEPD.Partition
+	}
 	go func() {
 		for _, err := os.Stat(devicePath); os.IsNotExist(err); _, err = os.Stat(devicePath) {
 			time.Sleep(time.Second)
@@ -131,14 +150,52 @@ func (util *GCEDiskUtil) AttachDisk(GCEPD *PersistentDisk) (string, error) {
 	case <-success:
 		break
 	case <-time.After(10 * time.Second):
-		return "", errors.New("Could not attach disk: Timeout after 10s")
+		return errors.New("Could not attach disk: Timeout after 10s")
 	}
-	return devicePath, nil
+	globalPDPath := path.Join(GCEPD.RootDir, "global", "pd", GCEPD.PDName)
+	// Only mount the PD globally once.
+	if _, err = os.Stat(globalPDPath); os.IsNotExist(err) {
+		err = os.MkdirAll(globalPDPath, 0750)
+		if err != nil {
+			return err
+		}
+		err = GCEPD.mounter.Mount(devicePath, globalPDPath, GCEPD.FSType, flags, "")
+		if err != nil {
+			os.RemoveAll(globalPDPath)
+			return err
+		}
+	}
+	return nil
 }
 
-func (util *GCEDiskUtil) DetachDisk(GCEPD *PersistentDisk) error {
+// Unmounts the device and detaches the disk from the kubelet's host machine.
+func (util *GCEDiskUtil) DetachDisk(GCEPD *PersistentDisk, devicePath string) error {
 	if !util.connected {
 		return errors.New("Not connected to API")
+	}
+	actualDevicePath, err := filepath.EvalSymlinks(devicePath)
+	if err != nil {
+		return err
+	}
+	//TODO(jonesdl) extract the partition number directory from the regex.
+	isMatch, err := regexp.MatchString("[a-z][a-z]*[0-9]", path.Base(actualDevicePath))
+	if err != nil {
+		return err
+	}
+	if isMatch {
+		partition := string(actualDevicePath[len(actualDevicePath)-1])
+		devicePath = strings.TrimSuffix(devicePath, "-part"+partition)
+	}
+	deviceName := strings.TrimPrefix(path.Base(devicePath), "google-")
+	globalPDPath := path.Join(GCEPD.RootDir, "global", "pd", deviceName)
+	if err := GCEPD.mounter.Unmount(globalPDPath, 0); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(globalPDPath); err != nil {
+		return err
+	}
+	if _, err := util.detachDisk(deviceName); err != nil {
+		return err
 	}
 	return nil
 }

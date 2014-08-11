@@ -20,42 +20,56 @@ package volume
 
 import (
 	"io/ioutil"
-	"path"
 	"regexp"
 	"strings"
 	"syscall"
 )
 
+const MOUNT_MS_BIND = syscall.MS_BIND
+const MOUNT_MS_RDONLY = syscall.MS_RDONLY
+
 type DiskMounter struct{}
 
-func (mounter *DiskMounter) Mount(source string, target string, fstype string, flags string, data string) error {
-	var sysflags uintptr
-	if flags == "bind" {
-		sysflags = syscall.MS_BIND
-	}
-	return syscall.Mount(source, target, fstype, sysflags, data)
+// Wraps syscall.Mount()
+func (mounter *DiskMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	return syscall.Mount(source, target, fstype, flags, data)
 }
 
+// Wraps syscall.Unmount()
 func (mounter *DiskMounter) Unmount(target string, flags int) error {
 	return syscall.Unmount(target, flags)
 }
 
-func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (int, error) {
+// Examines /proc/mounts to find the source device of the PD resource and the
+// number of references to that device. Returns both the full device path under
+// the /dev tree and the number of references.
+func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (string, int, error) {
 	contents, err := ioutil.ReadFile("/proc/mounts")
 	if err != nil {
-		return -1, err
+		return "", -1, err
 	}
 	refCount := 0
-	deviceName := path.Join("dev/disk/by-id", "google-"+PD.PDName)
+	var deviceName string
 	lines := strings.Split(string(contents), "\n")
+	// Find the actual device path.
+	for _, line := range lines {
+		success, err := regexp.MatchString(PD.GetPath(), line)
+		if err != nil {
+			return "", -1, err
+		}
+		if success {
+			deviceName = strings.Split(line, " ")[0]
+		}
+	}
+	// Find the number of references to the device.
 	for _, line := range lines {
 		success, err := regexp.MatchString(deviceName, line)
 		if err != nil {
-			return -1, err
+			return "", -1, err
 		}
 		if success {
 			refCount++
 		}
 	}
-	return refCount, nil
+	return deviceName, refCount, nil
 }

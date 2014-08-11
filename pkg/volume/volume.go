@@ -55,17 +55,22 @@ type APIDiskUtil interface {
 	// Establishes a connection and verifies that the kubelet is running
 	// in the correct cloud platform.
 	// Connect must be called at least once before attaching/detaching a disk.
+	// TODO(jonesdl) Connect() can probably be removed from the interface and used
+	// as an implementation detail of attach/detach
 	Connect() error
-	// Attaches the disk to the kubelet and returns its device path
-	AttachDisk(PD *PersistentDisk) (string, error)
-	// Detaches the disk from the kubelet.
-	DetachDisk(PD *PersistentDisk) error
+	// Attaches the disk to the kubelet's host machine.
+	AttachDisk(PD *PersistentDisk) error
+	// Detaches the disk from the kubelet's host machine.
+	DetachDisk(PD *PersistentDisk, devicePath string) error
 }
 
+// Mounters wrap os/system specific calls to perform mounts.
 type Mounter interface {
-	Mount(string, string, string, string, string) error
+	Mount(string, string, string, uintptr, string) error
 	Unmount(string, int) error
-	RefCount(PD *PersistentDisk) (int, error)
+	// RefCount returns the device path for the source disk of the PD, and
+	// the number of references to that target disk.
+	RefCount(PD *PersistentDisk) (string, int, error)
 }
 
 // Host Directory volumes represent a bare host directory mount.
@@ -106,6 +111,8 @@ func (emptyDir *EmptyDirectory) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
+// renameDirectory moves the path of the volume mount to a temporary
+// directory, suffixed with ".deleting~".
 func renameDirectory(vol Interface) (string, error) {
 	oldPath := vol.GetPath()
 	name := path.Base(oldPath)
@@ -133,28 +140,33 @@ func (emptyDir *EmptyDirectory) TearDown() error {
 	return nil
 }
 
-// Google Compute Engine Persistent Disks can only be used when running Kubernetes
-// on a GCE cloud. PDs must be created in GCE prior to mounting in Kubernetes.
-// A PD can only be mounted as Read-Write once, but can be mounted
-// as read-only multiple times.
+// PersistentDisk volumes are disk resources provided by a cloud platform
+// that are attached to the kubelet's host machine and exposed to the pod.
 type PersistentDisk struct {
 	Name    string
 	PodID   string
 	RootDir string
-	// Unique identifier of the PD, used to find the resource in an API.
+	// Unique identifier of the PD, used to find the disk resource in the provider.
 	PDName string
 	// Filesystem type, optional.
 	FSType string
+	// Specifies the partition to mount
+	Partition string
+	// Specifies the cloud platform provider.
+	Provider string
 	// Specifies whether the disk will be attached as ReadOnly.
 	ReadOnly bool
-	util     APIDiskUtil
-	mounter  Mounter
+	// Utility interface that provides API calls to the provider to attach/detach disks.
+	util APIDiskUtil
+	// Mounter interface that provides system calls to mount the disks.
+	mounter Mounter
 }
 
 func (PD *PersistentDisk) GetPath() string {
-	return path.Join(PD.RootDir, PD.PodID, "volumes", "pd", PD.Name)
+	return path.Join(PD.RootDir, PD.PodID, "volumes", PD.Provider+"-pd", PD.Name)
 }
 
+// Attaches the disk and bind mounts to the volume path.
 func (PD *PersistentDisk) SetUp() error {
 	if _, err := os.Stat(PD.GetPath()); !os.IsNotExist(err) {
 		return nil
@@ -162,21 +174,13 @@ func (PD *PersistentDisk) SetUp() error {
 	if err := PD.util.Connect(); err != nil {
 		return err
 	}
-	devicePath, err := PD.util.AttachDisk(PD)
+	err := PD.util.AttachDisk(PD)
 	if err != nil {
 		return err
 	}
-	globalPDPath := path.Join(PD.RootDir, "global", "pd", PD.PDName)
-	// Only mount the PD globally once.
-	if _, err = os.Stat(globalPDPath); os.IsNotExist(err) {
-		err = os.MkdirAll(globalPDPath, 0750)
-		if err != nil {
-			return err
-		}
-		err = PD.mounter.Mount(devicePath, globalPDPath, PD.FSType, "", "")
-		if err != nil {
-			return err
-		}
+	flags := uintptr(0)
+	if PD.ReadOnly {
+		flags = MOUNT_MS_RDONLY
 	}
 	//Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	if _, err = os.Stat(PD.GetPath()); os.IsNotExist(err) {
@@ -184,7 +188,8 @@ func (PD *PersistentDisk) SetUp() error {
 		if err != nil {
 			return err
 		}
-		err = PD.mounter.Mount(globalPDPath, PD.GetPath(), "", "bind", "")
+		globalPDPath := path.Join(PD.RootDir, "global", "pd", PD.PDName)
+		err = PD.mounter.Mount(globalPDPath, PD.GetPath(), "", MOUNT_MS_BIND|flags, "")
 		if err != nil {
 			return err
 		}
@@ -192,10 +197,17 @@ func (PD *PersistentDisk) SetUp() error {
 	return nil
 }
 
+// Unmounts the bind mount, and detaches the disk only if the PD
+// resource was the last reference to that disk on the kubelet.
 func (PD *PersistentDisk) TearDown() error {
+	devicePath, refCount, err := PD.mounter.RefCount(PD)
+	if err != nil {
+		return err
+	}
 	if err := PD.mounter.Unmount(PD.GetPath(), 0); err != nil {
 		return err
 	}
+	refCount--
 	tmpDir, err := renameDirectory(PD)
 	if err != nil {
 		return err
@@ -203,11 +215,17 @@ func (PD *PersistentDisk) TearDown() error {
 	if err := os.RemoveAll(tmpDir); err != nil {
 		return err
 	}
-	if err := PD.util.Connect(); err != nil {
+	if err != nil {
 		return err
 	}
-	if err := PD.util.DetachDisk(PD); err != nil {
-		return err
+	// Detach the disk on the last reference.
+	if refCount == 1 {
+		if err := PD.util.Connect(); err != nil {
+			return err
+		}
+		if err := PD.util.DetachDisk(PD, devicePath); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -226,13 +244,15 @@ func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *Emp
 func createPersistentDisk(volume *api.Volume, podID string, rootDir string) (*PersistentDisk, error) {
 	PDName := volume.Source.PersistentDisk.PDName
 	FSType := volume.Source.PersistentDisk.FSType
+	partition := volume.Source.PersistentDisk.Partition
 	readOnly := volume.Source.PersistentDisk.ReadOnly
-	util, err := newDiskUtil(volume.Source.PersistentDisk.Platform)
+	provider := volume.Source.PersistentDisk.Provider
+	util, err := newDiskUtil(provider)
 	mounter := &DiskMounter{}
 	if err != nil {
 		return nil, err
 	}
-	return &PersistentDisk{volume.Name, podID, rootDir, PDName, FSType, readOnly, util, mounter}, nil
+	return &PersistentDisk{volume.Name, podID, rootDir, PDName, FSType, partition, provider, readOnly, util, mounter}, nil
 }
 
 func newDiskUtil(Platform string) (APIDiskUtil, error) {
@@ -278,6 +298,8 @@ func CreateVolumeCleaner(kind string, name string, podID string, rootDir string)
 	switch kind {
 	case "empty":
 		return &EmptyDirectory{name, podID, rootDir}, nil
+	case "gce-pd":
+		return &PersistentDisk{name, podID, rootDir, "", "", "", "gce", false, &GCEDiskUtil{}, &DiskMounter{}}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -316,7 +338,7 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 				// TODO(thockin) This should instead return a reference to an extant volume object
 				cleaner, err := CreateVolumeCleaner(volumeKind, volumeName, podID, rootDirectory)
 				if err != nil {
-					glog.Errorf("Could not create volume cleaner: %s, (%s)", volumeNameDirs, err)
+					glog.Errorf("Could not create volume cleaner: %s, (%s)", volumeNameDir.Name(), err)
 					continue
 				}
 				currentVolumes[identifier] = cleaner
