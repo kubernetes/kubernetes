@@ -61,6 +61,12 @@ func (m *MuxHealthChecker) HealthCheck(currentState api.PodState, container api.
 	return checker.HealthCheck(currentState, container)
 }
 
+// HTTPGetInterface is an abstract interface for testability. It abstracts the interface of http.Client.Get.
+type HTTPGetInterface interface {
+	Get(url string) (*http.Response, error)
+}
+
+// DoHTTPCheck checks if a GET request to the url succeeds.
 // HTTPHealthChecker is an implementation of HealthChecker which checks container health by sending HTTP Get requests.
 type HTTPHealthChecker struct {
 	client HTTPGetInterface
@@ -113,6 +119,22 @@ func getURLParts(currentState api.PodState, container api.Container) (string, in
 // Formats a URL from args.  For testability.
 func formatURL(host string, port int, path string) string {
 	return fmt.Sprintf("http://%s:%d%s", host, port, path)
+}
+
+// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
+// If the HTTP response code is unsuccessful, it returns Unhealthy.
+// It returns Unknown and err if the HTTP communication itself fails.
+func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
+	res, err := client.Get(url)
+	if err != nil {
+		return Unknown, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
+		return Healthy, nil
+	}
+	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
+	return Unhealthy, nil
 }
 
 // HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.

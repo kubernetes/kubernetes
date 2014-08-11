@@ -16,11 +16,7 @@ limitations under the License.
 
 package health
 
-import (
-	"net/http"
-
-	"github.com/golang/glog"
-)
+import ()
 
 type Status int
 
@@ -30,25 +26,3 @@ const (
 	Unhealthy
 	Unknown
 )
-
-// HTTPGetInterface is an abstract interface for testability. It abstracts the interface of http.Client.Get.
-type HTTPGetInterface interface {
-	Get(url string) (*http.Response, error)
-}
-
-// DoHTTPCheck checks if a GET request to the url succeeds.
-// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
-// If the HTTP response code is unsuccessful, it returns Unhealthy.
-// It returns Unknown and err if the HTTP communication itself fails.
-func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
-	res, err := client.Get(url)
-	if err != nil {
-		return Unknown, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return Healthy, nil
-	}
-	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-	return Unhealthy, nil
-}
