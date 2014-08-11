@@ -83,6 +83,16 @@ const (
 	IntstrString                   // The IntOrString holds a string.
 )
 
+// MakeIntOrStringFromInt creates an IntOrString object with an int value.
+func MakeIntOrStringFromInt(val int) IntOrString {
+	return IntOrString{Kind: IntstrInt, IntVal: val}
+}
+
+// MakeIntOrStringFromInt creates an IntOrString object with a string value.
+func MakeIntOrStringFromString(val string) IntOrString {
+	return IntOrString{Kind: IntstrString, StrVal: val}
+}
+
 // SetYAML implements the yaml.Setter interface.
 func (intstr *IntOrString) SetYAML(tag string, value interface{}) bool {
 	switch v := value.(type) {

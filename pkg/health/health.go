@@ -19,36 +19,61 @@ package health
 import (
 	"net/http"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
 )
 
+// Status represents the result of a single health-check operation.
 type Status int
 
-// Status takes only one of values of these constants.
+// Status values must be one of these constants.
 const (
 	Healthy Status = iota
 	Unhealthy
 	Unknown
 )
 
-// HTTPGetInterface is an abstract interface for testability. It abstracts the interface of http.Client.Get.
-type HTTPGetInterface interface {
-	Get(url string) (*http.Response, error)
+// HealthChecker defines an abstract interface for checking container health.
+type HealthChecker interface {
+	HealthCheck(currentState api.PodState, container api.Container) (Status, error)
 }
 
-// Check checks if a GET request to the url succeeds.
-// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Healthy.
-// If the HTTP response code is unsuccessful, it returns Unhealthy.
-// It returns Unknown and err if the HTTP communication itself fails.
-func Check(url string, client HTTPGetInterface) (Status, error) {
-	res, err := client.Get(url)
-	if err != nil {
-		return Unknown, err
+// NewHealthChecker creates a new HealthChecker which supports multiple types of liveness probes.
+func NewHealthChecker() HealthChecker {
+	return &muxHealthChecker{
+		checkers: map[string]HealthChecker{
+			"http": &HTTPHealthChecker{
+				client: &http.Client{},
+			},
+			"tcp": &TCPHealthChecker{},
+		},
 	}
-	defer res.Body.Close()
-	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		return Healthy, nil
+}
+
+// muxHealthChecker bundles multiple implementations of HealthChecker of different types.
+type muxHealthChecker struct {
+	checkers map[string]HealthChecker
+}
+
+// HealthCheck delegates the health-checking of the container to one of the bundled implementations.
+// It chooses an implementation according to container.LivenessProbe.Type.
+// If there is no matching health checker it returns Unknown, nil.
+func (m *muxHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
+	checker, ok := m.checkers[container.LivenessProbe.Type]
+	if !ok || checker == nil {
+		glog.Warningf("Failed to find health checker for %s %s", container.Name, container.LivenessProbe.Type)
+		return Unknown, nil
 	}
-	glog.V(1).Infof("Health check failed for %s, Response: %v", url, *res)
-	return Unhealthy, nil
+	return checker.HealthCheck(currentState, container)
+}
+
+// A helper function to look up a port in a container by name.
+// Returns the HostPort if found, -1 if not found.
+func findPortByName(container api.Container, portName string) int {
+	for _, port := range container.Ports {
+		if port.Name == portName {
+			return port.HostPort
+		}
+	}
+	return -1
 }

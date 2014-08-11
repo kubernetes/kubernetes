@@ -49,7 +49,7 @@ func (h *HealthyMinionRegistry) List() (currentMinions []string, err error) {
 		return result, err
 	}
 	for _, minion := range list {
-		status, err := health.Check(h.makeMinionURL(minion), h.client)
+		status, err := health.DoHTTPCheck(h.makeMinionURL(minion), h.client)
 		if err != nil {
 			glog.Errorf("%s failed health check with error: %s", minion, err)
 			continue
@@ -77,7 +77,7 @@ func (h *HealthyMinionRegistry) Contains(minion string) (bool, error) {
 	if !contains {
 		return false, nil
 	}
-	status, err := health.Check(h.makeMinionURL(minion), h.client)
+	status, err := health.DoHTTPCheck(h.makeMinionURL(minion), h.client)
 	if err != nil {
 		return false, err
 	}

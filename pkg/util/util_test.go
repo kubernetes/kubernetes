@@ -71,6 +71,20 @@ func TestHandleCrash(t *testing.T) {
 	}
 }
 
+func TestMakeIntOrStringFromInt(t *testing.T) {
+	i := MakeIntOrStringFromInt(93)
+	if i.Kind != IntstrInt || i.IntVal != 93 {
+		t.Errorf("Expected IntVal=93, got %+v", i)
+	}
+}
+
+func TestMakeIntOrStringFromString(t *testing.T) {
+	i := MakeIntOrStringFromString("76")
+	if i.Kind != IntstrString || i.StrVal != "76" {
+		t.Errorf("Expected StrVal=\"76\", got %+v", i)
+	}
+}
+
 type IntOrStringHolder struct {
 	IOrS IntOrString `json:"val" yaml:"val"`
 }

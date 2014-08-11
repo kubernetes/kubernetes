@@ -139,18 +139,18 @@ type EnvVar struct {
 
 // HTTPGetProbe describes a liveness probe based on HTTP Get requests.
 type HTTPGetProbe struct {
-	// Path to access on the http server
+	// Optional: Path to access on the HTTP server.
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
-	// Name or number of the port to access on the container
-	Port string `yaml:"port,omitempty" json:"port,omitempty"`
-	// Host name to connect to.  Optional, default: "localhost"
+	// Required: Name or number of the port to access on the container.
+	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
+	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 }
 
 // TCPSocketProbe describes a liveness probe based on opening a socket
 type TCPSocketProbe struct {
-	// Port is the port to connect to. Required.
-	Port int `yaml:"port,omitempty" json:"port,omitempty"`
+	// Required: Port to connect to.
+	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
 }
 
 // LivenessProbe describes a liveness probe to be examined to the container.
