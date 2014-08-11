@@ -140,6 +140,10 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
 	for _, node := range nodes {
 		obj := reflect.New(v.Type().Elem())
 		err = h.Codec.DecodeInto([]byte(node.Value), obj.Interface())
+		if h.ResourceVersioner != nil {
+			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface(), node.ModifiedIndex)
+			// being unable to set the version does not prevent the object from being extracted
+		}
 		if err != nil {
 			return err
 		}
