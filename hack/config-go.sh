@@ -59,7 +59,7 @@ mkdir -p "${KUBE_GO_PACKAGE_BASEDIR}"
 # Create symlink under output/go/src.
 ln -snf "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
 
-GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/third_party"
+GOPATH="${KUBE_TARGET}:`godep path`"
 export GOPATH
 
 # Unset GOBIN in case it already exsits in the current session.
