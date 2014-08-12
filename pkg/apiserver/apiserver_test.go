@@ -586,7 +586,7 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *a
 
 func TestErrorsToAPIStatus(t *testing.T) {
 	cases := map[error]api.Status{
-		NewAlreadyExistsErr("foo", "bar"): api.Status{
+		NewAlreadyExistsErr("foo", "bar"): {
 			Status:  api.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "already_exists",
@@ -596,7 +596,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 				ID:   "bar",
 			},
 		},
-		NewConflictErr("foo", "bar", errors.New("failure")): api.Status{
+		NewConflictErr("foo", "bar", errors.New("failure")): {
 			Status:  api.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "conflict",
@@ -719,9 +719,12 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 }
 
 func TestSyncCreateTimeout(t *testing.T) {
+	testOver := make(chan struct{})
+	defer close(testOver)
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			time.Sleep(5 * time.Millisecond)
+			// Eliminate flakes by ensuring the create operation takes longer than this test.
+			<-testOver
 			return obj, nil
 		},
 	}
