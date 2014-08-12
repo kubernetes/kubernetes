@@ -26,5 +26,6 @@ if [ ! -x $CLOUDCFG ]; then
 fi
 
 detect-master > /dev/null
+export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 
 $CLOUDCFG $@
