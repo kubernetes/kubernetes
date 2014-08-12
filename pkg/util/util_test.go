@@ -101,10 +101,10 @@ func TestIntOrStringUnmarshalYAML(t *testing.T) {
 	for _, c := range cases {
 		var result IntOrStringHolder
 		if err := yaml.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal: %v", err)
+			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
 		}
 		if result.IOrS != c.result {
-			t.Errorf("Failed to unmarshal IntOrString: got %+v", result)
+			t.Errorf("Failed to unmarshal input '%v': expected: %+v, got %+v", c.input, c.result, result)
 		}
 	}
 }
@@ -122,10 +122,10 @@ func TestIntOrStringMarshalYAML(t *testing.T) {
 		input := IntOrStringHolder{c.input}
 		result, err := yaml.Marshal(&input)
 		if err != nil {
-			t.Errorf("Failed to marshal: %v", err)
+			t.Errorf("Failed to marshal input '%v': %v", input, err)
 		}
 		if string(result) != c.result {
-			t.Errorf("Failed to marshal IntOrString: got %q", string(result))
+			t.Errorf("Failed to marshal input '%v': expected: %+v, got %q", input, c.result, string(result))
 		}
 	}
 }
@@ -142,10 +142,10 @@ func TestIntOrStringUnmarshalJSON(t *testing.T) {
 	for _, c := range cases {
 		var result IntOrStringHolder
 		if err := json.Unmarshal([]byte(c.input), &result); err != nil {
-			t.Errorf("Failed to unmarshal: %v", err)
+			t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
 		}
 		if result.IOrS != c.result {
-			t.Errorf("Failed to unmarshal IntOrString: got %+v", result)
+			t.Errorf("Failed to unmarshal input '%v': expected %+v, got %+v", c.input, c.result, result)
 		}
 	}
 }
@@ -163,10 +163,10 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 		input := IntOrStringHolder{c.input}
 		result, err := json.Marshal(&input)
 		if err != nil {
-			t.Errorf("Failed to marshal: %v", err)
+			t.Errorf("Failed to marshal input '%v': %v", input, err)
 		}
 		if string(result) != c.result {
-			t.Errorf("Failed to marshal IntOrString: got %q", string(result))
+			t.Errorf("Failed to marshal input '%v': expected: %+v, got %q", input, c.result, string(result))
 		}
 	}
 }

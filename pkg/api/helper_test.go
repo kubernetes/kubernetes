@@ -43,7 +43,11 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// only when all 8 bytes are set.
 		j.ResourceVersion = c.RandUint64() >> 8
 		j.SelfLink = c.RandString()
-		j.CreationTimestamp = c.RandString()
+
+		var sec, nsec int64
+		c.Fuzz(&sec)
+		c.Fuzz(&nsec)
+		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
@@ -113,6 +117,7 @@ func runTest(t *testing.T, source interface{}) {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
+
 	obj2, err := Decode(data)
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
