@@ -26,7 +26,7 @@ net.ipv4.ip_forward:
     - value: 1
 
 bridge-utils:
-  pkg.latest
+  pkg.installed
 
 cbr0:
   container_bridge.ensure:
@@ -59,7 +59,7 @@ docker:
     - makedirs: true
 
 lxc-docker:
-  pkg.latest
+  pkg.installed
 
 # There is a race here, I think.  As the package is installed, it will start
 # docker.  If it doesn't write its pid file fast enough then this next stanza

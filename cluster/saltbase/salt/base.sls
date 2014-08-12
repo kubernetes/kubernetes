@@ -1,5 +1,5 @@
 pkg-core:
-  pkg.latest:
+  pkg.installed:
     - names:
 {% if grains['os_family'] == 'RedHat' %}
       - python
