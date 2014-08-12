@@ -47,7 +47,7 @@ server {
           auth_basic_user_file  /usr/share/nginx/htpasswd;
 
           # Proxy settings
-          proxy_pass http://localhost:8080/;
+          proxy_pass http://127.0.0.1:8080/;
           proxy_connect_timeout 159s;
           proxy_send_timeout   600s;
           proxy_read_timeout   600s;

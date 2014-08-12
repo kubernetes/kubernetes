@@ -3,7 +3,4 @@
 	{% set daemon_args = "" %}
 {% endif %}
 {% set master="-master=127.0.0.1:8080" %}
-{% if grains.master_ip is defined %}
-  {% set master="-master=" + grains.master_ip + ":8080" %}  
-{% endif %}
 DAEMON_ARGS="{{daemon_args}} {{master}}"
