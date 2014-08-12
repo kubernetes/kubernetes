@@ -339,6 +339,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
+		Privileged:   container.Privileged,
 	})
 	if err == nil && container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		handlerErr := kl.runHandler(GetPodFullName(pod), pod.Manifest.UUID, container, container.Lifecycle.PostStart)
