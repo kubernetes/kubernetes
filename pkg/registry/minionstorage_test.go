@@ -55,7 +55,7 @@ func TestMinionRegistryStorage(t *testing.T) {
 		t.Errorf("delete failed")
 	}
 	obj = <-c
-	if s, ok := obj.(api.Status); !ok || s.Status != api.StatusSuccess {
+	if s, ok := obj.(*api.Status); !ok || s.Status != api.StatusSuccess {
 		t.Errorf("delete return value was weird: %#v", obj)
 	}
 	if _, err := ms.Get("bar"); err != ErrDoesNotExist {

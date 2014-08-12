@@ -100,6 +100,6 @@ func (storage *MinionRegistryStorage) Delete(id string) (<-chan interface{}, err
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, storage.registry.Delete(id)
+		return &api.Status{Status: api.StatusSuccess}, storage.registry.Delete(id)
 	}), nil
 }

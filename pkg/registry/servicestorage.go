@@ -156,7 +156,7 @@ func (sr *ServiceRegistryStorage) Delete(id string) (<-chan interface{}, error) 
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		sr.deleteExternalLoadBalancer(service)
-		return api.Status{Status: api.StatusSuccess}, sr.registry.DeleteService(id)
+		return &api.Status{Status: api.StatusSuccess}, sr.registry.DeleteService(id)
 	}), nil
 }
 

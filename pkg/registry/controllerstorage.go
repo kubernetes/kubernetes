@@ -69,7 +69,7 @@ func (storage *ControllerRegistryStorage) Get(id string) (interface{}, error) {
 // Delete asynchronously deletes the ReplicationController specified by its id.
 func (storage *ControllerRegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, storage.registry.DeleteController(id)
+		return &api.Status{Status: api.StatusSuccess}, storage.registry.DeleteController(id)
 	}), nil
 }
 
