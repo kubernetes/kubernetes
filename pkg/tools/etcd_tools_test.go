@@ -70,15 +70,15 @@ func TestExtractList(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: `{"id":"foo"}`,
+						Value:         `{"id":"foo"}`,
 						ModifiedIndex: 1,
 					},
 					{
-						Value: `{"id":"bar"}`,
+						Value:         `{"id":"bar"}`,
 						ModifiedIndex: 2,
 					},
 					{
-						Value: `{"id":"baz"}`,
+						Value:         `{"id":"baz"}`,
 						ModifiedIndex: 3,
 					},
 				},
