@@ -65,7 +65,7 @@ The commands above will not work if there are more than one directory in ``$GOPA
 Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that *godep* is installed and in your PATH. If you have already set up Go development environment correctly, the following command will install *godep* into your ``GOBIN`` directory, which is ``$GOPATH/bin`` if ``GOBIN`` is not set:
 
 ```
-go get github.com/tools/godeps
+go get github.com/tools/godep
 ```
 
 ### Hooks
