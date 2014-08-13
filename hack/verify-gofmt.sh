@@ -24,9 +24,11 @@ if [[ ${GO_VERSION[2]} != "go1.2" && ${GO_VERSION[2]} != "go1.3" ]]; then
   exit 0
 fi
 
+REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
 
-bad=$(gofmt -s -l pkg/ cmd/)
-if [ "$?" != "0" ]; then
+files="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "third_party/\|release/\|output/\|target/")"
+bad=$(gofmt -s -l ${files})
+if [[ -n "${bad}" ]]; then
   echo "$bad"
   exit 1
 fi
