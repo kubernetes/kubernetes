@@ -34,15 +34,10 @@ def ensure(name, cidr, mtu=1460):
     '''
     ret = {'name': name, 'changes': {}, 'result': False, 'comment': ''}
 
-    iptables_rule_1 = {
+    iptables_rule = {
         'table': 'nat',
         'chain': 'POSTROUTING',
         'rule': '-o eth0 -j MASQUERADE \! -d 10.0.0.0/8'
-    }
-    iptables_rule_2 = {
-        'table': 'nat',
-        'chain': 'POSTROUTING',
-        'rule': '-s %s -j MASQUERADE \! -d %s' % (cidr, cidr)
     }
 
     def bridge_exists(name):
@@ -95,10 +90,8 @@ def ensure(name, cidr, mtu=1460):
             ret['details'] = {}
         # This module function is strange and returns True if the rule exists.
         # If not, it returns a string with the error from the call to iptables.
-        ret['iptables_rule_1_exists'] = \
-          __salt__['iptables.check'](**iptables_rule_1) == True
-        ret['iptables_rule_2_exists'] = \
-          __salt__['iptables.check'](**iptables_rule_2) == True
+        ret['iptables_rule_exists'] = \
+          __salt__['iptables.check'](**iptables_rule) == True
         return ret
 
     # This is a little hacky.  I should probably import a real library for this
@@ -119,8 +112,7 @@ def ensure(name, cidr, mtu=1460):
         and current_state['details']['mtu'] == mtu
         and desired_network in current_state['details']['networks']
         and current_state['details']['up']
-        and current_state['iptables_rule_1_exists']
-        and current_state['iptables_rule_2_exists']):
+        and current_state['iptables_rule_exists']):
         ret['result'] = True
         ret['comment'] = 'System already in the correct state'
         return ret
@@ -155,10 +147,8 @@ def ensure(name, cidr, mtu=1460):
         __salt__['cmd.run'](
             'ip link set dev {0} up'.format(name))
     new_state = get_current_state()
-    if not new_state['iptables_rule_1_exists']:
-        __salt__['iptables.append'](**iptables_rule_1)
-    if not new_state['iptables_rule_2_exists']:
-        __salt__['iptables.append'](**iptables_rule_2)
+    if not new_state['iptables_rule_exists']:
+        __salt__['iptables.append'](**iptables_rule)
     new_state = get_current_state()
 
     ret['comment'] = 'The state of "{0}" was changed!'.format(name)
