@@ -42,6 +42,32 @@ If you are a company and are looking for a more formal engagement with Google ar
 
 ## Development
 
+### Go development environment
+
+Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH.
+
+### Put kubernetes into GOPATH
+
+We highly recommend to put kubernetes' code into your GOPATH. For example, the following commands will download kubernetes' code under the current user's GOPATH (Assuming there's only one directory in GOPATH.):
+
+```
+$ echo $GOPATH
+/home/user/goproj
+$ mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform/
+$ cd $GOPATH/src/github.com/GoogleCloudPlatform/
+$ git clone git@github.com:GoogleCloudPlatform/kubernetes.git
+```
+
+The commands above will not work if there are more than one directory in ``$GOPATH``.
+
+### godep and dependency management
+
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that *godep* is installed and in your PATH. If you have already set up Go development environment correctly, the following command will install *godep* into your ``GOBIN`` directory, which is ``$GOPATH/bin`` if ``GOBIN`` is not set:
+
+```
+go get github.com/tools/godeps
+```
+
 ### Hooks
 ```
 # Before committing any changes, please link/copy these hooks into your .git
@@ -56,9 +82,28 @@ ln -s ../../hooks/commit-msg .git/hooks/commit-msg
 ```
 
 ### Unit tests
+
 ```
 cd kubernetes
 hack/test-go.sh
+```
+
+Alternatively, you could also run:
+
+```
+cd kubernetes
+godep go test ./...
+```
+
+If you only want to run unit tests in one package, you could run ``godep go test`` under the package directory. For example, the following commands will run all unit tests in package kubelet:
+
+```
+$ cd kubernetes # step into kubernetes' directory.
+$ cd pkg/kubelet
+$ godep go test
+# some output from unit tests
+PASS
+ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
 ```
 
 ### Coverage
@@ -89,6 +134,20 @@ With a GCE account set up for running `cluster/kube-up.sh` (see Setup above):
 cd kubernetes
 hack/e2e-test.sh
 ```
+
+### Add/Update dependencies
+
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. To add or update a package, please follow the instructions on [godep's document](https://github.com/tools/godep).
+
+To add a new package ``foo/bar``:
+- Download foo/bar into the first directory in GOPATH: ``go get foo/bar``.
+- Change code in kubernetes to use ``foo/bar``.
+- Run ``godep save ./...`` under kubernetes' root directory.
+
+To update a package ``foo/bar``:
+- Update the package with ``go get -u foo/bar``.
+- Change code in kubernetes accordingly if necessary.
+- Run ``godep update foo/bar``.
 
 ### Keeping your development fork in sync
 One time after cloning your forked repo:

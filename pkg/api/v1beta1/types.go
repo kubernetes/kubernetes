@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/fsouza/go-dockerclient-copiedstructs"
+	"github.com/GoogleCloudPlatform/kubernetes/third_party/docker-api-structs"
 )
 
 // Common string formats
