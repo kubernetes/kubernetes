@@ -73,11 +73,9 @@ func TestReadFromFile(t *testing.T) {
 		expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{
 			Name: "test",
 			Manifest: api.ContainerManifest{
-				ID:      "test",
-				Version: "v1beta1",
-				Containers: []api.Container{api.Container{
-					Image: "test/image"},
-				},
+				ID:         "test",
+				Version:    "v1beta1",
+				Containers: []api.Container{{Image: "test/image"}},
 			},
 		})
 		if !reflect.DeepEqual(expected, update) {

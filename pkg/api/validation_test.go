@@ -420,7 +420,7 @@ func TestValidateReplicationController(t *testing.T) {
 		"negative_replicas": {
 			JSONBase: JSONBase{ID: "abc"},
 			DesiredState: ReplicationControllerState{
-				Replicas: -1,
+				Replicas:        -1,
 				ReplicaSelector: validSelector,
 			},
 		},
