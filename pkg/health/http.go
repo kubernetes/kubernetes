@@ -38,6 +38,10 @@ type HTTPHealthChecker struct {
 	client HTTPGetInterface
 }
 
+func NewHTTPHealthChecker(client *http.Client) HealthChecker {
+	return &HTTPHealthChecker{client: &http.Client{}}
+}
+
 // Get the components of the target URL.  For testability.
 func getURLParts(currentState api.PodState, container api.Container) (string, int, string, error) {
 	params := container.LivenessProbe.HTTPGet
@@ -94,7 +98,7 @@ func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 }
 
 // HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
-func (h *HTTPHealthChecker) HealthCheck(currentState api.PodState, container api.Container) (Status, error) {
+func (h *HTTPHealthChecker) HealthCheck(podFullName string, currentState api.PodState, container api.Container) (Status, error) {
 	host, port, path, err := getURLParts(currentState, container)
 	if err != nil {
 		return Unknown, err

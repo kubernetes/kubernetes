@@ -102,7 +102,7 @@ func TestTcpHealthChecker(t *testing.T) {
 		if params != nil && test.expectedStatus == Healthy {
 			params.Port = util.MakeIntOrStringFromString(port)
 		}
-		status, err := checker.HealthCheck(api.PodState{PodIP: host}, container)
+		status, err := checker.HealthCheck("test", api.PodState{PodIP: host}, container)
 		if status != test.expectedStatus {
 			t.Errorf("expected: %v, got: %v", test.expectedStatus, status)
 		}
