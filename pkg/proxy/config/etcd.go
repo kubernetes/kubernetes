@@ -39,6 +39,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -77,7 +78,7 @@ func (s ConfigSourceEtcd) Run() {
 		if err == nil {
 			break
 		}
-		glog.Errorf("Failed to get any services: %v", err)
+		glog.V(1).Infof("Failed to get any services: %v", err)
 		time.Sleep(s.interval)
 	}
 
@@ -117,8 +118,10 @@ func (s ConfigSourceEtcd) Run() {
 func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) {
 	response, err := s.client.Get(registryRoot+"/specs", true, false)
 	if err != nil {
-		glog.Errorf("Failed to get the key %s: %v", registryRoot, err)
-		return make([]api.Service, 0), make([]api.Endpoints, 0), err
+		glog.V(1).Infof("Failed to get the key %s: %v", registryRoot, err)
+		if tools.IsEtcdNotFound(err) {
+			return []api.Service{}, []api.Endpoints{}, err
+		}
 	}
 	if response.Node.Dir == true {
 		retServices := make([]api.Service, len(response.Node.Nodes))
@@ -136,9 +139,14 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 			retServices[i] = svc
 			endpoints, err := s.GetEndpoints(svc.ID)
 			if err != nil {
+				if tools.IsEtcdNotFound(err) {
+					glog.V(1).Infof("Unable to get endpoints for %s : %v", svc.ID, err)
+				}
 				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.ID, err)
+				endpoints = api.Endpoints{}
+			} else {
+				glog.Infof("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
 			}
-			glog.Infof("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
 			retEndpoints[i] = endpoints
 		}
 		return retServices, retEndpoints, err
