@@ -39,7 +39,6 @@ rm -rf $KUBE_DIR/output/release/*
 MASTER_RELEASE_DIR=$KUBE_DIR/output/release/master-release
 mkdir -p $MASTER_RELEASE_DIR/bin
 mkdir -p $MASTER_RELEASE_DIR/src/scripts
-mkdir -p $MASTER_RELEASE_DIR/third_party/go
 
 echo "Building release tree"
 cp $KUBE_DIR/release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
@@ -49,17 +48,14 @@ cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
 EOF
 
-cp -r $KUBE_DIR/third_party/src $MASTER_RELEASE_DIR/third_party/go/src
-
 function find_go_files() {
   find * -not \( \
       \( \
-        -wholename 'third_party' \
-        -o -wholename 'release' \
+        -wholename 'release' \
       \) -prune \
     \) -name '*.go'
 }
-# find_go_files is directory dependant
+# find_go_files is directory dependent
 pushd $KUBE_DIR
 for f in $(find_go_files); do
   mkdir -p $MASTER_RELEASE_DIR/src/go/$(dirname ${f})

@@ -24,24 +24,6 @@
       - group
       - mode
 
-kubelet-third-party-go:
-  file.recurse:
-    - name: {{ root }}/src
-    - source: salt://third-party/go/src
-    - user: root
-    {% if grains['os_family'] == 'RedHat' %}
-    - group: root
-    {% else %}
-    - group: staff
-    {% endif %}
-    - dir_mode: 775
-    - file_mode: 664
-    - makedirs: True
-    - recurse:
-      - user
-      - group
-      - mode
-
 {{ environment_file}}:
   file.managed:
     - source: salt://kubelet/default
@@ -57,7 +39,7 @@ kubelet-build:
       - go build {{ package }}/cmd/kubelet
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
-      - GOPATH: {{ root }}
+      - GOPATH: {{ root }}:{{ package_dir }}/Godeps/_workspace
     - require:
       - file: {{ package_dir }}
 
