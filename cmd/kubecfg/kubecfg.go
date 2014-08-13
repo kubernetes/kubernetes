@@ -57,6 +57,13 @@ var (
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 )
 
+var parser = kubecfg.NewParser(map[string]interface{}{
+	"pods":                   api.Pod{},
+	"services":               api.Service{},
+	"replicationControllers": api.ReplicationController{},
+	"minions":                api.Minion{},
+})
+
 func usage() {
 	fmt.Fprintf(os.Stderr, `usage: kubecfg -h [-c config/file.json] [-p :,..., :] <method>
 
@@ -71,10 +78,11 @@ func usage() {
   Options:
 `, prettyWireStorage())
 	flag.PrintDefaults()
+
 }
 
 func prettyWireStorage() string {
-	types := kubecfg.SupportedWireStorage()
+	types := parser.SupportedWireStorage()
 	sort.Strings(types)
 	return strings.Join(types, "|")
 }
@@ -89,7 +97,7 @@ func readConfig(storage string) []byte {
 	if err != nil {
 		glog.Fatalf("Unable to read %v: %v\n", *config, err)
 	}
-	data, err = kubecfg.ToWireFormat(data, storage)
+	data, err = parser.ToWireFormat(data, storage)
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
 	}
@@ -190,7 +198,7 @@ func storagePathFromArg(arg string) (storage, path string, hasSuffix bool) {
 
 //checkStorage returns true if the provided storage is valid
 func checkStorage(storage string) bool {
-	for _, allowed := range kubecfg.SupportedWireStorage() {
+	for _, allowed := range parser.SupportedWireStorage() {
 		if allowed == storage {
 			return true
 		}
