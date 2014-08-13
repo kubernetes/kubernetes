@@ -21,17 +21,20 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/golang/glog"
 )
 
 type WatchHandler struct {
 	storage map[string]RESTStorage
 	codec   Codec
+	timeout time.Duration
 }
 
 func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion uint64) {
@@ -73,7 +76,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		// TODO: This is one watch per connection. We want to multiplex, so that
 		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching}
+		watchServer := &WatchServer{watching, h.timeout}
 		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
 			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
 		} else {
@@ -88,6 +91,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	watching watch.Interface
+	timeout  time.Duration
 }
 
 // HandleWS implements a websocket handler.
@@ -129,29 +133,26 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	loggedW := httplog.LogOf(w)
 	w = httplog.Unlogged(w)
 
-	cn, ok := w.(http.CloseNotifier)
-	if !ok {
-		loggedW.Addf("unable to get CloseNotifier")
-		http.NotFound(loggedW, req)
-		return
-	}
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		loggedW.Addf("unable to get Flusher")
-		http.NotFound(loggedW, req)
-		return
-	}
-
 	loggedW.Header().Set("Transfer-Encoding", "chunked")
 	loggedW.WriteHeader(http.StatusOK)
-	flusher.Flush()
 
-	encoder := json.NewEncoder(w)
+	out, conn, flusher, err := hijackHTTPChunked(w)
+	if err != nil {
+		glog.Errorf("unable to hijack: %#v", err)
+		return
+	}
+	defer out.Close()
+	// closing the output writer does not close the conneciton.
+	defer conn.Close()
+	conn.SetReadDeadline(time.Time{})
+	// the write timeout must be longer than self.timeout to allow graceful shutdown
+	writeDuration := self.timeout + 1*time.Second
+
+	encoder := json.NewEncoder(out)
 	for {
+		conn.SetWriteDeadline(time.Now().Add(writeDuration))
+
 		select {
-		case <-cn.CloseNotify():
-			self.watching.Stop()
-			return
 		case event, ok := <-self.watching.ResultChan():
 			if !ok {
 				// End of results.
@@ -167,6 +168,9 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 			flusher.Flush()
+
+		case <-time.After(self.timeout):
+			self.watching.Stop()
 		}
 	}
 }

@@ -26,10 +26,11 @@ import (
 )
 
 type RESTHandler struct {
-	storage     map[string]RESTStorage
-	codec       Codec
-	ops         *Operations
-	asyncOpWait time.Duration
+	storage      map[string]RESTStorage
+	codec        Codec
+	ops          *Operations
+	asyncOpWait  time.Duration
+	watchTimeout time.Duration
 }
 
 // ServeHTTP handles requests to all RESTStorage objects.

@@ -86,6 +86,8 @@ func NewAPIGroup(storage map[string]RESTStorage, codec Codec) *APIGroup {
 		ops:     NewOperations(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
+		// The idle timeout for a watch connection
+		watchTimeout: time.Second * 60,
 	}}
 }
 
@@ -94,7 +96,7 @@ func NewAPIGroup(storage map[string]RESTStorage, codec Codec) *APIGroup {
 // in a slash.
 func (g *APIGroup) InstallREST(mux mux, paths ...string) {
 	restHandler := &g.handler
-	watchHandler := &WatchHandler{g.handler.storage, g.handler.codec}
+	watchHandler := &WatchHandler{g.handler.storage, g.handler.codec, g.handler.watchTimeout}
 	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
 
 	for _, prefix := range paths {
