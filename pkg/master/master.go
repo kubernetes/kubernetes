@@ -139,21 +139,11 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	}
 }
 
-// Run begins serving the Kubernetes API. It never returns.
-func (m *Master) Run(myAddress, apiPrefix string) error {
-	s := &http.Server{
-		Addr:           myAddress,
-		Handler:        m.ConstructHandler(apiPrefix),
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+// API_v1beta1 returns the resources and codec for API version v1beta1
+func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, apiserver.Codec) {
+	storage := make(map[string]apiserver.RESTStorage)
+	for k, v := range m.storage {
+		storage[k] = v
 	}
-	return s.ListenAndServe()
-}
-
-// ConstructHandler returns an http.Handler which serves the Kubernetes API.
-// Instead of calling Run, you can call this function to get a handler for your own server.
-// It is intended for testing. Only call once.
-func (m *Master) ConstructHandler(apiPrefix string) http.Handler {
-	return apiserver.New(m.storage, api.Codec, apiPrefix)
+	return storage, api.Codec
 }

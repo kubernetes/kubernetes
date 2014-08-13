@@ -21,15 +21,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"runtime/debug"
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
@@ -42,254 +39,109 @@ type Codec interface {
 	DecodeInto(data []byte, obj interface{}) error
 }
 
-// APIServer is an HTTPHandler that delegates to RESTStorage objects.
-// It handles URLs of the form:
-// ${prefix}/${storage_key}[/${object_name}]
-// Where 'prefix' is an arbitrary string, and 'storage_key' points to a RESTStorage object stored in storage.
-//
-// TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
-type APIServer struct {
-	storage     map[string]RESTStorage
-	codec       Codec
-	ops         *Operations
-	asyncOpWait time.Duration
-	handler     http.Handler
+// mux is an object that can register http handlers
+type mux interface {
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// New creates a new APIServer object. 'storage' contains a map of handlers. 'codec'
-// is an interface for decoding to and from JSON. 'prefix' is the hosting path prefix.
+// defaultAPIServer exposes nested objects for testability
+type defaultAPIServer struct {
+	http.Handler
+	group *APIGroup
+}
+
+// Handle returns a Handler function that expose the provided storage interfaces
+// as RESTful resources at prefix, serialized by codec, and also includes the support
+// http resources.
+func Handle(storage map[string]RESTStorage, codec Codec, prefix string) http.Handler {
+	group := NewAPIGroup(storage, codec)
+
+	mux := http.NewServeMux()
+	group.InstallREST(mux, prefix)
+	InstallSupport(mux)
+
+	return &defaultAPIServer{RecoverPanics(mux), group}
+}
+
+// APIGroup is a http.Handler that exposes multiple RESTStorage objects
+// It handles URLs of the form:
+// /${storage_key}[/${object_name}]
+// Where 'storage_key' points to a RESTStorage object stored in storage.
 //
-// The codec will be used to decode the request body into an object pointer returned by
-// RESTStorage.New().  The Create() and Update() methods should cast their argument to
-// the type returned by New().
+// TODO: consider migrating this to go-restful which is a more full-featured version of the same thing.
+type APIGroup struct {
+	handler RESTHandler
+}
+
+// NewAPIGroup returns an object that will serve a set of REST resources and their
+// associated operations.  The provided codec controls serialization and deserialization.
+// This is a helper method for registering multiple sets of REST handlers under different
+// prefixes onto a server.
 // TODO: add multitype codec serialization
-func New(storage map[string]RESTStorage, codec Codec, prefix string) *APIServer {
-	s := &APIServer{
+func NewAPIGroup(storage map[string]RESTStorage, codec Codec) *APIGroup {
+	return &APIGroup{RESTHandler{
 		storage: storage,
 		codec:   codec,
 		ops:     NewOperations(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
+	}}
+}
+
+// InstallREST registers the REST handlers (storage, watch, and operations) into a mux.
+// It is expected that the provided prefix will serve all operations. Path MUST NOT end
+// in a slash.
+func (g *APIGroup) InstallREST(mux mux, paths ...string) {
+	restHandler := &g.handler
+	watchHandler := &WatchHandler{g.handler.storage, g.handler.codec}
+	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
+
+	for _, prefix := range paths {
+		prefix = strings.TrimRight(prefix, "/")
+		mux.Handle(prefix+"/", http.StripPrefix(prefix, restHandler))
+		mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
+		mux.Handle(prefix+"/operations", http.StripPrefix(prefix+"/operations", opHandler))
+		mux.Handle(prefix+"/operations/", http.StripPrefix(prefix+"/operations/", opHandler))
 	}
+}
 
-	mux := http.NewServeMux()
-
-	prefix = strings.TrimRight(prefix, "/")
-
-	// Primary API handlers
-	restPrefix := prefix + "/"
-	mux.Handle(restPrefix, http.StripPrefix(restPrefix, http.HandlerFunc(s.handleREST)))
-
-	// Watch API handlers
-	watchPrefix := path.Join(prefix, "watch") + "/"
-	mux.Handle(watchPrefix, http.StripPrefix(watchPrefix, &WatchHandler{storage, codec}))
-
-	// Support services for the apiserver
-	logsPrefix := "/logs/"
-	mux.Handle(logsPrefix, http.StripPrefix(logsPrefix, http.FileServer(http.Dir("/var/log/"))))
+// InstallSupport registers the APIServer support functions into a mux.
+func InstallSupport(mux mux) {
 	healthz.InstallHandler(mux)
+	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+	mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
 	mux.HandleFunc("/version", handleVersion)
 	mux.HandleFunc("/", handleIndex)
-
-	// Handle both operations and operations/* with the same handler
-	handler := &OperationHandler{s.ops, s.codec}
-	operationPrefix := path.Join(prefix, "operations")
-	mux.Handle(operationPrefix, http.StripPrefix(operationPrefix, handler))
-	operationsPrefix := operationPrefix + "/"
-	mux.Handle(operationsPrefix, http.StripPrefix(operationsPrefix, handler))
-
-	// Proxy minion requests
-	mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
-
-	s.handler = mux
-
-	return s
 }
 
-// ServeHTTP implements the standard net/http interface.
-func (s *APIServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if x := recover(); x != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, "apis panic. Look in log for details.")
-			glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
-		}
-	}()
-	defer httplog.MakeLogged(req, &w).StacktraceWhen(
-		httplog.StatusIsNot(
-			http.StatusOK,
-			http.StatusAccepted,
-			http.StatusConflict,
-			http.StatusNotFound,
-		),
-	).Log()
-
-	// Dispatch to the internal handler
-	s.handler.ServeHTTP(w, req)
-}
-
-// handleREST handles requests to all our RESTStorage objects.
-func (s *APIServer) handleREST(w http.ResponseWriter, req *http.Request) {
-	parts := splitPath(req.URL.Path)
-	if len(parts) < 1 {
-		notFound(w, req)
-		return
-	}
-	storage := s.storage[parts[0]]
-	if storage == nil {
-		httplog.LogOf(w).Addf("'%v' has no storage object", parts[0])
-		notFound(w, req)
-		return
-	}
-
-	s.handleRESTStorage(parts, req, w, storage)
-}
-
-// handleRESTStorage is the main dispatcher for a storage object.  It switches on the HTTP method, and then
-// on path length, according to the following table:
-//   Method     Path          Action
-//   GET        /foo          list
-//   GET        /foo/bar      get 'bar'
-//   POST       /foo          create
-//   PUT        /foo/bar      update 'bar'
-//   DELETE     /foo/bar      delete 'bar'
-// Returns 404 if the method/pattern doesn't match one of these entries
-// The s accepts several query parameters:
-//    sync=[false|true] Synchronous request (only applies to create, update, delete operations)
-//    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
-//    labels=<label-selector> Used for filtering list operations
-func (s *APIServer) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	sync := req.URL.Query().Get("sync") == "true"
-	timeout := parseTimeout(req.URL.Query().Get("timeout"))
-	switch req.Method {
-	case "GET":
-		switch len(parts) {
-		case 1:
-			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
-			if err != nil {
-				errorJSON(err, s.codec, w)
-				return
+// RecoverPanics wraps an http Handler to recover and log panics
+func RecoverPanics(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			if x := recover(); x != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, "apis panic. Look in log for details.")
+				glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 			}
-			list, err := storage.List(selector)
-			if err != nil {
-				errorJSON(err, s.codec, w)
-				return
-			}
-			writeJSON(http.StatusOK, s.codec, list, w)
-		case 2:
-			item, err := storage.Get(parts[1])
-			if err != nil {
-				errorJSON(err, s.codec, w)
-				return
-			}
-			writeJSON(http.StatusOK, s.codec, item, w)
-		default:
-			notFound(w, req)
-		}
+		}()
+		defer httplog.MakeLogged(req, &w).StacktraceWhen(
+			httplog.StatusIsNot(
+				http.StatusOK,
+				http.StatusAccepted,
+				http.StatusConflict,
+				http.StatusNotFound,
+			),
+		).Log()
 
-	case "POST":
-		if len(parts) != 1 {
-			notFound(w, req)
-			return
-		}
-		body, err := readBody(req)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		obj := storage.New()
-		err = s.codec.DecodeInto(body, obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		out, err := storage.Create(obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	case "DELETE":
-		if len(parts) != 2 {
-			notFound(w, req)
-			return
-		}
-		out, err := storage.Delete(parts[1])
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	case "PUT":
-		if len(parts) != 2 {
-			notFound(w, req)
-			return
-		}
-		body, err := readBody(req)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		obj := storage.New()
-		err = s.codec.DecodeInto(body, obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		out, err := storage.Update(obj)
-		if err != nil {
-			errorJSON(err, s.codec, w)
-			return
-		}
-		op := s.createOperation(out, sync, timeout)
-		s.finishReq(op, w)
-
-	default:
-		notFound(w, req)
-	}
+		// Dispatch to the internal handler
+		handler.ServeHTTP(w, req)
+	})
 }
 
 // handleVersionReq writes the server's version information.
 func handleVersion(w http.ResponseWriter, req *http.Request) {
 	writeRawJSON(http.StatusOK, version.Get(), w)
-}
-
-// createOperation creates an operation to process a channel response
-func (s *APIServer) createOperation(out <-chan interface{}, sync bool, timeout time.Duration) *Operation {
-	op := s.ops.NewOperation(out)
-	if sync {
-		op.WaitFor(timeout)
-	} else if s.asyncOpWait != 0 {
-		op.WaitFor(s.asyncOpWait)
-	}
-	return op
-}
-
-// finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
-// Operation to receive the result and returning its ID down the writer.
-func (s *APIServer) finishReq(op *Operation, w http.ResponseWriter) {
-	obj, complete := op.StatusOrResult()
-	if complete {
-		status := http.StatusOK
-		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		case *api.Status:
-			if stat.Code != 0 {
-				status = stat.Code
-			}
-		}
-		writeJSON(status, s.codec, obj, w)
-	} else {
-		writeJSON(http.StatusAccepted, s.codec, obj, w)
-	}
 }
 
 // writeJSON renders an object as JSON to the response

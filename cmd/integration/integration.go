@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -86,11 +87,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	machineList := []string{"localhost", "machine"}
 
 	handler := delegateHandler{}
-	apiserver := httptest.NewServer(&handler)
+	apiServer := httptest.NewServer(&handler)
 
 	etcdClient := etcd.NewClient(servers)
 
-	cl := client.New(apiserver.URL, nil)
+	cl := client.New(apiServer.URL, nil)
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 
@@ -101,7 +102,8 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		Minions:       machineList,
 		PodInfoGetter: fakePodInfoGetter{},
 	})
-	handler.delegate = m.ConstructHandler("/api/v1beta1")
+	storage, codec := m.API_v1beta1()
+	handler.delegate = apiserver.Handle(storage, codec, "/api/v1beta1")
 
 	controllerManager := controller.MakeReplicationManager(cl)
 
@@ -130,7 +132,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), http.DefaultServeMux, "localhost", 10251)
 	}, 0)
 
-	return apiserver.URL
+	return apiServer.URL
 }
 
 func runReplicationControllerTest(kubeClient *client.Client) {

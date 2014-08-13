@@ -170,7 +170,7 @@ func TestNotFound(t *testing.T) {
 		"watch missing storage":        {"GET", "/prefix/version/watch/"},
 		"watch with bad method":        {"POST", "/prefix/version/watch/foo/bar"},
 	}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": &SimpleRESTStorage{},
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
@@ -193,7 +193,7 @@ func TestNotFound(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	handler := New(map[string]RESTStorage{}, codec, "/prefix/version")
+	handler := Handle(map[string]RESTStorage{}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -222,7 +222,7 @@ func TestSimpleList(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
@@ -241,7 +241,7 @@ func TestErrorList(t *testing.T) {
 		errors: map[string]error{"list": fmt.Errorf("test Error")},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
@@ -265,7 +265,7 @@ func TestNonEmptyList(t *testing.T) {
 		},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
@@ -300,7 +300,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
@@ -321,7 +321,7 @@ func TestGetMissing(t *testing.T) {
 		errors: map[string]error{"get": NewNotFoundErr("simple", "id")},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
@@ -339,7 +339,7 @@ func TestDelete(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	client := http.Client{}
@@ -361,7 +361,7 @@ func TestDeleteMissing(t *testing.T) {
 		errors: map[string]error{"delete": NewNotFoundErr("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	client := http.Client{}
@@ -381,7 +381,7 @@ func TestUpdate(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	item := Simple{
@@ -411,7 +411,7 @@ func TestUpdateMissing(t *testing.T) {
 		errors: map[string]error{"update": NewNotFoundErr("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
-	handler := New(storage, codec, "/prefix/version")
+	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
 	item := Simple{
@@ -436,10 +436,10 @@ func TestUpdateMissing(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -473,7 +473,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestCreateNotFound(t *testing.T) {
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
 			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
@@ -519,7 +519,7 @@ func TestSyncCreate(t *testing.T) {
 			return obj, nil
 		},
 	}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
@@ -621,8 +621,8 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 			return nil, NewAlreadyExistsErr("foo", "bar")
 		},
 	}
-	handler := New(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
-	handler.asyncOpWait = time.Millisecond / 2
+	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = time.Millisecond / 2
 	server := httptest.NewServer(handler)
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusConflict)
@@ -639,8 +639,8 @@ func TestAsyncCreateError(t *testing.T) {
 			return nil, NewAlreadyExistsErr("foo", "bar")
 		},
 	}
-	handler := New(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
-	handler.asyncOpWait = 0
+	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
+	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 
 	simple := Simple{Name: "foo"}
@@ -728,7 +728,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 			return obj, nil
 		},
 	}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)

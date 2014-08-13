@@ -41,7 +41,7 @@ var watchTestTable = []struct {
 func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
@@ -87,7 +87,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
@@ -144,7 +144,7 @@ func TestWatchHTTP(t *testing.T) {
 
 func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := New(map[string]RESTStorage{
+	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
