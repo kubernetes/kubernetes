@@ -86,9 +86,9 @@ type VolumeSource struct {
 	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
 	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
 	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
-	// PersistentDisk represents a Disk resource that is attached to a
+	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	PersistentDisk *PersistentDisk `yaml:"persistentDisk" json:"persistentDisk"`
+	GCEPersistentDisk *GCEPersistentDisk `yaml:"persistentDisk" json:"persistentDisk"`
 }
 
 // HostDirectory represents bare host directory volume.
@@ -98,23 +98,21 @@ type HostDirectory struct {
 
 type EmptyDirectory struct{}
 
-// Persistent Disk resource.
-type PersistentDisk struct {
-	// Unique name of the PD resource. Used to identify the disk in
-	// the specifed cloud provider.
+// GCEPersistent Disk resource.
+// A GCE PD must exist and be formatted before mounting to a container.
+// The disk must also be in the same GCE project and zone as the kubelet.
+// A GCE PD can only be mounted as read/write once.
+type GCEPersistentDisk struct {
+	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `yaml:"pdName" json:"pdName"`
-	// Optional: Filesystem type to mount.
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
 	FSType string `yaml:"fsType,omitempty" json:"fsType,omitempty"`
 	// Optional: Partition on the disk to mount. Usually a number.
 	// If omitted, kubelet will attempt to mount the device name.
-	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is empty.
-	Partition string `yaml:"partition,omitempty" json:"partition,omitempty"`
-	// Specifies the cloud platform provider. Must match the platform kubelet is running on.
-	// Currently supports: "gce"
-	//	- A GCE PD must exist before mounting to a container. The disk must
-	//	  also be in the same GCE project and zone as the kubelet.
-	//	  A GCE PD can only be mounted as read/write once.
-	Provider string `yaml:"provider" json:"provider"`
+	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
+	Partition int `yaml:"partition,omitempty" json:"partition,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`

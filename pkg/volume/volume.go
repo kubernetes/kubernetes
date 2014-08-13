@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
@@ -49,28 +50,22 @@ type Cleaner interface {
 	TearDown() error
 }
 
-// The APIDiskUtil interface provides the methods to attach and detach persistent disks
+// The DiskUtil interface provides the methods to attach and detach persistent disks
 // on a cloud platform.
-type APIDiskUtil interface {
-	// Establishes a connection and verifies that the kubelet is running
-	// in the correct cloud platform.
-	// Connect must be called at least once before attaching/detaching a disk.
-	// TODO(jonesdl) Connect() can probably be removed from the interface and used
-	// as an implementation detail of attach/detach
-	Connect() error
+type gcePersistentDiskUtil interface {
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(PD *PersistentDisk) error
+	AttachDisk(PD *GCEPersistentDisk) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(PD *PersistentDisk, devicePath string) error
+	DetachDisk(PD *GCEPersistentDisk, devicePath string) error
 }
 
 // Mounters wrap os/system specific calls to perform mounts.
-type Mounter interface {
-	Mount(string, string, string, uintptr, string) error
-	Unmount(string, int) error
-	// RefCount returns the device path for the source disk of the PD, and
+type mounter interface {
+	Mount(source string, target string, fstype string, flags uintptr, data string) error
+	Unmount(target string, flags int) error
+	// RefCount returns the device path for the source disk of a volume, and
 	// the number of references to that target disk.
-	RefCount(PD *PersistentDisk) (string, int, error)
+	RefCount(vol Interface) (string, int, error)
 }
 
 // Host Directory volumes represent a bare host directory mount.
@@ -113,8 +108,7 @@ func (emptyDir *EmptyDirectory) GetPath() string {
 
 // renameDirectory moves the path of the volume mount to a temporary
 // directory, suffixed with ".deleting~".
-func renameDirectory(vol Interface) (string, error) {
-	oldPath := vol.GetPath()
+func renameDirectory(oldPath string) (string, error) {
 	name := path.Base(oldPath)
 	newPath, err := ioutil.TempDir(path.Dir(oldPath), name+".deleting~")
 	if err != nil {
@@ -129,7 +123,7 @@ func renameDirectory(vol Interface) (string, error) {
 
 // TearDown simply deletes everything in the directory.
 func (emptyDir *EmptyDirectory) TearDown() error {
-	tmpDir, err := renameDirectory(emptyDir)
+	tmpDir, err := renameDirectory(emptyDir.GetPath())
 	if err != nil {
 		return err
 	}
@@ -140,9 +134,9 @@ func (emptyDir *EmptyDirectory) TearDown() error {
 	return nil
 }
 
-// PersistentDisk volumes are disk resources provided by a cloud platform
+// GCEPersistentDisk volumes are disk resources provided by Google Compute Engine
 // that are attached to the kubelet's host machine and exposed to the pod.
-type PersistentDisk struct {
+type GCEPersistentDisk struct {
 	Name    string
 	PodID   string
 	RootDir string
@@ -152,27 +146,22 @@ type PersistentDisk struct {
 	FSType string
 	// Specifies the partition to mount
 	Partition string
-	// Specifies the cloud platform provider.
-	Provider string
 	// Specifies whether the disk will be attached as ReadOnly.
 	ReadOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	util APIDiskUtil
+	util gcePersistentDiskUtil
 	// Mounter interface that provides system calls to mount the disks.
-	mounter Mounter
+	mounter mounter
 }
 
-func (PD *PersistentDisk) GetPath() string {
-	return path.Join(PD.RootDir, PD.PodID, "volumes", PD.Provider+"-pd", PD.Name)
+func (PD *GCEPersistentDisk) GetPath() string {
+	return path.Join(PD.RootDir, PD.PodID, "volumes", "gce-pd", PD.Name)
 }
 
 // Attaches the disk and bind mounts to the volume path.
-func (PD *PersistentDisk) SetUp() error {
+func (PD *GCEPersistentDisk) SetUp() error {
 	if _, err := os.Stat(PD.GetPath()); !os.IsNotExist(err) {
 		return nil
-	}
-	if err := PD.util.Connect(); err != nil {
-		return err
 	}
 	err := PD.util.AttachDisk(PD)
 	if err != nil {
@@ -188,9 +177,10 @@ func (PD *PersistentDisk) SetUp() error {
 		if err != nil {
 			return err
 		}
-		globalPDPath := path.Join(PD.RootDir, "global", "pd", PD.PDName)
+		globalPDPath := makeGlobalPDName(PD.RootDir, PD.PDName)
 		err = PD.mounter.Mount(globalPDPath, PD.GetPath(), "", MOUNT_MS_BIND|flags, "")
 		if err != nil {
+			os.RemoveAll(PD.GetPath())
 			return err
 		}
 	}
@@ -199,7 +189,7 @@ func (PD *PersistentDisk) SetUp() error {
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (PD *PersistentDisk) TearDown() error {
+func (PD *GCEPersistentDisk) TearDown() error {
 	devicePath, refCount, err := PD.mounter.RefCount(PD)
 	if err != nil {
 		return err
@@ -208,26 +198,26 @@ func (PD *PersistentDisk) TearDown() error {
 		return err
 	}
 	refCount--
-	tmpDir, err := renameDirectory(PD)
-	if err != nil {
-		return err
-	}
-	if err := os.RemoveAll(tmpDir); err != nil {
+	if err := os.RemoveAll(PD.GetPath()); err != nil {
 		return err
 	}
 	if err != nil {
 		return err
 	}
-	// Detach the disk on the last reference.
+	// If refCount is 1, then all bind mounts have been removed, and the
+	// remaining reference is the global mount. It is safe to detach.
 	if refCount == 1 {
-		if err := PD.util.Connect(); err != nil {
-			return err
-		}
 		if err := PD.util.DetachDisk(PD, devicePath); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+//TODO(jonesdl) prevent name collisions by using designated pod space as well.
+// Ex. (ROOT_DIR)/pods/...
+func makeGlobalPDName(rootDir string, devName string) string {
+	return path.Join(rootDir, "global", "pd", devName)
 }
 
 // createHostDirectory interprets API volume as a HostDirectory.
@@ -241,28 +231,26 @@ func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *Emp
 }
 
 // Interprets API volume as a PersistentDisk
-func createPersistentDisk(volume *api.Volume, podID string, rootDir string) (*PersistentDisk, error) {
-	PDName := volume.Source.PersistentDisk.PDName
-	FSType := volume.Source.PersistentDisk.FSType
-	partition := volume.Source.PersistentDisk.Partition
-	readOnly := volume.Source.PersistentDisk.ReadOnly
-	provider := volume.Source.PersistentDisk.Provider
-	util, err := newDiskUtil(provider)
+func createGCEPersistentDisk(volume *api.Volume, podID string, rootDir string) (*GCEPersistentDisk, error) {
+	PDName := volume.Source.GCEPersistentDisk.PDName
+	FSType := volume.Source.GCEPersistentDisk.FSType
+	partition := strconv.Itoa(volume.Source.GCEPersistentDisk.Partition)
+	if partition == "0" {
+		partition = ""
+	}
+	readOnly := volume.Source.GCEPersistentDisk.ReadOnly
+	util := &GCEDiskUtil{}
 	mounter := &DiskMounter{}
-	if err != nil {
-		return nil, err
-	}
-	return &PersistentDisk{volume.Name, podID, rootDir, PDName, FSType, partition, provider, readOnly, util, mounter}, nil
-}
-
-func newDiskUtil(Platform string) (APIDiskUtil, error) {
-	switch Platform {
-	case "gce":
-		util := &GCEDiskUtil{}
-		return util, nil
-	default:
-		return nil, ErrUnsupportedVolumeType
-	}
+	return &GCEPersistentDisk{
+		Name:      volume.Name,
+		PodID:     podID,
+		RootDir:   rootDir,
+		PDName:    PDName,
+		FSType:    FSType,
+		Partition: partition,
+		ReadOnly:  readOnly,
+		util:      util,
+		mounter:   mounter}, nil
 }
 
 // CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
@@ -282,8 +270,8 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 		vol = createHostDirectory(volume)
 	} else if source.EmptyDirectory != nil {
 		vol = createEmptyDirectory(volume, podID, rootDir)
-	} else if source.PersistentDisk != nil {
-		vol, err = createPersistentDisk(volume, podID, rootDir)
+	} else if source.GCEPersistentDisk != nil {
+		vol, err = createGCEPersistentDisk(volume, podID, rootDir)
 		if err != nil {
 			return nil, err
 		}
@@ -299,7 +287,12 @@ func CreateVolumeCleaner(kind string, name string, podID string, rootDir string)
 	case "empty":
 		return &EmptyDirectory{name, podID, rootDir}, nil
 	case "gce-pd":
-		return &PersistentDisk{name, podID, rootDir, "", "", "", "gce", false, &GCEDiskUtil{}, &DiskMounter{}}, nil
+		return &GCEPersistentDisk{
+			Name:    name,
+			PodID:   podID,
+			RootDir: rootDir,
+			util:    &GCEDiskUtil{},
+			mounter: &DiskMounter{}}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -321,6 +314,9 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 		}
 		podID := podIDDir.Name()
 		podIDPath := path.Join(rootDirectory, podID, "volumes")
+		if _, err := os.Stat(podIDPath); os.IsNotExist(err) {
+			continue
+		}
 		volumeKindDirs, err := ioutil.ReadDir(podIDPath)
 		if err != nil {
 			glog.Errorf("Could not read directory: %s, (%s)", podIDPath, err)

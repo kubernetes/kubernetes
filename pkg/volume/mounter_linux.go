@@ -19,7 +19,9 @@ limitations under the License.
 package volume
 
 import (
-	"io/ioutil"
+	"bufio"
+	"io"
+	"os"
 	"regexp"
 	"strings"
 	"syscall"
@@ -43,16 +45,24 @@ func (mounter *DiskMounter) Unmount(target string, flags int) error {
 // Examines /proc/mounts to find the source device of the PD resource and the
 // number of references to that device. Returns both the full device path under
 // the /dev tree and the number of references.
-func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (string, int, error) {
-	contents, err := ioutil.ReadFile("/proc/mounts")
+func (mounter *DiskMounter) RefCount(PD Interface) (string, int, error) {
+	// TODO(jonesdl) This can be split up into two procedures, finding the device path
+	// and finding the number of references. The parsing could also be separated and another
+	// utility could determine if a volume's path is an active mount point.
+	file, err := os.Open("/proc/mounts")
 	if err != nil {
 		return "", -1, err
 	}
+	defer file.Close()
+	scanner := bufio.NewReader(file)
 	refCount := 0
 	var deviceName string
-	lines := strings.Split(string(contents), "\n")
 	// Find the actual device path.
-	for _, line := range lines {
+	for {
+		line, err := scanner.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
 		success, err := regexp.MatchString(PD.GetPath(), line)
 		if err != nil {
 			return "", -1, err
@@ -61,13 +71,16 @@ func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (string, int, error) {
 			deviceName = strings.Split(line, " ")[0]
 		}
 	}
+	file.Close()
+	file, err = os.Open("/proc/mounts")
+	scanner.Reset(bufio.NewReader(file))
 	// Find the number of references to the device.
-	for _, line := range lines {
-		success, err := regexp.MatchString(deviceName, line)
-		if err != nil {
-			return "", -1, err
+	for {
+		line, err := scanner.ReadString('\n')
+		if err == io.EOF {
+			break
 		}
-		if success {
+		if strings.Split(line, " ")[0] == deviceName {
 			refCount++
 		}
 	}

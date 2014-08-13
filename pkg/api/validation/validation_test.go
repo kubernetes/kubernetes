@@ -36,10 +36,10 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
-		{Name: "123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path2"}}},
-		{Name: "abc-123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path3"}}},
-		{Name: "empty", Source: &VolumeSource{EmptyDirectory: &EmptyDirectory{}}},
-		{Name: "gcepd", Source: &VolumeSource{PersistentDisk: &PersistentDisk{"my-PD", "ext4", "1", "gce", false}}},
+		{Name: "123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path2"}}},
+		{Name: "abc-123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path3"}}},
+		{Name: "empty", Source: &api.VolumeSource{EmptyDirectory: &api.EmptyDirectory{}}},
+		{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -380,7 +380,14 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		Labels: validSelector,
 	}
-
+	invalidVolumePodTemplate := api.PodTemplate{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				Volumes: []api.Volume{{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
+			},
+		},
+	}
 	successCases := []api.ReplicationController{
 		{
 			JSONBase: api.JSONBase{ID: "abc"},
@@ -430,6 +437,13 @@ func TestValidateReplicationController(t *testing.T) {
 				ReplicaSelector: validSelector,
 			},
 		},
+		"read-write presistent disk": {
+			JSONBase: api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     invalidVolumePodTemplate,
+			},
+		},
 		"negative_replicas": {
 			JSONBase: api.JSONBase{ID: "abc"},
 			DesiredState: api.ReplicationControllerState{
@@ -448,6 +462,7 @@ func TestValidateReplicationController(t *testing.T) {
 			if !strings.HasPrefix(field, "desiredState.podTemplate.") &&
 				field != "id" &&
 				field != "desiredState.replicaSelector" &&
+				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "desiredState.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}

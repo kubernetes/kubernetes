@@ -33,7 +33,6 @@ else
   DIFFER=$(head "-${LINES}" "${FILE}" | diff -q - "${REF_FILE}")
 fi
 
-
 if [[ -z "${DIFFER}" ]]; then
   echo "1"
   exit 0

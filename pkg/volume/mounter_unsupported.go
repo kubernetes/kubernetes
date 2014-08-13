@@ -23,7 +23,7 @@ const MOUNT_MS_RDONLY = 0
 
 type DiskMounter struct{}
 
-func (mounter *DiskMounter) Mount(source string, target string, fstype string, flags string, data string) error {
+func (mounter *DiskMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
 	return nil
 }
 
@@ -31,6 +31,6 @@ func (mounter *DiskMounter) Unmount(target string, flags int) error {
 	return nil
 }
 
-func (mounter *DiskMounter) RefCount(PD *PersistentDisk) (string, int, error) {
+func (mounter *DiskMounter) RefCount(PD Interface) (string, int, error) {
 	return "", 0, nil
 }

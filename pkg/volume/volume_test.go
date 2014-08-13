@@ -28,13 +28,9 @@ import (
 
 type MockDiskUtil struct{}
 
-func (util *MockDiskUtil) Connect() error {
-	return nil
-}
-
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (util *MockDiskUtil) AttachDisk(PD *PersistentDisk) error {
+func (util *MockDiskUtil) AttachDisk(PD *GCEPersistentDisk) error {
 	err := os.MkdirAll(path.Join(PD.RootDir, "global", "pd", PD.PDName), 0750)
 	if err != nil {
 		return err
@@ -42,7 +38,7 @@ func (util *MockDiskUtil) AttachDisk(PD *PersistentDisk) error {
 	return nil
 }
 
-func (util *MockDiskUtil) DetachDisk(PD *PersistentDisk, devicePath string) error {
+func (util *MockDiskUtil) DetachDisk(PD *GCEPersistentDisk, devicePath string) error {
 	err := os.RemoveAll(path.Join(PD.RootDir, "global", "pd", PD.PDName))
 	if err != nil {
 		return err
@@ -60,7 +56,7 @@ func (mounter *MockMounter) Unmount(target string, flags int) error {
 	return nil
 }
 
-func (mounter *MockMounter) RefCount(PD *PersistentDisk) (string, int, error) {
+func (mounter *MockMounter) RefCount(vol Interface) (string, int, error) {
 	return "", 0, nil
 }
 
@@ -95,7 +91,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			api.Volume{
 				Name: "gce-pd",
 				Source: &api.VolumeSource{
-					PersistentDisk: &api.PersistentDisk{"my-disk", "ext4", "", "gce", false},
+					GCEPersistentDisk: &api.GCEPersistentDisk{"my-disk", "ext4", 0, false},
 				},
 			},
 			path.Join(tempDir, "/my-id/volumes/gce-pd/gce-pd"),
@@ -120,7 +116,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			}
 			continue
 		}
-		if tt.volume.Source.HostDirectory == nil && tt.volume.Source.EmptyDirectory == nil && tt.volume.Source.PersistentDisk == nil {
+		if tt.volume.Source.HostDirectory == nil && tt.volume.Source.EmptyDirectory == nil && tt.volume.Source.GCEPersistentDisk == nil {
 			if err != ErrUnsupportedVolumeType {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -159,7 +155,7 @@ func TestCreateVolumeCleaners(t *testing.T) {
 		if tt.kind == "empty" && actualKind != "EmptyDirectory" {
 			t.Errorf("CreateVolumeCleaner returned invalid type. Expected EmptyDirectory, got %v, %v", tt.kind, actualKind)
 		}
-		if tt.kind == "gce-pd" && actualKind != "PersistentDisk" {
+		if tt.kind == "gce-pd" && actualKind != "GCEPersistentDisk" {
 			t.Errorf("CreateVolumeCleaner returned invalid type. Expected PersistentDisk, got %v, %v", tt.kind, actualKind)
 		}
 	}
@@ -178,7 +174,7 @@ func TestSetUpAndTearDown(t *testing.T) {
 	}
 	volumes := []VolumeTester{
 		&EmptyDirectory{"empty", fakeID, tempDir},
-		&PersistentDisk{"pd", fakeID, tempDir, "pd-disk", "ext4", "", "gce", false, &MockDiskUtil{}, &MockMounter{}},
+		&GCEPersistentDisk{"pd", fakeID, tempDir, "pd-disk", "ext4", "", false, &MockDiskUtil{}, &MockMounter{}},
 	}
 
 	for _, vol := range volumes {
