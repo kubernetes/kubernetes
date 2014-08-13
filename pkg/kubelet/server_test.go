@@ -106,7 +106,7 @@ func TestContainer(t *testing.T) {
 	if len(received) != 1 {
 		t.Errorf("Expected 1 manifest, but got %v", len(received))
 	}
-	expectedPods := []Pod{Pod{Name: "1", Manifest: expected[0]}}
+	expectedPods := []Pod{{Name: "1", Manifest: expected[0]}}
 	if !reflect.DeepEqual(expectedPods, received[0]) {
 		t.Errorf("Expected %#v, but got %#v", expectedPods, received[0])
 	}
@@ -129,7 +129,7 @@ func TestContainers(t *testing.T) {
 	if len(received) != 1 {
 		t.Errorf("Expected 1 update, but got %v", len(received))
 	}
-	expectedPods := []Pod{Pod{Name: "1", Manifest: expected[0]}, Pod{Name: "2", Manifest: expected[1]}}
+	expectedPods := []Pod{{Name: "1", Manifest: expected[0]}, {Name: "2", Manifest: expected[1]}}
 	if !reflect.DeepEqual(expectedPods, received[0]) {
 		t.Errorf("Expected %#v, but got %#v", expectedPods, received[0])
 	}

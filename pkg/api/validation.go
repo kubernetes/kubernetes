@@ -321,7 +321,7 @@ func ValidateReplicationController(controller *ReplicationController) []error {
 		errors = append(errors, makeInvalidError("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
 	}
 	if controller.DesiredState.Replicas < 0 {
-		errors = append(errors, makeInvalidError("ReplicationController.Replicas", controller.DesiredState.Replicas ))
+		errors = append(errors, makeInvalidError("ReplicationController.Replicas", controller.DesiredState.Replicas))
 	}
 	errors = append(errors, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest)...)
 	return errors

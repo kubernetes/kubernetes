@@ -111,7 +111,7 @@ func TestMinionProxy(t *testing.T) {
 		fmt.Sprintf("/%s", proxy.Host): "/",
 	}
 
-	for value, _ := range failureCases {
+	for value := range failureCases {
 		resp, err := http.Get(fmt.Sprintf("%s%s", server.URL, value))
 		if err != nil {
 			t.Errorf("unexpected error for %s: %v", value, err)
