@@ -40,6 +40,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -93,7 +94,7 @@ func (s ConfigSourceEtcd) Run() {
 
 	// Ok, so we got something back from etcd. Let's set up a watch for new services, and
 	// their endpoints
-	go s.WatchForChanges()
+	go util.Forever(s.WatchForChanges, 1*time.Second)
 
 	for {
 		services, endpoints, err = s.GetServices()
@@ -186,7 +187,10 @@ func (s ConfigSourceEtcd) WatchForChanges() {
 	watchChannel := make(chan *etcd.Response)
 	go s.client.Watch("/registry/services/", 0, true, watchChannel, nil)
 	for {
-		watchResponse := <-watchChannel
+		watchResponse, ok := <-watchChannel
+		if !ok {
+			break
+		}
 		s.ProcessChange(watchResponse)
 	}
 }
