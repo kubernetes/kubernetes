@@ -730,7 +730,7 @@ func TestEtcdGetService(t *testing.T) {
 	}
 
 	if service.ID != "foo" {
-		t.Errorf("Unexpected pod: %#v", service)
+		t.Errorf("Unexpected service: %#v", service)
 	}
 }
 
@@ -803,6 +803,23 @@ func TestEtcdUpdateService(t *testing.T) {
 	}
 }
 
+func TestEtcdGetEndpoints(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.Set("/registry/services/endpoints/foo", api.EncodeOrDie(api.Endpoints{
+		JSONBase:  api.JSONBase{ID: "foo"},
+		Endpoints: []string{"127.0.0.1:34855"},
+	}), 0)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	endpoints, err := registry.GetEndpoints("foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if endpoints.ID != "foo" || !reflect.DeepEqual(endpoints.Endpoints, []string{"127.0.0.1:34855"}) {
+		t.Errorf("Unexpected endpoints: %#v", endpoints)
+	}
+}
+
 func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
@@ -827,6 +844,104 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	err = api.DecodeInto([]byte(response.Node.Value), &endpointsOut)
 	if !reflect.DeepEqual(endpoints, endpointsOut) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", endpointsOut, endpoints)
+	}
+}
+
+func TestEtcdWatchServices(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	watching, err := registry.WatchServices(
+		labels.Everything(),
+		labels.SelectorFromSet(labels.Set{"ID": "foo"}),
+		1,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.WaitForWatchCompletion()
+
+	select {
+	case _, ok := <-watching.ResultChan():
+		if !ok {
+			t.Errorf("watching channel should be open")
+		}
+	default:
+	}
+	fakeClient.WatchInjectError <- nil
+	if _, ok := <-watching.ResultChan(); ok {
+		t.Errorf("watching channel should be closed")
+	}
+	watching.Stop()
+}
+
+func TestEtcdWatchServicesBadSelector(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	_, err := registry.WatchServices(
+		labels.Everything(),
+		labels.SelectorFromSet(labels.Set{"Field.Selector": "foo"}),
+		0,
+	)
+	if err == nil {
+		t.Errorf("unexpected non-error: %v", err)
+	}
+
+	_, err = registry.WatchServices(
+		labels.SelectorFromSet(labels.Set{"Label.Selector": "foo"}),
+		labels.Everything(),
+		0,
+	)
+	if err == nil {
+		t.Errorf("unexpected non-error: %v", err)
+	}
+}
+
+func TestEtcdWatchEndpoints(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	watching, err := registry.WatchEndpoints(
+		labels.Everything(),
+		labels.SelectorFromSet(labels.Set{"ID": "foo"}),
+		1,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.WaitForWatchCompletion()
+
+	select {
+	case _, ok := <-watching.ResultChan():
+		if !ok {
+			t.Errorf("watching channel should be open")
+		}
+	default:
+	}
+	fakeClient.WatchInjectError <- nil
+	if _, ok := <-watching.ResultChan(); ok {
+		t.Errorf("watching channel should be closed")
+	}
+	watching.Stop()
+}
+
+func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	_, err := registry.WatchEndpoints(
+		labels.Everything(),
+		labels.SelectorFromSet(labels.Set{"Field.Selector": "foo"}),
+		0,
+	)
+	if err == nil {
+		t.Errorf("unexpected non-error: %v", err)
+	}
+
+	_, err = registry.WatchEndpoints(
+		labels.SelectorFromSet(labels.Set{"Label.Selector": "foo"}),
+		labels.Everything(),
+		0,
+	)
+	if err == nil {
+		t.Errorf("unexpected non-error: %v", err)
 	}
 }
 

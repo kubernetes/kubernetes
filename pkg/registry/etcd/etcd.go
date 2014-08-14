@@ -340,10 +340,54 @@ func (r *Registry) UpdateService(svc api.Service) error {
 	return r.SetObj(makeServiceKey(svc.ID), svc)
 }
 
+// WatchServices begins watching for new, changed, or deleted service configurations.
+func (r *Registry) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	if !label.Empty() {
+		return nil, fmt.Errorf("label selectors are not supported on services")
+	}
+	if value, found := field.RequiresExactMatch("ID"); found {
+		return r.Watch(makeServiceKey(value), resourceVersion)
+	}
+	if field.Empty() {
+		return r.WatchList("/registry/services/specs", resourceVersion, tools.Everything)
+	}
+	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
+}
+
+// GetEndpoints obtains endpoints specified by a service name
+func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
+	obj := &api.Endpoints{}
+	if err := r.ExtractObj(makeServiceEndpointsKey(name), obj, false); err != nil {
+		if tools.IsEtcdNotFound(err) {
+			if _, err := r.GetService(name); err != nil && apiserver.IsNotFound(err) {
+				return nil, apiserver.NewNotFoundErr("service", name)
+			}
+			return obj, nil
+		}
+		return nil, err
+	}
+	return obj, nil
+}
+
 // UpdateEndpoints update Endpoints of a Service.
 func (r *Registry) UpdateEndpoints(e api.Endpoints) error {
 	return r.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{},
-		func(interface{}) (interface{}, error) {
+		func(input interface{}) (interface{}, error) {
+			// TODO: racy - label query is returning different results for two simultaneous updaters
 			return e, nil
 		})
+}
+
+// WatchEndpoints begins watching for new, changed, or deleted endpoint configurations.
+func (r *Registry) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	if !label.Empty() {
+		return nil, fmt.Errorf("label selectors are not supported on endpoints")
+	}
+	if value, found := field.RequiresExactMatch("ID"); found {
+		return r.Watch(makeServiceEndpointsKey(value), resourceVersion)
+	}
+	if field.Empty() {
+		return r.WatchList("/registry/services/endpoints", resourceVersion, tools.Everything)
+	}
+	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
 }
