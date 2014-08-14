@@ -32,6 +32,12 @@ type Selector interface {
 	// Empty returns true if this selector does not restrict the selection space.
 	Empty() bool
 
+	// RequiresExactMatch allows a caller to introspect whether a given selector
+	// requires a single specific label to be set, and if so returns the value it
+	// requires.
+	// TODO: expand this to be more general
+	RequiresExactMatch(label string) (value string, found bool)
+
 	// String returns a human readable string that represents this selector.
 	String() string
 }
@@ -53,6 +59,13 @@ func (t *hasTerm) Empty() bool {
 	return false
 }
 
+func (t *hasTerm) RequiresExactMatch(label string) (value string, found bool) {
+	if t.label == label {
+		return t.value, true
+	}
+	return "", false
+}
+
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.label, t.value)
 }
@@ -67,6 +80,10 @@ func (t *notHasTerm) Matches(ls Labels) bool {
 
 func (t *notHasTerm) Empty() bool {
 	return false
+}
+
+func (t *notHasTerm) RequiresExactMatch(label string) (value string, found bool) {
+	return "", false
 }
 
 func (t *notHasTerm) String() string {
@@ -97,6 +114,18 @@ func (t andTerm) Empty() bool {
 		}
 	}
 	return true
+}
+
+func (t andTerm) RequiresExactMatch(label string) (string, bool) {
+	if t == nil || len([]Selector(t)) == 0 {
+		return "", false
+	}
+	for i := range t {
+		if value, found := t[i].RequiresExactMatch(label); found {
+			return value, found
+		}
+	}
+	return "", false
 }
 
 func (t andTerm) String() string {
@@ -173,7 +202,7 @@ func SelectorFromSet(ls Set) Selector {
 	return andTerm(items)
 }
 
-// ParseSelector takes a string repsenting a selector and returns an
+// ParseSelector takes a string representing a selector and returns an
 // object suitable for matching, or an error.
 func ParseSelector(selector string) (Selector, error) {
 	parts := strings.Split(selector, ",")

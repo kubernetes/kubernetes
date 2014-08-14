@@ -158,11 +158,44 @@ func TestSetIsEmpty(t *testing.T) {
 	if (&hasTerm{}).Empty() {
 		t.Errorf("hasTerm should not be empty")
 	}
+	if (&notHasTerm{}).Empty() {
+		t.Errorf("notHasTerm should not be empty")
+	}
 	if !(andTerm{andTerm{}}).Empty() {
 		t.Errorf("Nested andTerm should be empty")
 	}
 	if (andTerm{&hasTerm{"a", "b"}}).Empty() {
 		t.Errorf("Nested andTerm should not be empty")
+	}
+}
+
+func TestRequiresExactMatch(t *testing.T) {
+	testCases := map[string]struct {
+		S     Selector
+		Label string
+		Value string
+		Found bool
+	}{
+		"empty set":                 {Set{}.AsSelector(), "test", "", false},
+		"nil andTerm":               {andTerm(nil), "test", "", false},
+		"empty hasTerm":             {&hasTerm{}, "test", "", false},
+		"skipped hasTerm":           {&hasTerm{"a", "b"}, "test", "", false},
+		"valid hasTerm":             {&hasTerm{"test", "b"}, "test", "b", true},
+		"valid hasTerm no value":    {&hasTerm{"test", ""}, "test", "", true},
+		"valid notHasTerm":          {&notHasTerm{"test", "b"}, "test", "", false},
+		"valid notHasTerm no value": {&notHasTerm{"test", ""}, "test", "", false},
+		"nested andTerm":            {andTerm{andTerm{}}, "test", "", false},
+		"nested andTerm matches":    {andTerm{&hasTerm{"test", "b"}}, "test", "b", true},
+		"andTerm with non-match":    {andTerm{&hasTerm{}, &hasTerm{"test", "b"}}, "test", "b", true},
+	}
+	for k, v := range testCases {
+		value, found := v.S.RequiresExactMatch(v.Label)
+		if value != v.Value {
+			t.Errorf("%s: expected value %s, got %s", k, v.Value, value)
+		}
+		if found != v.Found {
+			t.Errorf("%s: expected found %s, got %s", k, v.Found, found)
+		}
 	}
 }
 
