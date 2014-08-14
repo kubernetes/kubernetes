@@ -391,8 +391,12 @@ func TestWatchInterpretation_Delete(t *testing.T) {
 
 	go w.sendResult(&etcd.Response{
 		Action: "delete",
+		Node: &etcd.Node{
+			ModifiedIndex: 2,
+		},
 		PrevNode: &etcd.Node{
-			Value: string(podBytes),
+			Value:         string(podBytes),
+			ModifiedIndex: 1,
 		},
 	})
 
@@ -400,6 +404,7 @@ func TestWatchInterpretation_Delete(t *testing.T) {
 	if e, a := watch.Deleted, got.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
+	pod.ResourceVersion = 2
 	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
@@ -497,43 +502,89 @@ func TestWatch(t *testing.T) {
 func TestWatchFromZeroIndex(t *testing.T) {
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 
-	fakeClient := MakeFakeEtcdClient(t)
-	fakeClient.Data["/some/key"] = EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         api.EncodeOrDie(pod),
-				ModifiedIndex: 1,
+	testCases := map[string]struct {
+		Response        EtcdResponseWithError
+		ExpectedVersion uint64
+		ExpectedType    watch.EventType
+	}{
+		"last write was a modify": {
+			EtcdResponseWithError{
+				R: &etcd.Response{
+					Node: &etcd.Node{
+						Value:         api.EncodeOrDie(pod),
+						ModifiedIndex: 1,
+					},
+					Action:    "compareAndSwap",
+					EtcdIndex: 2,
+				},
 			},
-			Action:    "compareAndSwap",
-			EtcdIndex: 2,
+			1,
+			watch.Modified,
+		},
+		"last write was a delete": {
+			EtcdResponseWithError{
+				R: &etcd.Response{
+					Node: &etcd.Node{
+						Value:         api.EncodeOrDie(pod),
+						ModifiedIndex: 2,
+					},
+					PrevNode: &etcd.Node{
+						Value:         api.EncodeOrDie(pod),
+						ModifiedIndex: 1,
+					},
+					Action:    "delete",
+					EtcdIndex: 3,
+				},
+			},
+			2,
+			watch.Deleted,
+		},
+		"last write was a create": {
+			EtcdResponseWithError{
+				R: &etcd.Response{
+					Node: &etcd.Node{
+						Value:         api.EncodeOrDie(pod),
+						ModifiedIndex: 2,
+					},
+					Action:    "create",
+					EtcdIndex: 3,
+				},
+			},
+			2,
+			watch.Added,
 		},
 	}
-	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	for k, testCase := range testCases {
+		fakeClient := MakeFakeEtcdClient(t)
+		fakeClient.Data["/some/key"] = testCase.Response
+		h := EtcdHelper{fakeClient, codec, versioner}
 
-	fakeClient.WaitForWatchCompletion()
+		watching, err := h.Watch("/some/key", 0)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", k, err)
+		}
 
-	// the existing node is detected and the index set
-	event := <-watching.ResultChan()
-	if e, a := watch.Modified, event.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
+		fakeClient.WaitForWatchCompletion()
+
+		// the existing node is detected and the index set
+		event := <-watching.ResultChan()
+		if e, a := testCase.ExpectedType, event.Type; e != a {
+			t.Errorf("%s: expected %v, got %v", k, e, a)
+		}
+		actualPod, ok := event.Object.(*api.Pod)
+		if !ok {
+			t.Fatalf("%s: expected a pod, got %#v", k, event.Object)
+		}
+		if actualPod.ResourceVersion != testCase.ExpectedVersion {
+			t.Errorf("%s: expected pod with resource version %d, Got %#v", k, testCase.ExpectedVersion, actualPod)
+		}
+		pod.ResourceVersion = testCase.ExpectedVersion
+		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: expected %v, got %v", k, e, a)
+		}
+		watching.Stop()
 	}
-	actualPod, ok := event.Object.(*api.Pod)
-	if !ok {
-		t.Fatalf("expected a pod, got %#v", event.Object)
-	}
-	if actualPod.ResourceVersion != 1 {
-		t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
-	}
-	pod.ResourceVersion = 1
-	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	watching.Stop()
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
