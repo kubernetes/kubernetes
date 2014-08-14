@@ -20,7 +20,8 @@ import (
 	"sync"
 )
 
-// Mux distributes event notifications among any number of watchers.
+// Mux distributes event notifications among any number of watchers. Every event
+// is delivered to every watcher.
 type Mux struct {
 	lock sync.Mutex
 
@@ -33,7 +34,7 @@ type Mux struct {
 // NewMux creates a new Mux. queueLength is the maximum number of events to queue.
 // When queueLength is 0, Action will block until any prior event has been
 // completely distributed. It is guaranteed that events will be distibuted in the
-// order in which they occurr, but the order in which a single event is distributed
+// order in which they ocurr, but the order in which a single event is distributed
 // among all of the watchers is unspecified.
 func NewMux(queueLength int) *Mux {
 	m := &Mux{
