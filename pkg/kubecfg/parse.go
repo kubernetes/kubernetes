@@ -23,17 +23,22 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-var storageToType = map[string]reflect.Type{
-	"pods":                   reflect.TypeOf(api.Pod{}),
-	"services":               reflect.TypeOf(api.Service{}),
-	"replicationControllers": reflect.TypeOf(api.ReplicationController{}),
-	"minions":                reflect.TypeOf(api.Minion{}),
+type Parser struct {
+	storageToType map[string]reflect.Type
+}
+
+func NewParser(objectMap map[string]interface{}) *Parser {
+	typeMap := make(map[string]reflect.Type)
+	for name, obj := range objectMap {
+		typeMap[name] = reflect.TypeOf(obj)
+	}
+	return &Parser{typeMap}
 }
 
 // ToWireFormat takes input 'data' as either json or yaml, checks that it parses as the
 // appropriate object type, and returns json for sending to the API or an error.
-func ToWireFormat(data []byte, storage string) ([]byte, error) {
-	prototypeType, found := storageToType[storage]
+func (p *Parser) ToWireFormat(data []byte, storage string) ([]byte, error) {
+	prototypeType, found := p.storageToType[storage]
 	if !found {
 		return nil, fmt.Errorf("unknown storage type: %v", storage)
 	}
@@ -46,9 +51,9 @@ func ToWireFormat(data []byte, storage string) ([]byte, error) {
 	return api.Encode(obj)
 }
 
-func SupportedWireStorage() []string {
+func (p *Parser) SupportedWireStorage() []string {
 	types := []string{}
-	for k := range storageToType {
+	for k := range p.storageToType {
 		types = append(types, k)
 	}
 	return types

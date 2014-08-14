@@ -24,19 +24,20 @@ import (
 )
 
 func TestParseBadStorage(t *testing.T) {
-	_, err := ToWireFormat([]byte("{}"), "badstorage")
+	p := NewParser(map[string]interface{}{})
+	_, err := p.ToWireFormat([]byte("{}"), "badstorage")
 	if err == nil {
 		t.Errorf("Expected error, received none")
 	}
 }
 
-func DoParseTest(t *testing.T, storage string, obj interface{}) {
+func DoParseTest(t *testing.T, storage string, obj interface{}, p *Parser) {
 	jsonData, _ := api.Encode(obj)
 	yamlData, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))
-	jsonGot, jsonErr := ToWireFormat(jsonData, storage)
-	yamlGot, yamlErr := ToWireFormat(yamlData, storage)
+	jsonGot, jsonErr := p.ToWireFormat(jsonData, storage)
+	yamlGot, yamlErr := p.ToWireFormat(yamlData, storage)
 
 	if jsonErr != nil {
 		t.Errorf("json err: %#v", jsonErr)
@@ -54,6 +55,12 @@ func DoParseTest(t *testing.T, storage string, obj interface{}) {
 	}
 }
 
+var testParser = NewParser(map[string]interface{}{
+	"pods":                   api.Pod{},
+	"services":               api.Service{},
+	"replicationControllers": api.ReplicationController{},
+})
+
 func TestParsePod(t *testing.T) {
 	DoParseTest(t, "pods", api.Pod{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "test pod", Kind: "Pod"},
@@ -68,7 +75,7 @@ func TestParsePod(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, testParser)
 }
 
 func TestParseService(t *testing.T) {
@@ -81,7 +88,7 @@ func TestParseService(t *testing.T) {
 		Selector: map[string]string{
 			"area": "staging",
 		},
-	})
+	}, testParser)
 }
 
 func TestParseController(t *testing.T) {
@@ -103,5 +110,22 @@ func TestParseController(t *testing.T) {
 				},
 			},
 		},
+	}, testParser)
+}
+
+type TestParseType struct {
+	api.JSONBase `json:",inline" yaml:",inline"`
+	Data         string `json:"data" yaml:"data"`
+}
+
+func TestParseCustomType(t *testing.T) {
+	api.AddKnownTypes("", TestParseType{})
+	api.AddKnownTypes("v1beta1", TestParseType{})
+	parser := NewParser(map[string]interface{}{
+		"custom": TestParseType{},
 	})
+	DoParseTest(t, "custom", TestParseType{
+		JSONBase: api.JSONBase{APIVersion: "", ID: "my custom object", Kind: "TestParseType"},
+		Data:     "test data",
+	}, parser)
 }
