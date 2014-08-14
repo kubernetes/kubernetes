@@ -26,6 +26,9 @@ if [ ! -x $CLOUDCFG ]; then
 fi
 
 detect-master > /dev/null
-export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
+if [ "$KUBE_MASTER_IP" != "" ] && [ "$KUBERNETES_MASTER" == "" ]; then
+  echo "Setting master to: https://${KUBE_MASTER_IP}"
+  export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
+fi
 
 $CLOUDCFG $@
