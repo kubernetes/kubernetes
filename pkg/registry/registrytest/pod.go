@@ -17,7 +17,6 @@ limitations under the License.
 package registrytest
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -26,15 +25,19 @@ import (
 )
 
 type PodRegistry struct {
-	Err  error
-	Pod  *api.Pod
-	Pods []api.Pod
+	Err     error
+	Machine string
+	Pod     *api.Pod
+	Pods    []api.Pod
 	sync.Mutex
+
+	mux *watch.Mux
 }
 
 func NewPodRegistry(pods []api.Pod) *PodRegistry {
 	return &PodRegistry{
 		Pods: pods,
+		mux:  watch.NewMux(0),
 	}
 }
 
@@ -53,8 +56,8 @@ func (r *PodRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	return filtered, nil
 }
 
-func (r *PodRegistry) WatchPods(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return nil, errors.New("unimplemented")
+func (r *PodRegistry) WatchPods(resourceVersion uint64) (watch.Interface, error) {
+	return r.mux.Watch(), nil
 }
 
 func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {
@@ -66,6 +69,9 @@ func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {
 func (r *PodRegistry) CreatePod(machine string, pod api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
+	r.Machine = machine
+	r.Pod = &pod
+	r.mux.Action(watch.Added, &pod)
 	return r.Err
 }
 
@@ -73,11 +79,13 @@ func (r *PodRegistry) UpdatePod(pod api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Pod = &pod
+	r.mux.Action(watch.Modified, &pod)
 	return r.Err
 }
 
 func (r *PodRegistry) DeletePod(podId string) error {
 	r.Lock()
 	defer r.Unlock()
+	r.mux.Action(watch.Deleted, r.Pod)
 	return r.Err
 }
