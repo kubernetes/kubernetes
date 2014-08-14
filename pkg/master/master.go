@@ -26,11 +26,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	goetcd "github.com/coreos/go-etcd/etcd"
@@ -106,7 +106,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	podCache := NewPodCache(podInfoGetter, m.podRegistry)
 	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
-	endpoints := endpoint.NewEndpointController(m.serviceRegistry, m.client)
+	endpoints := servicecontroller.NewEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	m.storage = map[string]apiserver.RESTStorage{
