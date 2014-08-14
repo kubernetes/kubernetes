@@ -22,26 +22,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestLoadBalanceValidateWorks(t *testing.T) {
-	loadBalancer := NewLoadBalancerRR()
-	if loadBalancer.isValid("") {
+func TestValidateWorks(t *testing.T) {
+	if isValidEndpoint("") {
 		t.Errorf("Didn't fail for empty string")
 	}
-	if loadBalancer.isValid("foobar") {
+	if isValidEndpoint("foobar") {
 		t.Errorf("Didn't fail with no port")
 	}
-	if loadBalancer.isValid("foobar:-1") {
+	if isValidEndpoint("foobar:-1") {
 		t.Errorf("Didn't fail with a negative port")
 	}
-	if !loadBalancer.isValid("foobar:8080") {
+	if !isValidEndpoint("foobar:8080") {
 		t.Errorf("Failed a valid config.")
 	}
 }
 
-func TestLoadBalanceFilterWorks(t *testing.T) {
-	loadBalancer := NewLoadBalancerRR()
+func TestFilterWorks(t *testing.T) {
 	endpoints := []string{"foobar:1", "foobar:2", "foobar:-1", "foobar:3", "foobar:-2"}
-	filtered := loadBalancer.filterValidEndpoints(endpoints)
+	filtered := filterValidEndpoints(endpoints)
 
 	if len(filtered) != 3 {
 		t.Errorf("Failed to filter to the correct size")

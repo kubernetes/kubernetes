@@ -49,7 +49,7 @@ func NewLoadBalancerRR() *LoadBalancerRR {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (string, error) {
+func (lb *LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (string, error) {
 	lb.lock.RLock()
 	endpoints, exists := lb.endpointsMap[service]
 	index := lb.rrIndex[service]
@@ -67,7 +67,7 @@ func (lb LoadBalancerRR) NextEndpoint(service string, srcAddr net.Addr) (string,
 	return endpoint, nil
 }
 
-func (lb LoadBalancerRR) isValid(spec string) bool {
+func isValidEndpoint(spec string) bool {
 	_, port, err := net.SplitHostPort(spec)
 	if err != nil {
 		return false
@@ -79,10 +79,10 @@ func (lb LoadBalancerRR) isValid(spec string) bool {
 	return value > 0
 }
 
-func (lb LoadBalancerRR) filterValidEndpoints(endpoints []string) []string {
+func filterValidEndpoints(endpoints []string) []string {
 	var result []string
 	for _, spec := range endpoints {
-		if lb.isValid(spec) {
+		if isValidEndpoint(spec) {
 			result = append(result, spec)
 		}
 	}
@@ -92,14 +92,14 @@ func (lb LoadBalancerRR) filterValidEndpoints(endpoints []string) []string {
 // OnUpdate manages the registered service endpoints.
 // Registered endpoints are updated if found in the update set or
 // unregistered if missing from the update set.
-func (lb LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
+func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	registeredEndpoints := make(map[string]bool)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	// Update endpoints for services.
 	for _, endpoint := range endpoints {
 		existingEndpoints, exists := lb.endpointsMap[endpoint.ID]
-		validEndpoints := lb.filterValidEndpoints(endpoint.Endpoints)
+		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
 		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
 			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.ID, endpoint.Endpoints)
 			lb.endpointsMap[endpoint.ID] = validEndpoints
