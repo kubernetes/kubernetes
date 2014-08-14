@@ -43,6 +43,7 @@ export KUBE_REPO_ROOT="$(dirname $0)/.."
 export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
 
 if [[ $TEAR_DOWN -ne 0 ]]; then
+  detect-project
   trap test-teardown EXIT
   exit 0
 fi
