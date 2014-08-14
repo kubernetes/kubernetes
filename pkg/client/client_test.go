@@ -361,7 +361,7 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	}
 
 	if expected, received := requestBody, c.handler.RequestBody; expected != nil && *expected != received {
-		t.Errorf("bad body for request %#v: expected %s, got %s", c.Request, expected, received)
+		t.Errorf("bad body for request %#v: expected %s, got %s", c.Request, *expected, received)
 	}
 
 	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
