@@ -257,6 +257,4 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	case err := <-injectedError:
 		return nil, err
 	}
-	// Never get here.
-	return nil, nil
 }
