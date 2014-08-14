@@ -93,7 +93,6 @@ func LogOf(w http.ResponseWriter) *respLogger {
 		return rl
 	}
 	panic("Logger not installed yet!")
-	return nil
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
