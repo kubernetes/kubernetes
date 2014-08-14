@@ -357,7 +357,7 @@ function test-teardown {
     --project ${PROJECT} \
     --norespect_terminal_width \
     --force \
-    ${MINION_TAG}-http-alt
+    ${MINION_TAG}-http-alt || true > /dev/null
   $(dirname $0)/../cluster/kube-down.sh > /dev/null
 }
 
