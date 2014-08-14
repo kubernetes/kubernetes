@@ -42,7 +42,7 @@ function make-binaries() {
 
   function make-binary() {
     echo "+++ Building $1 for ${GOOS}/${GOARCH}"
-    go build \
+    godep go build \
       -o "${ARCH_TARGET}/$1" \
       github.com/GoogleCloudPlatform/kubernetes/cmd/$1
   }

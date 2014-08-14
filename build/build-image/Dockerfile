@@ -45,17 +45,17 @@ RUN cd /usr/local/go/src && \
 
 # Set up Go Environment
 ENV PATH    /go/bin:$PATH
-ENV GOPATH  /go:/go/src/github.com/GoogleCloudPlatform/kubernetes/third_party
+ENV GOPATH  /go
 ENV GOOS    linux
 ENV GOARCH  amd64
 
 # Get the code coverage tool and etcd for integration tests
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/coreos/etcd
+RUN go get code.google.com/p/go.tools/cmd/cover github.com/coreos/etcd github.com/tools/godep
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
 
-# Upload Kubernetes
+# Upload Kubernetes source
 ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes
