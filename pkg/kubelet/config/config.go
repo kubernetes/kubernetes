@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
@@ -251,7 +251,7 @@ func filterInvalidPods(pods []kubelet.Pod, source string) (filtered []*kubelet.P
 	for i := range pods {
 		var errors []error
 		if names.Has(pods[i].Name) {
-			errors = append(errors, api.ValidationError{api.ErrTypeDuplicate, "Pod.Name", pods[i].Name})
+			errors = append(errors, apierrs.NewDuplicate("Pod.Name", pods[i].Name))
 		} else {
 			names.Insert(pods[i].Name)
 		}

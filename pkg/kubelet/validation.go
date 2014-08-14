@@ -18,16 +18,13 @@ package kubelet
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func makeInvalidError(field string, value interface{}) api.ValidationError {
-	return api.ValidationError{api.ErrTypeInvalid, field, value}
-}
-
 func ValidatePod(pod *Pod) (errors []error) {
 	if !util.IsDNSSubdomain(pod.Name) {
-		errors = append(errors, makeInvalidError("Pod.Name", pod.Name))
+		errors = append(errors, apierrs.NewInvalid("Pod.Name", pod.Name))
 	}
 	if errs := api.ValidateManifest(&pod.Manifest); len(errs) != 0 {
 		errors = append(errors, errs...)
