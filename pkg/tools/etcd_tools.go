@@ -419,11 +419,11 @@ func etcdGetInitialWatchState(client EtcdGetSet, key string, recursive bool, inc
 			return
 		}
 		if index, ok := etcdErrorIndex(err); ok {
-			resourceVersion = index
+			resourceVersion = index + 1
 		}
 		return
 	}
-	resourceVersion = resp.EtcdIndex
+	resourceVersion = resp.EtcdIndex + 1
 	convertRecursiveResponse(resp.Node, resp, incoming)
 	return
 }
@@ -438,6 +438,11 @@ func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming
 		return
 	}
 	copied := *response
+	if node.ModifiedIndex == node.CreatedIndex {
+		copied.Action = "create"
+	} else {
+		copied.Action = "set"
+	}
 	copied.Node = node
 	incoming <- &copied
 }
