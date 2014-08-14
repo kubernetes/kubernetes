@@ -24,6 +24,7 @@ source $(dirname $0)/../cluster/$KUBERNETES_PROVIDER/util.sh
 # cluster running.
 ALREADY_UP=${1:-0}
 LEAVE_UP=${2:-0}
+TEAR_DOWN=${3:-0}
 
 HAVE_JQ=$(which jq)
 if [[ -z ${HAVE_JQ} ]]; then
@@ -40,6 +41,11 @@ set -e
 export KUBE_CONFIG_FILE="config-test.sh"
 export KUBE_REPO_ROOT="$(dirname $0)/.."
 export CLOUDCFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
+
+if [[ $TEAR_DOWN -ne 0 ]]; then
+  trap test-teardown EXIT
+  exit 0
+fi
 
 # Build a release required by the test provider [if any]
 test-build-release
