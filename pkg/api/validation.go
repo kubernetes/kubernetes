@@ -199,7 +199,7 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errorLis
 
 // AccumulateUniquePorts runs an extraction function on each Port of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, extract func(*Port) int) errorList {
+func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, extract func(*Port) int) []error {
 	allErrs := errorList{}
 
 	for ci := range containers {
@@ -213,13 +213,14 @@ func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, ext
 			}
 		}
 	}
-	return allErrs
+	return []error(allErrs)
 }
 
 // Checks for colliding Port.HostPort values across a slice of containers.
 func checkHostPortConflicts(containers []Container) errorList {
 	allPorts := map[int]bool{}
-	return AccumulateUniquePorts(containers, allPorts, func(p *Port) int { return p.HostPort })
+	return errorList(AccumulateUniquePorts(containers, allPorts,
+		func(p *Port) int { return p.HostPort }))
 }
 
 func validateContainers(containers []Container, volumes util.StringSet) errorList {
@@ -313,16 +314,16 @@ func ValidateService(service *Service) []error {
 
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *ReplicationController) []error {
-	errors := []error{}
+	allErrs := errorList{}
 	if controller.ID == "" {
-		errors = append(errors, makeInvalidError("ReplicationController.ID", controller.ID))
+		allErrs.Append(makeInvalidError("ReplicationController.ID", controller.ID))
 	}
 	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
-		errors = append(errors, makeInvalidError("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
+		allErrs.Append(makeInvalidError("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
 	}
 	if controller.DesiredState.Replicas < 0 {
-		errors = append(errors, makeInvalidError("ReplicationController.Replicas", controller.DesiredState.Replicas))
+		allErrs.Append(makeInvalidError("ReplicationController.Replicas", controller.DesiredState.Replicas))
 	}
-	errors = append(errors, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest)...)
-	return errors
+	allErrs.Append(ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest)...)
+	return []error(allErrs)
 }
