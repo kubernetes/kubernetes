@@ -491,7 +491,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 			return
 		}
 		data = []byte(res.PrevNode.Value)
-		index = res.PrevNode.ModifiedIndex
+		index = res.Node.ModifiedIndex
 		action = watch.Deleted
 	default:
 		glog.Errorf("unknown action: %v", res.Action)
