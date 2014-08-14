@@ -9,7 +9,6 @@
 
 {% if grains.etcd_servers is defined %}
   {% set etcd_servers = "-etcd_servers=http://" + grains.etcd_servers + ":4001" %}
-  {% set address = "-address=" + grains.etcd_servers %}  
 {% else %}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() %}
   {% set etcd_servers = "-etcd_servers=http://" + ips[0][0] + ":4001" %}

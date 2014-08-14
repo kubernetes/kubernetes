@@ -19,20 +19,19 @@ set -e
 source $(dirname $0)/provision-config.sh
 
 MINION_IP=$4
-# we will run provision to update code each time we test, so we do not want to do salt install each time
-if [ ! -f "/var/kube-vagrant-setup" ]; then
 
-  if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
-    echo "Adding host entry for $MASTER_NAME"
-    echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
-  fi
+# make sure each minion has an entry in hosts file for master
+if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
+  echo "Adding host entry for $MASTER_NAME"
+  echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+fi
 
-  # Prepopulate the name of the Master
-  mkdir -p /etc/salt/minion.d
-  echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+# Let the minion know who its master is
+mkdir -p /etc/salt/minion.d
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-  # Our minions will have a pool role to distinguish them from the master.
-  cat <<EOF >/etc/salt/minion.d/grains.conf
+# Our minions will have a pool role to distinguish them from the master.
+cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   minion_ip: $MINION_IP
   etcd_servers: $MASTER_IP
@@ -41,6 +40,8 @@ grains:
   cbr-cidr: $MINION_IP_RANGE
 EOF
 
+# we will run provision to update code each time we test, so we do not want to do salt install each time
+if [ ! $(which salt-minion) ]; then
   # Install Salt
   #
   # We specify -X to avoid a race condition that can cause minion failure to
@@ -50,8 +51,4 @@ EOF
   ## TODO this only works on systemd distros, need to find a work-around as removing -X above fails to start the services installed
   systemctl enable salt-minion
   systemctl start salt-minion
-
-  # a file we touch to state that base-setup is done
-  echo "Salt configured" > /var/kube-vagrant-setup
-
 fi

@@ -18,12 +18,11 @@
 set -e
 source $(dirname $0)/provision-config.sh
 
-# we will run provision to update code each time we test, so we do not want to do salt install each time
-if [ ! -f "/var/kube-vagrant-setup" ]; then
-  mkdir -p /etc/salt/minion.d
-  echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+# Update salt configuration
+mkdir -p /etc/salt/minion.d
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-  cat <<EOF >/etc/salt/minion.d/grains.conf
+cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   master_ip: $MASTER_IP
   etcd_servers: $MASTER_IP
@@ -32,26 +31,37 @@ grains:
     - kubernetes-master
 EOF
 
-  # Configure the salt-master
-  # Auto accept all keys from minions that try to join
-  mkdir -p /etc/salt/master.d
-  cat <<EOF >/etc/salt/master.d/auto-accept.conf
+# Configure the salt-master
+# Auto accept all keys from minions that try to join
+mkdir -p /etc/salt/master.d
+cat <<EOF >/etc/salt/master.d/auto-accept.conf
 open_mode: True
 auto_accept: True
 EOF
 
-  cat <<EOF >/etc/salt/master.d/reactor.conf
+cat <<EOF >/etc/salt/master.d/reactor.conf
 # React to new minions starting by running highstate on them.
 reactor:
   - 'salt/minion/*/start':
     - /srv/reactor/start.sls
 EOF
 
-  cat <<EOF >/etc/salt/master.d/salt-output.conf
+cat <<EOF >/etc/salt/master.d/salt-output.conf
 # Minimize the amount of output to terminal
 state_verbose: False
 state_output: mixed  
 EOF
+
+# Configure nginx authorization
+mkdir -p $KUBE_TEMP
+mkdir -p /srv/salt/nginx
+echo "Using password: $MASTER_USER:$MASTER_PASSWD"
+python $(dirname $0)/../../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $MASTER_USER $MASTER_PASSWD
+MASTER_HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
+echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
+
+# we will run provision to update code each time we test, so we do not want to do salt install each time
+if [ ! $(which salt-master) ]; then
 
   # Install Salt
   #
@@ -67,11 +77,6 @@ EOF
   # (a new service file needs to be added for salt-api)
   curl -sS -L https://raw.githubusercontent.com/saltstack/salt-bootstrap/v2014.06.30/bootstrap-salt.sh | sh -s -- -M
 
-  mkdir -p /srv/salt/nginx
-  echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
-
-  # a file we touch to state that base-setup is done
-  echo "Salt configured" > /var/kube-vagrant-setup
 fi
 
 # Build release

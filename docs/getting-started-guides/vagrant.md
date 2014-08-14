@@ -91,6 +91,28 @@ cluster/kube-push.sh => updates a vagrant cluster
 cluster/kubecfg.sh => interact with the cluster
 ```
 
+### Authenticating with your master
+
+To interact with the cluster, you must authenticate with the master when running cluster/kubecfg.sh commands.
+
+If it's your first time using the cluster, your first invocation of cluster/kubecfg.sh will prompt you for credentials:
+
+```
+cd kubernetes
+cluster/kubecfg.sh list minions
+Please enter Username: vagrant
+Please enter Password: vagrant
+Minion identifier
+----------
+```
+
+The kubecfg.sh command will cache your credentials in a .kubernetes_auth file so you will not be prompted in the future.
+```
+cat ~/.kubernetes_auth
+{"User":"vagrant","Password":"vagrant"}
+```
+
+If you try Kubernetes against multiple cloud providers, make sure this file is correct for your target environment.
 
 ### Running a container
 
@@ -130,6 +152,21 @@ hack/e2e-test.sh
 
 
 ### Troubleshooting
+
+#### I just created the cluster, but I am getting authorization errors!
+
+You probably have an incorrect ~/.kubernetes_auth file for the cluster you are attempting to contact.
+
+```
+rm ~/.kubernetes_auth
+```
+
+And when using kubecfg.sh, provide the correct credentials:
+
+```
+Please enter Username: vagrant
+Please enter Password: vagrant
+```
 
 #### I just created the cluster, but I do not see my container running!
 
