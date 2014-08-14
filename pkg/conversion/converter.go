@@ -88,7 +88,7 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 type FieldMatchingFlags int
 
 const (
-	// Loop through destiation fields, search for matching source
+	// Loop through destination fields, search for matching source
 	// field to copy it from. Source fields with no corresponding
 	// destination field will be ignored. If SourceToDest is
 	// specified, this flag is ignored. If niether is specified,

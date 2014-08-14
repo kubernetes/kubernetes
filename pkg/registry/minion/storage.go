@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // RegistryStorage implements the RESTStorage interface, backed by a MinionRegistry.
@@ -44,6 +45,9 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	if minion.ID == "" {
 		return nil, fmt.Errorf("ID should not be empty: %#v", minion)
 	}
+
+	minion.CreationTimestamp = util.Now()
+
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		err := rs.registry.Insert(minion.ID)
 		if err != nil {
