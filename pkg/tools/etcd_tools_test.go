@@ -17,6 +17,7 @@ limitations under the License.
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -277,6 +278,37 @@ func TestAtomicUpdate(t *testing.T) {
 		t.Errorf("Wanted %v, got %v", expect, got)
 	}
 
+	if !callbackCalled {
+		t.Errorf("tryUpdate callback should have been called.")
+	}
+}
+
+func TestAtomicUpdateNoChange(t *testing.T) {
+	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+	helper := EtcdHelper{fakeClient, scheme, api.NewJSONBaseResourceVersioner()}
+
+	// Create a new node.
+	fakeClient.ExpectNotFoundGet("/some/key")
+	obj := &TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 1}
+	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+		return obj, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+
+	// Update an existing node with the same data
+	callbackCalled := false
+	objUpdate := &TestResource{JSONBase: api.JSONBase{ID: "foo"}, Value: 1}
+	fakeClient.Err = errors.New("should not be called")
+	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in interface{}) (interface{}, error) {
+		callbackCalled = true
+		return objUpdate, nil
+	})
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
 	if !callbackCalled {
 		t.Errorf("tryUpdate callback should have been called.")
 	}

@@ -249,7 +249,7 @@ type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
 //	// Before this function is called, currentObj has been reset to etcd's current
 //	// contents for "myKey".
 //
-//	cur := input.(*MyType) // Gauranteed to work.
+//	cur := input.(*MyType) // Guaranteed to work.
 //
 //	// Make a *modification*.
 //	cur.Counter++
@@ -288,6 +288,10 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate E
 				continue
 			}
 			return err
+		}
+
+		if string(data) == origBody {
+			return nil
 		}
 
 		_, err = h.Client.CompareAndSwap(key, string(data), 0, origBody, index)
