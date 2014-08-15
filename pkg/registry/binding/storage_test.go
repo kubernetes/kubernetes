@@ -17,14 +17,20 @@ limitations under the License.
 package binding
 
 import (
+	"errors"
+	"net/http"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-func TestBindingStorage_Extract(t *testing.T) {
-	b := &BindingStorage{}
+func TestNewBindingStorage(t *testing.T) {
+	mockRegistry := MockRegistry{
+		OnApplyBinding: func(b *api.Binding) error { return nil },
+	}
+	b := NewBindingStorage(mockRegistry)
 
 	binding := &api.Binding{
 		PodID: "foo",
@@ -41,5 +47,69 @@ func TestBindingStorage_Extract(t *testing.T) {
 	}
 	if e, a := binding, obj; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %#v, but got %#v", e, a)
+	}
+}
+
+func TestBindingStorageUnsupported(t *testing.T) {
+	mockRegistry := MockRegistry{
+		OnApplyBinding: func(b *api.Binding) error { return nil },
+	}
+	b := NewBindingStorage(mockRegistry)
+	if _, err := b.Delete("binding id"); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := b.Update(&api.Binding{PodID: "foo", Host: "new machine"}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := b.Get("binding id"); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector()); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	// Try sending wrong object just to get 100% coverage
+	if _, err := b.Create(&api.Pod{}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestBindingStoragePost(t *testing.T) {
+	table := []struct {
+		b   *api.Binding
+		err error
+	}{
+		{b: &api.Binding{PodID: "foo", Host: "bar"}, err: errors.New("no host bar")},
+		{b: &api.Binding{PodID: "baz", Host: "qux"}, err: nil},
+		{b: &api.Binding{PodID: "dvorak", Host: "qwerty"}, err: nil},
+	}
+
+	for i, item := range table {
+		mockRegistry := MockRegistry{
+			OnApplyBinding: func(b *api.Binding) error {
+				if !reflect.DeepEqual(item.b, b) {
+					t.Errorf("%v: expected %#v, but got %#v", i, item, b)
+				}
+				return item.err
+			},
+		}
+		b := NewBindingStorage(mockRegistry)
+		resultChan, err := b.Create(item.b)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+			continue
+		}
+		var expect *api.Status
+		if item.err == nil {
+			expect = &api.Status{Status: api.StatusSuccess}
+		} else {
+			expect = &api.Status{
+				Status:  api.StatusFailure,
+				Code:    http.StatusInternalServerError,
+				Message: item.err.Error(),
+			}
+		}
+		if e, a := expect, <-resultChan; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: expected %#v, got %#v", i, e, a)
+		}
 	}
 }

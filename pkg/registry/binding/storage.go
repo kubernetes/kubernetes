@@ -22,20 +22,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 )
 
 // BindingStorage implements the RESTStorage interface. When bindings are written, it
 // changes the location of the affected pods. This information is eventually reflected
 // in the pod's CurrentState.Host field.
 type BindingStorage struct {
-	podRegistry pod.Registry
+	registry Registry
 }
 
-// MakeBindingStorage makes a new BindingStorage backed by the given PodRegistry.
-func MakeBindingStorage(podRegistry pod.Registry) *BindingStorage {
+// NewBindingStorage makes a new BindingStorage backed by the given bindingRegistry.
+func NewBindingStorage(bindingRegistry Registry) *BindingStorage {
 	return &BindingStorage{
-		podRegistry: podRegistry,
+		registry: bindingRegistry,
 	}
 }
 
@@ -65,8 +64,12 @@ func (b *BindingStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
 	}
-	_ = binding
-	return nil, fmt.Errorf("Implementation coming in the future. Storage layer can't easily support this yet.")
+	return apiserver.MakeAsync(func() (interface{}, error) {
+		if err := b.registry.ApplyBinding(binding); err != nil {
+			return nil, err
+		}
+		return &api.Status{Status: api.StatusSuccess}, nil
+	}), nil
 }
 
 // Update returns an error-- this object may not be updated.
