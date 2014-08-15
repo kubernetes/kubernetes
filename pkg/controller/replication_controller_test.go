@@ -319,7 +319,7 @@ func TestSyncronize(t *testing.T) {
 
 type FakeWatcher struct {
 	w *watch.FakeWatcher
-	*client.FakeClient
+	*client.Fake
 }
 
 func (fw FakeWatcher) WatchReplicationControllers(l, f labels.Selector, rv uint64) (watch.Interface, error) {
@@ -327,7 +327,7 @@ func (fw FakeWatcher) WatchReplicationControllers(l, f labels.Selector, rv uint6
 }
 
 func TestWatchControllers(t *testing.T) {
-	client := FakeWatcher{watch.NewFake(), &client.FakeClient{}}
+	client := FakeWatcher{watch.NewFake(), &client.Fake{}}
 	manager := MakeReplicationManager(client)
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})
