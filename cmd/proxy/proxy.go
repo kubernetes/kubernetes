@@ -18,7 +18,9 @@ package main
 
 import (
 	"flag"
+	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -29,11 +31,12 @@ import (
 
 var (
 	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
+	master         = flag.String("master", "", "The address of the Kubernetes API server (optional)")
 	etcdServerList util.StringList
 )
 
 func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional)")
 }
 
 func main() {
@@ -43,24 +46,39 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	// Set up logger for etcd client
-	etcd.SetLogger(util.NewLogger("etcd "))
-
-	glog.Infof("Using configuration file %s and etcd_servers %v", *configFile, etcdServerList)
-
 	serviceConfig := config.NewServiceConfig()
 	endpointsConfig := config.NewEndpointsConfig()
 
+	// define api config source
+	if *master != "" {
+		glog.Infof("Using api calls to get config %v", *master)
+		//TODO: add auth info
+		client := client.New(*master, nil)
+		config.NewSourceAPI(
+			client,
+			30*time.Second,
+			serviceConfig.Channel("api"),
+			endpointsConfig.Channel("api"),
+		)
+	}
+
 	// Create a configuration source that handles configuration from etcd.
-	etcdClient := etcd.NewClient(etcdServerList)
-	config.NewConfigSourceEtcd(etcdClient,
-		serviceConfig.Channel("etcd"),
-		endpointsConfig.Channel("etcd"))
+	if len(etcdServerList) > 0 && *master == "" {
+		glog.Infof("Using etcd servers %v", etcdServerList)
+
+		// Set up logger for etcd client
+		etcd.SetLogger(util.NewLogger("etcd "))
+		etcdClient := etcd.NewClient(etcdServerList)
+		config.NewConfigSourceEtcd(etcdClient,
+			serviceConfig.Channel("etcd"),
+			endpointsConfig.Channel("etcd"))
+	}
 
 	// And create a configuration source that reads from a local file
 	config.NewConfigSourceFile(*configFile,
 		serviceConfig.Channel("file"),
 		endpointsConfig.Channel("file"))
+	glog.Infof("Using configuration file %s", *configFile)
 
 	loadBalancer := proxy.NewLoadBalancerRR()
 	proxier := proxy.NewProxier(loadBalancer)

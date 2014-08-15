@@ -47,7 +47,7 @@ func main() {
 	}
 
 	controllerManager := controller.NewReplicationManager(
-		client.New("http://"+*master, nil))
+		client.New(*master, nil))
 
 	controllerManager.Run(10 * time.Second)
 	select {}

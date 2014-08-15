@@ -66,7 +66,7 @@ KUBELET_PID=$!
 
 PROXY_LOG=/tmp/kube-proxy.log
 ${GO_OUT}/proxy \
-  --etcd_servers="http://127.0.0.1:4001" &> ${PROXY_LOG} &
+  --master="http://${API_HOST}:${API_PORT}" &> ${PROXY_LOG} &
 PROXY_PID=$!
 
 echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
