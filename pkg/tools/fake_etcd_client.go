@@ -27,6 +27,8 @@ import (
 type EtcdResponseWithError struct {
 	R *etcd.Response
 	E error
+	// if N is non-null, it will be assigned into the map after this response is used for an operation
+	N *EtcdResponseWithError
 }
 
 // TestLogger is a type passed to Test functions to support formatted test logs.
@@ -92,6 +94,15 @@ func (f *FakeEtcdClient) generateIndex() uint64 {
 	return f.ChangeIndex
 }
 
+// Requires that f.Mutex be held.
+func (f *FakeEtcdClient) updateResponse(key string) {
+	resp, found := f.Data[key]
+	if !found || resp.N == nil {
+		return
+	}
+	f.Data[key] = *resp.N
+}
+
 func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
@@ -103,6 +114,7 @@ func (f *FakeEtcdClient) AddChild(key, data string, ttl uint64) (*etcd.Response,
 func (f *FakeEtcdClient) Get(key string, sort, recursive bool) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	result := f.Data[key]
 	if result.R == nil {
@@ -161,6 +173,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 func (f *FakeEtcdClient) Set(key, value string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	return f.setLocked(key, value, ttl)
 }
@@ -182,6 +195,7 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	if !f.nodeExists(key) {
 		f.t.Logf("c&s: node doesn't exist")
@@ -206,6 +220,7 @@ func (f *FakeEtcdClient) CompareAndSwap(key, value string, ttl uint64, prevValue
 func (f *FakeEtcdClient) Create(key, value string, ttl uint64) (*etcd.Response, error) {
 	f.Mutex.Lock()
 	defer f.Mutex.Unlock()
+	defer f.updateResponse(key)
 
 	if f.nodeExists(key) {
 		return nil, EtcdErrorNodeExist
