@@ -182,7 +182,7 @@ Just like the master, we want to have a service to proxy connections to the read
 }
 ```
 
-This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself--as we've done here--to make it easy to locate them with the `kubecfg -l "label=value" list sevices` command.
+This time the selector for the service is `name=redisslave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself--as we've done here--to make it easy to locate them with the `kubecfg -l "label=value" list services` command.
 
 Now that you have created the service specification, create it in your cluster with the `kubecfg` CLI:
 
