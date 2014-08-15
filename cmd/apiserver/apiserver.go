@@ -71,6 +71,10 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 	verifyMinionFlags()
 
+	if len(etcdServerList) == 0 {
+		glog.Fatalf("-etcd_servers flag is required.")
+	}
+
 	var cloud cloudprovider.Interface
 	switch *cloudProvider {
 	case "gce":
@@ -94,26 +98,16 @@ func main() {
 
 	client := client.New("http://"+net.JoinHostPort(*address, strconv.Itoa(int(*port))), nil)
 
-	var m *master.Master
-	if len(etcdServerList) > 0 {
-		m = master.New(&master.Config{
-			Client:             client,
-			Cloud:              cloud,
-			EtcdServers:        etcdServerList,
-			HealthCheckMinions: *healthCheckMinions,
-			Minions:            machineList,
-			MinionCacheTTL:     *minionCacheTTL,
-			MinionRegexp:       *minionRegexp,
-			PodInfoGetter:      podInfoGetter,
-		})
-	} else {
-		m = master.NewMemoryServer(&master.Config{
-			Client:        client,
-			Cloud:         cloud,
-			Minions:       machineList,
-			PodInfoGetter: podInfoGetter,
-		})
-	}
+	m := master.New(&master.Config{
+		Client:             client,
+		Cloud:              cloud,
+		EtcdServers:        etcdServerList,
+		HealthCheckMinions: *healthCheckMinions,
+		Minions:            machineList,
+		MinionCacheTTL:     *minionCacheTTL,
+		MinionRegexp:       *minionRegexp,
+		PodInfoGetter:      podInfoGetter,
+	})
 
 	storage, codec := m.API_v1beta1()
 	s := &http.Server{

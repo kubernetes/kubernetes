@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/memory"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -59,19 +58,6 @@ type Master struct {
 	minionRegistry     minion.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
-}
-
-// NewMemoryServer returns a new instance of Master backed with memory (not etcd).
-func NewMemoryServer(c *Config) *Master {
-	m := &Master{
-		podRegistry:        memory.NewRegistry(),
-		controllerRegistry: memory.NewRegistry(),
-		serviceRegistry:    memory.NewRegistry(),
-		minionRegistry:     minion.NewRegistry(c.Minions),
-		client:             c.Client,
-	}
-	m.init(c.Cloud, c.PodInfoGetter)
-	return m
 }
 
 // New returns a new instance of Master connected to the given etcdServer.

@@ -20,10 +20,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
+func NewServiceRegistry() *ServiceRegistry {
+	return &ServiceRegistry{}
+}
+
 type ServiceRegistry struct {
 	List      api.ServiceList
+	Service   *api.Service
 	Err       error
 	Endpoints api.Endpoints
+
+	DeletedID string
+	GottenID  string
 }
 
 func (r *ServiceRegistry) ListServices() (api.ServiceList, error) {
@@ -31,14 +39,17 @@ func (r *ServiceRegistry) ListServices() (api.ServiceList, error) {
 }
 
 func (r *ServiceRegistry) CreateService(svc api.Service) error {
+	r.Service = &svc
 	return r.Err
 }
 
-func (r *ServiceRegistry) GetService(name string) (*api.Service, error) {
-	return nil, r.Err
+func (r *ServiceRegistry) GetService(id string) (*api.Service, error) {
+	r.GottenID = id
+	return r.Service, r.Err
 }
 
-func (r *ServiceRegistry) DeleteService(name string) error {
+func (r *ServiceRegistry) DeleteService(id string) error {
+	r.DeletedID = id
 	return r.Err
 }
 

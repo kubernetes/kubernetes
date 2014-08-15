@@ -21,15 +21,14 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/memory"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestRegistry(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
@@ -52,7 +51,7 @@ func TestRegistry(t *testing.T) {
 }
 
 func TestServiceStorageValidatesCreate(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	storage := NewRegistryStorage(registry, nil, nil)
 	failureCases := map[string]api.Service{
 		"empty ID": {
@@ -76,7 +75,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 }
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -104,7 +103,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryExternalService(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
@@ -128,7 +127,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 }
 
 func TestServiceRegistryExternalServiceError(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{
 		Err: fmt.Errorf("test error"),
 	}
@@ -144,18 +143,13 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "get-zone" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService("foo")
-	if !apiserver.IsNotFound(err) {
-		if err != nil {
-			t.Errorf("registry.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
-		} else {
-			t.Errorf("registry.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
-		}
+	if registry.Service != nil {
+		t.Errorf("expected registry.CreateService to not get called, but it got %#v", registry.Service)
 	}
 }
 
 func TestServiceRegistryDelete(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
@@ -169,18 +163,13 @@ func TestServiceRegistryDelete(t *testing.T) {
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(svc.ID)
-	if !apiserver.IsNotFound(err) {
-		if err != nil {
-			t.Errorf("registry.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
-		} else {
-			t.Errorf("registry.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
-		}
+	if e, a := "foo", registry.DeletedID; e != a {
+		t.Errorf("expected %v, but got %v", e, a)
 	}
 }
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
-	registry := memory.NewRegistry()
+	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
@@ -195,13 +184,8 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(svc.ID)
-	if !apiserver.IsNotFound(err) {
-		if err != nil {
-			t.Errorf("registry.GetService(%q) failed with %v; expected failure with not found error", svc.ID, err)
-		} else {
-			t.Errorf("registry.GetService(%q) = %v; expected failure with not found error", svc.ID, srv)
-		}
+	if e, a := "foo", registry.DeletedID; e != a {
+		t.Errorf("expected %v, but got %v", e, a)
 	}
 }
 
