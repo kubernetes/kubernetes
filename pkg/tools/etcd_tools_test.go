@@ -496,9 +496,9 @@ func TestWatch(t *testing.T) {
 	}
 
 	fakeClient.WaitForWatchCompletion()
-	// when no get can be done AND the server doesn't provide an index, the Watch is 0 (from now)
-	if fakeClient.WatchIndex != 0 {
-		t.Errorf("Expected client to be at index %d, got %#v", 0, fakeClient)
+	// when server returns not found, the watch index starts at the next value (1)
+	if fakeClient.WatchIndex != 1 {
+		t.Errorf("Expected client to be at index %d, got %#v", 1, fakeClient)
 	}
 
 	// Test normal case
@@ -539,51 +539,35 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		ExpectedVersion uint64
 		ExpectedType    watch.EventType
 	}{
-		"last write was a modify": {
+		"get value created": {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
 						Value:         api.EncodeOrDie(pod),
+						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
-					Action:    "compareAndSwap",
+					Action:    "get",
 					EtcdIndex: 2,
 				},
 			},
 			1,
-			watch.Modified,
-		},
-		"last write was a delete": {
-			EtcdResponseWithError{
-				R: &etcd.Response{
-					Node: &etcd.Node{
-						Value:         api.EncodeOrDie(pod),
-						ModifiedIndex: 2,
-					},
-					PrevNode: &etcd.Node{
-						Value:         api.EncodeOrDie(pod),
-						ModifiedIndex: 1,
-					},
-					Action:    "delete",
-					EtcdIndex: 3,
-				},
-			},
-			2,
-			watch.Deleted,
-		},
-		"last write was a create": {
-			EtcdResponseWithError{
-				R: &etcd.Response{
-					Node: &etcd.Node{
-						Value:         api.EncodeOrDie(pod),
-						ModifiedIndex: 2,
-					},
-					Action:    "create",
-					EtcdIndex: 3,
-				},
-			},
-			2,
 			watch.Added,
+		},
+		"get value modified": {
+			EtcdResponseWithError{
+				R: &etcd.Response{
+					Node: &etcd.Node{
+						Value:         api.EncodeOrDie(pod),
+						CreatedIndex:  1,
+						ModifiedIndex: 2,
+					},
+					Action:    "get",
+					EtcdIndex: 3,
+				},
+			},
+			2,
+			watch.Modified,
 		},
 	}
 
@@ -598,6 +582,9 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		}
 
 		fakeClient.WaitForWatchCompletion()
+		if e, a := testCase.Response.R.EtcdIndex+1, fakeClient.WatchIndex; e != a {
+			t.Errorf("%s: expected watch index to be %d, got %d", k, e, a)
+		}
 
 		// the existing node is detected and the index set
 		event := <-watching.ResultChan()
@@ -693,8 +680,8 @@ func TestWatchFromNotFound(t *testing.T) {
 	}
 
 	fakeClient.WaitForWatchCompletion()
-	if fakeClient.WatchIndex != 2 {
-		t.Errorf("Expected client to wait for %d, got %#v", 2, fakeClient)
+	if fakeClient.WatchIndex != 3 {
+		t.Errorf("Expected client to wait for %d, got %#v", 3, fakeClient)
 	}
 
 	watching.Stop()
