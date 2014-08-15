@@ -16,11 +16,11 @@
 
 # Print 1 if the file in $1 has the correct boilerplate header, 0 otherwise.
 FILE=$1
-EXT=${FILE#*.}
+EXT=${FILE##*.}
 
 REF_FILE="$(dirname $0)/boilerplate.${EXT}.txt"
 
-if [[ ! -e "${REF_FILE}" ]]; then
+if [ ! -e $REF_FILE ]; then
   echo "1"
   exit 0
 fi
