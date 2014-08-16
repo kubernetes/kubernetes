@@ -22,84 +22,91 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// FakeClient implements Interface. Meant to be embedded into a struct to get a default
+type FakeAction struct {
+	Action string
+	Value  interface{}
+}
+
+// Fake implements Interface. Meant to be embedded into a struct to get a default
 // implementation. This makes faking out just the method you want to test easier.
-type FakeClient struct {
-	// FakeClient by default keeps a simple list of the methods that have been called.
-	Actions []string
+type Fake struct {
+	// Fake by default keeps a simple list of the methods that have been called.
+	Actions []FakeAction
+	Pods    api.PodList
+	Ctrl    api.ReplicationController
 }
 
-func (client *FakeClient) ListPods(selector labels.Selector) (api.PodList, error) {
-	client.Actions = append(client.Actions, "list-pods")
-	return api.PodList{}, nil
+func (c *Fake) ListPods(selector labels.Selector) (api.PodList, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "list-pods"})
+	return c.Pods, nil
 }
 
-func (client *FakeClient) GetPod(name string) (api.Pod, error) {
-	client.Actions = append(client.Actions, "get-pod")
+func (c *Fake) GetPod(name string) (api.Pod, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-pod", Value: name})
 	return api.Pod{}, nil
 }
 
-func (client *FakeClient) DeletePod(name string) error {
-	client.Actions = append(client.Actions, "delete-pod")
+func (c *Fake) DeletePod(name string) error {
+	c.Actions = append(c.Actions, FakeAction{Action: "delete-pod", Value: name})
 	return nil
 }
 
-func (client *FakeClient) CreatePod(pod api.Pod) (api.Pod, error) {
-	client.Actions = append(client.Actions, "create-pod")
+func (c *Fake) CreatePod(pod api.Pod) (api.Pod, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "create-pod"})
 	return api.Pod{}, nil
 }
 
-func (client *FakeClient) UpdatePod(pod api.Pod) (api.Pod, error) {
-	client.Actions = append(client.Actions, "update-pod")
+func (c *Fake) UpdatePod(pod api.Pod) (api.Pod, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "update-pod", Value: pod.ID})
 	return api.Pod{}, nil
 }
 
-func (client *FakeClient) ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error) {
-	client.Actions = append(client.Actions, "list-controllers")
+func (c *Fake) ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "list-controllers"})
 	return api.ReplicationControllerList{}, nil
 }
 
-func (client *FakeClient) GetReplicationController(name string) (api.ReplicationController, error) {
-	client.Actions = append(client.Actions, "get-controller")
+func (c *Fake) GetReplicationController(name string) (api.ReplicationController, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-controller", Value: name})
+	return c.Ctrl, nil
+}
+
+func (c *Fake) CreateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "create-controller", Value: controller})
 	return api.ReplicationController{}, nil
 }
 
-func (client *FakeClient) CreateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
-	client.Actions = append(client.Actions, "create-controller")
+func (c *Fake) UpdateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "update-controller", Value: controller})
 	return api.ReplicationController{}, nil
 }
 
-func (client *FakeClient) UpdateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
-	client.Actions = append(client.Actions, "update-controller")
-	return api.ReplicationController{}, nil
-}
-
-func (client *FakeClient) DeleteReplicationController(controller string) error {
-	client.Actions = append(client.Actions, "delete-controller")
+func (c *Fake) DeleteReplicationController(controller string) error {
+	c.Actions = append(c.Actions, FakeAction{Action: "delete-controller", Value: controller})
 	return nil
 }
 
-func (client *FakeClient) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	client.Actions = append(client.Actions, "watch-controllers")
+func (c *Fake) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "watch-controllers"})
 	return watch.NewFake(), nil
 }
 
-func (client *FakeClient) GetService(name string) (api.Service, error) {
-	client.Actions = append(client.Actions, "get-controller")
+func (c *Fake) GetService(name string) (api.Service, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-service", Value: name})
 	return api.Service{}, nil
 }
 
-func (client *FakeClient) CreateService(controller api.Service) (api.Service, error) {
-	client.Actions = append(client.Actions, "create-service")
+func (c *Fake) CreateService(service api.Service) (api.Service, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "create-service", Value: service})
 	return api.Service{}, nil
 }
 
-func (client *FakeClient) UpdateService(controller api.Service) (api.Service, error) {
-	client.Actions = append(client.Actions, "update-service")
+func (c *Fake) UpdateService(service api.Service) (api.Service, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "update-service", Value: service})
 	return api.Service{}, nil
 }
 
-func (client *FakeClient) DeleteService(controller string) error {
-	client.Actions = append(client.Actions, "delete-service")
+func (c *Fake) DeleteService(service string) error {
+	c.Actions = append(c.Actions, FakeAction{Action: "delete-service", Value: service})
 	return nil
 }

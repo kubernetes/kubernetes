@@ -20,18 +20,18 @@ import (
 	"testing"
 )
 
-// This test file just ensures that FakeClient and structs it is embedded in
+// This test file just ensures that Fake and structs it is embedded in
 // implement Interface.
 
 func TestFakeImplementsInterface(t *testing.T) {
-	_ = Interface(&FakeClient{})
+	_ = Interface(&Fake{})
 }
 
 type MyFake struct {
-	*FakeClient
+	*Fake
 }
 
 func TestEmbeddedFakeImplementsInterface(t *testing.T) {
-	_ = Interface(MyFake{&FakeClient{}})
-	_ = Interface(&MyFake{&FakeClient{}})
+	_ = Interface(MyFake{&Fake{}})
+	_ = Interface(&MyFake{&Fake{}})
 }
