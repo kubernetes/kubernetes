@@ -212,7 +212,7 @@ var supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
-func ValidateManifest(manifest *ContainerManifest) []error {
+func ValidateManifest(manifest *ContainerManifest) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	if len(manifest.Version) == 0 {
@@ -225,10 +225,10 @@ func ValidateManifest(manifest *ContainerManifest) []error {
 		allErrs = append(allErrs, errs...)
 	}
 	allErrs = append(allErrs, validateContainers(manifest.Containers, allVolumes)...)
-	return []error(allErrs)
+	return allErrs
 }
 
-func ValidatePodState(podState *PodState) []error {
+func ValidatePodState(podState *PodState) errs.ErrorList {
 	allErrs := errs.ErrorList(ValidateManifest(&podState.Manifest))
 	if podState.RestartPolicy.Type == "" {
 		podState.RestartPolicy.Type = RestartAlways
@@ -238,21 +238,21 @@ func ValidatePodState(podState *PodState) []error {
 		allErrs = append(allErrs, errs.NewNotSupported("PodState.RestartPolicy.Type", podState.RestartPolicy.Type))
 	}
 
-	return []error(allErrs)
+	return allErrs
 }
 
 // Pod tests if required fields in the pod are set.
-func ValidatePod(pod *Pod) []error {
+func ValidatePod(pod *Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if pod.ID == "" {
 		allErrs = append(allErrs, errs.NewInvalid("Pod.ID", pod.ID))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState)...)
-	return []error(allErrs)
+	return allErrs
 }
 
 // ValidateService tests if required fields in the service are set.
-func ValidateService(service *Service) []error {
+func ValidateService(service *Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if service.ID == "" {
 		allErrs = append(allErrs, errs.NewInvalid("Service.ID", service.ID))
@@ -262,21 +262,21 @@ func ValidateService(service *Service) []error {
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewInvalid("Service.Selector", service.Selector))
 	}
-	return []error(allErrs)
+	return allErrs
 }
 
 // ValidateReplicationController tests if required fields in the replication controller are set.
-func ValidateReplicationController(controller *ReplicationController) []error {
-	el := []error{}
+func ValidateReplicationController(controller *ReplicationController) errs.ErrorList {
+	allErrs := errs.ErrorList{}
 	if controller.ID == "" {
-		el = append(el, errs.NewInvalid("ReplicationController.ID", controller.ID))
+		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.ID", controller.ID))
 	}
 	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
-		el = append(el, errs.NewInvalid("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
+		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
 	}
 	if controller.DesiredState.Replicas < 0 {
-		el = append(el, errs.NewInvalid("ReplicationController.Replicas", controller.DesiredState.Replicas))
+		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.Replicas", controller.DesiredState.Replicas))
 	}
-	el = append(el, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest)...)
-	return el
+	allErrs = append(allErrs, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest)...)
+	return allErrs
 }
