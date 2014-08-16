@@ -10,7 +10,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
 ### Step One: Turn up the redis master.
 
-Use the file `examples/guestbook/redis-master.json` which describes a single podrunning a redis key-value server in a container.
+Use the file `examples/guestbook/redis-master.json` which describes a single pod running a redis key-value server in a container.
 
 ```javascript
 {
