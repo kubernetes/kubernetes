@@ -90,11 +90,6 @@ func (list errorListInternal) Error() string {
 	return strings.Join(sl, "; ")
 }
 
-// Deprecated, will be removed soon.
-func (list *ErrorList) Append(errs ...error) {
-	*list = append(*list, errs...)
-}
-
 // ToError converts an ErrorList into a "normal" error, or nil if the list is empty.
 func (list ErrorList) ToError() error {
 	if len(list) == 0 {
