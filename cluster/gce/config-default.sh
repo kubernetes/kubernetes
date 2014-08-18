@@ -29,3 +29,8 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
+
+# Interesting way to override the image of a particular minion
+# MINION_4_IMAGE=centos-6-v20140718
+# In theory, it could also be used like this
+# MASTER_IMAGE=centos-6-v20140718

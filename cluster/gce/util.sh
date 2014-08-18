@@ -117,6 +117,8 @@ function verify-prereqs {
 # Instantiate a kubernetes cluster
 function kube-up {
 
+  local image
+
   # Find the release to use.  Generally it will be passed when doing a 'prod'
   # install and will default to the release/config.sh version when doing a
   # developer up.
@@ -151,12 +153,13 @@ function kube-up {
     --target_tags ${MASTER_TAG} \
     --allowed tcp:443 &
 
+  image=${MASTER_IMAGE-${IMAGE}}
   gcutil addinstance ${MASTER_NAME}\
     --norespect_terminal_width \
     --project ${PROJECT} \
     --zone ${ZONE} \
     --machine_type ${MASTER_SIZE} \
-    --image ${IMAGE} \
+    --image ${image} \
     --tags ${MASTER_TAG} \
     --network ${NETWORK} \
     --service_account_scopes="storage-ro,compute-rw" \
@@ -178,12 +181,13 @@ function kube-up {
       --allowed_ip_sources ${MINION_IP_RANGES[$i]} \
       --allowed "tcp,udp,icmp,esp,ah,sctp" &
 
+    eval image=\${MINION_$NUM_IMAGE-\${IMAGE}}
     gcutil addinstance ${MINION_NAMES[$i]} \
     --norespect_terminal_width \
       --project ${PROJECT} \
       --zone ${ZONE} \
       --machine_type ${MINION_SIZE} \
-      --image ${IMAGE} \
+      --image ${image} \
       --tags ${MINION_TAG} \
       --network ${NETWORK} \
       --service_account_scopes=${MINION_SCOPES} \
