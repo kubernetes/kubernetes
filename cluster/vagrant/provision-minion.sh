@@ -46,7 +46,7 @@ if [ ! $(which salt-minion) ]; then
   #
   # We specify -X to avoid a race condition that can cause minion failure to
   # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-  curl -sS -L http://bootstrap.saltstack.com | sh -s -- -X
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X
 
   ## TODO this only works on systemd distros, need to find a work-around as removing -X above fails to start the services installed
   systemctl enable salt-minion
