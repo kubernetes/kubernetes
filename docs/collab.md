@@ -20,6 +20,8 @@ If a PR has gone 2 work days without an owner emerging, please poke the PR threa
 
 Except for rare cases, such as trivial changes (e.g. typos, comments) or emergencies (e.g. broken builds), maintainers should not merge their own changes.
 
+Expect reviewers to request that you avoid [common go style mistakes](https://code.google.com/p/go-wiki/wiki/CodeReviewComments) in your PRs.
+
 ## Merge hours
 
 Maintainers will do merges between the hours of 7:00 am Monday and 7:00 pm (19:00h) Friday.  PRs that arrive over the weekend or on holidays will only be merged if there is a very good reason for it and if the code review requirements have been met.
