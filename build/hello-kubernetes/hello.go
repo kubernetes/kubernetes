@@ -21,14 +21,11 @@ import (
 	"net/http"
 )
 
-func helloFromKubernetes(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello World! -- Kubernetes")
-}
-
 func main() {
-	http.HandleFunc("/", helloFromKubernetes)
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Hello World! -- Kubernetes")
+	})
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic("ListenAndServe: " + err.Error())
 	}
 }
