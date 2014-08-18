@@ -17,4 +17,5 @@ base:
     - etcd
     - apiserver
     - controller-manager
+    - scheduler
     - nginx
