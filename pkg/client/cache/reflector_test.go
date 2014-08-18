@@ -30,10 +30,10 @@ func TestReflector_watchHandler(t *testing.T) {
 	s.Add("foo", &api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
 	s.Add("bar", &api.Pod{JSONBase: api.JSONBase{ID: "bar"}})
 	go func() {
-		fw.Modify(&api.Pod{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 55}})
-		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 32}})
 		fw.Add(&api.Service{JSONBase: api.JSONBase{ID: "rejected"}})
 		fw.Delete(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
+		fw.Modify(&api.Pod{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 55}})
+		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 32}})
 		fw.Stop()
 	}()
 	var resumeRV uint64
@@ -62,8 +62,8 @@ func TestReflector_watchHandler(t *testing.T) {
 		}
 	}
 
-	// RV should stay 1 higher than the highest id we see.
-	if e, a := uint64(56), resumeRV; e != a {
+	// RV should stay 1 higher than the last id we see.
+	if e, a := uint64(33), resumeRV; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -87,7 +87,7 @@ func TestReflector_Run(t *testing.T) {
 	}
 	s := NewFIFO()
 	r := NewReflector(watchStarter, &api.Pod{}, s)
-	r.loopDelay = 0
+	r.period = 0
 	r.Run()
 
 	ids := []string{"foo", "bar", "baz", "qux", "zoo"}

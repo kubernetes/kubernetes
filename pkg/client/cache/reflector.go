@@ -26,29 +26,17 @@ import (
 	"github.com/golang/glog"
 )
 
-// Store is a generic object storage interface. Reflector knows how to watch a server
-// and update a store. A generic store is provided, which allows Reflector to be used
-// as a local caching system, and an LRU store, which allows Reflector to work like a
-// queue of items yet to be processed.
-type Store interface {
-	Add(ID string, obj interface{})
-	Update(ID string, obj interface{})
-	Delete(ID string, obj interface{})
-	List() []interface{}
-	Get(ID string) (item interface{}, exists bool)
-}
-
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// The type of object we expect to place in the store.
 	expectedType reflect.Type
 	// The destination to sync up with the watch source
 	store Store
-	// watchCreater is called to initiate watches.
+	// watchFactory is called to initiate watches.
 	watchFactory WatchFactory
-	// loopDelay controls timing between one watch ending and
+	// period controls timing between one watch ending and
 	// the beginning of the next one.
-	loopDelay time.Duration
+	period time.Duration
 }
 
 // WatchFactory should begin a watch at the specified version.
@@ -62,7 +50,7 @@ func NewReflector(watchFactory WatchFactory, expectedType interface{}, store Sto
 		watchFactory: watchFactory,
 		store:        store,
 		expectedType: reflect.TypeOf(expectedType),
-		loopDelay:    time.Second,
+		period:       time.Second,
 	}
 	return gc
 }
@@ -78,7 +66,7 @@ func (gc *Reflector) Run() {
 			return
 		}
 		gc.watchHandler(w, &resourceVersion)
-	}, gc.loopDelay)
+	}, gc.period)
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
@@ -104,13 +92,13 @@ func (gc *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
 		case watch.Modified:
 			gc.store.Update(jsonBase.ID(), event.Object)
 		case watch.Deleted:
-			gc.store.Delete(jsonBase.ID(), event.Object)
+			// TODO: Will any consumers need access to the "last known
+			// state", which is passed in event.Object? If so, may need
+			// to change this.
+			gc.store.Delete(jsonBase.ID())
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
-		next := jsonBase.ResourceVersion() + 1
-		if next > *resourceVersion {
-			*resourceVersion = next
-		}
+		*resourceVersion = jsonBase.ResourceVersion() + 1
 	}
 }
