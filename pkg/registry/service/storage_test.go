@@ -191,11 +191,19 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 	service := api.Service{
-		JSONBase:      api.JSONBase{ID: "foo"},
+		JSONBase:      api.JSONBase{ID: "foo-bar"},
 		Selector:      map[string]string{"bar": "baz"},
 		ContainerPort: util.IntOrString{Kind: util.IntstrString, StrVal: "a-b-c"},
 	}
-	vars := makeLinkVariables(service, "mars")
+	registry := registrytest.NewServiceRegistry()
+	registry.List = api.ServiceList{
+		Items: []api.Service{service},
+	}
+	machine := "machine"
+	vars, err := GetServiceEnvironmentVariables(registry, machine)
+	if err != nil {
+		t.Errorf("unexpected err: %v", err)
+	}
 	for _, v := range vars {
 		if !util.IsCIdentifier(v.Name) {
 			t.Errorf("Environment variable name is not valid: %v", v.Name)
