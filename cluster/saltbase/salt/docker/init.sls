@@ -1,11 +1,11 @@
 include:
   - base
 
-# We need IPv4 forwarding on
+# We need IPv4 forwarding on.
 net.ipv4.ip_forward:
   sysctl.present:
   - value: 1
-{% if grains['cloud_provider'] == 'gce' %}
+{% if salt['file.file_exists']('/etc/sysctl.d/11-gce-network-security.conf') %}
 # The default GCE images have ip_forwarding explicitly set to 0.
 # Here we take care of commenting that out on the specific file.
   - config: /etc/sysctl.d/11-gce-network-security.conf
