@@ -17,6 +17,8 @@ limitations under the License.
 package health
 
 import (
+	"sync"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
 )
@@ -36,16 +38,32 @@ type HealthChecker interface {
 	HealthCheck(podFullName string, currentState api.PodState, container api.Container) (Status, error)
 }
 
+// protects checkers
+var checkerLock = sync.Mutex{}
 var checkers = map[string]HealthChecker{}
 
+// Add a health checker to the list of known HealthChecker objects.  Any subsequent call to
+// NewHealthChecker will know about this HealthChecker.
+// panics if 'key' is already present.
 func AddHealthChecker(key string, checker HealthChecker) {
+	checkerLock.Lock()
+	defer checkerLock.Unlock()
+	if _, found := checkers[key]; found {
+		glog.Fatalf("HealthChecker already defined for key %s.", key)
+	}
 	checkers[key] = checker
 }
 
 // NewHealthChecker creates a new HealthChecker which supports multiple types of liveness probes.
 func NewHealthChecker() HealthChecker {
+	checkerLock.Lock()
+	defer checkerLock.Unlock()
+	input := map[string]HealthChecker{}
+	for key, value := range checkers {
+		input[key] = value
+	}
 	return &muxHealthChecker{
-		checkers: checkers,
+		checkers: input,
 	}
 }
 
