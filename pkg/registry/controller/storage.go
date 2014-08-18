@@ -48,7 +48,7 @@ func NewRegistryStorage(registry Registry, podRegistry pod.Registry) apiserver.R
 	}
 }
 
-// Create registers then given ReplicationController.
+// Create registers the given ReplicationController.
 func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
@@ -70,7 +70,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return rs.waitForController(*controller)
+		return rs.registry.GetController(controller.ID)
 	}), nil
 }
 
@@ -124,7 +124,7 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return rs.waitForController(*controller)
+		return rs.registry.GetController(controller.ID)
 	}), nil
 }
 

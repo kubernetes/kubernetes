@@ -239,30 +239,10 @@ func TestCreateController(t *testing.T) {
 	}
 
 	select {
+	case <-channel:
+		// expected case
 	case <-time.After(time.Millisecond * 100):
-		// Do nothing, this is expected.
-	case <-channel:
-		t.Error("Unexpected read from async channel")
-	}
-
-	mockPodRegistry.Lock()
-	mockPodRegistry.Pods = []api.Pod{
-		{
-			JSONBase: api.JSONBase{ID: "foo"},
-			Labels:   map[string]string{"a": "b"},
-		},
-		{
-			JSONBase: api.JSONBase{ID: "bar"},
-			Labels:   map[string]string{"a": "b"},
-		},
-	}
-	mockPodRegistry.Unlock()
-
-	select {
-	case <-time.After(time.Second * 1):
-		t.Error("Unexpected timeout")
-	case <-channel:
-		// Do nothing, this is expected
+		t.Error("Unexpected timeout from async channel")
 	}
 }
 

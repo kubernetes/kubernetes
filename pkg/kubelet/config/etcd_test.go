@@ -63,7 +63,7 @@ func TestGetEtcdNoData(t *testing.T) {
 		R: &etcd.Response{},
 		E: nil,
 	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
+	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
 	_, err := c.fetchNextState(0)
 	if err == nil {
 		t.Errorf("Expected error")
@@ -86,7 +86,7 @@ func TestGetEtcd(t *testing.T) {
 		},
 		E: nil,
 	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
+	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
 	lastIndex, err := c.fetchNextState(0)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -118,7 +118,7 @@ func TestWatchEtcd(t *testing.T) {
 		},
 		E: nil,
 	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
+	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
 	lastIndex, err := c.fetchNextState(1)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -140,7 +140,7 @@ func TestGetEtcdNotFound(t *testing.T) {
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
+	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
 	_, err := c.fetchNextState(0)
 	if err == nil {
 		t.Errorf("Expected error")
@@ -157,7 +157,7 @@ func TestGetEtcdError(t *testing.T) {
 			ErrorCode: 200, // non not found error
 		},
 	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond}
+	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
 	_, err := c.fetchNextState(0)
 	if err == nil {
 		t.Errorf("Expected error")
