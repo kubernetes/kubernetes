@@ -69,14 +69,7 @@ if [ ! $(which salt-master) ]; then
   # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
   #
   # -M installs the master
-  # FIXME: The following line should be replaced with:
-  # curl -L http://bootstrap.saltstack.com | sh -s -- -M
-  # when the merged salt-api service is included in the fedora salt-master rpm
-  # Merge is here: https://github.com/saltstack/salt/pull/13554
-  # Fedora git repository is here: http://pkgs.fedoraproject.org/cgit/salt.git/
-  # (a new service file needs to be added for salt-api)
-  curl -sS -L https://raw.githubusercontent.com/saltstack/salt-bootstrap/v2014.06.30/bootstrap-salt.sh | sh -s -- -M
-
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M
 fi
 
 # Build release
