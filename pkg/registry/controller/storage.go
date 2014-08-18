@@ -131,7 +131,17 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 // Watch returns ReplicationController events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
 func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return rs.registry.WatchControllers(label, field, resourceVersion)
+	if !field.Empty() {
+		return nil, fmt.Errorf("no field selector implemented for controllers")
+	}
+	incoming, err := rs.registry.WatchControllers(resourceVersion)
+	if err != nil {
+		return nil, err
+	}
+	return watch.Filter(incoming, func(e watch.Event) (watch.Event, bool) {
+		repController := e.Object.(*api.ReplicationController)
+		return e, label.Matches(labels.Set(repController.Labels))
+	}), nil
 }
 
 func (rs *RegistryStorage) waitForController(ctrl api.ReplicationController) (interface{}, error) {

@@ -55,9 +55,8 @@ func expectPod(t *testing.T, ch <-chan interface{}) (*api.Pod, bool) {
 }
 
 func TestCreatePodRegistryError(t *testing.T) {
-	podRegistry := &registrytest.PodRegistry{
-		Err: fmt.Errorf("test error"),
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
 		scheduler: &registrytest.Scheduler{},
 		registry:  podRegistry,
@@ -96,12 +95,11 @@ func TestCreatePodSchedulerError(t *testing.T) {
 }
 
 func TestCreatePodSetsIds(t *testing.T) {
-	mockRegistry := &registrytest.PodRegistryStorage{
-		PodRegistry: registrytest.PodRegistry{Err: fmt.Errorf("test error")},
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
 		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  mockRegistry,
+		registry:  podRegistry,
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
@@ -113,26 +111,25 @@ func TestCreatePodSetsIds(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
 	}
-	expectApiStatusError(t, ch, mockRegistry.Err.Error())
+	expectApiStatusError(t, ch, podRegistry.Err.Error())
 
-	if len(mockRegistry.PodRegistry.Pod.ID) == 0 {
+	if len(podRegistry.Pod.ID) == 0 {
 		t.Errorf("Expected pod ID to be set, Got %#v", pod)
 	}
-	if mockRegistry.PodRegistry.Pod.DesiredState.Manifest.ID != mockRegistry.PodRegistry.Pod.ID {
+	if podRegistry.Pod.DesiredState.Manifest.ID != podRegistry.Pod.ID {
 		t.Errorf("Expected manifest ID to be equal to pod ID, Got %#v", pod)
 	}
 }
 
 func TestListPodsError(t *testing.T) {
-	mockRegistry := registrytest.PodRegistry{
-		Err: fmt.Errorf("test error"),
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		registry: &mockRegistry,
+		registry: podRegistry,
 	}
 	pods, err := storage.List(labels.Everything())
-	if err != mockRegistry.Err {
-		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
+	if err != podRegistry.Err {
+		t.Errorf("Expected %#v, Got %#v", podRegistry.Err, err)
 	}
 	if len(pods.(api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
@@ -140,9 +137,9 @@ func TestListPodsError(t *testing.T) {
 }
 
 func TestListEmptyPodList(t *testing.T) {
-	mockRegistry := registrytest.PodRegistry{}
+	podRegistry := registrytest.NewPodRegistry(nil)
 	storage := RegistryStorage{
-		registry: &mockRegistry,
+		registry: podRegistry,
 	}
 	pods, err := storage.List(labels.Everything())
 	if err != nil {
@@ -155,22 +152,21 @@ func TestListEmptyPodList(t *testing.T) {
 }
 
 func TestListPodList(t *testing.T) {
-	mockRegistry := registrytest.PodRegistry{
-		Pods: []api.Pod{
-			{
-				JSONBase: api.JSONBase{
-					ID: "foo",
-				},
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pods = []api.Pod{
+		{
+			JSONBase: api.JSONBase{
+				ID: "foo",
 			},
-			{
-				JSONBase: api.JSONBase{
-					ID: "bar",
-				},
+		},
+		{
+			JSONBase: api.JSONBase{
+				ID: "bar",
 			},
 		},
 	}
 	storage := RegistryStorage{
-		registry: &mockRegistry,
+		registry: podRegistry,
 	}
 	podsObj, err := storage.List(labels.Everything())
 	pods := podsObj.(api.PodList)
@@ -190,9 +186,9 @@ func TestListPodList(t *testing.T) {
 }
 
 func TestPodDecode(t *testing.T) {
-	mockRegistry := registrytest.PodRegistry{}
+	podRegistry := registrytest.NewPodRegistry(nil)
 	storage := RegistryStorage{
-		registry: &mockRegistry,
+		registry: podRegistry,
 	}
 	expected := &api.Pod{
 		JSONBase: api.JSONBase{
@@ -215,13 +211,10 @@ func TestPodDecode(t *testing.T) {
 }
 
 func TestGetPod(t *testing.T) {
-	mockRegistry := registrytest.PodRegistry{
-		Pod: &api.Pod{
-			JSONBase: api.JSONBase{ID: "foo"},
-		},
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	storage := RegistryStorage{
-		registry: &mockRegistry,
+		registry: podRegistry,
 	}
 	obj, err := storage.Get("foo")
 	pod := obj.(*api.Pod)
@@ -229,20 +222,17 @@ func TestGetPod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(*mockRegistry.Pod, *pod) {
-		t.Errorf("Unexpected pod.  Expected %#v, Got %#v", *mockRegistry.Pod, *pod)
+	if e, a := podRegistry.Pod, pod; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected pod. Expected %#v, Got %#v", e, a)
 	}
 }
 
 func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &cloudprovider.FakeCloud{}
-	mockRegistry := registrytest.PodRegistry{
-		Pod: &api.Pod{
-			JSONBase: api.JSONBase{ID: "foo"},
-		},
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	storage := RegistryStorage{
-		registry:      &mockRegistry,
+		registry:      podRegistry,
 		cloudProvider: fakeCloud,
 	}
 	obj, err := storage.Get("foo")
@@ -251,8 +241,8 @@ func TestGetPodCloud(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(*mockRegistry.Pod, *pod) {
-		t.Errorf("Unexpected pod.  Expected %#v, Got %#v", *mockRegistry.Pod, *pod)
+	if e, a := podRegistry.Pod, pod; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected pod. Expected %#v, Got %#v", e, a)
 	}
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "ip-address" {
 		t.Errorf("Unexpected calls: %#v", fakeCloud.Calls)
@@ -354,12 +344,11 @@ func TestMakePodStatus(t *testing.T) {
 }
 
 func TestPodStorageValidatesCreate(t *testing.T) {
-	mockRegistry := &registrytest.PodRegistryStorage{
-		PodRegistry: registrytest.PodRegistry{Err: fmt.Errorf("test error")},
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
 		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  mockRegistry,
+		registry:  podRegistry,
 	}
 	pod := &api.Pod{}
 	c, err := storage.Create(pod)
@@ -372,12 +361,11 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 }
 
 func TestPodStorageValidatesUpdate(t *testing.T) {
-	mockRegistry := &registrytest.PodRegistryStorage{
-		PodRegistry: registrytest.PodRegistry{Err: fmt.Errorf("test error")},
-	}
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
 		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  mockRegistry,
+		registry:  podRegistry,
 	}
 	pod := &api.Pod{}
 	c, err := storage.Update(pod)
@@ -390,16 +378,15 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 }
 
 func TestCreatePod(t *testing.T) {
-	mockRegistry := registrytest.PodRegistry{
-		Pod: &api.Pod{
-			JSONBase: api.JSONBase{ID: "foo"},
-			CurrentState: api.PodState{
-				Host: "machine",
-			},
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pod = &api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
+		CurrentState: api.PodState{
+			Host: "machine",
 		},
 	}
 	storage := RegistryStorage{
-		registry:      &mockRegistry,
+		registry:      podRegistry,
 		podPollPeriod: time.Millisecond * 100,
 		scheduler:     scheduler.MakeRoundRobinScheduler(),
 		minionLister:  minion.NewRegistry([]string{"machine"}),
@@ -424,7 +411,8 @@ func TestCreatePod(t *testing.T) {
 	case <-channel:
 		t.Error("Unexpected read from async channel")
 	}
-	mockRegistry.UpdatePod(api.Pod{
+	// TODO: Is the below actually testing something?
+	podRegistry.UpdatePod(api.Pod{
 		JSONBase: api.JSONBase{ID: "foo"},
 		CurrentState: api.PodState{
 			Status: api.PodRunning,

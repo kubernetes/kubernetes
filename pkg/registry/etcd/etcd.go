@@ -77,6 +77,11 @@ func (r *Registry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 	return filteredPods, nil
 }
 
+// WatchPods begins watching for new, changed, or deleted pods.
+func (r *Registry) WatchPods(resourceVersion uint64) (watch.Interface, error) {
+	return r.WatchList("/registry/pods", resourceVersion, tools.Everything)
+}
+
 // GetPod gets a specific pod specified by its ID.
 func (r *Registry) GetPod(podID string) (*api.Pod, error) {
 	var pod api.Pod
@@ -209,13 +214,8 @@ func (r *Registry) ListControllers() ([]api.ReplicationController, error) {
 }
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
-func (r *Registry) WatchControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	if !field.Empty() {
-		return nil, fmt.Errorf("no field selector implemented for controllers")
-	}
-	return r.WatchList("/registry/controllers", resourceVersion, func(obj interface{}) bool {
-		return label.Matches(labels.Set(obj.(*api.ReplicationController).Labels))
-	})
+func (r *Registry) WatchControllers(resourceVersion uint64) (watch.Interface, error) {
+	return r.WatchList("/registry/controllers", resourceVersion, tools.Everything)
 }
 
 func makeControllerKey(id string) string {
