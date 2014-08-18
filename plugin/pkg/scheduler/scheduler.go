@@ -31,7 +31,7 @@ type Binder interface {
 // Scheduler watches for new unscheduled pods. It attempts to find
 // minions that they fit on and writes bindings back to the api server.
 type Scheduler struct {
-	c *Config
+	config *Config
 }
 
 type Config struct {
@@ -53,28 +53,28 @@ type Config struct {
 // New returns a new scheduler.
 func New(c *Config) *Scheduler {
 	s := &Scheduler{
-		c: c,
+		config: c,
 	}
 	return s
 }
 
-// Run begins watching and scheduling.
+// Run begins watching and scheduling. It starts a goroutine and returns immediately.
 func (s *Scheduler) Run() {
 	go util.Forever(s.scheduleOne, 0)
 }
 
 func (s *Scheduler) scheduleOne() {
-	pod := s.c.NextPod()
-	dest, err := s.c.Algorithm.Schedule(*pod, s.c.MinionLister)
+	pod := s.config.NextPod()
+	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
-		s.c.Error(pod, err)
+		s.config.Error(pod, err)
 		return
 	}
 	b := &api.Binding{
 		PodID: pod.ID,
 		Host:  dest,
 	}
-	if err := s.c.Binder.Bind(b); err != nil {
-		s.c.Error(pod, err)
+	if err := s.config.Binder.Bind(b); err != nil {
+		s.config.Error(pod, err)
 	}
 }
