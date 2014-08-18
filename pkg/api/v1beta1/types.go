@@ -158,7 +158,8 @@ type ExecProbe struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
-	// a shell, you need to explicitly call out to that shell
+	// a shell, you need to explicitly call out to that shell.
+	// A return code of zero is treated as 'Healthy', non-zero is 'Unhealthy'
 	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
 }
 
