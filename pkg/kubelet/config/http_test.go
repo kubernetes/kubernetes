@@ -47,6 +47,53 @@ func TestExtractFromHttpBadness(t *testing.T) {
 	expectEmptyChannel(t, ch)
 }
 
+func TestExtractInvalidManifest(t *testing.T) {
+	var testCases = []struct {
+		desc      string
+		manifests interface{}
+	}{
+		{
+			desc:      "No version",
+			manifests: []api.ContainerManifest{{Version: ""}},
+		},
+		{
+			desc:      "Invalid version",
+			manifests: []api.ContainerManifest{{Version: "v1betta2"}},
+		},
+		{
+			desc: "Invalid volume name",
+			manifests: []api.ContainerManifest{
+				{Version: "v1beta1", Volumes: []api.Volume{{Name: "_INVALID_"}}},
+			},
+		},
+		{
+			desc: "Duplicate volume names",
+			manifests: []api.ContainerManifest{
+				{
+					Version: "v1beta1",
+					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		data, err := json.Marshal(testCase.manifests)
+		if err != nil {
+			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
+		}
+		fakeHandler := util.FakeHandler{
+			StatusCode:   200,
+			ResponseBody: string(data),
+		}
+		testServer := httptest.NewServer(&fakeHandler)
+		ch := make(chan interface{}, 1)
+		c := SourceURL{testServer.URL, ch}
+		if err := c.extractFromURL(); err == nil {
+			t.Errorf("%s: Expected error", testCase.desc)
+		}
+	}
+}
+
 func TestExtractFromHTTP(t *testing.T) {
 	var testCases = []struct {
 		desc      string
