@@ -107,21 +107,7 @@ func Update(name string, client client.Interface, updatePeriod time.Duration) er
 
 // StopController stops a controller named 'name' by setting replicas to zero
 func StopController(name string, client client.Interface) error {
-	controller, err := client.GetReplicationController(name)
-	if err != nil {
-		return err
-	}
-	controller.DesiredState.Replicas = 0
-	controllerOut, err := client.UpdateReplicationController(controller)
-	if err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(controllerOut)
-	if err != nil {
-		return err
-	}
-	fmt.Print(string(data))
-	return nil
+	return ResizeController(name, 0, client)
 }
 
 // ResizeController resizes a controller named 'name' by setting replicas to 'replicas'
