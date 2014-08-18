@@ -96,7 +96,7 @@ func New(host string, auth *AuthInfo) *Client {
 			},
 		},
 		Sync:       false,
-		PollPeriod: time.Second * 20,
+		PollPeriod: time.Second * 2,
 		Timeout:    time.Second * 20,
 	}
 }
