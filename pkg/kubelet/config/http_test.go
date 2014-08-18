@@ -41,97 +41,72 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
 	c := SourceURL{"http://localhost:49575/_not_found_", ch}
-	err := c.extractFromURL()
-	if err == nil {
+	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
 	expectEmptyChannel(t, ch)
 }
 
-func TestExtractFromHttpSingle(t *testing.T) {
-	manifests := []api.ContainerManifest{
-		{Version: "v1beta1", ID: "foo"},
+func TestExtractFromHTTP(t *testing.T) {
+	var testCases = []struct {
+		desc      string
+		manifests interface{}
+		expected  kubelet.PodUpdate
+	}{
+		{
+			desc:      "Single manifest",
+			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
+			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.Pod{
+					Name:     "foo",
+					Manifest: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
+				}),
+		},
+		{
+			desc: "Multiple manifests",
+			manifests: []api.ContainerManifest{
+				{Version: "v1beta1", ID: "", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+			},
+			expected: CreatePodUpdate(kubelet.SET,
+				kubelet.Pod{
+					Name:     "1",
+					Manifest: api.ContainerManifest{Version: "v1beta1", ID: "", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				},
+				kubelet.Pod{
+					Name:     "bar",
+					Manifest: api.ContainerManifest{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				}),
+		},
+		{
+			desc:      "Empty Array",
+			manifests: []api.ContainerManifest{},
+			expected:  CreatePodUpdate(kubelet.SET),
+		},
 	}
-	// Taking a single-manifest from a URL allows kubelet to be used
-	// in the implementation of google's container VM image.
-	data, err := json.Marshal(manifests[0])
-
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(data),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	ch := make(chan interface{}, 1)
-	c := SourceURL{testServer.URL, ch}
-
-	err = c.extractFromURL()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: manifests[0]})
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected: %#v, Got: %#v", expected, update)
-	}
-}
-
-func TestExtractFromHttpMultiple(t *testing.T) {
-	manifests := []api.ContainerManifest{
-		{Version: "v1beta1", ID: "", Containers: []api.Container{{Name: "1", Image: "foo"}}},
-		{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
-	}
-	data, err := json.Marshal(manifests)
-	if err != nil {
-		t.Fatalf("Some weird json problem: %v", err)
-	}
-
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(data),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	ch := make(chan interface{}, 1)
-	c := SourceURL{testServer.URL, ch}
-
-	err = c.extractFromURL()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "1", Manifest: manifests[0]}, kubelet.Pod{Name: "bar", Manifest: manifests[1]})
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected: %#v, Got: %#v", expected, update)
-	}
-	for i := range update.Pods {
-		if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
-			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
+	for _, testCase := range testCases {
+		data, err := json.Marshal(testCase.manifests)
+		if err != nil {
+			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
 		}
-	}
-}
-
-func TestExtractFromHttpEmptyArray(t *testing.T) {
-	manifests := []api.ContainerManifest{}
-	data, err := json.Marshal(manifests)
-	if err != nil {
-		t.Fatalf("Some weird json problem: %v", err)
-	}
-
-	fakeHandler := util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(data),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	ch := make(chan interface{}, 1)
-	c := SourceURL{testServer.URL, ch}
-
-	err = c.extractFromURL()
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET)
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected: %#v, Got: %#v", expected, update)
+		fakeHandler := util.FakeHandler{
+			StatusCode:   200,
+			ResponseBody: string(data),
+		}
+		testServer := httptest.NewServer(&fakeHandler)
+		ch := make(chan interface{}, 1)
+		c := SourceURL{testServer.URL, ch}
+		if err := c.extractFromURL(); err != nil {
+			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
+		}
+		update := (<-ch).(kubelet.PodUpdate)
+		if !reflect.DeepEqual(testCase.expected, update) {
+			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
+		}
+		for i := range update.Pods {
+			if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+				t.Errorf("%s: Expected no validation errors on %#v, Got %#v", testCase.desc, update.Pods[i], errs)
+			}
+		}
 	}
 }
