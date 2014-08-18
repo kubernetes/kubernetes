@@ -74,6 +74,7 @@ func NewMainKubelet(
 		rootDirectory:  rd,
 		resyncInterval: ri,
 		podWorkers:     newPodWorkers(),
+		runner:         NewDockerContainerCommandRunner(),
 	}
 }
 
@@ -451,9 +452,10 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 			// look for changes in the container.
 			if hash == 0 || hash == expectedHash {
 				// TODO: This should probably be separated out into a separate goroutine.
-				healthy, err := kl.healthy(podState, container, dockerContainer)
+				healthy, err := kl.healthy(podFullName, podState, container, dockerContainer)
 				if err != nil {
 					glog.V(1).Infof("health check errored: %v", err)
+					containersToKeep[containerID] = empty{}
 					continue
 				}
 				if healthy == health.Healthy {
@@ -702,7 +704,7 @@ func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
 	return kl.cadvisorClient.MachineInfo()
 }
 
-func (kl *Kubelet) healthy(currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
+func (kl *Kubelet) healthy(podFullName string, currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
 		return health.Healthy, nil
@@ -713,7 +715,7 @@ func (kl *Kubelet) healthy(currentState api.PodState, container api.Container, d
 	if kl.healthChecker == nil {
 		return health.Healthy, nil
 	}
-	return kl.healthChecker.HealthCheck(currentState, container)
+	return kl.healthChecker.HealthCheck(podFullName, currentState, container)
 }
 
 // Returns logs of current machine.
@@ -723,11 +725,10 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 }
 
 // Run a command in a container, returns the combined stdout, stderr as an array of bytes
-func (kl *Kubelet) RunInContainer(pod *Pod, container string, cmd []string) ([]byte, error) {
+func (kl *Kubelet) RunInContainer(podFullName, container string, cmd []string) ([]byte, error) {
 	if kl.runner == nil {
 		return nil, fmt.Errorf("no runner specified.")
 	}
-	podFullName := GetPodFullName(pod)
 	dockerContainers, err := getKubeletDockerContainers(kl.dockerClient)
 	if err != nil {
 		return nil, err

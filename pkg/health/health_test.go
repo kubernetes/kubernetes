@@ -30,6 +30,7 @@ import (
 const statusServerEarlyShutdown = -1
 
 func TestHealthChecker(t *testing.T) {
+	AddHealthChecker("http", &HTTPHealthChecker{client: &http.Client{}})
 	var healthCheckerTests = []struct {
 		status int
 		health Status
@@ -67,7 +68,7 @@ func TestHealthChecker(t *testing.T) {
 			},
 		}
 		hc := NewHealthChecker()
-		health, err := hc.HealthCheck(api.PodState{}, container)
+		health, err := hc.HealthCheck("test", api.PodState{}, container)
 		if err != nil && tt.health != Unknown {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -133,7 +134,7 @@ func TestMuxHealthChecker(t *testing.T) {
 		container.LivenessProbe.Type = tt.probeType
 		container.LivenessProbe.HTTPGet.Port = util.MakeIntOrStringFromString(port)
 		container.LivenessProbe.HTTPGet.Host = host
-		health, err := mc.HealthCheck(api.PodState{}, container)
+		health, err := mc.HealthCheck("test", api.PodState{}, container)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}

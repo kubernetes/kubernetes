@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
@@ -150,6 +151,10 @@ func main() {
 		etcdClient,
 		*rootDirectory,
 		*syncFrequency)
+
+	health.AddHealthChecker("exec", health.NewExecHealthChecker(k))
+	health.AddHealthChecker("http", health.NewHTTPHealthChecker(&http.Client{}))
+	health.AddHealthChecker("tcp", &health.TCPHealthChecker{})
 
 	// start the kubelet
 	go util.Forever(func() { k.Run(cfg.Updates()) }, 0)

@@ -473,7 +473,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 
 type FalseHealthChecker struct{}
 
-func (f *FalseHealthChecker) HealthCheck(state api.PodState, container api.Container) (health.Status, error) {
+func (f *FalseHealthChecker) HealthCheck(podFullName string, state api.PodState, container api.Container) (health.Status, error) {
 	return health.Unhealthy, nil
 }
 
@@ -1056,7 +1056,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "etcd"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		&Pod{Name: podName, Namespace: podNamespace},
+		podName+"."+podNamespace,
 		containerName,
 		[]string{"ls"})
 	if output != nil {
@@ -1086,7 +1086,7 @@ func TestRunInContainer(t *testing.T) {
 
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer(
-		&Pod{Name: podName, Namespace: podNamespace},
+		podName+"."+podNamespace,
 		containerName,
 		cmd)
 	if fakeCommandRunner.ID != containerID {

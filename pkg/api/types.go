@@ -150,6 +150,15 @@ type TCPSocketProbe struct {
 	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
 }
 
+// ExecProbe describes a "run in container" health probe.
+type ExecProbe struct {
+	// Command is the command line to execute inside the container, the working directory for the
+	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
+	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
+	// a shell, you need to explicitly call out to that shell
+	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
+}
+
 // LivenessProbe describes a liveness probe to be examined to the container.
 type LivenessProbe struct {
 	// Type of liveness probe.  Current legal values "http", "tcp"
@@ -158,6 +167,8 @@ type LivenessProbe struct {
 	HTTPGet *HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
 	// TCPSocketProbe parameter, required if Type == 'tcp'
 	TCPSocket *TCPSocketProbe `yaml:"tcpSocket,omitempty" json:"tcpSocket,omitempty"`
+	// ExecProbe parameter, required if Type == 'exec'
+	Exec *ExecProbe `yaml:"exec,omitempty" json:"exec,omitempty"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
 }
