@@ -1,5 +1,12 @@
 ## Getting started locally
 
+### Requirements 
+
+ - Linux 
+ - Docker 1.0.0+
+
+Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](vagrant.md), or on a cloud provider like [Google Compute Engine](gce.md)
+
 In a separate tab of your terminal, run:
 
 ```
