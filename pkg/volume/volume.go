@@ -167,6 +167,9 @@ func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 	// Volume information is extracted from the directory structure:
 	// (ROOT_DIR)/(POD_ID)/volumes/(VOLUME_KIND)/(VOLUME_NAME)
 	for _, podIDDir := range podIDDirs {
+		if !podIDDir.IsDir() {
+			continue
+		}
 		podID := podIDDir.Name()
 		podIDPath := path.Join(mountPath, podID, "volumes")
 		volumeKindDirs, err := ioutil.ReadDir(podIDPath)
