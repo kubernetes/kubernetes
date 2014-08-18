@@ -134,7 +134,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 		return result, err
 	}
 	for _, service := range services.Items {
-		name := strings.ToUpper(service.ID) + "_SERVICE_PORT"
+		name := makeEnvVariableName(service.ID) + "_SERVICE_PORT"
 		value := strconv.Itoa(service.Port)
 		result = append(result, api.EnvVar{Name: name, Value: value})
 		result = append(result, makeLinkVariables(service, machine)...)
@@ -187,15 +187,19 @@ func (rs *RegistryStorage) deleteExternalLoadBalancer(service *api.Service) erro
 	return nil
 }
 
+func makeEnvVariableName(str string) string {
+	return strings.ToUpper(strings.Replace(str, "-", "_", -1))
+}
+
 func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
-	prefix := strings.ToUpper(service.ID)
+	prefix := makeEnvVariableName(service.ID)
 	var port string
 	if service.ContainerPort.Kind == util.IntstrString {
 		port = service.ContainerPort.StrVal
 	} else {
 		port = strconv.Itoa(service.ContainerPort.IntVal)
 	}
-	portPrefix := prefix + "_PORT_" + strings.ToUpper(strings.Replace(port, "-", "_", -1)) + "_TCP"
+	portPrefix := prefix + "_PORT_" + makeEnvVariableName(port) + "_TCP"
 	return []api.EnvVar{
 		{
 			Name:  prefix + "_PORT",
