@@ -23,6 +23,12 @@ if [[ -z "$(which go)" ]]; then
   exit 1
 fi
 
+if [[ -z "$(which godep)" ]]; then
+  echo "Can't find 'godep' in PATH, please fix and retry." >&2
+  echo "See https://github.com/tools/godep#install for installation instructions." >&2
+  exit 1
+fi
+
 # Travis continuous build uses a head go release that doesn't report
 # a version number, so we skip this check on Travis.  Its unnecessary
 # there anyway.
