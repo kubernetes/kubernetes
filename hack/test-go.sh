@@ -25,11 +25,11 @@ find_test_dirs() {
   find . -not \( \
       \( \
         -wholename './third_party' \
-	-wholename './Godeps' \
+        -wholename './Godeps' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
-	-o -wholename '*/Godeps/*' \
+        -o -wholename '*/Godeps/*' \
         -o -wholename '*/output/*' \
       \) -prune \
     \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
