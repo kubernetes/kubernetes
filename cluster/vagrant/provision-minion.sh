@@ -52,3 +52,6 @@ if [ ! $(which salt-minion) ]; then
   systemctl enable salt-minion
   systemctl start salt-minion
 fi
+
+# run the networking setup
+$(dirname $0)/provision-network.sh $@
