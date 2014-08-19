@@ -36,12 +36,13 @@ find_test_dirs() {
 }
 
 # -covermode=atomic becomes default with -race in Go >=1.3
-KUBE_COVER="-cover -covermode=atomic"
+KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 30s}
 
 cd "${KUBE_TARGET}"
 
 if [ "$1" != "" ]; then
-  go test -race -timeout 30s $KUBE_COVER -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1" "${@:2}"
+  go test -race $KUBE_TIMEOUT $KUBE_COVER -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1" "${@:2}"
   exit 0
 fi
 
