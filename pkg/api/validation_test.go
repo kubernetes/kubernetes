@@ -73,7 +73,7 @@ func TestValidatePorts(t *testing.T) {
 	if errs := validatePorts(nonCanonicalCase); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if nonCanonicalCase[0].HostPort != 80 || nonCanonicalCase[0].Protocol != "TCP" {
+	if nonCanonicalCase[0].HostPort != 0 || nonCanonicalCase[0].Protocol != "TCP" {
 		t.Errorf("expected default values: %+v", nonCanonicalCase[0])
 	}
 

@@ -95,9 +95,7 @@ func validatePorts(ports []Port) errs.ErrorList {
 		if !util.IsValidPortNum(port.ContainerPort) {
 			allErrs = append(allErrs, errs.NewInvalid("Port.ContainerPort", port.ContainerPort))
 		}
-		if port.HostPort == 0 {
-			port.HostPort = port.ContainerPort
-		} else if !util.IsValidPortNum(port.HostPort) {
+		if port.HostPort != 0 && !util.IsValidPortNum(port.HostPort) {
 			allErrs = append(allErrs, errs.NewInvalid("Port.HostPort", port.HostPort))
 		}
 		if len(port.Protocol) == 0 {
@@ -160,6 +158,9 @@ func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, ext
 		ctr := &containers[ci]
 		for pi := range ctr.Ports {
 			port := extract(&ctr.Ports[pi])
+			if port == 0 {
+				continue
+			}
 			if accumulator[port] {
 				allErrs = append(allErrs, errs.NewDuplicate("Port", port))
 			} else {
