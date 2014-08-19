@@ -116,13 +116,17 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
 				return
 			}
 			glog.Infof("Got watch: %#v", event)
-			if rc, ok := event.Object.(*api.ReplicationController); !ok {
+			rc, ok := event.Object.(*api.ReplicationController)
+			if !ok {
 				glog.Errorf("unexpected object: %#v", event.Object)
-			} else {
-				// If we get disconnected, start where we left off.
-				*resourceVersion = rc.ResourceVersion + 1
-				rm.syncHandler(*rc)
+				continue
 			}
+			// If we get disconnected, start where we left off.
+			*resourceVersion = rc.ResourceVersion + 1
+			// Sync even if this is a deletion event, to ensure that we leave
+			// it in the desired state.
+			glog.Infof("About to sync from watch: %v", rc.ID)
+			rm.syncHandler(*rc)
 		}
 	}
 }
@@ -187,6 +191,7 @@ func (rm *ReplicationManager) synchronize() {
 	for ix := range controllerSpecs {
 		go func(ix int) {
 			defer wg.Done()
+			glog.Infof("periodic sync of %v", controllerSpecs[ix].ID)
 			err := rm.syncHandler(controllerSpecs[ix])
 			if err != nil {
 				glog.Errorf("Error synchronizing: %#v", err)
