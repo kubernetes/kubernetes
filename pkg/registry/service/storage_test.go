@@ -22,12 +22,13 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestRegistry(t *testing.T) {
+func TestServiceRegistryCreate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloudprovider.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
@@ -37,7 +38,11 @@ func TestRegistry(t *testing.T) {
 		Selector: map[string]string{"bar": "baz"},
 	}
 	c, _ := storage.Create(svc)
-	<-c
+	created_svc := <-c
+	created_service := created_svc.(*api.Service)
+	if created_service.ID != "foo" {
+		t.Errorf("Expected foo, but got %v", created_service.ID)
+	}
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -71,6 +76,33 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected to get an error")
 		}
+	}
+}
+
+func TestServiceRegistryUpdate(t *testing.T) {
+	registry := registrytest.NewServiceRegistry()
+	registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz1"},
+	})
+	storage := NewRegistryStorage(registry, nil, nil)
+	c, err := storage.Update(&api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz2"},
+	})
+	if c == nil {
+		t.Errorf("Expected non-nil channel")
+	}
+	if err != nil {
+		t.Errorf("Expected no error")
+	}
+	updated_svc := <-c
+	updated_service := updated_svc.(*api.Service)
+	if updated_service.ID != "foo" {
+		t.Errorf("Expected foo, but got %v", updated_service.ID)
+	}
+	if e, a := "foo", registry.UpdatedID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
 	}
 }
 
@@ -119,7 +151,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	}
 	srv, err := registry.GetService(svc.ID)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.ID)
@@ -144,7 +176,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	if registry.Service != nil {
-		t.Errorf("expected registry.CreateService to not get called, but it got %#v", registry.Service)
+		t.Errorf("Expected registry.CreateService to not get called, but it got %#v", registry.Service)
 	}
 }
 
@@ -164,7 +196,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	if e, a := "foo", registry.DeletedID; e != a {
-		t.Errorf("expected %v, but got %v", e, a)
+		t.Errorf("Expected %v, but got %v", e, a)
 	}
 }
 
@@ -185,7 +217,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	if e, a := "foo", registry.DeletedID; e != a {
-		t.Errorf("expected %v, but got %v", e, a)
+		t.Errorf("Expected %v, but got %v", e, a)
 	}
 }
 
@@ -202,11 +234,58 @@ func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 	machine := "machine"
 	vars, err := GetServiceEnvironmentVariables(registry, machine)
 	if err != nil {
-		t.Errorf("unexpected err: %v", err)
+		t.Errorf("Unexpected err: %v", err)
 	}
 	for _, v := range vars {
 		if !util.IsCIdentifier(v.Name) {
 			t.Errorf("Environment variable name is not valid: %v", v.Name)
 		}
+	}
+}
+
+func TestServiceRegistryGet(t *testing.T) {
+	registry := registrytest.NewServiceRegistry()
+	fakeCloud := &cloudprovider.FakeCloud{}
+	machines := []string{"foo", "bar", "baz"}
+	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
+	registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz"},
+	})
+	storage.Get("foo")
+	if len(fakeCloud.Calls) != 0 {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+	if e, a := "foo", registry.GottenID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+}
+
+func TestServiceRegistryList(t *testing.T) {
+	registry := registrytest.NewServiceRegistry()
+	fakeCloud := &cloudprovider.FakeCloud{}
+	machines := []string{"foo", "bar", "baz"}
+	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
+	registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz"},
+	})
+	registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo2"},
+		Selector: map[string]string{"bar2": "baz2"},
+	})
+	s, _ := storage.List(labels.Everything())
+	sl := s.(api.ServiceList)
+	if len(fakeCloud.Calls) != 0 {
+		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
+	}
+	if len(sl.Items) != 2 {
+		t.Fatalf("Expected 2 services, but got %v", len(sl.Items))
+	}
+	if e, a := "foo", sl.Items[0].ID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if e, a := "foo2", sl.Items[1].ID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
 	}
 }
