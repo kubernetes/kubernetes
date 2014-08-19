@@ -20,12 +20,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 )
 
 func TestCloudList(t *testing.T) {
 	instances := []string{"m1", "m2"}
-	fakeCloud := cloudprovider.FakeCloud{
+	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
 	registry, err := NewCloudRegistry(&fakeCloud, ".*")
@@ -45,7 +45,7 @@ func TestCloudList(t *testing.T) {
 
 func TestCloudContains(t *testing.T) {
 	instances := []string{"m1", "m2"}
-	fakeCloud := cloudprovider.FakeCloud{
+	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
 	registry, err := NewCloudRegistry(&fakeCloud, ".*")
@@ -74,7 +74,7 @@ func TestCloudContains(t *testing.T) {
 
 func TestCloudListRegexp(t *testing.T) {
 	instances := []string{"m1", "m2", "n1", "n2"}
-	fakeCloud := cloudprovider.FakeCloud{
+	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
 	registry, err := NewCloudRegistry(&fakeCloud, "m[0-9]+")

@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package fake_cloud
 
 import (
 	"net"
 	"regexp"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
 // FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
@@ -28,7 +30,7 @@ type FakeCloud struct {
 	Calls    []string
 	IP       net.IP
 	Machines []string
-	Zone
+	cloudprovider.Zone
 }
 
 func (f *FakeCloud) addCall(desc string) {
@@ -43,18 +45,18 @@ func (f *FakeCloud) ClearCalls() {
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
 //
 // Actually it just returns f itself.
-func (f *FakeCloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
+func (f *FakeCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return f, true
 }
 
 // Instances returns a fake implementation of Instances.
 //
 // Actually it just returns f itself.
-func (f *FakeCloud) Instances() (Instances, bool) {
+func (f *FakeCloud) Instances() (cloudprovider.Instances, bool) {
 	return f, true
 }
 
-func (f *FakeCloud) Zones() (Zones, bool) {
+func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
@@ -104,7 +106,7 @@ func (f *FakeCloud) List(filter string) ([]string, error) {
 	return result, f.Err
 }
 
-func (f *FakeCloud) GetZone() (Zone, error) {
+func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 	f.addCall("get-zone")
 	return f.Zone, f.Err
 }
