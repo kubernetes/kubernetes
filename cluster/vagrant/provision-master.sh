@@ -26,7 +26,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   master_ip: $MASTER_IP
   etcd_servers: $MASTER_IP
-  minion_ips: $MINION_IPS
+  cloud_provider: vagrant
   roles:
     - kubernetes-master
 EOF
@@ -63,6 +63,20 @@ echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 # we will run provision to update code each time we test, so we do not want to do salt install each time
 if [ ! $(which salt-master) ]; then
 
+  # Configure the salt-api
+  cat <<EOF >/etc/salt/master.d/salt-api.conf
+# Set vagrant user as REST API user
+external_auth:
+  pam:
+    vagrant:
+      - .*
+rest_cherrypy:
+  port: 8000
+  host: 127.0.0.1
+  disable_ssl: True
+  webhook_disable_auth: True
+EOF
+
   # Install Salt
   #
   # We specify -X to avoid a race condition that can cause minion failure to
@@ -70,6 +84,14 @@ if [ ! $(which salt-master) ]; then
   #
   # -M installs the master
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M
+
+  # Install salt-api
+  # 
+  # This is used to inform the cloud provider used in the vagrant cluster    
+  yum install -y salt-api
+  systemctl enable salt-api
+  systemctl start salt-api
+
 fi
 
 # Build release

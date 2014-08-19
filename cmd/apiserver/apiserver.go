@@ -83,6 +83,12 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Couldn't connect to GCE cloud: %#v", err)
 		}
+	case "vagrant":
+		var err error
+		cloud, err = cloudprovider.NewVagrantCloud()
+		if err != nil {
+			glog.Fatalf("Couldn't connect to vagrant cloud: %#v", err)
+		}
 	default:
 		if len(*cloudProvider) > 0 {
 			glog.Infof("Unknown cloud provider: %s", *cloudProvider)
