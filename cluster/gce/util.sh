@@ -171,6 +171,13 @@ function kube-up {
       grep -v "^#" $(dirname $0)/templates/salt-minion.sh
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
+    gcutil addfirewall ${MINION_NAMES[$i]}-all \
+      --norespect_terminal_width \
+      --project ${PROJECT} \
+      --network ${NETWORK} \
+      --allowed_ip_sources ${MINION_IP_RANGES[$i]} \
+      --allowed "tcp,udp,icmp,esp,ah,sctp" &
+
     gcutil addinstance ${MINION_NAMES[$i]} \
     --norespect_terminal_width \
       --project ${PROJECT} \
@@ -276,6 +283,12 @@ function kube-down {
     --delete_boot_pd \
     --zone ${ZONE} \
     ${MASTER_NAME} &
+
+  gcutil deletefirewall  \
+    --project ${PROJECT} \
+    --norespect_terminal_width \
+    --force \
+    ${MINION_NAMES[*]/%/-all} &
 
   gcutil deleteinstance \
     --project ${PROJECT} \
