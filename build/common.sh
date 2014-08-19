@@ -121,10 +121,13 @@ function build-image() {
     api
     build
     cmd
+    examples
+    Godeps
     hack
+    LICENSE
+    README.md
     pkg
     third_party
-    LICENSE
   "
   mkdir -p ${BUILD_CONTEXT_DIR}
   tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz ${SOURCE}
@@ -194,9 +197,9 @@ function run-build-command() {
 # If the Docker server is remote, copy the results back out.
 function copy-output() {
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    # When we are on the Mac with boot2docker Now we need to copy the results
-    # back out.  Ideally we would leave the container around and use 'docker cp'
-    # to copy the results out.  However, that doesn't work for mounted volumes
+    # When we are on the Mac with boot2docker we need to copy the results back
+    # out.  Ideally we would leave the container around and use 'docker cp' to
+    # copy the results out.  However, that doesn't work for mounted volumes
     # currently (https://github.com/dotcloud/docker/issues/1992).  And it is
     # just plain broken (https://github.com/dotcloud/docker/issues/6483).
     #

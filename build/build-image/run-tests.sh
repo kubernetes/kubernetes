@@ -19,27 +19,11 @@ set -e
 
 source $(dirname $0)/common.sh
 
-find_test_dirs() {
-  (
-    cd ${KUBE_REPO_ROOT}
-    find . -not \( \
-        \( \
-          -wholename './third_party' \
-          -o -wholename './output' \
-        \) -prune \
-      \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u
-  )
-}
-
-cd "${KUBE_TARGET}"
-
 echo "+++ Running unit tests"
 
 if [[ -n "$1" ]]; then
-  go test -cover -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1"
+  godep go test -cover -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1"
   exit 0
 fi
 
-for package in $(find_test_dirs); do
-  go test -cover -coverprofile=tmp.out "${KUBE_GO_PACKAGE}/${package}"
-done
+godep go test ./...

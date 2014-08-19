@@ -25,7 +25,7 @@ fi
 
 if [[ -z "$(which godep)" ]]; then
   echo "Can't find 'godep' in PATH, please fix and retry." >&2
-  echo "See https://github.com/tools/godep#install for installation instructions." >&2
+  echo "See https://github.com/GoogleCloudPlatform/kubernetes#godep-and-dependency-management" >&2
   exit 1
 fi
 
@@ -65,7 +65,7 @@ mkdir -p "${KUBE_GO_PACKAGE_BASEDIR}"
 # Create symlink under output/go/src.
 ln -snf "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
 
-GOPATH="${KUBE_TARGET}:`godep path`"
+GOPATH="${KUBE_TARGET}:$(godep path)"
 export GOPATH
 
 # Unset GOBIN in case it already exsits in the current session.

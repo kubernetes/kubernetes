@@ -62,20 +62,29 @@ The commands above will not work if there are more than one directory in ``$GOPA
 
 ### godep and dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that *godep* is installed and in your PATH. If you have already set up Go development environment correctly, the following command will install *godep* into your ``GOBIN`` directory, which is ``$GOPATH/bin`` if ``GOBIN`` is not set:
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that ``godep`` is installed and in your ``$PATH``. If you have already set up Go development environment correctly, the following command will install ``godep`` into your ``$GOBIN`` directory, which is ``$GOPATH/bin`` by default if ``$GOBIN`` is not set:
 
 ```
 go get github.com/tools/godep
 ```
 
+Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godep/_workspace.  You can use `godep` in three ways:
+
+1. Use `godep` to call your `go` commands.  For example: `godep go test ./...`
+2. Use `godep` to modify your `$GOPATH` so that other tools know where to find the dependencies.  Specifically: `export GOPATH=$GOPATH:$(godep path)`
+3. Use `godep` to copy the saved versions of packages into your `$GOPATH`.  This is done with `godep restore`.
+
+We recommend using options #1 or #2.
+
 ### Hooks
+
+Before committing any changes, please link/copy these hooks into your .git
+directory. This will keep you from accidentally committing non-gofmt'd go code.
+
+**NOTE:** The `../..` part seems odd but is correct, since the newly created
+links will be 2 levels down the tree.
+
 ```
-# Before committing any changes, please link/copy these hooks into your .git
-# directory. This will keep you from accidentally committing non-gofmt'd
-# go code.
-#
-# NOTE: The "../.." part seems odd but is correct, since the newly created
-# links will be 2 levels down the tree.
 cd kubernetes
 ln -s ../../hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
 ln -s ../../hooks/commit-msg .git/hooks/commit-msg
@@ -109,13 +118,14 @@ ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
 ### Coverage
 ```
 cd kubernetes
-go tool cover -html=target/c.out
+godep go tool cover -html=target/c.out
 ```
 
 ### Integration tests
+
+You need an etcd somewhere in your path. To get from head:
+
 ```
-# You need an etcd somewhere in your path.
-# To get from head:
 go get github.com/coreos/etcd
 go install github.com/coreos/etcd
 sudo ln -s "$GOPATH/bin/etcd" /usr/bin/etcd
@@ -129,7 +139,9 @@ hack/integration-test.sh
 ```
 
 ### End-to-End tests
+
 With a GCE account set up for running `cluster/kube-up.sh` (see Setup above):
+
 ```
 cd kubernetes
 hack/e2e-test.sh
@@ -140,28 +152,34 @@ hack/e2e-test.sh
 Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. To add or update a package, please follow the instructions on [godep's document](https://github.com/tools/godep).
 
 To add a new package ``foo/bar``:
+
 - Download foo/bar into the first directory in GOPATH: ``go get foo/bar``.
 - Change code in kubernetes to use ``foo/bar``.
 - Run ``godep save ./...`` under kubernetes' root directory.
 
 To update a package ``foo/bar``:
+
 - Update the package with ``go get -u foo/bar``.
 - Change code in kubernetes accordingly if necessary.
 - Run ``godep update foo/bar``.
 
 ### Keeping your development fork in sync
+
 One time after cloning your forked repo:
+
 ```
 git remote add upstream https://github.com/GoogleCloudPlatform/kubernetes.git
 ```
 
 Then each time you want to sync to upstream:
+
 ```
 git fetch upstream
 git rebase upstream/master
 ```
 
 ### Regenerating the documentation
+
 ```
 cd kubernetes/api
 sudo docker build -t kubernetes/raml2html .
