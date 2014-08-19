@@ -111,18 +111,26 @@ func (r *Registry) CreatePod(machine string, pod api.Pod) error {
 		return err
 	}
 	// TODO: Until scheduler separation is completed, just assign here.
-	return r.AssignPod(pod.ID, machine)
+	return r.assignPod(pod.ID, machine)
 }
 
-// AssignPod assigns the given pod to the given machine.
+// ApplyBinding implements binding's registry
+func (r *Registry) ApplyBinding(binding *api.Binding) error {
+	return r.assignPod(binding.PodID, binding.Host)
+}
+
+// assignPod assigns the given pod to the given machine.
 // TODO: hook this up via apiserver, not by calling it from CreatePod().
-func (r *Registry) AssignPod(podID string, machine string) error {
+func (r *Registry) assignPod(podID string, machine string) error {
 	podKey := makePodKey(podID)
 	var finalPod *api.Pod
 	err := r.AtomicUpdate(podKey, &api.Pod{}, func(obj interface{}) (interface{}, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
+		}
+		if pod.DesiredState.Host != "" {
+			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.ID, pod.DesiredState.Host)
 		}
 		pod.DesiredState.Host = machine
 		finalPod = pod
