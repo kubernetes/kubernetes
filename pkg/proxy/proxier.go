@@ -199,10 +199,10 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	for _, service := range services {
 		activeServices.Insert(service.ID)
 		info, exists := proxier.getServiceInfo(service.ID)
-		if exists && info.port == service.Port {
+		if exists && info.active && info.port == service.Port {
 			continue
 		}
-		if exists {
+		if exists && info.port != service.Port {
 			proxier.StopProxy(service.ID)
 		}
 		glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
