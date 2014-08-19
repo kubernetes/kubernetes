@@ -99,8 +99,7 @@ type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	// Optional: Defaults to ContainerPort.  If specified, this must be a
-	// valid port number, 0 < x < 65536.
+	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
 	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`

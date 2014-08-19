@@ -227,8 +227,12 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 	exposedPorts := map[docker.Port]struct{}{}
 	portBindings := map[docker.Port][]docker.PortBinding{}
 	for _, port := range container.Ports {
-		interiorPort := port.ContainerPort
 		exteriorPort := port.HostPort
+		if exteriorPort == 0 {
+			// No need to do port binding when HostPort is not specified
+			continue
+		}
+		interiorPort := port.ContainerPort
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string

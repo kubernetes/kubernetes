@@ -71,6 +71,9 @@ func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (s
 		for _, scheduledPod := range machineToPods[machine] {
 			for _, container := range pod.DesiredState.Manifest.Containers {
 				for _, port := range container.Ports {
+					if port.HostPort == 0 {
+						continue
+					}
 					if s.containsPort(scheduledPod, port) {
 						podFits = false
 					}
