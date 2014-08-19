@@ -39,6 +39,10 @@ type GCECloud struct {
 	instanceRE string
 }
 
+func init() {
+	cloudprovider.RegisterCloudProvider("gce", func() (cloudprovider.Interface, error) { return newGCECloud() })
+}
+
 func getProjectAndZone() (string, string, error) {
 	client := http.Client{}
 	url := "http://metadata/computeMetadata/v1/instance/zone"
@@ -63,8 +67,8 @@ func getProjectAndZone() (string, string, error) {
 	return parts[1], parts[3], nil
 }
 
-// NewGCECloud creates a new instance of GCECloud.
-func NewGCECloud() (*GCECloud, error) {
+// newGCECloud creates a new instance of GCECloud.
+func newGCECloud() (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err

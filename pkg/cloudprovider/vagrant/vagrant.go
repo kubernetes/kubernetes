@@ -36,6 +36,10 @@ type VagrantCloud struct {
 	saltAuth string
 }
 
+func init() {
+	cloudprovider.RegisterCloudProvider("vagrant", func() (cloudprovider.Interface, error) { return newVagrantCloud() })
+}
+
 // SaltToken is an authorization token required by Salt REST API
 type SaltToken struct {
 	Token string `json:"token"`
@@ -63,8 +67,8 @@ type SaltMinionsResponse struct {
 	Minions []SaltMinions `json:"return"`
 }
 
-// NewVagrantCloud creates a new instance of VagrantCloud configured to talk to the Salt REST API.
-func NewVagrantCloud() (*VagrantCloud, error) {
+// newVagrantCloud creates a new instance of VagrantCloud configured to talk to the Salt REST API.
+func newVagrantCloud() (*VagrantCloud, error) {
 	return &VagrantCloud{
 		saltURL:  "http://127.0.0.1:8000",
 		saltUser: "vagrant",
