@@ -279,7 +279,7 @@
     "name": "foo"
   }
 }
-    
+
 </code></pre></small></p></div></div></div></div></div></div></div><div class="panel panel-white"><div class=panel-heading><h4 class=panel-title><a class=collapsed data-toggle=collapse href=#panel__pods__podId_><span class=parent>/pods</span>/{podId}</a> <span class=methods><a href=# data-toggle=modal data-target=#_pods__podId__get><span class="badge badge_get">get</span></a> <a href=# data-toggle=modal data-target=#_pods__podId__put><span class="badge badge_put">put</span></a> <a href=# data-toggle=modal data-target=#_pods__podId__delete><span class="badge badge_delete">delete</span></a></span></h4></div><div id=panel__pods__podId_ class="panel-collapse collapse"><div class=panel-body><div class=list-group><a href=# data-toggle=modal data-target=#_pods__podId__get class=list-group-item><span class="badge badge_get">get</span><div class=method_description><p>Get a specific pod</p></div><div class=clearfix></div></a> <a href=# data-toggle=modal data-target=#_pods__podId__put class=list-group-item><span class="badge badge_put">put</span><div class=method_description><p>Update a pod</p></div><div class=clearfix></div></a> <a href=# data-toggle=modal data-target=#_pods__podId__delete class=list-group-item><span class="badge badge_delete">delete</span><div class=method_description><p>Delete a specific pod</p></div><div class=clearfix></div></a></div></div></div><div class="modal fade" tabindex=0 id=_pods__podId__get><div class=modal-dialog><div class=modal-content><div class=modal-header><button type=button class=close data-dismiss=modal aria-hidden=true>&times;</button><h4 class=modal-title id=myModalLabel><span class="badge badge_get">get</span> <span class=parent>/pods</span>/{podId}</h4></div><div class=modal-body><div class="alert alert-info"><p>Get a specific pod</p></div><ul class="nav nav-tabs"><li class=active><a href=#_pods__podId__get_request data-toggle=tab>Request</a></li><li><a href=#_pods__podId__get_response data-toggle=tab>Response</a></li></ul><div class=tab-content><div class="tab-pane active" id=_pods__podId__get_request><h3>URI Parameters</h3><ul><li><strong>podId</strong>: <em>required (string)</em></li></ul></div><div class=tab-pane id=_pods__podId__get_response><h2>HTTP status code <a href=http://httpstatus.es/200 target=_blank>200</a></h2><h3>Body</h3><p><strong>Type: application/json</strong></p><p><small><strong>Example</strong>:<pre><code>{
   "kind": "Pod",
   "apiVersion": "v1beta1",
@@ -311,7 +311,7 @@
     "name": "foo"
   }
 }
-    
+
 </code></pre></small></p></div></div></div></div></div></div><div class="modal fade" tabindex=0 id=_pods__podId__put><div class=modal-dialog><div class=modal-content><div class=modal-header><button type=button class=close data-dismiss=modal aria-hidden=true>&times;</button><h4 class=modal-title id=myModalLabel><span class="badge badge_put">put</span> <span class=parent>/pods</span>/{podId}</h4></div><div class=modal-body><div class="alert alert-info"><p>Update a pod</p></div><ul class="nav nav-tabs"><li class=active><a href=#_pods__podId__put_request data-toggle=tab>Request</a></li></ul><div class=tab-content><div class="tab-pane active" id=_pods__podId__put_request><h3>URI Parameters</h3><ul><li><strong>podId</strong>: <em>required (string)</em></li></ul><h3>Body</h3><p><strong>Type: application/json</strong></p><p><small><strong>Schema</strong>:<pre><code>{
   "$schema": "http://json-schema.org/draft-03/schema",
   "type": "object",
@@ -430,7 +430,7 @@
     "name": "foo"
   }
 }
-    
+
 </code></pre></small></p></div></div></div></div></div></div><div class="modal fade" tabindex=0 id=_pods__podId__delete><div class=modal-dialog><div class=modal-content><div class=modal-header><button type=button class=close data-dismiss=modal aria-hidden=true>&times;</button><h4 class=modal-title id=myModalLabel><span class="badge badge_delete">delete</span> <span class=parent>/pods</span>/{podId}</h4></div><div class=modal-body><div class="alert alert-info"><p>Delete a specific pod</p></div><ul class="nav nav-tabs"><li class=active><a href=#_pods__podId__delete_request data-toggle=tab>Request</a></li><li><a href=#_pods__podId__delete_response data-toggle=tab>Response</a></li></ul><div class=tab-content><div class="tab-pane active" id=_pods__podId__delete_request><h3>URI Parameters</h3><ul><li><strong>podId</strong>: <em>required (string)</em></li></ul></div><div class=tab-pane id=_pods__podId__delete_response><h2>HTTP status code <a href=http://httpstatus.es/200 target=_blank>200</a></h2><h3>Body</h3><p><strong>Type: application/json</strong></p><p><small><strong>Example</strong>:<pre><code>{ 
   "success": true
 }
@@ -699,6 +699,10 @@
       "type": "number",
       "required": false
     },
+    "containerPort": {
+      "type": "string",
+      "required": false
+    },
     "labels": {
       "type": "object",
       "required": false
@@ -761,6 +765,10 @@
     },
     "port": {
       "type": "number",
+      "required": false
+    },
+    "containerPort": {
+      "type": "string",
       "required": false
     },
     "labels": {
