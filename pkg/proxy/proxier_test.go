@@ -133,6 +133,33 @@ func TestProxyUpdateDelete(t *testing.T) {
 	}
 }
 
+func TestProxyUpdateDeleteUpdate(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+
+	p := NewProxier(lb)
+
+	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+	conn, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
+	if err != nil {
+		t.Fatalf("error connecting to proxy: %v", err)
+	}
+	conn.Close()
+
+	p.OnUpdate([]api.Service{})
+	if err := waitForClosedPort(p, proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	proxyPortNum, _ := strconv.Atoi(proxyPort)
+	p.OnUpdate([]api.Service{
+		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum},
+	})
+	testEchoConnection(t, "127.0.0.1", proxyPort)
+}
+
 func TestProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
@@ -164,4 +191,45 @@ func TestProxyUpdatePort(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	testEchoConnection(t, "127.0.0.1", newPort)
+}
+
+func TestProxyUpdatePortLetsGoOfOldPort(t *testing.T) {
+	lb := NewLoadBalancerRR()
+	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+
+	p := NewProxier(lb)
+
+	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	if err != nil {
+		t.Fatalf("error adding new service: %#v", err)
+	}
+
+	// add a new dummy listener in order to get a port that is free
+	l, _ := net.Listen("tcp", ":0")
+	_, newPort, _ := net.SplitHostPort(l.Addr().String())
+	portNum, _ := strconv.Atoi(newPort)
+	l.Close()
+
+	// Wait for the socket to actually get free.
+	if err := waitForClosedPort(p, newPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	if proxyPort == newPort {
+		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
+	}
+	p.OnUpdate([]api.Service{
+		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
+	})
+	if err := waitForClosedPort(p, proxyPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	testEchoConnection(t, "127.0.0.1", newPort)
+	proxyPortNum, _ := strconv.Atoi(proxyPort)
+	p.OnUpdate([]api.Service{
+		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum},
+	})
+	if err := waitForClosedPort(p, newPort); err != nil {
+		t.Fatalf(err.Error())
+	}
+	testEchoConnection(t, "127.0.0.1", proxyPort)
 }
