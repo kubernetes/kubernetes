@@ -49,7 +49,7 @@ Once that's up you can list the pods in the cluster, to verify that the master i
 cluster/kubecfg.sh list pods
 ```
 
-You'll see a single redis master pod. It will also display the machine that the pod is running on.
+You'll see a single redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds).
 
 ```
 Name                Image(s)            Host                                          Labels
@@ -230,7 +230,7 @@ Name                 Image(s)                 Selector            Replicas
 frontendController   brendanburns/php-redis   name=frontend       3
 ```
 
-Once that's up you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
+Once that's up (it may take ten to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
 ```shell
 $ cluster/kubecfg.sh list pods
