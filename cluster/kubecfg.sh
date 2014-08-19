@@ -30,4 +30,4 @@ if [ "$KUBE_MASTER_IP" != "" ] && [ "$KUBERNETES_MASTER" == "" ]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-$CLOUDCFG $@
+$CLOUDCFG "$@"
