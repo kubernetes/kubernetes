@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
@@ -79,7 +80,7 @@ func main() {
 	switch *cloudProvider {
 	case "gce":
 		var err error
-		cloud, err = cloudprovider.NewGCECloud()
+		cloud, err = gce_cloud.NewGCECloud()
 		if err != nil {
 			glog.Fatalf("Couldn't connect to GCE cloud: %#v", err)
 		}
