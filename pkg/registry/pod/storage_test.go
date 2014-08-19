@@ -74,26 +74,6 @@ func TestCreatePodRegistryError(t *testing.T) {
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 }
 
-func TestCreatePodSchedulerError(t *testing.T) {
-	mockScheduler := registrytest.Scheduler{
-		Err: fmt.Errorf("test error"),
-	}
-	storage := RegistryStorage{
-		scheduler: &mockScheduler,
-	}
-	desiredState := api.PodState{
-		Manifest: api.ContainerManifest{
-			Version: "v1beta1",
-		},
-	}
-	pod := &api.Pod{DesiredState: desiredState}
-	ch, err := storage.Create(pod)
-	if err != nil {
-		t.Errorf("Expected %#v, Got %#v", nil, err)
-	}
-	expectApiStatusError(t, ch, mockScheduler.Err.Error())
-}
-
 func TestCreatePodSetsIds(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")

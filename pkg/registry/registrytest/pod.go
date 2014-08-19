@@ -25,10 +25,9 @@ import (
 )
 
 type PodRegistry struct {
-	Err     error
-	Machine string
-	Pod     *api.Pod
-	Pods    []api.Pod
+	Err  error
+	Pod  *api.Pod
+	Pods []api.Pod
 	sync.Mutex
 
 	mux *watch.Mux
@@ -66,10 +65,9 @@ func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {
 	return r.Pod, r.Err
 }
 
-func (r *PodRegistry) CreatePod(machine string, pod api.Pod) error {
+func (r *PodRegistry) CreatePod(pod api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
-	r.Machine = machine
 	r.Pod = &pod
 	r.mux.Action(watch.Added, &pod)
 	return r.Err

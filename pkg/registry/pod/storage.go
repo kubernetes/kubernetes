@@ -243,12 +243,7 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 func (rs *RegistryStorage) scheduleAndCreatePod(pod api.Pod) error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	// TODO(lavalamp): Separate scheduler more cleanly.
-	machine, err := rs.scheduler.Schedule(pod, rs.minionLister)
-	if err != nil {
-		return err
-	}
-	return rs.registry.CreatePod(machine, pod)
+	return rs.registry.CreatePod(pod)
 }
 
 func (rs *RegistryStorage) waitForPodRunning(pod api.Pod) (interface{}, error) {
