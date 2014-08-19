@@ -138,7 +138,7 @@ func main() {
 	if len(etcdServerList) > 0 {
 		glog.Infof("Watching for etcd configs at %v", etcdServerList)
 		etcdClient = etcd.NewClient(etcdServerList)
-		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), etcdClient, 30*time.Second, cfg.Channel("etcd"))
+		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), etcdClient, cfg.Channel("etcd"))
 	}
 
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop

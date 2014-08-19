@@ -113,7 +113,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	// Kubelet (localhost)
 	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
-	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, 30*time.Second, cfg1.Channel("etcd"))
+	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, cfg1.Channel("etcd"))
 	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
 	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
@@ -125,7 +125,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
-	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, 30*time.Second, cfg2.Channel("etcd"))
+	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, cfg2.Channel("etcd"))
 	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
 	go util.Forever(func() {

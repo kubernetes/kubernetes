@@ -43,7 +43,7 @@ func TestGetEtcdData(t *testing.T) {
 		},
 		E: nil,
 	}
-	NewSourceEtcd("/registry/hosts/machine/kubelet", fakeClient, time.Millisecond, ch)
+	NewSourceEtcd("/registry/hosts/machine/kubelet", fakeClient, ch)
 
 	//TODO: update FakeEtcdClient.Watch to handle receiver=nil with a given index
 	//returns an infinite stream of updates
