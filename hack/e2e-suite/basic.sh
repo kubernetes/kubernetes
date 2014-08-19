@@ -41,7 +41,7 @@ function teardown() {
 
 trap "teardown" EXIT
 
-POD_ID_LIST=$($CLOUDCFG -json -l name=myNginx list pods | jq ".items[].id")
+POD_ID_LIST=$($CLOUDCFG '-template={{range.Items}}{{.ID}} {{end}}' -l name=myNginx list pods)
 # Container turn up on a clean cluster can take a while for the docker image pull.
 ALL_RUNNING=0
 while [ $ALL_RUNNING -ne 1 ]; do
@@ -49,7 +49,7 @@ while [ $ALL_RUNNING -ne 1 ]; do
   sleep 5
   ALL_RUNNING=1
   for id in $POD_ID_LIST; do
-    CURRENT_STATUS=$(remove-quotes $($CLOUDCFG -json get "pods/$(remove-quotes ${id})" | jq '.currentState.info["mynginx"].State.Running and .currentState.info["net"].State.Running'))
+    CURRENT_STATUS=$($CLOUDCFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
     if [ "$CURRENT_STATUS" != "true" ]; then
       ALL_RUNNING=0
     fi
