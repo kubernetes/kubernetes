@@ -36,7 +36,9 @@ func validateVolumes(volumes []Volume) (util.StringSet, errs.ErrorList) {
 		if vol.Source != nil {
 			el = validateSource(vol.Source)
 		}
-		if !util.IsDNSLabel(vol.Name) {
+		if len(vol.Name) == 0 {
+			el = append(el, errs.NewRequired("Volume.Name", vol.Name))
+		} else if !util.IsDNSLabel(vol.Name) {
 			el = append(el, errs.NewInvalid("Volume.Name", vol.Name))
 		} else if allNames.Has(vol.Name) {
 			el = append(el, errs.NewDuplicate("Volume.Name", vol.Name))
@@ -92,7 +94,9 @@ func validatePorts(ports []Port) errs.ErrorList {
 				allNames.Insert(port.Name)
 			}
 		}
-		if !util.IsValidPortNum(port.ContainerPort) {
+		if port.ContainerPort == 0 {
+			allErrs = append(allErrs, errs.NewRequired("Port.ContainerPort", port.ContainerPort))
+		} else if !util.IsValidPortNum(port.ContainerPort) {
 			allErrs = append(allErrs, errs.NewInvalid("Port.ContainerPort", port.ContainerPort))
 		}
 		if port.HostPort != 0 && !util.IsValidPortNum(port.HostPort) {
@@ -113,7 +117,7 @@ func validateEnv(vars []EnvVar) errs.ErrorList {
 	for i := range vars {
 		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 {
-			allErrs = append(allErrs, errs.NewInvalid("EnvVar.Name", ev.Name))
+			allErrs = append(allErrs, errs.NewRequired("EnvVar.Name", ev.Name))
 		}
 		if !util.IsCIdentifier(ev.Name) {
 			allErrs = append(allErrs, errs.NewInvalid("EnvVar.Name", ev.Name))
@@ -128,14 +132,14 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errs.Err
 	for i := range mounts {
 		mnt := &mounts[i] // so we can set default values
 		if len(mnt.Name) == 0 {
-			allErrs = append(allErrs, errs.NewInvalid("VolumeMount.Name", mnt.Name))
+			allErrs = append(allErrs, errs.NewRequired("VolumeMount.Name", mnt.Name))
 		} else if !volumes.Has(mnt.Name) {
 			allErrs = append(allErrs, errs.NewNotFound("VolumeMount.Name", mnt.Name))
 		}
 		if len(mnt.MountPath) == 0 {
 			// Backwards compat.
 			if len(mnt.Path) == 0 {
-				allErrs = append(allErrs, errs.NewInvalid("VolumeMount.MountPath", mnt.MountPath))
+				allErrs = append(allErrs, errs.NewRequired("VolumeMount.MountPath", mnt.MountPath))
 			} else {
 				glog.Warning("DEPRECATED: VolumeMount.Path has been replaced by VolumeMount.MountPath")
 				mnt.MountPath = mnt.Path
@@ -183,7 +187,9 @@ func validateContainers(containers []Container, volumes util.StringSet) errs.Err
 	allNames := util.StringSet{}
 	for i := range containers {
 		ctr := &containers[i] // so we can set default values
-		if !util.IsDNSLabel(ctr.Name) {
+		if len(ctr.Name) == 0 {
+			allErrs = append(allErrs, errs.NewRequired("Container.Name", ctr.Name))
+		} else if !util.IsDNSLabel(ctr.Name) {
 			allErrs = append(allErrs, errs.NewInvalid("Container.Name", ctr.Name))
 		} else if allNames.Has(ctr.Name) {
 			allErrs = append(allErrs, errs.NewDuplicate("Container.Name", ctr.Name))
@@ -217,7 +223,7 @@ func ValidateManifest(manifest *ContainerManifest) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	if len(manifest.Version) == 0 {
-		allErrs = append(allErrs, errs.NewInvalid("ContainerManifest.Version", manifest.Version))
+		allErrs = append(allErrs, errs.NewRequired("ContainerManifest.Version", manifest.Version))
 	} else if !supportedManifestVersions.Has(strings.ToLower(manifest.Version)) {
 		allErrs = append(allErrs, errs.NewNotSupported("ContainerManifest.Version", manifest.Version))
 	}
@@ -245,8 +251,8 @@ func ValidatePodState(podState *PodState) errs.ErrorList {
 // Pod tests if required fields in the pod are set.
 func ValidatePod(pod *Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if pod.ID == "" {
-		allErrs = append(allErrs, errs.NewInvalid("Pod.ID", pod.ID))
+	if len(pod.ID) == 0 {
+		allErrs = append(allErrs, errs.NewRequired("Pod.ID", pod.ID))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState)...)
 	return allErrs
@@ -255,8 +261,8 @@ func ValidatePod(pod *Pod) errs.ErrorList {
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if service.ID == "" {
-		allErrs = append(allErrs, errs.NewInvalid("Service.ID", service.ID))
+	if len(service.ID) == 0 {
+		allErrs = append(allErrs, errs.NewRequired("Service.ID", service.ID))
 	} else if !util.IsDNS952Label(service.ID) {
 		allErrs = append(allErrs, errs.NewInvalid("Service.ID", service.ID))
 	}
@@ -264,7 +270,7 @@ func ValidateService(service *Service) errs.ErrorList {
 		allErrs = append(allErrs, errs.NewInvalid("Service.Port", service.Port))
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewInvalid("Service.Selector", service.Selector))
+		allErrs = append(allErrs, errs.NewRequired("Service.Selector", service.Selector))
 	}
 	return allErrs
 }
@@ -272,11 +278,11 @@ func ValidateService(service *Service) errs.ErrorList {
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if controller.ID == "" {
-		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.ID", controller.ID))
+	if len(controller.ID) == 0 {
+		allErrs = append(allErrs, errs.NewRequired("ReplicationController.ID", controller.ID))
 	}
 	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
+		allErrs = append(allErrs, errs.NewRequired("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
 	}
 	selector := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 	labels := labels.Set(controller.DesiredState.PodTemplate.Labels)

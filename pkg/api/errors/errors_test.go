@@ -24,23 +24,27 @@ import (
 func TestMakeFuncs(t *testing.T) {
 	testCases := []struct {
 		fn       func() ValidationError
-		expected ValidationErrorEnum
+		expected ValidationErrorType
 	}{
 		{
 			func() ValidationError { return NewInvalid("f", "v") },
-			Invalid,
+			ValidationErrorTypeInvalid,
 		},
 		{
 			func() ValidationError { return NewNotSupported("f", "v") },
-			NotSupported,
+			ValidationErrorTypeNotSupported,
 		},
 		{
 			func() ValidationError { return NewDuplicate("f", "v") },
-			Duplicate,
+			ValidationErrorTypeDuplicate,
 		},
 		{
 			func() ValidationError { return NewNotFound("f", "v") },
-			NotFound,
+			ValidationErrorTypeNotFound,
+		},
+		{
+			func() ValidationError { return NewRequired("f", "v") },
+			ValidationErrorTypeRequired,
 		},
 	}
 
