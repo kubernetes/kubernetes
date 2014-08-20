@@ -41,7 +41,33 @@ ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
 (etcd -name test -data-dir ${ETCD_DIR} &> /tmp/etcd.log) &
 ETCD_PID=$!
 
-sleep 5
+# Continue as soon as etcd is ready (i.e. returns 200).
+if [ "$(which curl)" != "" ]; then
+    # Wait for a maximum of 6.6 seconds (sleep + max-time) for etcd to come up.
+    TRIES=3
+    PAUSE=".1 .5 3" # in seconds
+    TRY=0
+    for seconds in $PAUSE; do 
+        ((TRY++))
+        sleep $seconds
+        if [ "$(curl -sL \
+                     --max-time 1 \
+                     -w "%{http_code}" \
+                     http://127.0.0.1:4001/version \
+                     -o /dev/null)" == "200" ]; then
+            # etcd is up
+            break
+        fi
+        if [ $TRY -eq 3 ]; then
+            echo "etcd did not come up properly"
+            exit 1
+        fi
+    done
+else
+    # curl is not in the path, so we can't check to be sure that etcd has
+    # started. Instead we sleep 5 seconds.
+    sleep 5
+fi
 
 # Shut down anyway if there's an error.
 set +e
