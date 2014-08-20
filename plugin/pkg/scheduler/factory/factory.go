@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 
@@ -70,7 +71,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 		NextPod: func() *api.Pod {
 			return podQueue.Pop().(*api.Pod)
 		},
-		Error: factory.defaultErrorFunc,
+		Error: factory.makeDefaultErrorFunc(podQueue),
 	}
 }
 
@@ -118,8 +119,27 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &minionEnumerator{list}, nil
 }
 
-func (factory *ConfigFactory) defaultErrorFunc(pod *api.Pod, err error) {
-	glog.Errorf("Error scheduling %v: %v; retrying", pod.ID, err)
+func (factory *ConfigFactory) makeDefaultErrorFunc(podQueue *cache.FIFO) func(pod *api.Pod, err error) {
+	return func(pod *api.Pod, err error) {
+		glog.Errorf("Error scheduling %v: %v; retrying", pod.ID, err)
+
+		// Retry asynchronously.
+		// Note that this is extremely rudimentary and we need a more real error handling path.
+		go func() {
+			defer util.HandleCrash()
+			podID := pod.ID
+			// Get the pod again; it may have changed/been scheduled already.
+			pod = &api.Pod{}
+			err := factory.Client.Get().Path("pods").Path(podID).Do().Into(pod)
+			if err != nil {
+				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
+				return
+			}
+			if pod.DesiredState.Host == "" {
+				podQueue.Add(pod.ID, pod)
+			}
+		}()
+	}
 }
 
 // storeToMinionLister turns a store into a minion lister. The store must contain (only) minions.

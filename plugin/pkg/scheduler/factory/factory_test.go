@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -125,6 +126,36 @@ func TestPollMinions(t *testing.T) {
 		if e, a := len(item.minions), ce.Len(); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+	}
+}
+
+func TestDefaultErrorFunc(t *testing.T) {
+	testPod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	handler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: api.EncodeOrDie(testPod),
+		T:            t,
+	}
+	server := httptest.NewServer(&handler)
+	factory := ConfigFactory{client.New(server.URL, nil)}
+	queue := cache.NewFIFO()
+	errFunc := factory.makeDefaultErrorFunc(queue)
+
+	errFunc(testPod, nil)
+	for {
+		// This is a terrible way to do this but I plan on replacing this
+		// whole error handling system in the future. The test will time
+		// out if something doesn't work.
+		time.Sleep(10 * time.Millisecond)
+		got, exists := queue.Get("foo")
+		if !exists {
+			continue
+		}
+		handler.ValidateRequest(t, "/api/v1beta1/pods/foo", "GET", nil)
+		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		break
 	}
 }
 
