@@ -358,7 +358,7 @@ function test-setup {
       --target_tags ${MINION_TAG} \
       --allowed tcp:80,tcp:8080 \
       --network ${NETWORK} \
-      ${MINION_TAG}-http-alt
+      ${MINION_TAG}-${INSTANCE_PREFIX}-http-alt
   fi
 
 }
@@ -370,7 +370,7 @@ function test-teardown {
     --project ${PROJECT} \
     --norespect_terminal_width \
     --force \
-    ${MINION_TAG}-http-alt || true > /dev/null
+    ${MINION_TAG}-${INSTANCE_PREFIX}-http-alt || true > /dev/null
   $(dirname $0)/../cluster/kube-down.sh > /dev/null
 }
 
