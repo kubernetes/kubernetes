@@ -190,7 +190,7 @@ func (op *Operation) StatusOrResult() (description interface{}, finished bool) {
 	defer op.lock.Unlock()
 
 	if op.finished == nil {
-		return api.Status{
+		return &api.Status{
 			Status:  api.StatusWorking,
 			Reason:  api.ReasonTypeWorking,
 			Details: &api.StatusDetails{ID: op.ID, Kind: "operation"},

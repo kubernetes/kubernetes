@@ -91,7 +91,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 
 func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		return api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(id)
 	}), nil
 }
 
