@@ -62,10 +62,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	} else if !reflect.DeepEqual(obj, expectedObj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &reqBody)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo" {
-		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
-	}
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &reqBody)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -88,7 +85,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Path("foo/bar").
 		Path("baz").
 		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
-		Sync(false).
+		Sync(true).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
 		Do().Get()
@@ -102,10 +99,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo" {
-		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
-	}
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo&sync=true&timeout=1s", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -141,10 +135,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo" {
-		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
-	}
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -194,10 +185,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz", "POST", &tmpStr)
-	if fakeHandler.RequestReceived.URL.RawQuery != "labels=name%3Dfoo" {
-		t.Errorf("Unexpected query: %v", fakeHandler.RequestReceived.URL.RawQuery)
-	}
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
