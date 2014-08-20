@@ -168,7 +168,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
 			ReplicaSelector: map[string]string{
-				"name": name,
+				"replicationController": name,
 			},
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
@@ -184,12 +184,9 @@ func RunController(image, name string, replicas int, client client.Interface, po
 					},
 				},
 				Labels: map[string]string{
-					"name": name,
+					"replicationController": name,
 				},
 			},
-		},
-		Labels: map[string]string{
-			"name": name,
 		},
 	}
 
