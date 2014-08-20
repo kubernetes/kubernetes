@@ -106,7 +106,7 @@ func NewNotFound(field string, value interface{}) ValidationError {
 // the ToError() method, which will return nil for an empty ErrorList.
 type ErrorList []error
 
-// This helper implements the error interface for ErrorList, but must prevents
+// This helper implements the error interface for ErrorList, but prevents
 // accidental conversion of ErrorList to error.
 type errorListInternal ErrorList
 
@@ -128,4 +128,28 @@ func (list ErrorList) ToError() error {
 		return nil
 	}
 	return errorListInternal(list)
+}
+
+// Prefix adds a prefix to the Field of every ValidationError in the list. Returns
+// the list for convenience.
+func (list ErrorList) Prefix(prefix string) ErrorList {
+	for i := range list {
+		if err, ok := list[i].(ValidationError); ok {
+			if strings.HasPrefix(err.Field, "[") {
+				err.Field = prefix + err.Field
+			} else if len(err.Field) != 0 {
+				err.Field = prefix + "." + err.Field
+			} else {
+				err.Field = prefix
+			}
+			list[i] = err
+		}
+	}
+	return list
+}
+
+// PrefixIndex adds an index to the Field of every ValidationError in the list. Returns
+// the list for convenience.
+func (list ErrorList) PrefixIndex(index int) ErrorList {
+	return list.Prefix(fmt.Sprintf("[%d]", index))
 }

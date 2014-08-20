@@ -21,9 +21,18 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
+	for i := range errs {
+		if !strings.HasPrefix(errs[i].(errors.ValidationError).Field, prefix) {
+			t.Errorf("expected prefix '%s' for %v", errs[i])
+		}
+	}
+}
 
 func TestValidateVolumes(t *testing.T) {
 	successCase := []Volume{
@@ -40,15 +49,29 @@ func TestValidateVolumes(t *testing.T) {
 		t.Errorf("wrong names result: %v", names)
 	}
 
-	errorCases := map[string][]Volume{
-		"zero-length name":     {{Name: ""}},
-		"name > 63 characters": {{Name: strings.Repeat("a", 64)}},
-		"name not a DNS label": {{Name: "a.b.c"}},
-		"name not unique":      {{Name: "abc"}, {Name: "abc"}},
+	errorCases := map[string]struct {
+		V []Volume
+		T errors.ValidationErrorType
+		F string
+	}{
+		"zero-length name":     {[]Volume{{Name: ""}}, errors.ValidationErrorTypeRequired, "[0].name"},
+		"name > 63 characters": {[]Volume{{Name: strings.Repeat("a", 64)}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not a DNS label": {[]Volume{{Name: "a.b.c"}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not unique":      {[]Volume{{Name: "abc"}, {Name: "abc"}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
 	}
 	for k, v := range errorCases {
-		if _, errs := validateVolumes(v); len(errs) == 0 {
+		_, errs := validateVolumes(v.V)
+		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
+			continue
+		}
+		for i := range errs {
+			if errs[i].(errors.ValidationError).Type != v.T {
+				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
+			}
+			if errs[i].(errors.ValidationError).Field != v.F {
+				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
+			}
 		}
 	}
 }
@@ -77,21 +100,34 @@ func TestValidatePorts(t *testing.T) {
 		t.Errorf("expected default values: %+v", nonCanonicalCase[0])
 	}
 
-	errorCases := map[string][]Port{
-		"name > 63 characters": {{Name: strings.Repeat("a", 64), ContainerPort: 80}},
-		"name not a DNS label": {{Name: "a.b.c", ContainerPort: 80}},
-		"name not unique": {
+	errorCases := map[string]struct {
+		P []Port
+		T errors.ValidationErrorType
+		F string
+	}{
+		"name > 63 characters": {[]Port{{Name: strings.Repeat("a", 64), ContainerPort: 80}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not a DNS label": {[]Port{{Name: "a.b.c", ContainerPort: 80}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not unique": {[]Port{
 			{Name: "abc", ContainerPort: 80},
 			{Name: "abc", ContainerPort: 81},
-		},
-		"zero container port":    {{ContainerPort: 0}},
-		"invalid container port": {{ContainerPort: 65536}},
-		"invalid host port":      {{ContainerPort: 80, HostPort: 65536}},
-		"invalid protocol":       {{ContainerPort: 80, Protocol: "ICMP"}},
+		}, errors.ValidationErrorTypeDuplicate, "[1].name"},
+		"zero container port":    {[]Port{{ContainerPort: 0}}, errors.ValidationErrorTypeRequired, "[0].containerPort"},
+		"invalid container port": {[]Port{{ContainerPort: 65536}}, errors.ValidationErrorTypeInvalid, "[0].containerPort"},
+		"invalid host port":      {[]Port{{ContainerPort: 80, HostPort: 65536}}, errors.ValidationErrorTypeInvalid, "[0].hostPort"},
+		"invalid protocol":       {[]Port{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol"},
 	}
 	for k, v := range errorCases {
-		if errs := validatePorts(v); len(errs) == 0 {
+		errs := validatePorts(v.P)
+		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
+		}
+		for i := range errs {
+			if errs[i].(errors.ValidationError).Type != v.T {
+				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
+			}
+			if errs[i].(errors.ValidationError).Field != v.F {
+				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
+			}
 		}
 	}
 }
@@ -449,8 +485,18 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateReplicationController(&v); len(errs) == 0 {
+		errs := ValidateReplicationController(&v)
+		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
+		}
+		for i := range errs {
+			field := errs[i].(errors.ValidationError).Field
+			if !strings.HasPrefix(field, "desiredState.podTemplate.") &&
+				field != "id" &&
+				field != "desiredState.replicaSelector" &&
+				field != "desiredState.replicas" {
+				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
 		}
 	}
 }
