@@ -18,13 +18,11 @@ package master
 
 import (
 	"sync"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 )
@@ -36,17 +34,15 @@ type PodCache struct {
 	pods          pod.Registry
 	// This is a map of pod id to a map of container name to the
 	podInfo map[string]api.PodInfo
-	period  time.Duration
 	podLock sync.Mutex
 }
 
 // NewPodCache returns a new PodCache which watches container information registered in the given PodRegistry.
-func NewPodCache(info client.PodInfoGetter, pods pod.Registry, period time.Duration) *PodCache {
+func NewPodCache(info client.PodInfoGetter, pods pod.Registry) *PodCache {
 	return &PodCache{
 		containerInfo: info,
 		pods:          pods,
 		podInfo:       map[string]api.PodInfo{},
-		period:        period,
 	}
 }
 
@@ -86,10 +82,4 @@ func (p *PodCache) UpdateAllContainers() {
 			glog.Errorf("Error synchronizing container: %v", err)
 		}
 	}
-}
-
-// Loop begins watching updates of container information.
-// It runs forever, and is expected to be placed in a go routine.
-func (p *PodCache) Loop() {
-	util.Forever(func() { p.UpdateAllContainers() }, p.period)
 }

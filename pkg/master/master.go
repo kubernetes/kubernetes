@@ -105,8 +105,8 @@ func makeMinionRegistry(c *Config) minion.Registry {
 }
 
 func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
-	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
-	go podCache.Loop()
+	podCache := NewPodCache(podInfoGetter, m.podRegistry)
+	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
 	endpoints := endpoint.NewEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)

@@ -19,7 +19,6 @@ package master
 import (
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -40,7 +39,7 @@ func (f *FakePodInfoGetter) GetPodInfo(host, id string) (api.PodInfo, error) {
 }
 
 func TestPodCacheGet(t *testing.T) {
-	cache := NewPodCache(nil, nil, time.Second*1)
+	cache := NewPodCache(nil, nil)
 
 	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
 	cache.podInfo["foo"] = expected
@@ -55,7 +54,7 @@ func TestPodCacheGet(t *testing.T) {
 }
 
 func TestPodCacheGetMissing(t *testing.T) {
-	cache := NewPodCache(nil, nil, time.Second*1)
+	cache := NewPodCache(nil, nil)
 
 	info, err := cache.GetPodInfo("host", "foo")
 	if err == nil {
@@ -71,7 +70,7 @@ func TestPodGetPodInfoGetter(t *testing.T) {
 	fake := FakePodInfoGetter{
 		data: expected,
 	}
-	cache := NewPodCache(&fake, nil, time.Second*1)
+	cache := NewPodCache(&fake, nil)
 
 	cache.updatePodInfo("host", "foo")
 
@@ -103,7 +102,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	fake := FakePodInfoGetter{
 		data: expected,
 	}
-	cache := NewPodCache(&fake, mockRegistry, time.Second*1)
+	cache := NewPodCache(&fake, mockRegistry)
 
 	cache.UpdateAllContainers()
 
