@@ -20,7 +20,7 @@ An alternative we considered was an additional layer of addressing: pod-centric 
 
 ## Current implementation
 
-For the Google Compute Engine cluster configuration scripts, [advanced routing](https://developers.google.com/compute/docs/networking#routing) is set up so that each VM has a extra 256 IP addresses that get routed to it.  This is in addition to the 'main' IP address assigned to the VM that is NAT-ed for Internet access.  The networking bridge (called `cbr0` to differentiate it from `docker0`) is set up outside of Docker proper and only does NAT for egress network traffic that isn't aimed at the virtual network.
+For the Google Compute Engine cluster configuration scripts, [advanced routing](https://developers.google.com/compute/docs/networking#routing) is set up so that each VM has an extra 256 IP addresses that get routed to it.  This is in addition to the 'main' IP address assigned to the VM that is NAT-ed for Internet access.  The networking bridge (called `cbr0` to differentiate it from `docker0`) is set up outside of Docker proper and only does NAT for egress network traffic that isn't aimed at the virtual network.
 
 Ports mapped in from the 'main IP' (and hence the internet if the right firewall rules are set up) are proxied in user mode by Docker.  In the future, this should be done with `iptables` by either the Kubelet or Docker: [Issue #15](https://github.com/GoogleCloudPlatform/kubernetes/issues/15).
 
