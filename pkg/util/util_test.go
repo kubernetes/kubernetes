@@ -18,6 +18,7 @@ package util
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"gopkg.in/v1/yaml"
@@ -167,6 +168,33 @@ func TestIntOrStringMarshalJSON(t *testing.T) {
 		}
 		if string(result) != c.result {
 			t.Errorf("Failed to marshal input '%v': expected: %+v, got %q", input, c.result, string(result))
+		}
+	}
+}
+
+func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
+	cases := []struct {
+		input IntOrString
+	}{
+		{IntOrString{Kind: IntstrInt, IntVal: 123}},
+		{IntOrString{Kind: IntstrString, StrVal: "123"}},
+	}
+
+	for _, c := range cases {
+		input := IntOrStringHolder{c.input}
+		jsonMarshalled, err := json.Marshal(&input)
+		if err != nil {
+			t.Errorf("1: Failed to marshal input: '%v': %v", input, err)
+		}
+
+		var result IntOrStringHolder
+		err = yaml.Unmarshal(jsonMarshalled, &result)
+		if err != nil {
+			t.Errorf("2: Failed to unmarshall '%+v': %v", string(jsonMarshalled), err)
+		}
+
+		if !reflect.DeepEqual(input, result) {
+			t.Errorf("3: Failed to marshal input '%+v': got %+v", input, result)
 		}
 	}
 }
