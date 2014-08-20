@@ -14,19 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-.img {
+img {
   height: 100px;
   width: 100px;
-  background-size: 100px 100px; 
-  margin-left: 25px;
+  float: right;
+  background-size: 100px 100px;
+  background-color: black;
+  margin-left: 10px;
+  border: none;
 }
 
-.server {
+ul {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.pod {
   font-family: Roboto, Open Sans, arial;
-  width: 150px;
-  height: 150px;
   border: 1px solid black;
+  border-radius: 5px;
+  padding: 10px;
   margin: 10px;
   display: inline-block;
-  padding: 3px;
+  background-color: #D1D1D1;
 }

@@ -78,7 +78,10 @@ func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
 // 'name' points to a replication controller.
 // 'client' is used for updating pods.
 // 'updatePeriod' is the time between pod updates.
-// 'imageName' is the new image to update to the template
+// 'imageName' is the new image to update for the template.  This will work
+//     with the first container in the pod.  There is no support yet for
+//     updating more complex replication controllers.  If this is blank then no
+//     update of the image is performed.
 func Update(name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {

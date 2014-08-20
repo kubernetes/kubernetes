@@ -16,72 +16,77 @@ limitations under the License.
 
 var base = "http://localhost:8001/api/v1beta1/";
 
-var updateColor = function($http, server) {
-    $http.get("http://" + server.ip + ":8080/data.json")
+var updateImage = function($http, server) {
+  $http.get("http://" + server.ip + ":8080/data.json")
     .success(function(data) {
-	    server.color = data.color;
-	    console.log(data);
-	})
+      server.image = data.image;
+      console.log(data);
+    })
     .error(function(data) {
-            server.color = "#000";
-	    console.log(data);
-	});
+      server.image = ""
+      console.log(data);
+    });
 };
 
 var updateServer = function($http, server) {
-	$http.get(base + "pods/" + server.id)
-	.success(function(data) {
-		console.log(data);
-		server.ip = data.currentState.hostIP;
-		updateColor($http, server);
-	    })
-	.error(function(data) {
-		console.log(data);
-	    });
+  $http.get(base + "pods/" + server.id)
+    .success(function(data) {
+      console.log(data);
+      server.ip = data.currentState.hostIP;
+      server.labels = data.labels;
+      server.host = data.currentState.host.split('.')[0]
+      server.dockerImage = data.currentState.info["update-demo-container"].Config.Image
+      updateImage($http, server);
+    })
+    .error(function(data) {
+      console.log(data);
+    });
 };
 
 var updateData = function($scope, $http) {
-    var servers = $scope.servers
-    for (var i = 0; i < servers.length; ++i) {
-	var server = servers[i];
-	updateServer($http, server);
-    }
+  var servers = $scope.servers
+  for (var i = 0; i < servers.length; ++i) {
+    var server = servers[i];
+    updateServer($http, server);
+  }
 };
 
 var ButtonsCtrl = function ($scope, $http, $interval) {
-    $scope.servers = [];
-    update($scope, $http);
-    $interval(angular.bind({}, update, $scope, $http), 2000);
+  $scope.servers = [];
+  update($scope, $http);
+  $interval(angular.bind({}, update, $scope, $http), 2000);
 };
 
 var getServer = function($scope, id) {
-    var servers = $scope.servers;
-    for (var i = 0; i < servers.length; ++i) {
-	if (servers[i].id == id) {
-	    return servers[i];
-	}
+  var servers = $scope.servers;
+  for (var i = 0; i < servers.length; ++i) {
+    if (servers[i].id == id) {
+      return servers[i];
     }
-    return null;
+  }
+  return null;
 };
 
 var update = function($scope, $http) {
-    if (!$http) {
-	console.log("No HTTP!");
-	return;
-    }
-    $http.get(base + "pods")
-      .success(function(data) {
-        console.log(data);
-        var newServers = [];
-	for (var i = 0; i < data.items.length; ++i) {
-	    var server = getServer($scope, data.items[i].id);
-	    if (server == null) {
-		server = { "id": data.items[i].id };
-	    }
-	    newServers.push(server);
-	}
-	$scope.servers = newServers;
-        updateData($scope, $http)
+  if (!$http) {
+    console.log("No HTTP!");
+    return;
+  }
+  $http.get(base + "pods")
+    .success(function(data) {
+      console.log(data);
+      var newServers = [];
+      for (var i = 0; i < data.items.length; ++i) {
+        var server = getServer($scope, data.items[i].id);
+        if (server == null) {
+          server = { "id": data.items[i].id };
+        }
+        newServers.push(server);
+      }
+      $scope.servers = newServers;
+      updateData($scope, $http)
     })
-    .error(function(data) { console.log("ERROR: " + data); })
+    .error(function(data) {
+      console.log("ERROR: " + data);
+    })
 };

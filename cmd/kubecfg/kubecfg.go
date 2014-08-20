@@ -55,7 +55,7 @@ var (
 	www           = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
 	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
-	imageName     = flag.String("image", "", "Image used when updating a replicationController")
+	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 )
 
 var parser = kubecfg.NewParser(map[string]interface{}{
@@ -72,10 +72,13 @@ func usage() {
   kubecfg [OPTIONS] get|list|create|delete|update <%s>[/<id>]
 
   Manage replication controllers:
-  kubecfg [OPTIONS] stop|rm|rollingupdate <controller>
+  kubecfg [OPTIONS] stop|rm <controller>
   kubecfg [OPTIONS] [-u <time>] [-image image] rollingupdate <controller>
-  kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
   kubecfg [OPTIONS] resize <controller> <replicas>
+
+  Launch a simple ReplicationController with a single container based
+  on the given image:
+  kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
 
   Options:
 `, prettyWireStorage())
