@@ -311,7 +311,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 			Template: tmpl,
 		}
 	default:
-		printer = &kubecfg.HumanReadablePrinter{}
+		printer = humanReadablePrinter()
 	}
 
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
@@ -368,4 +368,10 @@ func executeControllerRequest(method string, c *kube_client.Client) bool {
 		glog.Fatalf("Error: %v", err)
 	}
 	return true
+}
+
+func humanReadablePrinter() *kubecfg.HumanReadablePrinter {
+	printer := kubecfg.NewHumanReadablePrinter()
+	// Add Handler calls here to support additional types
+	return printer
 }

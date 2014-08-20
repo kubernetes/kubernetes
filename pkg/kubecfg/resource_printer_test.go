@@ -19,6 +19,8 @@ package kubecfg
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"reflect"
 	"testing"
 
@@ -99,5 +101,58 @@ func TestIdentityPrinter(t *testing.T) {
 	}
 	if !reflect.DeepEqual(&obj, objOut) {
 		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)
+	}
+}
+
+type TestPrintType struct {
+	Data string
+}
+
+type TestUnknownType struct{}
+
+func PrintCustomType(obj *TestPrintType, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s", obj.Data)
+	return err
+}
+
+func ErrorPrintHandler(obj *TestPrintType, w io.Writer) error {
+	return fmt.Errorf("ErrorPrintHandler error")
+}
+
+func TestCustomTypePrinting(t *testing.T) {
+	columns := []string{"Data"}
+	printer := NewHumanReadablePrinter()
+	printer.Handler(columns, PrintCustomType)
+
+	obj := TestPrintType{"test object"}
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&obj, buffer)
+	if err != nil {
+		t.Errorf("An error occurred printing the custom type: %#v", err)
+	}
+	expectedOutput := "Data\n----------\ntest object"
+	if buffer.String() != expectedOutput {
+		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
+	}
+}
+
+func TestPrintHandlerError(t *testing.T) {
+	columns := []string{"Data"}
+	printer := NewHumanReadablePrinter()
+	printer.Handler(columns, ErrorPrintHandler)
+	obj := TestPrintType{"test object"}
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&obj, buffer)
+	if err == nil || err.Error() != "ErrorPrintHandler error" {
+		t.Errorf("Did not get the expected error: %#v", err)
+	}
+}
+
+func TestUnknownTypePrinting(t *testing.T) {
+	printer := NewHumanReadablePrinter()
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&TestUnknownType{}, buffer)
+	if err == nil {
+		t.Errorf("An error was expected from printing unknown type")
 	}
 }

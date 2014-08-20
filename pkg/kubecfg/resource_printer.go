@@ -20,12 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"text/tabwriter"
 	"text/template"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
 
@@ -81,14 +83,77 @@ func (y *YAMLPrinter) PrintObj(obj interface{}, w io.Writer) error {
 	return err
 }
 
+type handlerEntry struct {
+	columns   []string
+	printFunc reflect.Value
+}
+
 // HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide more elegant output.
-type HumanReadablePrinter struct{}
+type HumanReadablePrinter struct {
+	handlerMap map[reflect.Type]*handlerEntry
+}
+
+// NewHumanReadablePrinter creates a HumanReadablePrinter
+func NewHumanReadablePrinter() *HumanReadablePrinter {
+	printer := &HumanReadablePrinter{make(map[reflect.Type]*handlerEntry)}
+	printer.addDefaultHandlers()
+	return printer
+}
+
+// Handler adds a print handler with a given set of columns to HumanReadablePrinter instance
+// printFunc is the function that will be called to print an object
+// It must be of the following type:
+//  func printFunc(object ObjectType, w io.Writer) error
+// where ObjectType is the type of the object that will be printed.
+func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) error {
+	printFuncValue := reflect.ValueOf(printFunc)
+	if err := h.validatePrintHandlerFunc(printFuncValue); err != nil {
+		glog.Errorf("Unable to add print handler: %v", err)
+		return err
+	}
+	objType := printFuncValue.Type().In(0)
+	h.handlerMap[objType] = &handlerEntry{
+		columns:   columns,
+		printFunc: printFuncValue,
+	}
+	return nil
+}
+
+func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
+	if printFunc.Kind() != reflect.Func {
+		return fmt.Errorf("Invalid print handler. %#v is not a function.", printFunc)
+	}
+	funcType := printFunc.Type()
+	if funcType.NumIn() != 2 || funcType.NumOut() != 1 {
+		return fmt.Errorf("Invalid print handler." +
+			"Must accept 2 parameters and return 1 value.")
+	}
+	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
+		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
+		return fmt.Errorf("Invalid print handler. The expected signature is: "+
+			"func handler(obj %v, w io.Writer) error", funcType.In(0))
+	}
+	return nil
+}
 
 var podColumns = []string{"Name", "Image(s)", "Host", "Labels"}
 var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Replicas"}
 var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
 var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
+
+// handleDefaultTypes adds print handlers for default Kubernetes types
+func (h *HumanReadablePrinter) addDefaultHandlers() {
+	h.Handler(podColumns, printPod)
+	h.Handler(podColumns, printPodList)
+	h.Handler(replicationControllerColumns, printReplicationController)
+	h.Handler(replicationControllerColumns, printReplicationControllerList)
+	h.Handler(serviceColumns, printService)
+	h.Handler(serviceColumns, printServiceList)
+	h.Handler(minionColumns, printMinion)
+	h.Handler(minionColumns, printMinionList)
+	h.Handler(statusColumns, printStatus)
+}
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "Unknown object: %s", string(data))
@@ -107,7 +172,7 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 	return err
 }
 
-func (h *HumanReadablePrinter) makeImageList(manifest api.ContainerManifest) string {
+func makeImageList(manifest api.ContainerManifest) string {
 	var images []string
 	for _, container := range manifest.Containers {
 		images = append(images, container.Image)
@@ -115,74 +180,74 @@ func (h *HumanReadablePrinter) makeImageList(manifest api.ContainerManifest) str
 	return strings.Join(images, ",")
 }
 
-func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer) error {
+func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-		pod.ID, h.makeImageList(pod.DesiredState.Manifest), pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, labels.Set(pod.Labels))
+		pod.ID, makeImageList(pod.DesiredState.Manifest),
+		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, labels.Set(pod.Labels))
 	return err
 }
 
-func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer) error {
+func printPodList(podList *api.PodList, w io.Writer) error {
 	for _, pod := range podList.Items {
-		if err := h.printPod(&pod, w); err != nil {
+		if err := printPod(&pod, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *HumanReadablePrinter) printReplicationController(ctrl *api.ReplicationController, w io.Writer) error {
+func printReplicationController(ctrl *api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		ctrl.ID, h.makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest), labels.Set(ctrl.DesiredState.ReplicaSelector), ctrl.DesiredState.Replicas)
+		ctrl.ID, makeImageList(ctrl.DesiredState.PodTemplate.DesiredState.Manifest),
+		labels.Set(ctrl.DesiredState.ReplicaSelector), ctrl.DesiredState.Replicas)
 	return err
 }
 
-func (h *HumanReadablePrinter) printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer) error {
+func printReplicationControllerList(list *api.ReplicationControllerList, w io.Writer) error {
 	for _, ctrl := range list.Items {
-		if err := h.printReplicationController(&ctrl, w); err != nil {
+		if err := printReplicationController(&ctrl, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *HumanReadablePrinter) printService(svc *api.Service, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.ID, labels.Set(svc.Labels), labels.Set(svc.Selector), svc.Port)
+func printService(svc *api.Service, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.ID, labels.Set(svc.Labels),
+		labels.Set(svc.Selector), svc.Port)
 	return err
 }
 
-func (h *HumanReadablePrinter) printServiceList(list *api.ServiceList, w io.Writer) error {
+func printServiceList(list *api.ServiceList, w io.Writer) error {
 	for _, svc := range list.Items {
-		if err := h.printService(&svc, w); err != nil {
+		if err := printService(&svc, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *HumanReadablePrinter) printMinion(minion *api.Minion, w io.Writer) error {
+func printMinion(minion *api.Minion, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\n", minion.ID)
 	return err
 }
 
-func (h *HumanReadablePrinter) printMinionList(list *api.MinionList, w io.Writer) error {
+func printMinionList(list *api.MinionList, w io.Writer) error {
 	for _, minion := range list.Items {
-		if err := h.printMinion(&minion, w); err != nil {
+		if err := printMinion(&minion, w); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *HumanReadablePrinter) printStatus(status *api.Status, w io.Writer) error {
-	err := h.printHeader(statusColumns, w)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(w, "%v\n", status.Status)
+func printStatus(status *api.Status, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%v\n", status.Status)
 	return err
 }
 
-// Print parses the data as JSON, then prints the parsed data in a human-friendly format according to the type of the data.
+// Print parses the data as JSON, then prints the parsed data in a human-friendly
+// format according to the type of the data.
 func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 	var mapObj map[string]interface{}
 	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {
@@ -204,36 +269,17 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error {
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()
-	switch o := obj.(type) {
-	case *api.Pod:
-		h.printHeader(podColumns, w)
-		return h.printPod(o, w)
-	case *api.PodList:
-		h.printHeader(podColumns, w)
-		return h.printPodList(o, w)
-	case *api.ReplicationController:
-		h.printHeader(replicationControllerColumns, w)
-		return h.printReplicationController(o, w)
-	case *api.ReplicationControllerList:
-		h.printHeader(replicationControllerColumns, w)
-		return h.printReplicationControllerList(o, w)
-	case *api.Service:
-		h.printHeader(serviceColumns, w)
-		return h.printService(o, w)
-	case *api.ServiceList:
-		h.printHeader(serviceColumns, w)
-		return h.printServiceList(o, w)
-	case *api.Minion:
-		h.printHeader(minionColumns, w)
-		return h.printMinion(o, w)
-	case *api.MinionList:
-		h.printHeader(minionColumns, w)
-		return h.printMinionList(o, w)
-	case *api.Status:
-		return h.printStatus(o, w)
-	default:
-		_, err := fmt.Fprintf(w, "Error: unknown type %#v", obj)
-		return err
+	if handler := h.handlerMap[reflect.TypeOf(obj)]; handler != nil {
+		h.printHeader(handler.columns, w)
+		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w)}
+		resultValue := handler.printFunc.Call(args)[0]
+		if resultValue.IsNil() {
+			return nil
+		} else {
+			return resultValue.Interface().(error)
+		}
+	} else {
+		return fmt.Errorf("Error: unknown type %#v", obj)
 	}
 }
 
