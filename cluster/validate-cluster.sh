@@ -26,6 +26,8 @@ set -e
 source $(dirname $0)/kube-env.sh
 source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
+get-password
+detect-master > /dev/null
 detect-minions > /dev/null
 
 MINIONS_FILE=/tmp/minions
@@ -36,6 +38,16 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     if [ "$count" == "0" ]; then
 	echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
         exit 1
+    fi
+
+    # Make sure the kubelet is healthy
+    if [ "$(curl --insecure -sw '%{http_code}' --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "200" ]; then
+        echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
+        echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
+        exit 1
+    else
+    echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
+
     fi
 done
 echo "Cluster validation succeeded"
