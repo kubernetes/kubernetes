@@ -29,6 +29,8 @@ import (
 	"text/template"
 	"time"
 
+	goyaml "gopkg.in/v1/yaml"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
@@ -179,7 +181,7 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(method, client) || executeControllerRequest(method, client)
+	matchFound := executeAPIRequest(method, client) || executeControllerRequest(method, client) || executeConfigRequest(method, client)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
@@ -368,6 +370,63 @@ func executeControllerRequest(method string, c *kube_client.Client) bool {
 		glog.Fatalf("Error: %v", err)
 	}
 	return true
+}
+
+func executeConfigRequest(method string, c *kube_client.Client) bool {
+	if method != "apply" {
+		return false
+	}
+
+	data, err := ioutil.ReadFile(*config)
+	if err != nil {
+		glog.Fatalf("Unable to read %v: %v\n", *config, err)
+	}
+
+	obj := api.Config{}
+	if err := goyaml.Unmarshal(data, &obj); err != nil {
+		glog.Fatalf("Unable to parse config: %v", err)
+	}
+
+	for _, service := range obj.Services {
+		createObject(c, service)
+	}
+	for _, pod := range obj.Pods {
+		createObject(c, pod)
+	}
+	for _, replicationController := range obj.ReplicationControllers {
+		createObject(c, replicationController)
+	}
+
+	return true
+}
+
+func createObject(c *kube_client.Client, obj interface{}) {
+	var path string
+
+	data, err := api.Encode(obj)
+	if err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
+
+	switch obj.(type) {
+	case api.Service:
+		path = "/services"
+	case api.Pod:
+		path = "/pods"
+	case api.ReplicationController:
+		path = "/replicationControllers"
+	default:
+		glog.Fatalf("Error: Unknown object: %T", obj)
+	}
+
+	request := c.Verb("POST").
+		Path(path).
+		ParseSelectorParam("labels", *selector).
+		Body(data)
+
+	if _, err := request.Do().Get(); err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
 }
 
 func humanReadablePrinter() *kubecfg.HumanReadablePrinter {
