@@ -76,10 +76,8 @@ func makeServerTest() *serverTestFramework {
 	}
 	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{}
-	fw.serverUnderTest = &Server{
-		host:    fw.fakeKubelet,
-		updates: fw.updateChan,
-	}
+	server := NewServer(fw.fakeKubelet, fw.updateChan)
+	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
 }
