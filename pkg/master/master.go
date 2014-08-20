@@ -65,7 +65,7 @@ type Master struct {
 // New returns a new instance of Master connected to the given etcdServer.
 func New(c *Config) *Master {
 	etcdClient := goetcd.NewClient(c.EtcdServers)
-	minionRegistry := minionRegistryMaker(c)
+	minionRegistry := makeMinionRegistry(c)
 	m := &Master{
 		podRegistry:        etcd.NewRegistry(etcdClient, minionRegistry),
 		controllerRegistry: etcd.NewRegistry(etcdClient, minionRegistry),
@@ -78,7 +78,7 @@ func New(c *Config) *Master {
 	return m
 }
 
-func minionRegistryMaker(c *Config) minion.Registry {
+func makeMinionRegistry(c *Config) minion.Registry {
 	var minionRegistry minion.Registry
 	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
 		var err error
