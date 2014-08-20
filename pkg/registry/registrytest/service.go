@@ -32,6 +32,7 @@ type ServiceRegistry struct {
 
 	DeletedID string
 	GottenID  string
+	UpdatedID string
 }
 
 func (r *ServiceRegistry) ListServices() (api.ServiceList, error) {
@@ -40,6 +41,7 @@ func (r *ServiceRegistry) ListServices() (api.ServiceList, error) {
 
 func (r *ServiceRegistry) CreateService(svc api.Service) error {
 	r.Service = &svc
+	r.List.Items = append(r.List.Items, svc)
 	return r.Err
 }
 
@@ -54,6 +56,7 @@ func (r *ServiceRegistry) DeleteService(id string) error {
 }
 
 func (r *ServiceRegistry) UpdateService(svc api.Service) error {
+	r.UpdatedID = svc.ID
 	return r.Err
 }
 
