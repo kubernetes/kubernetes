@@ -78,11 +78,21 @@ func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
 // 'name' points to a replication controller.
 // 'client' is used for updating pods.
 // 'updatePeriod' is the time between pod updates.
-func Update(name string, client client.Interface, updatePeriod time.Duration) error {
+// 'imageName' is the new image to update to the template
+func Update(name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
 		return err
 	}
+
+	if len(imageName) != 0 {
+		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = imageName
+		controller, err = client.UpdateReplicationController(controller)
+		if err != nil {
+			return err
+		}
+	}
+
 	s := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 
 	podList, err := client.ListPods(s)

@@ -55,6 +55,7 @@ var (
 	www           = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
 	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
+	imageName     = flag.String("image", "", "Image used when updating a replicationController")
 )
 
 var parser = kubecfg.NewParser(map[string]interface{}{
@@ -72,7 +73,8 @@ func usage() {
 
   Manage replication controllers:
   kubecfg [OPTIONS] stop|rm|rollingupdate <controller>
-  kubecfg [OPTIONS] run <image> <replicas> <controller>
+  kubecfg [OPTIONS] [-u <time>] [-image image] rollingupdate <controller>
+  kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
   kubecfg [OPTIONS] resize <controller> <replicas>
 
   Options:
@@ -337,7 +339,7 @@ func executeControllerRequest(method string, c *client.Client) bool {
 	case "rm":
 		err = kubecfg.DeleteController(parseController(), c)
 	case "rollingupdate":
-		err = kubecfg.Update(parseController(), c, *updatePeriod)
+		err = kubecfg.Update(parseController(), c, *updatePeriod, *imageName)
 	case "run":
 		if len(flag.Args()) != 4 {
 			glog.Fatal("usage: kubecfg [OPTIONS] run <image> <replicas> <controller>")
