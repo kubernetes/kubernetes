@@ -479,7 +479,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 
 		glog.Infof("Container doesn't exist, creating %#v", container)
 		if err := kl.dockerPuller.Pull(container.Image); err != nil {
-			glog.Errorf("Failed to pull image: %v skipping pod %s container %s.", err, podFullName, container.Name)
+			glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
 			continue
 		}
 		containerID, err := kl.runContainer(pod, &container, podVolumes, "container:"+string(netID))
