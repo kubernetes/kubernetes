@@ -362,9 +362,9 @@ type Status struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	// One of: "success", "failure", "working" (for operations not yet completed)
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
-	// A human readable description of the status of this operation.
+	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty" yaml:"message,omitempty"`
-	// A machine readable description of why this operation is in the
+	// A machine-readable description of why this operation is in the
 	// "failure" or "working" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
@@ -391,6 +391,9 @@ type StatusDetails struct {
 	// The kind attribute of the resource associated with the status ReasonType.
 	// On some operations may differ from the requested resource Kind.
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	// The Causes array includes more details associated with the ReasonType
+	// failure. Not all ReasonTypes may provide detailed causes.
+	Causes []StatusCause `json:"causes,omitempty" yaml:"causes,omitempty"`
 }
 
 // Values of Status.Status
@@ -447,6 +450,62 @@ const (
 	// conflict.
 	// Status code 409
 	ReasonTypeConflict ReasonType = "conflict"
+
+	// ResourceTypeInvalid means the requested create or update operation cannot be
+	// completed due to invalid data provided as part of the request. The client may
+	// need to alter the request. When set, the client may use the StatusDetails
+	// message field as a summary of the issues encountered.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the invalid resource
+	//   "id"   string - the identifier of the invalid resource
+	//   "causes"      - one or more StatusCause entries indicating the data in the
+	//                   provided resource that was invalid.  The code, message, and
+	//                   field attributes will be set.
+	// Status code 422
+	ReasonTypeInvalid ReasonType = "invalid"
+)
+
+// StatusCause provides more information about an api.Status failure, including
+// cases when multiple errors are encountered.
+type StatusCause struct {
+	// A machine-readable description of the cause of the error. If this value is
+	// empty there is no information available.
+	Reason CauseReasonType `json:"reason,omitempty" yaml:"reason,omitempty"`
+	// A human-readable description of the cause of the error.  This field may be
+	// presented as-is to a reader.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	// The field of the resource that has caused this error, as named by its JSON
+	// serialization. May include dot and postfix notation for nested attributes.
+	// Arrays are zero-indexed.  Fields may appear more than once in an array of
+	// causes due to fields having multiple errors.
+	// Optional.
+	//
+	// Examples:
+	//   "name" - the field "name" on the current resource
+	//   "items[0].name" - the field "name" on the first array entry in "items"
+	Field string `json:"field,omitempty" yaml:"field,omitempty"`
+}
+
+// CauseReasonType is a machine readable value providing more detail about why
+// an operation failed. An operation may have multiple causes for a failure.
+type CauseReasonType string
+
+const (
+	// CauseReasonTypeFieldValueNotFound is used to report failure to find a requested value
+	// (e.g. looking up an ID).
+	CauseReasonTypeFieldValueNotFound CauseReasonType = "fieldValueNotFound"
+	// CauseReasonTypeFieldValueInvalid is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	CauseReasonTypeFieldValueRequired CauseReasonType = "fieldValueRequired"
+	// CauseReasonTypeFieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	CauseReasonTypeFieldValueDuplicate CauseReasonType = "fieldValueDuplicate"
+	// CauseReasonTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match).
+	CauseReasonTypeFieldValueInvalid CauseReasonType = "fieldValueInvalid"
+	// CauseReasonTypeFieldValueNotSupported is used to report valid (as per formatting rules)
+	// values that can not be handled (e.g. an enumerated string).
+	CauseReasonTypeFieldValueNotSupported CauseReasonType = "fieldValueNotSupported"
 )
 
 // ServerOp is an operation delivered to API clients.

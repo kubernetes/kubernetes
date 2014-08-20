@@ -395,6 +395,9 @@ type StatusDetails struct {
 	// The kind attribute of the resource associated with the status ReasonType.
 	// On some operations may differ from the requested resource Kind.
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	// The Causes array includes more details associated with the ReasonType
+	// failure. Not all ReasonTypes may provide detailed causes.
+	Causes []StatusCause `json:"causes,omitempty" yaml:"causes,omitempty"`
 }
 
 // Values of Status.Status
@@ -451,6 +454,49 @@ const (
 	// conflict.
 	// Status code 409
 	ReasonTypeConflict ReasonType = "conflict"
+)
+
+// StatusCause provides more information about an api.Status failure, including
+// cases when multiple errors are encountered.
+type StatusCause struct {
+	// A machine-readable description of the cause of the error. If this value is
+	// empty there is no information available.
+	Reason CauseReasonType `json:"reason,omitempty" yaml:"reason,omitempty"`
+	// A human-readable description of the cause of the error.  This field may be
+	// presented as-is to a reader.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	// The field of the resource that has caused this error, as named by its JSON
+	// serialization. May include dot and postfix notation for nested attributes.
+	// Arrays are zero-indexed.  Fields may appear more than once in an array of
+	// causes due to fields having multiple errors.
+	// Optional.
+	//
+	// Examples:
+	//   "name" - the field "name" on the current resource
+	//   "items[0].name" - the field "name" on the first array entry in "items"
+	Field string `json:"field,omitempty" yaml:"field,omitempty"`
+}
+
+// CauseReasonType is a machine readable value providing more detail about why
+// an operation failed. An operation may have multiple causes for a failure.
+type CauseReasonType string
+
+const (
+	// CauseReasonTypeFieldValueNotFound is used to report failure to find a requested value
+	// (e.g. looking up an ID).
+	CauseReasonTypeFieldValueNotFound CauseReasonType = "fieldValueNotFound"
+	// CauseReasonTypeFieldValueInvalid is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	CauseReasonTypeFieldValueRequired CauseReasonType = "fieldValueRequired"
+	// CauseReasonTypeFieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	CauseReasonTypeFieldValueDuplicate CauseReasonType = "fieldValueDuplicate"
+	// CauseReasonTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match).
+	CauseReasonTypeFieldValueInvalid CauseReasonType = "fieldValueInvalid"
+	// CauseReasonTypeFieldValueNotSupported is used to report valid (as per formatting rules)
+	// values that can not be handled (e.g. an enumerated string).
+	CauseReasonTypeFieldValueNotSupported CauseReasonType = "fieldValueNotSupported"
 )
 
 // ServerOp is an operation delivered to API clients.

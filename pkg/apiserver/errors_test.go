@@ -35,11 +35,31 @@ func TestErrorNew(t *testing.T) {
 	if IsNotFound(err) {
 		t.Errorf(fmt.Sprintf("expected to not be %s", api.ReasonTypeNotFound))
 	}
+	if IsInvalid(err) {
+		t.Errorf("expected to not be invalid")
+	}
 
 	if !IsConflict(NewConflictErr("test", "2", errors.New("message"))) {
-		t.Errorf("expected to be confict")
+		t.Errorf("expected to be conflict")
 	}
 	if !IsNotFound(NewNotFoundErr("test", "3")) {
 		t.Errorf("expected to be not found")
+	}
+	if !IsInvalid(NewInvalidError("test", "2", nil)) {
+		t.Errorf("expected to be invalid")
+	}
+}
+
+func Test_errToAPIStatus(t *testing.T) {
+	err := &apiServerError{}
+	status := errToAPIStatus(err)
+	if status.Reason != api.ReasonTypeUnknown || status.Status != api.StatusFailure {
+		t.Errorf("unexpected status object: %#v", status)
+	}
+}
+
+func Test_reasonForError(t *testing.T) {
+	if e, a := api.ReasonTypeUnknown, reasonForError(nil); e != a {
+		t.Errorf("unexpected reason type: %#v", a)
 	}
 }

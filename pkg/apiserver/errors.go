@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
@@ -76,6 +77,21 @@ func NewConflictErr(kind, name string, err error) error {
 	}}
 }
 
+// NewInvalidError returns an error indicating the item is invalid and cannot be processed.
+func NewInvalidError(kind, name string, errs errors.ErrorList) error {
+	return &apiServerError{api.Status{
+		Status: api.StatusFailure,
+		Code:   422, // RFC 4918
+		Reason: api.ReasonTypeInvalid,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+			// TODO: causes
+		},
+		Message: fmt.Sprintf("%s %q is invalid: %s", kind, name, errs.ToError()),
+	}}
+}
+
 // IsNotFound returns true if the specified error was created by NewNotFoundErr
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.ReasonTypeNotFound
@@ -89,6 +105,11 @@ func IsAlreadyExists(err error) bool {
 // IsConflict determines if the err is an error which indicates the provided update conflicts
 func IsConflict(err error) bool {
 	return reasonForError(err) == api.ReasonTypeConflict
+}
+
+// IsInvalid determines if the err is an error which indicates the provided resource is not valid
+func IsInvalid(err error) bool {
+	return reasonForError(err) == api.ReasonTypeInvalid
 }
 
 func reasonForError(err error) api.ReasonType {
@@ -110,7 +131,7 @@ func errToAPIStatus(err error) *api.Status {
 	default:
 		status := http.StatusInternalServerError
 		switch {
-		//TODO: replace me with NewUpdateConflictErr
+		//TODO: replace me with NewConflictErr
 		case tools.IsEtcdTestFailed(err):
 			status = http.StatusConflict
 		}
