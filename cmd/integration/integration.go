@@ -118,7 +118,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
 	go util.Forever(func() {
-		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), http.DefaultServeMux, "localhost", 10250)
+		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), "localhost", 10250)
 	}, 0)
 
 	// Kubelet (machine)
@@ -129,7 +129,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
 	go util.Forever(func() {
-		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), http.DefaultServeMux, "localhost", 10251)
+		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), "localhost", 10251)
 	}, 0)
 
 	return apiServer.URL

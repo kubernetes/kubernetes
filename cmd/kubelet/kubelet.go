@@ -162,7 +162,7 @@ func main() {
 	// start the kubelet server
 	if *enableServer {
 		go util.Forever(func() {
-			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), http.DefaultServeMux, *address, *port)
+			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), *address, *port)
 		}, 0)
 	}
 
