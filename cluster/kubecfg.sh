@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
-
 source $(dirname $0)/kube-env.sh
 source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
