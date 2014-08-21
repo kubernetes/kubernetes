@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package vagrant_cloud
 
 import (
 	"encoding/json"
@@ -24,6 +24,8 @@ import (
 	"net/http"
 	neturl "net/url"
 	"sort"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
 // VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster
@@ -32,6 +34,10 @@ type VagrantCloud struct {
 	saltUser string
 	saltPass string
 	saltAuth string
+}
+
+func init() {
+	cloudprovider.RegisterCloudProvider("vagrant", func() (cloudprovider.Interface, error) { return newVagrantCloud() })
 }
 
 // SaltToken is an authorization token required by Salt REST API
@@ -61,8 +67,8 @@ type SaltMinionsResponse struct {
 	Minions []SaltMinions `json:"return"`
 }
 
-// NewVagrantCloud creates a new instance of VagrantCloud configured to talk to the Salt REST API.
-func NewVagrantCloud() (*VagrantCloud, error) {
+// newVagrantCloud creates a new instance of VagrantCloud configured to talk to the Salt REST API.
+func newVagrantCloud() (*VagrantCloud, error) {
 	return &VagrantCloud{
 		saltURL:  "http://127.0.0.1:8000",
 		saltUser: "vagrant",
@@ -72,17 +78,17 @@ func NewVagrantCloud() (*VagrantCloud, error) {
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud
-func (v *VagrantCloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
+func (v *VagrantCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
 }
 
 // Instances returns an implementation of Instances for Vagrant cloud
-func (v *VagrantCloud) Instances() (Instances, bool) {
+func (v *VagrantCloud) Instances() (cloudprovider.Instances, bool) {
 	return v, true
 }
 
 // Zones returns an implementation of Zones for Vagrant cloud
-func (v *VagrantCloud) Zones() (Zones, bool) {
+func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 

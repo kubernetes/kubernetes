@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package gce_cloud
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 
 	"code.google.com/p/goauth2/compute/serviceaccount"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -36,6 +37,10 @@ type GCECloud struct {
 	projectID  string
 	zone       string
 	instanceRE string
+}
+
+func init() {
+	cloudprovider.RegisterCloudProvider("gce", func() (cloudprovider.Interface, error) { return newGCECloud() })
 }
 
 func getProjectAndZone() (string, string, error) {
@@ -62,8 +67,8 @@ func getProjectAndZone() (string, string, error) {
 	return parts[1], parts[3], nil
 }
 
-// NewGCECloud creates a new instance of GCECloud.
-func NewGCECloud() (*GCECloud, error) {
+// newGCECloud creates a new instance of GCECloud.
+func newGCECloud() (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
@@ -84,17 +89,17 @@ func NewGCECloud() (*GCECloud, error) {
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
-func (gce *GCECloud) TCPLoadBalancer() (TCPLoadBalancer, bool) {
+func (gce *GCECloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return gce, true
 }
 
 // Instances returns an implementation of Instances for Google Compute Engine.
-func (gce *GCECloud) Instances() (Instances, bool) {
+func (gce *GCECloud) Instances() (cloudprovider.Instances, bool) {
 	return gce, true
 }
 
 // Zones returns an implementation of Zones for Google Compute Engine.
-func (gce *GCECloud) Zones() (Zones, bool) {
+func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
 	return gce, true
 }
 
@@ -237,12 +242,12 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	return instances, nil
 }
 
-func (gce *GCECloud) GetZone() (Zone, error) {
+func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 	region, err := getGceRegion(gce.zone)
 	if err != nil {
-		return Zone{}, err
+		return cloudprovider.Zone{}, err
 	}
-	return Zone{
+	return cloudprovider.Zone{
 		FailureDomain: gce.zone,
 		Region:        region,
 	}, nil

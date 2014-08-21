@@ -75,23 +75,13 @@ func main() {
 		glog.Fatalf("-etcd_servers flag is required.")
 	}
 
-	var cloud cloudprovider.Interface
-	switch *cloudProvider {
-	case "gce":
-		var err error
-		cloud, err = cloudprovider.NewGCECloud()
-		if err != nil {
-			glog.Fatalf("Couldn't connect to GCE cloud: %#v", err)
-		}
-	case "vagrant":
-		var err error
-		cloud, err = cloudprovider.NewVagrantCloud()
-		if err != nil {
-			glog.Fatalf("Couldn't connect to vagrant cloud: %#v", err)
-		}
-	default:
+	cloud, err := cloudprovider.GetCloudProvider(*cloudProvider)
+	if err != nil {
+		glog.Fatalf("Couldn't init cloud provider %q: %#v", *cloudProvider, err)
+	}
+	if cloud == nil {
 		if len(*cloudProvider) > 0 {
-			glog.Infof("Unknown cloud provider: %s", *cloudProvider)
+			glog.Fatalf("Unknown cloud provider: %s", *cloudProvider)
 		} else {
 			glog.Info("No cloud provider specified.")
 		}
