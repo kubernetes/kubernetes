@@ -59,8 +59,8 @@ func Forever(f func(), period time.Duration) {
 	}
 }
 
-// MakeJSONString returns obj marshalled as a JSON string, ignoring any errors.
-func MakeJSONString(obj interface{}) string {
+// EncodeJSON returns obj marshalled as a JSON string, ignoring any errors.
+func EncodeJSON(obj interface{}) string {
 	data, _ := json.Marshal(obj)
 	return string(data)
 }
@@ -83,13 +83,13 @@ const (
 	IntstrString                   // The IntOrString holds a string.
 )
 
-// MakeIntOrStringFromInt creates an IntOrString object with an int value.
-func MakeIntOrStringFromInt(val int) IntOrString {
+// NewIntOrStringFromInt creates an IntOrString object with an int value.
+func NewIntOrStringFromInt(val int) IntOrString {
 	return IntOrString{Kind: IntstrInt, IntVal: val}
 }
 
-// MakeIntOrStringFromInt creates an IntOrString object with a string value.
-func MakeIntOrStringFromString(val string) IntOrString {
+// NewIntOrStringFromInt creates an IntOrString object with a string value.
+func NewIntOrStringFromString(val string) IntOrString {
 	return IntOrString{Kind: IntstrString, StrVal: val}
 }
 

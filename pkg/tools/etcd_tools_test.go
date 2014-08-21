@@ -65,7 +65,7 @@ func TestIsEtcdNotFound(t *testing.T) {
 }
 
 func TestExtractList(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -107,9 +107,9 @@ func TestExtractList(t *testing.T) {
 }
 
 func TestExtractObj(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	expect := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	fakeClient.Set("/some/key", util.MakeJSONString(expect), 0)
+	fakeClient.Set("/some/key", util.EncodeJSON(expect), 0)
 	helper := EtcdHelper{fakeClient, codec, versioner}
 	var got api.Pod
 	err := helper.ExtractObj("/some/key", &got, false)
@@ -122,7 +122,7 @@ func TestExtractObj(t *testing.T) {
 }
 
 func TestExtractObjNotFoundErr(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -163,7 +163,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 
 func TestSetObj(t *testing.T) {
 	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, codec, versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
@@ -182,7 +182,7 @@ func TestSetObj(t *testing.T) {
 
 func TestSetObjWithVersion(t *testing.T) {
 	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}}
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -211,7 +211,7 @@ func TestSetObjWithVersion(t *testing.T) {
 
 func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, codec, nil}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
@@ -229,7 +229,7 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 }
 
 func TestAtomicUpdate(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	codec := scheme
 	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
@@ -284,7 +284,7 @@ func TestAtomicUpdate(t *testing.T) {
 }
 
 func TestAtomicUpdateNoChange(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	helper := EtcdHelper{fakeClient, scheme, api.NewJSONBaseResourceVersioner()}
 
@@ -315,7 +315,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 }
 
 func TestAtomicUpdate_CreateCollision(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	codec := scheme
 	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
@@ -486,7 +486,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
@@ -572,7 +572,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		fakeClient := MakeFakeEtcdClient(t)
+		fakeClient := NewFakeEtcdClient(t)
 		fakeClient.Data["/some/key"] = testCase.Response
 		h := EtcdHelper{fakeClient, codec, versioner}
 
@@ -609,7 +609,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 func TestWatchListFromZeroIndex(t *testing.T) {
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -662,7 +662,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchFromNotFound(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -688,7 +688,7 @@ func TestWatchFromNotFound(t *testing.T) {
 }
 
 func TestWatchFromOtherError(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -720,7 +720,7 @@ func TestWatchFromOtherError(t *testing.T) {
 }
 
 func TestWatchPurposefulShutdown(t *testing.T) {
-	fakeClient := MakeFakeEtcdClient(t)
+	fakeClient := NewFakeEtcdClient(t)
 	h := EtcdHelper{fakeClient, codec, versioner}
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 

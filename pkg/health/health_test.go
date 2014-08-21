@@ -60,7 +60,7 @@ func TestHealthChecker(t *testing.T) {
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
 				HTTPGet: &api.HTTPGetProbe{
-					Port: util.MakeIntOrStringFromString(port),
+					Port: util.NewIntOrStringFromString(port),
 					Path: "/foo/bar",
 					Host: host,
 				},
@@ -132,7 +132,7 @@ func TestMuxHealthChecker(t *testing.T) {
 			},
 		}
 		container.LivenessProbe.Type = tt.probeType
-		container.LivenessProbe.HTTPGet.Port = util.MakeIntOrStringFromString(port)
+		container.LivenessProbe.HTTPGet.Port = util.NewIntOrStringFromString(port)
 		container.LivenessProbe.HTTPGet.Host = host
 		health, err := mc.HealthCheck("test", api.PodState{}, container)
 		if err != nil {

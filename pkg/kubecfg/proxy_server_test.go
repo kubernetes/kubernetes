@@ -34,7 +34,7 @@ func TestFileServing(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	prefix := "/foo/"
-	handler := makeFileHandler(prefix, dir)
+	handler := newFileHandler(prefix, dir)
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 	req, err := http.NewRequest("GET", server.URL+prefix+"test.txt", nil)

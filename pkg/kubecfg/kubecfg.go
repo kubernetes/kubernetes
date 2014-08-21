@@ -129,7 +129,7 @@ func ResizeController(name string, replicas int, client client.Interface) error 
 	return nil
 }
 
-func makePorts(spec string) []api.Port {
+func portsFromString(spec string) []api.Port {
 	parts := strings.Split(spec, ",")
 	var result []api.Port
 	for _, part := range parts {
@@ -172,7 +172,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 							{
 								Name:  strings.ToLower(name),
 								Image: image,
-								Ports: makePorts(portSpec),
+								Ports: portsFromString(portSpec),
 							},
 						},
 					},

@@ -233,7 +233,7 @@ func TestLoadAuthInfo(t *testing.T) {
 }
 
 func TestMakePorts(t *testing.T) {
-	var makePortsTests = []struct {
+	var testCases = []struct {
 		spec  string
 		ports []api.Port
 	}{
@@ -246,8 +246,8 @@ func TestMakePorts(t *testing.T) {
 			},
 		},
 	}
-	for _, tt := range makePortsTests {
-		ports := makePorts(tt.spec)
+	for _, tt := range testCases {
+		ports := portsFromString(tt.spec)
 		if !reflect.DeepEqual(ports, tt.ports) {
 			t.Errorf("Expected %#v, got %#v", tt.ports, ports)
 		}

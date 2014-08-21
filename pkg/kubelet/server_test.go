@@ -70,7 +70,7 @@ type serverTestFramework struct {
 	testHTTPServer  *httptest.Server
 }
 
-func makeServerTest() *serverTestFramework {
+func newServerTest() *serverTestFramework {
 	fw := &serverTestFramework{
 		updateChan: make(chan interface{}),
 	}
@@ -89,11 +89,11 @@ func readResp(resp *http.Response) (string, error) {
 }
 
 func TestContainer(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 	expected := []api.ContainerManifest{
 		{ID: "test_manifest"},
 	}
-	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected[0]))) // Only send a single ContainerManifest
+	body := bytes.NewBuffer([]byte(util.EncodeJSON(expected[0]))) // Only send a single ContainerManifest
 	resp, err := http.Post(fw.testHTTPServer.URL+"/container", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
@@ -111,12 +111,12 @@ func TestContainer(t *testing.T) {
 }
 
 func TestContainers(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 	expected := []api.ContainerManifest{
 		{ID: "test_manifest_1"},
 		{ID: "test_manifest_2"},
 	}
-	body := bytes.NewBuffer([]byte(util.MakeJSONString(expected)))
+	body := bytes.NewBuffer([]byte(util.EncodeJSON(expected)))
 	resp, err := http.Post(fw.testHTTPServer.URL+"/containers", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
@@ -134,7 +134,7 @@ func TestContainers(t *testing.T) {
 }
 
 func TestPodInfo(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 	expected := api.PodInfo{"goodpod": docker.Container{ID: "myContainerID"}}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
 		if name == "goodpod.etcd" {
@@ -160,7 +160,7 @@ func TestPodInfo(t *testing.T) {
 }
 
 func TestContainerInfo(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 	expectedInfo := &info.ContainerInfo{
 		StatsPercentiles: &info.ContainerStatsPercentiles{
 			MaxMemoryUsage: 1024001,
@@ -201,7 +201,7 @@ func TestContainerInfo(t *testing.T) {
 }
 
 func TestRootInfo(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 	expectedInfo := &info.ContainerInfo{
 		StatsPercentiles: &info.ContainerStatsPercentiles{
 			MaxMemoryUsage: 1024001,
@@ -237,7 +237,7 @@ func TestRootInfo(t *testing.T) {
 }
 
 func TestMachineInfo(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 	expectedInfo := &info.MachineInfo{
 		NumCores:       4,
 		MemoryCapacity: 1024,
@@ -262,7 +262,7 @@ func TestMachineInfo(t *testing.T) {
 }
 
 func TestServeLogs(t *testing.T) {
-	fw := makeServerTest()
+	fw := newServerTest()
 
 	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
 

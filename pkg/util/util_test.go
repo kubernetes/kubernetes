@@ -34,7 +34,7 @@ type FakePod struct {
 	Str          string
 }
 
-func TestMakeJSONString(t *testing.T) {
+func TestEncodeJSON(t *testing.T) {
 	pod := FakePod{
 		FakeJSONBase: FakeJSONBase{ID: "foo"},
 		Labels: map[string]string{
@@ -45,7 +45,7 @@ func TestMakeJSONString(t *testing.T) {
 		Str: "a string",
 	}
 
-	body := MakeJSONString(pod)
+	body := EncodeJSON(pod)
 
 	expectedBody, err := json.Marshal(pod)
 	if err != nil {
@@ -72,15 +72,15 @@ func TestHandleCrash(t *testing.T) {
 	}
 }
 
-func TestMakeIntOrStringFromInt(t *testing.T) {
-	i := MakeIntOrStringFromInt(93)
+func TestNewIntOrStringFromInt(t *testing.T) {
+	i := NewIntOrStringFromInt(93)
 	if i.Kind != IntstrInt || i.IntVal != 93 {
 		t.Errorf("Expected IntVal=93, got %+v", i)
 	}
 }
 
-func TestMakeIntOrStringFromString(t *testing.T) {
-	i := MakeIntOrStringFromString("76")
+func TestNewIntOrStringFromString(t *testing.T) {
+	i := NewIntOrStringFromString("76")
 	if i.Kind != IntstrString || i.StrVal != "76" {
 		t.Errorf("Expected StrVal=\"76\", got %+v", i)
 	}

@@ -125,7 +125,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 				glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 			}
 		}()
-		defer httplog.MakeLogged(req, &w).StacktraceWhen(
+		defer httplog.NewLogged(req, &w).StacktraceWhen(
 			httplog.StatusIsNot(
 				http.StatusOK,
 				http.StatusAccepted,

@@ -31,7 +31,7 @@ type ProxyServer struct {
 	Client *client.Client
 }
 
-func makeFileHandler(prefix, base string) http.Handler {
+func newFileHandler(prefix, base string) http.Handler {
 	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
 }
 
@@ -44,7 +44,7 @@ func NewProxyServer(filebase, host string, auth *client.AuthInfo) *ProxyServer {
 		Client: client.New(host, auth),
 	}
 	http.Handle("/api/", server)
-	http.Handle("/static/", makeFileHandler("/static/", filebase))
+	http.Handle("/static/", newFileHandler("/static/", filebase))
 	return server
 }
 

@@ -61,7 +61,7 @@ func (f *FakePodControl) deletePod(podID string) error {
 	return nil
 }
 
-func makeReplicationController(replicas int) api.ReplicationController {
+func newReplicationController(replicas int) api.ReplicationController {
 	return api.ReplicationController{
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
@@ -84,7 +84,7 @@ func makeReplicationController(replicas int) api.ReplicationController {
 	}
 }
 
-func makePodList(count int) api.PodList {
+func newPodList(count int) api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
@@ -108,7 +108,7 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
+	body, _ := api.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -118,17 +118,17 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := makeReplicationController(2)
+	controllerSpec := newReplicationController(2)
 
 	manager.syncReplicationController(controllerSpec)
 	validateSyncReplication(t, &fakePodControl, 0, 0)
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := api.Encode(makePodList(2))
+	body, _ := api.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -138,17 +138,17 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := makeReplicationController(1)
+	controllerSpec := newReplicationController(1)
 
 	manager.syncReplicationController(controllerSpec)
 	validateSyncReplication(t, &fakePodControl, 0, 1)
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body, _ := api.Encode(makePodList(0))
+	body, _ := api.Encode(newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -158,10 +158,10 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 
 	fakePodControl := FakePodControl{}
 
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	manager.podControl = &fakePodControl
 
-	controllerSpec := makeReplicationController(2)
+	controllerSpec := newReplicationController(2)
 
 	manager.syncReplicationController(controllerSpec)
 	validateSyncReplication(t, &fakePodControl, 2, 0)
@@ -268,16 +268,16 @@ func TestSyncronize(t *testing.T) {
 		},
 	}
 
-	fakeEtcd := tools.MakeFakeEtcdClient(t)
+	fakeEtcd := tools.NewFakeEtcdClient(t)
 	fakeEtcd.Data["/registry/controllers"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: util.MakeJSONString(controllerSpec1),
+						Value: util.EncodeJSON(controllerSpec1),
 					},
 					{
-						Value: util.MakeJSONString(controllerSpec2),
+						Value: util.EncodeJSON(controllerSpec2),
 					},
 				},
 			},
@@ -308,7 +308,7 @@ func TestSyncronize(t *testing.T) {
 	})
 	testServer := httptest.NewServer(mux)
 	client := client.New(testServer.URL, nil)
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl
 
@@ -328,7 +328,7 @@ func (fw FakeWatcher) WatchReplicationControllers(l, f labels.Selector, rv uint6
 
 func TestWatchControllers(t *testing.T) {
 	client := FakeWatcher{watch.NewFake(), &client.Fake{}}
-	manager := MakeReplicationManager(client)
+	manager := NewReplicationManager(client)
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})
 	manager.syncHandler = func(controllerSpec api.ReplicationController) error {

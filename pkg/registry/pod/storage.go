@@ -105,7 +105,7 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 	}
 	if rs.podCache != nil || rs.podInfoGetter != nil {
 		rs.fillPodInfo(pod)
-		pod.CurrentState.Status = makePodStatus(pod)
+		pod.CurrentState.Status = getPodStatus(pod)
 	}
 	pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
 	return pod, err
@@ -210,7 +210,7 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 	return addr.String()
 }
 
-func makePodStatus(pod *api.Pod) api.PodStatus {
+func getPodStatus(pod *api.Pod) api.PodStatus {
 	if pod.CurrentState.Info == nil || pod.CurrentState.Host == "" {
 		return api.PodWaiting
 	}

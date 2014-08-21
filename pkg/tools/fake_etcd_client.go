@@ -59,7 +59,7 @@ type FakeEtcdClient struct {
 	WatchStop        chan<- bool
 }
 
-func MakeFakeEtcdClient(t TestLogger) *FakeEtcdClient {
+func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	ret := &FakeEtcdClient{
 		t:                    t,
 		expectNotFoundGetSet: map[string]struct{}{},

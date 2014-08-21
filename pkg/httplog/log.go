@@ -32,7 +32,7 @@ import (
 // Intended to wrap calls to your ServeMux.
 func Handler(delegate http.Handler, pred StacktracePred) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		defer MakeLogged(req, &w).StacktraceWhen(pred).Log()
+		defer NewLogged(req, &w).StacktraceWhen(pred).Log()
 		delegate.ServeHTTP(w, req)
 	})
 }
@@ -59,11 +59,11 @@ func DefaultStacktracePred(status int) bool {
 	return status < http.StatusOK || status >= http.StatusBadRequest
 }
 
-// MakeLogged turns a normal response writer into a logged response writer.
+// NewLogged turns a normal response writer into a logged response writer.
 //
 // Usage:
 //
-// defer MakeLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
+// defer NewLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
 //
 // (Only the call to Log() is defered, so you can set everything up in one line!)
 //
@@ -71,10 +71,10 @@ func DefaultStacktracePred(status int) bool {
 // through the logger.
 //
 // Use LogOf(w).Addf(...) to log something along with the response result.
-func MakeLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
+func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 	if _, ok := (*w).(*respLogger); ok {
 		// Don't double-wrap!
-		panic("multiple MakeLogged calls!")
+		panic("multiple NewLogged calls!")
 	}
 	rl := &respLogger{
 		startTime:         time.Now(),
@@ -87,7 +87,7 @@ func MakeLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 }
 
 // LogOf returns the logger hiding in w. Panics if there isn't such a logger,
-// because MakeLogged() must have been previously called for the log to work.
+// because NewLogged() must have been previously called for the log to work.
 func LogOf(w http.ResponseWriter) *respLogger {
 	if rl, ok := w.(*respLogger); ok {
 		return rl

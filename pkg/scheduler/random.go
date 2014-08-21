@@ -29,7 +29,7 @@ type RandomScheduler struct {
 	randomLock sync.Mutex
 }
 
-func MakeRandomScheduler(random *rand.Rand) Scheduler {
+func NewRandomScheduler(random *rand.Rand) Scheduler {
 	return &RandomScheduler{
 		random: random,
 	}
