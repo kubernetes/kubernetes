@@ -17,29 +17,27 @@ limitations under the License.
 package cache
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore()
-	g := NewReflector("foo", nil, &api.Pod{}, s)
+	g := NewReflector(nil, &api.Pod{}, s)
 	fw := watch.NewFake()
 	s.Add("foo", &api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
 	s.Add("bar", &api.Pod{JSONBase: api.JSONBase{ID: "bar"}})
 	go func() {
-		fw.Modify(&api.Pod{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 55}})
-		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: "baz"}})
 		fw.Add(&api.Service{JSONBase: api.JSONBase{ID: "rejected"}})
 		fw.Delete(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
+		fw.Modify(&api.Pod{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 55}})
+		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 32}})
 		fw.Stop()
 	}()
-	g.watchHandler(fw)
+	var resumeRV uint64
+	g.watchHandler(fw, &resumeRV)
 
 	table := []struct {
 		ID     string
@@ -49,7 +47,7 @@ func TestReflector_watchHandler(t *testing.T) {
 		{"foo", 0, false},
 		{"rejected", 0, false},
 		{"bar", 55, true},
-		{"baz", 0, true},
+		{"baz", 32, true},
 	}
 	for _, item := range table {
 		obj, exists := s.Get(item.ID)
@@ -63,32 +61,62 @@ func TestReflector_watchHandler(t *testing.T) {
 			t.Errorf("%v: expected %v, got %v", item.ID, e, a)
 		}
 	}
+
+	// RV should stay 1 higher than the last id we see.
+	if e, a := uint64(33), resumeRV; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }
 
-func TestReflector_startWatch(t *testing.T) {
-	table := []struct{ resource, path string }{
-		{"pods", "/api/v1beta1/pods/watch"},
-		{"services", "/api/v1beta1/services/watch"},
-	}
-	for _, testItem := range table {
-		got := make(chan struct{})
-		srv := httptest.NewServer(http.HandlerFunc(
-			func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(http.StatusNotFound)
-				if req.URL.Path == testItem.path {
-					close(got)
-					return
-				}
-				t.Errorf("unexpected path %v", req.URL.Path)
-			}))
-		s := NewStore()
-		c := client.New(srv.URL, nil)
-		g := NewReflector(testItem.resource, c, &api.Pod{}, s)
-		_, err := g.startWatch()
-		// We're just checking that it watches the right path.
-		if err == nil {
-			t.Errorf("unexpected non-error")
+func TestReflector_Run(t *testing.T) {
+	createdFakes := make(chan *watch.FakeWatcher)
+
+	// Expect our starter to get called at the beginning of the watch with 0, and again with 3 when we
+	// inject an error at 2.
+	expectedRVs := []uint64{0, 3}
+	watchStarter := func(rv uint64) (watch.Interface, error) {
+		fw := watch.NewFake()
+		if e, a := expectedRVs[0], rv; e != a {
+			t.Errorf("Expected rv %v, but got %v", e, a)
 		}
-		<-got
+		expectedRVs = expectedRVs[1:]
+		// channel is not buffered because the for loop below needs to block. But
+		// we don't want to block here, so report the new fake via a go routine.
+		go func() { createdFakes <- fw }()
+		return fw, nil
+	}
+	s := NewFIFO()
+	r := NewReflector(watchStarter, &api.Pod{}, s)
+	r.period = 0
+	r.Run()
+
+	ids := []string{"foo", "bar", "baz", "qux", "zoo"}
+	var fw *watch.FakeWatcher
+	for i, id := range ids {
+		if fw == nil {
+			fw = <-createdFakes
+		}
+		sendingRV := uint64(i + 1)
+		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: id, ResourceVersion: sendingRV}})
+		if sendingRV == 2 {
+			// Inject a failure.
+			fw.Stop()
+			fw = nil
+		}
+	}
+
+	// Verify we received the right ids with the right resource versions.
+	for i, id := range ids {
+		pod := s.Pop().(*api.Pod)
+		if e, a := id, pod.ID; e != a {
+			t.Errorf("%v: Expected %v, got %v", i, e, a)
+		}
+		if e, a := uint64(i+1), pod.ResourceVersion; e != a {
+			t.Errorf("%v: Expected %v, got %v", i, e, a)
+		}
+	}
+
+	if len(expectedRVs) != 0 {
+		t.Error("called watchStarter an unexpected number of times")
 	}
 }

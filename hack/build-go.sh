@@ -33,7 +33,7 @@ cd "${KUBE_REPO_ROOT}"
 
 if [[ $# == 0 ]]; then
   # Update $@ with the default list of targets to build.
-  set -- cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg
+  set -- cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg plugin/cmd/scheduler
 fi
 
 binaries=()

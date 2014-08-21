@@ -18,6 +18,8 @@ package cache
 
 import (
 	"sync"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // FIFO receives adds and updates from a Reflector, and puts them in a queue for
@@ -33,30 +35,30 @@ type FIFO struct {
 }
 
 // Add inserts an item, and puts it in the queue.
-func (f *FIFO) Add(ID string, obj interface{}) {
+func (f *FIFO) Add(id string, obj interface{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.items[ID] = obj
-	f.queue = append(f.queue, ID)
+	f.items[id] = obj
+	f.queue = append(f.queue, id)
 	f.cond.Broadcast()
 }
 
 // Update updates an item, and adds it to the queue.
-func (f *FIFO) Update(ID string, obj interface{}) {
+func (f *FIFO) Update(id string, obj interface{}) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.items[ID] = obj
-	f.queue = append(f.queue, ID)
+	f.items[id] = obj
+	f.queue = append(f.queue, id)
 	f.cond.Broadcast()
 }
 
 // Delete removes an item. It doesn't add it to the queue, because
 // this implementation assumes the consumer only cares about the objects,
 // not the order in which they were created/added.
-func (f *FIFO) Delete(ID string, obj interface{}) {
+func (f *FIFO) Delete(id string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	delete(f.items, ID)
+	delete(f.items, id)
 }
 
 // List returns a list of all the items.
@@ -70,11 +72,24 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
+// Contains returns a util.StringSet containing all IDs of stored the items.
+// This is a snapshot of a moment in time, and one should keep in mind that
+// other go routines can add or remove items after you call this.
+func (c *FIFO) Contains() util.StringSet {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	set := util.StringSet{}
+	for id := range c.items {
+		set.Insert(id)
+	}
+	return set
+}
+
 // Get returns the requested item, or sets exists=false.
-func (f *FIFO) Get(ID string) (item interface{}, exists bool) {
+func (f *FIFO) Get(id string) (item interface{}, exists bool) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	item, exists = f.items[ID]
+	item, exists = f.items[id]
 	return item, exists
 }
 

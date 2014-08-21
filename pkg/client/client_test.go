@@ -343,13 +343,17 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	}
 
 	requestBody := body(c.Request.Body, c.Request.RawBody)
+	actualQuery := c.handler.RequestReceived.URL.Query()
+	// We check the query manually, so blank it out so that FakeHandler.ValidateRequest
+	// won't check it.
+	c.handler.RequestReceived.URL.RawQuery = ""
 	c.handler.ValidateRequest(t, makeURL(c.Request.Path), c.Request.Method, requestBody)
 	for key, values := range c.Request.Query {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			validator = func(a, b string) bool { return a == b }
 		}
-		observed := c.handler.RequestReceived.URL.Query().Get(key)
+		observed := actualQuery.Get(key)
 		if !validator(values[0], observed) {
 			t.Errorf("Unexpected query arg for key: %s.  Expected %s, Received %s", key, values[0], observed)
 		}

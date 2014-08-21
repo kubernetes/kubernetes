@@ -21,62 +21,56 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
 
-// Store is a generic object storage interface. Reflector knows how to watch a server
-// and update a store. A generic store is provided, which allows Reflector to be used
-// as a local caching system, and an LRU store, which allows Reflector to work like a
-// queue of items yet to be processed.
-type Store interface {
-	Add(ID string, obj interface{})
-	Update(ID string, obj interface{})
-	Delete(ID string, obj interface{})
-	List() []interface{}
-	Get(ID string) (item interface{}, exists bool)
-}
-
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
-	kubeClient   *client.Client
-	resource     string
+	// The type of object we expect to place in the store.
 	expectedType reflect.Type
-	store        Store
+	// The destination to sync up with the watch source
+	store Store
+	// watchFactory is called to initiate watches.
+	watchFactory WatchFactory
+	// period controls timing between one watch ending and
+	// the beginning of the next one.
+	period time.Duration
 }
+
+// WatchFactory should begin a watch at the specified version.
+type WatchFactory func(resourceVersion uint64) (watch.Interface, error)
 
 // NewReflector makes a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
 // only put things in the store that have the type of expectedType.
-// TODO: define a query so you only locally cache a subset of items.
-func NewReflector(resource string, kubeClient *client.Client, expectedType interface{}, store Store) *Reflector {
+func NewReflector(watchFactory WatchFactory, expectedType interface{}, store Store) *Reflector {
 	gc := &Reflector{
-		resource:     resource,
-		kubeClient:   kubeClient,
+		watchFactory: watchFactory,
 		store:        store,
 		expectedType: reflect.TypeOf(expectedType),
+		period:       time.Second,
 	}
 	return gc
 }
 
+// Run starts a watch and handles watch events. Will restart the watch if it is closed.
+// Run starts a goroutine and returns immediately.
 func (gc *Reflector) Run() {
+	var resourceVersion uint64
 	go util.Forever(func() {
-		w, err := gc.startWatch()
+		w, err := gc.watchFactory(resourceVersion)
 		if err != nil {
-			glog.Errorf("failed to watch %v: %v", gc.resource, err)
+			glog.Errorf("failed to watch %v: %v", gc.expectedType, err)
 			return
 		}
-		gc.watchHandler(w)
-	}, 5*time.Second)
+		gc.watchHandler(w, &resourceVersion)
+	}, gc.period)
 }
 
-func (gc *Reflector) startWatch() (watch.Interface, error) {
-	return gc.kubeClient.Get().Path(gc.resource).Path("watch").Watch()
-}
-
-func (gc *Reflector) watchHandler(w watch.Interface) {
+// watchHandler watches w and keeps *resourceVersion up to date.
+func (gc *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
 	for {
 		event, ok := <-w.ResultChan()
 		if !ok {
@@ -98,9 +92,13 @@ func (gc *Reflector) watchHandler(w watch.Interface) {
 		case watch.Modified:
 			gc.store.Update(jsonBase.ID(), event.Object)
 		case watch.Deleted:
-			gc.store.Delete(jsonBase.ID(), event.Object)
+			// TODO: Will any consumers need access to the "last known
+			// state", which is passed in event.Object? If so, may need
+			// to change this.
+			gc.store.Delete(jsonBase.ID())
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
+		*resourceVersion = jsonBase.ResourceVersion() + 1
 	}
 }

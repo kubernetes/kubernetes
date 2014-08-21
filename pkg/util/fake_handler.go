@@ -19,6 +19,8 @@ package util
 import (
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"reflect"
 )
 
 // TestInterface is a simple interface providing Errorf, to make injection for
@@ -57,8 +59,15 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 
 // ValidateRequest verifies that FakeHandler received a request with expected path, method, and body.
 func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
-	if f.RequestReceived.URL.Path != expectedPath {
-		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectedPath)
+	expectURL, err := url.Parse(expectedPath)
+	if err != nil {
+		t.Errorf("Couldn't parse %v as a URL.", expectedPath)
+	}
+	if f.RequestReceived.URL.Path != expectURL.Path {
+		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectURL.Path)
+	}
+	if e, a := expectURL.Query(), f.RequestReceived.URL.Query(); !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected query for request %#v, received: %q, expected: %q", f.RequestReceived, a, e)
 	}
 	if f.RequestReceived.Method != expectedMethod {
 		t.Errorf("Unexpected method: %q, expected: %q", f.RequestReceived.Method, expectedMethod)

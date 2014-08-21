@@ -1,0 +1,11 @@
+[Unit]
+Description=Kubernetes Scheduler Plugin
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/scheduler
+ExecStart=/usr/local/bin/scheduler "$DAEMON_ARGS"
+
+[Install]
+WantedBy=multi-user.target

@@ -40,10 +40,12 @@ func doTestStore(t *testing.T, store Store) {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 	}
-	store.Delete("foo", "qux")
+	store.Delete("foo")
 	if _, ok := store.Get("foo"); ok {
 		t.Errorf("found deleted item??")
 	}
+
+	// Test List
 	store.Add("a", "b")
 	store.Add("c", "d")
 	store.Add("e", "e")
@@ -55,6 +57,15 @@ func doTestStore(t *testing.T, store Store) {
 		t.Errorf("missing items")
 	}
 	if len(found) != 3 {
+		t.Errorf("extra items")
+	}
+
+	// Check that ID list is correct.
+	ids := store.Contains()
+	if !ids.HasAll("a", "c", "e") {
+		t.Errorf("missing items")
+	}
+	if len(ids) != 3 {
 		t.Errorf("extra items")
 	}
 }
