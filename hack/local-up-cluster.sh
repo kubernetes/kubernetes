@@ -42,13 +42,13 @@ ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
 ETCD_PID=$!
 
 # Continue as soon as etcd is ready (i.e. /version returns 200).
-if [ "$(which curl)" != "" ]; then
+if [ -z "$(which curl)" ]; then
     # Wait for 100ms initially for etcd to come up, then wait
     # a maximum of 4.5 more seconds (sleep + max-time below).
     sleep .1
     TRY=0
     until $(curl -sL --max-time 1 --fail --output /dev/null \
-            --silent http://127.0.0.1:4001/version); do 
+            --silent http://127.0.0.1:4001/v2/stats/leader); do 
         if [ $TRY -eq 3 ]; then
             echo "etcd did not come up properly"
             exit 1
