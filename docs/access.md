@@ -41,8 +41,8 @@ K8s user assets:
 
 K8s Cluster assets:
   - Assets of each k8s-user
-  - certificates which identify the k8s machines and servers to users.
-  - cluster resources (the value of k8s computing resources).
+  - Certificates or secrets which identify the k8s machines and servers to users.
+  - The value of k8s cluster computing resources (cpu, memory, etc).
 
 This document is primarily about protecting k8s user assets and K8s cluster assets from other k8s users and k8s insiders.
  
@@ -69,7 +69,7 @@ Hosted cluster:
   - Offering K8s API as a service, or offering a Paas or Saas built on K8s
   - May already offer web services, and need to integrate with existing customer account concept, and existing authentication, accounting, auditing, and security policy infrastructure.
   - May want to leverage K8s user accounts and accounting to manage their user accounts (not a priority to support this use case.)
-  - Precise and accurate accounting of resources needed.
+  - Precise and accurate accounting of resources needed.  Resource controls needed for hard limits (users given limited slice of data) and soft limits (users can grow up to some limit and then be expanded).
 
 K8s ecosystem services:
  - There may be companies that want to offer their existing services (Build, CI, A/B-test, release automation, etc) for use with K8s.  There should be some story for this case.
@@ -78,7 +78,9 @@ Pods configs should be largely portable between Org-run and hosted configuration
 
 
 # Design 
-Related discussion: https://github.com/GoogleCloudPlatform/kubernetes/issues/443
+Related discussion:
+- https://github.com/GoogleCloudPlatform/kubernetes/issues/442
+- https://github.com/GoogleCloudPlatform/kubernetes/issues/443
 
 This doc describes two security profiles:
   - Simple profile:  like single-user mode.  Make it easy to evaluate k8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
@@ -104,7 +106,6 @@ Initial Features:
 - `userAccount` may access multiple projects.
 
 Improvements:
-- Have API calls to create and delete `userAccount`s.
 - Make `userAccount` part of a separate API group from core k8s objects like `pod`.  Facilitates plugging in alternate Access Management.
 
 Simple Profile:
@@ -114,8 +115,7 @@ Enterprise Profile:
    - every human user has own `userAccount`. 
    - `userAccount`s have labels that indicate both membership in groups, and ability to act in certain roles.
    - each service using the API has own `userAccount` too. (e.g. `scheduler`, `repcontroller`)
-   - list of users may be synced in from existing enterprise directory service.
-      - issue: deleting username still being referenced by pod, etc.
+   - automated jobs to denormalize the ldap group info into the local system list of users into the k8s userAccount file.
 
 ###Unix accounts 
 A `userAccount` is not a Unix user account.  The fact that a pod is started by a `userAccount` does not mean that the processes in that pod's containers run as a Unix user with a corresponding name or identity.  
@@ -139,7 +139,6 @@ Initial Features:
 
 Improvements:
 - have API calls to create and delete `project` objects.
-- sync in from enterprise directory service.
 
 Most API objects have an associated `project`:
 - pods have a `project`.
@@ -160,9 +159,12 @@ Project versus userAccount vs Labels:
 
 
 how is `project` selected when making a REST call?
-- query parameter
 - default to only project if there is only one.
+- query parameter
 - subdomain, e.g. http://myproject.kubernetes.example.com.  nginx proxy can translate that to a query parameter
+  - Subdomains have potential scaling limits. If using project names to identify the domain, you have to defend against profane or vanity names, and probably support blacklist limits on new project names. In non-hosted environments is less of an issue. Requires that the apiservers be tied into DNS, which is onerous to configure in some environments. Nice in some contexts.
+- offering a project API scope /projects/<id>/<kubernetes api>
+- global access via globally unique id (where supported, which isn't very consistent today) /pods/<uuid>
 
 ## Authentication
 
@@ -185,27 +187,19 @@ Things to consider for Improved implementation:
   - Use with endpoint that generates short-term bearer token.
 - tokens that are bound to the channel between the client and the api server
      - http://www.ietf.org/proceedings/90/slides/slides-90-uta-0.pdf
-     - http://ww.browserauth.net
+     - http://www.browserauth.net
 
 Where to do authentication.  Either:
-- Authenticate in reverse proxy (nginx).  Proxy either rejects invalid token or appends authorized_user identifier to the request before passing to APIserver.
+- Authenticate in reverse proxy (currently nginx, could easily be apache+mod_auth).  Proxy either rejects invalid token or appends authorized_user identifier to the request before passing to APIserver.
 - Apiserver checks token.
 
 Considerations:
 - In some arrangements, the proxy might terminate SSL, and use a CA-signed certificate, while the APIserver might just use a self-signed or organization-signed certificate.
 - some large orgs will already have existing SaaS web services (e.g. storage, VMs).  Some will already have a gateway that handles auth for multiple services.  If K8s does auth in the proxy, then those orgs can just replace the proxy with their existing web service gateway.
-- nginx is more stable than k8s code.  Prefer to put secrets (tokens, SSL cert.) in lower-touch place.
+- Apache or nginx is more stable than k8s code.  Prefer to put secrets (tokens, SSL cert.) in lower-touch place.
 - Admins configuring k8s for enterprise use are more likely to know how to config a proxy than to modify Go code of apiserver. 
 
 Based on above considerations, auth should happen in the proxy.
-
-Implementation options:
-- Simplest: a list of encoded tokens is stored in nginx config file as a map.  a rewrite rule (http://nginx.org/en/docs/http/ngx_http_rewrite_module.html) adds authorized_user if Auth header is in the is in the map, else returns a 401 Unauthorized.
-- nginx can defer auth to a separate auth server.  This could aid integration with existing enterprise auth solutions.  e.g.:
-      - https://github.com/algermissen/nginx-dlg-auth/blob/master/README.md
-      - http://nginx.org/en/docs/http/ngx_http_auth_request_module.html
-- nginx can have lua plugin:  https://github.com/openresty/lua-nginx-module 
-- User can provide own proxy, other than nginx.
 
 
 ## Authorization
