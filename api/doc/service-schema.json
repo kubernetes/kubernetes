@@ -28,6 +28,10 @@
       "type": "number",
       "required": false
     },
+    "containerPort": {
+      "type": "string",
+      "required": false
+    },
     "labels": {
       "type": "object",
       "required": false
