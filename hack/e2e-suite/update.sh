@@ -41,7 +41,7 @@ function validate() {
 
     ids=($POD_ID_LIST)
     if [ ${#ids[@]} -ne $1 ]; then
-	echo "Unexpected number of pods: ${#ids[@]}"
+	echo "Unexpected number of pods: ${#ids[@]}.  Expected $1"
 	exit 1
     fi
 }
@@ -62,11 +62,11 @@ trap "teardown" EXIT
 validate 2
 
 $CLOUDCFG resize $controller 1
-
+sleep 2
 validate 1
 
 $CLOUDCFG resize $controller 2
-
+sleep 2
 validate 2
 
 # TODO: test rolling update here, but to do so, we need to make the update blocking
