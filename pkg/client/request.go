@@ -52,11 +52,11 @@ var specialParams = util.NewStringSet("sync", "timeout")
 // if err != nil { ... }
 // list, ok := resp.(*api.PodList)
 //
-func (c *Client) Verb(verb string) *Request {
+func (c *RESTClient) Verb(verb string) *Request {
 	return &Request{
 		verb:       verb,
 		c:          c,
-		path:       "/api/v1beta1",
+		path:       c.Prefix,
 		sync:       c.Sync,
 		timeout:    c.Timeout,
 		params:     map[string]string{},
@@ -65,27 +65,27 @@ func (c *Client) Verb(verb string) *Request {
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
-func (c *Client) Post() *Request {
+func (c *RESTClient) Post() *Request {
 	return c.Verb("POST")
 }
 
 // Put begins a PUT request. Short for c.Verb("PUT").
-func (c *Client) Put() *Request {
+func (c *RESTClient) Put() *Request {
 	return c.Verb("PUT")
 }
 
 // Get begins a GET request. Short for c.Verb("GET").
-func (c *Client) Get() *Request {
+func (c *RESTClient) Get() *Request {
 	return c.Verb("GET")
 }
 
 // Delete begins a DELETE request. Short for c.Verb("DELETE").
-func (c *Client) Delete() *Request {
+func (c *RESTClient) Delete() *Request {
 	return c.Verb("DELETE")
 }
 
 // PollFor makes a request to do a single poll of the completion of the given operation.
-func (c *Client) PollFor(operationID string) *Request {
+func (c *RESTClient) PollFor(operationID string) *Request {
 	return c.Get().Path("operations").Path(operationID).Sync(false).PollPeriod(0)
 }
 
@@ -93,7 +93,7 @@ func (c *Client) PollFor(operationID string) *Request {
 // Any errors are stored until the end of your call, so you only have to
 // check once.
 type Request struct {
-	c          *Client
+	c          *RESTClient
 	err        error
 	verb       string
 	path       string

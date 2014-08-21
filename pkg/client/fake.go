@@ -19,6 +19,7 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -109,4 +110,10 @@ func (c *Fake) UpdateService(service api.Service) (api.Service, error) {
 func (c *Fake) DeleteService(service string) error {
 	c.Actions = append(c.Actions, FakeAction{Action: "delete-service", Value: service})
 	return nil
+}
+
+func (c *Fake) ServerVersion() (*version.Info, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-version", Value: nil})
+	versionInfo := version.Get()
+	return &versionInfo, nil
 }

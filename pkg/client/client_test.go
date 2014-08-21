@@ -415,7 +415,7 @@ func TestMakeRequest(t *testing.T) {
 		{Request: testRequest{Method: "GET", Path: "/good"}, Response: Response{StatusCode: 200}},
 		{Request: testRequest{Method: "GET", Path: "/bad%ZZ"}, Error: true},
 		{Client: New("", &AuthInfo{"foo", "bar"}), Request: testRequest{Method: "GET", Path: "/auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
-		{Client: &Client{httpClient: http.DefaultClient}, Request: testRequest{Method: "GET", Path: "/nocertificate"}, Error: true},
+		{Client: &Client{&RESTClient{httpClient: http.DefaultClient}}, Request: testRequest{Method: "GET", Path: "/nocertificate"}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "/error"}, Response: Response{StatusCode: 500}, Error: true},
 		{Request: testRequest{Method: "POST", Path: "/faildecode"}, Response: Response{StatusCode: 200, Body: "aaaaa"}, Target: &struct{}{}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "/failread"}, Response: Response{StatusCode: 200, Body: "aaaaa"}, Target: &struct{}{}, Error: true},
