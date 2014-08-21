@@ -44,7 +44,7 @@ func TestUpdateWithPods(t *testing.T) {
 		},
 	}
 	Update("foo", &fakeClient, 0)
-	if len(fakeClient.Actions) != 4 {
+	if len(fakeClient.Actions) != 5 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
@@ -52,6 +52,7 @@ func TestUpdateWithPods(t *testing.T) {
 	// Update deletes the pods, it relies on the replication controller to replace them.
 	validateAction(client.FakeAction{Action: "delete-pod", Value: "pod-1"}, fakeClient.Actions[2], t)
 	validateAction(client.FakeAction{Action: "delete-pod", Value: "pod-2"}, fakeClient.Actions[3], t)
+	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[4], t)
 }
 
 func TestUpdateNoPods(t *testing.T) {
