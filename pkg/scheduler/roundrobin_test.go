@@ -25,7 +25,7 @@ import (
 func TestRoundRobinScheduler(t *testing.T) {
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeRoundRobinScheduler(),
+		scheduler:    NewRoundRobinScheduler(),
 		minionLister: FakeMinionLister{"m1", "m2", "m3", "m4"},
 	}
 	st.expectSchedule(api.Pod{}, "m1")

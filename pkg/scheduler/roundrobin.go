@@ -25,7 +25,7 @@ type RoundRobinScheduler struct {
 	currentIndex int
 }
 
-func MakeRoundRobinScheduler() Scheduler {
+func NewRoundRobinScheduler() Scheduler {
 	return &RoundRobinScheduler{
 		currentIndex: -1,
 	}

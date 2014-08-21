@@ -27,7 +27,7 @@ func TestRandomScheduler(t *testing.T) {
 	random := rand.New(rand.NewSource(0))
 	st := schedulerTester{
 		t:            t,
-		scheduler:    MakeRandomScheduler(random),
+		scheduler:    NewRandomScheduler(random),
 		minionLister: FakeMinionLister{"m1", "m2", "m3", "m4"},
 	}
 	st.expectSuccess(api.Pod{})

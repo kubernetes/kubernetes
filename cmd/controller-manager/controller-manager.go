@@ -46,7 +46,7 @@ func main() {
 		glog.Fatal("usage: controller-manager -master <master>")
 	}
 
-	controllerManager := controller.MakeReplicationManager(
+	controllerManager := controller.NewReplicationManager(
 		client.New("http://"+*master, nil))
 
 	controllerManager.Run(10 * time.Second)

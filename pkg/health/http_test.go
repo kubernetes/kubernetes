@@ -35,14 +35,14 @@ func TestGetURLParts(t *testing.T) {
 		port  int
 		path  string
 	}{
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromInt(-1), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString(""), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("-1"), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("not-found"), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromInt(76), Path: ""}, true, "127.0.0.1", 76, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.MakeIntOrStringFromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
-		{&api.HTTPGetProbe{Host: "hostname", Port: util.MakeIntOrStringFromInt(76), Path: "path"}, true, "hostname", 76, "path"},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromInt(-1), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString(""), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("-1"), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("not-found"), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromInt(76), Path: ""}, true, "127.0.0.1", 76, ""},
+		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
+		{&api.HTTPGetProbe{Host: "hostname", Port: util.NewIntOrStringFromInt(76), Path: "path"}, true, "hostname", 76, "path"},
 	}
 
 	for _, test := range testCases {
@@ -122,7 +122,7 @@ func TestHTTPHealthChecker(t *testing.T) {
 		}
 		params := container.LivenessProbe.HTTPGet
 		if params != nil {
-			params.Port = util.MakeIntOrStringFromString(port)
+			params.Port = util.NewIntOrStringFromString(port)
 			params.Host = host
 		}
 		health, err := hc.HealthCheck("test", api.PodState{PodIP: host}, container)

@@ -72,8 +72,8 @@ func (r RealPodControl) deletePod(podID string) error {
 	return r.kubeClient.DeletePod(podID)
 }
 
-// MakeReplicationManager creates a new ReplicationManager.
-func MakeReplicationManager(kubeClient client.Interface) *ReplicationManager {
+// NewReplicationManager creates a new ReplicationManager.
+func NewReplicationManager(kubeClient client.Interface) *ReplicationManager {
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
 		podControl: RealPodControl{

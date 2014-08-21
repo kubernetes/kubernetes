@@ -26,7 +26,7 @@ import (
 
 func TestEtcdMasterOther(t *testing.T) {
 	path := "foo"
-	etcd := tools.MakeFakeEtcdClient(t)
+	etcd := tools.NewFakeEtcdClient(t)
 	etcd.Set(path, "baz", 0)
 	master := NewEtcdMasterElector(etcd)
 	w := master.Elect(path, "bar")
@@ -39,7 +39,7 @@ func TestEtcdMasterOther(t *testing.T) {
 
 func TestEtcdMasterNoOther(t *testing.T) {
 	path := "foo"
-	e := tools.MakeFakeEtcdClient(t)
+	e := tools.NewFakeEtcdClient(t)
 	e.TestIndex = true
 	e.Data["foo"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
@@ -60,7 +60,7 @@ func TestEtcdMasterNoOther(t *testing.T) {
 
 func TestEtcdMasterNoOtherThenConflict(t *testing.T) {
 	path := "foo"
-	e := tools.MakeFakeEtcdClient(t)
+	e := tools.NewFakeEtcdClient(t)
 	e.TestIndex = true
 	// Ok, so we set up a chain of responses from etcd:
 	//   1) Nothing there

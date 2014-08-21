@@ -263,7 +263,7 @@ func TestMakePodStatus(t *testing.T) {
 		Host: "machine",
 	}
 	pod := &api.Pod{DesiredState: desiredState, CurrentState: currentState}
-	status := makePodStatus(pod)
+	status := getPodStatus(pod)
 	if status != api.PodWaiting {
 		t.Errorf("Expected 'Waiting', got '%s'", status)
 	}
@@ -290,7 +290,7 @@ func TestMakePodStatus(t *testing.T) {
 			Host: "machine",
 		},
 	}
-	status = makePodStatus(pod)
+	status = getPodStatus(pod)
 	if status != api.PodRunning {
 		t.Errorf("Expected 'Running', got '%s'", status)
 	}
@@ -306,7 +306,7 @@ func TestMakePodStatus(t *testing.T) {
 			Host: "machine",
 		},
 	}
-	status = makePodStatus(pod)
+	status = getPodStatus(pod)
 	if status != api.PodTerminated {
 		t.Errorf("Expected 'Terminated', got '%s'", status)
 	}
@@ -322,7 +322,7 @@ func TestMakePodStatus(t *testing.T) {
 			Host: "machine",
 		},
 	}
-	status = makePodStatus(pod)
+	status = getPodStatus(pod)
 	if status != api.PodWaiting {
 		t.Errorf("Expected 'Waiting', got '%s'", status)
 	}
@@ -337,7 +337,7 @@ func TestMakePodStatus(t *testing.T) {
 			Host: "machine",
 		},
 	}
-	status = makePodStatus(pod)
+	status = getPodStatus(pod)
 	if status != api.PodWaiting {
 		t.Errorf("Expected 'Waiting', got '%s'", status)
 	}
@@ -388,7 +388,7 @@ func TestCreatePod(t *testing.T) {
 	storage := RegistryStorage{
 		registry:      podRegistry,
 		podPollPeriod: time.Millisecond * 100,
-		scheduler:     scheduler.MakeRoundRobinScheduler(),
+		scheduler:     scheduler.NewRoundRobinScheduler(),
 		minionLister:  minion.NewRegistry([]string{"machine"}),
 	}
 	desiredState := api.PodState{

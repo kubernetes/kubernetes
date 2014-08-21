@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func makePodList(count int) api.PodList {
+func newPodList(count int) api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
@@ -122,7 +122,7 @@ func TestFindPort(t *testing.T) {
 }
 
 func TestSyncEndpointsEmpty(t *testing.T) {
-	body, _ := json.Marshal(makePodList(0))
+	body, _ := json.Marshal(newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -139,7 +139,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 }
 
 func TestSyncEndpointsError(t *testing.T) {
-	body, _ := json.Marshal(makePodList(0))
+	body, _ := json.Marshal(newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -157,7 +157,7 @@ func TestSyncEndpointsError(t *testing.T) {
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
-	body, _ := json.Marshal(makePodList(1))
+	body, _ := json.Marshal(newPodList(1))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),

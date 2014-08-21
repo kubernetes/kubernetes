@@ -206,7 +206,7 @@ func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
 
 // ServeHTTP responds to HTTP requests on the Kubelet
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer httplog.MakeLogged(req, &w).StacktraceWhen(
+	defer httplog.NewLogged(req, &w).StacktraceWhen(
 		httplog.StatusIsNot(
 			http.StatusOK,
 			http.StatusNotFound,

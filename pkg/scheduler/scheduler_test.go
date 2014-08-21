@@ -59,7 +59,7 @@ func (st *schedulerTester) expectFailure(pod api.Pod) {
 	}
 }
 
-func makePod(host string, hostPorts ...int) api.Pod {
+func newPod(host string, hostPorts ...int) api.Pod {
 	networkPorts := []api.Port{}
 	for _, port := range hostPorts {
 		networkPorts = append(networkPorts, api.Port{HostPort: port})

@@ -30,7 +30,7 @@ import (
 // TODO(lavalamp): Use the etcd watcher from the tools package, and make sure all test cases here are tested there.
 
 func TestGetEtcdData(t *testing.T) {
-	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient := tools.NewFakeEtcdClient(t)
 	ch := make(chan interface{})
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
@@ -57,7 +57,7 @@ func TestGetEtcdData(t *testing.T) {
 }
 
 func TestGetEtcdNoData(t *testing.T) {
-	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient := tools.NewFakeEtcdClient(t)
 	ch := make(chan interface{}, 1)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
@@ -72,7 +72,7 @@ func TestGetEtcdNoData(t *testing.T) {
 }
 
 func TestGetEtcd(t *testing.T) {
-	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient := tools.NewFakeEtcdClient(t)
 	ch := make(chan interface{}, 1)
 	manifest := api.ContainerManifest{ID: "foo", Version: "v1beta1", Containers: []api.Container{{Name: "1", Image: "foo"}}}
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
@@ -107,7 +107,7 @@ func TestGetEtcd(t *testing.T) {
 }
 
 func TestWatchEtcd(t *testing.T) {
-	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient := tools.NewFakeEtcdClient(t)
 	ch := make(chan interface{}, 1)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
@@ -134,7 +134,7 @@ func TestWatchEtcd(t *testing.T) {
 }
 
 func TestGetEtcdNotFound(t *testing.T) {
-	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient := tools.NewFakeEtcdClient(t)
 	ch := make(chan interface{}, 1)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
@@ -149,7 +149,7 @@ func TestGetEtcdNotFound(t *testing.T) {
 }
 
 func TestGetEtcdError(t *testing.T) {
-	fakeClient := tools.MakeFakeEtcdClient(t)
+	fakeClient := tools.NewFakeEtcdClient(t)
 	ch := make(chan interface{}, 1)
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},

@@ -34,13 +34,13 @@ func TestGetTCPAddrParts(t *testing.T) {
 		host  string
 		port  int
 	}{
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromInt(-1)}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("")}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("-1")}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("not-found")}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("found")}, true, "1.2.3.4", 93},
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromInt(76)}, true, "1.2.3.4", 76},
-		{&api.TCPSocketProbe{Port: util.MakeIntOrStringFromString("118")}, true, "1.2.3.4", 118},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromInt(-1)}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("")}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("-1")}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("not-found")}, false, "", -1},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("found")}, true, "1.2.3.4", 93},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromInt(76)}, true, "1.2.3.4", 76},
+		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("118")}, true, "1.2.3.4", 118},
 	}
 
 	for _, test := range testCases {
@@ -100,7 +100,7 @@ func TestTcpHealthChecker(t *testing.T) {
 		}
 		params := container.LivenessProbe.TCPSocket
 		if params != nil && test.expectedStatus == Healthy {
-			params.Port = util.MakeIntOrStringFromString(port)
+			params.Port = util.NewIntOrStringFromString(port)
 		}
 		status, err := checker.HealthCheck("test", api.PodState{PodIP: host}, container)
 		if status != test.expectedStatus {
