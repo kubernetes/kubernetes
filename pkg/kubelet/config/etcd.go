@@ -41,20 +41,21 @@ type SourceEtcd struct {
 	client  tools.EtcdClient
 	updates chan<- interface{}
 
-	waitDuration time.Duration
+	interval time.Duration
+	timeout  time.Duration
 }
 
 // NewSourceEtcd creates a config source that watches and pulls from a key in etcd
-func NewSourceEtcd(key string, client tools.EtcdClient, period time.Duration, updates chan<- interface{}) *SourceEtcd {
+func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface{}) *SourceEtcd {
 	config := &SourceEtcd{
 		key:     key,
 		client:  client,
 		updates: updates,
 
-		waitDuration: period,
+		timeout: 1 * time.Minute,
 	}
 	glog.Infof("Watching etcd for %s", key)
-	go util.Forever(config.run, period)
+	go util.Forever(config.run, time.Second)
 	return config
 }
 
@@ -81,7 +82,7 @@ func (s *SourceEtcd) fetchNextState(fromIndex uint64) (nextIndex uint64, err err
 	if fromIndex == 0 {
 		response, err = s.client.Get(s.key, true, false)
 	} else {
-		response, err = s.client.Watch(s.key, fromIndex, false, nil, stopChannel(s.waitDuration))
+		response, err = s.client.Watch(s.key, fromIndex, false, nil, stopChannel(s.timeout))
 		if tools.IsEtcdWatchStoppedByUser(err) {
 			return fromIndex, nil
 		}
@@ -125,9 +126,13 @@ func responseToPods(response *etcd.Response) ([]kubelet.Pod, error) {
 	return pods, nil
 }
 
-// stopChannel creates a channel that is closed after a duration for use with etcd client API
+// stopChannel creates a channel that is closed after a duration for use with etcd client API.
+// If until is 0, the channel will never close.
 func stopChannel(until time.Duration) chan bool {
 	stop := make(chan bool)
+	if until == 0 {
+		return stop
+	}
 	go func() {
 		select {
 		case <-time.After(until):

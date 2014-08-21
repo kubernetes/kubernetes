@@ -85,7 +85,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 		if err := rs.scheduleAndCreatePod(*pod); err != nil {
 			return nil, err
 		}
-		return rs.waitForPodRunning(*pod)
+		return rs.registry.GetPod(pod.ID)
 	}), nil
 }
 
@@ -153,7 +153,7 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 		if err := rs.registry.UpdatePod(*pod); err != nil {
 			return nil, err
 		}
-		return rs.waitForPodRunning(*pod)
+		return rs.registry.GetPod(pod.ID)
 	}), nil
 }
 

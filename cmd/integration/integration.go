@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -113,7 +114,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 
 	// Kubelet (localhost)
 	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
-	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, 30*time.Second, cfg1.Channel("etcd"))
+	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, cfg1.Channel("etcd"))
 	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
 	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
@@ -125,7 +126,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// Create a second kubelet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
 	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
-	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, 30*time.Second, cfg2.Channel("etcd"))
+	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, cfg2.Channel("etcd"))
 	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
 	go util.Forever(func() {
@@ -135,7 +136,24 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	return apiServer.URL
 }
 
-func runReplicationControllerTest(kubeClient *client.Client) {
+// podsOnMinions returns true when all of the selected pods exist on a minion.
+func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
+	podInfo := fakePodInfoGetter{}
+	return func() (bool, error) {
+		for i := range pods.Items {
+			host, id := pods.Items[i].CurrentState.Host, pods.Items[i].ID
+			if len(host) == 0 {
+				return false, nil
+			}
+			if _, err := podInfo.GetPodInfo(host, id); err != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+}
+
+func runReplicationControllerTest(c *client.Client) {
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
@@ -146,20 +164,26 @@ func runReplicationControllerTest(kubeClient *client.Client) {
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := kubeClient.CreateReplicationController(controllerRequest); err != nil {
+	if _, err := c.CreateReplicationController(controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
 
 	// Give the controllers some time to actually create the pods
-	time.Sleep(time.Second * 10)
-
-	// Validate that they're truly up.
-	pods, err := kubeClient.ListPods(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
-	if err != nil || len(pods.Items) != controllerRequest.DesiredState.Replicas {
-		glog.Fatalf("FAILED: %#v", pods.Items)
+	if err := wait.Poll(time.Second, 10, c.ControllerHasDesiredReplicas(controllerRequest)); err != nil {
+		glog.Fatalf("FAILED: pods never created %v", err)
 	}
-	glog.Infof("Replication controller produced:\n\n%#v\n\n", pods)
+
+	// wait for minions to indicate they have info about the desired pods
+	pods, err := c.ListPods(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	if err != nil {
+		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
+	}
+	if err := wait.Poll(time.Second, 10, podsOnMinions(c, pods)); err != nil {
+		glog.Fatalf("FAILED: pods never started running %v", err)
+	}
+
+	glog.Infof("Pods created")
 }
 
 func runAtomicPutTest(c *client.Client) {

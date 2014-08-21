@@ -406,23 +406,10 @@ func TestCreatePod(t *testing.T) {
 	}
 
 	select {
+	case <-channel:
+		// Do nothing, this is expected.
 	case <-time.After(time.Millisecond * 100):
-		// Do nothing, this is expected.
-	case <-channel:
-		t.Error("Unexpected read from async channel")
-	}
-	// TODO: Is the below actually testing something?
-	podRegistry.UpdatePod(api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
-		CurrentState: api.PodState{
-			Status: api.PodRunning,
-		},
-	})
-	select {
-	case <-time.After(time.Second * 1):
-		t.Error("Unexpected timeout")
-	case <-channel:
-		// Do nothing, this is expected.
+		t.Error("Unexpected timeout on async channel")
 	}
 }
 
