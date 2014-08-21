@@ -67,3 +67,11 @@ function test-setup {
 function test-teardown {
 	echo "Vagrant ignores tear-down"
 }
+
+# Set the {user} and {password} environment values required to interact with provider
+function get-password {
+	export user=vagrant
+	export passwd=vagrant
+	echo "Using credentials: $user:$passwd"
+}
+

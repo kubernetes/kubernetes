@@ -61,3 +61,8 @@ function test-setup {
 function test-teardown {
 	echo "TODO"
 }
+
+# Set the {user} and {password} environment values required to interact with provider
+function get-password {
+	echo "TODO"
+}

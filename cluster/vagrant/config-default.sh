@@ -27,4 +27,5 @@ export KUBERNETES_MASTER="https://10.245.1.2"
 MINION_IP_BASE="10.245.2."
 for (( i=0; i <${NUM_MINIONS}; i++)) do
 	KUBE_MINION_IP_ADDRESSES[$i]="${MINION_IP_BASE}$[$i+2]"
+	MINION_NAMES[$i]="${MINION_IP_BASE}$[$i+2]"
 done

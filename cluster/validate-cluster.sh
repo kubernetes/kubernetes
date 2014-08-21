@@ -34,9 +34,10 @@ MINIONS_FILE=/tmp/minions
 $(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE})
+    # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
+    count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
     if [ "$count" == "0" ]; then
-	echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
+	    echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
         exit 1
     fi
 
@@ -46,9 +47,8 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1
     else
-    echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
-
-    fi
+        echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
+    fi    
 done
 echo "Cluster validation succeeded"
 
