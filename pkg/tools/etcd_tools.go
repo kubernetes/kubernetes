@@ -477,7 +477,6 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	var action watch.EventType
 	var data []byte
 	var index uint64
-	glog.Infof("watching: got %v", res.Action)
 	switch res.Action {
 	case "create":
 		if res.Node == nil {

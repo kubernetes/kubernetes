@@ -418,7 +418,7 @@ func TestFillPodInfo(t *testing.T) {
 	storage := RegistryStorage{
 		podCache: &fakeGetter,
 	}
-	pod := api.Pod{}
+	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
 	storage.fillPodInfo(&pod)
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
 		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
@@ -441,7 +441,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 	storage := RegistryStorage{
 		podCache: &fakeGetter,
 	}
-	pod := api.Pod{}
+	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
 	storage.fillPodInfo(&pod)
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
 		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)

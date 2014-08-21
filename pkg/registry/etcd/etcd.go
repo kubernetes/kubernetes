@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -149,6 +150,9 @@ func (r *Registry) assignPod(podID string, machine string) error {
 	err = r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
 		manifests := *in.(*api.ContainerManifestList)
 		manifests.Items = append(manifests.Items, manifest)
+		if !constraint.Allowed(manifests.Items) {
+			return nil, fmt.Errorf("The assignment would cause a constraint violation")
+		}
 		return manifests, nil
 	})
 	if err != nil {

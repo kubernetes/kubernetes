@@ -48,6 +48,7 @@ func NewPodCache(info client.PodInfoGetter, pods pod.Registry) *PodCache {
 
 // GetPodInfo Implements the PodInfoGetter.GetPodInfo.
 // The returned value should be treated as read-only.
+// TODO: Remove the host from this call, it's totally unnecessary.
 func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
