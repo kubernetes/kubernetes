@@ -25,9 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -58,8 +56,7 @@ func TestCreatePodRegistryError(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
@@ -78,8 +75,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
@@ -327,8 +323,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	pod := &api.Pod{}
 	c, err := storage.Create(pod)
@@ -344,8 +339,7 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	pod := &api.Pod{}
 	c, err := storage.Update(pod)
@@ -368,8 +362,6 @@ func TestCreatePod(t *testing.T) {
 	storage := RegistryStorage{
 		registry:      podRegistry,
 		podPollPeriod: time.Millisecond * 100,
-		scheduler:     scheduler.NewRoundRobinScheduler(),
-		minionLister:  minion.NewRegistry([]string{"machine"}),
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{

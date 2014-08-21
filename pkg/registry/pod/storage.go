@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -39,33 +38,27 @@ import (
 type RegistryStorage struct {
 	cloudProvider cloudprovider.Interface
 	mu            sync.Mutex
-	minionLister  scheduler.MinionLister
 	podCache      client.PodInfoGetter
 	podInfoGetter client.PodInfoGetter
 	podPollPeriod time.Duration
 	registry      Registry
-	scheduler     scheduler.Scheduler
 }
 
 type RegistryStorageConfig struct {
 	CloudProvider cloudprovider.Interface
-	MinionLister  scheduler.MinionLister
 	PodCache      client.PodInfoGetter
 	PodInfoGetter client.PodInfoGetter
 	Registry      Registry
-	Scheduler     scheduler.Scheduler
 }
 
 // NewRegistryStorage returns a new RegistryStorage.
 func NewRegistryStorage(config *RegistryStorageConfig) apiserver.RESTStorage {
 	return &RegistryStorage{
 		cloudProvider: config.CloudProvider,
-		minionLister:  config.MinionLister,
 		podCache:      config.PodCache,
 		podInfoGetter: config.PodInfoGetter,
 		podPollPeriod: time.Second * 10,
 		registry:      config.Registry,
-		scheduler:     config.Scheduler,
 	}
 }
 
@@ -82,7 +75,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	pod.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		if err := rs.scheduleAndCreatePod(*pod); err != nil {
+		if err := rs.registry.CreatePod(*pod); err != nil {
 			return nil, err
 		}
 		return rs.registry.GetPod(pod.ID)
@@ -243,12 +236,6 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 	default:
 		return api.PodWaiting
 	}
-}
-
-func (rs *RegistryStorage) scheduleAndCreatePod(pod api.Pod) error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	return rs.registry.CreatePod(pod)
 }
 
 func (rs *RegistryStorage) waitForPodRunning(pod api.Pod) (interface{}, error) {
