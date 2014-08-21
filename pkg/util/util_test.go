@@ -190,7 +190,7 @@ func TestIntOrStringMarshalJSONUnmarshalYAML(t *testing.T) {
 		var result IntOrStringHolder
 		err = yaml.Unmarshal(jsonMarshalled, &result)
 		if err != nil {
-			t.Errorf("2: Failed to unmarshall '%+v': %v", string(jsonMarshalled), err)
+			t.Errorf("2: Failed to unmarshal '%+v': %v", string(jsonMarshalled), err)
 		}
 
 		if !reflect.DeepEqual(input, result) {
