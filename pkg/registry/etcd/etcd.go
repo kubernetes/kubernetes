@@ -135,7 +135,6 @@ func (r *Registry) setPodHostTo(podID, oldMachine, machine string) (finalPod *ap
 }
 
 // assignPod assigns the given pod to the given machine.
-// TODO: hook this up via apiserver, not by calling it from CreatePod().
 func (r *Registry) assignPod(podID string, machine string) error {
 	finalPod, err := r.setPodHostTo(podID, "", machine)
 	if err != nil {

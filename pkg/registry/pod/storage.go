@@ -133,10 +133,11 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 		pod := e.Object.(*api.Pod)
 		fields := labels.Set{
 			"ID": pod.ID,
-			"DesiredState.Status": string(pod.CurrentState.Status),
-			"DesiredState.Host":   pod.CurrentState.Host,
+			"DesiredState.Status": string(pod.DesiredState.Status),
+			"DesiredState.Host":   pod.DesiredState.Host,
 		}
-		return e, label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+		passesFilter := label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+		return e, passesFilter
 	}), nil
 }
 
@@ -158,6 +159,10 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 }
 
 func (rs *RegistryStorage) fillPodInfo(pod *api.Pod) {
+	pod.CurrentState.Host = pod.DesiredState.Host
+	if pod.CurrentState.Host == "" {
+		return
+	}
 	// Get cached info for the list currently.
 	// TODO: Optionally use fresh info
 	if rs.podCache != nil {

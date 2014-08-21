@@ -38,6 +38,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
@@ -64,7 +67,7 @@ func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 			Port:   10251,
 		}
 	default:
-		glog.Fatalf("Can't get info for: %v, %v", host, podID)
+		glog.Fatalf("Can't get info for: '%v', '%v'", host, podID)
 	}
 	return c.GetPodInfo("localhost", podID)
 }
@@ -105,6 +108,9 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	})
 	storage, codec := m.API_v1beta1()
 	handler.delegate = apiserver.Handle(storage, codec, "/api/v1beta1")
+
+	// Scheduler
+	scheduler.New((&factory.ConfigFactory{cl}).Create()).Run()
 
 	controllerManager := controller.NewReplicationManager(cl)
 
