@@ -65,7 +65,7 @@ type Master struct {
 // New returns a new instance of Master connected to the given etcdServer.
 func New(c *Config) *Master {
 	etcdClient := goetcd.NewClient(c.EtcdServers)
-	minionRegistry := minionRegistryMaker(c)
+	minionRegistry := makeMinionRegistry(c)
 	m := &Master{
 		podRegistry:        etcd.NewRegistry(etcdClient, minionRegistry),
 		controllerRegistry: etcd.NewRegistry(etcdClient, minionRegistry),
@@ -78,7 +78,7 @@ func New(c *Config) *Master {
 	return m
 }
 
-func minionRegistryMaker(c *Config) minion.Registry {
+func makeMinionRegistry(c *Config) minion.Registry {
 	var minionRegistry minion.Registry
 	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
 		var err error
@@ -105,8 +105,8 @@ func minionRegistryMaker(c *Config) minion.Registry {
 }
 
 func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
-	podCache := NewPodCache(podInfoGetter, m.podRegistry, time.Second*30)
-	go podCache.Loop()
+	podCache := NewPodCache(podInfoGetter, m.podRegistry)
+	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
 	endpoints := endpoint.NewEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
