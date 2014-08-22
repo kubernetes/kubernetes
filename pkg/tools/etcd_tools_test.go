@@ -365,88 +365,127 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	}
 }
 
-func TestWatchInterpretation_ListCreate(t *testing.T) {
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
+func TestWatchInterpretations(t *testing.T) {
+	// Declare some pods to make the test cases compact.
+	podFoo := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podBar := &api.Pod{JSONBase: api.JSONBase{ID: "bar"}}
+	podBaz := &api.Pod{JSONBase: api.JSONBase{ID: "baz"}}
+	firstLetterIsB := func(obj interface{}) bool {
+		return obj.(*api.Pod).ID[0] == 'b'
+	}
 
-	go w.sendResult(&etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value: string(podBytes),
+	// All of these test cases will be run with the firstLetterIsB FilterFunc.
+	table := map[string]struct {
+		actions       []string // Run this test item for every action here.
+		prevNodeValue string
+		nodeValue     string
+		expectEmit    bool
+		expectType    watch.EventType
+		expectObject  interface{}
+	}{
+		"create": {
+			actions:      []string{"create", "get"},
+			nodeValue:    api.EncodeOrDie(podBar),
+			expectEmit:   true,
+			expectType:   watch.Added,
+			expectObject: podBar,
 		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Added, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestWatchInterpretation_ListAdd(t *testing.T) {
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: string(podBytes),
+		"create but filter blocks": {
+			actions:    []string{"create", "get"},
+			nodeValue:  api.EncodeOrDie(podFoo),
+			expectEmit: false,
 		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Modified, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestWatchInterpretation_Delete(t *testing.T) {
-	w := newEtcdWatcher(true, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBytes, _ := codec.Encode(pod)
-
-	go w.sendResult(&etcd.Response{
-		Action: "delete",
-		Node: &etcd.Node{
-			ModifiedIndex: 2,
+		"delete": {
+			actions:       []string{"delete"},
+			prevNodeValue: api.EncodeOrDie(podBar),
+			expectEmit:    true,
+			expectType:    watch.Deleted,
+			expectObject:  podBar,
 		},
-		PrevNode: &etcd.Node{
-			Value:         string(podBytes),
-			ModifiedIndex: 1,
+		"delete but filter blocks": {
+			actions:    []string{"delete"},
+			nodeValue:  api.EncodeOrDie(podFoo),
+			expectEmit: false,
 		},
-	})
-
-	got := <-w.outgoing
-	if e, a := watch.Deleted, got.Type; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
+		"modify appears to create 1": {
+			actions:      []string{"set", "compareAndSwap"},
+			nodeValue:    api.EncodeOrDie(podBar),
+			expectEmit:   true,
+			expectType:   watch.Added,
+			expectObject: podBar,
+		},
+		"modify appears to create 2": {
+			actions:       []string{"set", "compareAndSwap"},
+			prevNodeValue: api.EncodeOrDie(podFoo),
+			nodeValue:     api.EncodeOrDie(podBar),
+			expectEmit:    true,
+			expectType:    watch.Added,
+			expectObject:  podBar,
+		},
+		"modify appears to delete": {
+			actions:       []string{"set", "compareAndSwap"},
+			prevNodeValue: api.EncodeOrDie(podBar),
+			nodeValue:     api.EncodeOrDie(podFoo),
+			expectEmit:    true,
+			expectType:    watch.Deleted,
+			expectObject:  podBar, // Should return last state that passed the filter!
+		},
+		"modify modifies": {
+			actions:       []string{"set", "compareAndSwap"},
+			prevNodeValue: api.EncodeOrDie(podBar),
+			nodeValue:     api.EncodeOrDie(podBaz),
+			expectEmit:    true,
+			expectType:    watch.Modified,
+			expectObject:  podBaz,
+		},
+		"modify ignores": {
+			actions:    []string{"set", "compareAndSwap"},
+			nodeValue:  api.EncodeOrDie(podFoo),
+			expectEmit: false,
+		},
 	}
-	pod.ResourceVersion = 2
-	if e, a := pod, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected %v, got %v", e, a)
+
+	for name, item := range table {
+		for _, action := range item.actions {
+			w := newEtcdWatcher(true, firstLetterIsB, codec, versioner, nil)
+			emitCalled := false
+			w.emit = func(event watch.Event) {
+				emitCalled = true
+				if !item.expectEmit {
+					return
+				}
+				if e, a := item.expectType, event.Type; e != a {
+					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
+				}
+				if e, a := item.expectObject, event.Object; !reflect.DeepEqual(e, a) {
+					t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
+				}
+			}
+
+			var n, pn *etcd.Node
+			if item.nodeValue != "" {
+				n = &etcd.Node{Value: item.nodeValue}
+			}
+			if item.prevNodeValue != "" {
+				pn = &etcd.Node{Value: item.prevNodeValue}
+			}
+
+			w.sendResult(&etcd.Response{
+				Action:   action,
+				Node:     n,
+				PrevNode: pn,
+			})
+
+			if e, a := item.expectEmit, emitCalled; e != a {
+				t.Errorf("'%v - %v': expected %v, got %v", name, action, e, a)
+			}
+			w.Stop()
+		}
 	}
 }
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
+	w := newEtcdWatcher(false, Everything, codec, versioner, nil)
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -454,35 +493,44 @@ func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 	w.sendResult(&etcd.Response{
 		Action: "update",
 	})
+	w.Stop()
 }
 
 func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	w.emit = func(e watch.Event) {
-		t.Errorf("Unexpected emit: %v", e)
+	actions := []string{"create", "set", "compareAndSwap", "delete"}
+	for _, action := range actions {
+		w := newEtcdWatcher(false, Everything, codec, versioner, nil)
+		w.emit = func(e watch.Event) {
+			t.Errorf("Unexpected emit: %v", e)
+		}
+		w.sendResult(&etcd.Response{
+			Action: action,
+		})
+		w.Stop()
 	}
-	w.sendResult(&etcd.Response{
-		Action: "set",
-	})
 }
 
 func TestWatchInterpretation_ResponseBadData(t *testing.T) {
-	w := newEtcdWatcher(false, func(interface{}) bool {
-		t.Errorf("unexpected filter call")
-		return true
-	}, codec, versioner, nil)
-	w.emit = func(e watch.Event) {
-		t.Errorf("Unexpected emit: %v", e)
+	actions := []string{"create", "set", "compareAndSwap", "delete"}
+	for _, action := range actions {
+		w := newEtcdWatcher(false, Everything, codec, versioner, nil)
+		w.emit = func(e watch.Event) {
+			t.Errorf("Unexpected emit: %v", e)
+		}
+		w.sendResult(&etcd.Response{
+			Action: action,
+			Node: &etcd.Node{
+				Value: "foobar",
+			},
+		})
+		w.sendResult(&etcd.Response{
+			Action: action,
+			PrevNode: &etcd.Node{
+				Value: "foobar",
+			},
+		})
+		w.Stop()
 	}
-	w.sendResult(&etcd.Response{
-		Action: "set",
-		Node: &etcd.Node{
-			Value: "foobar",
-		},
-	})
 }
 
 func TestWatch(t *testing.T) {
@@ -512,7 +560,7 @@ func TestWatch(t *testing.T) {
 	}
 
 	event := <-watching.ResultChan()
-	if e, a := watch.Modified, event.Type; e != a {
+	if e, a := watch.Added, event.Type; e != a {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 	if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
@@ -617,11 +665,13 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 				Nodes: etcd.Nodes{
 					&etcd.Node{
 						Value:         api.EncodeOrDie(pod),
+						CreatedIndex:  1,
 						ModifiedIndex: 1,
 						Nodes:         etcd.Nodes{},
 					},
 					&etcd.Node{
 						Value:         api.EncodeOrDie(pod),
+						CreatedIndex:  2,
 						ModifiedIndex: 2,
 						Nodes:         etcd.Nodes{},
 					},
@@ -633,15 +683,18 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.WatchList("/some/key", 0, nil)
+	watching, err := h.WatchList("/some/key", 0, Everything)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// the existing node is detected and the index set
-	event := <-watching.ResultChan()
+	event, open := <-watching.ResultChan()
+	if !open {
+		t.Fatalf("unexpected channel close")
+	}
 	for i := 0; i < 2; i++ {
-		if e, a := watch.Modified, event.Type; e != a {
+		if e, a := watch.Added, event.Type; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		actualPod, ok := event.Object.(*api.Pod)

@@ -79,8 +79,15 @@ func (r *Registry) ListPods(selector labels.Selector) ([]api.Pod, error) {
 }
 
 // WatchPods begins watching for new, changed, or deleted pods.
-func (r *Registry) WatchPods(resourceVersion uint64) (watch.Interface, error) {
-	return r.WatchList("/registry/pods", resourceVersion, tools.Everything)
+func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
+	return r.WatchList("/registry/pods", resourceVersion, func(obj interface{}) bool {
+		pod, ok := obj.(*api.Pod)
+		if !ok {
+			glog.Errorf("Unexpected object during pod watch: %#v", obj)
+			return false
+		}
+		return filter(pod)
+	})
 }
 
 // GetPod gets a specific pod specified by its ID.

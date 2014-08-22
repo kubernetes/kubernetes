@@ -343,7 +343,7 @@ func (h *EtcdHelper) Watch(key string, resourceVersion uint64) (watch.Interface,
 //   })
 //
 func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, transform TransformFunc) (watch.Interface, error) {
-	w := newEtcdWatcher(false, nil, h.Codec, h.ResourceVersioner, transform)
+	w := newEtcdWatcher(false, Everything, h.Codec, h.ResourceVersioner, transform)
 	go w.etcdWatch(h.Client, key, resourceVersion)
 	return w, nil
 }
@@ -442,11 +442,7 @@ func convertRecursiveResponse(node *etcd.Node, response *etcd.Response, incoming
 		return
 	}
 	copied := *response
-	if node.ModifiedIndex == node.CreatedIndex {
-		copied.Action = "create"
-	} else {
-		copied.Action = "set"
-	}
+	copied.Action = "get"
 	copied.Node = node
 	incoming <- &copied
 }
@@ -473,46 +469,10 @@ func (w *etcdWatcher) translate() {
 	}
 }
 
-func (w *etcdWatcher) sendResult(res *etcd.Response) {
-	var action watch.EventType
-	var data []byte
-	var index uint64
-	switch res.Action {
-	case "create":
-		if res.Node == nil {
-			glog.Errorf("unexpected nil node: %#v", res)
-			return
-		}
-		data = []byte(res.Node.Value)
-		index = res.Node.ModifiedIndex
-		action = watch.Added
-	case "set", "compareAndSwap", "get":
-		if res.Node == nil {
-			glog.Errorf("unexpected nil node: %#v", res)
-			return
-		}
-		data = []byte(res.Node.Value)
-		index = res.Node.ModifiedIndex
-		action = watch.Modified
-	case "delete":
-		if res.PrevNode == nil {
-			glog.Errorf("unexpected nil prev node: %#v", res)
-			return
-		}
-		data = []byte(res.PrevNode.Value)
-		index = res.Node.ModifiedIndex
-		action = watch.Deleted
-	default:
-		glog.Errorf("unknown action: %v", res.Action)
-		return
-	}
-
+func (w *etcdWatcher) decodeObject(data []byte, index uint64) (interface{}, error) {
 	obj, err := w.encoding.Decode(data)
 	if err != nil {
-		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(data), res, res.Node)
-		// TODO: expose an error through watch.Interface?
-		w.Stop()
-		return
+		return nil, err
 	}
 
 	// ensure resource version is set on the object we load from etcd
@@ -527,16 +487,120 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 		obj, err = w.transform(obj)
 		if err != nil {
 			glog.Errorf("failure to transform api object %#v: %v", obj, err)
-			// TODO: expose an error through watch.Interface?
-			w.Stop()
-			return
+			return nil, err
 		}
 	}
 
+	return obj, nil
+}
+
+func (w *etcdWatcher) sendCreate(res *etcd.Response) {
+	if res.Node == nil {
+		glog.Errorf("unexpected nil node: %#v", res)
+		return
+	}
+	data := []byte(res.Node.Value)
+	obj, err := w.decodeObject(data, res.Node.ModifiedIndex)
+	if err != nil {
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(data), res, res.Node)
+		// TODO: expose an error through watch.Interface?
+		// Ignore this value. If we stop the watch on a bad value, a client that uses
+		// the resourceVersion to resume will never be able to get past a bad value.
+		return
+	}
+	if !w.filter(obj) {
+		return
+	}
+	action := watch.Added
+	if res.Node.ModifiedIndex != res.Node.CreatedIndex {
+		action = watch.Modified
+	}
 	w.emit(watch.Event{
 		Type:   action,
 		Object: obj,
 	})
+}
+
+func (w *etcdWatcher) sendModify(res *etcd.Response) {
+	if res.Node == nil {
+		glog.Errorf("unexpected nil node: %#v", res)
+		return
+	}
+	curData := []byte(res.Node.Value)
+	curObj, err := w.decodeObject(curData, res.Node.ModifiedIndex)
+	if err != nil {
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(curData), res, res.Node)
+		// TODO: expose an error through watch.Interface?
+		// Ignore this value. If we stop the watch on a bad value, a client that uses
+		// the resourceVersion to resume will never be able to get past a bad value.
+		return
+	}
+	curObjPasses := w.filter(curObj)
+	oldObjPasses := false
+	var oldObj interface{}
+	if res.PrevNode != nil && res.PrevNode.Value != "" {
+		// Ignore problems reading the old object.
+		if oldObj, err = w.decodeObject([]byte(res.PrevNode.Value), res.PrevNode.ModifiedIndex); err == nil {
+			oldObjPasses = w.filter(oldObj)
+		}
+	}
+	// Some changes to an object may cause it to start or stop matching a filter.
+	// We need to report those as adds/deletes. So we have to check both the previous
+	// and current value of the object.
+	switch {
+	case curObjPasses && oldObjPasses:
+		w.emit(watch.Event{
+			Type:   watch.Modified,
+			Object: curObj,
+		})
+	case curObjPasses && !oldObjPasses:
+		w.emit(watch.Event{
+			Type:   watch.Added,
+			Object: curObj,
+		})
+	case !curObjPasses && oldObjPasses:
+		w.emit(watch.Event{
+			Type:   watch.Deleted,
+			Object: oldObj,
+		})
+	}
+	// Do nothing if neither new nor old object passed the filter.
+}
+
+func (w *etcdWatcher) sendDelete(res *etcd.Response) {
+	if res.PrevNode == nil {
+		glog.Errorf("unexpected nil prev node: %#v", res)
+		return
+	}
+	data := []byte(res.PrevNode.Value)
+	obj, err := w.decodeObject(data, res.PrevNode.ModifiedIndex)
+	if err != nil {
+		glog.Errorf("failure to decode api object: '%v' from %#v %#v", string(data), res, res.PrevNode)
+		// TODO: expose an error through watch.Interface?
+		// Ignore this value. If we stop the watch on a bad value, a client that uses
+		// the resourceVersion to resume will never be able to get past a bad value.
+		return
+	}
+	if !w.filter(obj) {
+		return
+	}
+	w.emit(watch.Event{
+		Type:   watch.Deleted,
+		Object: obj,
+	})
+}
+
+func (w *etcdWatcher) sendResult(res *etcd.Response) {
+	switch res.Action {
+	case "create", "get":
+		w.sendCreate(res)
+	case "set", "compareAndSwap":
+		w.sendModify(res)
+	case "delete":
+		w.sendDelete(res)
+	default:
+		glog.Errorf("unknown action: %v", res.Action)
+	}
 }
 
 // ResultChannel implements watch.Interface.

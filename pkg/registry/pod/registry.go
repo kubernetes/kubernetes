@@ -27,7 +27,7 @@ type Registry interface {
 	// ListPods obtains a list of pods that match selector.
 	ListPods(selector labels.Selector) ([]api.Pod, error)
 	// Watch for new/changed/deleted pods
-	WatchPods(resourceVersion uint64) (watch.Interface, error)
+	WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error)
 	// Get a specific pod
 	GetPod(podID string) (*api.Pod, error)
 	// Create a pod based on a specification.
