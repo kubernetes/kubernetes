@@ -12,64 +12,66 @@ High level goals are:
 
 ### Actors
 Each of these can act as normal users or attackers.
-   - End users (e.g. visitors to a website which is served by programs which are run on kubernetes)
-   - k8s users (e.g. people who create k8s API objects like Pods)
-   - k8s insiders (e.g. people who setup k8s binaries, or others with special access to machines and networks.)
+   - External Users: People who are accessing applications running on K8s (e.g. a web site served by webserver running in a container on K8s), but who do not have K8s API access.
+   - K8s Users : People who access the K8s API (e.g. create K8s API objects like Pods)
+   - K8s Project Admins: People who manage access for some K8s Users
+   - K8s Cluster Admins: People who control the machines, networks, or binaries that comprise a K8s cluster.
+   - K8s Admin means K8s Cluster Admins and K8s Project Admins taken together.
 
 ### Threats
 Both intentional attacks and accidental use of privilege are concerns.
 
 For both cases it may be useful to think about these categories differently:
-  - Application Path - attack by sending network messages from the internet to the IP/port of any application running on k8s.  May exploit weakness in application or misconfiguration of k8s.
-  - K8s API Path - attack by sending network messages to any k8s infrastructure network endpoint.  Attacker may have k8s user identity.
-  - Insider Path - attack on k8s system components.  Attacker may have privileged access to networks, machines or k8s software and data.  Software errors in k8s system components and administrator error are some types of threat in this category.
+  - Application Path - attack by sending network messages from the internet to the IP/port of any application running on K8s.  May exploit weakness in application or misconfiguration of K8s.
+  - K8s API Path - attack by sending network messages to any K8s API endpoint.
+  - Insider Path - attack on K8s system components.  Attacker may have privileged access to networks, machines or K8s software and data.  Software errors in K8s system components and administrator error are some types of threat in this category.
 
 This document is primarily concerned with K8s API paths, and secondarily with Internal paths.   The Application path also needs to be secure, but is not the focus of this document.
  
 ### Assets to protect
 
-End user assets:
-   - Personal information like private messages, or images uploaded by end users
+External User assets:
+   - Personal information like private messages, or images uploaded by External Users
    - web server logs
 
-K8s user assets:
-  - end-user assets of each k8s user
+K8s User assets:
+  - External User assets of each K8s User
   - things private to the K8s app, like:
     - credentials for accessing other services (docker private repos, storage services, facebook, etc)
     - SSL certificates for web servers
     - proprietary data and code
 
 K8s Cluster assets:
-  - Assets of each k8s-user
-  - Certificates or secrets which identify the k8s machines and servers to users.
-  - The value of k8s cluster computing resources (cpu, memory, etc).
+  - Assets of each K8s User
+  - Machine Certificates or secrets.
+  - The value of K8s cluster computing resources (cpu, memory, etc).
 
-This document is primarily about protecting k8s user assets and K8s cluster assets from other k8s users and k8s insiders.
+This document is primarily about protecting K8s User assets and K8s cluster assets from other K8s Users and K8s Project and Cluster Admins.
  
 ### Usage environments
 Cluster in Small organization:  
-   - k8s insiders may be the same people as k8s users.  
-   - few k8s insiders.  
+   - K8s Admins may be the same people as K8s Users.  
+   - few K8s Admins.  
     - prefer ease of use to fine-grained access control/precise accounting, etc.
- - Product requirement that it be easy for potential users to try out setting up a simple cluster.
+ - Product requirement that it be easy for potential K8s Cluster Admin to try out setting up a simple cluster.
 
 Cluster in Large organization: 
-   - k8s insiders typically distinct people from k8s users.  may need to divide k8s insider access by roles. 
-   - k8s users need to be protected from each other.  
-   - auditing of k8s user and k8s insider actions important.   
+   - K8s Admins typically distinct people from K8s Users.  May need to divide K8s Cluster Admin access by roles. 
+   - K8s Users need to be protected from each other.  
+   - Auditing of K8s User and K8s Admin actions important.   
    - flexible accurate usage accounting and resource controls important.
    - Lots of automated access to APIs.  
    - Need to integrate with existing enterprise directory, authentication, accounting, auditing, and security policy infrastructure.
 
 Org-run cluster: 
-   - organization that runs k8s master components is same as the org that runs apps on k8s.  
+   - organization that runs K8s master components is same as the org that runs apps on K8s.  
    - Minions may be on-premises VMs or physical machines; Cloud VMs; or a mix.
  
 Hosted cluster:
   - Offering K8s API as a service, or offering a Paas or Saas built on K8s
   - May already offer web services, and need to integrate with existing customer account concept, and existing authentication, accounting, auditing, and security policy infrastructure.
-  - May want to leverage K8s user accounts and accounting to manage their user accounts (not a priority to support this use case.)
-  - Precise and accurate accounting of resources needed.  Resource controls needed for hard limits (users given limited slice of data) and soft limits (users can grow up to some limit and then be expanded).
+  - May want to leverage K8s User accounts and accounting to manage their User accounts (not a priority to support this use case.)
+  - Precise and accurate accounting of resources needed.  Resource controls needed for hard limits (Users given limited slice of data) and soft limits (Users can grow up to some limit and then be expanded).
 
 K8s ecosystem services:
  - There may be companies that want to offer their existing services (Build, CI, A/B-test, release automation, etc) for use with K8s.  There should be some story for this case.
@@ -83,7 +85,7 @@ Related discussion:
 - https://github.com/GoogleCloudPlatform/kubernetes/issues/443
 
 This doc describes two security profiles:
-  - Simple profile:  like single-user mode.  Make it easy to evaluate k8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
+  - Simple profile:  like single-user mode.  Make it easy to evaluate K8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
   - Enterprise profile: Provide mechanisms needed for large numbers of users.  Defence in depth.  Should integrate with existing enterprise security infrastructure.
  
 K8s distribution should include templates of config, and documentation, for simple and enterprise profiles.  System should be flexible enough for knowledgeable users to create intermediate profiles, but K8s developers should only reason about those two Profiles, not a matrix.
@@ -101,21 +103,21 @@ K8s will have a `userAccount` API object.
 Initial Features:
 - `userAccount` object is immutable
 - there is no superuser `userAccount`
-- `userAccount` objects are statically populated in the k8s API store by reading a config file.  Only a k8s admin can do this.
+- `userAccount` objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
 - `userAccount` can have a default `project`.  If API call does not specify a `project`, the default `project` for that caller is assumed.
 - `userAccount` may access multiple projects.
 
 Improvements:
-- Make `userAccount` part of a separate API group from core k8s objects like `pod`.  Facilitates plugging in alternate Access Management.
+- Make `userAccount` part of a separate API group from core K8s objects like `pod`.  Facilitates plugging in alternate Access Management.
 
 Simple Profile:
-   - single `userAccount`, used by all users.
+   - single `userAccount`, used by all K8s Users and Project Admins.
 
 Enterprise Profile:
    - every human user has own `userAccount`. 
    - `userAccount`s have labels that indicate both membership in groups, and ability to act in certain roles.
    - each service using the API has own `userAccount` too. (e.g. `scheduler`, `repcontroller`)
-   - automated jobs to denormalize the ldap group info into the local system list of users into the k8s userAccount file.
+   - automated jobs to denormalize the ldap group info into the local system list of users into the K8s userAccount file.
 
 ###Unix accounts 
 A `userAccount` is not a Unix user account.  The fact that a pod is started by a `userAccount` does not mean that the processes in that pod's containers run as a Unix user with a corresponding name or identity.  
@@ -134,7 +136,7 @@ K8s will have a have a `project` API object.
 
 Initial Features:
 - `project` object is immutable.
-- `project` objects are statically populated in the k8s API store by reading a config file.  Only admin can do this.
+- `project` objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
 - In order to allow using `project` name as namespace for objects under that `project`, and to ensure the compound names are still DNS-compatible names, `project` names must be DNS label format.  
 
 Improvements:
@@ -196,8 +198,8 @@ Where to do authentication.  Either:
 Considerations:
 - In some arrangements, the proxy might terminate SSL, and use a CA-signed certificate, while the APIserver might just use a self-signed or organization-signed certificate.
 - some large orgs will already have existing SaaS web services (e.g. storage, VMs).  Some will already have a gateway that handles auth for multiple services.  If K8s does auth in the proxy, then those orgs can just replace the proxy with their existing web service gateway.
-- Apache or nginx is more stable than k8s code.  Prefer to put secrets (tokens, SSL cert.) in lower-touch place.
-- Admins configuring k8s for enterprise use are more likely to know how to config a proxy than to modify Go code of apiserver. 
+- Apache or nginx is more stable than K8s code.  Prefer to put secrets (tokens, SSL cert.) in lower-touch place.
+- Admins configuring K8s for enterprise use are more likely to know how to config a proxy than to modify Go code of apiserver. 
 
 Based on above considerations, auth should happen in the proxy.
 
@@ -223,12 +225,12 @@ Enterprise Profile:
 
 Initial Features:
 - Policy object is immutable
-- Policy objects are statically populated in the k8s API store by reading a config file.  Only admin can do this.
+- Policy objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
 - Just a few policies per `project` which list which users can create objects, which can just view, them, etc.
 - Objects are created with reference to these default policies.
 
 Improvements:
-- Have API calls to create and delete and modify Policy objects.   These would be in a separate API group from core k8s APIs.  This allows for replacing the k8s authorization service with an alternate implementation, and to centralize policies that might apply to services other than k8s.
+- Have API calls to create and delete and modify Policy objects.   These would be in a separate API group from core K8s APIs.  This allows for replacing the K8s authorization service with an alternate implementation, and to centralize policies that might apply to services other than K8s.
 - Ability to change policy for an object.
 - Ability to create an object with a non-default policy effective immediately at creation time.
 - Ability to defer policy object checking to a policy server.
@@ -313,15 +315,15 @@ The API should have a `quota` concept (see (https://github.com/GoogleCloudPlatfo
 
 Initially:
 - a `quota` object is immutable.
-- for hosted k8s systems that do billing, Project is recommended level for billing accounts.
+- for hosted K8s systems that do billing, Project is recommended level for billing accounts.
 - Every object that consumes resources should have a `project` so that Resource usage stats are roll-up-able to `project`. 
-- admin sets quota objects by writing a config file.
+- K8s Cluster Admin sets quota objects by writing a config file.
 
 Improvements:
 - allow one project to charge the quota for one or more other projects.  This would be controlled by a policy which allows changing a billing_project= label on an object.
 - allow quota to be set by project owners for (project x label) combinations (e.g. let "webserver" project use 100 cores, but to prevent accidents, don't allow "webserver" project and "instance=test" use more than 10 cores.
 - tools to help write consistent quota config files based on number of minions, historical project usages, QoS needs, etc.
-- way for admin to incrementally adjust Quota objects.
+- way for K8s Cluster Admin to incrementally adjust Quota objects.
 
 Simple profile:
    - a single `project` with infinite resource limits.
