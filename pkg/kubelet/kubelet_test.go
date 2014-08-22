@@ -638,6 +638,24 @@ func TestMakeEnvVariables(t *testing.T) {
 	}
 }
 
+func TestMakeContainerEnvVariables(t *testing.T) {
+	container := api.Container{
+		Name: "foo",
+	}
+	pod := Pod{
+		Manifest: api.ContainerManifest{
+			ID: "bar",
+		},
+	}
+	vars := makeContainerEnvironmentVariables(&pod, &container)
+	if len(vars) != 2 {
+		t.Fatalf("Vars don't match.  Expected: 2 Found: %#v", vars)
+	}
+	if vars[0] != "K8S_POD_ID=bar" || vars[1] != "K8S_CONTAINER_NAME=foo" {
+		t.Errorf("Vars don't match. Found: %#v", vars)
+	}
+}
+
 func TestMountExternalVolumes(t *testing.T) {
 	kubelet, _, _ := newTestKubelet(t)
 	manifest := api.ContainerManifest{
