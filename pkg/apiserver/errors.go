@@ -78,15 +78,25 @@ func NewConflictErr(kind, name string, err error) error {
 }
 
 // NewInvalidError returns an error indicating the item is invalid and cannot be processed.
-func NewInvalidError(kind, name string, errs errors.ErrorList) error {
+func NewInvalidErr(kind, name string, errs errors.ErrorList) error {
+	causes := make([]api.StatusCause, 0, len(errs))
+	for i := range errs {
+		if err, ok := errs[i].(errors.ValidationError); ok {
+			causes = append(causes, api.StatusCause{
+				Reason:  api.CauseReasonType(err.Type),
+				Message: err.Error(),
+				Field:   err.Field,
+			})
+		}
+	}
 	return &apiServerError{api.Status{
 		Status: api.StatusFailure,
 		Code:   422, // RFC 4918
 		Reason: api.ReasonTypeInvalid,
 		Details: &api.StatusDetails{
-			Kind: kind,
-			ID:   name,
-			// TODO: causes
+			Kind:   kind,
+			ID:     name,
+			Causes: causes,
 		},
 		Message: fmt.Sprintf("%s %q is invalid: %s", kind, name, errs.ToError()),
 	}}

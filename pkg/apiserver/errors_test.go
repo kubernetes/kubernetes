@@ -19,9 +19,11 @@ package apiserver
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 )
 
 func TestErrorNew(t *testing.T) {
@@ -45,8 +47,83 @@ func TestErrorNew(t *testing.T) {
 	if !IsNotFound(NewNotFoundErr("test", "3")) {
 		t.Errorf("expected to be not found")
 	}
-	if !IsInvalid(NewInvalidError("test", "2", nil)) {
+	if !IsInvalid(NewInvalidErr("test", "2", nil)) {
 		t.Errorf("expected to be invalid")
+	}
+}
+
+func TestNewInvalidErr(t *testing.T) {
+	testCases := []struct {
+		Err     apierrors.ValidationError
+		Details *api.StatusDetails
+	}{
+		{
+			apierrors.NewDuplicate("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Reason: api.CauseReasonTypeFieldValueDuplicate,
+					Field:  "field[0].name",
+				}},
+			},
+		},
+		{
+			apierrors.NewInvalid("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Reason: api.CauseReasonTypeFieldValueInvalid,
+					Field:  "field[0].name",
+				}},
+			},
+		},
+		{
+			apierrors.NewNotFound("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Reason: api.CauseReasonTypeFieldValueNotFound,
+					Field:  "field[0].name",
+				}},
+			},
+		},
+		{
+			apierrors.NewNotSupported("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Reason: api.CauseReasonTypeFieldValueNotSupported,
+					Field:  "field[0].name",
+				}},
+			},
+		},
+		{
+			apierrors.NewRequired("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Reason: api.CauseReasonTypeFieldValueRequired,
+					Field:  "field[0].name",
+				}},
+			},
+		},
+	}
+	for i := range testCases {
+		vErr, expected := testCases[i].Err, testCases[i].Details
+		expected.Causes[0].Message = vErr.Error()
+		err := NewInvalidErr("kind", "name", apierrors.ErrorList{vErr})
+		status := errToAPIStatus(err)
+		if status.Code != 422 || status.Reason != api.ReasonTypeInvalid {
+			t.Errorf("unexpected status: %#v", status)
+		}
+		if !reflect.DeepEqual(expected, status.Details) {
+			t.Errorf("expected %#v, got %#v", expected, status.Details)
+		}
 	}
 }
 

@@ -18,6 +18,7 @@ package errors
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -56,8 +57,21 @@ func TestMakeFuncs(t *testing.T) {
 	}
 }
 
+func TestValidationError(t *testing.T) {
+	s := NewInvalid("foo", "bar").Error()
+	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
+		t.Errorf("error message did not contain expected values, got %s", s)
+	}
+}
+
 func TestErrorList(t *testing.T) {
 	errList := ErrorList{}
+	if a := errList.ToError(); a != nil {
+		t.Errorf("unexpected non-nil error for empty list: %v", a)
+	}
+	if a := errorListInternal(errList).Error(); a != "" {
+		t.Errorf("expected empty string, got %v", a)
+	}
 	errList = append(errList, NewInvalid("field", "value"))
 	// The fact that this compiles is the test.
 }
@@ -84,6 +98,66 @@ func TestErrorListToError(t *testing.T) {
 		}
 		if err.Error() != testCase.expected {
 			t.Errorf("expected %q, got %q", testCase.expected, err.Error())
+		}
+	}
+}
+
+func TestErrListPrefix(t *testing.T) {
+	testCases := []struct {
+		Err      ValidationError
+		Expected string
+	}{
+		{
+			NewNotFound("[0].bar", "value"),
+			"foo[0].bar",
+		},
+		{
+			NewInvalid("field", "value"),
+			"foo.field",
+		},
+		{
+			NewDuplicate("", "value"),
+			"foo",
+		},
+	}
+	for _, testCase := range testCases {
+		errList := ErrorList{testCase.Err}
+		prefix := errList.Prefix("foo")
+		if prefix == nil || len(prefix) != len(errList) {
+			t.Errorf("Prefix should return self")
+		}
+		if e, a := testCase.Expected, errList[0].(ValidationError).Field; e != a {
+			t.Errorf("expected %s, got %s", e, a)
+		}
+	}
+}
+
+func TestErrListPrefixIndex(t *testing.T) {
+	testCases := []struct {
+		Err      ValidationError
+		Expected string
+	}{
+		{
+			NewNotFound("[0].bar", "value"),
+			"[1][0].bar",
+		},
+		{
+			NewInvalid("field", "value"),
+			"[1].field",
+		},
+		{
+			NewDuplicate("", "value"),
+			"[1]",
+		},
+	}
+	for _, testCase := range testCases {
+		errList := ErrorList{testCase.Err}
+		prefix := errList.PrefixIndex(1)
+		if prefix == nil || len(prefix) != len(errList) {
+			t.Errorf("PrefixIndex should return self")
+		}
+		if e, a := testCase.Expected, errList[0].(ValidationError).Field; e != a {
+			t.Errorf("expected %s, got %s", e, a)
 		}
 	}
 }

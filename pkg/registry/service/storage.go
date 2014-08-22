@@ -48,7 +48,7 @@ func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machin
 func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(*api.Service)
 	if errs := api.ValidateService(srv); len(errs) > 0 {
-		return nil, fmt.Errorf("Validation errors: %v", errs)
+		return nil, apiserver.NewInvalidErr("service", srv.ID, errs)
 	}
 
 	srv.CreationTimestamp = util.Now()
@@ -147,11 +147,8 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 
 func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(*api.Service)
-	if srv.ID == "" {
-		return nil, fmt.Errorf("ID should not be empty: %#v", srv)
-	}
 	if errs := api.ValidateService(srv); len(errs) > 0 {
-		return nil, fmt.Errorf("Validation errors: %v", errs)
+		return nil, apiserver.NewInvalidErr("service", srv.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: check to see if external load balancer status changed
