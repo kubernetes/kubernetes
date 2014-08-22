@@ -206,107 +206,25 @@ Based on above considerations, auth should happen in the proxy.
 
 ## Authorization
 
-Authorization is done by the APIserver.
+K8s authorization should:
+- Allow for a range of maturity levels, from single-user for those test driving the system, to integration with existing to enterprise authorization systems.
+- Allow for centralized management of users and policies.  In some organizations, this will mean that the definition of users and access policies needs to reside on a system other than k8s and encompass other web services (such as a storage service).
+- Allow processes running in K8s Pods to take on identity, and to allow narrow scoping of permissions for those identities in order to limit damage from software faults.
+- Have Authorization Policies exposed as API objects so that a single config file can create or delete Pods, Controllers, Services, and the identities and policies for those Pods and Controllers. 
+- Be separate as much as practical from Authentication, to allow Authentication methods to change over time and space, without impacting Authorization policies.
 
-Authorization is done using Policy objects.
+K8s will implement a relatively simple 
+[Attribute-Based Access Control][http://en.wikipedia.org/wiki/Attribute_Based_Access_Control] model.
+The model will be described in more detail in a forthcoming document.  The model
+- Be less complex than XACML
+- Be easily recognizable to those familiar with Amazon IAM Policies.
+- Have a subset/aliases/defaults which allow it to be used in a way comfortable to those users more familiar with Role-Based Access Control.
 
+Authorization policy is set by creating a set of Policy objects.
 
-### Policy objects
-Policy objects are API objects.  They express http://en.wikipedia.org/wiki/Attribute_Based_Access_Control 
+The API Server will be the Enforcement Point for Policy. For each API call that it receives, it will construct the Attributes needed to evaluate the policy (what user is making the call, what resource they are accessing, what they are trying to do that resource, etc) and pass those attribytes to a Decision Point.  The Decision Point code evaluates the Attributes against all the Policies and allows or denys the API call.  The system will be modular enough that the Decision Point code can either be linked into the APIserver binary, or be another service that the apiserver calls for each Decision (with appropriate time-limited caching as needed for performance).
 
-Simple Profile:
-- one Policy object that allows the single `userAccount` to CRUD objects in the single `project`.
-
-Enterprise Profile:
-- Many policy objects in each of many projects.
-- Tools and services that wrap policy creation interface to enforce meta policies, do template expansions, report, etc.
-
-
-
-Initial Features:
-- Policy object is immutable
-- Policy objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
-- Just a few policies per `project` which list which users can create objects, which can just view, them, etc.
-- Objects are created with reference to these default policies.
-
-Improvements:
-- Have API calls to create and delete and modify Policy objects.   These would be in a separate API group from core K8s APIs.  This allows for replacing the K8s authorization service with an alternate implementation, and to centralize policies that might apply to services other than K8s.
-- Ability to change policy for an object.
-- Ability to create an object with a non-default policy effective immediately at creation time.
-- Ability to defer policy object checking to a policy server.
-- Authorization tokens to authorize entities without a `userAccount`.
-
-
-### Policy object format
-
-Policy Object:
-```go
-type policies map[string]policy
-
-type policy {
-    project string, // ref to project of this Policy, to namespace the name.  
-    name string, // name within the project name of the Policy
-    a PolicyType,
-    s Subject,
-    v Verb,
-    o Object 
-    expires string // RFC3339
-}
-type PolicyType string
-const {
-   ALLOW PolicyType = "ALLOW",
-   // Later DENY, etc.
-}
-
-type Subject string // Serialized label selector
-type Verb string
-const {
-   GET Verb = "GET",
-   // ... other HTTP methods.
-   ANY Verb = "ANY" // any http method
-   CREATE Verb = "CREATE" // PUT or POST
-   // ...
-}
-type Object {
-  exact string  // any resource with exactly this path
-  // OR
-  prefix string // any resource with this path prefix (after removing "/api/<version>/")
-  // OR
-  where string // serialized label selector.
-}
-```
-
-Ideally, lists of policy objects would have relatively concise and readable YAML forms, such as:
-```
-{name: bob_can_read_pods, a: ALLOW, s: user.name is bob@example.com, v: GET, prefix: /pods}
-{name: admins_can_delete_pods, a: ALLOW, s: user.role is admin, v: DELETE, prefix: /pods}
-{name: tmp1234, a: ALLOW, s: user.name is "some.agent", v: POST, prefix: /pods/somepod, expires: 2014-08-13 16:21:42-07:00 }
-```
-
-Requests that don't match at least one ALLOW are not allowed.
-TODO: define DENY, and other operations and their precedence.
-
-Delegation can be implemented by writing new narrowly tailored policies.
-TODO: example of policy to delegate pod creation from a podTemplate (see https://github.com/GoogleCloudPlatform/kubernetes/issues/170).
-
-### Architecture for Authorization
-When the APIserver receives a new request, it passes the
-the `userAccount`, http method, and http path to an `Authorize() method`.
-
-In a simple implementation, the Authorize() module:
-  - runs in the APIserver
-  - searches all policy objects for a match.
-  - updates its cache  when new Policy is added.
-
-In alternate implementations, it may:
-  - have indexes to speed matching.  (Maybe this can share code with Label Queries.)
-  - defer to a centralized auth server for the enterprise. 
-
-
-### Labels
-Initially, IIUC, labels are strings and not API objects in their own right. 
-Eventually, labels may have policies or namespaces which restrict application of certain labels.
-  
+Policy objects may be applicable only to a single project; K8s Project Admins would be able to create those as needed.  Other Policy objects may be applicable to all projects; a K8s Cluster Admin might create those in order to authorize a new type of controller to be used by all projects, or to make a K8s User into a K8s Project Admin.)
 
 ## Accounting
 
