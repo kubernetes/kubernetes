@@ -18,17 +18,17 @@
 # release.
 
 # First build the binaries
-$(dirname $0)/build-go.sh
+make -C $(dirname "$0")/.. all
 if [ "$?" != "0" ]; then
         exit 1
 fi
 
 # Then build a release
-$(dirname $0)/../release/release.sh
+$(dirname "$0")/../release/release.sh
 if [ "$?" != "0" ]; then
         echo "Building the release failed!"
         exit 1
 fi
 
 # Now bring a new cluster up with that release.
-$(dirname $0)/../cluster/kube-up.sh
+$(dirname "$0")/../cluster/kube-up.sh

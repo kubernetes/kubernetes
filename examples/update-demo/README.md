@@ -23,7 +23,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
     $ cd kubernetes
     $ hack/dev-build-and-up.sh
-    $ hack/build-go.sh
+    $ make
 
 This example also assumes that you have [Docker](http://docker.io) installed on your local machine.
 

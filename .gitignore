@@ -31,5 +31,8 @@ Session.vim
 .vagrant
 network_closure.sh
 
+# Version file we automatically make
+.version
+
 # compiled binaries in third_party
 /third_party/pkg

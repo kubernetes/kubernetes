@@ -64,6 +64,6 @@ You are running a single minion setup.  This has the limitation of only supporti
 
 ```
 cd kubernetes
-hack/build-go.sh
+make
 hack/local-up-cluster.sh
 ```

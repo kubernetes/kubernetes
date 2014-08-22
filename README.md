@@ -113,7 +113,7 @@ ln -s ../../hooks/commit-msg .git/hooks/commit-msg
 
 ```
 cd kubernetes
-hack/test-go.sh
+make test
 ```
 
 Alternatively, you could also run:

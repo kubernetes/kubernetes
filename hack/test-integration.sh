@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source $(dirname $0)/util.sh
+source $(dirname "$0")/util.sh
 
 function cleanup()
 {
@@ -27,7 +27,7 @@ function cleanup()
 
 # Stop right away if the build fails
 set -e
-$(dirname $0)/build-go.sh cmd/integration
+make -C $(dirname "$0")/.. integration
 
 start_etcd
 
@@ -36,14 +36,15 @@ trap cleanup EXIT SIGINT
 echo
 echo Integration test cases ...
 echo
-$(dirname $0)/../hack/test-go.sh test/integration -tags 'integration no-docker'
+make -C $(dirname "$0")/.. test WHAT=test/integration \
+    GOFLAGS='-tags "integration no-docker"'
 # leave etcd running if integration tests fail
 trap "echo etcd still running" EXIT
 
 echo
 echo Integration scenario ...
 echo
-$(dirname $0)/../output/go/bin/integration
+$(dirname "$0")/../output/go/bin/integration
 
 # nuke etcd
 trap cleanup EXIT SIGINT
