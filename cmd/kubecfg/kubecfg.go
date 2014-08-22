@@ -344,11 +344,11 @@ func executeControllerRequest(method string, c *kube_client.Client) bool {
 			glog.Fatal("usage: kubecfg [OPTIONS] run <image> <replicas> <controller>")
 		}
 		image := flag.Arg(1)
-		replicas, err := strconv.Atoi(flag.Arg(2))
-		name := flag.Arg(3)
-		if err != nil {
-			glog.Fatalf("Error parsing replicas: %v", err)
+		replicas, err2 := strconv.Atoi(flag.Arg(2))
+		if err2 != nil {
+			glog.Fatalf("Error parsing replicas: %v", err2)
 		}
+		name := flag.Arg(3)
 		err = kubecfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
 		args := flag.Args()
@@ -356,9 +356,9 @@ func executeControllerRequest(method string, c *kube_client.Client) bool {
 			glog.Fatal("usage: kubecfg resize <controller> <replicas>")
 		}
 		name := args[1]
-		replicas, err := strconv.Atoi(args[2])
-		if err != nil {
-			glog.Fatalf("Error parsing replicas: %v", err)
+		replicas, err2 := strconv.Atoi(args[2])
+		if err2 != nil {
+			glog.Fatalf("Error parsing replicas: %v", err2)
 		}
 		err = kubecfg.ResizeController(name, replicas, c)
 	default:
