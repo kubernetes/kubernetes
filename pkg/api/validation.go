@@ -275,6 +275,11 @@ func ValidateReplicationController(controller *ReplicationController) errs.Error
 	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.ReplicaSelector", controller.DesiredState.ReplicaSelector))
 	}
+	selector := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
+	labels := labels.Set(controller.DesiredState.PodTemplate.Labels)
+	if !selector.Matches(labels) {
+		allErrs = append(allErrs, errs.NewInvalid("ReplicaController.DesiredState.PodTemplate.Labels", controller.DesiredState.PodTemplate))
+	}
 	if controller.DesiredState.Replicas < 0 {
 		allErrs = append(allErrs, errs.NewInvalid("ReplicationController.Replicas", controller.DesiredState.Replicas))
 	}

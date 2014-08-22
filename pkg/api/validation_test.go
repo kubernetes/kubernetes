@@ -373,6 +373,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Version: "v1beta1",
 			},
 		},
+		Labels: validSelector,
 	}
 
 	successCases := []ReplicationController{
@@ -409,6 +410,13 @@ func TestValidateReplicationController(t *testing.T) {
 			JSONBase: JSONBase{ID: "abc"},
 			DesiredState: ReplicationControllerState{
 				PodTemplate: validPodTemplate,
+			},
+		},
+		"selector_doesnt_match": {
+			JSONBase: JSONBase{ID: "abc"},
+			DesiredState: ReplicationControllerState{
+				ReplicaSelector: map[string]string{"foo": "bar"},
+				PodTemplate:     validPodTemplate,
 			},
 		},
 		"invalid manifest": {

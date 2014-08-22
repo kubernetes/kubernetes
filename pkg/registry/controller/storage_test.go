@@ -205,6 +205,7 @@ var validPodTemplate = api.PodTemplate{
 			},
 		},
 	},
+	Labels: map[string]string{"a": "b"},
 }
 
 func TestCreateController(t *testing.T) {
