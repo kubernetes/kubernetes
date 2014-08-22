@@ -18,6 +18,7 @@ AZ_SSH_CERT=$HOME/.ssh/azure.pem
 AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04-LTS-amd64-server-20140618.1-en-us-30GB
 AZ_SUBNET=Subnet-1
 TAG=testing
+INSTANCE_PREFIX=kubernetes
 
 if [ -z "$(which azure)" ]; then
     echo "Couldn't find azure in PATH"

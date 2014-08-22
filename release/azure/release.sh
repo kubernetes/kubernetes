@@ -26,7 +26,6 @@ function json_val () {
 }
 
 source $SCRIPT_DIR/config.sh
-source $SCRIPT_DIR/../../cluster/${KUBE_CONFIG_FILE-"config-default.sh"}
 
 $SCRIPT_DIR/../build-release.sh $INSTANCE_PREFIX
 
