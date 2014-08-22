@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
@@ -93,6 +94,10 @@ func Update(name string, client client.Interface, updatePeriod time.Duration) er
 	if err != nil {
 		return err
 	}
+	expected := len(podList.Items)
+	if expected == 0 {
+		return nil
+	}
 	for _, pod := range podList.Items {
 		// We delete the pod here, the controller will recreate it.  This will result in pulling
 		// a new Docker image.  This isn't a full "update" but it's what we support for now.
@@ -102,7 +107,13 @@ func Update(name string, client client.Interface, updatePeriod time.Duration) er
 		}
 		time.Sleep(updatePeriod)
 	}
-	return nil
+	return wait.Poll(time.Second*5, 60 /* timeout after 300 seconds */, func() (bool, error) {
+		podList, err := client.ListPods(s)
+		if err != nil {
+			return false, err
+		}
+		return len(podList.Items) == expected, nil
+	})
 }
 
 // StopController stops a controller named 'name' by setting replicas to zero
