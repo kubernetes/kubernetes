@@ -333,7 +333,20 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidateService(t *testing.T) {
+	// This test should fail because the port number is invalid i.e.
+	// the Port field has a default value of 0.
 	errs := ValidateService(&Service{
+		JSONBase: JSONBase{ID: "foo"},
+		Selector: map[string]string{
+			"foo": "bar",
+		},
+	})
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+
+	errs = ValidateService(&Service{
+		Port:     6502,
 		JSONBase: JSONBase{ID: "foo"},
 		Selector: map[string]string{
 			"foo": "bar",
@@ -344,6 +357,7 @@ func TestValidateService(t *testing.T) {
 	}
 
 	errs = ValidateService(&Service{
+		Port: 6502,
 		Selector: map[string]string{
 			"foo": "bar",
 		},
@@ -353,6 +367,7 @@ func TestValidateService(t *testing.T) {
 	}
 
 	errs = ValidateService(&Service{
+		Port:     6502,
 		JSONBase: JSONBase{ID: "foo"},
 	})
 	if len(errs) != 1 {
@@ -360,7 +375,7 @@ func TestValidateService(t *testing.T) {
 	}
 
 	errs = ValidateService(&Service{})
-	if len(errs) != 2 {
+	if len(errs) != 3 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 }

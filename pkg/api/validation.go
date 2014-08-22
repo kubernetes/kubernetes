@@ -260,6 +260,10 @@ func ValidateService(service *Service) errs.ErrorList {
 	} else if !util.IsDNS952Label(service.ID) {
 		allErrs = append(allErrs, errs.NewInvalid("Service.ID", service.ID))
 	}
+	// Make sure the service port number is valid.
+	if !util.IsValidPortNum(service.Port) {
+		allErrs = append(allErrs, errs.NewInvalid("Service.Port", service.Port))
+	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewInvalid("Service.Selector", service.Selector))
 	}
