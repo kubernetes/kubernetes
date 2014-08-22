@@ -107,7 +107,7 @@ func Update(name string, client client.Interface, updatePeriod time.Duration) er
 		}
 		time.Sleep(updatePeriod)
 	}
-	return wait.Poll(time.Second*5, 60 /* timeout after 300 seconds */, func() (bool, error) {
+	return wait.Poll(time.Second*5, time.Second*300, func() (bool, error) {
 		podList, err := client.ListPods(s)
 		if err != nil {
 			return false, err

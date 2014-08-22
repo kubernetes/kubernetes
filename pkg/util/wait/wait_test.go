@@ -23,7 +23,7 @@ import (
 )
 
 func TestPoller(t *testing.T) {
-	w := poller(time.Millisecond, 2)
+	w := poller(time.Millisecond, 2*time.Millisecond)
 	ch := w()
 	count := 0
 DRAIN:
@@ -34,7 +34,7 @@ DRAIN:
 				break DRAIN
 			}
 			count++
-		case <-time.After(time.Millisecond * 5):
+		case <-time.After(time.Second):
 			t.Errorf("unexpected timeout after poll")
 		}
 	}
@@ -62,12 +62,63 @@ func TestPoll(t *testing.T) {
 		invocations++
 		return true, nil
 	})
-	if err := Poll(time.Microsecond, 1, f); err != nil {
+	if err := Poll(time.Microsecond, time.Microsecond, f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	if invocations == 0 {
 		t.Errorf("Expected at least one invocation, got zero")
 	}
+}
+
+func TestPollForever(t *testing.T) {
+	ch := make(chan struct{})
+	done := make(chan struct{}, 1)
+	complete := make(chan struct{})
+	go func() {
+		f := ConditionFunc(func() (bool, error) {
+			ch <- struct{}{}
+			select {
+			case <-done:
+				return true, nil
+			default:
+			}
+			return false, nil
+		})
+		if err := Poll(time.Microsecond, 0, f); err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		close(ch)
+		complete <- struct{}{}
+	}()
+
+	// ensure the condition is opened
+	<-ch
+
+	// ensure channel sends events
+	for i := 0; i < 10; i++ {
+		select {
+		case _, open := <-ch:
+			if !open {
+				t.Fatalf("did not expect channel to be closed")
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("channel did not return at least once within the poll interval")
+		}
+	}
+
+	// at most two poll notifications should be sent once we return from the condition
+	done <- struct{}{}
+	go func() {
+		for i := 0; i < 2; i++ {
+			_, open := <-ch
+			if open {
+				<-complete
+				return
+			}
+		}
+		t.Fatalf("expected closed channel after two iterations")
+	}()
+	<-complete
 }
 
 func TestWaitFor(t *testing.T) {
