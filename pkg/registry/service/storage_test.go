@@ -43,6 +43,9 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if created_service.ID != "foo" {
 		t.Errorf("Expected foo, but got %v", created_service.ID)
 	}
+	if created_service.CreationTimestamp.IsZero() {
+		t.Errorf("Expected timestamp to be set, got %:v", created_service.CreationTimestamp)
+	}
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}

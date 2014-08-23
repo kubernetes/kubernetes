@@ -50,6 +50,9 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	if errs := api.ValidateService(srv); len(errs) > 0 {
 		return nil, fmt.Errorf("Validation errors: %v", errs)
 	}
+
+	srv.CreationTimestamp = util.Now()
+
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
@@ -78,7 +81,6 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 				return nil, err
 			}
 		}
-		// TODO actually wait for the object to be fully created here.
 		err := rs.registry.CreateService(*srv)
 		if err != nil {
 			return nil, err
