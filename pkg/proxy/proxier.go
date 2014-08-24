@@ -30,7 +30,6 @@ import (
 )
 
 type serviceInfo struct {
-	name     string
 	port     int
 	listener net.Listener
 	mu       sync.Mutex // protects active
@@ -78,16 +77,16 @@ func (proxier *Proxier) StopProxy(service string) error {
 	if !found {
 		return fmt.Errorf("unknown service: %s", service)
 	}
-	return proxier.stopProxyInternal(info)
+	return proxier.stopProxyInternal(service, info)
 }
 
-func (proxier *Proxier) stopProxyInternal(info *serviceInfo) error {
+func (proxier *Proxier) stopProxyInternal(name string, info *serviceInfo) error {
 	info.mu.Lock()
 	defer info.mu.Unlock()
 	if !info.active {
 		return nil
 	}
-	glog.Infof("Removing service: %s", info.name)
+	glog.Infof("Removing service: %s", name)
 	info.active = false
 	return info.listener.Close()
 }
@@ -102,7 +101,6 @@ func (proxier *Proxier) getServiceInfo(service string) (*serviceInfo, bool) {
 func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
-	info.name = service
 	proxier.serviceMap[service] = info
 }
 
@@ -210,7 +208,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	defer proxier.mu.Unlock()
 	for name, info := range proxier.serviceMap {
 		if !activeServices.Has(name) {
-			proxier.stopProxyInternal(info)
+			proxier.stopProxyInternal(name, info)
 		}
 	}
 }
