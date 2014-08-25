@@ -72,6 +72,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			}
 			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
 		}
+		// TODO: this is totally broken, we need to compute this and store inside an AtomicUpdate loop.
 		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
 			JSONBase:  api.JSONBase{ID: service.ID},
 			Endpoints: endpoints,

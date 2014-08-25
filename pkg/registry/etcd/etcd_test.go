@@ -805,18 +805,21 @@ func TestEtcdUpdateService(t *testing.T) {
 
 func TestEtcdGetEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/endpoints/foo", api.EncodeOrDie(api.Endpoints{
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	endpoints := &api.Endpoints{
 		JSONBase:  api.JSONBase{ID: "foo"},
 		Endpoints: []string{"127.0.0.1:34855"},
-	}), 0)
-	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
-	endpoints, err := registry.GetEndpoints("foo")
+	}
+
+	fakeClient.Set("/registry/services/endpoints/foo", api.EncodeOrDie(endpoints), 0)
+
+	got, err := registry.GetEndpoints("foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if endpoints.ID != "foo" || !reflect.DeepEqual(endpoints.Endpoints, []string{"127.0.0.1:34855"}) {
-		t.Errorf("Unexpected endpoints: %#v", endpoints)
+	if e, a := endpoints, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Unexpected endpoints: %#v, expected %#v", e, a)
 	}
 }
 

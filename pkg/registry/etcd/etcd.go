@@ -313,6 +313,20 @@ func (r *Registry) GetService(name string) (*api.Service, error) {
 	return &svc, nil
 }
 
+// GetEndpoints obtains the endpoints for the service identified by 'name'.
+func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
+	key := makeServiceEndpointsKey(name)
+	var endpoints api.Endpoints
+	err := r.ExtractObj(key, &endpoints, false)
+	if tools.IsEtcdNotFound(err) {
+		return nil, apiserver.NewNotFoundErr("endpoints", name)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &endpoints, nil
+}
+
 func makeServiceEndpointsKey(name string) string {
 	return "/registry/services/endpoints/" + name
 }
@@ -354,23 +368,9 @@ func (r *Registry) WatchServices(label, field labels.Selector, resourceVersion u
 	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
 }
 
-// GetEndpoints obtains endpoints specified by a service name
-func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
-	obj := &api.Endpoints{}
-	if err := r.ExtractObj(makeServiceEndpointsKey(name), obj, false); err != nil {
-		if tools.IsEtcdNotFound(err) {
-			if _, err := r.GetService(name); err != nil && apiserver.IsNotFound(err) {
-				return nil, apiserver.NewNotFoundErr("service", name)
-			}
-			return obj, nil
-		}
-		return nil, err
-	}
-	return obj, nil
-}
-
 // UpdateEndpoints update Endpoints of a Service.
 func (r *Registry) UpdateEndpoints(e api.Endpoints) error {
+	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
 	return r.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{},
 		func(input interface{}) (interface{}, error) {
 			// TODO: racy - label query is returning different results for two simultaneous updaters

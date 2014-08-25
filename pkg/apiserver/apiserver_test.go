@@ -71,6 +71,9 @@ type SimpleRESTStorage struct {
 	requestedFieldSelector   labels.Selector
 	requestedResourceVersion uint64
 
+	// The location
+	requestedResourceLocationID string
+
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
 	injectedFunction func(obj interface{}) (returnObj interface{}, err error)
@@ -140,6 +143,15 @@ func (storage *SimpleRESTStorage) Watch(label, field labels.Selector, resourceVe
 	}
 	storage.fakeWatch = watch.NewFake()
 	return storage.fakeWatch, nil
+}
+
+// Implement Redirector.
+func (storage *SimpleRESTStorage) ResourceLocation(id string) (string, error) {
+	storage.requestedResourceLocationID = id
+	if err := storage.errors["resourceLocation"]; err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func extractBody(response *http.Response, object interface{}) (string, error) {

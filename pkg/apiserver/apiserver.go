@@ -32,20 +32,20 @@ import (
 )
 
 // Codec defines methods for serializing and deserializing API
-// objects
+// objects.
 type Codec interface {
 	Encode(obj interface{}) (data []byte, err error)
 	Decode(data []byte) (interface{}, error)
 	DecodeInto(data []byte, obj interface{}) error
 }
 
-// mux is an object that can register http handlers
+// mux is an object that can register http handlers.
 type mux interface {
 	Handle(pattern string, handler http.Handler)
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// defaultAPIServer exposes nested objects for testability
+// defaultAPIServer exposes nested objects for testability.
 type defaultAPIServer struct {
 	http.Handler
 	group *APIGroup
@@ -95,12 +95,14 @@ func NewAPIGroup(storage map[string]RESTStorage, codec Codec) *APIGroup {
 func (g *APIGroup) InstallREST(mux mux, paths ...string) {
 	restHandler := &g.handler
 	watchHandler := &WatchHandler{g.handler.storage, g.handler.codec}
+	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
 	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
 
 	for _, prefix := range paths {
 		prefix = strings.TrimRight(prefix, "/")
 		mux.Handle(prefix+"/", http.StripPrefix(prefix, restHandler))
 		mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
+		mux.Handle(prefix+"/redirect/", http.StripPrefix(prefix+"/redirect/", redirectHandler))
 		mux.Handle(prefix+"/operations", http.StripPrefix(prefix+"/operations", opHandler))
 		mux.Handle(prefix+"/operations/", http.StripPrefix(prefix+"/operations/", opHandler))
 	}
@@ -129,6 +131,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 			httplog.StatusIsNot(
 				http.StatusOK,
 				http.StatusAccepted,
+				http.StatusTemporaryRedirect,
 				http.StatusConflict,
 				http.StatusNotFound,
 			),
