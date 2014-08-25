@@ -26,6 +26,15 @@
 {% elif grains.cloud is defined and grains.cloud == 'azure' %}
   MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') }}" 
   {% set machines = "-machines $MACHINES" %}
+{% else %}
+  # No cloud defined, collect IPs of minions as machines list.
+  # Use a bash array to build the value we need. It doesn't appear to be
+  # possible call functions map or zip, or use lambda's from Jinja.
+  MACHINE_IPS=()
+  {% for addrs in salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').values() %}
+  MACHINE_IPS+=( {{ addrs[0] }} )
+  {% endfor %}
+  {% set machines = "-machines=$(echo ${MACHINE_IPS[@]} | xargs -n1 echo | paste -sd,)" %}
 {% endif %}
 
 DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{ minion_regexp }} {{ cloud_provider }}"

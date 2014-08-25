@@ -14,10 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'azure', 'vagrant', 'local', 'vsphere'
+source $(dirname ${BASH_SOURCE})/config-common.sh
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+NUM_MINIONS=4
+INSTANCE_PREFIX=kubernetes
+
+MASTER_NAME="${INSTANCE_PREFIX}-master"
+MASTER_MEMORY_MB=1024
+MASTER_CPU=1
+
+MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
+MINION_MEMORY_MB=2048
+MINION_CPU=1

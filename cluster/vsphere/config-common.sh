@@ -14,10 +14,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'azure', 'vagrant', 'local', 'vsphere'
+function public-key {
+  local dir=${HOME}/.ssh
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+  for f in $HOME/.ssh/{id_{rsa,dsa},*}.pub; do
+    if [ -r $f ]; then
+      echo $f
+      return
+    fi
+  done
+
+  echo "Can't find public key file..."
+  exit 1
+}
+
+DISK=kube.vmdk
+GUEST_ID=debian7_64Guest
+PUBLIC_KEY_FILE=${PUBLIC_KEY_FILE-$(public-key)}
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+
+# These need to be set
+#export GOVC_URL=
+#export GOVC_DATACENTER=
+#export GOVC_DATASTORE=
+#export GOVC_RESOURCE_POOL=
+#export GOVC_NETWORK=
+#export GOVC_GUEST_LOGIN='kube:kube'

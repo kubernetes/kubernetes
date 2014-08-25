@@ -14,10 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'azure', 'vagrant', 'local', 'vsphere'
+# Install release
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+echo "Unpacking release"
+rm -rf master-release || false
+tar xzf master-release.tgz
+
+echo "Running release install script"
+sudo master-release/src/scripts/master-release-install.sh

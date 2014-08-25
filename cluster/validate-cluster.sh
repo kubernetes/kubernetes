@@ -33,6 +33,13 @@ detect-minions > /dev/null
 MINIONS_FILE=/tmp/minions
 $(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
+# On vSphere, use minion IPs as their names
+if [ "$KUBERNETES_PROVIDER" == "vsphere" ]; then
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    MINION_NAMES[i]=${KUBE_MINION_IP_ADDRESSES[i]}
+  done
+fi
+
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
     count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
