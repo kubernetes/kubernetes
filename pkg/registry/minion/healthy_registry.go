@@ -79,6 +79,8 @@ func (r *HealthyRegistry) List() (currentMinions []string, err error) {
 		}
 		if status == health.Healthy {
 			result = append(result, minion)
+		} else {
+			glog.Errorf("%s failed a health check, ignoring.", minion)
 		}
 	}
 	return result, nil
