@@ -67,7 +67,7 @@ The commands above will not work if there are more than one directory in ``$GOPA
 
 ### godep and dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that ``godep`` is installed and in your ``$PATH``.
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree. Please make sure that ``godep`` is installed and in your ``$PATH``.
 
 #### Installing godep
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
