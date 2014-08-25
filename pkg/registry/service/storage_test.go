@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -30,7 +30,7 @@ import (
 
 func TestServiceRegistryCreate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{}
+	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := &api.Service{
@@ -78,6 +78,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected to get an error")
 		}
+
 	}
 }
 
@@ -143,7 +144,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 
 func TestServiceRegistryExternalService(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{}
+	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := &api.Service{
@@ -168,7 +169,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 
 func TestServiceRegistryExternalServiceError(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{
+	fakeCloud := &cloud.FakeCloud{
 		Err: fmt.Errorf("test error"),
 	}
 	machines := []string{"foo", "bar", "baz"}
@@ -191,7 +192,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 
 func TestServiceRegistryDelete(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{}
+	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := api.Service{
@@ -211,7 +212,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{}
+	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := api.Service{
@@ -254,7 +255,7 @@ func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 
 func TestServiceRegistryGet(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{}
+	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
 	registry.CreateService(api.Service{
@@ -272,7 +273,7 @@ func TestServiceRegistryGet(t *testing.T) {
 
 func TestServiceRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &fake_cloud.FakeCloud{}
+	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
 	registry.CreateService(api.Service{
