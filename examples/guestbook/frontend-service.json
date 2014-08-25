@@ -3,6 +3,7 @@
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 9998,
+  "containerPort": 80,
   "selector": {
     "name": "frontend"
   }
