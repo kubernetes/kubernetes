@@ -170,7 +170,7 @@ func runReplicationControllerTest(c *client.Client) {
 	glog.Infof("Done creating replication controllers")
 
 	// Give the controllers some time to actually create the pods
-	if err := wait.Poll(time.Second, 10, c.ControllerHasDesiredReplicas(controllerRequest)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*10, c.ControllerHasDesiredReplicas(controllerRequest)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
@@ -179,7 +179,7 @@ func runReplicationControllerTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}
-	if err := wait.Poll(time.Second, 10, podsOnMinions(c, pods)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*10, podsOnMinions(c, pods)); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 

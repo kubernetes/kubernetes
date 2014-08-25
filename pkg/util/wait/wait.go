@@ -28,17 +28,24 @@ var ErrWaitTimeout = errors.New("timed out waiting for the condition")
 // if the loop should be aborted.
 type ConditionFunc func() (done bool, err error)
 
-// Poll tries a condition func until it returns true, an error, or the
-// wait channel is closed.  Will always poll at least once.
-func Poll(interval time.Duration, cycles int, condition ConditionFunc) error {
-	return WaitFor(poller(interval, cycles), condition)
+// Poll tries a condition func until it returns true, an error, or the timeout
+// is reached. condition will always be invoked at least once but some intervals
+// may be missed if the condition takes too long or the time window is too short.
+// If you pass maxTimes = 0, Poll will loop until condition returns true or an
+// error.
+func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
+	return WaitFor(poller(interval, timeout), condition)
 }
 
 // WaitFunc creates a channel that receives an item every time a test
 // should be executed and is closed when the last test should be invoked.
 type WaitFunc func() <-chan struct{}
 
-// WaitFor implements the looping for a wait.
+// WaitFor gets a channel from wait(), and then invokes c once for every value
+// placed on the channel and once more when the channel is closed.  If c
+// returns an error the loop ends and that error is returned, and if c returns
+// true the loop ends and nil is returned. ErrWaitTimeout will be returned if
+// the channel is closed without c every returning true.
 func WaitFor(wait WaitFunc, c ConditionFunc) error {
 	w := wait()
 	for {
@@ -58,16 +65,20 @@ func WaitFor(wait WaitFunc, c ConditionFunc) error {
 }
 
 // poller returns a WaitFunc that will send to the channel every
-// interval until at most cycles * interval has elapsed and then
-// close the channel. Over very short intervals you may receive
-// no ticks before being closed.
-func poller(interval time.Duration, cycles int) WaitFunc {
+// interval until timeout has elapsed and then close the channel.
+// Over very short intervals you may receive no ticks before
+// the channel is closed closed.  If maxTimes is 0, the channel
+// will never be closed.
+func poller(interval, timeout time.Duration) WaitFunc {
 	return WaitFunc(func() <-chan struct{} {
 		ch := make(chan struct{})
 		go func() {
 			tick := time.NewTicker(interval)
 			defer tick.Stop()
-			after := time.After(interval * time.Duration(cycles))
+			var after <-chan time.Time
+			if timeout != 0 {
+				after = time.After(timeout)
+			}
 			for {
 				select {
 				case <-tick.C:
