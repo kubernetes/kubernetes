@@ -325,7 +325,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 		NetworkMode:  netMode,
 	})
 	if kl.lifecycle != nil {
-		if output, err := kl.lifecycle.OnStart(dockerContainer.ID); err != nil {
+		if output, err := kl.lifecycle.PostStart(dockerContainer.ID); err != nil {
 			glog.Infof("failed to run on start: %v, %s", err, output.Details)
 		}
 	}
@@ -337,7 +337,7 @@ func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 	glog.Infof("Killing: %s", dockerContainer.ID)
 
 	if kl.lifecycle != nil {
-		if output, err := kl.lifecycle.OnStop(dockerContainer.ID); err != nil {
+		if output, err := kl.lifecycle.PreStop(dockerContainer.ID); err != nil {
 			glog.Infof("failed to run on stop: %v, %s", err, output.Details)
 		}
 	}

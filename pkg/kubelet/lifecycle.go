@@ -23,10 +23,10 @@ type LifecycleOutput struct {
 
 // Lifecycle is an interface implemented by things that handle lifecycle events
 type Lifecycle interface {
-	// OnStart is called when a container is started.  The management system blocks until it returns
-	OnStart(containerID string) (LifecycleOutput, error)
-	// OnStop is called when a container is stopped.  The management system blocks until it returns
-	OnStop(containerID string) (LifecycleOutput, error)
+	// PostStart is called after a container is started.  The management system blocks until it returns
+	PostStart(containerID string) (LifecycleOutput, error)
+	// PreStop is called before a container is stopped.  The management system blocks until it returns
+	PreStop(containerID string) (LifecycleOutput, error)
 }
 
 func newCommandLineLifecycle(r ContainerCommandRunner) Lifecycle {
@@ -44,10 +44,10 @@ func (c *commandLineLifecycle) runLifecycleCommand(containerID string, cmd []str
 	return LifecycleOutput{string(data)}, err
 }
 
-func (c *commandLineLifecycle) OnStart(containerID string) (LifecycleOutput, error) {
-	return c.runLifecycleCommand(containerID, []string{"start.sh"})
+func (c *commandLineLifecycle) PostStart(containerID string) (LifecycleOutput, error) {
+	return c.runLifecycleCommand(containerID, []string{"kubernetes-on-start.sh"})
 }
 
-func (c *commandLineLifecycle) OnStop(containerID string) (LifecycleOutput, error) {
-	return c.runLifecycleCommand(containerID, []string{"stop.sh"})
+func (c *commandLineLifecycle) PreStop(containerID string) (LifecycleOutput, error) {
+	return c.runLifecycleCommand(containerID, []string{"kubernetes-on-stop.sh"})
 }

@@ -36,22 +36,22 @@ func (f *fakeCommandRunner) RunInContainer(id string, cmd []string) ([]byte, err
 	return f.output, f.err
 }
 
-func TestOnStart(t *testing.T) {
+func TestPostStart(t *testing.T) {
 	fake := fakeCommandRunner{}
 	lifecycle := newCommandLineLifecycle(&fake)
-	lifecycle.OnStart("foo")
+	lifecycle.PostStart("foo")
 
-	if len(fake.commands) != 1 || fake.commands[0].id != "foo" || fake.commands[0].command[0] != "start.sh" {
+	if len(fake.commands) != 1 || fake.commands[0].id != "foo" || fake.commands[0].command[0] != "kubernetes-on-start.sh" {
 		t.Errorf("unexpected commands: %v", fake.commands)
 	}
 }
 
-func TestOnStop(t *testing.T) {
+func TestPreStop(t *testing.T) {
 	fake := fakeCommandRunner{}
 	lifecycle := newCommandLineLifecycle(&fake)
-	lifecycle.OnStop("foo")
+	lifecycle.PreStop("foo")
 
-	if len(fake.commands) != 1 || fake.commands[0].id != "foo" || fake.commands[0].command[0] != "stop.sh" {
+	if len(fake.commands) != 1 || fake.commands[0].id != "foo" || fake.commands[0].command[0] != "kubernetes-on-stop.sh" {
 		t.Errorf("unexpected commands: %v", fake.commands)
 	}
 }
