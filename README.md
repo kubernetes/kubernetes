@@ -136,7 +136,7 @@ sudo ln -s "$REPO_ROOT/target/bin/etcd" /usr/bin/etcd
 
 ```
 cd kubernetes
-hack/integration-test.sh
+hack/test-integration.sh
 ```
 
 ### End-to-End tests

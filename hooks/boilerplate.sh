@@ -26,7 +26,12 @@ if [ ! -e $REF_FILE ]; then
 fi
 
 LINES=$(cat "${REF_FILE}" | wc -l | tr -d ' ')
-DIFFER=$(head "-${LINES}" "${FILE}" | diff -q - "${REF_FILE}")
+if [[ "${EXT}" == "go" ]]; then
+  # remove build tags from the top of Go file
+  DIFFER=$(cat "${FILE}" | sed '/\/\*/,$!d' | head "-${LINES}" | diff -q - "${REF_FILE}")
+else
+  DIFFER=$(head "-${LINES}" "${FILE}" | diff -q - "${REF_FILE}")
+fi
 
 if [[ -z "${DIFFER}" ]]; then
   echo "1"

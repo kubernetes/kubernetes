@@ -17,7 +17,7 @@ install:
 script:
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-go.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/integration-test.sh
+  - PATH=$HOME/gopath/bin:$PATH ./hack/test-integration.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"

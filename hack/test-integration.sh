@@ -14,30 +14,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ "$(which etcd)" == "" ]; then
-	echo "etcd must be in your PATH"
-	exit 1
-fi
+source $(dirname $0)/util.sh
 
-running_etcd=$(ps -ef | grep etcd | grep -c name)
-if [ "$running_etcd" != "0" ]; then
-	echo "etcd appears to already be running on this machine, please kill and restart the test."
-	exit 1
-fi
+function cleanup()
+{
+    set +e
+    kill ${ETCD_PID} 1>&2 2>/dev/null
+    rm -rf ${ETCD_DIR} 1>&2 2>/dev/null
+    echo
+    echo "Complete"
+}
 
 # Stop right away if the build fails
 set -e
-
 $(dirname $0)/build-go.sh cmd/integration
 
-ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
-trap "rm -rf ${ETCD_DIR}" EXIT
+start_etcd
 
-(etcd -name test -data-dir ${ETCD_DIR} > /tmp/etcd.log) &
-ETCD_PID=$!
+trap cleanup EXIT SIGINT
 
-sleep 5
+echo
+echo Integration test cases ...
+echo
+$(dirname $0)/../hack/test-go.sh test/integration -tags 'integration no-docker'
+# leave etcd running if integration tests fail
+trap "echo etcd still running" EXIT
 
+echo
+echo Integration scenario ...
+echo
 $(dirname $0)/../output/go/bin/integration
 
-kill $ETCD_PID
+# nuke etcd
+trap cleanup EXIT SIGINT
