@@ -166,8 +166,6 @@ function kube-up {
     grep -v "^#" $(dirname $0)/vsphere/templates/hostname.sh
     echo "MASTER_NAME=${MASTER_NAME}"
     echo "MASTER_HTPASSWD='${HTPASSWD}'"
-    echo "MINION_NAMES=( ${MINION_NAMES[@]} )"
-    echo "KUBE_MINION_IP_ADDRESSES=( ${KUBE_MINION_IP_ADDRESSES[@]} )"
     grep -v "^#" $(dirname $0)/vsphere/templates/install-release.sh
     grep -v "^#" $(dirname $0)/vsphere/templates/salt-master.sh
   ) > ${KUBE_TEMP}/master-start.sh
