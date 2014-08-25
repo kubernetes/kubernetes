@@ -19,3 +19,7 @@ base:
     - controller-manager
     - scheduler
     - nginx
+
+  'roles:kubernetes-pool-vsphere':
+    - match: grain
+    - static-routes

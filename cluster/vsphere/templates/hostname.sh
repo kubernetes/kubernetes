@@ -14,10 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'azure', 'vagrant', 'local', 'vsphere'
+# Remove kube.vm from /etc/hosts
+sed -i -e 's/\b\w\+.vm\b//' /etc/hosts
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+# Update hostname in /etc/hosts and /etc/hostname
+sed -i -e "s/\\bkube\\b/${MY_NAME}/g" /etc/host{s,name}
+hostname ${MY_NAME}
