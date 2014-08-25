@@ -27,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -39,33 +38,27 @@ import (
 type RegistryStorage struct {
 	cloudProvider cloudprovider.Interface
 	mu            sync.Mutex
-	minionLister  scheduler.MinionLister
 	podCache      client.PodInfoGetter
 	podInfoGetter client.PodInfoGetter
 	podPollPeriod time.Duration
 	registry      Registry
-	scheduler     scheduler.Scheduler
 }
 
 type RegistryStorageConfig struct {
 	CloudProvider cloudprovider.Interface
-	MinionLister  scheduler.MinionLister
 	PodCache      client.PodInfoGetter
 	PodInfoGetter client.PodInfoGetter
 	Registry      Registry
-	Scheduler     scheduler.Scheduler
 }
 
 // NewRegistryStorage returns a new RegistryStorage.
 func NewRegistryStorage(config *RegistryStorageConfig) apiserver.RESTStorage {
 	return &RegistryStorage{
 		cloudProvider: config.CloudProvider,
-		minionLister:  config.MinionLister,
 		podCache:      config.PodCache,
 		podInfoGetter: config.PodInfoGetter,
 		podPollPeriod: time.Second * 10,
 		registry:      config.Registry,
-		scheduler:     config.Scheduler,
 	}
 }
 
@@ -82,7 +75,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	pod.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (interface{}, error) {
-		if err := rs.scheduleAndCreatePod(*pod); err != nil {
+		if err := rs.registry.CreatePod(*pod); err != nil {
 			return nil, err
 		}
 		return rs.registry.GetPod(pod.ID)
@@ -133,10 +126,11 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 		pod := e.Object.(*api.Pod)
 		fields := labels.Set{
 			"ID": pod.ID,
-			"DesiredState.Status": string(pod.CurrentState.Status),
-			"DesiredState.Host":   pod.CurrentState.Host,
+			"DesiredState.Status": string(pod.DesiredState.Status),
+			"DesiredState.Host":   pod.DesiredState.Host,
 		}
-		return e, label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+		passesFilter := label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+		return e, passesFilter
 	}), nil
 }
 
@@ -158,6 +152,10 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 }
 
 func (rs *RegistryStorage) fillPodInfo(pod *api.Pod) {
+	pod.CurrentState.Host = pod.DesiredState.Host
+	if pod.CurrentState.Host == "" {
+		return
+	}
 	// Get cached info for the list currently.
 	// TODO: Optionally use fresh info
 	if rs.podCache != nil {
@@ -238,17 +236,6 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 	default:
 		return api.PodWaiting
 	}
-}
-
-func (rs *RegistryStorage) scheduleAndCreatePod(pod api.Pod) error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	// TODO(lavalamp): Separate scheduler more cleanly.
-	machine, err := rs.scheduler.Schedule(pod, rs.minionLister)
-	if err != nil {
-		return err
-	}
-	return rs.registry.CreatePod(machine, pod)
 }
 
 func (rs *RegistryStorage) waitForPodRunning(pod api.Pod) (interface{}, error) {

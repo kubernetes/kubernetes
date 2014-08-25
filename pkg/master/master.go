@@ -17,7 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -32,7 +31,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	goetcd "github.com/coreos/go-etcd/etcd"
@@ -111,16 +109,12 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	endpoints := endpoint.NewEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
-	random := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
-	s := scheduler.NewRandomFitScheduler(m.podRegistry, random)
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewRegistryStorage(&pod.RegistryStorageConfig{
 			CloudProvider: cloud,
-			MinionLister:  m.minionRegistry,
 			PodCache:      podCache,
 			PodInfoGetter: podInfoGetter,
 			Registry:      m.podRegistry,
-			Scheduler:     s,
 		}),
 		"replicationControllers": controller.NewRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),

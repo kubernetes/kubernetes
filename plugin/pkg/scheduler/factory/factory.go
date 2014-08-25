@@ -69,7 +69,14 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 		Algorithm:    algo,
 		Binder:       &binder{factory.Client},
 		NextPod: func() *api.Pod {
-			return podQueue.Pop().(*api.Pod)
+			pod := podQueue.Pop().(*api.Pod)
+			// TODO: Remove or reduce verbosity by sep 6th, 2014. Leave until then to
+			// make it easy to find scheduling problems.
+			glog.Infof("About to try and schedule pod %v\n"+
+				"\tknown minions: %v\n"+
+				"\tknown scheduled pods: %v\n",
+				pod.ID, minionCache.Contains(), podCache.Contains())
+			return pod
 		},
 		Error: factory.makeDefaultErrorFunc(podQueue),
 	}
@@ -193,5 +200,8 @@ type binder struct {
 
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *api.Binding) error {
+	// TODO: Remove or reduce verbosity by sep 6th, 2014. Leave until then to
+	// make it easy to find scheduling problems.
+	glog.Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
 	return b.Post().Path("bindings").Body(binding).Do().Error()
 }

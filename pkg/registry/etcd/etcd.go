@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -99,19 +100,15 @@ func makeContainerKey(machine string) string {
 	return "/registry/hosts/" + machine + "/kubelet"
 }
 
-// CreatePod creates a pod based on a specification, schedule it onto a specific machine.
-func (r *Registry) CreatePod(machine string, pod api.Pod) error {
+// CreatePod creates a pod based on a specification.
+func (r *Registry) CreatePod(pod api.Pod) error {
 	// Set current status to "Waiting".
 	pod.CurrentState.Status = api.PodWaiting
 	pod.CurrentState.Host = ""
 	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
 	pod.DesiredState.Status = api.PodRunning
 	pod.DesiredState.Host = ""
-	if err := r.CreateObj(makePodKey(pod.ID), &pod); err != nil {
-		return err
-	}
-	// TODO: Until scheduler separation is completed, just assign here.
-	return r.assignPod(pod.ID, machine)
+	return r.CreateObj(makePodKey(pod.ID), &pod)
 }
 
 // ApplyBinding implements binding's registry
@@ -119,23 +116,28 @@ func (r *Registry) ApplyBinding(binding *api.Binding) error {
 	return r.assignPod(binding.PodID, binding.Host)
 }
 
-// assignPod assigns the given pod to the given machine.
-// TODO: hook this up via apiserver, not by calling it from CreatePod().
-func (r *Registry) assignPod(podID string, machine string) error {
+// setPodHostTo sets the given pod's host to 'machine' iff it was previously 'oldMachine'.
+// Returns the current state of the pod, or an error.
+func (r *Registry) setPodHostTo(podID, oldMachine, machine string) (finalPod *api.Pod, err error) {
 	podKey := makePodKey(podID)
-	var finalPod *api.Pod
-	err := r.AtomicUpdate(podKey, &api.Pod{}, func(obj interface{}) (interface{}, error) {
+	err = r.AtomicUpdate(podKey, &api.Pod{}, func(obj interface{}) (interface{}, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
-		if pod.DesiredState.Host != "" {
+		if pod.DesiredState.Host != oldMachine {
 			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.ID, pod.DesiredState.Host)
 		}
 		pod.DesiredState.Host = machine
 		finalPod = pod
 		return pod, nil
 	})
+	return finalPod, err
+}
+
+// assignPod assigns the given pod to the given machine.
+func (r *Registry) assignPod(podID string, machine string) error {
+	finalPod, err := r.setPodHostTo(podID, "", machine)
 	if err != nil {
 		return err
 	}
@@ -148,14 +150,16 @@ func (r *Registry) assignPod(podID string, machine string) error {
 	err = r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
 		manifests := *in.(*api.ContainerManifestList)
 		manifests.Items = append(manifests.Items, manifest)
+		if !constraint.Allowed(manifests.Items) {
+			return nil, fmt.Errorf("The assignment would cause a constraint violation")
+		}
 		return manifests, nil
 	})
 	if err != nil {
-		// Don't strand stuff. This is a terrible hack that won't be needed
-		// when the above TODO is fixed.
-		err2 := r.Delete(podKey, false)
-		if err2 != nil {
-			glog.Errorf("Probably stranding a pod, couldn't delete %v: %#v", podKey, err2)
+		// Put the pod's host back the way it was. This is a terrible hack that
+		// won't be needed if we convert this to a rectification loop.
+		if _, err2 := r.setPodHostTo(podID, machine, ""); err2 != nil {
+			glog.Errorf("Stranding pod %v; couldn't clear host after previous error: %v", podID, err2)
 		}
 	}
 	return err

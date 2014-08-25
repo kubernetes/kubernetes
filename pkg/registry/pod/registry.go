@@ -30,8 +30,8 @@ type Registry interface {
 	WatchPods(resourceVersion uint64) (watch.Interface, error)
 	// Get a specific pod
 	GetPod(podID string) (*api.Pod, error)
-	// Create a pod based on a specification, schedule it onto a specific machine.
-	CreatePod(machine string, pod api.Pod) error
+	// Create a pod based on a specification.
+	CreatePod(pod api.Pod) error
 	// Update an existing pod
 	UpdatePod(pod api.Pod) error
 	// Delete an existing pod

@@ -25,9 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -58,8 +56,7 @@ func TestCreatePodRegistryError(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
@@ -74,32 +71,11 @@ func TestCreatePodRegistryError(t *testing.T) {
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 }
 
-func TestCreatePodSchedulerError(t *testing.T) {
-	mockScheduler := registrytest.Scheduler{
-		Err: fmt.Errorf("test error"),
-	}
-	storage := RegistryStorage{
-		scheduler: &mockScheduler,
-	}
-	desiredState := api.PodState{
-		Manifest: api.ContainerManifest{
-			Version: "v1beta1",
-		},
-	}
-	pod := &api.Pod{DesiredState: desiredState}
-	ch, err := storage.Create(pod)
-	if err != nil {
-		t.Errorf("Expected %#v, Got %#v", nil, err)
-	}
-	expectApiStatusError(t, ch, mockScheduler.Err.Error())
-}
-
 func TestCreatePodSetsIds(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
@@ -347,8 +323,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	pod := &api.Pod{}
 	c, err := storage.Create(pod)
@@ -364,8 +339,7 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
 	storage := RegistryStorage{
-		scheduler: &registrytest.Scheduler{Machine: "test"},
-		registry:  podRegistry,
+		registry: podRegistry,
 	}
 	pod := &api.Pod{}
 	c, err := storage.Update(pod)
@@ -388,8 +362,6 @@ func TestCreatePod(t *testing.T) {
 	storage := RegistryStorage{
 		registry:      podRegistry,
 		podPollPeriod: time.Millisecond * 100,
-		scheduler:     scheduler.NewRoundRobinScheduler(),
-		minionLister:  minion.NewRegistry([]string{"machine"}),
 	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
@@ -438,7 +410,7 @@ func TestFillPodInfo(t *testing.T) {
 	storage := RegistryStorage{
 		podCache: &fakeGetter,
 	}
-	pod := api.Pod{}
+	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
 	storage.fillPodInfo(&pod)
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
 		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
@@ -461,7 +433,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 	storage := RegistryStorage{
 		podCache: &fakeGetter,
 	}
-	pod := api.Pod{}
+	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
 	storage.fillPodInfo(&pod)
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
 		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)

@@ -78,7 +78,7 @@ func TestEtcdCreatePod(t *testing.T) {
 	}
 	fakeClient.Set("/registry/hosts/machine/kubelet", api.EncodeOrDie(&api.ContainerManifestList{}), 0)
 	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", api.Pod{
+	err := registry.CreatePod(api.Pod{
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
@@ -93,7 +93,13 @@ func TestEtcdCreatePod(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Suddenly, a wild scheduler appears:
+	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	resp, err := fakeClient.Get("/registry/pods/foo", false, false)
@@ -132,7 +138,7 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", api.Pod{
+	err := registry.CreatePod(api.Pod{
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
@@ -158,20 +164,27 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 		E: tools.EtcdErrorValueRequired,
 	}
 	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", api.Pod{
+	err := registry.CreatePod(api.Pod{
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
 	})
-	if err == nil {
-		t.Fatalf("Unexpected non-error")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
-	_, err = fakeClient.Get("/registry/pods/foo", false, false)
+
+	// Suddenly, a wild scheduler appears:
+	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
 	if err == nil {
-		t.Error("Unexpected non-error")
+		t.Fatalf("Unexpected non error.")
 	}
-	if !tools.IsEtcdNotFound(err) {
-		t.Errorf("Unexpected error: %#v", err)
+
+	existingPod, err := registry.GetPod("foo")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if existingPod.DesiredState.Host == "machine" {
+		t.Fatal("Pod's host changed in response to an unappliable binding.")
 	}
 }
 
@@ -191,7 +204,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", api.Pod{
+	err := registry.CreatePod(api.Pod{
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
@@ -206,6 +219,12 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 			},
 		},
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Suddenly, a wild scheduler appears:
+	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -250,7 +269,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
-	err := registry.CreatePod("machine", api.Pod{
+	err := registry.CreatePod(api.Pod{
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
@@ -266,7 +285,13 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Suddenly, a wild scheduler appears:
+	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	resp, err := fakeClient.Get("/registry/pods/foo", false, false)
