@@ -19,7 +19,7 @@
     - group: root
     - mode: 755
 
-refresh routes:
+refresh-routes:
   cmd.wait_script:
     - source: salt://static-routes/refresh
     - cwd: /etc/network/

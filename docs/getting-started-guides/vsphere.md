@@ -4,22 +4,31 @@
 
 1. You need administrator credentials to an ESXi machine or vCenter instance.
 2. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
-3. Install the govc tool to interact with ESXi/vCenter:
+3. You must have your `GOPATH` set up and include `$GOPATH/bin` in your `PATH`.
+
+   ```sh
+   export GOPATH=$HOME/src/go
+   mkdir -p $GOPATH
+   export PATH=$PATH:$GOPATH/bin
+   ```
+
+4. Install the govc tool to interact with ESXi/vCenter:
 
    ```sh
    go get github.com/vmware/govmomi/govc
    ```
-4. Install godep:
+
+5. Install godep:
 
    ```sh
-   export GOBIN=/usr/local/go/bin
    go get github.com/tools/godep
    ```
 
-5. Get the Kubernetes source:
+6. Get the Kubernetes source:
 
    ```sh
-   git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+   go get github.com/GoogleCloudPlatform/kubernetes
+   cd $GOPATH/src/github.com/GoogleCloudPlatform/kubernetes
    ```
 
 ### Setup
@@ -27,7 +36,7 @@
 Download a prebuilt Debian VMDK to be used as base image:
 
 ```sh
-wget http://storage.googleapis.com/govmomi/vmdk/kube.vmdk.gz{,.md5}
+wget https://storage.googleapis.com/govmomi/vmdk/kube.vmdk.gz{,.md5}
 md5sum -c kube.vmdk.gz.md5
 gzip -d kube.vmdk.gz
 ```
@@ -53,7 +62,7 @@ parameters. The guest login for the image that you imported is `kube:kube`.
 
 Now, let's continue with deploying Kubernetes:
 
-```
+```sh
 cd kubernetes
 
 # Build a release
