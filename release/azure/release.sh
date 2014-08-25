@@ -26,38 +26,37 @@ function json_val () {
 }
 
 source $SCRIPT_DIR/config.sh
-source $SCRIPT_DIR/../../cluster/${KUBE_CONFIG_FILE-"config-default.sh"}
 
 $SCRIPT_DIR/../build-release.sh $INSTANCE_PREFIX
 
-if [ -z "$(azure storage account show $STG_ACCOUNT 2>/dev/null | \
+if [ -z "$(azure storage account show $AZ_STG 2>/dev/null | \
     grep data)" ]; then
-    azure storage account create -l "$AZ_LOCATION" $STG_ACCOUNT
+    azure storage account create -l "$AZ_LOCATION" $AZ_STG
 fi
 
-stg_key=$(azure storage account keys list $STG_ACCOUNT --json | \
+stg_key=$(azure storage account keys list $AZ_STG --json | \
     json_val '["primaryKey"]')
 
-if [ -z "$(azure storage container show -a $STG_ACCOUNT -k "$stg_key" \
+if [ -z "$(azure storage container show -a $AZ_STG -k "$stg_key" \
     $CONTAINER 2>/dev/null | grep data)" ]; then
     azure storage container create \
-        -a $STG_ACCOUNT \
+        -a $AZ_STG \
         -k "$stg_key" \
         -p Blob \
         $CONTAINER
 fi
 
-if [ -n "$(azure storage blob show -a $STG_ACCOUNT -k "$stg_key" \
+if [ -n "$(azure storage blob show -a $AZ_STG -k "$stg_key" \
     $CONTAINER master-release.tgz 2>/dev/null | grep data)" ]; then
     azure storage blob delete \
-        -a $STG_ACCOUNT \
+        -a $AZ_STG \
         -k "$stg_key" \
         $CONTAINER \
         master-release.tgz
 fi
 
 azure storage blob upload \
-    -a $STG_ACCOUNT \
+    -a $AZ_STG \
     -k "$stg_key" \
     $SCRIPT_DIR/../../output/release/master-release.tgz \
     $CONTAINER \

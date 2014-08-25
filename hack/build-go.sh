@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(dirname "$0")
+hackdir=$(CDPATH="" cd $(dirname $0); pwd)
 
 # Set the environment variables required by the build.
 . "${hackdir}/config-go.sh"

@@ -14,13 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tear down a Kubernetes cluster.
 SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
-source $SCRIPT_DIR/../../release/azure/config.sh
-source $SCRIPT_DIR/../util.sh
+source $SCRIPT_DIR/../release/azure/config.sh
 
-echo "Bringing down cluster"
-azure vm delete $MASTER_NAME -b -q
-for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    azure vm delete ${MINION_NAMES[$i]} -b -q
-done
+AZ_SSH_KEY=$HOME/.ssh/azure_rsa
+AZ_SSH_CERT=$HOME/.ssh/azure.pem
+AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04-LTS-amd64-server-20140618.1-en-us-30GB
+AZ_SUBNET=Subnet-1
+AZ_VNET=kube-$AZ_HSH
+AZ_CS=kube-$AZ_HSH
+
+NUM_MINIONS=4
+
+MASTER_NAME="${INSTANCE_PREFIX}-master"
+MASTER_TAG="${INSTANCE_PREFIX}-master"
+MINION_TAG="${INSTANCE_PREFIX}-minion"
+MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
+MINION_SCOPES=""

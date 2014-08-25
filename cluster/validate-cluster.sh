@@ -37,7 +37,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
     count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
     if [ "$count" == "0" ]; then
-	    echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
+        echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
         exit 1
     fi
 
@@ -48,7 +48,6 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         exit 1
     else
         echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
-    fi    
+    fi
 done
 echo "Cluster validation succeeded"
-
