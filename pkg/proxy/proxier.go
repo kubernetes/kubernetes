@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os/exec"
 	"strconv"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ import (
 )
 
 type serviceInfo struct {
+	ip       string
 	port     int
 	listener net.Listener
 	mu       sync.Mutex // protects active
@@ -107,6 +109,7 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 // AcceptHandler proxies incoming connections for the specified service
 // to the load-balanced service endpoints.
 func (proxier *Proxier) AcceptHandler(service string, listener net.Listener) {
+	time.Sleep(5 * time.Second) // HACK - fixed properly in a different PR
 	info, found := proxier.getServiceInfo(service)
 	if !found {
 		glog.Errorf("Failed to find service: %s", service)
@@ -116,6 +119,7 @@ func (proxier *Proxier) AcceptHandler(service string, listener net.Listener) {
 		info.mu.Lock()
 		if !info.active {
 			info.mu.Unlock()
+			glog.Infof("Cancelling Accept() loop for service: %s", service)
 			break
 		}
 		info.mu.Unlock()
@@ -142,11 +146,37 @@ func (proxier *Proxier) AcceptHandler(service string, listener net.Listener) {
 	}
 }
 
+// getListener decides which local port to listen on and returns a Listener and
+// the assigned port.
+func getListener(ip string, port int) (net.Listener, int, error) {
+	// If the portal IP is set, allocate a random port locally.
+	if ip != "" {
+		port = 0
+	}
+	//FIXME: if the portal IP is set, listen on localhost only?
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return nil, 0, err
+	}
+	_, assignedPortStr, err := net.SplitHostPort(l.Addr().String())
+	if err != nil {
+		l.Close()
+		return nil, 0, err
+	}
+	assignedPortNum, err := strconv.Atoi(assignedPortStr)
+	if err != nil {
+		l.Close()
+		return nil, 0, err
+	}
+	return l, assignedPortNum, nil
+}
+
 // used to globally lock around unused ports. Only used in testing.
 var unusedPortLock sync.Mutex
 
 // addServiceOnUnusedPort starts listening for a new service, returning the
 // port it's using.  For testing on a system with unknown ports used.
+// FIXME: remove this?
 func (proxier *Proxier) addServiceOnUnusedPort(service string) (string, error) {
 	unusedPortLock.Lock()
 	defer unusedPortLock.Unlock()
@@ -176,6 +206,46 @@ func (proxier *Proxier) startAccepting(service string, l net.Listener) {
 	go proxier.AcceptHandler(service, l)
 }
 
+func installRedirect(ip string, port int, localPort int) error {
+	const iptables = "iptables"
+
+	//FIXME: check with -C first
+	glog.Info("TIM: starting iptables rules")
+	rule1 := []string{
+		"-t", "nat",
+		"-A", "PREROUTING",
+		"-p", "tcp",
+		"-d", ip,
+		"--dport", fmt.Sprintf("%d", port),
+		"-j", "REDIRECT",
+		"--to-ports", fmt.Sprintf("%d", localPort),
+	}
+	out, err := exec.Command(iptables, rule1...).CombinedOutput()
+	if err != nil {
+		glog.Errorf("error on iptables rule1: %s", out)
+		return err
+	}
+
+	rule2 := []string{
+		"-t", "nat",
+		"-A", "OUTPUT",
+		"-p", "tcp",
+		"-d", ip,
+		"--dport", fmt.Sprintf("%d", port),
+		"-j", "REDIRECT",
+		"--to-ports", fmt.Sprintf("%d", localPort),
+	}
+	out, err = exec.Command(iptables, rule2...).CombinedOutput()
+	if err != nil {
+		glog.Errorf("error on iptables rule2: %s", out)
+		//FIXME: undo rule1
+		return err
+	}
+
+	glog.Info("TIM: iptables rules are installed")
+	return nil
+}
+
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
@@ -188,16 +258,26 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		if exists && info.active && info.port == service.Port {
 			continue
 		}
+		//FIXME: also handle the IP changing
 		if exists && info.port != service.Port {
+			//FIXME: remove the iptables rules
 			proxier.StopProxy(service.ID)
 		}
-		glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", service.Port))
+		glog.Infof("Adding a new service %s at %s:%d", service.ID, service.PortalIP, service.Port)
+		listener, port, err := getListener(service.PortalIP, service.Port)
 		if err != nil {
-			glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
+			glog.Infof("Failed to start listening for %s: %+v", service.ID, err)
+			continue
+		}
+		glog.Infof("Proxying for service %s on local port %d", service.ID, port)
+		err = installRedirect(service.PortalIP, service.Port, port)
+		if err != nil {
+			glog.Infof("Failed to create IP redirect for %s on %d", service.ID, service.Port)
+			listener.Close()
 			continue
 		}
 		proxier.setServiceInfo(service.ID, &serviceInfo{
+			ip:       service.PortalIP,
 			port:     service.Port,
 			active:   true,
 			listener: listener,
@@ -208,6 +288,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	defer proxier.mu.Unlock()
 	for name, info := range proxier.serviceMap {
 		if !activeServices.Has(name) {
+			//FIXME: remove the iptables rules
 			proxier.stopProxyInternal(name, info)
 		}
 	}

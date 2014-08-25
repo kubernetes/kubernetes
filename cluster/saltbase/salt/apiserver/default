@@ -39,5 +39,10 @@
   {% set machines = "-machines=$(echo ${MACHINE_IPS[@]} | xargs -n1 echo | paste -sd,)" %}
 {% endif %}
 {% endif %}
+{% if grains.portal_subnet is defined %}
+  {% set portal_subnet = "-portal_subnet=" + grains.portal_subnet %}
+{% endif %}
+#FIXME: hack because I have no idea where to put this properly
+{% set portal_subnet = "-portal_subnet=10.0.0.0" %}
 
-DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{ minion_regexp }} {{ cloud_provider }}"
+DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{portal_subnet}} {{ minion_regexp }} {{ cloud_provider }}"

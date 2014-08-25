@@ -329,6 +329,13 @@ type Service struct {
 	// ContainerPort is the name of the port on the container to direct traffic to.
 	// Optional, if unspecified use the first port on the container.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
+
+	// This is the IP assigned to the service, which clients use to access
+	// it.  If this is specified this when creating a Service, it will be
+	// ignored.
+	//FIXME: Factor this into a ServiceBinding or something, use that not
+	//notify clients.
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

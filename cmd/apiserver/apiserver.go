@@ -44,6 +44,8 @@ var (
 	healthCheckMinions          = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
 	minionCacheTTL              = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. [default 30 seconds]")
 	etcdServerList, machineList util.StringList
+	//FIXME: make this a CIDR or a list of CIDRs or something
+	portalSubnet = flag.String("portal_subnet", "", "A /24 network from which to assign portal IPs")
 )
 
 func init() {
@@ -63,6 +65,12 @@ func verifyMinionFlags() {
 	}
 }
 
+func verifyPortalFlags() {
+	if *portalSubnet == "" {
+		glog.Fatal("No -portal_subnet specified")
+	}
+}
+
 func main() {
 	flag.Parse()
 	util.InitLogs()
@@ -70,6 +78,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 	verifyMinionFlags()
+	verifyPortalFlags()
 
 	if len(etcdServerList) == 0 {
 		glog.Fatalf("-etcd_servers flag is required.")
@@ -103,6 +112,7 @@ func main() {
 		MinionCacheTTL:     *minionCacheTTL,
 		MinionRegexp:       *minionRegexp,
 		PodInfoGetter:      podInfoGetter,
+		PortalSubnet:       *portalSubnet,
 	})
 
 	storage, codec := m.API_v1beta1()

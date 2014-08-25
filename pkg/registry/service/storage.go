@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -31,17 +32,91 @@ import (
 
 // RegistryStorage adapts a service registry into apiserver's RESTStorage model.
 type RegistryStorage struct {
-	registry Registry
-	cloud    cloudprovider.Interface
-	machines minion.Registry
+	registry  Registry
+	cloud     cloudprovider.Interface
+	machines  minion.Registry
+	portalMgr *IPAllocator
+}
+
+// FIXME: probably should be [4]byte and also carry the subnet part
+type ipSubnet [4]string
+
+//FIXME: error
+func ipSubnetFromString(str string) ipSubnet {
+	parts := strings.Split(str, ".")
+	if len(parts) != 4 {
+		//FIXME: error
+		return ipSubnet{}
+	}
+	//FIXME: there must be syntax for this?
+	var r ipSubnet
+	for i := range parts {
+		r[i] = parts[i]
+	}
+	return r
+}
+
+func (ips *ipSubnet) String() string {
+	return strings.Join(ips[:], ".")
+}
+
+//FIXME: needs a new pkg, maybe util
+type IPAllocator struct {
+	subnet ipSubnet
+	//FIXME: needs to be smarter, for now a bitmap will suffice
+	lock sync.Mutex
+	used [32]byte
+}
+
+// NewIPAllocator creates and intializes a new IPAllocator object.
+// FIXME: resync from storage at startup.
+func NewIPAllocator(subnet string) *IPAllocator {
+	return &IPAllocator{
+		subnet: ipSubnetFromString(subnet),
+	}
+}
+
+// Allocate allocates and returns a new IP.
+//FIXME: error if we are "full"?
+func (ipa *IPAllocator) Allocate() string {
+	ipa.lock.Lock()
+	defer ipa.lock.Unlock()
+	for i := range ipa.used {
+		if ipa.used[i] != 0xff {
+			free := ^ipa.used[i]
+			next := free & ^(free - 1)
+			ip := ipa.subnet
+			ip[3] = fmt.Sprintf("%d", int(next))
+			return ip.String()
+		}
+	}
+	//FIXME: error
+	return ""
+}
+
+// Release de-allocates an IP.
+//FIXME: error if that IP is not allocated or IP subnet does not match
+func (ipa *IPAllocator) Release(ipstr string) {
+	ipa.lock.Lock()
+	defer ipa.lock.Unlock()
+	ip := ipSubnetFromString(ipstr)
+	host, err := strconv.Atoi(ip[3])
+	if err != nil {
+		//FIXME:
+		return
+	}
+	i := host / 8
+	m := byte(1 << byte(host%8))
+	ipa.used[i] = ipa.used[i] &^ m
 }
 
 // NewRegistryStorage returns a new RegistryStorage.
-func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry) apiserver.RESTStorage {
+func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet string) apiserver.RESTStorage {
 	return &RegistryStorage{
-		registry: registry,
-		cloud:    cloud,
-		machines: machines,
+		registry:  registry,
+		cloud:     cloud,
+		machines:  machines,
+		portalMgr: NewIPAllocator(portalNet),
 	}
 }
 
@@ -52,7 +127,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	}
 
 	srv.CreationTimestamp = util.Now()
-
+	srv.PortalIP = rs.portalMgr.Allocate()
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
@@ -94,6 +169,7 @@ func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	rs.portalMgr.Release(service.PortalIP)
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		rs.deleteExternalLoadBalancer(service)
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(id)

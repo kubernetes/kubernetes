@@ -22,7 +22,8 @@ DAEMON_ARGS=""
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-DAEMON_USER=kube-proxy
+#FIXME: if we deploy a setuid-root, 0700 u=kube-proxy binary that calls iptables, AND use random ports, we can not run as root
+DAEMON_USER=root
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0

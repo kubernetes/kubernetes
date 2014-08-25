@@ -47,6 +47,7 @@ type Config struct {
 	MinionCacheTTL     time.Duration
 	MinionRegexp       string
 	PodInfoGetter      client.PodInfoGetter
+	PortalSubnet       string //FIXME: this should take an IP type, with helper functo validate IsSubnet
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -58,6 +59,7 @@ type Master struct {
 	bindingRegistry    binding.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
+	portalSubnet       string
 }
 
 // New returns a new instance of Master connected to the given etcdServer.
@@ -71,6 +73,7 @@ func New(c *Config) *Master {
 		bindingRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
+		portalSubnet:       c.PortalSubnet,
 	}
 	m.init(c.Cloud, c.PodInfoGetter)
 	return m
@@ -117,7 +120,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 			Registry:      m.podRegistry,
 		}),
 		"replicationControllers": controller.NewRegistryStorage(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
+		"services":               service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry, m.portalSubnet),
 		"minions":                minion.NewRegistryStorage(m.minionRegistry),
 
 		// TODO: should appear only in scheduler API group.

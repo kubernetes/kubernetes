@@ -280,6 +280,8 @@ func ValidateService(service *Service) errs.ErrorList {
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewRequired("selector", service.Selector))
 	}
+	//FIXME: this is broken on updates.
+	//service.PortalIP = ""
 	return allErrs
 }
 
