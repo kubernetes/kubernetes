@@ -19,6 +19,7 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -43,7 +44,7 @@ type Fake struct {
 
 func (c *Fake) ListPods(selector labels.Selector) (api.PodList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-pods"})
-	return c.Pods, nil
+	return *runtime.CopyOrDie(c.Pods).(*api.PodList), nil
 }
 
 func (c *Fake) GetPod(name string) (api.Pod, error) {
@@ -73,7 +74,7 @@ func (c *Fake) ListReplicationControllers(selector labels.Selector) (api.Replica
 
 func (c *Fake) GetReplicationController(name string) (api.ReplicationController, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-controller", Value: name})
-	return c.Ctrl, nil
+	return *runtime.CopyOrDie(c.Ctrl).(*api.ReplicationController), nil
 }
 
 func (c *Fake) CreateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {
