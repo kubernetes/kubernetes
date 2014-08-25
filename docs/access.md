@@ -95,23 +95,30 @@ Features in this doc are divided into "Initial Feature", and "Improvements".   I
 ## Identity
 ###userAccount
 K8s will have a `userAccount` API object.
-- `userAccount` has a name which is a string. 
-- `userAccount` is not the same as the unix username of processes 
-- 'userAccount` objects have a name.  The name should allow relatively free-form strings (at least flexible enough to hold most email addresses) to aid integration with existing enterprise auth systems, or existing account identifiers in hosting systems.
+- `userAccount` has a UID which is immutable.  This is used to associate users with objects and to record actions in audit logs.
+- `userAccount` has a name which is a string and human readable and unique among userAccounts.  It is used to refer to users in Policies, to ensure that the Policies are human readable.  It can be changed only when there are no Policy objects or other objects which refer to that name.  An email address is a suggested format for this field.
+- `userAccount` is not related to the unix username of processes in Pods created by that userAccount.
 - `userAccount` API objects can have labels
 
+The system may associate one or more Authentication Methods with a
+`userAccount` (but they are not formally part of the userAccount object.)
+In a simple deployment, the authentication method for a
+user might be an authentication token which is verified by a K8s server.  In a
+more complex deployment, the authentication might be delegated to
+another system which is trusted by the K8s API to authenticate users, but where
+the authentication details are unknown to K8s.
+
 Initial Features:
-- `userAccount` object is immutable
 - there is no superuser `userAccount`
 - `userAccount` objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
 - `userAccount` can have a default `project`.  If API call does not specify a `project`, the default `project` for that caller is assumed.
-- `userAccount` may access multiple projects.
+- `userAccount` is global.  A single human with access to multiple projects is recommended to only have one userAccount.
 
 Improvements:
 - Make `userAccount` part of a separate API group from core K8s objects like `pod`.  Facilitates plugging in alternate Access Management.
 
 Simple Profile:
-   - single `userAccount`, used by all K8s Users and Project Admins.
+   - single `userAccount`, used by all K8s Users and Project Admins.  One access token shared by all.
 
 Enterprise Profile:
    - every human user has own `userAccount`. 
