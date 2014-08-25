@@ -436,14 +436,14 @@ const (
 	//                   resource.
 	//   "id"   string - the identifier of the missing resource
 	// Status code 404
-	ReasonTypeNotFound ReasonType = "not_found"
+	ReasonTypeNotFound ReasonType = "notFound"
 
 	// ReasonTypeAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the conflicting resource
 	//   "id"   string - the identifier of the conflicting resource
 	// Status code 409
-	ReasonTypeAlreadyExists ReasonType = "already_exists"
+	ReasonTypeAlreadyExists ReasonType = "alreadyExists"
 
 	// ResourceTypeConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
