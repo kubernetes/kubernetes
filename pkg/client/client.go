@@ -34,26 +34,49 @@ import (
 
 // Interface holds the methods for clients of Kubenetes,
 // an interface to allow mock testing.
-// TODO: split this up by resource?
 // TODO: these should return/take pointers.
 type Interface interface {
+	PodInterface
+	ReplicationControllerInterface
+	ServiceInterface
+	VersionInterface
+}
+
+// PodInterface has methods to work with Pod resources
+type PodInterface interface {
 	ListPods(selector labels.Selector) (api.PodList, error)
 	GetPod(name string) (api.Pod, error)
 	DeletePod(name string) error
 	CreatePod(api.Pod) (api.Pod, error)
 	UpdatePod(api.Pod) (api.Pod, error)
+}
 
+// ReplicationControllerInterface has methods to work with ReplicationController resources
+type ReplicationControllerInterface interface {
 	ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error)
 	GetReplicationController(name string) (api.ReplicationController, error)
 	CreateReplicationController(api.ReplicationController) (api.ReplicationController, error)
 	UpdateReplicationController(api.ReplicationController) (api.ReplicationController, error)
 	DeleteReplicationController(string) error
 	WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+}
 
+// ServiceInterface has methods to work with Service resources
+type ServiceInterface interface {
 	GetService(name string) (api.Service, error)
 	CreateService(api.Service) (api.Service, error)
 	UpdateService(api.Service) (api.Service, error)
 	DeleteService(string) error
+}
+
+// VersionInterface has a method to retrieve the server version
+type VersionInterface interface {
+	ServerVersion() (*version.Info, error)
+}
+
+// Client is the actual implementation of a Kubernetes client.
+type Client struct {
+	*RESTClient
 }
 
 // StatusErr might get returned from an api call if your request is still being processed
@@ -72,20 +95,23 @@ type AuthInfo struct {
 	Password string
 }
 
-// Client is the actual implementation of a Kubernetes client.
+// RESTClient holds common code used to work with API resources that follow the
+// Kubernetes API pattern
 // Host is the http://... base for the URL
-type Client struct {
+type RESTClient struct {
 	host       string
 	auth       *AuthInfo
 	httpClient *http.Client
 	Sync       bool
 	PollPeriod time.Duration
 	Timeout    time.Duration
+	Prefix     string
 }
 
-// New creates a new client object.
-func New(host string, auth *AuthInfo) *Client {
-	return &Client{
+// NewRESTClient creates a new RESTClient. This client performs generic REST functions
+// such as Get, Put, Post, and Delete on specified paths.
+func NewRESTClient(host string, auth *AuthInfo, prefix string) *RESTClient {
+	return &RESTClient{
 		auth: auth,
 		host: host,
 		httpClient: &http.Client{
@@ -98,11 +124,19 @@ func New(host string, auth *AuthInfo) *Client {
 		Sync:       false,
 		PollPeriod: time.Second * 2,
 		Timeout:    time.Second * 20,
+		Prefix:     prefix,
 	}
+
+}
+
+// New creates a Kubernetes client. This client works with pods, replication controllers
+// and services. It allows operations such as list, get, update and delete on these objects.
+func New(host string, auth *AuthInfo) *Client {
+	return &Client{NewRESTClient(host, auth, "/api/v1beta1/")}
 }
 
 // Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
-func (c *Client) doRequest(request *http.Request) ([]byte, error) {
+func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	if c.auth != nil {
 		request.SetBasicAuth(c.auth.User, c.auth.Password)
 	}
@@ -148,7 +182,7 @@ func (c *Client) doRequest(request *http.Request) ([]byte, error) {
 // path is the path on the host to hit
 // requestBody is the body of the request. Can be nil.
 // target the interface to marshal the JSON response into.  Can be nil.
-func (c *Client) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
+func (c *RESTClient) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
 	request, err := http.NewRequest(method, c.makeURL(path), requestBody)
 	if err != nil {
 		return nil, err
@@ -167,8 +201,8 @@ func (c *Client) rawRequest(method, path string, requestBody io.Reader, target i
 	return body, err
 }
 
-func (c *Client) makeURL(path string) string {
-	return c.host + "/api/v1beta1/" + path
+func (c *RESTClient) makeURL(path string) string {
+	return c.host + c.Prefix + path
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector

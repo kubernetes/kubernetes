@@ -36,16 +36,11 @@ import (
 )
 
 func GetServerVersion(client *client.Client) (*version.Info, error) {
-	body, err := client.Get().AbsPath("/version").Do().Raw()
+	info, err := client.ServerVersion()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Got error: %v", err)
 	}
-	var info version.Info
-	err = json.Unmarshal(body, &info)
-	if err != nil {
-		return nil, fmt.Errorf("Got '%s': %v", string(body), err)
-	}
-	return &info, nil
+	return info, nil
 }
 
 func promptForString(field string, r io.Reader) string {
