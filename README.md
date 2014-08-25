@@ -32,6 +32,8 @@ While the concepts and architecture in Kubernetes represent years of experience 
 
 [Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
 
+[Cluster Monitoring](https://github.com/GoogleCloudPlatform/heapster)
+
 Or fork and start hacking!
 
 ## Community, discussion and support
