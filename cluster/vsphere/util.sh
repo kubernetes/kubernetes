@@ -243,7 +243,27 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
-	echo "TODO"
+  detect-master
+
+  govc guest.upload \
+    -vm ${MASTER_NAME} \
+    -f \
+    ./output/release/master-release.tgz \
+    /home/kube/master-release.tgz
+
+  (
+    grep -v "^#" $(dirname $0)/vsphere/templates/install-release.sh
+    echo "echo Executing configuration"
+    echo "sudo salt '*' mine.update"
+    echo "sudo salt --force-color '*' state.highstate"
+  ) | kube-ssh ${KUBE_MASTER_IP} bash
+
+  get-password
+
+  echo "Kubernetes cluster is updated.  Access the master at:"
+  echo
+  echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+  echo
 }
 
 # Execute prior to running tests to build a release if required for env
