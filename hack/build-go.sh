@@ -28,8 +28,8 @@ hackdir=$(dirname "$0")
 # Go to the top of the tree.
 cd "${KUBE_REPO_ROOT}"
 
-# Update the version.
-"${hackdir}/version-gen.sh"
+# Fetch the version.
+version=$(gitcommit)
 
 if [[ $# == 0 ]]; then
   # Update $@ with the default list of targets to build.
@@ -41,4 +41,4 @@ for arg; do
   binaries+=("${KUBE_GO_PACKAGE}/${arg}")
 done
 
-go install "${binaries[@]}"
+go install -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.commitFromGit '${version}'" "${binaries[@]}"

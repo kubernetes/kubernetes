@@ -17,6 +17,27 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
+# gitcommit prints the current Git commit information
+function gitcommit() {
+  set -o errexit
+  set -o nounset
+  set -o pipefail
+
+  topdir=$(dirname "$0")/..
+  cd "${topdir}"
+
+  # TODO: when we start making tags, switch to git describe?
+  if git_commit=$(git rev-parse --short "HEAD^{commit}" 2>/dev/null); then
+    # Check if the tree is dirty.
+    if ! dirty_tree=$(git status --porcelain) || [[ -n "${dirty_tree}" ]]; then
+      echo "${git_commit}-dirty"
+    fi
+  else
+    echo "(none)"
+  fi
+  return 0
+}
+
 if [[ -z "$(which go)" ]]; then
   echo "Can't find 'go' in PATH, please fix and retry." >&2
   echo "See http://golang.org/doc/install for installation instructions." >&2
