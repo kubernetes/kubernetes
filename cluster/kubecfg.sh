@@ -23,9 +23,21 @@ if [ ! -x $CLOUDCFG ]; then
   exit 1
 fi
 
+# When we are using vagrant it has hard coded auth.  We repeat that here so that
+# we don't clobber auth that might be used for a publicly facing cluster.
+if [ "$KUBERNETES_PROVIDER" == "vagrant" ]; then
+  cat >~/.kubernetes_vagrant_auth <<EOF
+{
+  "User": "vagrant",
+  "Password": "vagrant"
+}
+EOF
+  AUTH_CONFIG="-auth $HOME/.kubernetes_vagrant_auth"
+fi
+
 detect-master > /dev/null
 if [ "$KUBE_MASTER_IP" != "" ] && [ "$KUBERNETES_MASTER" == "" ]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-$CLOUDCFG "$@"
+$CLOUDCFG $AUTH_CONFIG "$@"
