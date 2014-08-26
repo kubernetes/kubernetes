@@ -53,19 +53,19 @@ func TestExec(t *testing.T) {
 		// Ok
 		{Healthy, &api.LivenessProbe{
 			Type: "exec",
-			Exec: &api.ExecProbe{Command: []string{"ls", "-l"}},
+			Exec: &api.ExecAction{Command: []string{"ls", "-l"}},
 		}, false, []byte("OK"), nil},
 		// Run returns error
 		{Unknown, &api.LivenessProbe{
 			Type: "exec",
-			Exec: &api.ExecProbe{
+			Exec: &api.ExecAction{
 				Command: []string{"ls", "-l"},
 			},
 		}, true, []byte("OK, NOT"), fmt.Errorf("test error")},
 		// Command error
 		{Unhealthy, &api.LivenessProbe{
 			Type: "exec",
-			Exec: &api.ExecProbe{
+			Exec: &api.ExecAction{
 				Command: []string{"ls", "-l"},
 			},
 		}, false, []byte{}, &exec.ExitError{}},

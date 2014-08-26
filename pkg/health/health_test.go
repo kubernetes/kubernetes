@@ -59,7 +59,7 @@ func TestHealthChecker(t *testing.T) {
 		}
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: &api.HTTPGetProbe{
+				HTTPGet: &api.HTTPGetAction{
 					Port: util.NewIntOrStringFromString(port),
 					Path: "/foo/bar",
 					Host: host,
@@ -128,7 +128,7 @@ func TestMuxHealthChecker(t *testing.T) {
 		}
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
-				HTTPGet: &api.HTTPGetProbe{},
+				HTTPGet: &api.HTTPGetAction{},
 			},
 		}
 		container.LivenessProbe.Type = tt.probeType

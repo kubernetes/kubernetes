@@ -29,18 +29,18 @@ import (
 
 func TestGetTCPAddrParts(t *testing.T) {
 	testCases := []struct {
-		probe *api.TCPSocketProbe
+		probe *api.TCPSocketAction
 		ok    bool
 		host  string
 		port  int
 	}{
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromInt(-1)}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("")}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("-1")}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("not-found")}, false, "", -1},
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("found")}, true, "1.2.3.4", 93},
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromInt(76)}, true, "1.2.3.4", 76},
-		{&api.TCPSocketProbe{Port: util.NewIntOrStringFromString("118")}, true, "1.2.3.4", 118},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromInt(-1)}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("")}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("-1")}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("not-found")}, false, "", -1},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("found")}, true, "1.2.3.4", 93},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromInt(76)}, true, "1.2.3.4", 76},
+		{&api.TCPSocketAction{Port: util.NewIntOrStringFromString("118")}, true, "1.2.3.4", 118},
 	}
 
 	for _, test := range testCases {
@@ -69,13 +69,13 @@ func TestGetTCPAddrParts(t *testing.T) {
 
 func TestTcpHealthChecker(t *testing.T) {
 	tests := []struct {
-		probe          *api.TCPSocketProbe
+		probe          *api.TCPSocketAction
 		expectedStatus Status
 		expectError    bool
 	}{
 		// The probe will be filled in below.  This is primarily testing that a connection is made.
-		{&api.TCPSocketProbe{}, Healthy, false},
-		{&api.TCPSocketProbe{}, Unhealthy, false},
+		{&api.TCPSocketAction{}, Healthy, false},
+		{&api.TCPSocketAction{}, Unhealthy, false},
 		{nil, Unknown, true},
 	}
 

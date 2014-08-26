@@ -29,20 +29,20 @@ import (
 
 func TestGetURLParts(t *testing.T) {
 	testCases := []struct {
-		probe *api.HTTPGetProbe
+		probe *api.HTTPGetAction
 		ok    bool
 		host  string
 		port  int
 		path  string
 	}{
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromInt(-1), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString(""), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("-1"), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("not-found"), Path: ""}, false, "", -1, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromInt(76), Path: ""}, true, "127.0.0.1", 76, ""},
-		{&api.HTTPGetProbe{Host: "", Port: util.NewIntOrStringFromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
-		{&api.HTTPGetProbe{Host: "hostname", Port: util.NewIntOrStringFromInt(76), Path: "path"}, true, "hostname", 76, "path"},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromInt(-1), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromString(""), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromString("-1"), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromString("not-found"), Path: ""}, false, "", -1, ""},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromInt(76), Path: ""}, true, "127.0.0.1", 76, ""},
+		{&api.HTTPGetAction{Host: "", Port: util.NewIntOrStringFromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
+		{&api.HTTPGetAction{Host: "hostname", Port: util.NewIntOrStringFromInt(76), Path: "path"}, true, "hostname", 76, "path"},
 	}
 
 	for _, test := range testCases {
@@ -90,13 +90,13 @@ func TestFormatURL(t *testing.T) {
 
 func TestHTTPHealthChecker(t *testing.T) {
 	testCases := []struct {
-		probe  *api.HTTPGetProbe
+		probe  *api.HTTPGetAction
 		status int
 		health Status
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
-		{&api.HTTPGetProbe{}, http.StatusOK, Healthy},
-		{&api.HTTPGetProbe{}, -1, Unhealthy},
+		{&api.HTTPGetAction{}, http.StatusOK, Healthy},
+		{&api.HTTPGetAction{}, -1, Unhealthy},
 		{nil, -1, Unknown},
 	}
 	hc := &HTTPHealthChecker{
