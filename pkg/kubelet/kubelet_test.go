@@ -1056,7 +1056,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "etcd"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		podName+"."+podNamespace,
+		GetPodFullName(&Pod{Name: podName, Namespace: podNamespace}),
 		containerName,
 		[]string{"ls"})
 	if output != nil {
@@ -1086,7 +1086,7 @@ func TestRunInContainer(t *testing.T) {
 
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer(
-		podName+"."+podNamespace,
+		GetPodFullName(&Pod{Name: podName, Namespace: podNamespace}),
 		containerName,
 		cmd)
 	if fakeCommandRunner.ID != containerID {

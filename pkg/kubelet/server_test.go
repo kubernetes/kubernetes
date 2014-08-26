@@ -40,6 +40,7 @@ type fakeKubelet struct {
 	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	machineInfoFunc   func() (*info.MachineInfo, error)
 	logFunc           func(w http.ResponseWriter, req *http.Request)
+	runFunc           func(podFullName, containerName string, cmd []string) ([]byte, error)
 }
 
 func (fk *fakeKubelet) GetPodInfo(name string) (api.PodInfo, error) {
@@ -60,6 +61,10 @@ func (fk *fakeKubelet) GetMachineInfo() (*info.MachineInfo, error) {
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
+}
+
+func (fk *fakeKubelet) RunInContainer(podFullName, containerName string, cmd []string) ([]byte, error) {
+	return fk.runFunc(podFullName, containerName, cmd)
 }
 
 type serverTestFramework struct {
@@ -286,5 +291,44 @@ func TestServeLogs(t *testing.T) {
 	result := string(body)
 	if !strings.Contains(result, "kubelet.log") || !strings.Contains(result, "google.log") {
 		t.Errorf("Received wrong data: %s", result)
+	}
+}
+
+func TestServeRunInContainer(t *testing.T) {
+	fw := newServerTest()
+	output := "foo bar"
+	podName := "foo"
+	expectedPodName := podName + ".etcd"
+	expectedContainerName := "baz"
+	expectedCommand := "ls -a"
+	fw.fakeKubelet.runFunc = func(podFullName, containerName string, cmd []string) ([]byte, error) {
+		if podFullName != expectedPodName {
+			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+		}
+		if containerName != expectedContainerName {
+			t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+		}
+		if strings.Join(cmd, " ") != expectedCommand {
+			t.Errorf("expected: %s, got %v", expectedCommand, cmd)
+		}
+
+		return []byte(output), nil
+	}
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podName + "/" + expectedContainerName + "?cmd=ls%20-a")
+
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		// copying the response body did not work
+		t.Errorf("Cannot copy resp: %#v", err)
+	}
+	result := string(body)
+	if result != output {
+		t.Errorf("expected %s, got %s", output, result)
 	}
 }
