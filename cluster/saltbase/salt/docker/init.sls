@@ -4,6 +4,9 @@
 {% set environment_file = '/etc/default/docker' %}
 {% endif %}
 
+bridge-utils:
+  pkg.installed
+
 {% if grains['os_family'] != 'RedHat' %}
 
 docker-repo:
@@ -24,9 +27,6 @@ docker-repo:
 net.ipv4.ip_forward:
   sysctl.present:
     - value: 1
-
-bridge-utils:
-  pkg.installed
 
 cbr0:
   container_bridge.ensure:
