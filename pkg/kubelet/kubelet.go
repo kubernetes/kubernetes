@@ -66,6 +66,7 @@ func NewMainKubelet(
 	ec tools.EtcdClient,
 	rd string,
 	ri time.Duration) *Kubelet {
+	runner := NewDockerContainerCommandRunner()
 	return &Kubelet{
 		hostname:       hn,
 		dockerClient:   dc,
@@ -74,7 +75,8 @@ func NewMainKubelet(
 		rootDirectory:  rd,
 		resyncInterval: ri,
 		podWorkers:     newPodWorkers(),
-		runner:         NewDockerContainerCommandRunner(),
+		runner:         runner,
+		lifecycle:      newCommandLineLifecycle(runner),
 	}
 }
 
@@ -114,6 +116,8 @@ type Kubelet struct {
 	logServer http.Handler
 	// Optional, defaults to simple Docker implementation
 	runner ContainerCommandRunner
+	// Optional, lifecycle events are not sent if it is missing
+	lifecycle Lifecycle
 }
 
 // Run starts the kubelet reacting to config updates
@@ -320,12 +324,24 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 		Binds:        binds,
 		NetworkMode:  netMode,
 	})
+	if kl.lifecycle != nil {
+		if output, err := kl.lifecycle.PostStart(dockerContainer.ID); err != nil {
+			glog.Infof("failed to run on start: %v, %s", err, output.Details)
+		}
+	}
 	return DockerID(dockerContainer.ID), err
 }
 
 // Kill a docker container
 func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 	glog.Infof("Killing: %s", dockerContainer.ID)
+
+	if kl.lifecycle != nil {
+		if output, err := kl.lifecycle.PreStop(dockerContainer.ID); err != nil {
+			glog.Infof("failed to run on stop: %v, %s", err, output.Details)
+		}
+	}
+
 	err := kl.dockerClient.StopContainer(dockerContainer.ID, 10)
 	podFullName, containerName, _ := parseDockerName(dockerContainer.Names[0])
 	kl.LogEvent(&api.Event{
