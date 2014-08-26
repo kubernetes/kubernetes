@@ -516,11 +516,35 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers DockerContainers) error {
 			killedContainers[containerID] = empty{}
 		}
 
-		glog.Infof("Container doesn't exist, creating %#v", container)
+		// Check RestartPolicy for container
+		recentContainers, err := getRecentDockerContainersWithNameAndUUID(kl.dockerClient, podFullName, uuid, container.Name)
+		if err != nil {
+			glog.Errorf("Error listing recent containers with name and uuid:%s--%s--%s", podFullName, uuid, container.Name)
+			// TODO(dawnchen): error handling here?
+		}
+
+		if len(recentContainers) > 0 && pod.Manifest.RestartPolicy.Always == nil {
+			if pod.Manifest.RestartPolicy.Never != nil {
+				glog.Infof("Already ran container with name %s--%s--%s, do nothing",
+					podFullName, uuid, container.Name)
+				continue
+			}
+			if pod.Manifest.RestartPolicy.OnFailure != nil {
+				// Check the exit code of last run
+				if recentContainers[0].State.ExitCode == 0 {
+					glog.Infof("Already successfully ran container with name %s--%s--%s, do nothing",
+						podFullName, uuid, container.Name)
+					continue
+				}
+			}
+		}
+
+		glog.Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uuid, container.Name, container)
 		if err := kl.dockerPuller.Pull(container.Image); err != nil {
 			glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
 			continue
 		}
+		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		containerID, err := kl.runContainer(pod, &container, podVolumes, "container:"+string(netID))
 		if err != nil {
 			// TODO(bburns) : Perhaps blacklist a container after N failures?

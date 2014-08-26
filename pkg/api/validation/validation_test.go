@@ -216,6 +216,40 @@ func TestValidateContainers(t *testing.T) {
 	}
 }
 
+func TestValidateRestartPolicy(t *testing.T) {
+	successCases := []api.RestartPolicy{
+		{},
+		{Always: &api.RestartPolicyAlways{}},
+		{OnFailure: &api.RestartPolicyOnFailure{}},
+		{Never: &api.RestartPolicyNever{}},
+	}
+	for _, policy := range successCases {
+		if errs := validateRestartPolicy(&policy); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []api.RestartPolicy{
+		{Always: &api.RestartPolicyAlways{}, Never: &api.RestartPolicyNever{}},
+		{Never: &api.RestartPolicyNever{}, OnFailure: &api.RestartPolicyOnFailure{}},
+	}
+	for k, policy := range errorCases {
+		if errs := validateRestartPolicy(&policy); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+
+	noPolicySpecified := api.RestartPolicy{}
+	errs := validateRestartPolicy(&noPolicySpecified)
+	if len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+	if noPolicySpecified.Always == nil {
+		t.Errorf("expected Always policy specified")
+	}
+
+}
+
 func TestValidateManifest(t *testing.T) {
 	successCases := []api.ContainerManifest{
 		{Version: "v1beta1", ID: "abc"},
@@ -286,8 +320,13 @@ func TestValidatePod(t *testing.T) {
 			"foo": "bar",
 		},
 		DesiredState: api.PodState{
-			Manifest:      api.ContainerManifest{Version: "v1beta1", ID: "abc"},
-			RestartPolicy: api.RestartPolicy{Type: "RestartAlways"},
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				ID:      "abc",
+				RestartPolicy: api.RestartPolicy{
+					Always: &api.RestartPolicyAlways{},
+				},
+			},
 		},
 	})
 	if len(errs) != 0 {
@@ -312,8 +351,12 @@ func TestValidatePod(t *testing.T) {
 			"foo": "bar",
 		},
 		DesiredState: api.PodState{
-			Manifest:      api.ContainerManifest{Version: "v1beta1", ID: "abc"},
-			RestartPolicy: api.RestartPolicy{Type: "WhatEver"},
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				ID:      "abc",
+				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{},
+					Never: &api.RestartPolicyNever{}},
+			},
 		},
 	})
 	if len(errs) != 1 {

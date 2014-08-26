@@ -58,9 +58,10 @@ type ContainerManifest struct {
 	// TODO: UUID on Manifest is deprecated in the future once we are done
 	// with the API refactoring. It is required for now to determine the instance
 	// of a Pod.
-	UUID       string      `yaml:"uuid,omitempty" json:"uuid,omitempty"`
-	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
-	Containers []Container `yaml:"containers" json:"containers"`
+	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty"`
+	Volumes       []Volume      `yaml:"volumes" json:"volumes"`
+	Containers    []Container   `yaml:"containers" json:"containers"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
@@ -254,19 +255,21 @@ const (
 // PodInfo contains one entry for every container with available info.
 type PodInfo map[string]docker.Container
 
-// RestartPolicyType represents a restart policy for a pod.
-type RestartPolicyType string
+type RestartPolicyAlways struct{}
 
-// Valid restart policies defined for a PodState.RestartPolicy.
-const (
-	RestartAlways    RestartPolicyType = "RestartAlways"
-	RestartOnFailure RestartPolicyType = "RestartOnFailure"
-	RestartNever     RestartPolicyType = "RestartNever"
-)
+// TODO(dchen1107): Define what kinds of failures should restart.
+// TODO(dchen1107): Decide whether to support policy knobs, and, if so, which ones.
+type RestartPolicyOnFailure struct{}
+
+type RestartPolicyNever struct{}
 
 type RestartPolicy struct {
-	// Optional: Defaults to "RestartAlways".
-	Type RestartPolicyType `yaml:"type,omitempty" json:"type,omitempty"`
+	// Only one of the following restart policies may be specified.
+	// If none of the following policies is specified, the default one
+	// is RestartPolicyAlways.
+	Always    *RestartPolicyAlways    `json:"always,omitempty" yaml:"always,omitempty"`
+	OnFailure *RestartPolicyOnFailure `json:"onFailure,omitempty" yaml:"onFailure,omitempty"`
+	Never     *RestartPolicyNever     `json:"never,omitempty" yaml:"never,omitempty"`
 }
 
 // PodState is the state of a pod, used as either input (desired state) or output (current state).
@@ -283,8 +286,7 @@ type PodState struct {
 	// upon.
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
-	Info          PodInfo       `json:"info,omitempty" yaml:"info,omitempty"`
-	RestartPolicy RestartPolicy `json:"restartpolicy,omitempty" yaml:"restartpolicy,omitempty"`
+	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
 // PodList is a list of Pods.

@@ -153,6 +153,33 @@ func getKubeletDockerContainers(client DockerInterface) (DockerContainers, error
 	return result, nil
 }
 
+// getRecentDockerContainersWithName returns a list of dead docker containers which matches the name
+// and uuid given.
+func getRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullName, uuid, containerName string) ([]*docker.Container, error) {
+	var result []*docker.Container
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+	for _, dockerContainer := range containers {
+		dockerPodName, dockerUUID, dockerContainerName, _ := parseDockerName(dockerContainer.Names[0])
+		if dockerPodName != podFullName {
+			continue
+		}
+		if uuid != "" && dockerUUID != uuid {
+			continue
+		}
+		if dockerContainerName != containerName {
+			continue
+		}
+		inspectResult, _ := client.InspectContainer(dockerContainer.ID)
+		if inspectResult != nil && !inspectResult.State.Running && !inspectResult.State.Paused {
+			result = append(result, inspectResult)
+		}
+	}
+	return result, nil
+}
+
 // ErrNoContainersInPod is returned when there are no running containers for a given pod
 var ErrNoContainersInPod = errors.New("no containers exist for this pod")
 

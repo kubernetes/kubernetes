@@ -231,19 +231,33 @@ func ValidateManifest(manifest *api.ContainerManifest) errs.ErrorList {
 	allVolumes, errs := validateVolumes(manifest.Volumes)
 	allErrs = append(allErrs, errs.Prefix("volumes")...)
 	allErrs = append(allErrs, validateContainers(manifest.Containers, allVolumes).Prefix("containers")...)
+	allErrs = append(allErrs, validateRestartPolicy(&manifest.RestartPolicy).Prefix("restartPolicy")...)
 	return allErrs
+}
+
+func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ErrorList {
+	numPolicies := 0
+	allErrors := errs.ErrorList{}
+	if restartPolicy.Always != nil {
+		numPolicies++
+	}
+	if restartPolicy.OnFailure != nil {
+		numPolicies++
+	}
+	if restartPolicy.Never != nil {
+		numPolicies++
+	}
+	if numPolicies == 0 {
+		restartPolicy.Always = &api.RestartPolicyAlways{}
+	}
+	if numPolicies > 1 {
+		allErrors = append(allErrors, errs.NewFieldInvalid("", restartPolicy))
+	}
+	return allErrors
 }
 
 func ValidatePodState(podState *api.PodState) errs.ErrorList {
 	allErrs := errs.ErrorList(ValidateManifest(&podState.Manifest)).Prefix("manifest")
-	if podState.RestartPolicy.Type == "" {
-		podState.RestartPolicy.Type = api.RestartAlways
-	} else if podState.RestartPolicy.Type != api.RestartAlways &&
-		podState.RestartPolicy.Type != api.RestartOnFailure &&
-		podState.RestartPolicy.Type != api.RestartNever {
-		allErrs = append(allErrs, errs.NewFieldNotSupported("restartPolicy.type", podState.RestartPolicy.Type))
-	}
-
 	return allErrs
 }
 
