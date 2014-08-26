@@ -25,7 +25,7 @@ import (
 
 // ValidationErrorType is a machine readable value providing more detail about why
 // a field is invalid.  These values are expected to match 1-1 with
-// CauseReasonType in api/types.go.
+// CauseType in api/types.go.
 type ValidationErrorType string
 
 const (

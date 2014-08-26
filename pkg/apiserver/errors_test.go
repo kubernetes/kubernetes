@@ -35,7 +35,7 @@ func TestErrorNew(t *testing.T) {
 		t.Errorf("expected to not be confict")
 	}
 	if IsNotFound(err) {
-		t.Errorf(fmt.Sprintf("expected to not be %s", api.ReasonTypeNotFound))
+		t.Errorf(fmt.Sprintf("expected to not be %s", api.StatusReasonNotFound))
 	}
 	if IsInvalid(err) {
 		t.Errorf("expected to not be invalid")
@@ -63,8 +63,8 @@ func TestNewInvalidErr(t *testing.T) {
 				Kind: "kind",
 				ID:   "name",
 				Causes: []api.StatusCause{{
-					Reason: api.CauseReasonTypeFieldValueDuplicate,
-					Field:  "field[0].name",
+					Type:  api.CauseTypeFieldValueDuplicate,
+					Field: "field[0].name",
 				}},
 			},
 		},
@@ -74,8 +74,8 @@ func TestNewInvalidErr(t *testing.T) {
 				Kind: "kind",
 				ID:   "name",
 				Causes: []api.StatusCause{{
-					Reason: api.CauseReasonTypeFieldValueInvalid,
-					Field:  "field[0].name",
+					Type:  api.CauseTypeFieldValueInvalid,
+					Field: "field[0].name",
 				}},
 			},
 		},
@@ -85,8 +85,8 @@ func TestNewInvalidErr(t *testing.T) {
 				Kind: "kind",
 				ID:   "name",
 				Causes: []api.StatusCause{{
-					Reason: api.CauseReasonTypeFieldValueNotFound,
-					Field:  "field[0].name",
+					Type:  api.CauseTypeFieldValueNotFound,
+					Field: "field[0].name",
 				}},
 			},
 		},
@@ -96,8 +96,8 @@ func TestNewInvalidErr(t *testing.T) {
 				Kind: "kind",
 				ID:   "name",
 				Causes: []api.StatusCause{{
-					Reason: api.CauseReasonTypeFieldValueNotSupported,
-					Field:  "field[0].name",
+					Type:  api.CauseTypeFieldValueNotSupported,
+					Field: "field[0].name",
 				}},
 			},
 		},
@@ -107,8 +107,8 @@ func TestNewInvalidErr(t *testing.T) {
 				Kind: "kind",
 				ID:   "name",
 				Causes: []api.StatusCause{{
-					Reason: api.CauseReasonTypeFieldValueRequired,
-					Field:  "field[0].name",
+					Type:  api.CauseTypeFieldValueRequired,
+					Field: "field[0].name",
 				}},
 			},
 		},
@@ -118,7 +118,7 @@ func TestNewInvalidErr(t *testing.T) {
 		expected.Causes[0].Message = vErr.Error()
 		err := NewInvalidErr("kind", "name", apierrors.ErrorList{vErr})
 		status := errToAPIStatus(err)
-		if status.Code != 422 || status.Reason != api.ReasonTypeInvalid {
+		if status.Code != 422 || status.Reason != api.StatusReasonInvalid {
 			t.Errorf("unexpected status: %#v", status)
 		}
 		if !reflect.DeepEqual(expected, status.Details) {
@@ -130,13 +130,13 @@ func TestNewInvalidErr(t *testing.T) {
 func Test_errToAPIStatus(t *testing.T) {
 	err := &apiServerError{}
 	status := errToAPIStatus(err)
-	if status.Reason != api.ReasonTypeUnknown || status.Status != api.StatusFailure {
+	if status.Reason != api.StatusReasonUnknown || status.Status != api.StatusFailure {
 		t.Errorf("unexpected status object: %#v", status)
 	}
 }
 
 func Test_reasonForError(t *testing.T) {
-	if e, a := api.ReasonTypeUnknown, reasonForError(nil); e != a {
+	if e, a := api.StatusReasonUnknown, reasonForError(nil); e != a {
 		t.Errorf("unexpected reason type: %#v", a)
 	}
 }
