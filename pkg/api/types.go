@@ -362,13 +362,13 @@ type Status struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	// One of: "success", "failure", "working" (for operations not yet completed)
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
-	// A human readable description of the status of this operation.
+	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty" yaml:"message,omitempty"`
-	// A machine readable description of why this operation is in the
+	// A machine-readable description of why this operation is in the
 	// "failure" or "working" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
-	Reason ReasonType `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Reason StatusReason `json:"reason,omitempty" yaml:"reason,omitempty"`
 	// Extended data associated with the reason.  Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by
@@ -385,12 +385,15 @@ type Status struct {
 // and should assume that any attribute may be empty, invalid, or under
 // defined.
 type StatusDetails struct {
-	// The ID attribute of the resource associated with the status ReasonType
+	// The ID attribute of the resource associated with the status StatusReason
 	// (when there is a single ID which can be described).
 	ID string `json:"id,omitempty" yaml:"id,omitempty"`
-	// The kind attribute of the resource associated with the status ReasonType.
+	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	// The Causes array includes more details associated with the StatusReason
+	// failure. Not all StatusReasons may provide detailed causes.
+	Causes []StatusCause `json:"causes,omitempty" yaml:"causes,omitempty"`
 }
 
 // Values of Status.Status
@@ -400,19 +403,19 @@ const (
 	StatusWorking = "working"
 )
 
-// ReasonType is an enumeration of possible failure causes.  Each ReasonType
+// StatusReason is an enumeration of possible failure causes.  Each StatusReason
 // must map to a single HTTP status code, but multiple reasons may map
 // to the same HTTP status code.
 // TODO: move to apiserver
-type ReasonType string
+type StatusReason string
 
 const (
-	// ReasonTypeUnknown means the server has declined to indicate a specific reason.
+	// StatusReasonUnknown means the server has declined to indicate a specific reason.
 	// The details field may contain other information about this error.
 	// Status code 500.
-	ReasonTypeUnknown ReasonType = ""
+	StatusReasonUnknown StatusReason = ""
 
-	// ReasonTypeWorking means the server is processing this request and will complete
+	// StatusReasonWorking means the server is processing this request and will complete
 	// at a future time.
 	// Details (optional):
 	//   "kind" string - the name of the resource being referenced ("operation" today)
@@ -422,7 +425,7 @@ const (
 	//   "Location" - HTTP header populated with a URL that can retrieved the final
 	//                status of this operation.
 	// Status code 202
-	ReasonTypeWorking ReasonType = "working"
+	StatusReasonWorking StatusReason = "working"
 
 	// ResourceTypeNotFound means one or more resources required for this operation
 	// could not be found.
@@ -432,21 +435,78 @@ const (
 	//                   resource.
 	//   "id"   string - the identifier of the missing resource
 	// Status code 404
-	ReasonTypeNotFound ReasonType = "not_found"
+	StatusReasonNotFound StatusReason = "not_found"
 
-	// ReasonTypeAlreadyExists means the resource you are creating already exists.
+	// StatusReasonAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the conflicting resource
 	//   "id"   string - the identifier of the conflicting resource
 	// Status code 409
-	ReasonTypeAlreadyExists ReasonType = "already_exists"
+	StatusReasonAlreadyExists StatusReason = "already_exists"
 
 	// ResourceTypeConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
 	// Each resource may define custom details that indicate the nature of the
 	// conflict.
 	// Status code 409
-	ReasonTypeConflict ReasonType = "conflict"
+	StatusReasonConflict StatusReason = "conflict"
+
+	// ResourceTypeInvalid means the requested create or update operation cannot be
+	// completed due to invalid data provided as part of the request. The client may
+	// need to alter the request. When set, the client may use the StatusDetails
+	// message field as a summary of the issues encountered.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the invalid resource
+	//   "id"   string - the identifier of the invalid resource
+	//   "causes"      - one or more StatusCause entries indicating the data in the
+	//                   provided resource that was invalid.  The code, message, and
+	//                   field attributes will be set.
+	// Status code 422
+	StatusReasonInvalid StatusReason = "invalid"
+)
+
+// StatusCause provides more information about an api.Status failure, including
+// cases when multiple errors are encountered.
+type StatusCause struct {
+	// A machine-readable description of the cause of the error. If this value is
+	// empty there is no information available.
+	Type CauseType `json:"reason,omitempty" yaml:"reason,omitempty"`
+	// A human-readable description of the cause of the error.  This field may be
+	// presented as-is to a reader.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	// The field of the resource that has caused this error, as named by its JSON
+	// serialization. May include dot and postfix notation for nested attributes.
+	// Arrays are zero-indexed.  Fields may appear more than once in an array of
+	// causes due to fields having multiple errors.
+	// Optional.
+	//
+	// Examples:
+	//   "name" - the field "name" on the current resource
+	//   "items[0].name" - the field "name" on the first array entry in "items"
+	Field string `json:"field,omitempty" yaml:"field,omitempty"`
+}
+
+// CauseType is a machine readable value providing more detail about what
+// occured in a status response. An operation may have multiple causes for a
+// status (whether failure, success, or working).
+type CauseType string
+
+const (
+	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
+	// (e.g. looking up an ID).
+	CauseTypeFieldValueNotFound CauseType = "fieldValueNotFound"
+	// CauseTypeFieldValueInvalid is used to report required values that are not
+	// provided (e.g. empty strings, null values, or empty arrays).
+	CauseTypeFieldValueRequired CauseType = "fieldValueRequired"
+	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be
+	// unique (e.g. unique IDs).
+	CauseTypeFieldValueDuplicate CauseType = "fieldValueDuplicate"
+	// CauseTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
+	// match).
+	CauseTypeFieldValueInvalid CauseType = "fieldValueInvalid"
+	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
+	// values that can not be handled (e.g. an enumerated string).
+	CauseTypeFieldValueNotSupported CauseType = "fieldValueNotSupported"
 )
 
 // ServerOp is an operation delivered to API clients.

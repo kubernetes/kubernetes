@@ -60,7 +60,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	// Pod Manifest ID should be assigned by the pod API
 	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
 	if errs := api.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, fmt.Errorf("Validation errors: %v", errs)
+		return nil, apiserver.NewInvalidErr("replicationController", controller.ID, errs)
 	}
 
 	controller.CreationTimestamp = util.Now()
@@ -117,7 +117,7 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if errs := api.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, fmt.Errorf("Validation errors: %v", errs)
+		return nil, apiserver.NewInvalidErr("replicationController", controller.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		err := rs.registry.UpdateController(*controller)

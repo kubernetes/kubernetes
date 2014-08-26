@@ -626,7 +626,7 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusConflict)
-	if status.Status != api.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != api.ReasonTypeAlreadyExists {
+	if status.Status != api.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != api.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
 }
@@ -687,7 +687,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		writeJSON(http.StatusOK, api.Codec, &T{"Undecodable"}, w)
 	}))
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
-	if status.Reason != api.ReasonTypeUnknown {
+	if status.Reason != api.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
 	if !strings.Contains(status.Message, "type apiserver.T is not registered") {

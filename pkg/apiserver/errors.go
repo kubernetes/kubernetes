@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
@@ -39,7 +40,7 @@ func NewNotFoundErr(kind, name string) error {
 	return &apiServerError{api.Status{
 		Status: api.StatusFailure,
 		Code:   http.StatusNotFound,
-		Reason: api.ReasonTypeNotFound,
+		Reason: api.StatusReasonNotFound,
 		Details: &api.StatusDetails{
 			Kind: kind,
 			ID:   name,
@@ -53,7 +54,7 @@ func NewAlreadyExistsErr(kind, name string) error {
 	return &apiServerError{api.Status{
 		Status: api.StatusFailure,
 		Code:   http.StatusConflict,
-		Reason: api.ReasonTypeAlreadyExists,
+		Reason: api.StatusReasonAlreadyExists,
 		Details: &api.StatusDetails{
 			Kind: kind,
 			ID:   name,
@@ -67,7 +68,7 @@ func NewConflictErr(kind, name string, err error) error {
 	return &apiServerError{api.Status{
 		Status: api.StatusFailure,
 		Code:   http.StatusConflict,
-		Reason: api.ReasonTypeConflict,
+		Reason: api.StatusReasonConflict,
 		Details: &api.StatusDetails{
 			Kind: kind,
 			ID:   name,
@@ -76,27 +77,57 @@ func NewConflictErr(kind, name string, err error) error {
 	}}
 }
 
+// NewInvalidError returns an error indicating the item is invalid and cannot be processed.
+func NewInvalidErr(kind, name string, errs errors.ErrorList) error {
+	causes := make([]api.StatusCause, 0, len(errs))
+	for i := range errs {
+		if err, ok := errs[i].(errors.ValidationError); ok {
+			causes = append(causes, api.StatusCause{
+				Type:    api.CauseType(err.Type),
+				Message: err.Error(),
+				Field:   err.Field,
+			})
+		}
+	}
+	return &apiServerError{api.Status{
+		Status: api.StatusFailure,
+		Code:   422, // RFC 4918
+		Reason: api.StatusReasonInvalid,
+		Details: &api.StatusDetails{
+			Kind:   kind,
+			ID:     name,
+			Causes: causes,
+		},
+		Message: fmt.Sprintf("%s %q is invalid: %s", kind, name, errs.ToError()),
+	}}
+}
+
 // IsNotFound returns true if the specified error was created by NewNotFoundErr
 func IsNotFound(err error) bool {
-	return reasonForError(err) == api.ReasonTypeNotFound
+	return reasonForError(err) == api.StatusReasonNotFound
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
 func IsAlreadyExists(err error) bool {
-	return reasonForError(err) == api.ReasonTypeAlreadyExists
+	return reasonForError(err) == api.StatusReasonAlreadyExists
 }
 
 // IsConflict determines if the err is an error which indicates the provided update conflicts
 func IsConflict(err error) bool {
-	return reasonForError(err) == api.ReasonTypeConflict
+	return reasonForError(err) == api.StatusReasonConflict
 }
 
-func reasonForError(err error) api.ReasonType {
+// IsInvalid determines if the err is an error which indicates the provided resource is not valid
+func IsInvalid(err error) bool {
+	return reasonForError(err) == api.StatusReasonInvalid
+}
+
+func reasonForError(err error) api.StatusReason {
 	switch t := err.(type) {
 	case *apiServerError:
 		return t.Status.Reason
 	}
-	return api.ReasonTypeUnknown
+	return api.StatusReasonUnknown
 }
 
 // errToAPIStatus converts an error to an api.Status object.
@@ -110,14 +141,14 @@ func errToAPIStatus(err error) *api.Status {
 	default:
 		status := http.StatusInternalServerError
 		switch {
-		//TODO: replace me with NewUpdateConflictErr
+		//TODO: replace me with NewConflictErr
 		case tools.IsEtcdTestFailed(err):
 			status = http.StatusConflict
 		}
 		return &api.Status{
 			Status:  api.StatusFailure,
 			Code:    status,
-			Reason:  api.ReasonTypeUnknown,
+			Reason:  api.StatusReasonUnknown,
 			Message: err.Error(),
 		}
 	}

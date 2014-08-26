@@ -192,7 +192,7 @@ func (op *Operation) StatusOrResult() (description interface{}, finished bool) {
 	if op.finished == nil {
 		return &api.Status{
 			Status:  api.StatusWorking,
-			Reason:  api.ReasonTypeWorking,
+			Reason:  api.StatusReasonWorking,
 			Details: &api.StatusDetails{ID: op.ID, Kind: "operation"},
 		}, false
 	}
