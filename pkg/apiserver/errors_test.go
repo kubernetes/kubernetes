@@ -18,7 +18,10 @@ package apiserver
 
 import (
 	"errors"
+	"fmt"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func TestErrorNew(t *testing.T) {
@@ -30,7 +33,7 @@ func TestErrorNew(t *testing.T) {
 		t.Errorf("expected to not be confict")
 	}
 	if IsNotFound(err) {
-		t.Errorf("expected to not be not_found")
+		t.Errorf(fmt.Sprintf("expected to not be %s", api.ReasonTypeNotFound))
 	}
 
 	if !IsConflict(NewConflictErr("test", "2", errors.New("message"))) {
