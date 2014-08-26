@@ -1,0 +1,1 @@
+OPTIONS="--selinux-enabled --bridge cbr0 --iptables=false -r=false"

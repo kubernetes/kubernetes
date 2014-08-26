@@ -1,10 +1,70 @@
-{% if grains['os_family'] == 'RedHat' %}
-{% set environment_file = '/etc/sysconfig/docker' %}
-{% else %}
-{% set environment_file = '/etc/default/docker' %}
+include:
+  - base
+
+# We need IPv4 forwarding on.
+net.ipv4.ip_forward:
+  sysctl.present:
+  - value: 1
+{% if salt['file.file_exists']('/etc/sysctl.d/11-gce-network-security.conf') %}
+# The default GCE images have ip_forwarding explicitly set to 0.
+# Here we take care of commenting that out on the specific file.
+  - config: /etc/sysctl.d/11-gce-network-security.conf
 {% endif %}
 
-{% if grains['os_family'] != 'RedHat' %}
+bridge-utils:
+  pkg.installed
+
+dummy0:
+  network.managed:
+    - enabled: True
+    - type: eth
+    - proto: static
+
+cbr0:
+  network.managed:
+    - enabled: True
+    - type: bridge
+    - bridge: cbr0
+    - delay: 0
+    - proto: static
+    - ipaddr: {{ grains['cbr-cidr'].split('/')[0] }}
+    - netmask: {{ grains['cbr-cidr'].split('/')[1] }}
+    - mtu: 1460
+    - require:
+      - pkg: bridge-utils
+      - sysctl: net.ipv4.ip_forward
+    - use:
+      - network: dummy0
+    - ports: dummy0
+    - require:
+      - network: dummy0
+
+
+{% if grains['os_family'] == 'RedHat' %}
+
+docker-io:
+  pkg:
+    - installed
+
+/etc/sysconfig/docker:
+  file.managed:
+    - source: salt://docker/docker-defaults-fedora
+    - template: jinja
+    - user: root
+    - group: root
+    - mode: 644
+    - makedirs: true
+    - require:
+      - network: cbr0
+
+docker:
+  service.running:
+    - enable: True
+    - watch:
+      - pkg: docker-io
+      - file: /etc/sysconfig/docker
+
+{% else %}
 
 docker-repo:
   pkgrepo.managed:
@@ -14,42 +74,10 @@ docker-repo:
     - require:
       - pkg: pkg-core
 
-# The default GCE images have ip_forwarding explicitly set to 0.
-# Here we take care of commenting that out.
-/etc/sysctl.d/11-gce-network-security.conf:
-  file.replace:
-    - pattern: '^net.ipv4.ip_forward=0'
-    - repl: '# net.ipv4.ip_forward=0'
-
-net.ipv4.ip_forward:
-  sysctl.present:
-    - value: 1
-
-bridge-utils:
+lxc-docker:
   pkg.installed
 
-cbr0:
-  container_bridge.ensure:
-    - cidr: {{ grains['cbr-cidr'] }}
-    - mtu: 1460
-
-{% endif %}
-
-{% if grains['os_family'] == 'RedHat' %}
-
-docker-io:
-  pkg:
-    - installed
-
-docker:
-  service.running:
-    - enable: True
-    - require: 
-      - pkg: docker-io
-
-{% else %}
-
-{{ environment_file }}:
+/etc/default/docker:
   file.managed:
     - source: salt://docker/docker-defaults
     - template: jinja
@@ -57,23 +85,18 @@ docker:
     - group: root
     - mode: 644
     - makedirs: true
+    - require:
+      - network: cbr0
 
-lxc-docker:
-  pkg.installed
-
-# There is a race here, I think.  As the package is installed, it will start
-# docker.  If it doesn't write its pid file fast enough then this next stanza
-# will try to ensure that docker is running.  That might start another copy of
-# docker causing the thing to get wedged.
-#
-# See docker issue https://github.com/dotcloud/docker/issues/6184
-
-# docker:
-#   service.running:
-#     - enable: True
-#     - require:
-#       - pkg: lxc-docker
-#     - watch:
-#       - file: /etc/default/docker
+# With the correct dependencies, the race condition present here
+# should no longer be a problem.
+docker:
+  service.running:
+    - enable: True
+    - require:
+      - pkg: lxc-docker
+      - network: cbr0
+    - watch:
+      - file: /etc/default/docker
 
 {% endif %}
