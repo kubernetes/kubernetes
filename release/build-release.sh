@@ -27,10 +27,6 @@ INSTANCE_PREFIX=$1
 
 KUBE_DIR=$SCRIPT_DIR/..
 
-# First ensure the version pkg is complete and is up to date
-HACK_DIR=$KUBE_DIR/hack
-$HACK_DIR/version-gen.sh
-
 # Next build the release tar.  This gets copied on to the master and installed
 # from there.  It includes the go source for the necessary servers along with
 # the salt configs.

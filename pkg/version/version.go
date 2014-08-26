@@ -20,6 +20,10 @@ import (
 	"fmt"
 )
 
+// commitFromGit is a constant representing the source version that
+// generated this build. It should be set during build via -ldflags.
+var commitFromGit string
+
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
@@ -41,5 +45,9 @@ func Get() Info {
 
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
-	return fmt.Sprintf("version %s.%s, build %s", info.Major, info.Minor, info.GitCommit)
+	commit := info.GitCommit
+	if commit == "" {
+		commit = "(unknown)"
+	}
+	return fmt.Sprintf("version %s.%s, build %s", info.Major, info.Minor, commit)
 }
