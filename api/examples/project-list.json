@@ -1,0 +1,18 @@
+{
+    "kind": "ProjectList",
+    "apiVersion": "v1beta1",
+    "items": [
+        {
+            "id": "example1",
+            "labels": {
+                "name": "My Project"
+            },
+        },
+        {
+            "id": "example2",
+            "labels": {
+                "name": "My Other Project"
+            },
+        }
+    ]
+}

@@ -1,0 +1,22 @@
+  {
+    "id": "hello-world-controller",
+    "kind": "ReplicationController",
+    "desiredState": {
+      "replicas": 2,
+      "replicaSelector": {"name": "hello-world"},
+      "podTemplate": {
+        "desiredState": {
+           "manifest": {
+             "version": "v1beta1",
+             "id": "hello-world",
+             "containers": [{
+               "name": "hello-world",
+               "image": "openshift/hello-openshift",
+               "ports": []
+             }]
+           }
+         },
+         "labels": {"name": "hello-world", "project":"project-example"}
+        }},
+    "labels": {"name": "hello-world", "project":"project-example"}
+  }

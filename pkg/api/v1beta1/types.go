@@ -331,6 +331,20 @@ type Service struct {
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 }
 
+// Project enables scoping of Kubernetes resources
+type Project struct {
+	JSONBase `json:",inline" yaml:",inline"`
+
+	// This projects set of labels.
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+}
+
+// ProjectList is a collection of projects.
+type ProjectList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Project `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {

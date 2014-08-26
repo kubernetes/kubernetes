@@ -64,6 +64,8 @@ func init() {
 		ContainerManifestList{},
 		Endpoints{},
 		Binding{},
+		Project{},
+		ProjectList{},
 	)
 	AddKnownTypes("v1beta1",
 		v1beta1.PodList{},
@@ -80,6 +82,8 @@ func init() {
 		v1beta1.ContainerManifestList{},
 		v1beta1.Endpoints{},
 		v1beta1.Binding{},
+		Project{},
+		ProjectList{},
 	)
 
 	Codec = conversionScheme

@@ -292,3 +292,13 @@ func ValidateReplicationController(controller *ReplicationController) errs.Error
 	allErrs = append(allErrs, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest).Prefix("desiredState.podTemplate.desiredState.manifest")...)
 	return allErrs
 }
+
+func ValidateProject(project *Project) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	if project.ID == "" {
+		allErrs = append(allErrs, errs.NewInvalid("Project.ID", project.ID))
+	} else if !util.IsDNSLabel(project.ID) {
+		allErrs = append(allErrs, errs.NewInvalid("Project.ID", project.ID))
+	}
+	return allErrs
+}

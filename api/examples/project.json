@@ -1,0 +1,9 @@
+{
+  "kind": "Project",
+  "apiVersion": "v1beta1",
+  "id": "example",
+  "labels": {
+    "name": "My Project"
+  }
+}
+

@@ -945,6 +945,145 @@ func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
 	}
 }
 
+func TestEtcdListProjects(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	key := "/registry/projects"
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: api.EncodeOrDie(api.Project{JSONBase: api.JSONBase{ID: "foo"}}),
+					},
+					{
+						Value: api.EncodeOrDie(api.Project{JSONBase: api.JSONBase{ID: "bar"}}),
+					},
+				},
+			},
+		},
+		E: nil,
+	}
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	projects, err := registry.ListProjects()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(projects) != 2 || projects[0].ID != "foo" || projects[1].ID != "bar" {
+		t.Errorf("Unexpected projects list: %#v", projects)
+	}
+}
+
+func TestEtcdGetProject(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.Set("/registry/projects/foo", api.EncodeOrDie(api.Project{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	project, err := registry.GetProject("foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if project.ID != "foo" {
+		t.Errorf("Unexpected project: %#v", project)
+	}
+}
+
+func TestEtcdGetProjectNotFound(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.Data["/registry/projects/foo"] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: nil,
+		},
+		E: tools.EtcdErrorNotFound,
+	}
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	project, err := registry.GetProject("foo")
+	if project != nil {
+		t.Errorf("Unexpected non-nil project: %#v", project)
+	}
+	if err == nil {
+		t.Error("Unexpected non-error.")
+	}
+}
+
+func TestEtcdDeleteProject(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	err := registry.DeleteProject("foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(fakeClient.DeletedKeys) != 1 {
+		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
+	}
+	key := "/registry/projects/foo"
+	if fakeClient.DeletedKeys[0] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
+	}
+}
+
+func TestEtcdCreateProject(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	err := registry.CreateProject(api.Project{
+		JSONBase: api.JSONBase{
+			ID: "foo",
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	resp, err := fakeClient.Get("/registry/projects/foo", false, false)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	var project api.Project
+	err = api.DecodeInto([]byte(resp.Node.Value), &project)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if project.ID != "foo" {
+		t.Errorf("Unexpected project: %#v %s", project, resp.Node.Value)
+	}
+}
+
+func TestEtcdCreateProjectAlreadyExisting(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.Set("/registry/projects/foo", api.EncodeOrDie(api.Project{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	err := registry.CreateProject(api.Project{
+		JSONBase: api.JSONBase{
+			ID: "foo",
+		},
+	})
+	if !apiserver.IsAlreadyExists(err) {
+		t.Errorf("expected already exists err, got %#v", err)
+	}
+}
+
+func TestEtcdUpdateProject(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+
+	resp, _ := fakeClient.Set("/registry/projects/foo", api.EncodeOrDie(api.Project{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	registry := NewTestEtcdRegistry(fakeClient, []string{"machine"})
+	err := registry.UpdateProject(api.Project{
+		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	project, err := registry.GetProject("foo")
+	if project.ID != "foo" {
+		t.Errorf("Unexpected project: %#v", project)
+	}
+}
+
 // TODO We need a test for the compare and swap behavior.  This basically requires two things:
 //   1) Add a per-operation synchronization channel to the fake etcd client, such that any operation waits on that
 //      channel, this will enable us to orchestrate the flow of etcd requests in the test.

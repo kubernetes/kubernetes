@@ -6,16 +6,17 @@ mediaType: application/json
 documentation:
  - title: Overview
    content: |
-     The Kubernetes API currently manages 3 main resources: `pods`,
-     `replicationControllers`, and `services`. Pods correspond to
-     colocated groups of [Docker containers](http://docker.io) with
-     shared volumes, as supported by [Google Cloud Platform's
+     The Kubernetes API currently manages 4 main resources: `pods`,
+     `replicationControllers`, `services`, and 'projects'. 
+     Pods correspond to colocated groups of [Docker containers](http://docker.io) 
+     with shared volumes, as supported by [Google Cloud Platform's
      container-vm
      images](https://developers.google.com/compute/docs/containers).
      Singleton pods can be created directly via the `/pods`
      endpoint. Sets of pods may created, maintained, and scaled using
      replicationControllers.  Services create load-balanced targets
-     for sets of pods.
+     for sets of pods.  Projects logically scope a set of related pods,
+     replicationControllers, and services.
 
  - title: Resource identifiers
    content: |
@@ -27,7 +28,7 @@ documentation:
      are used to specify identifying metadata that can be used to
      define sets of resources by specifying required labels. Examples
      of typical pod label keys include `stage`, `service`, `name`,
-     `tier`, `partition`, and `track`, but you are free to develop
+     `tier`, `partition`, 'project', and `track`, but you are free to develop
      your own conventions.
 
  - title: Creation semantics
@@ -175,6 +176,41 @@ documentation:
         example: !include examples/service.json
     delete:
       description: Delete a specific service
+      responses:
+        200:
+          body:
+            example: |
+              { 
+                "success": true
+              }
+
+/projects:
+  get:
+    description: List all projects on this cluster
+    responses:
+      200:
+        body:
+          example: !include examples/project-list.json
+  post:
+    description: Create a new project
+    body:
+      schema: !include doc/project-schema.json
+      example: !include examples/project.json
+  
+  /{projectId}:
+    get:
+      description: Get a specific project
+      responses:
+        200:
+          body:
+            example: !include examples/project.json
+    put:
+      description: Update a project
+      body:
+        schema: !include doc/project-schema.json
+        example: !include examples/project.json
+    delete:
+      description: Delete a specific project
       responses:
         200:
           body:
