@@ -125,7 +125,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion = resp.Node.ModifiedIndex
 		event = <-w.ResultChan()
 		if event.Type != watch.Deleted {
-			t.Fatalf("expected deleted event", event)
+			t.Errorf("expected deleted event %#v", event)
 		}
 		pod = event.Object.(*api.Pod)
 		if pod.ResourceVersion != expectedVersion {
