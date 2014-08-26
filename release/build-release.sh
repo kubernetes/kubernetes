@@ -40,14 +40,27 @@ echo "Building release tree"
 cp $KUBE_DIR/release/master-release-install.sh $MASTER_RELEASE_DIR/src/scripts/master-release-install.sh
 cp -r $KUBE_DIR/cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
 
+# Capture the same version we are using to build the client tools and pass that
+# on.
+version=$(
+  unset IFS
+  source $KUBE_DIR/hack/config-go.sh
+  gitcommit
+)
+
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
+go_opt: -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.commitFromGit '$version'"
 EOF
 
 function find_go_files() {
   find * -not \( \
       \( \
         -wholename 'release' \
+        -o -wholename 'output' \
+        -o -wholename '_output' \
+        -o -wholename 'examples' \
+        -o -wholename 'test' \
       \) -prune \
     \) -name '*.go'
 }

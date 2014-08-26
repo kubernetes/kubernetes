@@ -1,6 +1,7 @@
 {% set root = '/var/src/scheduler' %}
 {% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
 {% set package_dir = root + '/src/' + package %}
+{% set go_opt = pillar['go_opt'] %}
 {% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/scheduler' %}
 {% else %}
@@ -36,7 +37,7 @@ scheduler-build:
   cmd.run:
     - cwd: {{ root }}
     - names:
-      - go build {{ package }}/plugin/cmd/scheduler
+      - go build {{ go_opt }} {{ package }}/plugin/cmd/scheduler
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}:{{ package_dir }}/Godeps/_workspace

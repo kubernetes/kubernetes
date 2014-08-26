@@ -1,6 +1,7 @@
 {% set root = '/var/src/kubelet' %}
 {% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
 {% set package_dir = root + '/src/' + package %}
+{% set go_opt = pillar['go_opt'] %}
 {% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/kubelet' %}
 {% else %}
@@ -36,7 +37,7 @@ kubelet-build:
   cmd.run:
     - cwd: {{ root }}
     - names:
-      - go build {{ package }}/cmd/kubelet
+      - go build {{ go_opt }} {{ package }}/cmd/kubelet
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}:{{ package_dir }}/Godeps/_workspace
