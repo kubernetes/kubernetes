@@ -65,6 +65,7 @@ type HostInterface interface {
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name string) (api.PodInfo, error)
+	RunInContainer(name, container string, cmd []string) ([]byte, error)
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
@@ -88,6 +89,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
+	s.mux.HandleFunc("/run/", s.handleRun)
 }
 
 // error serializes an error object into an HTTP response
@@ -202,6 +204,31 @@ func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-type", "application/json")
 	w.Write(data)
 
+}
+
+// handleRun handles requests to run a command inside a container
+func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
+	u, err := url.ParseRequestURI(req.RequestURI)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	parts := strings.Split(u.Path, "/")
+	if len(parts) != 4 {
+		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
+		return
+	}
+	podID := parts[2]
+	container := parts[3]
+	podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
+	command := strings.Split(u.Query().Get("cmd"), " ")
+	data, err := s.host.RunInContainer(podFullName, container, command)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	w.Header().Add("Content-type", "text/plain")
+	w.Write(data)
 }
 
 // ServeHTTP responds to HTTP requests on the Kubelet
