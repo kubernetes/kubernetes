@@ -1,11 +1,11 @@
 # Kubernetes Roadmap
 
-Updated August 8, 2014
+Updated August 25, 2014
 
 This document is intended to capture the set of features, docs, and patterns that we feel are required to call Kubernetes “feature complete” for a 1.0 release candidate.  This list does not emphasize the bug fixes and stabilization that will be required to take it all the way to production ready.  This is a living document, and is certainly open for discussion.
 
 ## APIs
-1. Versioned APIs:  Manage APIs for master components and kubelets with explicit versions, version-specific conversion routines, and component-to-component version checking.
+1. ~~Versioned APIs:  Manage APIs for master components and kubelets with explicit versions, version-specific conversion routines, and component-to-component version checking.~~ **Done**
 2. Deprecation policy: Declare the project’s intentions with regards to expiring and removing features and interfaces.
 3. Compatibility policy: Declare the project’s intentions with regards to saved state and live upgrades of components.
 4. Component-centric APIs:  Clarify which types belong in each component’s API and which ones are truly common.
@@ -24,7 +24,7 @@ This document is intended to capture the set of features, docs, and patterns tha
 
 
 ## Factoring and pluggability
-1. Pluggable scheduling: Cleanly separate the scheduler from the apiserver.
+1. ~~Pluggable scheduling: Cleanly separate the scheduler from the apiserver.~~ **Done**
 2. Pluggable naming and discovery: Call-outs or hooks to enable external naming systems.
 3. Pluggable volumes: Allow new kinds of data sources as volumes.
 4. Replication controller: Make replication controller a standalone entity in the master stack.
