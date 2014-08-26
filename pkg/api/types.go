@@ -478,3 +478,9 @@ type WatchEvent struct {
 type APIObject struct {
 	Object interface{}
 }
+
+type Config struct {
+	Services               []Service               `yaml:"services,omitempty" json:"services,omitempty"`
+	Pods                   []Pod                   `yaml:"pods,omitempty" json:"pods,omitempty"`
+	ReplicationControllers []ReplicationController `yaml:"replicationControllers,omitempty" json:"replicationControllers,omitempty"`
+}
