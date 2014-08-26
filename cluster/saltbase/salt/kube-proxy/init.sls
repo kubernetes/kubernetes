@@ -1,6 +1,7 @@
 {% set root = '/var/src/kube-proxy' %}
 {% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
 {% set package_dir = root + '/src/' + package %}
+{% set go_opt = pillar['go_opt'] %}
 {% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/kube-proxy' %}
 {% else %}
@@ -28,7 +29,7 @@ kube-proxy-build:
   cmd.run:
     - cwd: {{ root }}
     - names:
-      - go build {{ package }}/cmd/proxy
+      - go build {{ go_opt }} {{ package }}/cmd/proxy
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}:{{ package_dir }}/Godeps/_workspace

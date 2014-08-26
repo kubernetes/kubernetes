@@ -1,6 +1,7 @@
 {% set root = '/var/src/apiserver' %}
 {% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
 {% set package_dir = root + '/src/' + package %}
+{% set go_opt = pillar['go_opt'] %}
 {% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/apiserver' %}
 {% else %}
@@ -36,7 +37,7 @@ apiserver-build:
   cmd.run:
     - cwd: {{ root }}
     - names:
-      - go build {{ package }}/cmd/apiserver
+      - go build {{ go_opt }} {{ package }}/cmd/apiserver
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
       - GOPATH: {{ root }}:{{ package_dir }}/Godeps/_workspace

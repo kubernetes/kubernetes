@@ -41,4 +41,8 @@ for arg; do
   binaries+=("${KUBE_GO_PACKAGE}/${arg}")
 done
 
+# Note that the flags to 'go build' are duplicated in the salt build setup for
+# our cluster deploy.  If we add more command line options to our standard build
+# we'll want to duplicate them there.  As we move to distributing pre- built
+# binaries we can eliminate this duplication.
 go install -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.commitFromGit '${version}'" "${binaries[@]}"
