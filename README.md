@@ -64,12 +64,27 @@ The commands above will not work if there are more than one directory in ``$GOPA
 
 ### godep and dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that ``godep`` is installed and in your ``$PATH``. If you have already set up Go development environment correctly, the following command will install ``godep`` into your ``$GOBIN`` directory, which is ``$GOPATH/bin`` by default if ``$GOBIN`` is not set:
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. Please make sure that ``godep`` is installed and in your ``$PATH``.
 
+#### Installing godep
+There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
+
+1. Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
+source control system).  Use ```apt-get install mercurial``` or ```yum install mercurial``` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
+directly from mercurial.
+2. Create a new GOPATH for your tools and install godep:
 ```
-go get github.com/tools/godep
+GOPATH=$HOME/src/go-tools
+mkdir -p $GOPATH
+go install github.com/tools/godep
 ```
 
+3. Add $HOME/src/go-tools/bin to your path. Typically you'd add this to your ~/.profile:
+```
+export PATH=$PATH:$HOME/src/go-tools/bin
+```
+
+#### Using godep
 Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godep/_workspace.  You can use `godep` in three ways:
 
 1. Use `godep` to call your `go` commands.  For example: `godep go test ./...`

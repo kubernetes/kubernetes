@@ -9,12 +9,7 @@
 4. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
 5. You must have the [`gcloud` components](https://developers.google.com/cloud/sdk/) installed.
 6. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
-7. Install godep:
-   ```sh
-   export GOBIN=/usr/local/go/bin
-   go get github.com/tools/godep
-   ```
-
+7. Install godep. [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
 8. Get the Kubernetes source:
 
         git clone https://github.com/GoogleCloudPlatform/kubernetes.git
