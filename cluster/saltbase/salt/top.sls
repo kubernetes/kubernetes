@@ -10,6 +10,9 @@ base:
     - kube-proxy
     - cadvisor
     - nsinit
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
+    - openvpn-client
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
@@ -19,6 +22,9 @@ base:
     - controller-manager
     - scheduler
     - nginx
+{% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
+    - openvpn
+{% endif %}
 
   'roles:kubernetes-pool-vsphere':
     - match: grain
