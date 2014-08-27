@@ -32,14 +32,13 @@ If this rule is missing from the default network or if you change the network be
 
 ### Running a container (simple version)
 
-Once you have your instances up and running, the `build-go.sh` script sets up
-your Go workspace and builds the Go components.
+Once you have your instances up and running, run `make` to build the kubernetes binaries.
 
 The `kubecfg.sh` script spins up two containers, running [Nginx](http://nginx.org/en/) and with port 80 mapped to 8080:
 
 ```
 cd kubernetes
-hack/build-go.sh
+make
 cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
 ```
 
@@ -56,7 +55,7 @@ cluster/kubecfg.sh rm myNginx
 ### Running a container (more complete version)
 
 
-Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`, you
+Assuming you've run `hack/dev-build-and-up.sh` and `make`, you
 can create a pod like this:
 
 

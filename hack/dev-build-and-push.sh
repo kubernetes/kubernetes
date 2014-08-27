@@ -17,17 +17,17 @@
 # This script will build a dev release and push it to an existing cluster.
 
 # First build the binaries
-$(dirname $0)/build-go.sh
+make -C $(dirname "$0")/.. all
 if [ "$?" != "0" ]; then
         exit 1
 fi
 
 # Then build a release
-$(dirname $0)/../release/release.sh
+$(dirname "$0")/../release/release.sh
 if [ "$?" != "0" ]; then
         echo "Building a release failed!"
         exit 1
 fi
 
 # Now push this out to the cluster
-$(dirname $0)/../cluster/kube-push.sh
+$(dirname "$0")/../cluster/kube-push.sh

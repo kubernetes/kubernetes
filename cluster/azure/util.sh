@@ -251,7 +251,7 @@ function kube-down {
 # # Execute prior to running tests to build a release if required for env
 # function test-build-release {
 #   # Build source
-#   ${KUBE_REPO_ROOT}/hack/build-go.sh
+#   make -C ${KUBE_REPO_ROOT}
 #   # Make a release
 #   $(dirname $0)/../release/release.sh
 # }

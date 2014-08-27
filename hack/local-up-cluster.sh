@@ -29,7 +29,7 @@ fi
 # Stop right away if the build fails
 set -e
 
-$(dirname $0)/build-go.sh
+make -C $(dirname "$0")/..
 
 echo "Starting etcd"
 start_etcd
@@ -41,7 +41,7 @@ API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 
-GO_OUT=$(dirname $0)/../output/go/bin
+GO_OUT=$(dirname "$0")/../output/go/bin
 
 APISERVER_LOG=/tmp/apiserver.log
 ${GO_OUT}/apiserver \

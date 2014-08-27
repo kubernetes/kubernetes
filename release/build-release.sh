@@ -44,10 +44,11 @@ cp -r $KUBE_DIR/cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
 # on.
 version=$(
   unset IFS
-  source $KUBE_DIR/hack/config-go.sh
-  gitcommit
+  make -s -C $KUBE_DIR .version
+  cat $KUBE_DIR/.version
 )
 
+# Keep the go_opt flag in sync with Makefile.
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
 go_opt: -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.commitFromGit '$version'"

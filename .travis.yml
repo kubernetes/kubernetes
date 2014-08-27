@@ -5,17 +5,17 @@ go:
   - 1.2
   - tip
 
-install: 
+install:
   - go get code.google.com/p/go.tools/cmd/cover
   - go get github.com/coreos/etcd
   - go get github.com/tools/godep
-  - ./hack/verify-gofmt.sh
+  - PATH=$HOME/gopath/bin:$PATH make check_gofmt
   - ./hack/verify-boilerplate.sh
   - ./hack/install-std-race.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/build-go.sh
+  - PATH=$HOME/gopath/bin:$PATH make all
 
 script:
-  - PATH=$HOME/gopath/bin:$PATH ./hack/test-go.sh
+  - PATH=$HOME/gopath/bin:$PATH make test
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-integration.sh
 
