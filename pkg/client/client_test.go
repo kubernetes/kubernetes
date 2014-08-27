@@ -542,3 +542,12 @@ func TestGetServerVersion(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
+
+func TestListMinions(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "GET", Path: "/minions"},
+		Response: Response{StatusCode: 200, Body: &api.MinionList{JSONBase: api.JSONBase{ID: "minion-1"}}},
+	}
+	response, err := c.Setup().ListMinions()
+	c.Validate(t, &response, err)
+}

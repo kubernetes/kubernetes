@@ -128,3 +128,8 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 	versionInfo := version.Get()
 	return &versionInfo, nil
 }
+
+func (c *Fake) ListMinions() (api.MinionList, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "list-minions", Value: nil})
+	return api.MinionList{}, nil
+}
