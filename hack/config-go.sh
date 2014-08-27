@@ -17,27 +17,43 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-# gitcommit prints the current Git commit information
-function gitcommit() {
-  set -o errexit
-  set -o nounset
-  set -o pipefail
+# --- Helper Functions ---
 
-  topdir=$(dirname "$0")/..
-  cd "${topdir}"
+# Function kube::version_ldflags() prints the value that needs to be passed to
+# the -ldflags parameter of go build in order to set the Kubernetes based on the
+# git tree status.
+kube::version_ldflags() {
+  (
+    # Run this in a subshell to prevent settings/variables from leaking.
+    set -o errexit
+    set -o nounset
+    set -o pipefail
 
-  # TODO: when we start making tags, switch to git describe?
-  if git_commit=$(git rev-parse --short "HEAD^{commit}" 2>/dev/null); then
-    # Check if the tree is dirty.
-    if ! dirty_tree=$(git status --porcelain) || [[ -n "${dirty_tree}" ]]; then
-      echo "${git_commit}-dirty"
-    else
-      echo "${git_commit}"
+    unset CDPATH
+
+    cd "${KUBE_REPO_ROOT}"
+
+    declare -a ldflags=()
+    if git_commit=$(git rev-parse "HEAD^{commit}" 2>/dev/null); then
+      ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${git_commit}")
+
+      # Check if the tree is dirty.
+      if git_status=$(git status --porcelain) && [[ -z "${git_status}" ]]; then
+        git_tree_state="clean"
+      else
+        git_tree_state="dirty"
+      fi
+      ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${git_tree_state}")
+
+      # Use git describe to find the version based on annotated tags.
+      if git_version=$(git describe --abbrev=14 "${git_commit}^{commit}" 2>/dev/null); then
+        ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${git_version}")
+      fi
     fi
-  else
-    echo "(none)"
-  fi
-  return 0
+
+    # The -ldflags parameter takes a single string, so join the output.
+    echo "${ldflags[*]}"
+  )
 }
 
 # kube::setup_go_environment will check that `go` and `godep` commands are

@@ -26,6 +26,8 @@ INSTANCE_PREFIX=$1
 
 KUBE_DIR=$SCRIPT_DIR/..
 
+. "${KUBE_DIR}/hack/config-go.sh"
+
 # Next build the release tar.  This gets copied on to the master and installed
 # from there.  It includes the go source for the necessary servers along with
 # the salt configs.
@@ -41,15 +43,11 @@ cp -r $KUBE_DIR/cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
 
 # Capture the same version we are using to build the client tools and pass that
 # on.
-version=$(
-  unset IFS
-  source $KUBE_DIR/hack/config-go.sh
-  gitcommit
-)
+version_ldflags=$(kube::version_ldflags)
 
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
-go_opt: -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.gitCommit '$version'"
+go_opt: -ldflags '${version_ldflags}'
 EOF
 
 function find_go_files() {
