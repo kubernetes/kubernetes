@@ -47,9 +47,54 @@ KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 30s}
 
 cd "${KUBE_TARGET}"
 
-if [ "$1" != "" ]; then
-  go test -race $KUBE_TIMEOUT $KUBE_COVER -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1" "${@:2}"
+while getopts "i:" opt ; do
+  case $opt in
+    i)
+      iterations=$OPTARG
+      ;;
+    ?)
+      echo "Invalid argument -$OPTARG"
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG <value>"
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+if [[ -n "${iterations}" ]]; then
+  echo "Running ${iterations} times"
+  if [[ -n "$1" ]]; then
+    pkg=$KUBE_GO_PACKAGE/$1
+  fi
+  rm -f *.test
+  # build a test binary
+  echo "${pkg}"
+  go test -c -race ${KUBE_TIMEOUT} "${pkg}"
+  # keep going, even if there are failures
+  pass=0
+  count=0
+  for i in $(seq 1 ${iterations}); do
+    for test_binary in *.test; do
+      if "./${test_binary}"; then
+        ((pass++))
+      fi
+      ((count++))
+    done
+  done 2>&1
+  echo "${pass}" / "${count}" passing
+  if [[ ${pass} != ${count} ]]; then
+    exit 1
+  else
+    exit 0
+  fi
+fi
+
+if [[ -n "$1" ]]; then
+  go test -race ${KUBE_TIMEOUT} ${KUBE_COVER} -coverprofile=tmp.out "${KUBE_GO_PACKAGE}/$1" "${@:2}"
   exit 0
 fi
 
-find_test_dirs | xargs go test -race -timeout 30s $KUBE_COVER "${@:2}"
+find_test_dirs | xargs go test -race -timeout 30s ${KUBE_COVER} "${@:2}"
