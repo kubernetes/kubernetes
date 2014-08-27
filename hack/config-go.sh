@@ -31,6 +31,8 @@ function gitcommit() {
     # Check if the tree is dirty.
     if ! dirty_tree=$(git status --porcelain) || [[ -n "${dirty_tree}" ]]; then
       echo "${git_commit}-dirty"
+    else
+      echo "${git_commit}"
     fi
   else
     echo "(none)"
