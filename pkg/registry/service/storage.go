@@ -179,7 +179,7 @@ func (rs *RegistryStorage) ResourceLocation(id string) (string, error) {
 	if len(e.Endpoints) == 0 {
 		return "", fmt.Errorf("no endpoints available for %v", id)
 	}
-	return e.Endpoints[rand.Intn(len(e.Endpoints))], nil
+	return "http://" + e.Endpoints[rand.Intn(len(e.Endpoints))], nil
 }
 
 func (rs *RegistryStorage) deleteExternalLoadBalancer(service *api.Service) error {

@@ -51,6 +51,7 @@ func TestRedirect(t *testing.T) {
 
 	for _, item := range table {
 		simpleStorage.errors["resourceLocation"] = item.err
+		simpleStorage.resourceLocation = item.id
 		resp, err := client.Get(server.URL + "/prefix/version/redirect/foo/" + item.id)
 		if resp == nil {
 			t.Fatalf("Unexpected nil resp")
