@@ -198,29 +198,20 @@ func makeEnvironmentVariables(container *api.Container) []string {
 	return result
 }
 
-func makeVolumesAndBinds(pod *Pod, container *api.Container, podVolumes volumeMap) (map[string]struct{}, []string) {
-	volumes := map[string]struct{}{}
+func makeBinds(pod *Pod, container *api.Container, podVolumes volumeMap) []string {
 	binds := []string{}
-	for _, volume := range container.VolumeMounts {
-		var basePath string
-		if vol, ok := podVolumes[volume.Name]; ok {
-			// Host volumes are not Docker volumes and are directly mounted from the host.
-			basePath = fmt.Sprintf("%s:%s", vol.GetPath(), volume.MountPath)
-		} else if volume.MountType == "HOST" {
-			// DEPRECATED: VolumeMount.MountType will be handled by the Volume struct.
-			basePath = fmt.Sprintf("%s:%s", volume.MountPath, volume.MountPath)
-		} else {
-			// TODO(jonesdl) This clause should be deleted and an error should be thrown. The default
-			// behavior is now supported by the EmptyDirectory type.
-			volumes[volume.MountPath] = struct{}{}
-			basePath = fmt.Sprintf("/exports/%s/%s:%s", GetPodFullName(pod), volume.Name, volume.MountPath)
+	for _, mount := range container.VolumeMounts {
+		vol, ok := podVolumes[mount.Name]
+		if !ok {
+			continue
 		}
-		if volume.ReadOnly {
-			basePath += ":ro"
+		b := fmt.Sprintf("%s:%s", vol.GetPath(), mount.MountPath)
+		if mount.ReadOnly {
+			b += ":ro"
 		}
-		binds = append(binds, basePath)
+		binds = append(binds, b)
 	}
-	return volumes, binds
+	return binds
 }
 
 func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
@@ -294,7 +285,7 @@ func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volume
 // Run a single container from a pod. Returns the docker container ID
 func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes volumeMap, netMode string) (id DockerID, err error) {
 	envVariables := makeEnvironmentVariables(container)
-	volumes, binds := makeVolumesAndBinds(pod, container, podVolumes)
+	binds := makeBinds(pod, container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
 	opts := docker.CreateContainerOptions{
@@ -307,7 +298,6 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 			Image:        container.Image,
 			Memory:       int64(container.Memory),
 			CpuShares:    int64(milliCPUToShares(container.CPU)),
-			Volumes:      volumes,
 			WorkingDir:   container.WorkingDir,
 		},
 	}

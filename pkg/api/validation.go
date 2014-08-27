@@ -22,7 +22,6 @@ import (
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 func validateVolumes(volumes []Volume) (util.StringSet, errs.ErrorList) {
@@ -142,17 +141,7 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errs.Err
 			mErrs = append(mErrs, errs.NewNotFound("name", mnt.Name))
 		}
 		if len(mnt.MountPath) == 0 {
-			// Backwards compat.
-			if len(mnt.Path) == 0 {
-				mErrs = append(mErrs, errs.NewRequired("mountPath", mnt.MountPath))
-			} else {
-				glog.Warning("DEPRECATED: VolumeMount.Path has been replaced by VolumeMount.MountPath")
-				mnt.MountPath = mnt.Path
-				mnt.Path = ""
-			}
-		}
-		if len(mnt.MountType) != 0 {
-			glog.Warning("DEPRECATED: VolumeMount.MountType will be removed. The Volume struct will handle types")
+			mErrs = append(mErrs, errs.NewRequired("mountPath", mnt.MountPath))
 		}
 		allErrs = append(allErrs, mErrs.PrefixIndex(i)...)
 	}
