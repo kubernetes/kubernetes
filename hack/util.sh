@@ -64,3 +64,26 @@ function start_etcd {
 
   wait_for_url "http://localhost:4001/v2/keys/" "etcd: "
 }
+
+# gitcommit prints the current Git commit information
+function gitcommit() {
+  set -o errexit
+  set -o nounset
+  set -o pipefail
+
+  topdir=$(dirname "$0")/..
+  cd "${topdir}"
+
+  # TODO: when we start making tags, switch to git describe?
+  if git_commit=$(git rev-parse --short "HEAD^{commit}" 2>/dev/null); then
+    # Check if the tree is dirty.
+    if ! dirty_tree=$(git status --porcelain) || [[ -n "${dirty_tree}" ]]; then
+      echo "${git_commit}-dirty"
+    else
+      echo "${git_commit}"
+    fi
+  else
+    echo "(none)"
+  fi
+  return 0
+}
