@@ -198,6 +198,13 @@ func makeEnvironmentVariables(container *api.Container) []string {
 	return result
 }
 
+func makeContainerEnvironmentVariables(pod *Pod, container *api.Container) []string {
+	return []string{
+		fmt.Sprintf("K8S_POD_ID=%s", pod.Manifest.ID),
+		fmt.Sprintf("K8S_CONTAINER_NAME=%s", container.Name),
+	}
+}
+
 func makeVolumesAndBinds(pod *Pod, container *api.Container, podVolumes volumeMap) (map[string]struct{}, []string) {
 	volumes := map[string]struct{}{}
 	binds := []string{}
@@ -294,6 +301,7 @@ func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volume
 // Run a single container from a pod. Returns the docker container ID
 func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes volumeMap, netMode string) (id DockerID, err error) {
 	envVariables := makeEnvironmentVariables(container)
+	envVariables = append(envVariables, makeContainerEnvironmentVariables(pod, container)...)
 	volumes, binds := makeVolumesAndBinds(pod, container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
