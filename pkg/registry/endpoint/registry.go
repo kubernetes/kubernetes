@@ -14,25 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package endpoint
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// Registry is an interface for things that know how to store services.
+// Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListServices() (api.ServiceList, error)
-	CreateService(svc api.Service) error
-	GetService(name string) (*api.Service, error)
-	DeleteService(name string) error
-	UpdateService(svc api.Service) error
-	WatchServices(labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
-
-	// TODO: endpoints and their implementation should be separated, setting endpoints should be
-	// supported via the API, and the endpoints-controller should use the API to update endpoints.
-	endpoint.Registry
+	GetEndpoints(name string) (*api.Endpoints, error)
+	WatchEndpoints(labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	UpdateEndpoints(e api.Endpoints) error
 }

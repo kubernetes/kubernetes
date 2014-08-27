@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // RegistryStorage adapts a service registry into apiserver's RESTStorage model.
@@ -121,6 +122,12 @@ func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
 	}
 	list.Items = filtered
 	return list, err
+}
+
+// Watch returns Services events via a watch.Interface.
+// It implements apiserver.ResourceWatcher.
+func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return rs.registry.WatchServices(label, field, resourceVersion)
 }
 
 func (rs RegistryStorage) New() interface{} {

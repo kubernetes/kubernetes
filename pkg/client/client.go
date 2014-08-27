@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -67,6 +68,9 @@ type ServiceInterface interface {
 	CreateService(api.Service) (api.Service, error)
 	UpdateService(api.Service) (api.Service, error)
 	DeleteService(string) error
+	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+
+	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // VersionInterface has a method to retrieve the server version
@@ -183,7 +187,12 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 // requestBody is the body of the request. Can be nil.
 // target the interface to marshal the JSON response into.  Can be nil.
 func (c *RESTClient) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
-	request, err := http.NewRequest(method, c.makeURL(path), requestBody)
+	reqUrl, err := c.makeURL(path)
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequest(method, reqUrl, requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +210,24 @@ func (c *RESTClient) rawRequest(method, path string, requestBody io.Reader, targ
 	return body, err
 }
 
-func (c *RESTClient) makeURL(path string) string {
-	return c.host + c.Prefix + path
+func (c *RESTClient) makeURL(path string) (string, error) {
+	base := c.host
+	hostURL, err := url.Parse(base)
+	if err != nil {
+		return "", err
+	}
+	if hostURL.Scheme == "" {
+		hostURL, err = url.Parse("http://" + base)
+		if err != nil {
+			return "", err
+		}
+		if hostURL.Path != "" && hostURL.Path != "/" {
+			return "", fmt.Errorf("host must be a URL or a host:port pair: %s", base)
+		}
+	}
+	hostURL.Path += c.Prefix + path
+
+	return hostURL.String(), nil
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector
@@ -307,6 +332,28 @@ func (c *Client) UpdateService(svc api.Service) (result api.Service, err error) 
 // DeleteService deletes an existing service.
 func (c *Client) DeleteService(name string) error {
 	return c.Delete().Path("services").Path(name).Do().Error()
+}
+
+// WatchService returns a watch.Interface that watches the requested services.
+func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return c.Get().
+		Path("watch").
+		Path("services").
+		UintParam("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
+}
+
+// WatchEndpoints returns a watch.Interface that watches the requested endpoints for a service.
+func (c *Client) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return c.Get().
+		Path("watch").
+		Path("endpoints").
+		UintParam("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
 }
 
 // ServerVersion retrieves and parses the server's version.

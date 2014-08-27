@@ -35,6 +35,7 @@ type Fake struct {
 	Actions []FakeAction
 	Pods    api.PodList
 	Ctrl    api.ReplicationController
+	Watch   watch.Interface
 }
 
 func (c *Fake) ListPods(selector labels.Selector) (api.PodList, error) {
@@ -88,8 +89,8 @@ func (c *Fake) DeleteReplicationController(controller string) error {
 }
 
 func (c *Fake) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	c.Actions = append(c.Actions, FakeAction{Action: "watch-controllers"})
-	return watch.NewFake(), nil
+	c.Actions = append(c.Actions, FakeAction{Action: "watch-controllers", Value: resourceVersion})
+	return c.Watch, nil
 }
 
 func (c *Fake) GetService(name string) (api.Service, error) {
@@ -110,6 +111,16 @@ func (c *Fake) UpdateService(service api.Service) (api.Service, error) {
 func (c *Fake) DeleteService(service string) error {
 	c.Actions = append(c.Actions, FakeAction{Action: "delete-service", Value: service})
 	return nil
+}
+
+func (c *Fake) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "watch-services", Value: resourceVersion})
+	return c.Watch, nil
+}
+
+func (c *Fake) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
+	return c.Watch, nil
 }
 
 func (c *Fake) ServerVersion() (*version.Info, error) {

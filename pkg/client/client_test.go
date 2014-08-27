@@ -37,6 +37,33 @@ func makeURL(suffix string) string {
 	return apiPath + suffix
 }
 
+func TestValidatesHostParameter(t *testing.T) {
+	testCases := map[string]struct {
+		Value string
+		Err   bool
+	}{
+		"foo.bar.com":        {"http://foo.bar.com/api/v1beta1/", false},
+		"http://host/server": {"http://host/server/api/v1beta1/", false},
+		"host/server":        {"", true},
+	}
+	for k, expected := range testCases {
+		c := RESTClient{host: k, Prefix: "/api/v1beta1/"}
+		actual, err := c.makeURL("")
+		switch {
+		case err == nil && expected.Err:
+			t.Errorf("expected error but was nil")
+			continue
+		case err != nil && !expected.Err:
+			t.Errorf("unexpected error %v", err)
+			continue
+		}
+		if expected.Value != actual {
+			t.Errorf("%s: expected %s, got %s", k, expected.Value, actual)
+			continue
+		}
+	}
+}
+
 func TestListEmptyPods(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/pods"},

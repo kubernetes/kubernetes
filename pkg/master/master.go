@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	goetcd "github.com/coreos/go-etcd/etcd"
@@ -54,6 +55,7 @@ type Master struct {
 	podRegistry        pod.Registry
 	controllerRegistry controller.Registry
 	serviceRegistry    service.Registry
+	endpointRegistry   endpoint.Registry
 	minionRegistry     minion.Registry
 	bindingRegistry    binding.Registry
 	storage            map[string]apiserver.RESTStorage
@@ -68,6 +70,7 @@ func New(c *Config) *Master {
 		podRegistry:        etcd.NewRegistry(etcdClient, minionRegistry),
 		controllerRegistry: etcd.NewRegistry(etcdClient, minionRegistry),
 		serviceRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
+		endpointRegistry:   etcd.NewRegistry(etcdClient, minionRegistry),
 		bindingRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
@@ -106,7 +109,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	podCache := NewPodCache(podInfoGetter, m.podRegistry)
 	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
-	endpoints := endpoint.NewEndpointController(m.serviceRegistry, m.client)
+	endpoints := servicecontroller.NewEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	m.storage = map[string]apiserver.RESTStorage{
@@ -118,6 +121,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 		}),
 		"replicationControllers": controller.NewRegistryStorage(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
+		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
 		"minions":                minion.NewRegistryStorage(m.minionRegistry),
 
 		// TODO: should appear only in scheduler API group.

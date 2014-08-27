@@ -241,6 +241,122 @@ func TestWatch(t *testing.T) {
 	}
 }
 
+func TestWatchEtcdState(t *testing.T) {
+	type T struct {
+		Type      watch.EventType
+		Endpoints []string
+	}
+	testCases := map[string]struct {
+		Initial   map[string]EtcdResponseWithError
+		Responses []*etcd.Response
+		From      uint64
+		Expected  []*T
+	}{
+		"from not found": {
+			Initial: map[string]EtcdResponseWithError{},
+			Responses: []*etcd.Response{
+				{
+					Action: "create",
+					Node: &etcd.Node{
+						Value: string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+					},
+				},
+			},
+			From: 1,
+			Expected: []*T{
+				{watch.Added, nil},
+			},
+		},
+		"from version 1": {
+			Responses: []*etcd.Response{
+				{
+					Action: "compareAndSwap",
+					Node: &etcd.Node{
+						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						CreatedIndex:  1,
+						ModifiedIndex: 2,
+					},
+					PrevNode: &etcd.Node{
+						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						CreatedIndex:  1,
+						ModifiedIndex: 1,
+					},
+				},
+			},
+			From: 1,
+			Expected: []*T{
+				{watch.Modified, []string{"127.0.0.1:9000"}},
+			},
+		},
+		"from initial state": {
+			Initial: map[string]EtcdResponseWithError{
+				"/somekey/foo": {
+					R: &etcd.Response{
+						Action: "get",
+						Node: &etcd.Node{
+							Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+							CreatedIndex:  1,
+							ModifiedIndex: 1,
+						},
+						EtcdIndex: 1,
+					},
+				},
+			},
+			Responses: []*etcd.Response{
+				nil,
+				{
+					Action: "compareAndSwap",
+					Node: &etcd.Node{
+						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						CreatedIndex:  1,
+						ModifiedIndex: 2,
+					},
+					PrevNode: &etcd.Node{
+						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						CreatedIndex:  1,
+						ModifiedIndex: 1,
+					},
+				},
+			},
+			Expected: []*T{
+				{watch.Added, nil},
+				{watch.Modified, []string{"127.0.0.1:9000"}},
+			},
+		},
+	}
+
+	for k, testCase := range testCases {
+		fakeClient := NewFakeEtcdClient(t)
+		for key, value := range testCase.Initial {
+			fakeClient.Data[key] = value
+		}
+		h := EtcdHelper{fakeClient, codec, versioner}
+		watching, err := h.Watch("/somekey/foo", testCase.From)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", k, err)
+			continue
+		}
+		fakeClient.WaitForWatchCompletion()
+
+		t.Logf("Testing %v", k)
+		for i := range testCase.Responses {
+			if testCase.Responses[i] != nil {
+				fakeClient.WatchResponse <- testCase.Responses[i]
+			}
+			event := <-watching.ResultChan()
+			if e, a := testCase.Expected[i].Type, event.Type; e != a {
+				t.Errorf("%s: expected type %v, got %v", k, e, a)
+				break
+			}
+			if e, a := testCase.Expected[i].Endpoints, event.Object.(*api.Endpoints).Endpoints; !reflect.DeepEqual(e, a) {
+				t.Errorf("%s: expected type %v, got %v", k, e, a)
+				break
+			}
+		}
+		watching.Stop()
+	}
+}
+
 func TestWatchFromZeroIndex(t *testing.T) {
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 

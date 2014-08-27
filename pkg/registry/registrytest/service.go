@@ -18,6 +18,8 @@ package registrytest
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func NewServiceRegistry() *ServiceRegistry {
@@ -60,7 +62,19 @@ func (r *ServiceRegistry) UpdateService(svc api.Service) error {
 	return r.Err
 }
 
+func (r *ServiceRegistry) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return nil, r.Err
+}
+
+func (r *ServiceRegistry) GetEndpoints(name string) (*api.Endpoints, error) {
+	return &r.Endpoints, r.Err
+}
+
 func (r *ServiceRegistry) UpdateEndpoints(e api.Endpoints) error {
 	r.Endpoints = e
 	return r.Err
+}
+
+func (r *ServiceRegistry) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+	return nil, r.Err
 }
