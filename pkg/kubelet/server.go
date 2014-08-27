@@ -68,6 +68,7 @@ type HostInterface interface {
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name, uuid string) (api.PodInfo, error)
 	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
+	GetKubeletContainerLogs(containerID, tail string, follow bool, writer io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
@@ -92,6 +93,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
 	s.mux.HandleFunc("/run/", s.handleRun)
+	s.mux.HandleFunc("/containerLogs", s.handleContainerLogs)
 }
 
 // error serializes an error object into an HTTP response.
@@ -143,7 +145,45 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handlePodInfo handles podInfo requests against the Kubelet.
+// handleContainerLogs handles containerLogs request againts the Kubelet
+func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+	u, err := url.ParseRequestURI(req.RequestURI)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	uriValues := u.Query()
+
+	containerID := uriValues.Get("containerID")
+	follow := uriValues.Get("follow") == "1"
+	tail := uriValues.Get("tail")
+
+	if len(containerID) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "Missing 'containerID=' query entry.", http.StatusBadRequest)
+		return
+	}
+	logWriter := httplog.LogOf(req, w)
+	w = httplog.Unlogged(w)
+	fw := FlushWriter{writer: w}
+	if flusher, ok := w.(http.Flusher); ok {
+		fw.flusher = flusher
+	} else {
+		logWriter.Addf("unable to get Flusher")
+		http.NotFound(w, req)
+		return
+	}
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
+	err = s.host.GetKubeletContainerLogs(containerID, tail, follow, &fw)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+}
+
+// handlePodInfo handles podInfo requests against the Kubelet
 func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {

@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/fsouza/go-dockerclient"
@@ -46,6 +47,7 @@ type DockerInterface interface {
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
+	Logs(opts docker.LogsOptions) error
 }
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
@@ -200,6 +202,26 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 		}
 	}
 	return result, nil
+}
+
+// GetKubeletDockerContainerLogs returns logs of specific container
+func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail string, follow bool, writer io.Writer) (err error) {
+	opts := docker.LogsOptions{
+		Container:    containerID,
+		Stdout:       true,
+		Stderr:       true,
+		OutputStream: writer,
+		ErrorStream:  writer,
+		Timestamps:   true,
+		RawTerminal:  true,
+	}
+
+	if opts.Follow = follow; follow == false {
+		opts.Tail = tail
+	}
+
+	err = client.Logs(opts)
+	return
 }
 
 // ErrNoContainersInPod is returned when there are no containers for a given pod
