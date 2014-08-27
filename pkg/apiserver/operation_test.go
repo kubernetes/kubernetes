@@ -92,7 +92,15 @@ func TestOperation(t *testing.T) {
 }
 
 func TestOperationsList(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{}
+	testOver := make(chan struct{})
+	defer close(testOver)
+	simpleStorage := &SimpleRESTStorage{
+		injectedFunction: func(obj interface{}) (interface{}, error) {
+			// Eliminate flakes by ensuring the create operation takes longer than this test.
+			<-testOver
+			return obj, nil
+		},
+	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version")
