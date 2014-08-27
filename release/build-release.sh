@@ -49,7 +49,7 @@ version=$(
 
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
-go_opt: -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.commitFromGit '$version'"
+go_opt: -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.gitCommit '$version'"
 EOF
 
 function find_go_files() {
