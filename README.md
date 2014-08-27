@@ -151,6 +151,9 @@ cd kubernetes
 hack/e2e-test.sh
 ```
 
+### Testing out flaky tests
+[Instructions here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/flaky-tests.md)
+
 ### Add/Update dependencies
 
 Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. To add or update a package, please follow the instructions on [godep's document](https://github.com/tools/godep).
