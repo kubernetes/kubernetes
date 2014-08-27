@@ -45,4 +45,4 @@ done
 # our cluster deploy.  If we add more command line options to our standard build
 # we'll want to duplicate them there.  As we move to distributing pre- built
 # binaries we can eliminate this duplication.
-go install -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.commitFromGit '${version}'" "${binaries[@]}"
+go install -ldflags "-X github.com/GoogleCloudPlatform/kubernetes/pkg/version.gitCommit '${version}'" "${binaries[@]}"
