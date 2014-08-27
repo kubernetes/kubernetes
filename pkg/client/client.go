@@ -328,6 +328,7 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
+// Lists all the minions in the cluster.
 func (c *Client) ListMinions() (minionList api.MinionList, err error) {
 	err = c.Get().Path("minions").Do().Into(&minionList)
 	return
