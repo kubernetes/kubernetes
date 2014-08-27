@@ -116,13 +116,7 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
 	// Required.
-	// Exactly one of the following must be set.  If both are set, prefer MountPath.
-	// DEPRECATED: Path will be removed in a future version of the API.
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
-	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
-	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
-	// DEPRECATED: MountType will be removed in a future version of the API.
-	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container

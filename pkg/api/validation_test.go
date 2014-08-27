@@ -17,12 +17,10 @@ limitations under the License.
 package api
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -154,42 +152,6 @@ func TestValidateEnv(t *testing.T) {
 	}
 }
 
-func TestEnvConversion(t *testing.T) {
-	nonCanonical := []v1beta1.EnvVar{
-		{Key: "EV"},
-		{Key: "EV", Name: "EX"},
-	}
-	canonical := []EnvVar{
-		{Name: "EV"},
-		{Name: "EX"},
-	}
-	for i := range nonCanonical {
-		var got EnvVar
-		err := Convert(&nonCanonical[i], &got)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if e, a := canonical[i], got; !reflect.DeepEqual(e, a) {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-	}
-
-	// Test conversion the other way, too.
-	for i := range canonical {
-		var got v1beta1.EnvVar
-		err := Convert(&canonical[i], &got)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if e, a := canonical[i].Name, got.Key; e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-		if e, a := canonical[i].Name, got.Name; e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-	}
-}
-
 func TestValidateVolumeMounts(t *testing.T) {
 	volumes := util.NewStringSet("abc", "123", "abc-123")
 
@@ -200,16 +162,6 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 	if errs := validateVolumeMounts(successCase, volumes); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
-	}
-
-	nonCanonicalCase := []VolumeMount{
-		{Name: "abc", Path: "/foo"},
-	}
-	if errs := validateVolumeMounts(nonCanonicalCase, volumes); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-	if nonCanonicalCase[0].MountPath != "/foo" {
-		t.Errorf("expected canonicalized values: %+v", nonCanonicalCase[0])
 	}
 
 	errorCases := map[string][]VolumeMount{
@@ -293,7 +245,7 @@ func TestValidateManifest(t *testing.T) {
 					},
 					VolumeMounts: []VolumeMount{
 						{Name: "vol1", MountPath: "/foo"},
-						{Name: "vol1", Path: "/bar"},
+						{Name: "vol1", MountPath: "/bar"},
 					},
 				},
 			},

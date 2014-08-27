@@ -43,10 +43,9 @@ type resourceVersioner interface {
 var Codec codec
 var ResourceVersioner resourceVersioner
 
-var conversionScheme *conversion.Scheme
+var conversionScheme = conversion.NewScheme()
 
 func init() {
-	conversionScheme = conversion.NewScheme()
 	conversionScheme.InternalVersion = ""
 	conversionScheme.ExternalVersion = "v1beta1"
 	conversionScheme.MetaInsertionFactory = metaInsertion{}
@@ -81,30 +80,6 @@ func init() {
 		v1beta1.ContainerManifestList{},
 		v1beta1.Endpoints{},
 		v1beta1.Binding{},
-	)
-
-	// TODO: when we get more of this stuff, move to its own file. This is not a
-	// good home for lots of conversion functions.
-	// TODO: Consider inverting dependency chain-- imagine v1beta1 package
-	// registering all of these functions. Then, if you want to be able to understand
-	// v1beta1 objects, you just import that package for its side effects.
-	AddConversionFuncs(
-		// EnvVar's Key is deprecated in favor of Name.
-		func(in *EnvVar, out *v1beta1.EnvVar) error {
-			out.Value = in.Value
-			out.Key = in.Name
-			out.Name = in.Name
-			return nil
-		},
-		func(in *v1beta1.EnvVar, out *EnvVar) error {
-			out.Value = in.Value
-			if in.Name != "" {
-				out.Name = in.Name
-			} else {
-				out.Name = in.Key
-			}
-			return nil
-		},
 	)
 
 	Codec = conversionScheme
