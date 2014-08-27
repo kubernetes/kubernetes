@@ -425,7 +425,7 @@ func TestWatchFromOtherError(t *testing.T) {
 		if ok {
 			t.Fatalf("expected result channel to be closed")
 		}
-	case <-time.After(1 * time.Millisecond):
+	case <-time.After(1 * time.Second):
 		t.Fatalf("watch should have closed channel: %#v", watching)
 	}
 
