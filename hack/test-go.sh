@@ -19,6 +19,12 @@ set -e
 
 source $(dirname $0)/config-go.sh
 
+# Go to the top of the tree.
+cd "${KUBE_REPO_ROOT}"
+
+# Check for `go` binary and set ${GOPATH}.
+kube::setup_go_environment
+
 
 find_test_dirs() {
   cd src/${KUBE_GO_PACKAGE}

@@ -28,6 +28,9 @@ hackdir=$(CDPATH="" cd $(dirname $0); pwd)
 # Go to the top of the tree.
 cd "${KUBE_REPO_ROOT}"
 
+# Check for `go` binary and set ${GOPATH}.
+kube::setup_go_environment
+
 # Fetch the version.
 version=$(gitcommit)
 
