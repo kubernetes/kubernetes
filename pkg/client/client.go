@@ -40,6 +40,7 @@ type Interface interface {
 	ReplicationControllerInterface
 	ServiceInterface
 	VersionInterface
+	MinionInterface
 }
 
 // PodInterface has methods to work with Pod resources
@@ -72,6 +73,10 @@ type ServiceInterface interface {
 // VersionInterface has a method to retrieve the server version
 type VersionInterface interface {
 	ServerVersion() (*version.Info, error)
+}
+
+type MinionInterface interface {
+	ListMinions() (api.MinionList, error)
 }
 
 // Client is the actual implementation of a Kubernetes client.
@@ -321,4 +326,9 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("Got '%s': %v", string(body), err)
 	}
 	return &info, nil
+}
+
+func (c *Client) ListMinions() (minionList api.MinionList, err error) {
+	err = c.Get().Path("minions").Do().Into(&minionList)
+	return
 }
