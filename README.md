@@ -21,6 +21,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [CoreOS](docs/getting-started-guides/coreos.md)
   * [Fedora](docs/getting-started-guides/fedora.md)
   * [vSphere](docs/getting-started-guides/vsphere.md)
+  * [Microsoft Azure](docs/getting-started-guides/azure.md)
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
 * [Discussion and Community Support](#community-discussion-and-support)
