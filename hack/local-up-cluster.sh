@@ -18,10 +18,7 @@
 # local-up.sh, but this one launches the three separate binaries.
 # You may need to run this as root to allow kubelet to open docker's socket.
 
-if [ "$(which etcd)" == "" ]; then
-	echo "etcd must be in your PATH"
-	exit 1
-fi
+source $(dirname $0)/util.sh
 
 docker ps 2> /dev/null 1> /dev/null
 if [ "$?" != "0" ]; then
@@ -35,13 +32,7 @@ set -e
 $(dirname $0)/build-go.sh
 
 echo "Starting etcd"
-
-ETCD_DIR=$(mktemp -d -t kube-integration.XXXXXX)
-
-(etcd -name test -data-dir ${ETCD_DIR} &> /tmp/etcd.log) &
-ETCD_PID=$!
-
-sleep 5
+start_etcd
 
 # Shut down anyway if there's an error.
 set +e
