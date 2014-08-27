@@ -23,7 +23,8 @@ set -o pipefail
 hackdir=$(CDPATH="" cd $(dirname $0); pwd)
 
 # Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
+source "${hackdir}/config-go.sh"
+source "${hackdir}/util.sh"
 
 # Go to the top of the tree.
 cd "${KUBE_REPO_ROOT}"

@@ -42,8 +42,7 @@ cp -r $KUBE_DIR/cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
 # Capture the same version we are using to build the client tools and pass that
 # on.
 version=$(
-  unset IFS
-  source $KUBE_DIR/hack/config-go.sh
+  source $KUBE_DIR/hack/util.sh
   gitcommit
 )
 
