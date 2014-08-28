@@ -103,16 +103,15 @@ kube::setup_go_environment() {
 # KUBE_TARGET     - Path where output Go files are saved.
 # KUBE_GO_PACKAGE - Full name of the Kubernetes Go package.
 
-KUBE_REPO_ROOT=$(dirname "${BASH_SOURCE:-$0}")/..
-if [[ "${OSTYPE:-}" == *darwin* ]]; then
-  # Make the path absolute if it is not.
-  if [[ "${KUBE_REPO_ROOT}" != /* ]]; then
-    KUBE_REPO_ROOT=${PWD}/${KUBE_REPO_ROOT}
-  fi
-else
-  # Resolve symlinks.
-  KUBE_REPO_ROOT=$(readlink -f "${KUBE_REPO_ROOT}")
-fi
+# Make ${KUBE_REPO_ROOT} an absolute path.
+KUBE_REPO_ROOT=$(
+  set -eu
+  unset CDPATH
+  scripts_dir=$(dirname "${BASH_SOURCE[0]}")
+  cd "${scripts_dir}"
+  cd ..
+  pwd
+)
 export KUBE_REPO_ROOT
 
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
