@@ -61,7 +61,7 @@ MASTER_HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time
-if [ ! $(which salt-master) ]; then
+if ! which salt-master >/dev/null 2>&1; then
 
   # Configure the salt-api
   cat <<EOF >/etc/salt/master.d/salt-api.conf
