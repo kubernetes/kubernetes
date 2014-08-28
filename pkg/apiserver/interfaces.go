@@ -55,3 +55,9 @@ type ResourceWatcher interface {
 	// particular version.
 	Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
+
+// Redirectors know how to return a remote resource's location.
+type Redirector interface {
+	// ResourceLocation should return the remote location of the given resource, or an error.
+	ResourceLocation(id string) (remoteLocation string, err error)
+}

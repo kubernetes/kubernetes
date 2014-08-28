@@ -275,6 +275,35 @@ func TestServiceRegistryGet(t *testing.T) {
 	}
 }
 
+func TestServiceRegistryResourceLocation(t *testing.T) {
+	registry := registrytest.NewServiceRegistry()
+	registry.Endpoints = api.Endpoints{Endpoints: []string{"foo:80"}}
+	fakeCloud := &cloud.FakeCloud{}
+	machines := []string{"foo", "bar", "baz"}
+	storage := NewRegistryStorage(registry, fakeCloud, minion.NewRegistry(machines))
+	registry.CreateService(api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"bar": "baz"},
+	})
+	redirector := storage.(apiserver.Redirector)
+	location, err := redirector.ResourceLocation("foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if e, a := "foo:80", location; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if e, a := "foo", registry.GottenID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+
+	// Test error path
+	registry.Err = fmt.Errorf("fake error")
+	if _, err = redirector.ResourceLocation("foo"); err == nil {
+		t.Errorf("unexpected nil error")
+	}
+}
+
 func TestServiceRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}

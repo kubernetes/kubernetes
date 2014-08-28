@@ -66,7 +66,8 @@ func (r *ServiceRegistry) WatchServices(label, field labels.Selector, resourceVe
 	return nil, r.Err
 }
 
-func (r *ServiceRegistry) GetEndpoints(name string) (*api.Endpoints, error) {
+func (r *ServiceRegistry) GetEndpoints(id string) (*api.Endpoints, error) {
+	r.GottenID = id
 	return &r.Endpoints, r.Err
 }
 

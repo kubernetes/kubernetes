@@ -18,6 +18,7 @@ package service
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -165,6 +166,18 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 		}
 		return rs.registry.GetService(srv.ID)
 	}), nil
+}
+
+// ResourceLocation returns a URL to which one can send traffic for the specified service.
+func (rs *RegistryStorage) ResourceLocation(id string) (string, error) {
+	e, err := rs.registry.GetEndpoints(id)
+	if err != nil {
+		return "", err
+	}
+	if len(e.Endpoints) == 0 {
+		return "", fmt.Errorf("no endpoints available for %v", id)
+	}
+	return e.Endpoints[rand.Intn(len(e.Endpoints))], nil
 }
 
 func (rs *RegistryStorage) deleteExternalLoadBalancer(service *api.Service) error {
