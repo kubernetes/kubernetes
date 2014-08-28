@@ -19,149 +19,67 @@ package config
 import (
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/coreos/go-etcd/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// TODO(lavalamp): Use the etcd watcher from the tools package, and make sure all test cases here are tested there.
-
-func TestGetEtcdData(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	ch := make(chan interface{})
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(&api.ContainerManifestList{
-					Items: []api.ContainerManifest{{ID: "foo"}},
-				}),
-				ModifiedIndex: 1,
-			},
+func TestEventToPods(t *testing.T) {
+	tests := []struct {
+		input watch.Event
+		pods  []kubelet.Pod
+		fail  bool
+	}{
+		{
+			input: watch.Event{Object: nil},
+			pods:  []kubelet.Pod{},
+			fail:  true,
 		},
-		E: nil,
+		{
+			input: watch.Event{Object: &api.ContainerManifestList{}},
+			pods:  []kubelet.Pod{},
+			fail:  false,
+		},
+		{
+			input: watch.Event{
+				Object: &api.ContainerManifestList{
+					Items: []api.ContainerManifest{
+						api.ContainerManifest{ID: "foo"},
+						api.ContainerManifest{ID: "bar"},
+					},
+				},
+			},
+			pods: []kubelet.Pod{
+				kubelet.Pod{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}},
+				kubelet.Pod{Name: "bar", Manifest: api.ContainerManifest{ID: "bar"}},
+			},
+			fail: false,
+		},
+		{
+			input: watch.Event{
+				Object: &api.ContainerManifestList{
+					Items: []api.ContainerManifest{
+						api.ContainerManifest{ID: ""},
+						api.ContainerManifest{ID: ""},
+					},
+				},
+			},
+			pods: []kubelet.Pod{
+				kubelet.Pod{Name: "1", Manifest: api.ContainerManifest{ID: ""}},
+				kubelet.Pod{Name: "2", Manifest: api.ContainerManifest{ID: ""}},
+			},
+			fail: false,
+		},
 	}
-	NewSourceEtcd("/registry/hosts/machine/kubelet", fakeClient, ch)
 
-	//TODO: update FakeEtcdClient.Watch to handle receiver=nil with a given index
-	//returns an infinite stream of updates
-	for i := 0; i < 2; i++ {
-		update := (<-ch).(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}})
-		if !reflect.DeepEqual(expected, update) {
-			t.Errorf("Expected %#v, Got %#v", expected, update)
+	for i, tt := range tests {
+		pods, err := eventToPods(tt.input)
+		if !reflect.DeepEqual(tt.pods, pods) {
+			t.Errorf("case %d: expected output %#v, got %#v", i, tt.pods, pods)
+		}
+		if tt.fail != (err != nil) {
+			t.Errorf("case %d: got fail=%t but err=%v", i, tt.fail, err)
 		}
 	}
-}
-
-func TestGetEtcdNoData(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	ch := make(chan interface{}, 1)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: nil,
-	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
-	_, err := c.fetchNextState(0)
-	if err == nil {
-		t.Errorf("Expected error")
-	}
-	expectEmptyChannel(t, ch)
-}
-
-func TestGetEtcd(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	ch := make(chan interface{}, 1)
-	manifest := api.ContainerManifest{ID: "foo", Version: "v1beta1", Containers: []api.Container{{Name: "1", Image: "foo"}}}
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(&api.ContainerManifestList{
-					Items: []api.ContainerManifest{manifest},
-				}),
-				ModifiedIndex: 1,
-			},
-		},
-		E: nil,
-	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
-	lastIndex, err := c.fetchNextState(0)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if lastIndex != 2 {
-		t.Errorf("Expected %#v, Got %#v", 2, lastIndex)
-	}
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: "foo", Manifest: manifest})
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
-	for i := range update.Pods {
-		if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
-			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
-		}
-	}
-}
-
-func TestWatchEtcd(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	ch := make(chan interface{}, 1)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(&api.ContainerManifestList{}),
-				ModifiedIndex: 2,
-			},
-		},
-		E: nil,
-	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
-	lastIndex, err := c.fetchNextState(1)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if lastIndex != 3 {
-		t.Errorf("Expected %d, Got %d", 3, lastIndex)
-	}
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET)
-	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
-}
-
-func TestGetEtcdNotFound(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	ch := make(chan interface{}, 1)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: tools.EtcdErrorNotFound,
-	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
-	_, err := c.fetchNextState(0)
-	if err == nil {
-		t.Errorf("Expected error")
-	}
-	expectEmptyChannel(t, ch)
-}
-
-func TestGetEtcdError(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	ch := make(chan interface{}, 1)
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: &etcd.EtcdError{
-			ErrorCode: 200, // non not found error
-		},
-	}
-	c := SourceEtcd{"/registry/hosts/machine/kubelet", fakeClient, ch, time.Millisecond, time.Minute}
-	_, err := c.fetchNextState(0)
-	if err == nil {
-		t.Errorf("Expected error")
-	}
-	expectEmptyChannel(t, ch)
 }
