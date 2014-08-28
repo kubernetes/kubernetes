@@ -62,6 +62,7 @@ type volumeMap map[string]volume.Interface
 func NewMainKubelet(
 	hn string,
 	dc DockerInterface,
+	da docker.AuthConfiguration,
 	cc CadvisorInterface,
 	ec tools.EtcdClient,
 	rd string,
@@ -69,6 +70,7 @@ func NewMainKubelet(
 	return &Kubelet{
 		hostname:       hn,
 		dockerClient:   dc,
+		dockerAuth:     da,
 		cadvisorClient: cc,
 		etcdClient:     ec,
 		rootDirectory:  rd,
@@ -98,6 +100,7 @@ type ContainerCommandRunner interface {
 type Kubelet struct {
 	hostname       string
 	dockerClient   DockerInterface
+	dockerAuth     docker.AuthConfiguration
 	rootDirectory  string
 	podWorkers     podWorkers
 	resyncInterval time.Duration
@@ -122,7 +125,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
 	}
 	if kl.dockerPuller == nil {
-		kl.dockerPuller = NewDockerPuller(kl.dockerClient)
+		kl.dockerPuller = NewDockerPuller(kl.dockerClient, kl.dockerAuth)
 	}
 	if kl.healthChecker == nil {
 		kl.healthChecker = health.NewHealthChecker()

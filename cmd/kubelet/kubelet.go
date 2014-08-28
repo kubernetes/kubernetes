@@ -56,6 +56,9 @@ var (
 	port               = flag.Uint("port", 10250, "The port for the info server to serve on")
 	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
+	dockerAuthUsername = flag.String("docker_auth_username", "", "Use this username to authenticate docker pulls.")
+	dockerAuthPassword = flag.String("docker_auth_password", "", "Use this password to authenticate docker pulls.")
+	dockerAuthEmail    = flag.String("docker_auth_email", "", "Use this email address to authenticate docker pulls.")
 	etcdServerList     util.StringList
 	rootDirectory      = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
 )
@@ -107,6 +110,12 @@ func main() {
 		glog.Fatal("Couldn't connect to docker.")
 	}
 
+	dockerAuth := docker.AuthConfiguration{
+		Username: *dockerAuthUsername,
+		Password: *dockerAuthPassword,
+		Email:    *dockerAuthEmail,
+	}
+
 	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:4194")
 	if err != nil {
 		glog.Errorf("Error on creating cadvisor client: %v", err)
@@ -147,6 +156,7 @@ func main() {
 	k := kubelet.NewMainKubelet(
 		getHostname(),
 		dockerClient,
+		dockerAuth,
 		cadvisorClient,
 		etcdClient,
 		*rootDirectory,
