@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package master contains code for setting up and running a kubenetes
+// Package master contains code for setting up and running a Kubernetes
 // cluster master.
 package master
