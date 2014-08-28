@@ -18,7 +18,7 @@
    go get github.com/vmware/govmomi/govc
    ```
 
-5. Install godep. [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
+5. Install godep (optional, only required when modifying package dependencies). [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
 
 6. Get the Kubernetes source:
 

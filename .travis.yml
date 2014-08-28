@@ -8,14 +8,13 @@ go:
 install: 
   - go get code.google.com/p/go.tools/cmd/cover
   - go get github.com/coreos/etcd
-  - go get github.com/tools/godep
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/install-std-race.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/build-go.sh
+  - ./hack/build-go.sh
 
 script:
-  - PATH=$HOME/gopath/bin:$PATH ./hack/test-go.sh
+  - ./hack/test-go.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-integration.sh
 

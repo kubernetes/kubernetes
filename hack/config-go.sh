@@ -56,21 +56,15 @@ kube::version_ldflags() {
   )
 }
 
-# kube::setup_go_environment will check that `go` and `godep` commands are
-# available in ${PATH}. If not running on Travis, it will also check that the Go
-# version is good enough for the Kubernetes build.
+# kube::setup_go_environment will check that the `go` commands is available in
+# ${PATH}. If not running on Travis, it will also check that the Go version is
+# good enough for the Kubernetes build.
 #
 # Also set ${GOPATH} and environment variables needed by Go.
 kube::setup_go_environment() {
   if [[ -z "$(which go)" ]]; then
     echo "Can't find 'go' in PATH, please fix and retry." >&2
     echo "See http://golang.org/doc/install for installation instructions." >&2
-    exit 1
-  fi
-
-  if [[ -z "$(which godep)" ]]; then
-    echo "Can't find 'godep' in PATH, please fix and retry." >&2
-    echo "See https://github.com/GoogleCloudPlatform/kubernetes#godep-and-dependency-management" >&2
     exit 1
   fi
 
@@ -88,8 +82,8 @@ kube::setup_go_environment() {
     fi
   fi
 
-  # TODO: get rid of this after PR #1054 gets rid of godep.
-  GOPATH="${KUBE_TARGET}:$(godep path)"
+  # Set GOPATH to point to the tree maintained by `godep`.
+  GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/Godeps/_workspace"
   export GOPATH
 
   # Unset GOBIN in case it already exsits in the current session.
