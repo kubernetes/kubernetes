@@ -195,7 +195,7 @@ func validateContainers(containers []Container, volumes util.StringSet) errs.Err
 			allNames.Insert(ctr.Name)
 		}
 		if len(ctr.Image) == 0 {
-			cErrs = append(cErrs, errs.NewInvalid("image", ctr.Name))
+			cErrs = append(cErrs, errs.NewRequired("image", ctr.Image))
 		}
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
