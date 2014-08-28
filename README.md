@@ -79,7 +79,7 @@ directly from mercurial.
 ```
 GOPATH=$HOME/src/go-tools
 mkdir -p $GOPATH
-go install github.com/tools/godep
+go get github.com/tools/godep
 ```
 
 3. Add $HOME/src/go-tools/bin to your path. Typically you'd add this to your ~/.profile:
