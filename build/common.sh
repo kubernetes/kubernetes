@@ -127,6 +127,7 @@ function build-image() {
     LICENSE
     README.md
     pkg
+    plugin
     third_party
   "
   mkdir -p ${BUILD_CONTEXT_DIR}
