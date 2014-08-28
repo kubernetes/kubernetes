@@ -17,8 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"net"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
@@ -333,8 +331,8 @@ type Service struct {
 	// ignored.
 	//FIXME: Factor this into a ServiceBinding or something, use that not
 	//notify clients.
-	//FIXME: use net.IP for all IP fields?
-	PortalIP net.IP `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
+	// TODO: Should we wrap up net.IP and use that for all IP fields?
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

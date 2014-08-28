@@ -17,8 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"net"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/third_party/docker-api-structs"
@@ -337,7 +335,7 @@ type Service struct {
 	// ignored.
 	//FIXME: Factor this into a ServiceBinding or something, use that not
 	//notify clients.
-	PortalIP net.IP `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

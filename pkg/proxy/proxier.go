@@ -263,20 +263,21 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			proxier.StopProxy(service.ID)
 		}
 		glog.Infof("Adding a new service %s at %s:%d", service.ID, service.PortalIP, service.Port)
-		listener, port, err := getListener(service.PortalIP, service.Port)
+		portalIP := net.ParseIP(service.PortalIP)
+		listener, port, err := getListener(portalIP, service.Port)
 		if err != nil {
 			glog.Infof("Failed to start listening for %s: %+v", service.ID, err)
 			continue
 		}
 		glog.Infof("Proxying for service %s on local port %d", service.ID, port)
-		err = installRedirect(service.PortalIP, service.Port, port)
+		err = installRedirect(portalIP, service.Port, port)
 		if err != nil {
 			glog.Infof("Failed to create IP redirect for %s on %d", service.ID, service.Port)
 			listener.Close()
 			continue
 		}
 		proxier.setServiceInfo(service.ID, &serviceInfo{
-			ip:       service.PortalIP,
+			ip:       portalIP,
 			port:     service.Port,
 			active:   true,
 			listener: listener,

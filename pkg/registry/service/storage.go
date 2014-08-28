@@ -105,7 +105,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	}
 
 	srv.CreationTimestamp = util.Now()
-	srv.PortalIP = rs.portalMgr.Allocate()
+	srv.PortalIP = rs.portalMgr.Allocate().String()
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
@@ -147,7 +147,7 @@ func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	rs.portalMgr.Release(service.PortalIP)
+	rs.portalMgr.Release(net.ParseIP(service.PortalIP))
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		rs.deleteExternalLoadBalancer(service)
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(id)
