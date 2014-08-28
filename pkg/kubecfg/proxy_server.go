@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-// ProxyServer is a http.Handler which proxies Kubenetes APIs to remote API server.
+// ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
 	Host   string
 	Auth   *client.AuthInfo

@@ -33,7 +33,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Interface holds the methods for clients of Kubenetes,
+// Interface holds the methods for clients of Kubernetes,
 // an interface to allow mock testing.
 // TODO: these should return/take pointers.
 type Interface interface {
