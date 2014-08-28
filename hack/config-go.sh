@@ -52,7 +52,7 @@ kube::version_ldflags() {
     fi
 
     # The -ldflags parameter takes a single string, so join the output.
-    echo "${ldflags[*]}"
+    echo "${ldflags[*]-}"
   )
 }
 
