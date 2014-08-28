@@ -97,6 +97,12 @@ kube::setup_go_environment() {
 }
 
 
+# --- Environment Variables ---
+
+# KUBE_REPO_ROOT  - Path to the top of the build tree.
+# KUBE_TARGET     - Path where output Go files are saved.
+# KUBE_GO_PACKAGE - Full name of the Kubernetes Go package.
+
 KUBE_REPO_ROOT=$(dirname "${BASH_SOURCE:-$0}")/..
 if [[ "${OSTYPE:-}" == *darwin* ]]; then
   # Make the path absolute if it is not.
@@ -107,11 +113,15 @@ else
   # Resolve symlinks.
   KUBE_REPO_ROOT=$(readlink -f "${KUBE_REPO_ROOT}")
 fi
+export KUBE_REPO_ROOT
 
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
 mkdir -p "${KUBE_TARGET}"
+export KUBE_TARGET
 
 KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
+export KUBE_GO_PACKAGE
+
 KUBE_GO_PACKAGE_DIR="${KUBE_TARGET}/src/${KUBE_GO_PACKAGE}"
 
 KUBE_GO_PACKAGE_BASEDIR=$(dirname "${KUBE_GO_PACKAGE_DIR}")
