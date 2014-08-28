@@ -46,9 +46,12 @@ func main() {
 		glog.Fatal("usage: controller-manager -master <master>")
 	}
 
-	controllerManager := controller.NewReplicationManager(
-		client.New("http://"+*master, nil))
+	kubeClient, err := client.New(*master, nil)
+	if err != nil {
+		glog.Fatalf("Invalid -master: %v", err)
+	}
 
+	controllerManager := controller.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
 	select {}
 }

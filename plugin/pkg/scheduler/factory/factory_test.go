@@ -37,7 +37,8 @@ func TestCreate(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	factory := ConfigFactory{client.New(server.URL, nil)}
+	client := client.NewOrDie(server.URL, nil)
+	factory := ConfigFactory{client}
 	factory.Create()
 }
 
@@ -87,7 +88,7 @@ func TestCreateWatches(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.New(server.URL, nil)
+		factory.Client = client.NewOrDie(server.URL, nil)
 		// This test merely tests that the correct request is made.
 		item.watchFactory(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -114,7 +115,8 @@ func TestPollMinions(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		cf := ConfigFactory{client.New(server.URL, nil)}
+		client := client.NewOrDie(server.URL, nil)
+		cf := ConfigFactory{client}
 
 		ce, err := cf.pollMinions()
 		if err != nil {
@@ -137,7 +139,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	factory := ConfigFactory{client.New(server.URL, nil)}
+	factory := ConfigFactory{client.NewOrDie(server.URL, nil)}
 	queue := cache.NewFIFO()
 	errFunc := factory.makeDefaultErrorFunc(queue)
 
@@ -242,10 +244,10 @@ func TestBind(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		b := binder{client.New(server.URL, nil)}
+		client := client.NewOrDie(server.URL, nil)
+		b := binder{client}
 
-		err := b.Bind(item.binding)
-		if err != nil {
+		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}

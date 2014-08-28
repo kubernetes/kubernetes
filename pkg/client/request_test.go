@@ -45,8 +45,8 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	s := New(testServer.URL, &auth)
-	obj, err := s.Verb("POST").
+	c := NewOrDie(testServer.URL, &auth)
+	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
 		ParseSelectorParam("labels", "name=foo").
@@ -80,8 +80,8 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	s := New(testServer.URL, &auth)
-	obj, err := s.Verb("POST").
+	c := NewOrDie(testServer.URL, &auth)
+	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
 		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
@@ -117,8 +117,8 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	s := New(testServer.URL, &auth)
-	obj, err := s.Verb("POST").
+	c := NewOrDie(testServer.URL, &auth)
+	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
 		SelectorParam("labels", labels.Set{"name": "foo"}.AsSelector()).
@@ -167,8 +167,8 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	s := New(testServer.URL, &auth)
-	obj, err := s.Verb("POST").
+	c := NewOrDie(testServer.URL, &auth)
+	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
 		ParseSelectorParam("labels", "name=foo").
@@ -192,7 +192,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestVerbs(t *testing.T) {
-	c := New("", nil)
+	c := NewOrDie("localhost", nil)
 	if r := c.Post(); r.verb != "POST" {
 		t.Errorf("Post verb is wrong")
 	}
@@ -209,7 +209,7 @@ func TestVerbs(t *testing.T) {
 
 func TestAbsPath(t *testing.T) {
 	expectedPath := "/bar/foo"
-	c := New("", nil)
+	c := NewOrDie("localhost", nil)
 	r := c.Post().Path("/foo").AbsPath(expectedPath)
 	if r.path != expectedPath {
 		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
@@ -217,7 +217,7 @@ func TestAbsPath(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	c := New("", nil)
+	c := NewOrDie("localhost", nil)
 	r := c.Get()
 	if r.sync {
 		t.Errorf("sync has wrong default")
@@ -238,13 +238,13 @@ func TestUintParam(t *testing.T) {
 		testVal   uint64
 		expectStr string
 	}{
-		{"foo", 31415, "?foo=31415"},
-		{"bar", 42, "?bar=42"},
-		{"baz", 0, "?baz=0"},
+		{"foo", 31415, "http://localhost?foo=31415"},
+		{"bar", 42, "http://localhost?bar=42"},
+		{"baz", 0, "http://localhost?baz=0"},
 	}
 
 	for _, item := range table {
-		c := New("", nil)
+		c := NewOrDie("localhost", nil)
 		r := c.Get().AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.finalURL(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
@@ -263,7 +263,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 	}
 
 	for _, item := range table {
-		c := New("", nil)
+		c := NewOrDie("localhost", nil)
 		r := c.Get().setParam(item.name, item.testVal)
 		if e, a := item.expectSuccess, r.err == nil; e != a {
 			t.Errorf("expected %v, got %v (%v)", e, a, r.err)
@@ -272,7 +272,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 }
 
 func TestSetPollPeriod(t *testing.T) {
-	c := New("", nil)
+	c := NewOrDie("localhost", nil)
 	r := c.Get()
 	if r.pollPeriod == 0 {
 		t.Errorf("polling should be on by default")
@@ -303,12 +303,12 @@ func TestPolling(t *testing.T) {
 	}))
 
 	auth := AuthInfo{User: "user", Password: "pass"}
-	s := New(testServer.URL, &auth)
+	c := NewOrDie(testServer.URL, &auth)
 
 	trials := []func(){
 		func() {
 			// Check that we do indeed poll when asked to.
-			obj, err := s.Get().PollPeriod(5 * time.Millisecond).Do().Get()
+			obj, err := c.Get().PollPeriod(5 * time.Millisecond).Do().Get()
 			if err != nil {
 				t.Errorf("Unexpected error: %v %#v", err, err)
 				return
@@ -323,7 +323,7 @@ func TestPolling(t *testing.T) {
 		},
 		func() {
 			// Check that we don't poll when asked not to.
-			obj, err := s.Get().PollPeriod(0).Do().Get()
+			obj, err := c.Get().PollPeriod(0).Do().Get()
 			if err == nil {
 				t.Errorf("Unexpected non error: %v", obj)
 				return
@@ -405,7 +405,10 @@ func TestWatch(t *testing.T) {
 		}
 	}))
 
-	s := New(testServer.URL, &auth)
+	s, err := New(testServer.URL, &auth)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	watching, err := s.Get().Path("path/to/watch/thing").Watch()
 	if err != nil {

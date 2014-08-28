@@ -24,6 +24,7 @@ import (
 	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	"github.com/golang/glog"
 )
 
 var (
@@ -38,7 +39,10 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	// TODO: security story for plugins!
-	kubeClient := client.New("http://"+*master, nil)
+	kubeClient, err := client.New(*master, nil)
+	if err != nil {
+		glog.Fatalf("Invalid -master: %v", err)
+	}
 
 	configFactory := &factory.ConfigFactory{Client: kubeClient}
 	config := configFactory.Create()

@@ -92,7 +92,10 @@ func main() {
 		Port:   *minionPort,
 	}
 
-	client := client.New("http://"+net.JoinHostPort(*address, strconv.Itoa(int(*port))), nil)
+	client, err := client.New(net.JoinHostPort(*address, strconv.Itoa(int(*port))), nil)
+	if err != nil {
+		glog.Fatalf("Invalid server address: %v", err)
+	}
 
 	m := master.New(&master.Config{
 		Client:             client,

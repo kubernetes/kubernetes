@@ -128,14 +128,12 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
-	err := endpoints.SyncServiceEndpoints()
-	if err != nil {
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
 }
 
 func TestSyncEndpointsError(t *testing.T) {
@@ -145,13 +143,12 @@ func TestSyncEndpointsError(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 	serviceRegistry := registrytest.ServiceRegistry{
 		Err: fmt.Errorf("test error"),
 	}
 	endpoints := NewEndpointController(&serviceRegistry, client)
-	err := endpoints.SyncServiceEndpoints()
-	if err != serviceRegistry.Err {
+	if err := endpoints.SyncServiceEndpoints(); err != serviceRegistry.Err {
 		t.Errorf("Errors don't match: %#v %#v", err, serviceRegistry.Err)
 	}
 }
@@ -163,7 +160,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 	serviceRegistry := registrytest.ServiceRegistry{
 		List: api.ServiceList{
 			Items: []api.Service{
@@ -176,8 +173,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 	}
 	endpoints := NewEndpointController(&serviceRegistry, client)
-	err := endpoints.SyncServiceEndpoints()
-	if err != nil {
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(serviceRegistry.Endpoints.Endpoints) != 1 {
@@ -190,7 +186,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		StatusCode: 500,
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 	serviceRegistry := registrytest.ServiceRegistry{
 		List: api.ServiceList{
 			Items: []api.Service{
@@ -203,8 +199,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		},
 	}
 	endpoints := NewEndpointController(&serviceRegistry, client)
-	err := endpoints.SyncServiceEndpoints()
-	if err == nil {
+	if err := endpoints.SyncServiceEndpoints(); err == nil {
 		t.Error("Unexpected non-error")
 	}
 }

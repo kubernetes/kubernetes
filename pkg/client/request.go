@@ -56,7 +56,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	return &Request{
 		verb:       verb,
 		c:          c,
-		path:       c.Prefix,
+		path:       c.prefix,
 		sync:       c.Sync,
 		timeout:    c.Timeout,
 		params:     map[string]string{},
