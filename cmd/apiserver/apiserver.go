@@ -44,8 +44,9 @@ var (
 	healthCheckMinions          = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
 	minionCacheTTL              = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. [default 30 seconds]")
 	etcdServerList, machineList util.StringList
-	//FIXME: make this a CIDR or a list of CIDRs or something
-	portalSubnet = flag.String("portal_subnet", "", "A /24 network from which to assign portal IPs")
+	//FIXME: make this a list of CIDR strings?
+	portalSubnetFlag = flag.String("portal_subnet", "", "A CIDR-notation network from which to assign portal IPs")
+	portalSubnet     *net.IPNet
 )
 
 func init() {
@@ -66,8 +67,15 @@ func verifyMinionFlags() {
 }
 
 func verifyPortalFlags() {
-	if *portalSubnet == "" {
+	if *portalSubnetFlag == "" {
 		glog.Fatal("No -portal_subnet specified")
+	}
+	_, portalSubnet, err := net.ParseCIDR(*portalSubnetFlag)
+	if err != nil {
+		glog.Fatal("Can't parse -portal_subnet as CIDR: ", *portalSubnetFlag)
+	}
+	if ip4 := portalSubnet.IP.To4(); ip4 == nil {
+		glog.Fatal("-portal_subnet must be IPv4: ", portalSubnet.String())
 	}
 }
 

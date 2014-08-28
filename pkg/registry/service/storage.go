@@ -18,6 +18,7 @@ package service
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,80 +39,57 @@ type RegistryStorage struct {
 	portalMgr *IPAllocator
 }
 
-// FIXME: probably should be [4]byte and also carry the subnet part
-type ipSubnet [4]string
-
-//FIXME: error
-func ipSubnetFromString(str string) ipSubnet {
-	parts := strings.Split(str, ".")
-	if len(parts) != 4 {
-		//FIXME: error
-		return ipSubnet{}
-	}
-	//FIXME: there must be syntax for this?
-	var r ipSubnet
-	for i := range parts {
-		r[i] = parts[i]
-	}
-	return r
-}
-
-func (ips *ipSubnet) String() string {
-	return strings.Join(ips[:], ".")
-}
-
 //FIXME: needs a new pkg, maybe util
 type IPAllocator struct {
-	subnet ipSubnet
+	subnet net.IPNet
 	//FIXME: needs to be smarter, for now a bitmap will suffice
 	lock sync.Mutex
+	//FIXME: assumes /24
 	used [32]byte
 }
 
 // NewIPAllocator creates and intializes a new IPAllocator object.
 // FIXME: resync from storage at startup.
-func NewIPAllocator(subnet string) *IPAllocator {
+func NewIPAllocator(subnet net.IPNet) *IPAllocator {
 	return &IPAllocator{
-		subnet: ipSubnetFromString(subnet),
+		subnet: subnet,
 	}
 }
 
 // Allocate allocates and returns a new IP.
 //FIXME: error if we are "full"?
-func (ipa *IPAllocator) Allocate() string {
+func (ipa *IPAllocator) Allocate() net.IP {
 	ipa.lock.Lock()
 	defer ipa.lock.Unlock()
 	for i := range ipa.used {
 		if ipa.used[i] != 0xff {
 			free := ^ipa.used[i]
+			//FIXME: not right - need to get bit index, not value
+			//FIXME: don't use the network address
 			next := free & ^(free - 1)
-			ip := ipa.subnet
-			ip[3] = fmt.Sprintf("%d", int(next))
-			return ip.String()
+			ip := ipa.subnet.IP
+			ip[3] = byte(i*8) + next
+			//FIXME: check not to use the broadcast addr
+			return ip
 		}
 	}
 	//FIXME: error
-	return ""
+	return nil
 }
 
 // Release de-allocates an IP.
-//FIXME: error if that IP is not allocated or IP subnet does not match
-func (ipa *IPAllocator) Release(ipstr string) {
+//FIXME: error if that IP is nil, not allocated, or IP subnet does not match
+func (ipa *IPAllocator) Release(ip net.IP) {
 	ipa.lock.Lock()
 	defer ipa.lock.Unlock()
-	ip := ipSubnetFromString(ipstr)
-	host, err := strconv.Atoi(ip[3])
-	if err != nil {
-		//FIXME:
-		return
-	}
+	host := ip[3]
 	i := host / 8
 	m := byte(1 << byte(host%8))
 	ipa.used[i] = ipa.used[i] &^ m
 }
 
 // NewRegistryStorage returns a new RegistryStorage.
-func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet string) apiserver.RESTStorage {
+func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet net.IPNet) apiserver.RESTStorage {
 	return &RegistryStorage{
 		registry:  registry,
 		cloud:     cloud,

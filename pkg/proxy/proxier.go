@@ -31,7 +31,7 @@ import (
 )
 
 type serviceInfo struct {
-	ip       string
+	ip       net.IP
 	port     int
 	listener net.Listener
 	mu       sync.Mutex // protects active
@@ -109,7 +109,6 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 // AcceptHandler proxies incoming connections for the specified service
 // to the load-balanced service endpoints.
 func (proxier *Proxier) AcceptHandler(service string, listener net.Listener) {
-	time.Sleep(5 * time.Second) // HACK - fixed properly in a different PR
 	info, found := proxier.getServiceInfo(service)
 	if !found {
 		glog.Errorf("Failed to find service: %s", service)
@@ -148,9 +147,9 @@ func (proxier *Proxier) AcceptHandler(service string, listener net.Listener) {
 
 // getListener decides which local port to listen on and returns a Listener and
 // the assigned port.
-func getListener(ip string, port int) (net.Listener, int, error) {
+func getListener(ip net.IP, port int) (net.Listener, int, error) {
 	// If the portal IP is set, allocate a random port locally.
-	if ip != "" {
+	if len(ip) != 0 {
 		port = 0
 	}
 	//FIXME: if the portal IP is set, listen on localhost only?
@@ -206,7 +205,7 @@ func (proxier *Proxier) startAccepting(service string, l net.Listener) {
 	go proxier.AcceptHandler(service, l)
 }
 
-func installRedirect(ip string, port int, localPort int) error {
+func installRedirect(ip net.IP, port int, localPort int) error {
 	const iptables = "iptables"
 
 	//FIXME: check with -C first
@@ -215,7 +214,7 @@ func installRedirect(ip string, port int, localPort int) error {
 		"-t", "nat",
 		"-A", "PREROUTING",
 		"-p", "tcp",
-		"-d", ip,
+		"-d", ip.String(),
 		"--dport", fmt.Sprintf("%d", port),
 		"-j", "REDIRECT",
 		"--to-ports", fmt.Sprintf("%d", localPort),
@@ -230,7 +229,7 @@ func installRedirect(ip string, port int, localPort int) error {
 		"-t", "nat",
 		"-A", "OUTPUT",
 		"-p", "tcp",
-		"-d", ip,
+		"-d", ip.String(),
 		"--dport", fmt.Sprintf("%d", port),
 		"-j", "REDIRECT",
 		"--to-ports", fmt.Sprintf("%d", localPort),

@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"net"
 	"net/http"
 	"time"
 
@@ -47,7 +48,7 @@ type Config struct {
 	MinionCacheTTL     time.Duration
 	MinionRegexp       string
 	PodInfoGetter      client.PodInfoGetter
-	PortalSubnet       string //FIXME: this should take an IP type, with helper functo validate IsSubnet
+	PortalSubnet       net.IPNet
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -59,7 +60,7 @@ type Master struct {
 	bindingRegistry    binding.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
-	portalSubnet       string
+	portalSubnet       net.IPNet
 }
 
 // New returns a new instance of Master connected to the given etcdServer.
