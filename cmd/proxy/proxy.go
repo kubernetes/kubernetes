@@ -53,7 +53,10 @@ func main() {
 	if *master != "" {
 		glog.Infof("Using api calls to get config %v", *master)
 		//TODO: add auth info
-		client := client.New(*master, nil)
+		client, err := client.New(*master, nil)
+		if err != nil {
+			glog.Fatalf("Invalid -master: %v", err)
+		}
 		config.NewSourceAPI(
 			client,
 			30*time.Second,

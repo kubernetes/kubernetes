@@ -114,7 +114,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
@@ -134,7 +134,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
@@ -154,7 +154,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 
 	fakePodControl := FakePodControl{}
 
@@ -174,7 +174,7 @@ func TestCreateReplica(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 
 	podControl := RealPodControl{
 		kubeClient: client,
@@ -307,7 +307,7 @@ func TestSyncronize(t *testing.T) {
 		t.Errorf("Unexpected request for %v", req.RequestURI)
 	})
 	testServer := httptest.NewServer(mux)
-	client := client.New(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, nil)
 	manager := NewReplicationManager(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl

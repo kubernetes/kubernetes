@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -30,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/golang/glog"
 )
 
 // Interface holds the methods for clients of Kubernetes,
@@ -88,6 +86,28 @@ type Client struct {
 	*RESTClient
 }
 
+// New creates a Kubernetes client. This client works with pods, replication controllers
+// and services. It allows operations such as list, get, update and delete on these objects.
+// host must be a host string, a host:port combo, or an http or https URL.  Passing a prefix
+// to a URL will prepend the server path. Returns an error if host cannot be converted to a
+// valid URL.
+func New(host string, auth *AuthInfo) (*Client, error) {
+	restClient, err := NewRESTClient(host, auth, "/api/v1beta1/")
+	if err != nil {
+		return nil, err
+	}
+	return &Client{restClient}, nil
+}
+
+// NewOrDie creates a Kubernetes client and panics if the provided host is invalid.
+func NewOrDie(host string, auth *AuthInfo) *Client {
+	client, err := New(host, auth)
+	if err != nil {
+		panic(err)
+	}
+	return client
+}
+
 // StatusErr might get returned from an api call if your request is still being processed
 // and hence the expected return data is not available yet.
 type StatusErr struct {
@@ -109,20 +129,31 @@ type AuthInfo struct {
 // Host is the http://... base for the URL
 type RESTClient struct {
 	host       string
+	prefix     string
+	secure     bool
 	auth       *AuthInfo
 	httpClient *http.Client
 	Sync       bool
 	PollPeriod time.Duration
 	Timeout    time.Duration
-	Prefix     string
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(host string, auth *AuthInfo, prefix string) *RESTClient {
+func NewRESTClient(host string, auth *AuthInfo, path string) (*RESTClient, error) {
+	prefix, err := normalizePrefix(host, path)
+	if err != nil {
+		return nil, err
+	}
+	base := *prefix
+	base.Path = ""
+	base.RawQuery = ""
+	base.Fragment = ""
 	return &RESTClient{
-		auth: auth,
-		host: host,
+		host:   base.String(),
+		prefix: prefix.Path,
+		secure: prefix.Scheme == "https",
+		auth:   auth,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -133,15 +164,36 @@ func NewRESTClient(host string, auth *AuthInfo, prefix string) *RESTClient {
 		Sync:       false,
 		PollPeriod: time.Second * 2,
 		Timeout:    time.Second * 20,
-		Prefix:     prefix,
-	}
-
+	}, nil
 }
 
-// New creates a Kubernetes client. This client works with pods, replication controllers
-// and services. It allows operations such as list, get, update and delete on these objects.
-func New(host string, auth *AuthInfo) *Client {
-	return &Client{NewRESTClient(host, auth, "/api/v1beta1/")}
+// normalizePrefix ensures the passed initial value is valid
+func normalizePrefix(host, prefix string) (*url.URL, error) {
+	if host == "" {
+		return nil, fmt.Errorf("host must be a URL or a host:port pair")
+	}
+	base := host
+	hostURL, err := url.Parse(base)
+	if err != nil {
+		return nil, err
+	}
+	if hostURL.Scheme == "" {
+		hostURL, err = url.Parse("http://" + base)
+		if err != nil {
+			return nil, err
+		}
+		if hostURL.Path != "" && hostURL.Path != "/" {
+			return nil, fmt.Errorf("host must be a URL or a host:port pair: %s", base)
+		}
+	}
+	hostURL.Path += prefix
+
+	return hostURL, nil
+}
+
+// Secure returns true if the client is configured for secure connections.
+func (c *RESTClient) Secure() bool {
+	return c.secure
 }
 
 // Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
@@ -184,55 +236,6 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 		return nil, &StatusErr{status}
 	}
 	return body, err
-}
-
-// Underlying base implementation of performing a request.
-// method is the HTTP method (e.g. "GET")
-// path is the path on the host to hit
-// requestBody is the body of the request. Can be nil.
-// target the interface to marshal the JSON response into.  Can be nil.
-func (c *RESTClient) rawRequest(method, path string, requestBody io.Reader, target interface{}) ([]byte, error) {
-	reqUrl, err := c.makeURL(path)
-	if err != nil {
-		return nil, err
-	}
-
-	request, err := http.NewRequest(method, reqUrl, requestBody)
-	if err != nil {
-		return nil, err
-	}
-	body, err := c.doRequest(request)
-	if err != nil {
-		return body, err
-	}
-	if target != nil {
-		err = api.DecodeInto(body, target)
-	}
-	if err != nil {
-		glog.Infof("Failed to parse: %s\n", string(body))
-		// FIXME: no need to return err here?
-	}
-	return body, err
-}
-
-func (c *RESTClient) makeURL(path string) (string, error) {
-	base := c.host
-	hostURL, err := url.Parse(base)
-	if err != nil {
-		return "", err
-	}
-	if hostURL.Scheme == "" {
-		hostURL, err = url.Parse("http://" + base)
-		if err != nil {
-			return "", err
-		}
-		if hostURL.Path != "" && hostURL.Path != "/" {
-			return "", fmt.Errorf("host must be a URL or a host:port pair: %s", base)
-		}
-	}
-	hostURL.Path += c.Prefix + path
-
-	return hostURL.String(), nil
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector

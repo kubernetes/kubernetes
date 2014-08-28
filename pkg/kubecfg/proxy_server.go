@@ -26,8 +26,6 @@ import (
 
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
-	Host   string
-	Auth   *client.AuthInfo
 	Client *client.Client
 }
 
@@ -37,11 +35,9 @@ func newFileHandler(prefix, base string) http.Handler {
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
-func NewProxyServer(filebase, host string, auth *client.AuthInfo) *ProxyServer {
+func NewProxyServer(filebase string, kubeClient *client.Client) *ProxyServer {
 	server := &ProxyServer{
-		Host:   host,
-		Auth:   auth,
-		Client: client.New(host, auth),
+		Client: kubeClient,
 	}
 	http.Handle("/api/", server)
 	http.Handle("/static/", newFileHandler("/static/", filebase))

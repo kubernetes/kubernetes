@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -30,7 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	kube_client "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -118,7 +117,6 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	secure := true
 	var masterServer string
 	if len(*httpServer) > 0 {
 		masterServer = *httpServer
@@ -127,26 +125,26 @@ func main() {
 	} else {
 		masterServer = "http://localhost:8080"
 	}
-	parsedURL, err := url.Parse(masterServer)
+	kubeClient, err := client.New(masterServer, nil)
 	if err != nil {
-		glog.Fatalf("Unable to parse %v as a URL\n", err)
-	}
-	if parsedURL.Scheme != "" && parsedURL.Scheme != "https" {
-		secure = false
+		glog.Fatalf("Unable to parse %s as a URL: %v", masterServer, err)
 	}
 
-	var auth *kube_client.AuthInfo
-	if secure {
-		auth, err = kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
+	// TODO: this won't work if TLS is enabled with client cert auth, but no
+	// passwords are required. Refactor when we address client auth abstraction.
+	if kubeClient.Secure() {
+		auth, err := kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
 		}
+		kubeClient, err = client.New(masterServer, auth)
+		if err != nil {
+			glog.Fatalf("Unable to parse %s as a URL: %v", masterServer, err)
+		}
 	}
 
-	client := kube_client.New(masterServer, auth)
-
 	if *serverVersion {
-		got, err := client.ServerVersion()
+		got, err := kubeClient.ServerVersion()
 		if err != nil {
 			fmt.Printf("Couldn't read version from server: %v\n", err)
 			os.Exit(1)
@@ -156,7 +154,7 @@ func main() {
 	}
 
 	if *preventSkew {
-		got, err := client.ServerVersion()
+		got, err := kubeClient.ServerVersion()
 		if err != nil {
 			fmt.Printf("Couldn't read version from server: %v\n", err)
 			os.Exit(1)
@@ -169,7 +167,7 @@ func main() {
 
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
-		server := kubecfg.NewProxyServer(*www, masterServer, auth)
+		server := kubecfg.NewProxyServer(*www, kubeClient)
 		glog.Fatal(server.Serve())
 	}
 
@@ -179,7 +177,7 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(method, client) || executeControllerRequest(method, client)
+	matchFound := executeAPIRequest(method, kubeClient) || executeControllerRequest(method, kubeClient)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
@@ -206,7 +204,7 @@ func checkStorage(storage string) bool {
 	return false
 }
 
-func executeAPIRequest(method string, s *kube_client.Client) bool {
+func executeAPIRequest(method string, c *client.Client) bool {
 	storage, path, hasSuffix := storagePathFromArg(flag.Arg(1))
 	validStorage := checkStorage(storage)
 	verb := ""
@@ -235,7 +233,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>", method, prettyWireStorage())
 		}
 	case "update":
-		obj, err := s.Verb("GET").Path(path).Do().Get()
+		obj, err := c.Verb("GET").Path(path).Do().Get()
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
@@ -253,7 +251,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 		return false
 	}
 
-	r := s.Verb(verb).
+	r := c.Verb(verb).
 		Path(path).
 		ParseSelectorParam("labels", *selector)
 	if setBody {
@@ -323,7 +321,7 @@ func executeAPIRequest(method string, s *kube_client.Client) bool {
 	return true
 }
 
-func executeControllerRequest(method string, c *kube_client.Client) bool {
+func executeControllerRequest(method string, c *client.Client) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
 			glog.Fatal("usage: kubecfg [OPTIONS] stop|rm|rollingupdate <controller>")
