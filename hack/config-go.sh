@@ -40,30 +40,46 @@ function gitcommit() {
   return 0
 }
 
-if [[ -z "$(which go)" ]]; then
-  echo "Can't find 'go' in PATH, please fix and retry." >&2
-  echo "See http://golang.org/doc/install for installation instructions." >&2
-  exit 1
-fi
-
-if [[ -z "$(which godep)" ]]; then
-  echo "Can't find 'godep' in PATH, please fix and retry." >&2
-  echo "See https://github.com/GoogleCloudPlatform/kubernetes#godep-and-dependency-management" >&2
-  exit 1
-fi
-
-# Travis continuous build uses a head go release that doesn't report
-# a version number, so we skip this check on Travis.  Its unnecessary
-# there anyway.
-if [[ "${TRAVIS:-}" != "true" ]]; then
-  GO_VERSION=($(go version))
-  if [[ "${GO_VERSION[2]}" < "go1.2" ]]; then
-    echo "Detected go version: ${GO_VERSION[*]}." >&2
-    echo "Kubernetes requires go version 1.2 or greater." >&2
-    echo "Please install Go version 1.2 or later" >&2
+# kube::setup_go_environment will check that `go` and `godep` commands are
+# available in ${PATH}. If not running on Travis, it will also check that the Go
+# version is good enough for the Kubernetes build.
+#
+# Also set ${GOPATH} and environment variables needed by Go.
+kube::setup_go_environment() {
+  if [[ -z "$(which go)" ]]; then
+    echo "Can't find 'go' in PATH, please fix and retry." >&2
+    echo "See http://golang.org/doc/install for installation instructions." >&2
     exit 1
   fi
-fi
+
+  if [[ -z "$(which godep)" ]]; then
+    echo "Can't find 'godep' in PATH, please fix and retry." >&2
+    echo "See https://github.com/GoogleCloudPlatform/kubernetes#godep-and-dependency-management" >&2
+    exit 1
+  fi
+
+  # Travis continuous build uses a head go release that doesn't report
+  # a version number, so we skip this check on Travis.  Its unnecessary
+  # there anyway.
+  if [[ "${TRAVIS:-}" != "true" ]]; then
+    local go_version
+    go_version=($(go version))
+    if [[ "${go_version[2]}" < "go1.2" ]]; then
+      echo "Detected go version: ${go_version[*]}." >&2
+      echo "Kubernetes requires go version 1.2 or greater." >&2
+      echo "Please install Go version 1.2 or later" >&2
+      exit 1
+    fi
+  fi
+
+  # TODO: get rid of this after PR #1054 gets rid of godep.
+  GOPATH="${KUBE_TARGET}:$(godep path)"
+  export GOPATH
+
+  # Unset GOBIN in case it already exsits in the current session.
+  unset GOBIN
+}
+
 
 KUBE_REPO_ROOT=$(dirname "${BASH_SOURCE:-$0}")/..
 if [[ "${OSTYPE:-}" == *darwin* ]]; then
@@ -87,9 +103,3 @@ mkdir -p "${KUBE_GO_PACKAGE_BASEDIR}"
 
 # Create symlink under output/go/src.
 ln -snf "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
-
-GOPATH="${KUBE_TARGET}:$(godep path)"
-export GOPATH
-
-# Unset GOBIN in case it already exsits in the current session.
-unset GOBIN
