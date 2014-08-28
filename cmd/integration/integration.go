@@ -94,6 +94,15 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	apiServer := httptest.NewServer(&handler)
 
 	etcdClient := etcd.NewClient(servers)
+	keys, err := etcdClient.Get("/", false, false)
+	if err != nil {
+		glog.Fatalf("Unable to list root etcd keys: %v", err)
+	}
+	for _, node := range keys.Node.Nodes {
+		if _, err := etcdClient.Delete(node.Key, true); err != nil {
+			glog.Fatalf("Unable delete key: %v", err)
+		}
+	}
 
 	cl := client.New(apiServer.URL, nil)
 	cl.PollPeriod = time.Second * 1
