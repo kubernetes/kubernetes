@@ -1,0 +1,28 @@
+#cloud-config
+
+write_files:
+- content: |
+    grains:
+      roles:
+        - kubernetes-master
+      cloud: rackspace
+  path: /etc/salt/minion.d/grains.conf
+- content: |
+    auto_accept: True
+  path: /etc/salt/master.d/auto-accept.conf
+- content: |
+    reactor:
+      - 'salt/minion/*/start':
+        - /srv/reactor/start.sls
+  path: /etc/salt/master.d/reactor.conf
+- content: |
+    master: KUBE_MASTER
+  path: /etc/salt/minion.d/master.conf
+
+runcmd:
+ - [mkdir, -p, /etc/salt/minion.d]
+ - [mkdir, -p, /etc/salt/master.d]
+ - [mkdir, -p, /srv/salt/nginx]
+ - echo "MASTER_HTPASSWD" > /srv/salt/nginx/htpasswd
+ - [bash, /root/masterStart.sh]
+ - curl -L http://bootstrap.saltstack.com | sh -s -- -M -X

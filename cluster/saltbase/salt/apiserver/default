@@ -27,6 +27,10 @@
 {% if grains.cloud == 'azure' %}
   MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') }}"
   {% set machines = "-machines $MACHINES" %}
+{% elif grains.cloud is defined and grains.cloud == 'rackspace' %}
+  MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|map(attribute='ip_interfaces.eth2')|map('first')|join(',') }}"
+  {% set machines = "-machines $MACHINES" %}
+  {% set minion_regexp = "" %}
 {% endif %}
 {% if grains.cloud == 'vsphere' %}
   # Collect IPs of minions as machines list.

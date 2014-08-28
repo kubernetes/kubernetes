@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Copyright 2014 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Sane defaults for dev environments. The following variables can be easily overriden
+# by setting each as a ENV variable ahead of time:
+# KUBE_IMAGE, KUBE_MASTER_FLAVOR, KUBE_MINION_FLAVOR, NUM_MINIONS, NOVA_NETWORK and SSH_KEY_NAME 
+
+# Shared
+KUBE_IMAGE="${KUBE_IMAGE-255df5fb-e3d4-45a3-9a07-c976debf7c14}" # Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+SSH_KEY_NAME="${SSH_KEY_NAME-id_kubernetes}"
+NOVA_NETWORK_LABEL="kubernetes-pool-net"
+NOVA_NETWORK_CIDR="${NOVA_NETWORK-192.168.0.0/24}"
+INSTANCE_PREFIX="kubernetes"
+
+# Master
+KUBE_MASTER_FLAVOR="${KUBE_MASTER_FLAVOR-performance1-1}"
+MASTER_NAME="${INSTANCE_PREFIX}-master"
+MASTER_TAG="tag=${INSTANCE_PREFIX}-master"
+
+# Minion
+KUBE_MINION_FLAVOR="${KUBE_MINION_FLAVOR-performance1-1}"
+RAX_NUM_MINIONS="${RAX_NUM_MINIONS-4}"
+MINION_TAG="tag=${INSTANCE_PREFIX}-minion"
+MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${RAX_NUM_MINIONS}}))
+KUBE_NETWORK=($(eval echo "10.240.{1..${RAX_NUM_MINIONS}}.0/24"))
