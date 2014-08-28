@@ -77,8 +77,11 @@ func (s *SourceEtcd) run() {
 		return
 	}
 
+	// watch must start from zero since the ModifiedIndex of the state may
+	// already be too far in the past for the etcd event queue
+	watchIndex := uint64(0)
 	for {
-		response, err = s.watchForNextState(response.Node.ModifiedIndex + 1)
+		response, err = s.watchForNextState(watchIndex)
 		if err != nil {
 			glog.Errorf("Unexpected error from etcd watch (%s): %v", s.key, err)
 			break
@@ -92,6 +95,8 @@ func (s *SourceEtcd) run() {
 			glog.Errorf("Failed parsing response from etcd watch (%s): %v", s.key, err)
 			return
 		}
+
+		watchIndex = response.Node.ModifiedIndex + 1
 	}
 }
 
