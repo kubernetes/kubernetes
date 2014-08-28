@@ -317,6 +317,11 @@ func (c *Client) WatchReplicationControllers(label, field labels.Selector, resou
 		Watch()
 }
 
+func (c *Client) ListServices(selector labels.Selector) (list api.ServiceList, err error) {
+	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(&list)
+	return
+}
+
 // GetService returns information about a particular service.
 func (c *Client) GetService(name string) (result api.Service, err error) {
 	err = c.Get().Path("services").Path(name).Do().Into(&result)

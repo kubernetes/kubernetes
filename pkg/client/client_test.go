@@ -406,6 +406,57 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	}
 }
 
+func TestListServices(t *testing.T) {
+	c := &testClient{
+		Request: testRequest{Method: "GET", Path: "/services"},
+		Response: Response{StatusCode: 200,
+			Body: api.ServiceList{
+				Items: []api.Service{
+					{
+						JSONBase: api.JSONBase{ID: "name"},
+						Labels: map[string]string{
+							"foo":  "bar",
+							"name": "baz",
+						},
+						Selector: map[string]string{
+							"one": "two",
+						},
+					},
+				},
+			},
+		},
+	}
+	receivedServiceList, err := c.Setup().ListServices(labels.Everything())
+	c.Validate(t, receivedServiceList, err)
+}
+
+func TestListServicesLabels(t *testing.T) {
+	c := &testClient{
+		Request: testRequest{Method: "GET", Path: "/services", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
+		Response: Response{StatusCode: 200,
+			Body: api.ServiceList{
+				Items: []api.Service{
+					{
+						JSONBase: api.JSONBase{ID: "name"},
+						Labels: map[string]string{
+							"foo":  "bar",
+							"name": "baz",
+						},
+						Selector: map[string]string{
+							"one": "two",
+						},
+					},
+				},
+			},
+		},
+	}
+	c.Setup()
+	c.QueryValidator["labels"] = validateLabels
+	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
+	receivedServiceList, err := c.ListServices(selector)
+	c.Validate(t, receivedServiceList, err)
+}
+
 func TestGetService(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/services/1"},
