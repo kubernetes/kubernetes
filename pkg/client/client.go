@@ -160,30 +160,37 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	}
 
 	// Did the server give us a status response?
-	isStatusResponse := false
 	var status api.Status
 	if err := api.DecodeInto(body, &status); err == nil && status.Status != "" {
-		isStatusResponse = true
-	}
+		switch {
+		case status.Status == api.StatusWorking:
+			switch response.StatusCode {
+			case http.StatusAccepted:
+				return nil, &StatusErr{status}
+			case http.StatusOK:
+				return nil, &StatusErr{status}
+			}
 
-	switch {
-	case response.StatusCode == http.StatusConflict:
-		// Return error given by server, if there was one.
-		if isStatusResponse {
+		case status.Status == api.StatusSuccess:
+			switch {
+			case response.StatusCode >= http.StatusOK && response.StatusCode <= http.StatusPartialContent:
+				return body, nil
+			}
+
+		case status.Status == api.StatusFailure:
 			return nil, &StatusErr{status}
 		}
-		fallthrough
-	case response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent:
+
 		return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
 	}
 
-	// If the server gave us a status back, look at what it was.
-	if isStatusResponse && status.Status != api.StatusSuccess {
-		// "Working" requests need to be handled specially.
-		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return nil, &StatusErr{status}
+	// handle standard HTTP style errors
+	switch {
+	case response.StatusCode == http.StatusAccepted:
+	case response.StatusCode >= 200 && response.StatusCode < 300:
+		return body, nil
 	}
-	return body, err
+	return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
 }
 
 // Underlying base implementation of performing a request.

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -43,9 +44,9 @@ func TestClient(t *testing.T) {
 	storage, codec := m.API_v1beta1()
 	s := httptest.NewServer(apiserver.Handle(storage, codec, "/api/v1beta1/"))
 
-	client := client.New(s.URL, nil)
+	c := client.New(s.URL, nil)
 
-	info, err := client.ServerVersion()
+	info, err := c.ServerVersion()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -53,7 +54,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.ListPods(labels.Everything())
+	pods, err := c.ListPods(labels.Everything())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,14 +75,32 @@ func TestClient(t *testing.T) {
 			},
 		},
 	}
-	got, err := client.CreatePod(pod)
+	got, err := c.CreatePod(pod)
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
+	}
+	statusErr, ok := err.(*client.StatusErr)
+	if !ok {
+		t.Fatalf("expected *client.StatusErr, got %#v", err)
+	}
+	//TODO: should be able to check apiserver.IsInvalid on statusErr
+	if statusErr.Status.Reason != api.StatusReasonInvalid {
+		t.Fatalf("expected an invalid error, got %#v", statusErr)
+	}
+	expectedCauses := []api.StatusCause{
+		{
+			Type:    api.CauseTypeFieldValueRequired,
+			Field:   "desiredState.manifest.containers[0].image",
+			Message: errors.NewRequired("desiredState.manifest.containers[0].image", "").Error(),
+		},
+	}
+	if !reflect.DeepEqual(statusErr.Status.Details.Causes, expectedCauses) {
+		t.Fatalf("expected %#v, got: %#v", expectedCauses, statusErr.Status.Details)
 	}
 
 	// get a created pod
 	pod.DesiredState.Manifest.Containers[0].Image = "an-image"
-	got, err = client.CreatePod(pod)
+	got, err = c.CreatePod(pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -90,7 +109,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.ListPods(labels.Everything())
+	pods, err = c.ListPods(labels.Everything())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
