@@ -67,11 +67,11 @@ func New(c *Config) *Master {
 	etcdClient := goetcd.NewClient(c.EtcdServers)
 	minionRegistry := makeMinionRegistry(c)
 	m := &Master{
-		podRegistry:        etcd.NewRegistry(etcdClient, minionRegistry),
-		controllerRegistry: etcd.NewRegistry(etcdClient, minionRegistry),
-		serviceRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
-		endpointRegistry:   etcd.NewRegistry(etcdClient, minionRegistry),
-		bindingRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
+		podRegistry:        etcd.NewRegistry(etcdClient),
+		controllerRegistry: etcd.NewRegistry(etcdClient),
+		serviceRegistry:    etcd.NewRegistry(etcdClient),
+		endpointRegistry:   etcd.NewRegistry(etcdClient),
+		bindingRegistry:    etcd.NewRegistry(etcdClient),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 	}
