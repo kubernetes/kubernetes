@@ -97,25 +97,41 @@ kube::setup_go_environment() {
 }
 
 
-KUBE_REPO_ROOT=$(dirname "${BASH_SOURCE:-$0}")/..
-if [[ "${OSTYPE:-}" == *darwin* ]]; then
-  # Make the path absolute if it is not.
-  if [[ "${KUBE_REPO_ROOT}" != /* ]]; then
-    KUBE_REPO_ROOT=${PWD}/${KUBE_REPO_ROOT}
-  fi
-else
-  # Resolve symlinks.
-  KUBE_REPO_ROOT=$(readlink -f "${KUBE_REPO_ROOT}")
-fi
+# --- Environment Variables ---
+
+# KUBE_REPO_ROOT  - Path to the top of the build tree.
+# KUBE_TARGET     - Path where output Go files are saved.
+# KUBE_GO_PACKAGE - Full name of the Kubernetes Go package.
+
+# Make ${KUBE_REPO_ROOT} an absolute path.
+KUBE_REPO_ROOT=$(
+  set -eu
+  unset CDPATH
+  scripts_dir=$(dirname "${BASH_SOURCE[0]}")
+  cd "${scripts_dir}"
+  cd ..
+  pwd
+)
+export KUBE_REPO_ROOT
 
 KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
 mkdir -p "${KUBE_TARGET}"
+export KUBE_TARGET
 
 KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
-KUBE_GO_PACKAGE_DIR="${KUBE_TARGET}/src/${KUBE_GO_PACKAGE}"
+export KUBE_GO_PACKAGE
 
-KUBE_GO_PACKAGE_BASEDIR=$(dirname "${KUBE_GO_PACKAGE_DIR}")
-mkdir -p "${KUBE_GO_PACKAGE_BASEDIR}"
+(
+  # Create symlink named ${KUBE_GO_PACKAGE} under output/go/src.
+  # So that Go knows how to import Kubernetes sources by full path.
+  # Use a subshell to avoid leaking these variables.
 
-# Create symlink under output/go/src.
-ln -snf "${KUBE_REPO_ROOT}" "${KUBE_GO_PACKAGE_DIR}"
+  set -eu
+  go_pkg_dir="${KUBE_TARGET}/src/${KUBE_GO_PACKAGE}"
+  go_pkg_basedir=$(dirname "${go_pkg_dir}")
+  mkdir -p "${go_pkg_basedir}"
+  rm -f "${go_pkg_dir}"
+  # TODO: This symlink should be relative.
+  ln -s "${KUBE_REPO_ROOT}" "${go_pkg_dir}"
+)
+
