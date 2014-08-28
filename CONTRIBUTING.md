@@ -25,4 +25,4 @@ Please read [this doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/ma
 
 ## Adding dependencies
 
-If your patch depends on new packages, add them to `third_party/deps.sh` and run `third_party/update.sh [package]` to fetch and commit the dependency.
+If your patch depends on new packages, add that package with [`godep`](https://github.com/tools/godep).  Follow the [instructions to add a dependency](https://github.com/tools/godep#add-a-dependency).
