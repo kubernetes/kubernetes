@@ -36,7 +36,12 @@ version_ldflags=$(kube::version_ldflags)
 
 if [[ $# == 0 ]]; then
   # Update $@ with the default list of targets to build.
-  set -- cmd/proxy cmd/apiserver cmd/controller-manager cmd/kubelet cmd/kubecfg plugin/cmd/scheduler
+  set -- \
+      cmd/proxy \
+      cmd/apiserver \
+      cmd/controller-manager \
+      cmd/kubelet cmd/kubecfg \
+      plugin/cmd/scheduler
 fi
 
 binaries=()
@@ -44,8 +49,10 @@ for arg; do
   binaries+=("${KUBE_GO_PACKAGE}/${arg}")
 done
 
-# Note that the flags to 'go build' are duplicated in the salt build setup for
-# our cluster deploy.  If we add more command line options to our standard build
-# we'll want to duplicate them there.  As we move to distributing pre- built
-# binaries we can eliminate this duplication.
-go install -ldflags "${version_ldflags}" "${binaries[@]}"
+# Note that the flags to 'go build' are duplicated in the salt build setup
+# (release/build-release.sh) for our cluster deploy.  If we add more command
+# line options to our standard build we'll want to duplicate them there.  As we
+# move to distributing pre- built binaries we can eliminate this duplication.
+go install ${GOFLAGS:-} \
+    -ldflags "${version_ldflags}" \
+    "${binaries[@]}"
