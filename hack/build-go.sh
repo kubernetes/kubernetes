@@ -49,10 +49,13 @@ for arg; do
   binaries+=("${KUBE_GO_PACKAGE}/${arg}")
 done
 
+# Use eval to preserve embedded quoted strings.
+eval "goflags=(${GOFLAGS:-})"
+
 # Note that the flags to 'go build' are duplicated in the salt build setup
 # (release/build-release.sh) for our cluster deploy.  If we add more command
 # line options to our standard build we'll want to duplicate them there.  As we
 # move to distributing pre- built binaries we can eliminate this duplication.
-go install ${GOFLAGS:-} \
+go install "${goflags[@]:+${goflags[@]}}" \
     -ldflags "${version_ldflags}" \
     "${binaries[@]}"
