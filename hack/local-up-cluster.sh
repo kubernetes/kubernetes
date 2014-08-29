@@ -69,12 +69,18 @@ ${GO_OUT}/proxy \
   --master="http://${API_HOST}:${API_PORT}" &> ${PROXY_LOG} &
 PROXY_PID=$!
 
+SCHEDULER_LOG=/tmp/k8s-scheduler.log
+${GO_OUT}/scheduler \
+  --master="http://${API_HOST}:${API_PORT}" &> ${SCHEDULER_LOG} &
+SCHEDULER_PID=$!
+
 echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
 echo "Logs: "
 echo "  ${APISERVER_LOG}"
 echo "  ${CTLRMGR_LOG}"
 echo "  ${KUBELET_LOG}"
 echo "  ${PROXY_LOG}"
+echo "  ${SCHEDULER_LOG}"
 
 cleanup()
 {
@@ -83,12 +89,13 @@ cleanup()
     kill ${CTLRMGR_PID}
     kill ${KUBELET_PID}
     kill ${PROXY_PID}
+    kill ${SCHEDULER_PID}
 
     kill ${ETCD_PID}
     rm -rf ${ETCD_DIR}
     exit 0
 }
- 
+
 trap cleanup EXIT
 
 while true; do read x; done
