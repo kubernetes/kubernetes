@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package api_test
 
 import (
 	"encoding/json"
@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/gofuzz"
@@ -32,7 +34,7 @@ var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
-	func(j *JSONBase, c fuzz.Continue) {
+	func(j *api.JSONBase, c fuzz.Continue) {
 		// We have to customize the randomization of JSONBases because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
@@ -105,20 +107,20 @@ func objDiff(a, b interface{}) string {
 func runTest(t *testing.T, source interface{}) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
-	j, err := FindJSONBase(source)
+	j, err := api.FindJSONBase(source)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, source)
 	}
 	j.SetKind("")
 	j.SetAPIVersion("")
 
-	data, err := Encode(source)
+	data, err := api.Encode(source)
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
 
-	obj2, err := Decode(data)
+	obj2, err := api.Decode(data)
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
 		return
@@ -129,7 +131,7 @@ func runTest(t *testing.T, source interface{}) {
 		}
 	}
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface()
-	err = DecodeInto(data, obj3)
+	err = api.DecodeInto(data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
@@ -142,22 +144,21 @@ func runTest(t *testing.T, source interface{}) {
 }
 
 func TestTypes(t *testing.T) {
-	// TODO: auto-fill all fields.
 	table := []interface{}{
-		&PodList{},
-		&Pod{},
-		&ServiceList{},
-		&Service{},
-		&ReplicationControllerList{},
-		&ReplicationController{},
-		&MinionList{},
-		&Minion{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
-		&ContainerManifestList{},
-		&Endpoints{},
-		&Binding{},
+		&api.PodList{},
+		&api.Pod{},
+		&api.ServiceList{},
+		&api.Service{},
+		&api.ReplicationControllerList{},
+		&api.ReplicationController{},
+		&api.MinionList{},
+		&api.Minion{},
+		&api.Status{},
+		&api.ServerOpList{},
+		&api.ServerOp{},
+		&api.ContainerManifestList{},
+		&api.Endpoints{},
+		&api.Binding{},
 	}
 	for _, item := range table {
 		// Try a few times, since runTest uses random values.
@@ -168,16 +169,16 @@ func TestTypes(t *testing.T) {
 }
 
 func TestEncode_NonPtr(t *testing.T) {
-	pod := Pod{
+	pod := api.Pod{
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := interface{}(pod)
-	data, err := Encode(obj)
-	obj2, err2 := Decode(data)
+	data, err := api.Encode(obj)
+	obj2, err2 := api.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
-	if _, ok := obj2.(*Pod); !ok {
+	if _, ok := obj2.(*api.Pod); !ok {
 		t.Fatalf("Got wrong type")
 	}
 	if !reflect.DeepEqual(obj2, &pod) {
@@ -186,16 +187,16 @@ func TestEncode_NonPtr(t *testing.T) {
 }
 
 func TestEncode_Ptr(t *testing.T) {
-	pod := &Pod{
+	pod := &api.Pod{
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := interface{}(pod)
-	data, err := Encode(obj)
-	obj2, err2 := Decode(data)
+	data, err := api.Encode(obj)
+	obj2, err2 := api.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
-	if _, ok := obj2.(*Pod); !ok {
+	if _, ok := obj2.(*api.Pod); !ok {
 		t.Fatalf("Got wrong type")
 	}
 	if !reflect.DeepEqual(obj2, pod) {
@@ -205,11 +206,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := Decode(badJSONMissingKind); err == nil {
+	if _, err := api.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := api.Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)

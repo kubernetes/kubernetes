@@ -25,7 +25,9 @@ import (
 	"testing"
 	"time"
 
+	// TODO: remove dependency on api, apiserver should be generic
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 )
 
 func TestOperation(t *testing.T) {
