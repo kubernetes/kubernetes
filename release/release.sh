@@ -38,21 +38,21 @@ $SCRIPT_DIR/build-release.sh $INSTANCE_PREFIX
 echo "Building launch script"
 # Create the local install script.  These are the tools to install the local
 # tools and launch a new cluster.
-LOCAL_RELEASE_DIR=output/release/local-release
+LOCAL_RELEASE_DIR=_output/release/local-release
 mkdir -p $LOCAL_RELEASE_DIR/src/scripts
 
 cp -r cluster/templates $LOCAL_RELEASE_DIR/src/templates
 cp -r cluster/*.sh $LOCAL_RELEASE_DIR/src/scripts
 
-tar cz -C $LOCAL_RELEASE_DIR -f output/release/launch-kubernetes.tgz .
+tar cz -C $LOCAL_RELEASE_DIR -f _output/release/launch-kubernetes.tgz .
 
-echo "#!/bin/bash" >> output/release/launch-kubernetes.sh
-echo "RELEASE_TAG=$RELEASE_TAG" >> output/release/launch-kubernetes.sh
-echo "RELEASE_PREFIX=$RELEASE_PREFIX" >> output/release/launch-kubernetes.sh
-echo "RELEASE_NAME=$RELEASE_NAME" >> output/release/launch-kubernetes.sh
-echo "RELEASE_FULL_PATH=$RELEASE_FULL_PATH" >> output/release/launch-kubernetes.sh
-cat release/launch-kubernetes-base.sh >> output/release/launch-kubernetes.sh
-chmod a+x output/release/launch-kubernetes.sh
+echo "#!/bin/bash" >> _output/release/launch-kubernetes.sh
+echo "RELEASE_TAG=$RELEASE_TAG" >> _output/release/launch-kubernetes.sh
+echo "RELEASE_PREFIX=$RELEASE_PREFIX" >> _output/release/launch-kubernetes.sh
+echo "RELEASE_NAME=$RELEASE_NAME" >> _output/release/launch-kubernetes.sh
+echo "RELEASE_FULL_PATH=$RELEASE_FULL_PATH" >> _output/release/launch-kubernetes.sh
+cat release/launch-kubernetes-base.sh >> _output/release/launch-kubernetes.sh
+chmod a+x _output/release/launch-kubernetes.sh
 
 # Now copy everything up to the release structure on GS
 echo "Uploading to Google Storage"
@@ -61,7 +61,7 @@ if ! gsutil ls $RELEASE_BUCKET > /dev/null 2>&1 ; then
   gsutil mb $RELEASE_BUCKET
 fi
 for x in master-release.tgz launch-kubernetes.tgz launch-kubernetes.sh; do
-  gsutil -q cp output/release/$x $RELEASE_FULL_PATH/$x
+  gsutil -q cp _output/release/$x $RELEASE_FULL_PATH/$x
 
   make_public_readable $RELEASE_FULL_PATH/$x
 done

@@ -58,6 +58,6 @@ fi
 azure storage blob upload \
     -a $AZ_STG \
     -k "$stg_key" \
-    $SCRIPT_DIR/../../output/release/master-release.tgz \
+    $SCRIPT_DIR/../../_output/release/master-release.tgz \
     $CONTAINER \
     master-release.tgz

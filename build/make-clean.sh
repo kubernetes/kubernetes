@@ -22,4 +22,4 @@ source $(dirname $0)/common.sh
 
 verify-prereqs
 build-image
-run-build-command rm -rf output/build/*
+run-build-command rm -rf _output/build/*

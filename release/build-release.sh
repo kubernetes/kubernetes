@@ -31,9 +31,9 @@ KUBE_DIR=$SCRIPT_DIR/..
 # Next build the release tar.  This gets copied on to the master and installed
 # from there.  It includes the go source for the necessary servers along with
 # the salt configs.
-rm -rf $KUBE_DIR/output/release/*
+rm -rf $KUBE_DIR/_output/release/*
 
-MASTER_RELEASE_DIR=$KUBE_DIR/output/release/master-release
+MASTER_RELEASE_DIR=$KUBE_DIR/_output/release/master-release
 mkdir -p $MASTER_RELEASE_DIR/bin
 mkdir -p $MASTER_RELEASE_DIR/src/scripts
 
@@ -63,12 +63,12 @@ function find_go_files() {
     \) -name '*.go'
 }
 # find_go_files is directory dependent
-pushd $KUBE_DIR
+pushd $KUBE_DIR >/dev/null
 for f in $(find_go_files); do
   mkdir -p $MASTER_RELEASE_DIR/src/go/$(dirname ${f})
   cp ${f} ${MASTER_RELEASE_DIR}/src/go/${f}
 done
-popd
+popd >/dev/null
 
 echo "Packaging release"
-tar cz -C $KUBE_DIR/output/release -f $KUBE_DIR/output/release/master-release.tgz master-release
+tar cz -C $KUBE_DIR/_output/release -f $KUBE_DIR/_output/release/master-release.tgz master-release

@@ -31,6 +31,7 @@ find_test_dirs() {
   find . -not \( \
       \( \
         -wholename './output' \
+        -o -wholename './_output' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \

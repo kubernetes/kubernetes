@@ -27,13 +27,13 @@ fi
 readonly KUBE_BUILD_IMAGE
 readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 
-# We set up a volume so that we have the same output directory from one run of
+# We set up a volume so that we have the same _output directory from one run of
 # the container to the next.
 #
 # Note that here "LOCAL" is local to the docker daemon.  In the boot2docker case
 # this is still inside the VM.  We use the same directory in both cases though.
-readonly LOCAL_OUTPUT_DIR="${KUBE_REPO_ROOT}/output/build"
-readonly REMOTE_OUTPUT_DIR="/go/src/${KUBE_GO_PACKAGE}/output/build"
+readonly LOCAL_OUTPUT_DIR="${KUBE_REPO_ROOT}/_output/build"
+readonly REMOTE_OUTPUT_DIR="/go/src/${KUBE_GO_PACKAGE}/_output/build"
 readonly DOCKER_CONTAINER_NAME=kube-build
 readonly DOCKER_MOUNT="-v ${LOCAL_OUTPUT_DIR}:${REMOTE_OUTPUT_DIR}"
 
@@ -45,7 +45,7 @@ readonly KUBE_RUN_BINARIES="
   "
 
 # This is where the final release artifacts are created locally
-readonly RELEASE_DIR="${KUBE_REPO_ROOT}/output/release"
+readonly RELEASE_DIR="${KUBE_REPO_ROOT}/_output/release"
 
 # ---------------------------------------------------------------------------
 # Basic setup functions
@@ -116,7 +116,7 @@ function verify-gcs-prereqs() {
 
 # Set up the context directory for the kube-build image and build it.
 function build-image() {
-  local -r BUILD_CONTEXT_DIR="${KUBE_REPO_ROOT}/output/images/${KUBE_BUILD_IMAGE}"
+  local -r BUILD_CONTEXT_DIR="${KUBE_REPO_ROOT}/_output/images/${KUBE_BUILD_IMAGE}"
   local -r SOURCE="
     api
     build
@@ -137,14 +137,14 @@ function build-image() {
 }
 
 # Builds the runtime image.  Assumes that the appropriate binaries are already
-# built and in output/build/.
+# built and in _output/build/.
 function run-image() {
-  local -r BUILD_CONTEXT_BASE="${KUBE_REPO_ROOT}/output/images/${KUBE_RUN_IMAGE_BASE}"
+  local -r BUILD_CONTEXT_BASE="${KUBE_REPO_ROOT}/_output/images/${KUBE_RUN_IMAGE_BASE}"
 
   # First build the base image.  This one brings in all of the binaries.
   mkdir -p "${BUILD_CONTEXT_BASE}"
   tar czf ${BUILD_CONTEXT_BASE}/kube-bins.tar.gz \
-    -C "output/build/linux/amd64" \
+    -C "_output/build/linux/amd64" \
     ${KUBE_RUN_BINARIES}
   cp -R build/run-images/base/* "${BUILD_CONTEXT_BASE}/"
   docker-build "${KUBE_RUN_IMAGE_BASE}" "${BUILD_CONTEXT_BASE}"
@@ -212,7 +212,7 @@ function copy-output() {
     # Kill any leftover container
     docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 
-    echo "+++ Syncing back output directory from boot2docker VM"
+    echo "+++ Syncing back _output directory from boot2docker VM"
     mkdir -p "${LOCAL_OUTPUT_DIR}"
     rm -rf "${LOCAL_OUTPUT_DIR}/*"
     ${DOCKER} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} ."  \
@@ -300,12 +300,12 @@ function package-tarballs() {
   mkdir -p "${RELEASE_DIR}"
 
   # Find all of the built kubecfg binaries
-  for platform in output/build/*/* ; do
+  for platform in _output/build/*/* ; do
     echo $platform
     local PLATFORM_TAG=$(echo $platform | awk -F / '{ printf "%s-%s", $3, $4 }')
     echo "+++ Building client package for $PLATFORM_TAG"
 
-    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/output/release-stage/${PLATFORM_TAG}/kubernetes"
+    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/_output/release-stage/${PLATFORM_TAG}/kubernetes"
     mkdir -p "${CLIENT_RELEASE_STAGE}"
     mkdir -p "${CLIENT_RELEASE_STAGE}/bin"
 

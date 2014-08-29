@@ -108,7 +108,7 @@ KUBE_REPO_ROOT=$(
 )
 export KUBE_REPO_ROOT
 
-KUBE_TARGET="${KUBE_REPO_ROOT}/output/go"
+KUBE_TARGET="${KUBE_REPO_ROOT}/_output/go"
 mkdir -p "${KUBE_TARGET}"
 export KUBE_TARGET
 
@@ -116,7 +116,7 @@ KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 export KUBE_GO_PACKAGE
 
 (
-  # Create symlink named ${KUBE_GO_PACKAGE} under output/go/src.
+  # Create symlink named ${KUBE_GO_PACKAGE} under _output/go/src.
   # So that Go knows how to import Kubernetes sources by full path.
   # Use a subshell to avoid leaking these variables.
 

@@ -43,7 +43,7 @@ trap "echo etcd still running" EXIT
 echo
 echo Integration scenario ...
 echo
-$(dirname $0)/../output/go/bin/integration
+$(dirname $0)/../_output/go/bin/integration
 
 # nuke etcd
 trap cleanup EXIT SIGINT

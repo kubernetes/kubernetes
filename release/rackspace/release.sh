@@ -43,7 +43,7 @@ if ! swiftly -A $OS_AUTH_URL -U $OS_USERNAME -K $OS_PASSWORD get $CONTAINER > /d
 fi
 
 for x in master-release.tgz; do
-  swiftly -A $OS_AUTH_URL -U $OS_USERNAME -K $OS_PASSWORD put -i output/release/$x $CONTAINER/output/release/$x > /dev/null 2>&1
+  swiftly -A $OS_AUTH_URL -U $OS_USERNAME -K $OS_PASSWORD put -i _output/release/$x $CONTAINER/output/release/$x > /dev/null 2>&1
 done
 
 echo "Release pushed."
