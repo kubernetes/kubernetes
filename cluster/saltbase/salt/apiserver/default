@@ -27,20 +27,19 @@
 {% if grains.cloud == 'azure' %}
   MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') }}"
   {% set machines = "-machines $MACHINES" %}
-{% elif grains.cloud is defined and grains.cloud == 'rackspace' %}
-  MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|map(attribute='ip_interfaces.eth2')|map('first')|join(',') }}"
-  {% set machines = "-machines $MACHINES" %}
-  {% set minion_regexp = "" %}
 {% endif %}
-{% if grains.cloud == 'vsphere' %}
+{% if grains.cloud == 'rackspace' or grains.cloud == 'vsphere' %}
   # Collect IPs of minions as machines list.
-  # Use a bash array to build the value we need. It doesn't appear to be
-  # possible call functions map or zip, or use lambda's from Jinja.
+  #
+  # Use a bash array to build the value we need. Jinja 2.7 does support a 'map'
+  # filter that would simplify this.  However, some installations (specifically
+  # Debian Wheezy) only install Jinja 2.6.
   MACHINE_IPS=()
   {% for addrs in salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').values() %}
   MACHINE_IPS+=( {{ addrs[0] }} )
   {% endfor %}
   {% set machines = "-machines=$(echo ${MACHINE_IPS[@]} | xargs -n1 echo | paste -sd,)" %}
+  {% set minion_regexp = "" %}
 {% endif %}
 {% endif %}
 
