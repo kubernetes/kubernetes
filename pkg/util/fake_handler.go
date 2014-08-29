@@ -34,7 +34,9 @@ type LogInterface interface {
 	Logf(format string, args ...interface{})
 }
 
-// FakeHandler is to assist in testing HTTP requests.
+// FakeHandler is to assist in testing HTTP requests. Notice that FakeHandler is
+// not thread safe and you must not direct traffic to except for the request
+// you want to test. You can do this by hiding it in an http.ServeMux.
 type FakeHandler struct {
 	RequestReceived *http.Request
 	RequestBody     string
