@@ -29,6 +29,8 @@ import (
 
 // Watcher is the interface needed to receive changes to services and endpoints.
 type Watcher interface {
+	ListServices(label labels.Selector) (api.ServiceList, error)
+	ListEndpoints(label labels.Selector) (api.EndpointsList, error)
 	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
@@ -70,6 +72,17 @@ func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceU
 
 // runServices loops forever looking for changes to services.
 func (s *SourceAPI) runServices(resourceVersion *uint64) {
+	if *resourceVersion == 0 {
+		services, err := s.client.ListServices(labels.Everything())
+		if err != nil {
+			glog.Errorf("Unable to load services: %v", err)
+			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
+			return
+		}
+		*resourceVersion = services.ResourceVersion
+		s.services <- ServiceUpdate{Op: SET, Services: services.Items}
+	}
+
 	watcher, err := s.client.WatchServices(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for services changes: %v", err)
@@ -97,10 +110,10 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 
 			switch event.Type {
 			case watch.Added, watch.Modified:
-				updates <- ServiceUpdate{Op: SET, Services: []api.Service{*service}}
+				updates <- ServiceUpdate{Op: ADD, Services: []api.Service{*service}}
 
 			case watch.Deleted:
-				updates <- ServiceUpdate{Op: SET}
+				updates <- ServiceUpdate{Op: REMOVE, Services: []api.Service{*service}}
 			}
 		}
 	}
@@ -108,6 +121,17 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 
 // runEndpoints loops forever looking for changes to endpoints.
 func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
+	if *resourceVersion == 0 {
+		endpoints, err := s.client.ListEndpoints(labels.Everything())
+		if err != nil {
+			glog.Errorf("Unable to load endpoints: %v", err)
+			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
+			return
+		}
+		*resourceVersion = endpoints.ResourceVersion
+		s.endpoints <- EndpointsUpdate{Op: SET, Endpoints: endpoints.Items}
+	}
+
 	watcher, err := s.client.WatchEndpoints(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for endpoints changes: %v", err)
@@ -135,10 +159,10 @@ func handleEndpointsWatch(resourceVersion *uint64, ch <-chan watch.Event, update
 
 			switch event.Type {
 			case watch.Added, watch.Modified:
-				updates <- EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints}}
+				updates <- EndpointsUpdate{Op: ADD, Endpoints: []api.Endpoints{*endpoints}}
 
 			case watch.Deleted:
-				updates <- EndpointsUpdate{Op: SET}
+				updates <- EndpointsUpdate{Op: REMOVE, Endpoints: []api.Endpoints{*endpoints}}
 			}
 		}
 	}

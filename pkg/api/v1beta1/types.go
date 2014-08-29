@@ -364,6 +364,12 @@ type Endpoints struct {
 	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }
 
+// EndpointsList is a list of endpoints.
+type EndpointsList struct {
+	JSONBase `json:",inline" yaml:",inline"`
+	Items    []Endpoints `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
 // Minion is a worker node in Kubernetenes.
 // The name of the minion according to etcd is in JSONBase.ID.
 type Minion struct {

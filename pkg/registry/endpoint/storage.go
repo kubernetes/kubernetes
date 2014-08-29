@@ -37,14 +37,17 @@ func NewStorage(registry Registry) apiserver.RESTStorage {
 	}
 }
 
-// Get satisfies the RESTStorage interface but is unimplemented.
+// Get satisfies the RESTStorage interface.
 func (rs *Storage) Get(id string) (interface{}, error) {
 	return rs.registry.GetEndpoints(id)
 }
 
-// List satisfies the RESTStorage interface but is unimplemented.
+// List satisfies the RESTStorage interface.
 func (rs *Storage) List(selector labels.Selector) (interface{}, error) {
-	return nil, errors.New("unimplemented")
+	if !selector.Empty() {
+		return nil, errors.New("label selectors are not supported on endpoints")
+	}
+	return rs.registry.ListEndpoints()
 }
 
 // Watch returns Endpoint events via a watch.Interface.

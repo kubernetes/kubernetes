@@ -65,12 +65,17 @@ type ReplicationControllerInterface interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
+	ListServices(selector labels.Selector) (api.ServiceList, error)
 	GetService(id string) (api.Service, error)
 	CreateService(api.Service) (api.Service, error)
 	UpdateService(api.Service) (api.Service, error)
 	DeleteService(string) error
 	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+}
 
+// EndpointsInterface has methods to work with Endpoints resources
+type EndpointsInterface interface {
+	ListEndpoints(selector labels.Selector) (api.EndpointsList, error)
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
@@ -318,8 +323,9 @@ func (c *Client) WatchReplicationControllers(label, field labels.Selector, resou
 		Watch()
 }
 
-func (c *Client) ListServices(selector labels.Selector) (list api.ServiceList, err error) {
-	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(&list)
+// ListServices takes a selector, and returns the list of services that match that selector
+func (c *Client) ListServices(selector labels.Selector) (result api.ServiceList, err error) {
+	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(&result)
 	return
 }
 
@@ -359,6 +365,12 @@ func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uin
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
+}
+
+// ListEndpoints takes a selector, and returns the list of endpoints that match that selector
+func (c *Client) ListEndpoints(selector labels.Selector) (result api.EndpointsList, err error) {
+	err = c.Get().Path("endpoints").SelectorParam("labels", selector).Do().Into(&result)
+	return
 }
 
 // WatchEndpoints returns a watch.Interface that watches the requested endpoints for a service.

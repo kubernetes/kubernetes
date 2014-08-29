@@ -35,6 +35,7 @@ func init() {
 		ServerOp{},
 		ContainerManifestList{},
 		Endpoints{},
+		EndpointsList{},
 		Binding{},
 	)
 }

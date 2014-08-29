@@ -370,6 +370,13 @@ func (r *Registry) WatchServices(label, field labels.Selector, resourceVersion u
 	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
 }
 
+// ListEndpoints obtains a list of Services.
+func (r *Registry) ListEndpoints() (*api.EndpointsList, error) {
+	list := &api.EndpointsList{}
+	err := r.ExtractList("/registry/services/endpoints", &list.Items, &list.ResourceVersion)
+	return list, err
+}
+
 // UpdateEndpoints update Endpoints of a Service.
 func (r *Registry) UpdateEndpoints(e api.Endpoints) error {
 	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.

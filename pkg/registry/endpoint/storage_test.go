@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
@@ -65,5 +66,31 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	}
 	if obj.(*api.Endpoints).Endpoints != nil {
 		t.Errorf("unexpected endpoints: %#v", obj)
+	}
+}
+
+func TestEndpointsRegistryList(t *testing.T) {
+	registry := registrytest.NewServiceRegistry()
+	storage := NewStorage(registry)
+	registry.EndpointsList = api.EndpointsList{
+		JSONBase: api.JSONBase{ResourceVersion: 1},
+		Items: []api.Endpoints{
+			{JSONBase: api.JSONBase{ID: "foo"}},
+			{JSONBase: api.JSONBase{ID: "bar"}},
+		},
+	}
+	s, _ := storage.List(labels.Everything())
+	sl := s.(*api.EndpointsList)
+	if len(sl.Items) != 2 {
+		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))
+	}
+	if e, a := "foo", sl.Items[0].ID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if e, a := "bar", sl.Items[1].ID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if sl.ResourceVersion != 1 {
+		t.Errorf("Unexpected resource version: %#v", sl)
 	}
 }
