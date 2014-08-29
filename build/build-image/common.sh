@@ -19,7 +19,7 @@
 
 cd $(dirname "${BASH_SOURCE}")/../.. >/dev/null
 readonly KUBE_REPO_ROOT="${PWD}"
-readonly KUBE_TARGET="${KUBE_REPO_ROOT}/output/build"
+readonly KUBE_TARGET="${KUBE_REPO_ROOT}/_output/build"
 readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 
 mkdir -p "${KUBE_TARGET}"

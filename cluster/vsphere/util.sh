@@ -180,7 +180,7 @@ function kube-up {
   govc guest.upload \
     -vm ${MASTER_NAME} \
     -f \
-    ./output/release/master-release.tgz \
+    ./_output/release/master-release.tgz \
     /home/kube/master-release.tgz
 
   # Kickstart start script
@@ -248,7 +248,7 @@ function kube-push {
   govc guest.upload \
     -vm ${MASTER_NAME} \
     -f \
-    ./output/release/master-release.tgz \
+    ./_output/release/master-release.tgz \
     /home/kube/master-release.tgz
 
   (

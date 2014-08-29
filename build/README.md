@@ -16,8 +16,8 @@ To build Kubernetes you need to have access to a Docker installation through eit
 * `run-tests.sh`: This will run the Kubernetes unit tests in a Docker container
 * `run-integration.sh`: This will build and run the integration test in a Docker container
 * `make-cross.sh`: This will make all cross-compiled binaries (currently just kubecfg).
-* `copy-output.sh`: This will copy the contents of `output/build` from any remote Docker container to the local `output/build`.  Right now this is only necessary on Mac OS X with `boot2docker`.
-* `make-clean.sh`: Clean out the contents of `output/build`.
+* `copy-output.sh`: This will copy the contents of `_output/build` from any remote Docker container to the local `_output/build`.  Right now this is only necessary on Mac OS X with `boot2docker`.
+* `make-clean.sh`: Clean out the contents of `_output/build`.
 * `shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
 * `release.sh`: Build everything, test it, upload the results to a GCS bucket.  Docker images are also sent to the same bucket using the [`google/docker-registry`](https://registry.hub.docker.com/u/google/docker-registry/) Docker image.
 
@@ -44,11 +44,11 @@ Other build artifacts:
 
 The scripts directly under `build/` are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on `build/build-image/Dockerfile`) and then execute the appropriate command in that container.  If necessary (for Mac OS X), the scripts will also copy results out.
 
-The `kube-build` container image is built by first creating a "context" directory in `output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
+The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
 Everything in `build/build-image/` is meant to be run inside of the container.  If it doesn't think it is running in the container it'll throw a warning.  While you can run some of that stuff outside of the container, it wasn't built to do so.
 
-The files necessarily for the release Docker images are in `build/run-images/*`.  All of this is staged into `output/images` similar to build-image.  The `base` image is used as a base for each of the specialized containers and is generally never pushed to a shared repository.
+The files necessarily for the release Docker images are in `build/run-images/*`.  All of this is staged into `_output/images` similar to build-image.  The `base` image is used as a base for each of the specialized containers and is generally never pushed to a shared repository.
 
 ## TODOs
 

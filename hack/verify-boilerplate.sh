@@ -18,7 +18,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
 
 result=0
 
-gofiles="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "Godeps/\|third_party/\|release/\|output/\|target/")"
+gofiles="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "Godeps/\|third_party/\|release/\|_?output/|target/")"
 for file in ${gofiles}; do
   if [[ "$(${REPO_ROOT}/hooks/boilerplate.sh "${file}")" -eq "0" ]]; then
     echo "Boilerplate header is wrong for: ${file}"

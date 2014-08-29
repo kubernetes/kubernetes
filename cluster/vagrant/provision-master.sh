@@ -49,7 +49,7 @@ EOF
 cat <<EOF >/etc/salt/master.d/salt-output.conf
 # Minimize the amount of output to terminal
 state_verbose: False
-state_output: mixed  
+state_output: mixed
 EOF
 
 # Configure nginx authorization
@@ -83,8 +83,8 @@ EOF
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M
 
   # Install salt-api
-  # 
-  # This is used to inform the cloud provider used in the vagrant cluster    
+  #
+  # This is used to inform the cloud provider used in the vagrant cluster
   yum install -y salt-api
   systemctl enable salt-api
   systemctl start salt-api
@@ -98,7 +98,7 @@ pushd /vagrant
 popd
 
 echo "Running release install script"
-pushd /vagrant/output/release/master-release/src/scripts
+pushd /vagrant/_output/release/master-release/src/scripts
   ./master-release-install.sh
 popd
 

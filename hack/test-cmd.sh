@@ -44,7 +44,7 @@ ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
-GO_OUT=$(dirname $0)/../output/go/bin
+GO_OUT=$(dirname $0)/../_output/go/bin
 
 # Check kubecfg
 out=$(${GO_OUT}/kubecfg -version)
