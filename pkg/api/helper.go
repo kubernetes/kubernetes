@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"gopkg.in/v1/yaml"
 )
@@ -64,22 +63,6 @@ func init() {
 		ContainerManifestList{},
 		Endpoints{},
 		Binding{},
-	)
-	AddKnownTypes("v1beta1",
-		v1beta1.PodList{},
-		v1beta1.Pod{},
-		v1beta1.ReplicationControllerList{},
-		v1beta1.ReplicationController{},
-		v1beta1.ServiceList{},
-		v1beta1.Service{},
-		v1beta1.MinionList{},
-		v1beta1.Minion{},
-		v1beta1.Status{},
-		v1beta1.ServerOpList{},
-		v1beta1.ServerOp{},
-		v1beta1.ContainerManifestList{},
-		v1beta1.Endpoints{},
-		v1beta1.Binding{},
 	)
 
 	Codec = conversionScheme

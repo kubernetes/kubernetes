@@ -14,25 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package v1beta1
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	// Alias this so it can be easily changed when we cut the next version.
+	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	// Also import under original name for Convert and AddConversionFuncs.
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func init() {
-	// TODO: Consider inverting dependency chain-- imagine v1beta1 package
-	// registering all of these functions. Then, if you want to be able to understand
-	// v1beta1 objects, you just import that package for its side effects.
-	AddConversionFuncs(
+	// Shortcut for sub-conversions. TODO: This should possibly be refactored
+	// such that this convert function is passed to each conversion func.
+	Convert := api.Convert
+	api.AddConversionFuncs(
 		// EnvVar's Key is deprecated in favor of Name.
-		func(in *EnvVar, out *v1beta1.EnvVar) error {
+		func(in *newer.EnvVar, out *EnvVar) error {
 			out.Value = in.Value
 			out.Key = in.Name
 			out.Name = in.Name
 			return nil
 		},
-		func(in *v1beta1.EnvVar, out *EnvVar) error {
+		func(in *EnvVar, out *newer.EnvVar) error {
 			out.Value = in.Value
 			if in.Name != "" {
 				out.Name = in.Name
@@ -43,7 +46,7 @@ func init() {
 		},
 
 		// Path & MountType are deprecated.
-		func(in *VolumeMount, out *v1beta1.VolumeMount) error {
+		func(in *newer.VolumeMount, out *VolumeMount) error {
 			out.Name = in.Name
 			out.ReadOnly = in.ReadOnly
 			out.MountPath = in.MountPath
@@ -51,7 +54,7 @@ func init() {
 			out.MountType = "" // MountType is ignored.
 			return nil
 		},
-		func(in *v1beta1.VolumeMount, out *VolumeMount) error {
+		func(in *VolumeMount, out *newer.VolumeMount) error {
 			out.Name = in.Name
 			out.ReadOnly = in.ReadOnly
 			if in.MountPath == "" {
@@ -63,13 +66,13 @@ func init() {
 		},
 
 		// MinionList.Items had a wrong name in v1beta1
-		func(in *MinionList, out *v1beta1.MinionList) error {
+		func(in *newer.MinionList, out *MinionList) error {
 			Convert(&in.JSONBase, &out.JSONBase)
 			Convert(&in.Items, &out.Items)
 			out.Minions = out.Items
 			return nil
 		},
-		func(in *v1beta1.MinionList, out *MinionList) error {
+		func(in *MinionList, out *newer.MinionList) error {
 			Convert(&in.JSONBase, &out.JSONBase)
 			if len(in.Items) == 0 {
 				Convert(&in.Minions, &out.Items)

@@ -14,26 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package v1beta1_test
 
 import (
 	"reflect"
 	"testing"
 
+	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 )
+
+var Convert = newer.Convert
 
 func TestEnvConversion(t *testing.T) {
 	nonCanonical := []v1beta1.EnvVar{
 		{Key: "EV"},
 		{Key: "EV", Name: "EX"},
 	}
-	canonical := []EnvVar{
+	canonical := []newer.EnvVar{
 		{Name: "EV"},
 		{Name: "EX"},
 	}
 	for i := range nonCanonical {
-		var got EnvVar
+		var got newer.EnvVar
 		err := Convert(&nonCanonical[i], &got)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -61,11 +64,11 @@ func TestEnvConversion(t *testing.T) {
 
 func TestVolumeMountConversionToOld(t *testing.T) {
 	table := []struct {
-		in  VolumeMount
+		in  newer.VolumeMount
 		out v1beta1.VolumeMount
 	}{
 		{
-			in:  VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
+			in:  newer.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
 			out: v1beta1.VolumeMount{Name: "foo", MountPath: "/dev/foo", Path: "/dev/foo", ReadOnly: true},
 		},
 	}
@@ -85,21 +88,21 @@ func TestVolumeMountConversionToOld(t *testing.T) {
 func TestVolumeMountConversionToNew(t *testing.T) {
 	table := []struct {
 		in  v1beta1.VolumeMount
-		out VolumeMount
+		out newer.VolumeMount
 	}{
 		{
 			in:  v1beta1.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
-			out: VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
+			out: newer.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
 		}, {
 			in:  v1beta1.VolumeMount{Name: "foo", MountPath: "/dev/foo", Path: "/dev/bar", ReadOnly: true},
-			out: VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
+			out: newer.VolumeMount{Name: "foo", MountPath: "/dev/foo", ReadOnly: true},
 		}, {
 			in:  v1beta1.VolumeMount{Name: "foo", Path: "/dev/bar", ReadOnly: true},
-			out: VolumeMount{Name: "foo", MountPath: "/dev/bar", ReadOnly: true},
+			out: newer.VolumeMount{Name: "foo", MountPath: "/dev/bar", ReadOnly: true},
 		},
 	}
 	for _, item := range table {
-		got := VolumeMount{}
+		got := newer.VolumeMount{}
 		err := Convert(&item.in, &got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -115,39 +118,39 @@ func TestMinionListConversionToNew(t *testing.T) {
 	oldMinion := func(id string) v1beta1.Minion {
 		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
 	}
-	newMinion := func(id string) Minion {
-		return Minion{JSONBase: JSONBase{ID: id}}
+	newMinion := func(id string) newer.Minion {
+		return newer.Minion{JSONBase: newer.JSONBase{ID: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []Minion{
+	newMinions := []newer.Minion{
 		newMinion("foo"),
 		newMinion("bar"),
 	}
 
 	table := []struct {
 		oldML *v1beta1.MinionList
-		newML *MinionList
+		newML *newer.MinionList
 	}{
 		{
 			oldML: &v1beta1.MinionList{Items: oldMinions},
-			newML: &MinionList{Items: newMinions},
+			newML: &newer.MinionList{Items: newMinions},
 		}, {
 			oldML: &v1beta1.MinionList{Minions: oldMinions},
-			newML: &MinionList{Items: newMinions},
+			newML: &newer.MinionList{Items: newMinions},
 		}, {
 			oldML: &v1beta1.MinionList{
 				Items:   oldMinions,
 				Minions: []v1beta1.Minion{oldMinion("baz")},
 			},
-			newML: &MinionList{Items: newMinions},
+			newML: &newer.MinionList{Items: newMinions},
 		},
 	}
 
 	for _, item := range table {
-		got := &MinionList{}
+		got := &newer.MinionList{}
 		err := Convert(item.oldML, got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -162,19 +165,19 @@ func TestMinionListConversionToOld(t *testing.T) {
 	oldMinion := func(id string) v1beta1.Minion {
 		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
 	}
-	newMinion := func(id string) Minion {
-		return Minion{JSONBase: JSONBase{ID: id}}
+	newMinion := func(id string) newer.Minion {
+		return newer.Minion{JSONBase: newer.JSONBase{ID: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []Minion{
+	newMinions := []newer.Minion{
 		newMinion("foo"),
 		newMinion("bar"),
 	}
 
-	newML := &MinionList{Items: newMinions}
+	newML := &newer.MinionList{Items: newMinions}
 	oldML := &v1beta1.MinionList{
 		Items:   oldMinions,
 		Minions: oldMinions,
