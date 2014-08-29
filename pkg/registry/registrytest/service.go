@@ -37,8 +37,8 @@ type ServiceRegistry struct {
 	UpdatedID string
 }
 
-func (r *ServiceRegistry) ListServices() (api.ServiceList, error) {
-	return r.List, r.Err
+func (r *ServiceRegistry) ListServices() (*api.ServiceList, error) {
+	return &r.List, r.Err
 }
 
 func (r *ServiceRegistry) CreateService(svc api.Service) error {

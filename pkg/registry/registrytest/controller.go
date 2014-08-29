@@ -24,10 +24,10 @@ import (
 // TODO: Why do we have this AND MemoryRegistry?
 type ControllerRegistry struct {
 	Err         error
-	Controllers []api.ReplicationController
+	Controllers *api.ReplicationControllerList
 }
 
-func (r *ControllerRegistry) ListControllers() ([]api.ReplicationController, error) {
+func (r *ControllerRegistry) ListControllers() (*api.ReplicationControllerList, error) {
 	return r.Controllers, r.Err
 }
 

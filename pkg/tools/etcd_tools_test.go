@@ -66,6 +66,7 @@ func TestExtractList(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
+			EtcdIndex: 10,
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
@@ -92,9 +93,13 @@ func TestExtractList(t *testing.T) {
 
 	var got []api.Pod
 	helper := EtcdHelper{fakeClient, codec, versioner}
-	err := helper.ExtractList("/some/key", &got)
+	resourceVersion := uint64(0)
+	err := helper.ExtractList("/some/key", &got, &resourceVersion)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
+	}
+	if resourceVersion != 10 {
+		t.Errorf("Unexpected resource version %d", resourceVersion)
 	}
 
 	for i := 0; i < len(expect); i++ {

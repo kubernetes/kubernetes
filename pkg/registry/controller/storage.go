@@ -92,16 +92,18 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 
 // List obtains a list of ReplicationControllers that match selector.
 func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
-	result := api.ReplicationControllerList{}
 	controllers, err := rs.registry.ListControllers()
-	if err == nil {
-		for _, controller := range controllers {
-			if selector.Matches(labels.Set(controller.Labels)) {
-				result.Items = append(result.Items, controller)
-			}
+	if err != nil {
+		return nil, err
+	}
+	filtered := []api.ReplicationController{}
+	for _, controller := range controllers.Items {
+		if selector.Matches(labels.Set(controller.Labels)) {
+			filtered = append(filtered, controller)
 		}
 	}
-	return result, err
+	controllers.Items = filtered
+	return controllers, err
 }
 
 // New creates a new ReplicationController for use with Create and Update.
@@ -150,7 +152,7 @@ func (rs *RegistryStorage) waitForController(ctrl api.ReplicationController) (in
 		if err != nil {
 			return ctrl, err
 		}
-		if len(pods) == ctrl.DesiredState.Replicas {
+		if len(pods.Items) == ctrl.DesiredState.Replicas {
 			break
 		}
 		time.Sleep(rs.pollPeriod)
