@@ -30,13 +30,11 @@ find_test_dirs() {
   cd src/${KUBE_GO_PACKAGE}
   find . -not \( \
       \( \
-        -wholename './third_party' \
-        -wholename './Godeps' \
+        -wholename './output' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
-        -o -wholename '*/output/*' \
       \) -prune \
     \) -name '*_test.go' -print0 | xargs -0n1 dirname | sort -u | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
 }
@@ -93,8 +91,16 @@ if [[ -n "${iterations}" ]]; then
 fi
 
 if [[ -n "$1" ]]; then
-  go test -race ${KUBE_TIMEOUT} ${KUBE_COVER} -coverprofile=tmp.out "${KUBE_GO_PACKAGE}/$1" "${@:2}"
+  go test ${GOFLAGS} \
+      -race \
+      ${KUBE_TIMEOUT} \
+      ${KUBE_COVER} -coverprofile=tmp.out \
+      "${KUBE_GO_PACKAGE}/$1" "${@:2}"
   exit 0
 fi
 
-find_test_dirs | xargs go test -race -timeout 30s ${KUBE_COVER} "${@:2}"
+find_test_dirs | xargs go test ${GOFLAGS:-} \
+    -race \
+    -timeout 30s \
+    ${KUBE_COVER} \
+    "${@:2}"

@@ -45,6 +45,7 @@ cp -r $KUBE_DIR/cluster/saltbase $MASTER_RELEASE_DIR/src/saltbase
 # on.
 version_ldflags=$(kube::version_ldflags)
 
+# Note: go_opt must stay in sync with the flags in hack/build-go.sh.
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
 instance_prefix: $INSTANCE_PREFIX-minion
 go_opt: -ldflags '${version_ldflags}'
