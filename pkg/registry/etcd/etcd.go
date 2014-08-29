@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -87,6 +88,12 @@ func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool)
 		}
 		return filter(pod)
 	})
+}
+
+// WatchKubeletPods begins watching for changes to the list of pods that are scheduled to a given kubelet.
+func (r *Registry) WatchKubeletPods(hostname string, resourceVersion uint64) (watch.Interface, error) {
+	key := path.Join("/", "registry", "hosts", hostname, "kubelet")
+	return r.Watch(key, resourceVersion)
 }
 
 // GetPod gets a specific pod specified by its ID.
