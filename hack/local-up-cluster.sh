@@ -44,34 +44,34 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 GO_OUT=$(dirname $0)/../output/go/bin
 
 APISERVER_LOG=/tmp/apiserver.log
-${GO_OUT}/apiserver \
+"${GO_OUT}/apiserver" \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
-  --machines="127.0.0.1" &> ${APISERVER_LOG} &
+  --machines="127.0.0.1" >"${APISERVER_LOG}" 2>&1 &
 APISERVER_PID=$!
 
 CTLRMGR_LOG=/tmp/controller-manager.log
-${GO_OUT}/controller-manager \
-  --master="${API_HOST}:${API_PORT}" &> ${CTLRMGR_LOG} &
+"${GO_OUT}/controller-manager" \
+  --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
-${GO_OUT}/kubelet \
+"${GO_OUT}/kubelet" \
   --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
-  --port="$KUBELET_PORT" &> ${KUBELET_LOG} &
+  --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
 KUBELET_PID=$!
 
 PROXY_LOG=/tmp/kube-proxy.log
-${GO_OUT}/proxy \
-  --master="http://${API_HOST}:${API_PORT}" &> ${PROXY_LOG} &
+"${GO_OUT}/proxy" \
+  --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 
 SCHEDULER_LOG=/tmp/k8s-scheduler.log
-${GO_OUT}/scheduler \
-  --master="http://${API_HOST}:${API_PORT}" &> ${SCHEDULER_LOG} &
+"${GO_OUT}/scheduler" \
+  --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!
 
 echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
@@ -85,14 +85,14 @@ echo "  ${SCHEDULER_LOG}"
 cleanup()
 {
     echo "Cleaning up..."
-    kill ${APISERVER_PID}
-    kill ${CTLRMGR_PID}
-    kill ${KUBELET_PID}
-    kill ${PROXY_PID}
-    kill ${SCHEDULER_PID}
+    kill "${APISERVER_PID}"
+    kill "${CTLRMGR_PID}"
+    kill "${KUBELET_PID}"
+    kill "${PROXY_PID}"
+    kill "${SCHEDULER_PID}"
 
-    kill ${ETCD_PID}
-    rm -rf ${ETCD_DIR}
+    kill "${ETCD_PID}"
+    rm -rf "${ETCD_DIR}"
     exit 0
 }
 
