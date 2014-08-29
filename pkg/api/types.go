@@ -339,7 +339,7 @@ type Minion struct {
 // MinionList is a list of minions.
 type MinionList struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
+	Items    []Minion `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.

@@ -110,3 +110,82 @@ func TestVolumeMountConversionToNew(t *testing.T) {
 		}
 	}
 }
+
+func TestMinionListConversionToNew(t *testing.T) {
+	oldMinion := func(id string) v1beta1.Minion {
+		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
+	}
+	newMinion := func(id string) Minion {
+		return Minion{JSONBase: JSONBase{ID: id}}
+	}
+	oldMinions := []v1beta1.Minion{
+		oldMinion("foo"),
+		oldMinion("bar"),
+	}
+	newMinions := []Minion{
+		newMinion("foo"),
+		newMinion("bar"),
+	}
+
+	table := []struct {
+		oldML *v1beta1.MinionList
+		newML *MinionList
+	}{
+		{
+			oldML: &v1beta1.MinionList{Items: oldMinions},
+			newML: &MinionList{Items: newMinions},
+		}, {
+			oldML: &v1beta1.MinionList{Minions: oldMinions},
+			newML: &MinionList{Items: newMinions},
+		}, {
+			oldML: &v1beta1.MinionList{
+				Items:   oldMinions,
+				Minions: []v1beta1.Minion{oldMinion("baz")},
+			},
+			newML: &MinionList{Items: newMinions},
+		},
+	}
+
+	for _, item := range table {
+		got := &MinionList{}
+		err := Convert(item.oldML, got)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if e, a := item.newML, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected: %#v, got %#v", e, a)
+		}
+	}
+}
+
+func TestMinionListConversionToOld(t *testing.T) {
+	oldMinion := func(id string) v1beta1.Minion {
+		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
+	}
+	newMinion := func(id string) Minion {
+		return Minion{JSONBase: JSONBase{ID: id}}
+	}
+	oldMinions := []v1beta1.Minion{
+		oldMinion("foo"),
+		oldMinion("bar"),
+	}
+	newMinions := []Minion{
+		newMinion("foo"),
+		newMinion("bar"),
+	}
+
+	newML := &MinionList{Items: newMinions}
+	oldML := &v1beta1.MinionList{
+		Items:   oldMinions,
+		Minions: oldMinions,
+	}
+
+	got := &v1beta1.MinionList{}
+	err := Convert(newML, got)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if e, a := oldML, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected: %#v, got %#v", e, a)
+	}
+}
