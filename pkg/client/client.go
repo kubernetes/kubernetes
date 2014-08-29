@@ -99,7 +99,7 @@ type Client struct {
 // to a URL will prepend the server path. Returns an error if host cannot be converted to a
 // valid URL.
 func New(host string, auth *AuthInfo) (*Client, error) {
-	restClient, err := NewRESTClient(host, auth, "/api/v1beta1/")
+	restClient, err := NewRESTClient(host, auth, "/api/v1beta1/", runtime.DefaultCodec)
 	if err != nil {
 		return nil, err
 	}
@@ -143,11 +143,12 @@ type RESTClient struct {
 	Sync       bool
 	PollPeriod time.Duration
 	Timeout    time.Duration
+	Codec      runtime.Codec
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(host string, auth *AuthInfo, path string) (*RESTClient, error) {
+func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec) (*RESTClient, error) {
 	prefix, err := normalizePrefix(host, path)
 	if err != nil {
 		return nil, err
@@ -171,6 +172,7 @@ func NewRESTClient(host string, auth *AuthInfo, path string) (*RESTClient, error
 		Sync:       false,
 		PollPeriod: time.Second * 2,
 		Timeout:    time.Second * 20,
+		Codec:      c,
 	}, nil
 }
 

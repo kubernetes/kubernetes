@@ -48,7 +48,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		"host/server":        {"", "", true},
 	}
 	for k, expected := range testCases {
-		c, err := NewRESTClient(k, nil, "/api/v1beta1/")
+		c, err := NewRESTClient(k, nil, "/api/v1beta1/", runtime.DefaultCodec)
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
