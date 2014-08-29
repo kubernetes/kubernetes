@@ -77,7 +77,7 @@ func (p *PodCache) UpdateAllContainers() {
 		glog.Errorf("Error synchronizing container list: %v", err)
 		return
 	}
-	for _, pod := range pods {
+	for _, pod := range pods.Items {
 		err := p.updatePodInfo(pod.CurrentState.Host, pod.ID)
 		if err != nil && err != client.ErrPodInfoNotAvailable {
 			glog.Errorf("Error synchronizing container: %v", err)

@@ -105,15 +105,13 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 }
 
 func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
-	var result api.PodList
 	pods, err := rs.registry.ListPods(selector)
 	if err == nil {
-		result.Items = pods
-		for i := range result.Items {
-			rs.fillPodInfo(&result.Items[i])
+		for i := range pods.Items {
+			rs.fillPodInfo(&pods.Items[i])
 		}
 	}
-	return result, err
+	return pods, err
 }
 
 // Watch begins watching for new, changed, or deleted pods.

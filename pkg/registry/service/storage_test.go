@@ -317,8 +317,9 @@ func TestServiceRegistryList(t *testing.T) {
 		JSONBase: api.JSONBase{ID: "foo2"},
 		Selector: map[string]string{"bar2": "baz2"},
 	})
+	registry.List.ResourceVersion = 1
 	s, _ := storage.List(labels.Everything())
-	sl := s.(api.ServiceList)
+	sl := s.(*api.ServiceList)
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -330,5 +331,8 @@ func TestServiceRegistryList(t *testing.T) {
 	}
 	if e, a := "foo2", sl.Items[1].ID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if sl.ResourceVersion != 1 {
+		t.Errorf("Unexpected resource version: %#v", sl)
 	}
 }

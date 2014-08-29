@@ -117,22 +117,29 @@ func etcdErrorIndex(err error) (uint64, bool) {
 	return 0, false
 }
 
-func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, error) {
+func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 	result, err := h.Client.Get(key, false, true)
 	if err != nil {
+		index, ok := etcdErrorIndex(err)
+		if !ok {
+			index = 0
+		}
 		nodes := make([]*etcd.Node, 0)
 		if IsEtcdNotFound(err) {
-			return nodes, nil
+			return nodes, index, nil
 		} else {
-			return nodes, err
+			return nodes, index, err
 		}
 	}
-	return result.Node.Nodes, nil
+	return result.Node.Nodes, result.EtcdIndex, nil
 }
 
-// Extract a go object per etcd node into a slice.
-func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}) error {
-	nodes, err := h.listEtcdNode(key)
+// Extract a go object per etcd node into a slice with the resource version.
+func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersion *uint64) error {
+	nodes, index, err := h.listEtcdNode(key)
+	if resourceVersion != nil {
+		*resourceVersion = index
+	}
 	if err != nil {
 		return err
 	}

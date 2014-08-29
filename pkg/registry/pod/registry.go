@@ -25,7 +25,7 @@ import (
 // Registry is an interface implemented by things that know how to store Pod objects.
 type Registry interface {
 	// ListPods obtains a list of pods that match selector.
-	ListPods(selector labels.Selector) ([]api.Pod, error)
+	ListPods(selector labels.Selector) (*api.PodList, error)
 	// Watch for new/changed/deleted pods
 	WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error)
 	// Get a specific pod

@@ -96,7 +96,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	}
 
 	pods := []api.Pod{pod}
-	mockRegistry := registrytest.NewPodRegistry(pods)
+	mockRegistry := registrytest.NewPodRegistry(&api.PodList{Items: pods})
 
 	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
 	fake := FakePodInfoGetter{

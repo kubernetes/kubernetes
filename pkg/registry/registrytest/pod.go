@@ -27,32 +27,34 @@ import (
 type PodRegistry struct {
 	Err  error
 	Pod  *api.Pod
-	Pods []api.Pod
+	Pods *api.PodList
 	sync.Mutex
 
 	mux *watch.Mux
 }
 
-func NewPodRegistry(pods []api.Pod) *PodRegistry {
+func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	return &PodRegistry{
 		Pods: pods,
 		mux:  watch.NewMux(0),
 	}
 }
 
-func (r *PodRegistry) ListPods(selector labels.Selector) ([]api.Pod, error) {
+func (r *PodRegistry) ListPods(selector labels.Selector) (*api.PodList, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {
-		return r.Pods, r.Err
+		return nil, r.Err
 	}
 	var filtered []api.Pod
-	for _, pod := range r.Pods {
+	for _, pod := range r.Pods.Items {
 		if selector.Matches(labels.Set(pod.Labels)) {
 			filtered = append(filtered, pod)
 		}
 	}
-	return filtered, nil
+	pods := *r.Pods
+	pods.Items = filtered
+	return &pods, nil
 }
 
 func (r *PodRegistry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {

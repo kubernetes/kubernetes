@@ -25,7 +25,7 @@ import (
 
 // Registry is an interface for things that know how to store services.
 type Registry interface {
-	ListServices() (api.ServiceList, error)
+	ListServices() (*api.ServiceList, error)
 	CreateService(svc api.Service) error
 	GetService(name string) (*api.Service, error)
 	DeleteService(name string) error

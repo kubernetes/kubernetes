@@ -37,18 +37,17 @@ func TestListControllersError(t *testing.T) {
 	storage := RegistryStorage{
 		registry: &mockRegistry,
 	}
-	controllersObj, err := storage.List(nil)
-	controllers := controllersObj.(api.ReplicationControllerList)
+	controllers, err := storage.List(nil)
 	if err != mockRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
 	}
-	if len(controllers.Items) != 0 {
-		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
+	if controllers != nil {
+		t.Errorf("Unexpected non-nil ctrl list: %#v", controllers)
 	}
 }
 
 func TestListEmptyControllerList(t *testing.T) {
-	mockRegistry := registrytest.ControllerRegistry{}
+	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{JSONBase: api.JSONBase{ResourceVersion: 1}}}
 	storage := RegistryStorage{
 		registry: &mockRegistry,
 	}
@@ -57,22 +56,27 @@ func TestListEmptyControllerList(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(controllers.(api.ReplicationControllerList).Items) != 0 {
+	if len(controllers.(*api.ReplicationControllerList).Items) != 0 {
 		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
+	}
+	if controllers.(*api.ReplicationControllerList).ResourceVersion != 1 {
+		t.Errorf("Unexpected resource version: %#v", controllers)
 	}
 }
 
 func TestListControllerList(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{
-		Controllers: []api.ReplicationController{
-			{
-				JSONBase: api.JSONBase{
-					ID: "foo",
+		Controllers: &api.ReplicationControllerList{
+			Items: []api.ReplicationController{
+				{
+					JSONBase: api.JSONBase{
+						ID: "foo",
+					},
 				},
-			},
-			{
-				JSONBase: api.JSONBase{
-					ID: "bar",
+				{
+					JSONBase: api.JSONBase{
+						ID: "bar",
+					},
 				},
 			},
 		},
@@ -81,7 +85,7 @@ func TestListControllerList(t *testing.T) {
 		registry: &mockRegistry,
 	}
 	controllersObj, err := storage.List(labels.Everything())
-	controllers := controllersObj.(api.ReplicationControllerList)
+	controllers := controllersObj.(*api.ReplicationControllerList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -212,10 +216,12 @@ var validPodTemplate = api.PodTemplate{
 func TestCreateController(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
 	mockPodRegistry := registrytest.PodRegistry{
-		Pods: []api.Pod{
-			{
-				JSONBase: api.JSONBase{ID: "foo"},
-				Labels:   map[string]string{"a": "b"},
+		Pods: &api.PodList{
+			Items: []api.Pod{
+				{
+					JSONBase: api.JSONBase{ID: "foo"},
+					Labels:   map[string]string{"a": "b"},
+				},
 			},
 		},
 	}

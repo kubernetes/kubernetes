@@ -108,13 +108,13 @@ func TestListPodsError(t *testing.T) {
 	if err != podRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", podRegistry.Err, err)
 	}
-	if len(pods.(api.PodList).Items) != 0 {
-		t.Errorf("Unexpected non-zero pod list: %#v", pods)
+	if pods.(*api.PodList) != nil {
+		t.Errorf("Unexpected non-nil pod list: %#v", pods)
 	}
 }
 
 func TestListEmptyPodList(t *testing.T) {
-	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry := registrytest.NewPodRegistry(&api.PodList{JSONBase: api.JSONBase{ResourceVersion: 1}})
 	storage := RegistryStorage{
 		registry: podRegistry,
 	}
@@ -123,22 +123,27 @@ func TestListEmptyPodList(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(pods.(api.PodList).Items) != 0 {
+	if len(pods.(*api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
+	}
+	if pods.(*api.PodList).ResourceVersion != 1 {
+		t.Errorf("Unexpected resource version: %#v", pods)
 	}
 }
 
 func TestListPodList(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pods = []api.Pod{
-		{
-			JSONBase: api.JSONBase{
-				ID: "foo",
+	podRegistry.Pods = &api.PodList{
+		Items: []api.Pod{
+			{
+				JSONBase: api.JSONBase{
+					ID: "foo",
+				},
 			},
-		},
-		{
-			JSONBase: api.JSONBase{
-				ID: "bar",
+			{
+				JSONBase: api.JSONBase{
+					ID: "bar",
+				},
 			},
 		},
 	}
@@ -146,7 +151,7 @@ func TestListPodList(t *testing.T) {
 		registry: podRegistry,
 	}
 	podsObj, err := storage.List(labels.Everything())
-	pods := podsObj.(api.PodList)
+	pods := podsObj.(*api.PodList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

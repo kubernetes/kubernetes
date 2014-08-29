@@ -59,22 +59,24 @@ func makePodKey(podID string) string {
 }
 
 // ListPods obtains a list of pods that match selector.
-func (r *Registry) ListPods(selector labels.Selector) ([]api.Pod, error) {
-	allPods := []api.Pod{}
-	filteredPods := []api.Pod{}
-	if err := r.ExtractList("/registry/pods", &allPods); err != nil {
+func (r *Registry) ListPods(selector labels.Selector) (*api.PodList, error) {
+	allPods := api.PodList{}
+	err := r.ExtractList("/registry/pods", &allPods.Items, &allPods.ResourceVersion)
+	if err != nil {
 		return nil, err
 	}
-	for _, pod := range allPods {
+	filtered := []api.Pod{}
+	for _, pod := range allPods.Items {
 		if selector.Matches(labels.Set(pod.Labels)) {
 			// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 			// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
 			// matches our desires.
 			pod.CurrentState.Host = pod.DesiredState.Host
-			filteredPods = append(filteredPods, pod)
+			filtered = append(filtered, pod)
 		}
 	}
-	return filteredPods, nil
+	allPods.Items = filtered
+	return &allPods, nil
 }
 
 // WatchPods begins watching for new, changed, or deleted pods.
@@ -225,9 +227,9 @@ func (r *Registry) DeletePod(podID string) error {
 }
 
 // ListControllers obtains a list of ReplicationControllers.
-func (r *Registry) ListControllers() ([]api.ReplicationController, error) {
-	var controllers []api.ReplicationController
-	err := r.ExtractList("/registry/controllers", &controllers)
+func (r *Registry) ListControllers() (*api.ReplicationControllerList, error) {
+	controllers := &api.ReplicationControllerList{}
+	err := r.ExtractList("/registry/controllers", &controllers.Items, &controllers.ResourceVersion)
 	return controllers, err
 }
 
@@ -283,9 +285,9 @@ func makeServiceKey(name string) string {
 }
 
 // ListServices obtains a list of Services.
-func (r *Registry) ListServices() (api.ServiceList, error) {
-	var list api.ServiceList
-	err := r.ExtractList("/registry/services/specs", &list.Items)
+func (r *Registry) ListServices() (*api.ServiceList, error) {
+	list := &api.ServiceList{}
+	err := r.ExtractList("/registry/services/specs", &list.Items, &list.ResourceVersion)
 	return list, err
 }
 

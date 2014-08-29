@@ -412,7 +412,7 @@ func TestEtcdEmptyListPods(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(pods) != 0 {
+	if len(pods.Items) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
@@ -430,7 +430,7 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(pods) != 0 {
+	if len(pods.Items) != 0 {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
 }
@@ -465,11 +465,11 @@ func TestEtcdListPods(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(pods) != 2 || pods[0].ID != "foo" || pods[1].ID != "bar" {
+	if len(pods.Items) != 2 || pods.Items[0].ID != "foo" || pods.Items[1].ID != "bar" {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
-	if pods[0].CurrentState.Host != "machine" ||
-		pods[1].CurrentState.Host != "machine" {
+	if pods.Items[0].CurrentState.Host != "machine" ||
+		pods.Items[1].CurrentState.Host != "machine" {
 		t.Errorf("Failed to populate host name.")
 	}
 }
@@ -487,7 +487,7 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(controllers) != 0 {
+	if len(controllers.Items) != 0 {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
 }
@@ -534,7 +534,7 @@ func TestEtcdListControllers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(controllers) != 2 || controllers[0].ID != "foo" || controllers[1].ID != "bar" {
+	if len(controllers.Items) != 2 || controllers.Items[0].ID != "foo" || controllers.Items[1].ID != "bar" {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
 }
