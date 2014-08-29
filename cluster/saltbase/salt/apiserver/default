@@ -28,7 +28,7 @@
   MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') }}"
   {% set machines = "-machines $MACHINES" %}
 {% endif %}
-{% if grains.cloud == 'rackspace' or grains.cloud == 'vsphere' %}
+{% if grains.cloud == 'vsphere' %}
   # Collect IPs of minions as machines list.
   #
   # Use a bash array to build the value we need. Jinja 2.7 does support a 'map'
@@ -40,6 +40,15 @@
   {% endfor %}
   {% set machines = "-machines=$(echo ${MACHINE_IPS[@]} | xargs -n1 echo | paste -sd,)" %}
   {% set minion_regexp = "" %}
+{% endif %}
+{%- if grains.cloud == 'rackspace' %}
+  {%- set ip_addrs = [] %}
+  {%- for addrs in salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values() %}
+    {%- do ip_addrs.append(addrs.ip_interfaces.eth2[0]) %}
+  {%- endfor %}
+    MACHINES="{{ip_addrs|join(',')}}"
+  {%- set machines = "-machines=$MACHINES" %}
+  {%- set minion_regexp = "" %}
 {% endif %}
 {% endif %}
 
