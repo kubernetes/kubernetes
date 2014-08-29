@@ -33,7 +33,7 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// Registry implements PodRegistry, ControllerRegistry and ServiceRegistry
+// Registry implements PodRegistry, ControllerRegistry, ServiceRegistry and ProjectRegistry
 // with backed by etcd.
 type Registry struct {
 	tools.EtcdHelper
@@ -390,4 +390,63 @@ func (r *Registry) WatchEndpoints(label, field labels.Selector, resourceVersion 
 		return r.WatchList("/registry/services/endpoints", resourceVersion, tools.Everything)
 	}
 	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
+}
+
+// makeProjectKey makes a key for a project
+func makeProjectKey(id string) string {
+	return "/registry/projects/" + id
+}
+
+// ListProjects obtains a list of projects
+func (r *Registry) ListProjects() ([]api.Project, error) {
+	var projects []api.Project
+	err := r.ExtractList("/registry/projects", &projects)
+	return projects, err
+}
+
+// WatchProjects does a watch on project resources
+func (r *Registry) WatchProjects(resourceVersion uint64) (watch.Interface, error) {
+	return r.WatchList("/registry/projects", resourceVersion, tools.Everything)
+}
+
+// GetProject gets a project
+func (r *Registry) GetProject(projectID string) (*api.Project, error) {
+	var project api.Project
+	key := makeProjectKey(projectID)
+	err := r.ExtractObj(key, &project, false)
+	if tools.IsEtcdNotFound(err) {
+		return nil, apiserver.NewNotFoundErr("project", projectID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+// CreateProject creates a project
+func (r *Registry) CreateProject(project api.Project) error {
+	err := r.CreateObj(makeProjectKey(project.ID), project)
+	if tools.IsEtcdNodeExist(err) {
+		return apiserver.NewAlreadyExistsErr("project", project.ID)
+	}
+	return err
+}
+
+// UpdateProject updates a project
+func (r *Registry) UpdateProject(project api.Project) error {
+	return r.SetObj(makeProjectKey(project.ID), project)
+}
+
+// DeleteProject deletes a project
+func (r *Registry) DeleteProject(projectID string) error {
+	key := makeProjectKey(projectID)
+	err := r.Delete(key, true)
+	if tools.IsEtcdNotFound(err) {
+		return apiserver.NewNotFoundErr("project", projectID)
+	}
+	if err != nil {
+		return err
+	}
+	// TODO think about clean-up of related resources??
+	return nil
 }

@@ -53,6 +53,7 @@ Kubecfg also supports raw access to the basic restful requests.  There are four 
    * `replicationControllers`
    * `services`
    * `minions`
+   * `projects`
 
 ###### Common Flags
    * -yaml : output in YAML format

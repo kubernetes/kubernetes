@@ -61,6 +61,7 @@ var parser = kubecfg.NewParser(map[string]interface{}{
 	"services":               api.Service{},
 	"replicationControllers": api.ReplicationController{},
 	"minions":                api.Minion{},
+	"projects":               api.Project{},
 })
 
 func usage() {

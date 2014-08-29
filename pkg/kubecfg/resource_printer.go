@@ -141,6 +141,7 @@ var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Rep
 var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
 var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
+var projectColumns = []string{"ID", "Labels"}
 
 // handleDefaultTypes adds print handlers for default Kubernetes types
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -153,6 +154,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(minionColumns, printMinion)
 	h.Handler(minionColumns, printMinionList)
 	h.Handler(statusColumns, printStatus)
+	h.Handler(projectColumns, printProject)
+	h.Handler(projectColumns, printProjectList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -221,6 +224,21 @@ func printService(svc *api.Service, w io.Writer) error {
 func printServiceList(list *api.ServiceList, w io.Writer) error {
 	for _, svc := range list.Items {
 		if err := printService(&svc, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printProject(project *api.Project, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%s\n", project.ID, labels.Set(project.Labels))
+	return err
+
+}
+
+func printProjectList(list *api.ProjectList, w io.Writer) error {
+	for _, project := range list.Items {
+		if err := printProject(&project, w); err != nil {
 			return err
 		}
 	}

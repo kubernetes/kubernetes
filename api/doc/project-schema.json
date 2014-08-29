@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-03/schema",
+  "type": "object",
+  "required": false,
+  "description": "A project resource.",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "required": false
+    },
+    "id": {
+      "type": "string",
+      "required": false
+    },
+    "creationTimestamp": {
+      "type": "string",
+      "required": false
+    },
+    "selfLink": {
+      "type": "string",
+      "required": false
+    },
+    "labels": {
+      "type": "object",
+      "required": false
+    },
+  }
+}

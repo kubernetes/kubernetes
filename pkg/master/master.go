@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/project"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -58,6 +59,7 @@ type Master struct {
 	endpointRegistry   endpoint.Registry
 	minionRegistry     minion.Registry
 	bindingRegistry    binding.Registry
+	projectRegistry    project.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 }
@@ -72,6 +74,7 @@ func New(c *Config) *Master {
 		serviceRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
 		endpointRegistry:   etcd.NewRegistry(etcdClient, minionRegistry),
 		bindingRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
+		projectRegistry:    etcd.NewRegistry(etcdClient, minionRegistry),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 	}
@@ -112,16 +115,20 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	endpoints := servicecontroller.NewEndpointController(m.serviceRegistry, m.client)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
+	projectStorage := project.NewRegistryStorage(m.projectRegistry)
+
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods": pod.NewRegistryStorage(&pod.RegistryStorageConfig{
-			CloudProvider: cloud,
-			PodCache:      podCache,
-			PodInfoGetter: podInfoGetter,
-			Registry:      m.podRegistry,
-		}),
-		"replicationControllers": controller.NewRegistryStorage(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
-		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
+		"pods": project.NewProjectRESTStorage(projectStorage,
+			pod.NewRegistryStorage(&pod.RegistryStorageConfig{
+				CloudProvider: cloud,
+				PodCache:      podCache,
+				PodInfoGetter: podInfoGetter,
+				Registry:      m.podRegistry,
+			})),
+		"replicationControllers": project.NewProjectRESTStorage(projectStorage, controller.NewRegistryStorage(m.controllerRegistry, m.podRegistry)),
+		"services":               project.NewProjectRESTStorage(projectStorage, service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry)),
+		"endpoints":              project.NewProjectRESTStorage(projectStorage, endpoint.NewStorage(m.endpointRegistry)),
+		"projects":               projectStorage,
 		"minions":                minion.NewRegistryStorage(m.minionRegistry),
 
 		// TODO: should appear only in scheduler API group.

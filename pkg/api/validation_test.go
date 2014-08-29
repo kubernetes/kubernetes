@@ -452,3 +452,46 @@ func TestValidateReplicationController(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateProject(t *testing.T) {
+	validNames := []string{
+		"abc",
+		"a0c",
+		"a-0c",
+		"o12345670123456701234567012345670123456701234567012345670123456",
+		"a",
+		"0--0",
+	}
+	successCases := make([]Project, len(validNames))
+	for n, validName := range validNames {
+		successCases[n] = Project{
+			JSONBase: JSONBase{ID: validName},
+		}
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateProject(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	invalidNames := []string{
+		"A0c-",
+		"-A0c",
+		"o123456701234567012345670123456701234567012345670123456701234567",
+		"",
+	}
+	errorCases := map[string]Project{}
+	for _, invalidName := range invalidNames {
+		errorCases["invalidName="+invalidName] = Project{
+			JSONBase: JSONBase{ID: invalidName},
+		}
+	}
+	errorCases["zero-length-id"] = Project{
+		JSONBase: JSONBase{ID: ""},
+	}
+	for k, v := range errorCases {
+		if errs := ValidateProject(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}
