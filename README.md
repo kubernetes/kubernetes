@@ -30,11 +30,16 @@ While the concepts and architecture in Kubernetes represent years of experience 
 * [Hacking on Kubernetes Salt configuration](docs/salt.md)
 
 ## Where to go next?
-[Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
 
-[Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
+Check out examples of Kubernetes in action, and community projects in the larger ecosystem:
 
-[Cluster Monitoring](https://github.com/GoogleCloudPlatform/heapster)
+* [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
+* [Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
+* [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
+* [OpenShift 3 and developer focused workflows](https://github.com/openshift/origin)
+* [Kubernetes-on-Mesos framework](https://github.com/mesosphere/kubernetes-mesos)
+* [Configure dynamic container networking with CoreOS Rudder](https://coreos.com/blog/introducing-rudder/)
+* [Azure Kubernetes visualizer](https://github.com/Azure/azure-kubernetes-visualizer)
 
 Or fork and start hacking!
 
