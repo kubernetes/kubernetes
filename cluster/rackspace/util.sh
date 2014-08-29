@@ -71,7 +71,7 @@ rax-boot-master() {
   ) > ${KUBE_TEMP}/masterStart.sh
 
 # Copy cloud-config to KUBE_TEMP and work some sed magic
-  sed -e "s/KUBE_MASTER/$MASTER_NAME/" \
+  sed -e "s/KUBE_MASTER/$MASTER_NAME/g" \
       -e "s/MASTER_HTPASSWD/$HTPASSWD/" \
       $(dirname $0)/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
@@ -197,8 +197,8 @@ kube-up() {
   rax-boot-master
   
   # a bit of a hack to wait until master is has an IP from the extra network
-  echo "cluster/rackspace/util.sh: sleeping 30 seconds"
-  sleep 30
+  echo "cluster/rackspace/util.sh: sleeping 35 seconds"
+  sleep 35
   
   detect-master-nova-net $NOVA_NETWORK_LABEL
   rax-boot-minions
@@ -213,7 +213,7 @@ kube-up() {
     exit 2
   fi
 
-  detect-master > /dev/null
+  detect-master
 
   echo "Waiting for cluster initialization."
   echo
@@ -223,11 +223,11 @@ kube-up() {
   echo
   
   #This will fail until apiserver salt is updated
-  #until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
-  #        --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
-  #    printf "."
-  #    sleep 2
-  #done
+  until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
+          --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
+      printf "."
+      sleep 2
+  done
   
   echo "Kubernetes cluster created."
   echo "Sanity checking cluster..."
@@ -238,25 +238,8 @@ kube-up() {
   set +e
   sleep 45
 
-  #detect-minions > /dev/null
   detect-minions
 
-
-  #This will fail until apiserver salt is updated
-  # Basic sanity checking
-  #for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
-  #
-  #    # Make sure the kubelet is running
-  #  if [ "$(curl --insecure --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${KUBE_MINION_IP_ADDRESSES[$i]}/healthz)" != "ok" ]; then
-  #      echo "Kubelet failed to install on ${KUBE_MINION_IP_ADDRESSES[$i]} your cluster is unlikely to work correctly"
-  #      echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
-  #      exit 1
-  #  else
-  #    echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
-  #
-  #  fi
-  #
-  #done
   echo "All minions may not be online yet, this is okay."
   echo
   echo "Kubernetes cluster is running.  Access the master at:"
