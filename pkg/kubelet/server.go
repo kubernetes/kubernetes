@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
@@ -82,7 +83,7 @@ func NewServer(host HostInterface, updates chan<- interface{}) Server {
 
 // InstallDefaultHandlers registers the set of supported HTTP request patterns with the mux
 func (s *Server) InstallDefaultHandlers() {
-	s.mux.HandleFunc("/healthz", s.handleHealth)
+	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/container", s.handleContainer)
 	s.mux.HandleFunc("/containers", s.handleContainers)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfo)
@@ -95,10 +96,6 @@ func (s *Server) InstallDefaultHandlers() {
 // error serializes an error object into an HTTP response
 func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
-}
-
-// handleHealth handles health checking requests against the Kubelet
-func (s *Server) handleHealth(w http.ResponseWriter, req *http.Request) {
 }
 
 // handleContainer handles container requests against the Kubelet
