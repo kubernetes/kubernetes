@@ -79,9 +79,6 @@ EOF
 
   # Install Salt
   #
-  # We specify -X to avoid a race condition that can cause minion failure to
-  # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-  #
   # -M installs the master
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M
 
