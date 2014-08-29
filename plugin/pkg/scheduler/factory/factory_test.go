@@ -17,6 +17,7 @@ limitations under the License.
 package factory
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
@@ -114,7 +115,10 @@ func TestPollMinions(t *testing.T) {
 			ResponseBody: api.EncodeOrDie(ml),
 			T:            t,
 		}
-		server := httptest.NewServer(&handler)
+		mux := http.NewServeMux()
+		// FakeHandler musn't be sent requests other than the one you want to test.
+		mux.Handle("/api/v1beta1/minions", &handler)
+		server := httptest.NewServer(mux)
 		client := client.NewOrDie(server.URL, nil)
 		cf := ConfigFactory{client}
 
@@ -138,7 +142,10 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ResponseBody: api.EncodeOrDie(testPod),
 		T:            t,
 	}
-	server := httptest.NewServer(&handler)
+	mux := http.NewServeMux()
+	// FakeHandler musn't be sent requests other than the one you want to test.
+	mux.Handle("/api/v1beta1/pods/foo", &handler)
+	server := httptest.NewServer(mux)
 	factory := ConfigFactory{client.NewOrDie(server.URL, nil)}
 	queue := cache.NewFIFO()
 	errFunc := factory.makeDefaultErrorFunc(queue)
