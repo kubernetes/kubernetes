@@ -16,12 +16,10 @@
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
-
+echo master: $MASTER_NAME > /etc/salt/minion.d/master.conf
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
-
-MINION_IP=$(ip -f inet a sh dev eth2 | grep -i inet | awk '{print $2}' | cut -d / -f 1)
+MINION_IP=$(ip -f inet a sh dev eth2 | awk -F '[ \t/]+' '/inet/ { print $3 }' )
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
@@ -29,22 +27,22 @@ grains:
     - kubernetes-pool
   cbr-cidr: $MINION_IP_RANGE
   minion_ip: $MINION_IP
+  etcd_servers: $MASTER_NAME
 EOF
-
 #Move all of this to salt
 apt-get update
 apt-get install bridge-utils -y
 brctl addbr cbr0
-ip link set dev cbr0 up
+ip l set dev cbr0 up
 #for loop to add routes of other minions
-for (( i=1; i<=${NUM_MINIONS[@]}; i++)); do
- ip r a 10.240.$i.0/24 dev cbr0
+for i in `seq 1 $NUM_MINIONS`
+do ip r a 10.240.$i.0/24 dev cbr0
 done
-ip link add vxlan42 type vxlan id 42 group 239.0.0.42 dev eth2
+ip l a vxlan42 type vxlan id 42 group 239.0.0.42 dev eth2
 brctl addif cbr0 vxlan42
 # Install Salt
 #
 # We specify -X to avoid a race condition that can cause minion failure to
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
 curl -L http://bootstrap.saltstack.com | sh -s -- -X
-ip link set vxlan42 up
+ip l set vxlan42 up
