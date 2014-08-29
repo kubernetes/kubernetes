@@ -19,15 +19,14 @@ package v1beta1
 import (
 	// Alias this so it can be easily changed when we cut the next version.
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	// Also import under original name for Convert and AddConversionFuncs.
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 )
 
 func init() {
 	// Shortcut for sub-conversions. TODO: This should possibly be refactored
 	// such that this convert function is passed to each conversion func.
-	Convert := api.Convert
-	api.AddConversionFuncs(
+	Convert := apitools.Convert
+	apitools.AddConversionFuncs(
 		// EnvVar's Key is deprecated in favor of Name.
 		func(in *newer.EnvVar, out *EnvVar) error {
 			out.Value = in.Value

@@ -14,14 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package apitools
 
 import (
 	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestGenericJSONBase(t *testing.T) {
+	type JSONBase struct {
+		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
+		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+		ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	}
 	j := JSONBase{
 		ID:              "foo",
 		APIVersion:      "a",
@@ -68,13 +78,25 @@ func TestGenericJSONBase(t *testing.T) {
 }
 
 func TestResourceVersionerOfAPI(t *testing.T) {
-	testCases := map[string]struct {
+	type JSONBase struct {
+		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
+		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+		ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	}
+	type MyAPIObject struct {
+		JSONBase `yaml:",inline" json:",inline"`
+	}
+	type T struct {
 		Object   interface{}
 		Expected uint64
-	}{
-		"empty api object":                   {Service{}, 0},
-		"api object with version":            {Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
-		"pointer to api object with version": {&Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+	}
+	testCases := map[string]T{
+		"empty api object":                   {&MyAPIObject{}, 0},
+		"api object with version":            {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+		"pointer to api object with version": {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
 	}
 	versioning := NewJSONBaseResourceVersioner()
 	for key, testCase := range testCases {

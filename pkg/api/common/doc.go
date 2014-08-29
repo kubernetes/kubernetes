@@ -14,27 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
-
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
-)
-
-func init() {
-	apitools.AddKnownTypes("v1beta1",
-		PodList{},
-		Pod{},
-		ReplicationControllerList{},
-		ReplicationController{},
-		ServiceList{},
-		Service{},
-		MinionList{},
-		Minion{},
-		Status{},
-		ServerOpList{},
-		ServerOp{},
-		ContainerManifestList{},
-		Endpoints{},
-		Binding{},
-	)
-}
+// Package common provides types useful for all versions of any object
+// that conforms to the kubernetes API object expectations.
+package common

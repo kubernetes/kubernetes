@@ -22,9 +22,10 @@ import (
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 )
 
-var Convert = newer.Convert
+var Convert = apitools.Convert
 
 func TestEnvConversion(t *testing.T) {
 	nonCanonical := []v1beta1.EnvVar{
