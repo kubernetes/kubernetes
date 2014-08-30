@@ -54,6 +54,21 @@ kube::version_ldflags() {
           git_version+="-dirty"
         fi
         ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${git_version}")
+
+        # Try to match the "git describe" output to a regex to try to extract
+        # the "major" and "minor" versions and whether this is the exact tagged
+        # version or whether the tree is between two tagged versions.
+        if [[ "${git_version}" =~ ^v([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
+          git_major=${BASH_REMATCH[1]}
+          git_minor=${BASH_REMATCH[2]}
+          if [[ -n "${BASH_REMATCH[3]}" ]]; then
+            git_minor+="+"
+          fi
+          ldflags+=(
+            -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${git_major}"
+            -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${git_minor}"
+          )
+        fi
       fi
     fi
 
