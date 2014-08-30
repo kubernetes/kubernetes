@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package flag defines utility functions to handle command line flags related to version of Kubernetes.
-package flag
+// Package verflag defines utility functions to handle command line flags
+// related to version of Kubernetes.
+package verflag
 
 import (
 	"flag"
