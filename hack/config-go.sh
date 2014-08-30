@@ -47,6 +47,12 @@ kube::version_ldflags() {
 
       # Use git describe to find the version based on annotated tags.
       if git_version=$(git describe --abbrev=14 "${git_commit}^{commit}" 2>/dev/null); then
+        if [[ "${git_tree_state}" == "dirty" ]]; then
+          # git describe --dirty only considers changes to existing files, but
+          # that is problematic since new untracked .go files affect the build,
+          # so use our idea of "dirty" from git status instead.
+          git_version+="-dirty"
+        fi
         ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${git_version}")
       fi
     fi
