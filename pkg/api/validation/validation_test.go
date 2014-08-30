@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -33,11 +34,11 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
 }
 
 func TestValidateVolumes(t *testing.T) {
-	successCase := []Volume{
+	successCase := []api.Volume{
 		{Name: "abc"},
-		{Name: "123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path2"}}},
-		{Name: "abc-123", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/path3"}}},
-		{Name: "empty", Source: &VolumeSource{EmptyDirectory: &EmptyDirectory{}}},
+		{Name: "123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path2"}}},
+		{Name: "abc-123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path3"}}},
+		{Name: "empty", Source: &api.VolumeSource{EmptyDirectory: &api.EmptyDirectory{}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -48,14 +49,14 @@ func TestValidateVolumes(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		V []Volume
+		V []api.Volume
 		T errors.ValidationErrorType
 		F string
 	}{
-		"zero-length name":     {[]Volume{{Name: ""}}, errors.ValidationErrorTypeRequired, "[0].name"},
-		"name > 63 characters": {[]Volume{{Name: strings.Repeat("a", 64)}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not a DNS label": {[]Volume{{Name: "a.b.c"}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not unique":      {[]Volume{{Name: "abc"}, {Name: "abc"}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
+		"zero-length name":     {[]api.Volume{{Name: ""}}, errors.ValidationErrorTypeRequired, "[0].name"},
+		"name > 63 characters": {[]api.Volume{{Name: strings.Repeat("a", 64)}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not a DNS label": {[]api.Volume{{Name: "a.b.c"}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not unique":      {[]api.Volume{{Name: "abc"}, {Name: "abc"}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
@@ -75,7 +76,7 @@ func TestValidateVolumes(t *testing.T) {
 }
 
 func TestValidatePorts(t *testing.T) {
-	successCase := []Port{
+	successCase := []api.Port{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "123", ContainerPort: 81, HostPort: 81},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
@@ -88,7 +89,7 @@ func TestValidatePorts(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	nonCanonicalCase := []Port{
+	nonCanonicalCase := []api.Port{
 		{ContainerPort: 80},
 	}
 	if errs := validatePorts(nonCanonicalCase); len(errs) != 0 {
@@ -99,20 +100,20 @@ func TestValidatePorts(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		P []Port
+		P []api.Port
 		T errors.ValidationErrorType
 		F string
 	}{
-		"name > 63 characters": {[]Port{{Name: strings.Repeat("a", 64), ContainerPort: 80}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not a DNS label": {[]Port{{Name: "a.b.c", ContainerPort: 80}}, errors.ValidationErrorTypeInvalid, "[0].name"},
-		"name not unique": {[]Port{
+		"name > 63 characters": {[]api.Port{{Name: strings.Repeat("a", 64), ContainerPort: 80}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not a DNS label": {[]api.Port{{Name: "a.b.c", ContainerPort: 80}}, errors.ValidationErrorTypeInvalid, "[0].name"},
+		"name not unique": {[]api.Port{
 			{Name: "abc", ContainerPort: 80},
 			{Name: "abc", ContainerPort: 81},
 		}, errors.ValidationErrorTypeDuplicate, "[1].name"},
-		"zero container port":    {[]Port{{ContainerPort: 0}}, errors.ValidationErrorTypeRequired, "[0].containerPort"},
-		"invalid container port": {[]Port{{ContainerPort: 65536}}, errors.ValidationErrorTypeInvalid, "[0].containerPort"},
-		"invalid host port":      {[]Port{{ContainerPort: 80, HostPort: 65536}}, errors.ValidationErrorTypeInvalid, "[0].hostPort"},
-		"invalid protocol":       {[]Port{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol"},
+		"zero container port":    {[]api.Port{{ContainerPort: 0}}, errors.ValidationErrorTypeRequired, "[0].containerPort"},
+		"invalid container port": {[]api.Port{{ContainerPort: 65536}}, errors.ValidationErrorTypeInvalid, "[0].containerPort"},
+		"invalid host port":      {[]api.Port{{ContainerPort: 80, HostPort: 65536}}, errors.ValidationErrorTypeInvalid, "[0].hostPort"},
+		"invalid protocol":       {[]api.Port{{ContainerPort: 80, Protocol: "ICMP"}}, errors.ValidationErrorTypeNotSupported, "[0].protocol"},
 	}
 	for k, v := range errorCases {
 		errs := validatePorts(v.P)
@@ -131,7 +132,7 @@ func TestValidatePorts(t *testing.T) {
 }
 
 func TestValidateEnv(t *testing.T) {
-	successCase := []EnvVar{
+	successCase := []api.EnvVar{
 		{Name: "abc", Value: "value"},
 		{Name: "ABC", Value: "value"},
 		{Name: "AbC_123", Value: "value"},
@@ -141,7 +142,7 @@ func TestValidateEnv(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	errorCases := map[string][]EnvVar{
+	errorCases := map[string][]api.EnvVar{
 		"zero-length name":        {{Name: ""}},
 		"name not a C identifier": {{Name: "a.b.c"}},
 	}
@@ -155,7 +156,7 @@ func TestValidateEnv(t *testing.T) {
 func TestValidateVolumeMounts(t *testing.T) {
 	volumes := util.NewStringSet("abc", "123", "abc-123")
 
-	successCase := []VolumeMount{
+	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
 		{Name: "123", MountPath: "/foo"},
 		{Name: "abc-123", MountPath: "/bar"},
@@ -164,7 +165,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	errorCases := map[string][]VolumeMount{
+	errorCases := map[string][]api.VolumeMount{
 		"empty name":      {{Name: "", MountPath: "/foo"}},
 		"name not found":  {{Name: "", MountPath: "/foo"}},
 		"empty mountpath": {{Name: "abc", MountPath: ""}},
@@ -179,7 +180,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 func TestValidateContainers(t *testing.T) {
 	volumes := util.StringSet{}
 
-	successCase := []Container{
+	successCase := []api.Container{
 		{Name: "abc", Image: "image"},
 		{Name: "123", Image: "image"},
 		{Name: "abc-123", Image: "image"},
@@ -188,7 +189,7 @@ func TestValidateContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	errorCases := map[string][]Container{
+	errorCases := map[string][]api.Container{
 		"zero-length name":     {{Name: "", Image: "image"}},
 		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image"}},
 		"name not a DNS label": {{Name: "a.b.c", Image: "image"}},
@@ -198,14 +199,14 @@ func TestValidateContainers(t *testing.T) {
 		},
 		"zero-length image": {{Name: "abc", Image: ""}},
 		"host port not unique": {
-			{Name: "abc", Image: "image", Ports: []Port{{ContainerPort: 80, HostPort: 80}}},
-			{Name: "def", Image: "image", Ports: []Port{{ContainerPort: 81, HostPort: 80}}},
+			{Name: "abc", Image: "image", Ports: []api.Port{{ContainerPort: 80, HostPort: 80}}},
+			{Name: "def", Image: "image", Ports: []api.Port{{ContainerPort: 81, HostPort: 80}}},
 		},
 		"invalid env var name": {
-			{Name: "abc", Image: "image", Env: []EnvVar{{Name: "ev.1"}}},
+			{Name: "abc", Image: "image", Env: []api.EnvVar{{Name: "ev.1"}}},
 		},
 		"unknown volume name": {
-			{Name: "abc", Image: "image", VolumeMounts: []VolumeMount{{Name: "anything", MountPath: "/foo"}}},
+			{Name: "abc", Image: "image", VolumeMounts: []api.VolumeMount{{Name: "anything", MountPath: "/foo"}}},
 		},
 	}
 	for k, v := range errorCases {
@@ -216,16 +217,16 @@ func TestValidateContainers(t *testing.T) {
 }
 
 func TestValidateManifest(t *testing.T) {
-	successCases := []ContainerManifest{
+	successCases := []api.ContainerManifest{
 		{Version: "v1beta1", ID: "abc"},
 		{Version: "v1beta2", ID: "123"},
 		{Version: "V1BETA1", ID: "abc.123.do-re-mi"},
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []Volume{{Name: "vol1", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol1"}}},
-				{Name: "vol2", Source: &VolumeSource{HostDirectory: &HostDirectory{"/mnt/vol2"}}}},
-			Containers: []Container{
+			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/vol1"}}},
+				{Name: "vol2", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/vol2"}}}},
+			Containers: []api.Container{
 				{
 					Name:       "abc",
 					Image:      "image",
@@ -233,17 +234,17 @@ func TestValidateManifest(t *testing.T) {
 					WorkingDir: "/tmp",
 					Memory:     1,
 					CPU:        1,
-					Ports: []Port{
+					Ports: []api.Port{
 						{Name: "p1", ContainerPort: 80, HostPort: 8080},
 						{Name: "p2", ContainerPort: 81},
 						{ContainerPort: 82},
 					},
-					Env: []EnvVar{
+					Env: []api.EnvVar{
 						{Name: "ev1", Value: "val1"},
 						{Name: "ev2", Value: "val2"},
 						{Name: "EV3", Value: "val3"},
 					},
-					VolumeMounts: []VolumeMount{
+					VolumeMounts: []api.VolumeMount{
 						{Name: "vol1", MountPath: "/foo"},
 						{Name: "vol1", MountPath: "/bar"},
 					},
@@ -257,18 +258,18 @@ func TestValidateManifest(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]ContainerManifest{
+	errorCases := map[string]api.ContainerManifest{
 		"empty version":   {Version: "", ID: "abc"},
 		"invalid version": {Version: "bogus", ID: "abc"},
 		"invalid volume name": {
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []Volume{{Name: "vol.1"}},
+			Volumes: []api.Volume{{Name: "vol.1"}},
 		},
 		"invalid container name": {
 			Version:    "v1beta1",
 			ID:         "abc",
-			Containers: []Container{{Name: "ctr.1", Image: "image"}},
+			Containers: []api.Container{{Name: "ctr.1", Image: "image"}},
 		},
 	}
 	for k, v := range errorCases {
@@ -279,40 +280,40 @@ func TestValidateManifest(t *testing.T) {
 }
 
 func TestValidatePod(t *testing.T) {
-	errs := ValidatePod(&Pod{
-		JSONBase: JSONBase{ID: "foo"},
+	errs := ValidatePod(&api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		DesiredState: PodState{
-			Manifest:      ContainerManifest{Version: "v1beta1", ID: "abc"},
-			RestartPolicy: RestartPolicy{Type: "RestartAlways"},
+		DesiredState: api.PodState{
+			Manifest:      api.ContainerManifest{Version: "v1beta1", ID: "abc"},
+			RestartPolicy: api.RestartPolicy{Type: "RestartAlways"},
 		},
 	})
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
-	errs = ValidatePod(&Pod{
-		JSONBase: JSONBase{ID: "foo"},
+	errs = ValidatePod(&api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		DesiredState: PodState{
-			Manifest: ContainerManifest{Version: "v1beta1", ID: "abc"},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
 		},
 	})
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
 
-	errs = ValidatePod(&Pod{
-		JSONBase: JSONBase{ID: "foo"},
+	errs = ValidatePod(&api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		DesiredState: PodState{
-			Manifest:      ContainerManifest{Version: "v1beta1", ID: "abc"},
-			RestartPolicy: RestartPolicy{Type: "WhatEver"},
+		DesiredState: api.PodState{
+			Manifest:      api.ContainerManifest{Version: "v1beta1", ID: "abc"},
+			RestartPolicy: api.RestartPolicy{Type: "WhatEver"},
 		},
 	})
 	if len(errs) != 1 {
@@ -323,8 +324,8 @@ func TestValidatePod(t *testing.T) {
 func TestValidateService(t *testing.T) {
 	// This test should fail because the port number is invalid i.e.
 	// the Port field has a default value of 0.
-	errs := ValidateService(&Service{
-		JSONBase: JSONBase{ID: "foo"},
+	errs := ValidateService(&api.Service{
+		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{
 			"foo": "bar",
 		},
@@ -333,9 +334,9 @@ func TestValidateService(t *testing.T) {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 
-	errs = ValidateService(&Service{
+	errs = ValidateService(&api.Service{
 		Port:     6502,
-		JSONBase: JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{
 			"foo": "bar",
 		},
@@ -344,7 +345,7 @@ func TestValidateService(t *testing.T) {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
 
-	errs = ValidateService(&Service{
+	errs = ValidateService(&api.Service{
 		Port: 6502,
 		Selector: map[string]string{
 			"foo": "bar",
@@ -354,15 +355,15 @@ func TestValidateService(t *testing.T) {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 
-	errs = ValidateService(&Service{
+	errs = ValidateService(&api.Service{
 		Port:     6502,
-		JSONBase: JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo"},
 	})
 	if len(errs) != 1 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 
-	errs = ValidateService(&Service{})
+	errs = ValidateService(&api.Service{})
 	if len(errs) != 3 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
@@ -370,26 +371,26 @@ func TestValidateService(t *testing.T) {
 
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := PodTemplate{
-		DesiredState: PodState{
-			Manifest: ContainerManifest{
+	validPodTemplate := api.PodTemplate{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 			},
 		},
 		Labels: validSelector,
 	}
 
-	successCases := []ReplicationController{
+	successCases := []api.ReplicationController{
 		{
-			JSONBase: JSONBase{ID: "abc"},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		{
-			JSONBase: JSONBase{ID: "abc-123"},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: "abc-123"},
+			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
@@ -401,36 +402,36 @@ func TestValidateReplicationController(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]ReplicationController{
+	errorCases := map[string]api.ReplicationController{
 		"zero-length ID": {
-			JSONBase: JSONBase{ID: ""},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: ""},
+			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"empty selector": {
-			JSONBase: JSONBase{ID: "abc"},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
 				PodTemplate: validPodTemplate,
 			},
 		},
 		"selector_doesnt_match": {
-			JSONBase: JSONBase{ID: "abc"},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"foo": "bar"},
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"invalid manifest": {
-			JSONBase: JSONBase{ID: "abc"},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 			},
 		},
 		"negative_replicas": {
-			JSONBase: JSONBase{ID: "abc"},
-			DesiredState: ReplicationControllerState{
+			JSONBase: api.JSONBase{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
 				Replicas:        -1,
 				ReplicaSelector: validSelector,
 			},
