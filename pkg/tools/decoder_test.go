@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/common"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -35,7 +36,7 @@ func TestDecoder(t *testing.T) {
 
 	expect := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	go func() {
-		err := encoder.Encode(api.WatchEvent{watch.Added, api.APIObject{expect}})
+		err := encoder.Encode(api.WatchEvent{watch.Added, common.Object{expect}})
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}

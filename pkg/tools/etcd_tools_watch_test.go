@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -47,62 +48,62 @@ func TestWatchInterpretations(t *testing.T) {
 	}{
 		"create": {
 			actions:      []string{"create", "get"},
-			nodeValue:    api.EncodeOrDie(podBar),
+			nodeValue:    apitools.EncodeOrDie(podBar),
 			expectEmit:   true,
 			expectType:   watch.Added,
 			expectObject: podBar,
 		},
 		"create but filter blocks": {
 			actions:    []string{"create", "get"},
-			nodeValue:  api.EncodeOrDie(podFoo),
+			nodeValue:  apitools.EncodeOrDie(podFoo),
 			expectEmit: false,
 		},
 		"delete": {
 			actions:       []string{"delete"},
-			prevNodeValue: api.EncodeOrDie(podBar),
+			prevNodeValue: apitools.EncodeOrDie(podBar),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
 			expectObject:  podBar,
 		},
 		"delete but filter blocks": {
 			actions:    []string{"delete"},
-			nodeValue:  api.EncodeOrDie(podFoo),
+			nodeValue:  apitools.EncodeOrDie(podFoo),
 			expectEmit: false,
 		},
 		"modify appears to create 1": {
 			actions:      []string{"set", "compareAndSwap"},
-			nodeValue:    api.EncodeOrDie(podBar),
+			nodeValue:    apitools.EncodeOrDie(podBar),
 			expectEmit:   true,
 			expectType:   watch.Added,
 			expectObject: podBar,
 		},
 		"modify appears to create 2": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: api.EncodeOrDie(podFoo),
-			nodeValue:     api.EncodeOrDie(podBar),
+			prevNodeValue: apitools.EncodeOrDie(podFoo),
+			nodeValue:     apitools.EncodeOrDie(podBar),
 			expectEmit:    true,
 			expectType:    watch.Added,
 			expectObject:  podBar,
 		},
 		"modify appears to delete": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: api.EncodeOrDie(podBar),
-			nodeValue:     api.EncodeOrDie(podFoo),
+			prevNodeValue: apitools.EncodeOrDie(podBar),
+			nodeValue:     apitools.EncodeOrDie(podFoo),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
 			expectObject:  podBar, // Should return last state that passed the filter!
 		},
 		"modify modifies": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: api.EncodeOrDie(podBar),
-			nodeValue:     api.EncodeOrDie(podBaz),
+			prevNodeValue: apitools.EncodeOrDie(podBar),
+			nodeValue:     apitools.EncodeOrDie(podBaz),
 			expectEmit:    true,
 			expectType:    watch.Modified,
 			expectObject:  podBaz,
 		},
 		"modify ignores": {
 			actions:    []string{"set", "compareAndSwap"},
-			nodeValue:  api.EncodeOrDie(podFoo),
+			nodeValue:  apitools.EncodeOrDie(podFoo),
 			expectEmit: false,
 		},
 	}
@@ -258,7 +259,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value: string(apitools.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 					},
 				},
 			},
@@ -272,12 +273,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(apitools.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(apitools.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -294,7 +295,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+							Value:         string(apitools.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -307,12 +308,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(apitools.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(api.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(apitools.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -369,7 +370,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
-						Value:         api.EncodeOrDie(pod),
+						Value:         apitools.EncodeOrDie(pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -384,7 +385,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
-						Value:         api.EncodeOrDie(pod),
+						Value:         apitools.EncodeOrDie(pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
@@ -442,13 +443,13 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 				Dir: true,
 				Nodes: etcd.Nodes{
 					&etcd.Node{
-						Value:         api.EncodeOrDie(pod),
+						Value:         apitools.EncodeOrDie(pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 						Nodes:         etcd.Nodes{},
 					},
 					&etcd.Node{
-						Value:         api.EncodeOrDie(pod),
+						Value:         apitools.EncodeOrDie(pod),
 						CreatedIndex:  2,
 						ModifiedIndex: 2,
 						Nodes:         etcd.Nodes{},

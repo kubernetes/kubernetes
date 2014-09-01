@@ -26,25 +26,27 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/golang/glog"
 )
 
 func validateObject(obj interface{}) (errors []error) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
-		errors = api.ValidateManifest(&t.DesiredState.PodTemplate.DesiredState.Manifest)
+		errors = validation.ValidateManifest(&t.DesiredState.PodTemplate.DesiredState.Manifest)
 	case *api.ReplicationControllerList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Service:
-		errors = api.ValidateService(t)
+		errors = validation.ValidateService(t)
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Pod:
-		errors = api.ValidateManifest(&t.DesiredState.Manifest)
+		errors = validation.ValidateManifest(&t.DesiredState.Manifest)
 	case *api.PodList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
@@ -101,7 +103,7 @@ func TestApiExamples(t *testing.T) {
 			return
 		}
 		tested += 1
-		if err := api.DecodeInto(data, expectedType); err != nil {
+		if err := apitools.DecodeInto(data, expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
@@ -135,7 +137,7 @@ func TestExamples(t *testing.T) {
 			return
 		}
 		tested += 1
-		if err := api.DecodeInto(data, expectedType); err != nil {
+		if err := apitools.DecodeInto(data, expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
@@ -166,14 +168,14 @@ func TestReadme(t *testing.T) {
 	}
 	for _, json := range match[1:] {
 		expectedType := &api.Pod{}
-		if err := api.DecodeInto([]byte(json), expectedType); err != nil {
+		if err := apitools.DecodeInto([]byte(json), expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
 		if errors := validateObject(expectedType); len(errors) > 0 {
 			t.Errorf("%s did not validate correctly: %v", path, errors)
 		}
-		encoded, err := api.Encode(expectedType)
+		encoded, err := apitools.Encode(expectedType)
 		if err != nil {
 			t.Errorf("Could not encode object: %v", err)
 			continue

@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
@@ -40,8 +41,8 @@ type TestResource struct {
 }
 
 var scheme *conversion.Scheme
-var codec = api.Codec
-var versioner = api.ResourceVersioner
+var codec = apitools.Codec
+var versioner = apitools.ResourceVersioner
 
 func init() {
 	scheme = conversion.NewScheme()
@@ -184,13 +185,13 @@ func TestSetObj(t *testing.T) {
 }
 
 func TestSetObjWithVersion(t *testing.T) {
-	obj := api.Pod{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}}
+	obj := &api.Pod{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         api.EncodeOrDie(obj),
+				Value:         apitools.EncodeOrDie(obj),
 				ModifiedIndex: 1,
 			},
 		},
@@ -235,7 +236,7 @@ func TestAtomicUpdate(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	codec := scheme
-	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, apitools.NewJSONBaseResourceVersioner()}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -289,7 +290,7 @@ func TestAtomicUpdate(t *testing.T) {
 func TestAtomicUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, scheme, api.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, scheme, apitools.NewJSONBaseResourceVersioner()}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -321,7 +322,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	codec := scheme
-	helper := EtcdHelper{fakeClient, codec, api.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, apitools.NewJSONBaseResourceVersioner()}
 
 	fakeClient.ExpectNotFoundGet("/some/key")
 

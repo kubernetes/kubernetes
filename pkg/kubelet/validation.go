@@ -17,8 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -26,7 +26,7 @@ func ValidatePod(pod *Pod) (errors []error) {
 	if !util.IsDNSSubdomain(pod.Name) {
 		errors = append(errors, apierrs.NewInvalid("Pod.Name", pod.Name))
 	}
-	if errs := api.ValidateManifest(&pod.Manifest); len(errs) != 0 {
+	if errs := validation.ValidateManifest(&pod.Manifest); len(errs) != 0 {
 		errors = append(errors, errs...)
 	}
 	return errors

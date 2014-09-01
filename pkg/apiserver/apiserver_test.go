@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -40,11 +41,11 @@ func convert(obj interface{}) (interface{}, error) {
 	return obj, nil
 }
 
-var codec = api.Codec
+var codec = apitools.Codec
 
 func init() {
-	api.AddKnownTypes("", Simple{}, SimpleList{})
-	api.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
+	apitools.AddKnownTypes("", Simple{}, SimpleList{})
+	apitools.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
 }
 
 type Simple struct {
@@ -696,7 +697,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		type T struct {
 			Value string
 		}
-		writeJSON(http.StatusOK, api.Codec, &T{"Undecodable"}, w)
+		writeJSON(http.StatusOK, apitools.Codec, &T{"Undecodable"}, w)
 	}))
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != api.StatusReasonUnknown {

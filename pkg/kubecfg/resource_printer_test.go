@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"gopkg.in/v1/yaml"
 )
 
@@ -95,7 +96,7 @@ func TestIdentityPrinter(t *testing.T) {
 	}
 	buff.Reset()
 	printer.PrintObj(obj, buff)
-	objOut, err := api.Decode([]byte(buff.String()))
+	objOut, err := apitools.Decode([]byte(buff.String()))
 	if err != nil {
 		t.Errorf("Unexpeted error: %#v", err)
 	}

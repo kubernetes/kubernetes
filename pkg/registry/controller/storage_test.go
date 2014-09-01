@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -111,13 +112,13 @@ func TestControllerDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := api.Encode(controller)
+	body, err := apitools.Encode(controller)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	controllerOut := storage.New()
-	if err := api.DecodeInto(body, controllerOut); err != nil {
+	if err := apitools.DecodeInto(body, controllerOut); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

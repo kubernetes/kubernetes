@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"gopkg.in/v1/yaml"
 )
 
@@ -32,7 +33,7 @@ func TestParseBadStorage(t *testing.T) {
 }
 
 func DoParseTest(t *testing.T, storage string, obj interface{}, p *Parser) {
-	jsonData, _ := api.Encode(obj)
+	jsonData, _ := apitools.Encode(obj)
 	yamlData, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))
@@ -119,8 +120,8 @@ type TestParseType struct {
 }
 
 func TestParseCustomType(t *testing.T) {
-	api.AddKnownTypes("", TestParseType{})
-	api.AddKnownTypes("v1beta1", TestParseType{})
+	apitools.AddKnownTypes("", TestParseType{})
+	apitools.AddKnownTypes("v1beta1", TestParseType{})
 	parser := NewParser(map[string]interface{}{
 		"custom": TestParseType{},
 	})

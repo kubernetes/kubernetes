@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
@@ -81,7 +81,7 @@ func (gc *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
 			continue
 		}
-		jsonBase, err := api.FindJSONBase(event.Object)
+		jsonBase, err := apitools.FindJSONBase(event.Object)
 		if err != nil {
 			glog.Errorf("unable to understand watch event %#v", event)
 			continue

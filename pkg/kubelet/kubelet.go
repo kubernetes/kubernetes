@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -600,7 +601,7 @@ func filterHostPortConflicts(pods []Pod) []Pod {
 	extract := func(p *api.Port) int { return p.HostPort }
 	for i := range pods {
 		pod := &pods[i]
-		if errs := api.AccumulateUniquePorts(pod.Manifest.Containers, ports, extract); len(errs) != 0 {
+		if errs := validation.AccumulateUniquePorts(pod.Manifest.Containers, ports, extract); len(errs) != 0 {
 			glog.Warningf("Pod %s has conflicting ports, ignoring: %v", GetPodFullName(pod), errs)
 			continue
 		}

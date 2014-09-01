@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -83,9 +84,9 @@ func TestExtractObj(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := newEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: api.Codec, ResourceVersioner: api.ResourceVersioner}
+	helper := tools.EtcdHelper{Client: client, Codec: apitools.Codec, ResourceVersioner: apitools.ResourceVersioner}
 	withEtcdKey(func(key string) {
-		resp, err := client.Set(key, api.EncodeOrDie(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+		resp, err := client.Set(key, apitools.EncodeOrDie(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

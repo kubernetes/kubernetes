@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -237,7 +238,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
-		jsonBase, err := api.FindJSONBase(obj)
+		jsonBase, err := apitools.FindJSONBase(obj)
 		if err != nil {
 			glog.Fatalf("error finding json base for update: %v", err)
 		}
@@ -257,16 +258,16 @@ func executeAPIRequest(method string, c *client.Client) bool {
 	if setBody {
 		if version != 0 {
 			data := readConfig(storage)
-			obj, err := api.Decode(data)
+			obj, err := apitools.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
-			jsonBase, err := api.FindJSONBase(obj)
+			jsonBase, err := apitools.FindJSONBase(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
 			jsonBase.SetResourceVersion(version)
-			data, err = api.Encode(obj)
+			data, err = apitools.Encode(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}

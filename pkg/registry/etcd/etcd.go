@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -44,8 +45,8 @@ func NewRegistry(client tools.EtcdClient) *Registry {
 	registry := &Registry{
 		EtcdHelper: tools.EtcdHelper{
 			client,
-			api.Codec,
-			api.ResourceVersioner,
+			apitools.Codec,
+			apitools.ResourceVersioner,
 		},
 	}
 	registry.manifestFactory = &BasicManifestFactory{
@@ -267,7 +268,7 @@ func (r *Registry) CreateController(controller api.ReplicationController) error 
 
 // UpdateController replaces an existing ReplicationController.
 func (r *Registry) UpdateController(controller api.ReplicationController) error {
-	return r.SetObj(makeControllerKey(controller.ID), controller)
+	return r.SetObj(makeControllerKey(controller.ID), &controller)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
@@ -352,7 +353,7 @@ func (r *Registry) DeleteService(name string) error {
 
 // UpdateService replaces an existing Service.
 func (r *Registry) UpdateService(svc api.Service) error {
-	return r.SetObj(makeServiceKey(svc.ID), svc)
+	return r.SetObj(makeServiceKey(svc.ID), &svc)
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.

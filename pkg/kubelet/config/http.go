@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -69,7 +70,7 @@ func (s *SourceURL) extractFromURL() error {
 	var manifest api.ContainerManifest
 	singleErr := yaml.Unmarshal(data, &manifest)
 	if singleErr == nil {
-		if errs := api.ValidateManifest(&manifest); len(errs) > 0 {
+		if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
 			singleErr = fmt.Errorf("invalid manifest: %v", errs)
 		}
 	}
@@ -90,7 +91,7 @@ func (s *SourceURL) extractFromURL() error {
 	// done at the end. Hence not returning early here.
 	if multiErr == nil {
 		for _, manifest := range manifests {
-			if errs := api.ValidateManifest(&manifest); len(errs) > 0 {
+			if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
 				multiErr = fmt.Errorf("invalid manifest: %v", errs)
 				break
 			}

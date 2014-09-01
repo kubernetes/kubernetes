@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -49,7 +50,7 @@ func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machin
 
 func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(*api.Service)
-	if errs := api.ValidateService(srv); len(errs) > 0 {
+	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, apiserver.NewInvalidErr("service", srv.ID, errs)
 	}
 
@@ -155,7 +156,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 
 func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(*api.Service)
-	if errs := api.ValidateService(srv); len(errs) > 0 {
+	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, apiserver.NewInvalidErr("service", srv.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {

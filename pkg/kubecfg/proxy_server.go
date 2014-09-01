@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
@@ -52,7 +53,7 @@ func (s *ProxyServer) Serve() error {
 func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Add("Content-type", "application/json")
-	data, _ := api.Encode(api.Status{
+	data, _ := apitools.Encode(api.Status{
 		Status:  api.StatusFailure,
 		Message: fmt.Sprintf("internal error: %#v", err),
 	})
