@@ -20,7 +20,7 @@ import (
 	"net"
 )
 
-// Interface is an abstract, pluggable interface for cloud providers
+// Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// TCPLoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	TCPLoadBalancer() (TCPLoadBalancer, bool)
@@ -51,7 +51,7 @@ type Instances interface {
 	List(filter string) ([]string, error)
 }
 
-// Zone represents the location of a particular machine
+// Zone represents the location of a particular machine.
 type Zone struct {
 	FailureDomain string
 	Region        string

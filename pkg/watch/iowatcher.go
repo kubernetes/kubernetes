@@ -73,7 +73,7 @@ func (sw *StreamWatcher) Stop() {
 	}
 }
 
-// In a loop, read a result from the decoder and send down the result channel.
+// receive reads result from the decoder in a loop and sends down the result channel.
 func (sw *StreamWatcher) receive() {
 	defer close(sw.result)
 	defer sw.Stop()

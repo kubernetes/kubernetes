@@ -54,7 +54,7 @@ type PodUpdate struct {
 	Op   PodOperation
 }
 
-//GetPodFullName returns a name that full identifies a pod across all config sources.
+// GetPodFullName returns a name that full identifies a pod across all config sources.
 func GetPodFullName(pod *Pod) string {
 	return fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
 }

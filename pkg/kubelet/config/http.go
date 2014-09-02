@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from an HTTP GET response
+// Reads the pod configuration from an HTTP GET response.
 package config
 
 import (

@@ -25,7 +25,7 @@ import (
 )
 
 // codec defines methods for serializing and deserializing API
-// objects
+// objects.
 type codec interface {
 	Encode(obj interface{}) (data []byte, err error)
 	Decode(data []byte) (interface{}, error)
@@ -33,7 +33,7 @@ type codec interface {
 }
 
 // resourceVersioner provides methods for setting and retrieving
-// the resource version from an API object
+// the resource version from an API object.
 type resourceVersioner interface {
 	SetResourceVersion(obj interface{}, version uint64) error
 	ResourceVersion(obj interface{}) (uint64, error)
@@ -187,7 +187,7 @@ func Encode(obj interface{}) (data []byte, err error) {
 	return conversionScheme.Encode(obj)
 }
 
-// Ensures that obj is a pointer of some sort. Returns a reflect.Value of the
+// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
 // dereferenced pointer, ensuring that it is settable/addressable.
 // Returns an error if this is not possible.
 func enforcePtr(obj interface{}) (reflect.Value, error) {

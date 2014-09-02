@@ -71,7 +71,7 @@ func (h *EtcdHelper) WatchAndTransform(key string, resourceVersion uint64, trans
 	return w, nil
 }
 
-// TransformFunc attempts to convert an object to another object for use with a watcher
+// TransformFunc attempts to convert an object to another object for use with a watcher.
 type TransformFunc func(interface{}) (interface{}, error)
 
 // etcdWatcher converts a native etcd watch to a watch.Interface.
@@ -333,7 +333,7 @@ func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	}
 }
 
-// ResultChannel implements watch.Interface.
+// ResultChan implements watch.Interface.
 func (w *etcdWatcher) ResultChan() <-chan watch.Event {
 	return w.outgoing
 }

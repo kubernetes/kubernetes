@@ -51,7 +51,7 @@ func getWatchParams(query url.Values) (label, field labels.Selector, resourceVer
 	return label, field, resourceVersion
 }
 
-// handleWatch processes a watch request
+// ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	parts := splitPath(req.URL.Path)
 	if len(parts) < 1 || req.Method != "GET" {

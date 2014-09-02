@@ -91,7 +91,7 @@ type Accessor interface {
 	MergedState() interface{}
 }
 
-// AccessorFunc implements the Accessor interface
+// AccessorFunc implements the Accessor interface.
 type AccessorFunc func() interface{}
 
 func (f AccessorFunc) MergedState() interface{} {
@@ -116,20 +116,20 @@ type Watcher struct {
 	listeners    []Listener
 }
 
-// Register a set of listeners that support the Listener interface and
-// notify them on changes.
+// NewWatcher registers a set of listeners that support the Listener interface
+// and notify them on changes.
 func NewWatcher() *Watcher {
 	return &Watcher{}
 }
 
-// Register Listener to receive updates of changes.
+// Add registers listener to receive updates of changes.
 func (m *Watcher) Add(listener Listener) {
 	m.listenerLock.Lock()
 	defer m.listenerLock.Unlock()
 	m.listeners = append(m.listeners, listener)
 }
 
-// Notify all listeners
+// Notify notifies all listeners.
 func (m *Watcher) Notify(instance interface{}) {
 	m.listenerLock.RLock()
 	listeners := m.listeners

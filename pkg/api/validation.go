@@ -172,7 +172,8 @@ func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, ext
 	return allErrs
 }
 
-// Checks for colliding Port.HostPort values across a slice of containers.
+// checkHostPortConflicts checks for colliding Port.HostPort values across
+// a slice of containers.
 func checkHostPortConflicts(containers []Container) errs.ErrorList {
 	allPorts := map[int]bool{}
 	return AccumulateUniquePorts(containers, allPorts, func(p *Port) int { return p.HostPort })
@@ -245,7 +246,7 @@ func ValidatePodState(podState *PodState) errs.ErrorList {
 	return allErrs
 }
 
-// Pod tests if required fields in the pod are set.
+// ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(pod.ID) == 0 {

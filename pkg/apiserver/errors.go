@@ -25,7 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
-// apiServerError is an error intended for consumption by a REST API server
+// apiServerError is an error intended for consumption by a REST API server.
 type apiServerError struct {
 	api.Status
 }
@@ -49,7 +49,7 @@ func NewNotFoundErr(kind, name string) error {
 	}}
 }
 
-// NewAlreadyExistsErr returns an error indicating the item requested exists by that identifier
+// NewAlreadyExistsErr returns an error indicating the item requested exists by that identifier.
 func NewAlreadyExistsErr(kind, name string) error {
 	return &apiServerError{api.Status{
 		Status: api.StatusFailure,
@@ -77,7 +77,7 @@ func NewConflictErr(kind, name string, err error) error {
 	}}
 }
 
-// NewInvalidError returns an error indicating the item is invalid and cannot be processed.
+// NewInvalidErr returns an error indicating the item is invalid and cannot be processed.
 func NewInvalidErr(kind, name string, errs errors.ErrorList) error {
 	causes := make([]api.StatusCause, 0, len(errs))
 	for i := range errs {
@@ -102,7 +102,7 @@ func NewInvalidErr(kind, name string, errs errors.ErrorList) error {
 	}}
 }
 
-// IsNotFound returns true if the specified error was created by NewNotFoundErr
+// IsNotFound returns true if the specified error was created by NewNotFoundErr.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound
 }
@@ -112,12 +112,12 @@ func IsAlreadyExists(err error) bool {
 	return reasonForError(err) == api.StatusReasonAlreadyExists
 }
 
-// IsConflict determines if the err is an error which indicates the provided update conflicts
+// IsConflict determines if the err is an error which indicates the provided update conflicts.
 func IsConflict(err error) bool {
 	return reasonForError(err) == api.StatusReasonConflict
 }
 
-// IsInvalid determines if the err is an error which indicates the provided resource is not valid
+// IsInvalid determines if the err is an error which indicates the provided resource is not valid.
 func IsInvalid(err error) bool {
 	return reasonForError(err) == api.StatusReasonInvalid
 }
@@ -154,13 +154,13 @@ func errToAPIStatus(err error) *api.Status {
 	}
 }
 
-// notFound renders a simple not found error
+// notFound renders a simple not found error.
 func notFound(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	fmt.Fprintf(w, "Not Found: %#v", req.RequestURI)
 }
 
-// badGatewayError renders a simple bad gateway error
+// badGatewayError renders a simple bad gateway error.
 func badGatewayError(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusBadGateway)
 	fmt.Fprintf(w, "Bad Gateway: %#v", req.RequestURI)

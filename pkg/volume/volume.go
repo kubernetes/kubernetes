@@ -29,13 +29,13 @@ import (
 var ErrUnsupportedVolumeType = errors.New("unsupported volume type")
 
 // Interface is a directory used by pods or hosts.
-// All method implementations of methods in the volume interface must be idempotent
+// All method implementations of methods in the volume interface must be idempotent.
 type Interface interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
 }
 
-// The Builder interface provides the method to set up/mount the volume.
+// Builder interface provides method to set up/mount the volume.
 type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
 	Interface
@@ -43,20 +43,20 @@ type Builder interface {
 	SetUp() error
 }
 
-// The Cleaner interface provides the method to cleanup/unmount the volumes.
+// Cleaner interface provides method to cleanup/unmount the volumes.
 type Cleaner interface {
 	// TearDown unmounts the volume and removes traces of the SetUp procedure.
 	TearDown() error
 }
 
-// Host Directory volumes represent a bare host directory mount.
+// HostDirectory volumes represent a bare host directory mount.
 // The directory in Path will be directly exposed to the container.
 type HostDirectory struct {
 	Path string
 }
 
-// Host directory mounts require no setup or cleanup, but still
-// need to fulfill the interface definitions.
+// SetUp implements interface definitions, even though host directory
+// mounts don't require any setup or cleanup.
 func (hostVol *HostDirectory) SetUp() error {
 	return nil
 }
@@ -73,7 +73,7 @@ type EmptyDirectory struct {
 	RootDir string
 }
 
-// SetUp creates the new directory.
+// SetUp creates new directory.
 func (emptyDir *EmptyDirectory) SetUp() error {
 	path := emptyDir.GetPath()
 	err := os.MkdirAll(path, 0750)
@@ -100,7 +100,7 @@ func (emptyDir *EmptyDirectory) renameDirectory() (string, error) {
 	return newPath, nil
 }
 
-// Simply delete everything in the directory.
+// TearDown simply deletes everything in the directory.
 func (emptyDir *EmptyDirectory) TearDown() error {
 	tmpDir, err := emptyDir.renameDirectory()
 	if err != nil {
@@ -113,12 +113,12 @@ func (emptyDir *EmptyDirectory) TearDown() error {
 	return nil
 }
 
-// Interprets API volume as a HostDirectory
+// createHostDirectory interprets API volume as a HostDirectory.
 func createHostDirectory(volume *api.Volume) *HostDirectory {
 	return &HostDirectory{volume.Source.HostDirectory.Path}
 }
 
-// Interprets API volume as an EmptyDirectory
+// createEmptyDirectory interprets API volume as an EmptyDirectory.
 func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
 	return &EmptyDirectory{volume.Name, podID, rootDir}
 }
@@ -155,8 +155,8 @@ func CreateVolumeCleaner(kind string, name string, podID string, rootDir string)
 	}
 }
 
-// Examines directory structure to determine volumes that are presently
-// active and mounted. Returns a map of Cleaner types.
+// GetCurrentVolumes examines directory structure to determine volumes that are
+// presently active and mounted. Returns a map of Cleaner types.
 func GetCurrentVolumes(rootDirectory string) map[string]Cleaner {
 	currentVolumes := make(map[string]Cleaner)
 	mountPath := rootDirectory

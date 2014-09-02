@@ -41,7 +41,7 @@ type Converter struct {
 	Debug DebugLogger
 }
 
-// NewConverter makes a new Converter object.
+// NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
 		funcs: map[typePair]reflect.Value{},
@@ -83,7 +83,7 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 	return nil
 }
 
-// FieldMatchingType contains a list of ways in which struct fields could be
+// FieldMatchingFlags contains a list of ways in which struct fields could be
 // copied. These constants may be | combined.
 type FieldMatchingFlags int
 
@@ -105,7 +105,7 @@ const (
 	AllowDifferentFieldTypeNames
 )
 
-// Returns true if the given flag or combination of flags is set.
+// IsSet returns true if the given flag or combination of flags is set.
 func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 	return f&flag == flag
 }

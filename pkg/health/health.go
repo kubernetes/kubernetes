@@ -42,9 +42,9 @@ type HealthChecker interface {
 var checkerLock = sync.Mutex{}
 var checkers = map[string]HealthChecker{}
 
-// Add a health checker to the list of known HealthChecker objects.  Any subsequent call to
-// NewHealthChecker will know about this HealthChecker.
-// panics if 'key' is already present.
+// AddHealthChecker adds a health checker to the list of known HealthChecker objects.
+// Any subsequent call to NewHealthChecker will know about this HealthChecker.
+// Panics if 'key' is already present.
 func AddHealthChecker(key string, checker HealthChecker) {
 	checkerLock.Lock()
 	defer checkerLock.Unlock()
@@ -84,7 +84,7 @@ func (m *muxHealthChecker) HealthCheck(podFullName string, currentState api.PodS
 	return checker.HealthCheck(podFullName, currentState, container)
 }
 
-// A helper function to look up a port in a container by name.
+// findPortByName is a helper function to look up a port in a container by name.
 // Returns the HostPort if found, -1 if not found.
 func findPortByName(container api.Container, portName string) int {
 	for _, port := range container.Ports {

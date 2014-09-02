@@ -111,12 +111,12 @@ func Update(name string, client client.Interface, updatePeriod time.Duration) er
 	})
 }
 
-// StopController stops a controller named 'name' by setting replicas to zero
+// StopController stops a controller named 'name' by setting replicas to zero.
 func StopController(name string, client client.Interface) error {
 	return ResizeController(name, 0, client)
 }
 
-// ResizeController resizes a controller named 'name' by setting replicas to 'replicas'
+// ResizeController resizes a controller named 'name' by setting replicas to 'replicas'.
 func ResizeController(name string, replicas int, client client.Interface) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
@@ -159,7 +159,7 @@ func portsFromString(spec string) []api.Port {
 	return result
 }
 
-// RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'
+// RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'.
 func RunController(image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
 	controller := api.ReplicationController{
 		JSONBase: api.JSONBase{
@@ -233,7 +233,7 @@ func createService(name string, port int, client client.Interface) (api.Service,
 }
 
 // DeleteController deletes a replication controller named 'name', requires that the controller
-// already be stopped
+// already be stopped.
 func DeleteController(name string, client client.Interface) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {

@@ -102,14 +102,14 @@ func (ops *Operations) NewOperation(from <-chan interface{}) *Operation {
 	return op
 }
 
-// Inserts op into the ops map.
+// insert inserts op into the ops map.
 func (ops *Operations) insert(op *Operation) {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 	ops.ops[op.ID] = op
 }
 
-// List operations for an API client.
+// List lists operations for an API client.
 func (ops *Operations) List() api.ServerOpList {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
@@ -126,14 +126,14 @@ func (ops *Operations) List() api.ServerOpList {
 	return ol
 }
 
-// Get returns the operation with the given ID, or nil
+// Get returns the operation with the given ID, or nil.
 func (ops *Operations) Get(id string) *Operation {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 	return ops.ops[id]
 }
 
-// Garbage collect operations that have finished longer than maxAge ago.
+// expire garbage collect operations that have finished longer than maxAge ago.
 func (ops *Operations) expire(maxAge time.Duration) {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
@@ -147,7 +147,7 @@ func (ops *Operations) expire(maxAge time.Duration) {
 	ops.ops = keep
 }
 
-// Waits forever for the operation to complete; call via go when
+// wait waits forever for the operation to complete; call via go when
 // the operation is created. Sets op.finished when the operation
 // does complete, and closes the notify channel, in case there
 // are any WaitFor() calls in progress.
@@ -173,7 +173,7 @@ func (op *Operation) WaitFor(timeout time.Duration) {
 	}
 }
 
-// Returns true if this operation finished before limitTime.
+// expired returns true if this operation finished before limitTime.
 func (op *Operation) expired(limitTime time.Time) bool {
 	op.lock.Lock()
 	defer op.lock.Unlock()

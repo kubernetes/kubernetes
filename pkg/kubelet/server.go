@@ -45,7 +45,7 @@ type Server struct {
 	mux     *http.ServeMux
 }
 
-// ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet
+// ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address string, port uint) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
 	handler := NewServer(host, updates)
@@ -70,7 +70,7 @@ type HostInterface interface {
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
-// NewServer initializes and configures a kubelet.Server object to handle HTTP requests
+// NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
 func NewServer(host HostInterface, updates chan<- interface{}) Server {
 	server := Server{
 		host:    host,
@@ -81,7 +81,7 @@ func NewServer(host HostInterface, updates chan<- interface{}) Server {
 	return server
 }
 
-// InstallDefaultHandlers registers the set of supported HTTP request patterns with the mux
+// InstallDefaultHandlers registers the set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/container", s.handleContainer)
@@ -93,12 +93,12 @@ func (s *Server) InstallDefaultHandlers() {
 	s.mux.HandleFunc("/run/", s.handleRun)
 }
 
-// error serializes an error object into an HTTP response
+// error serializes an error object into an HTTP response.
 func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, fmt.Sprintf("Internal Error: %v", err), http.StatusInternalServerError)
 }
 
-// handleContainer handles container requests against the Kubelet
+// handleContainer handles container requests against the Kubelet.
 func (s *Server) handleContainer(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	data, err := ioutil.ReadAll(req.Body)
@@ -119,7 +119,7 @@ func (s *Server) handleContainer(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handleContainers handles containers requests against the Kubelet
+// handleContainers handles containers requests against the Kubelet.
 func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	data, err := ioutil.ReadAll(req.Body)
@@ -142,7 +142,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handlePodInfo handles podInfo requests against the Kubelet
+// handlePodInfo handles podInfo requests against the Kubelet.
 func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
@@ -176,17 +176,17 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
-// handleStats handles stats requests against the Kubelet
+// handleStats handles stats requests against the Kubelet.
 func (s *Server) handleStats(w http.ResponseWriter, req *http.Request) {
 	s.serveStats(w, req)
 }
 
-// handleLogs handles logs requests against the Kubelet
+// handleLogs handles logs requests against the Kubelet.
 func (s *Server) handleLogs(w http.ResponseWriter, req *http.Request) {
 	s.host.ServeLogs(w, req)
 }
 
-// handleSpec handles spec requests against the Kubelet
+// handleSpec handles spec requests against the Kubelet.
 func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
 	info, err := s.host.GetMachineInfo()
 	if err != nil {
@@ -203,7 +203,7 @@ func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handleRun handles requests to run a command inside a container
+// handleRun handles requests to run a command inside a container.
 func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
@@ -228,7 +228,7 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
-// ServeHTTP responds to HTTP requests on the Kubelet
+// ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer httplog.NewLogged(req, &w).StacktraceWhen(
 		httplog.StatusIsNot(
@@ -239,7 +239,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.mux.ServeHTTP(w, req)
 }
 
-// serveStats implements stats logic
+// serveStats implements stats logic.
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	// /stats/<podfullname>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")

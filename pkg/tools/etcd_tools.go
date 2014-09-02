@@ -38,14 +38,14 @@ var (
 	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
 )
 
-// Codec provides methods for transforming Etcd values into objects and back
+// Codec provides methods for transforming Etcd values into objects and back.
 type Codec interface {
 	Encode(obj interface{}) (data []byte, err error)
 	Decode(data []byte) (interface{}, error)
 	DecodeInto(data []byte, obj interface{}) error
 }
 
-// ResourceVersioner provides methods for managing object modification tracking
+// ResourceVersioner provides methods for managing object modification tracking.
 type ResourceVersioner interface {
 	SetResourceVersion(obj interface{}, version uint64) error
 	ResourceVersion(obj interface{}) (uint64, error)
@@ -64,7 +64,7 @@ type EtcdClient interface {
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
 
-// Interface exposing only the etcd operations needed by EtcdHelper.
+// EtcdGetSet interface exposes only the etcd operations needed by EtcdHelper.
 type EtcdGetSet interface {
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
@@ -134,7 +134,7 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 	return result.Node.Nodes, result.EtcdIndex, nil
 }
 
-// Extract a go object per etcd node into a slice with the resource version.
+// ExtractList extracts a go object per etcd node into a slice with the resource version.
 func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersion *uint64) error {
 	nodes, index, err := h.listEtcdNode(key)
 	if resourceVersion != nil {
@@ -197,7 +197,7 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 	return body, response.Node.ModifiedIndex, err
 }
 
-// Create adds a new object at a key unless it already exists
+// CreateObj adds a new object at a key unless it already exists.
 func (h *EtcdHelper) CreateObj(key string, obj interface{}) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
@@ -213,7 +213,7 @@ func (h *EtcdHelper) CreateObj(key string, obj interface{}) error {
 	return err
 }
 
-// Delete removes the specified key
+// Delete removes the specified key.
 func (h *EtcdHelper) Delete(key string, recursive bool) error {
 	_, err := h.Client.Delete(key, recursive)
 	return err

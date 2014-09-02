@@ -37,7 +37,7 @@ func Handler(delegate http.Handler, pred StacktracePred) http.Handler {
 	})
 }
 
-// StacktracePred returns true if a stacktrace should be logged for this status
+// StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
@@ -103,7 +103,7 @@ func Unlogged(w http.ResponseWriter) http.ResponseWriter {
 	return w
 }
 
-// Sets the stacktrace logging predicate, which decides when to log a stacktrace.
+// StacktraceWhen sets the stacktrace logging predicate, which decides when to log a stacktrace.
 // There's a default, so you don't need to call this unless you don't like the default.
 func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
 	rl.logStacktracePred = pred
@@ -123,7 +123,7 @@ func StatusIsNot(statuses ...int) StacktracePred {
 	}
 }
 
-// Add additional data to be logged with this request.
+// Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
 	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
 }
@@ -134,17 +134,17 @@ func (rl *respLogger) Log() {
 	glog.Infof("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo)
 }
 
-// Implement http.ResponseWriter
+// Header implements http.ResponseWriter.
 func (rl *respLogger) Header() http.Header {
 	return rl.w.Header()
 }
 
-// Implement http.ResponseWriter
+// Write implements http.ResponseWriter.
 func (rl *respLogger) Write(b []byte) (int, error) {
 	return rl.w.Write(b)
 }
 
-// Implement http.ResponseWriter
+// WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
 	rl.status = status
 	if rl.logStacktracePred(status) {

@@ -42,7 +42,7 @@ type Reflector struct {
 // WatchFactory should begin a watch at the specified version.
 type WatchFactory func(resourceVersion uint64) (watch.Interface, error)
 
-// NewReflector makes a new Reflector object which will keep the given store up to
+// NewReflector creates a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
 // only put things in the store that have the type of expectedType.
 func NewReflector(watchFactory WatchFactory, expectedType interface{}, store Store) *Reflector {

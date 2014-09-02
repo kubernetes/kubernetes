@@ -77,8 +77,8 @@ type EndpointsConfig struct {
 	store   *endpointsStore
 }
 
-// NewEndpointConfig creates a new EndpointConfig.
-// It immediately runs the created EndpointConfig.
+// NewEndpointsConfig creates a new EndpointsConfig.
+// It immediately runs the created EndpointsConfig.
 func NewEndpointsConfig() *EndpointsConfig {
 	updates := make(chan struct{})
 	store := &endpointsStore{updates: updates, endpoints: make(map[string]map[string]api.Endpoints)}

@@ -32,7 +32,7 @@ type APIEventDecoder struct {
 	decoder *json.Decoder
 }
 
-// NewAPIEventDecoder makes an APIEventDecoder for the given stream.
+// NewAPIEventDecoder creates an APIEventDecoder for the given stream.
 func NewAPIEventDecoder(stream io.ReadCloser) *APIEventDecoder {
 	return &APIEventDecoder{
 		stream:  stream,

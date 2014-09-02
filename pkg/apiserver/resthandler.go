@@ -157,7 +157,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 	}
 }
 
-// createOperation creates an operation to process a channel response
+// createOperation creates an operation to process a channel response.
 func (h *RESTHandler) createOperation(out <-chan interface{}, sync bool, timeout time.Duration) *Operation {
 	op := h.ops.NewOperation(out)
 	if sync {

@@ -43,7 +43,7 @@ type Interface interface {
 	MinionInterface
 }
 
-// PodInterface has methods to work with Pod resources
+// PodInterface has methods to work with Pod resources.
 type PodInterface interface {
 	ListPods(selector labels.Selector) (api.PodList, error)
 	GetPod(name string) (api.Pod, error)
@@ -52,7 +52,7 @@ type PodInterface interface {
 	UpdatePod(api.Pod) (api.Pod, error)
 }
 
-// ReplicationControllerInterface has methods to work with ReplicationController resources
+// ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
 	ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error)
 	GetReplicationController(name string) (api.ReplicationController, error)
@@ -62,7 +62,7 @@ type ReplicationControllerInterface interface {
 	WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
-// ServiceInterface has methods to work with Service resources
+// ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
 	GetService(name string) (api.Service, error)
 	CreateService(api.Service) (api.Service, error)
@@ -73,7 +73,7 @@ type ServiceInterface interface {
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
-// VersionInterface has a method to retrieve the server version
+// VersionInterface has a method to retrieve the server version.
 type VersionInterface interface {
 	ServerVersion() (*version.Info, error)
 }
@@ -119,14 +119,14 @@ func (s *StatusErr) Error() string {
 	return fmt.Sprintf("Status: %v (%#v)", s.Status.Status, s.Status)
 }
 
-// AuthInfo is used to store authorization information
+// AuthInfo is used to store authorization information.
 type AuthInfo struct {
 	User     string
 	Password string
 }
 
 // RESTClient holds common code used to work with API resources that follow the
-// Kubernetes API pattern
+// Kubernetes API pattern.
 // Host is the http://... base for the URL
 type RESTClient struct {
 	host       string
@@ -168,7 +168,7 @@ func NewRESTClient(host string, auth *AuthInfo, path string) (*RESTClient, error
 	}, nil
 }
 
-// normalizePrefix ensures the passed initial value is valid
+// normalizePrefix ensures the passed initial value is valid.
 func normalizePrefix(host, prefix string) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
@@ -197,7 +197,8 @@ func (c *RESTClient) Secure() bool {
 	return c.secure
 }
 
-// Execute a request, adds authentication (if auth != nil), and HTTPS cert ignoring.
+// doRequest executes a request, adds authentication (if auth != nil), and HTTPS
+// cert ignoring.
 func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	if c.auth != nil {
 		request.SetBasicAuth(c.auth.User, c.auth.Password)
@@ -239,30 +240,30 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	return body, err
 }
 
-// ListPods takes a selector, and returns the list of pods that match that selector
+// ListPods takes a selector, and returns the list of pods that match that selector.
 func (c *Client) ListPods(selector labels.Selector) (result api.PodList, err error) {
 	err = c.Get().Path("pods").SelectorParam("labels", selector).Do().Into(&result)
 	return
 }
 
-// GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
+// GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs.
 func (c *Client) GetPod(name string) (result api.Pod, err error) {
 	err = c.Get().Path("pods").Path(name).Do().Into(&result)
 	return
 }
 
-// DeletePod takes the name of the pod, and returns an error if one occurs
+// DeletePod takes the name of the pod, and returns an error if one occurs.
 func (c *Client) DeletePod(name string) error {
 	return c.Delete().Path("pods").Path(name).Do().Error()
 }
 
-// CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs
+// CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
 	err = c.Post().Path("pods").Body(pod).Do().Into(&result)
 	return
 }
 
-// UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs
+// UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
 	if pod.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
@@ -272,25 +273,25 @@ func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
 	return
 }
 
-// ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector
+// ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector.
 func (c *Client) ListReplicationControllers(selector labels.Selector) (result api.ReplicationControllerList, err error) {
 	err = c.Get().Path("replicationControllers").SelectorParam("labels", selector).Do().Into(&result)
 	return
 }
 
-// GetReplicationController returns information about a particular replication controller
+// GetReplicationController returns information about a particular replication controller.
 func (c *Client) GetReplicationController(name string) (result api.ReplicationController, err error) {
 	err = c.Get().Path("replicationControllers").Path(name).Do().Into(&result)
 	return
 }
 
-// CreateReplicationController creates a new replication controller
+// CreateReplicationController creates a new replication controller.
 func (c *Client) CreateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
 	err = c.Post().Path("replicationControllers").Body(controller).Do().Into(&result)
 	return
 }
 
-// UpdateReplicationController updates an existing replication controller
+// UpdateReplicationController updates an existing replication controller.
 func (c *Client) UpdateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
 	if controller.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
@@ -343,7 +344,7 @@ func (c *Client) DeleteService(name string) error {
 	return c.Delete().Path("services").Path(name).Do().Error()
 }
 
-// WatchService returns a watch.Interface that watches the requested services.
+// WatchServices returns a watch.Interface that watches the requested services.
 func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
@@ -379,7 +380,7 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
-// Lists all the minions in the cluster.
+// ListMinions lists all the minions in the cluster.
 func (c *Client) ListMinions() (minionList api.MinionList, err error) {
 	err = c.Get().Path("minions").Do().Into(&minionList)
 	return

@@ -21,7 +21,7 @@ import (
 	"net/http"
 )
 
-// handleIndex is the root index page for Kubernetes
+// handleIndex is the root index page for Kubernetes.
 func handleIndex(w http.ResponseWriter, req *http.Request) {
 	if req.URL.Path != "/" && req.URL.Path != "/index.html" {
 		notFound(w, req)

@@ -21,8 +21,8 @@ import (
 	"reflect"
 )
 
-// NewJSONBaseVersioner returns a resourceVersioner that can set or retrieve
-// ResourceVersion on objects derived from JSONBase.
+// NewJSONBaseResourceVersioner returns a resourceVersioner that can set or
+// retrieve ResourceVersion on objects derived from JSONBase.
 func NewJSONBaseResourceVersioner() resourceVersioner {
 	return &jsonBaseResourceVersioner{}
 }
@@ -46,7 +46,7 @@ func (v jsonBaseResourceVersioner) SetResourceVersion(obj interface{}, version u
 	return nil
 }
 
-// JSONBase lets you work with a JSONBase from any of the versioned or
+// JSONBaseInterface lets you work with a JSONBase from any of the versioned or
 // internal APIObjects.
 type JSONBaseInterface interface {
 	ID() string
@@ -98,9 +98,9 @@ func (g genericJSONBase) SetResourceVersion(version uint64) {
 	*g.resourceVersion = version
 }
 
-// fieldPtr puts the address address of fieldName, which must be a member of v,
-// into dest, which must be an address of a variable to which this field's address
-// can be assigned.
+// fieldPtr puts the address of fieldName, which must be a member of v,
+// into dest, which must be an address of a variable to which this field's
+// address can be assigned.
 func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	field := v.FieldByName(fieldName)
 	if !field.IsValid() {
@@ -123,7 +123,7 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("Couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
-// newGenericJSONBase makes a new generic JSONBase from v, which must be an
+// newGenericJSONBase creates a new generic JSONBase from v, which must be an
 // addressable/setable reflect.Value having the same fields as api.JSONBase.
 // Returns an error if this isn't the case.
 func newGenericJSONBase(v reflect.Value) (genericJSONBase, error) {

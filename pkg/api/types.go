@@ -87,14 +87,14 @@ type VolumeSource struct {
 	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
 }
 
-// Bare host directory volume.
+// HostDirectory represents bare host directory volume.
 type HostDirectory struct {
 	Path string `yaml:"path" json:"path"`
 }
 
 type EmptyDirectory struct{}
 
-// Port represents a network port in a single container
+// Port represents a network port in a single container.
 type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
 	// in a pod must have a unique name.
@@ -109,7 +109,7 @@ type Port struct {
 	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
 }
 
-// VolumeMount describes a mounting of a Volume within a container
+// VolumeMount describes a mounting of a Volume within a container.
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
 	Name string `yaml:"name" json:"name"`
@@ -119,7 +119,7 @@ type VolumeMount struct {
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
 }
 
-// EnvVar represents an environment variable present in a Container
+// EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
 	Name string `yaml:"name" json:"name"`
@@ -137,7 +137,7 @@ type HTTPGetProbe struct {
 	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 }
 
-// TCPSocketProbe describes a liveness probe based on opening a socket
+// TCPSocketProbe describes a liveness probe based on opening a socket.
 type TCPSocketProbe struct {
 	// Required: Port to connect to.
 	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
@@ -148,7 +148,7 @@ type ExecProbe struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
-	// a shell, you need to explicitly call out to that shell
+	// a shell, you need to explicitly call out to that shell.
 	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
 }
 
@@ -187,7 +187,7 @@ type Container struct {
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 }
 
-// Event is the representation of an event logged to etcd backends
+// Event is the representation of an event logged to etcd backends.
 type Event struct {
 	Event     string             `json:"event,omitempty"`
 	Manifest  *ContainerManifest `json:"manifest,omitempty"`
@@ -197,7 +197,7 @@ type Event struct {
 
 // The below types are used by kube_client and api_server.
 
-// JSONBase is shared by all objects sent to, or returned from the client
+// JSONBase is shared by all objects sent to, or returned from the client.
 type JSONBase struct {
 	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
 	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
@@ -238,7 +238,7 @@ type RestartPolicy struct {
 	Type RestartPolicyType `yaml:"type,omitempty" json:"type,omitempty"`
 }
 
-// PodState is the state of a pod, used as either input (desired state) or output (current state)
+// PodState is the state of a pod, used as either input (desired state) or output (current state).
 type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
 	Status   PodStatus         `json:"status,omitempty" yaml:"status,omitempty"`
@@ -262,7 +262,7 @@ type PodList struct {
 	Items    []Pod `json:"items" yaml:"items,omitempty"`
 }
 
-// Pod is a collection of containers, used as either input (create, update) or as output (list, get)
+// Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	JSONBase     `json:",inline" yaml:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -270,7 +270,7 @@ type Pod struct {
 	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
 }
 
-// ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get)
+// ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get).
 type ReplicationControllerState struct {
 	Replicas        int               `json:"replicas" yaml:"replicas"`
 	ReplicaSelector map[string]string `json:"replicaSelector,omitempty" yaml:"replicaSelector,omitempty"`
@@ -283,20 +283,20 @@ type ReplicationControllerList struct {
 	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
-// ReplicationController represents the configuration of a replication controller
+// ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
 	JSONBase     `json:",inline" yaml:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
-// PodTemplate holds the information used for creating pods
+// PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
 	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
-// ServiceList holds a list of services
+// ServiceList holds a list of services.
 type ServiceList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Service `json:"items" yaml:"items"`
@@ -421,7 +421,7 @@ const (
 	// Status code 202
 	StatusReasonWorking StatusReason = "working"
 
-	// ResourceTypeNotFound means one or more resources required for this operation
+	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the missing resource
@@ -438,14 +438,14 @@ const (
 	// Status code 409
 	StatusReasonAlreadyExists StatusReason = "already_exists"
 
-	// ResourceTypeConflict means the requested update operation cannot be completed
+	// StatusReasonConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
 	// Each resource may define custom details that indicate the nature of the
 	// conflict.
 	// Status code 409
 	StatusReasonConflict StatusReason = "conflict"
 
-	// ResourceTypeInvalid means the requested create or update operation cannot be
+	// StatusReasonInvalid means the requested create or update operation cannot be
 	// completed due to invalid data provided as part of the request. The client may
 	// need to alter the request. When set, the client may use the StatusDetails
 	// message field as a summary of the issues encountered.

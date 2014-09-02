@@ -34,7 +34,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// RegistryStorage implements the RESTStorage interface in terms of a PodRegistry
+// RegistryStorage implements the RESTStorage interface in terms of a PodRegistry.
 type RegistryStorage struct {
 	cloudProvider cloudprovider.Interface
 	mu            sync.Mutex

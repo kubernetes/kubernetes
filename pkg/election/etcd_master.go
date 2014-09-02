@@ -27,7 +27,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd
+// NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd.
 func NewEtcdMasterElector(h tools.EtcdGetSet) MasterElector {
 	return &etcdMasterElector{etcd: h}
 }
@@ -41,7 +41,7 @@ type etcdMasterElector struct {
 	events chan watch.Event
 }
 
-// Elect implements the election.MasterElector interface
+// Elect implements the election.MasterElector interface.
 func (e *etcdMasterElector) Elect(path, id string) watch.Interface {
 	e.done = make(chan empty)
 	e.events = make(chan watch.Event)
@@ -66,12 +66,12 @@ func (e *etcdMasterElector) run(path, id string) {
 	}
 }
 
-// ResultChan implements the watch.Interface interface
+// ResultChan implements the watch.Interface interface.
 func (e *etcdMasterElector) ResultChan() <-chan watch.Event {
 	return e.events
 }
 
-// extendMaster attempts to extend ownership of a master lock for TTL seconds
+// extendMaster attempts to extend ownership of a master lock for TTL seconds.
 // returns "", nil if extension failed
 // returns id, nil if extension succeeded
 // returns "", err if an error occurred
@@ -90,7 +90,7 @@ func (e *etcdMasterElector) extendMaster(path, id string, ttl uint64, res *etcd.
 	return id, nil
 }
 
-// becomeMaster attempts to become the master for this lock
+// becomeMaster attempts to become the master for this lock.
 // returns "", nil if the attempt failed
 // returns id, nil if the attempt succeeded
 // returns "", err if an error occurred
@@ -106,7 +106,7 @@ func (e *etcdMasterElector) becomeMaster(path, id string, ttl uint64) (string, e
 	return id, nil
 }
 
-// handleMaster performs one loop of master locking
+// handleMaster performs one loop of master locking.
 // on success it returns <master>, nil
 // on error it returns "", err
 // in situations where you should try again due to concurrent state changes (e.g. another actor simultaneously acquiring the lock)
@@ -138,7 +138,7 @@ func (e *etcdMasterElector) handleMaster(path, id string, ttl uint64) (string, e
 	return e.extendMaster(path, id, ttl, res)
 }
 
-// Master provices a distributed master election lock, maintains lock until failure, or someone sends something in the done channel
+// master provices a distributed master election lock, maintains lock until failure, or someone sends something in the done channel.
 // The basic algorithm is:
 // while !done
 //   Get the current master

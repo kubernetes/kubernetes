@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from etcd using the Kubernetes etcd schema
+// Reads the pod configuration from etcd using the Kubernetes etcd schema.
 package config
 
 import (
@@ -46,7 +46,7 @@ type SourceEtcd struct {
 	timeout  time.Duration
 }
 
-// NewSourceEtcd creates a config source that watches and pulls from a key in etcd
+// NewSourceEtcd creates a config source that watches and pulls from a key in etcd.
 func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface{}) *SourceEtcd {
 	config := &SourceEtcd{
 		key:     key,
@@ -60,7 +60,7 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 	return config
 }
 
-// run loops forever looking for changes to a key in etcd
+// run loops forever looking for changes to a key in etcd.
 func (s *SourceEtcd) run() {
 	index := uint64(0)
 	for {
@@ -76,7 +76,7 @@ func (s *SourceEtcd) run() {
 }
 
 // fetchNextState fetches the key (or waits for a change to a key) and then returns
-// the nextIndex to read.  It will watch no longer than s.waitDuration and then return
+// the nextIndex to read.  It will watch no longer than s.waitDuration and then return.
 func (s *SourceEtcd) fetchNextState(fromIndex uint64) (nextIndex uint64, err error) {
 	var response *etcd.Response
 
@@ -142,5 +142,4 @@ func stopChannel(until time.Duration) chan bool {
 		close(stop)
 	}()
 	return stop
-
 }
