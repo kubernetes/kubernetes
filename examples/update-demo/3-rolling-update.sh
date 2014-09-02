@@ -20,7 +20,10 @@ if [ -z "$DOCKER_HUB_USER" ] ; then
 fi
 
 NEW_IMAGE=${1:-kitten}
+TIMING=${2:-10s}
+export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
+export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
 
 set -x
 
-../../cluster/kubecfg.sh -image $DOCKER_HUB_USER/update-demo:$NEW_IMAGE -u 10s rollingupdate update-demo
+$KUBECFG -image $DOCKER_HUB_USER/update-demo:$NEW_IMAGE -u $TIMING rollingupdate update-demo

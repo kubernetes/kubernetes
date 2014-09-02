@@ -14,7 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
+export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+
 set -x
 
-../../cluster/kubecfg.sh stop update-demo
-../../cluster/kubecfg.sh rm update-demo
+$KUBECFG stop update-demo
+$KUBECFG rm update-demo

@@ -19,6 +19,9 @@ if [ -z "$DOCKER_HUB_USER" ] ; then
   exit 1
 fi
 
+export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
+export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+
 set -x
 
-../../cluster/kubecfg.sh -p 8080:80 run $DOCKER_HUB_USER/update-demo:nautilus 2 update-demo
+$KUBECFG -p 8080:80 run $DOCKER_HUB_USER/update-demo:nautilus 2 update-demo

@@ -16,6 +16,9 @@
 
 NEW_SIZE=${1:-4}
 
+export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
+export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+
 set -x
 
-../../cluster/kubecfg.sh resize update-demo $NEW_SIZE
+$KUBECFG resize update-demo $NEW_SIZE
