@@ -46,9 +46,9 @@ func NewEndpointController(serviceRegistry service.Registry, client *client.Clie
 
 // SyncServiceEndpoints syncs service endpoints.
 func (e *EndpointController) SyncServiceEndpoints() error {
-	services, err := e.serviceRegistry.ListServices()
+	services, err := e.client.ListServices(labels.Everything())
 	if err != nil {
-		glog.Errorf("Failed to list services!")
+		glog.Errorf("Failed to list services: %v", err)
 		return err
 	}
 	var resultErr error
