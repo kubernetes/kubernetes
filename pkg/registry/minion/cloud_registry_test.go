@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 )
 
 func TestCloudList(t *testing.T) {

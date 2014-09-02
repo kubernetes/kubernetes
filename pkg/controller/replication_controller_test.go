@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -108,7 +109,7 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := api.Encode(newPodList(2))
+	body, _ := runtime.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -128,7 +129,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := api.Encode(newPodList(2))
+	body, _ := runtime.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -148,7 +149,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body, _ := api.Encode(newPodList(0))
+	body, _ := runtime.Encode(newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -168,7 +169,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	body, _ := api.Encode(api.Pod{})
+	body, _ := runtime.Encode(api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -291,7 +292,7 @@ func TestSyncronize(t *testing.T) {
 	}
 	fakeControllerHandler := util.FakeHandler{
 		StatusCode: 200,
-		ResponseBody: api.EncodeOrDie(&api.ReplicationControllerList{
+		ResponseBody: runtime.EncodeOrDie(&api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				controllerSpec1,
 				controllerSpec2,

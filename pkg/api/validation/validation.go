@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package validation
 
 import (
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func validateVolumes(volumes []Volume) (util.StringSet, errs.ErrorList) {
+func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 	allErrs := errs.ErrorList{}
 
 	allNames := util.StringSet{}
@@ -51,7 +52,7 @@ func validateVolumes(volumes []Volume) (util.StringSet, errs.ErrorList) {
 	return allNames, allErrs
 }
 
-func validateSource(source *VolumeSource) errs.ErrorList {
+func validateSource(source *api.VolumeSource) errs.ErrorList {
 	numVolumes := 0
 	allErrs := errs.ErrorList{}
 	if source.HostDirectory != nil {
@@ -68,7 +69,7 @@ func validateSource(source *VolumeSource) errs.ErrorList {
 	return allErrs
 }
 
-func validateHostDir(hostDir *HostDirectory) errs.ErrorList {
+func validateHostDir(hostDir *api.HostDirectory) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if hostDir.Path == "" {
 		allErrs = append(allErrs, errs.NewNotFound("path", hostDir.Path))
@@ -78,7 +79,7 @@ func validateHostDir(hostDir *HostDirectory) errs.ErrorList {
 
 var supportedPortProtocols = util.NewStringSet("TCP", "UDP")
 
-func validatePorts(ports []Port) errs.ErrorList {
+func validatePorts(ports []api.Port) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	allNames := util.StringSet{}
@@ -112,7 +113,7 @@ func validatePorts(ports []Port) errs.ErrorList {
 	return allErrs
 }
 
-func validateEnv(vars []EnvVar) errs.ErrorList {
+func validateEnv(vars []api.EnvVar) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	for i := range vars {
@@ -129,7 +130,7 @@ func validateEnv(vars []EnvVar) errs.ErrorList {
 	return allErrs
 }
 
-func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errs.ErrorList {
+func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	for i := range mounts {
@@ -150,7 +151,7 @@ func validateVolumeMounts(mounts []VolumeMount, volumes util.StringSet) errs.Err
 
 // AccumulateUniquePorts runs an extraction function on each Port of each Container,
 // accumulating the results and returning an error if any ports conflict.
-func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, extract func(*Port) int) errs.ErrorList {
+func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool, extract func(*api.Port) int) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	for ci := range containers {
@@ -174,12 +175,12 @@ func AccumulateUniquePorts(containers []Container, accumulator map[int]bool, ext
 
 // checkHostPortConflicts checks for colliding Port.HostPort values across
 // a slice of containers.
-func checkHostPortConflicts(containers []Container) errs.ErrorList {
+func checkHostPortConflicts(containers []api.Container) errs.ErrorList {
 	allPorts := map[int]bool{}
-	return AccumulateUniquePorts(containers, allPorts, func(p *Port) int { return p.HostPort })
+	return AccumulateUniquePorts(containers, allPorts, func(p *api.Port) int { return p.HostPort })
 }
 
-func validateContainers(containers []Container, volumes util.StringSet) errs.ErrorList {
+func validateContainers(containers []api.Container, volumes util.StringSet) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	allNames := util.StringSet{}
@@ -219,7 +220,7 @@ var supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
-func ValidateManifest(manifest *ContainerManifest) errs.ErrorList {
+func ValidateManifest(manifest *api.ContainerManifest) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	if len(manifest.Version) == 0 {
@@ -233,13 +234,13 @@ func ValidateManifest(manifest *ContainerManifest) errs.ErrorList {
 	return allErrs
 }
 
-func ValidatePodState(podState *PodState) errs.ErrorList {
+func ValidatePodState(podState *api.PodState) errs.ErrorList {
 	allErrs := errs.ErrorList(ValidateManifest(&podState.Manifest)).Prefix("manifest")
 	if podState.RestartPolicy.Type == "" {
-		podState.RestartPolicy.Type = RestartAlways
-	} else if podState.RestartPolicy.Type != RestartAlways &&
-		podState.RestartPolicy.Type != RestartOnFailure &&
-		podState.RestartPolicy.Type != RestartNever {
+		podState.RestartPolicy.Type = api.RestartAlways
+	} else if podState.RestartPolicy.Type != api.RestartAlways &&
+		podState.RestartPolicy.Type != api.RestartOnFailure &&
+		podState.RestartPolicy.Type != api.RestartNever {
 		allErrs = append(allErrs, errs.NewNotSupported("restartPolicy.type", podState.RestartPolicy.Type))
 	}
 
@@ -247,7 +248,7 @@ func ValidatePodState(podState *PodState) errs.ErrorList {
 }
 
 // ValidatePod tests if required fields in the pod are set.
-func ValidatePod(pod *Pod) errs.ErrorList {
+func ValidatePod(pod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(pod.ID) == 0 {
 		allErrs = append(allErrs, errs.NewRequired("id", pod.ID))
@@ -257,7 +258,7 @@ func ValidatePod(pod *Pod) errs.ErrorList {
 }
 
 // ValidateService tests if required fields in the service are set.
-func ValidateService(service *Service) errs.ErrorList {
+func ValidateService(service *api.Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(service.ID) == 0 {
 		allErrs = append(allErrs, errs.NewRequired("id", service.ID))
@@ -274,7 +275,7 @@ func ValidateService(service *Service) errs.ErrorList {
 }
 
 // ValidateReplicationController tests if required fields in the replication controller are set.
-func ValidateReplicationController(controller *ReplicationController) errs.ErrorList {
+func ValidateReplicationController(controller *api.ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(controller.ID) == 0 {
 		allErrs = append(allErrs, errs.NewRequired("id", controller.ID))

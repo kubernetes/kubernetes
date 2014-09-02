@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package runtime
 
 import (
 	"fmt"
@@ -39,34 +39,14 @@ type resourceVersioner interface {
 	ResourceVersion(obj interface{}) (uint64, error)
 }
 
-var Codec codec
-var ResourceVersioner resourceVersioner
-
+var ResourceVersioner resourceVersioner = NewJSONBaseResourceVersioner()
 var conversionScheme = conversion.NewScheme()
+var Codec codec = conversionScheme
 
 func init() {
 	conversionScheme.InternalVersion = ""
 	conversionScheme.ExternalVersion = "v1beta1"
 	conversionScheme.MetaInsertionFactory = metaInsertion{}
-	AddKnownTypes("",
-		PodList{},
-		Pod{},
-		ReplicationControllerList{},
-		ReplicationController{},
-		ServiceList{},
-		Service{},
-		MinionList{},
-		Minion{},
-		Status{},
-		ServerOpList{},
-		ServerOp{},
-		ContainerManifestList{},
-		Endpoints{},
-		Binding{},
-	)
-
-	Codec = conversionScheme
-	ResourceVersioner = NewJSONBaseResourceVersioner()
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
@@ -125,23 +105,6 @@ func FindJSONBase(obj interface{}) (JSONBaseInterface, error) {
 		return nil, err
 	}
 	return g, nil
-}
-
-// FindJSONBaseRO takes an arbitary api type, return a copy of its JSONBase field.
-// obj may be a pointer to an api type, or a non-pointer struct api type.
-func FindJSONBaseRO(obj interface{}) (JSONBase, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return JSONBase{}, fmt.Errorf("expected struct, but got %v (%#v)", v.Type().Name(), v.Interface())
-	}
-	jsonBase := v.FieldByName("JSONBase")
-	if !jsonBase.IsValid() {
-		return JSONBase{}, fmt.Errorf("struct %v lacks embedded JSON type", v.Type().Name())
-	}
-	return jsonBase.Interface().(JSONBase), nil
 }
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.

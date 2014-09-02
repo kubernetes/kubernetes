@@ -14,20 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
-
-import (
-	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-)
-
-func ValidatePod(pod *Pod) (errors []error) {
-	if !util.IsDNSSubdomain(pod.Name) {
-		errors = append(errors, apierrs.NewInvalid("Pod.Name", pod.Name))
-	}
-	if errs := validation.ValidateManifest(&pod.Manifest); len(errs) != 0 {
-		errors = append(errors, errs...)
-	}
-	return errors
-}
+// Package validation has functions for validating the correctness of api
+// objects and explaining what is wrong with them when they aren't valid.
+package validation

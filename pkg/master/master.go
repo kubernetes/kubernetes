@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -32,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -136,5 +136,5 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, apiserver.Code
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, api.Codec
+	return storage, runtime.Codec
 }

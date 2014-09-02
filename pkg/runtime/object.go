@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package runtime
 
 import (
 	"gopkg.in/v1/yaml"
@@ -26,7 +26,7 @@ import (
 // embedded within other API types.
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (a *APIObject) UnmarshalJSON(b []byte) error {
+func (a *Object) UnmarshalJSON(b []byte) error {
 	// Handle JSON's "null": Decode() doesn't expect it.
 	if len(b) == 4 && string(b) == "null" {
 		a.Object = nil
@@ -42,7 +42,7 @@ func (a *APIObject) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON implements the json.Marshaler interface.
-func (a APIObject) MarshalJSON() ([]byte, error) {
+func (a Object) MarshalJSON() ([]byte, error) {
 	if a.Object == nil {
 		// Encode unset/nil objects as JSON's "null".
 		return []byte("null"), nil
@@ -52,7 +52,7 @@ func (a APIObject) MarshalJSON() ([]byte, error) {
 }
 
 // SetYAML implements the yaml.Setter interface.
-func (a *APIObject) SetYAML(tag string, value interface{}) bool {
+func (a *Object) SetYAML(tag string, value interface{}) bool {
 	if value == nil {
 		a.Object = nil
 		return true
@@ -76,7 +76,7 @@ func (a *APIObject) SetYAML(tag string, value interface{}) bool {
 }
 
 // GetYAML implements the yaml.Getter interface.
-func (a APIObject) GetYAML() (tag string, value interface{}) {
+func (a Object) GetYAML() (tag string, value interface{}) {
 	if a.Object == nil {
 		value = "null"
 		return

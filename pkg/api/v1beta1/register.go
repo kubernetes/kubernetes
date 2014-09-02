@@ -17,11 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func init() {
-	api.AddKnownTypes("v1beta1",
+	runtime.AddKnownTypes("v1beta1",
 		PodList{},
 		Pod{},
 		ReplicationControllerList{},

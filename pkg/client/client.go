@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -216,7 +217,7 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
-	if err := api.DecodeInto(body, &status); err == nil && status.Status != "" {
+	if err := runtime.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package runtime
 
 import (
 	"fmt"
@@ -30,11 +30,11 @@ func NewJSONBaseResourceVersioner() resourceVersioner {
 type jsonBaseResourceVersioner struct{}
 
 func (v jsonBaseResourceVersioner) ResourceVersion(obj interface{}) (uint64, error) {
-	json, err := FindJSONBaseRO(obj)
+	json, err := FindJSONBase(obj)
 	if err != nil {
 		return 0, err
 	}
-	return json.ResourceVersion, nil
+	return json.ResourceVersion(), nil
 }
 
 func (v jsonBaseResourceVersioner) SetResourceVersion(obj interface{}, version uint64) error {

@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -177,13 +178,13 @@ func TestPodDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := api.Encode(expected)
+	body, err := runtime.Encode(expected)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := api.DecodeInto(body, actual); err != nil {
+	if err := runtime.DecodeInto(body, actual); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

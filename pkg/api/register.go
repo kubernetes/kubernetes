@@ -14,20 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package api
 
 import (
-	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-func ValidatePod(pod *Pod) (errors []error) {
-	if !util.IsDNSSubdomain(pod.Name) {
-		errors = append(errors, apierrs.NewInvalid("Pod.Name", pod.Name))
-	}
-	if errs := validation.ValidateManifest(&pod.Manifest); len(errs) != 0 {
-		errors = append(errors, errs...)
-	}
-	return errors
+func init() {
+	runtime.AddKnownTypes("",
+		PodList{},
+		Pod{},
+		ReplicationControllerList{},
+		ReplicationController{},
+		ServiceList{},
+		Service{},
+		MinionList{},
+		Minion{},
+		Status{},
+		ServerOpList{},
+		ServerOp{},
+		ContainerManifestList{},
+		Endpoints{},
+		Binding{},
+	)
 }

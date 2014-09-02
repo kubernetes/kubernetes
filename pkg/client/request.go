@@ -29,6 +29,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -204,7 +205,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	default:
-		data, err := api.Encode(obj)
+		data, err := runtime.Encode(obj)
 		if err != nil {
 			r.err = err
 			return r
@@ -317,7 +318,7 @@ func (r Result) Get() (interface{}, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return api.Decode(r.body)
+	return runtime.Decode(r.body)
 }
 
 // Into stores the result into obj, if possible.
@@ -325,7 +326,7 @@ func (r Result) Into(obj interface{}) error {
 	if r.err != nil {
 		return r.err
 	}
-	return api.DecodeInto(r.body, obj)
+	return runtime.DecodeInto(r.body, obj)
 }
 
 // Error returns the error executing the request, nil if no error occurred.

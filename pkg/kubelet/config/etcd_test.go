@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -35,7 +36,7 @@ func TestGetEtcdData(t *testing.T) {
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: api.EncodeOrDie(&api.ContainerManifestList{
+				Value: runtime.EncodeOrDie(&api.ContainerManifestList{
 					Items: []api.ContainerManifest{{ID: "foo"}},
 				}),
 				ModifiedIndex: 1,
@@ -78,7 +79,7 @@ func TestGetEtcd(t *testing.T) {
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: api.EncodeOrDie(&api.ContainerManifestList{
+				Value: runtime.EncodeOrDie(&api.ContainerManifestList{
 					Items: []api.ContainerManifest{manifest},
 				}),
 				ModifiedIndex: 1,
@@ -112,7 +113,7 @@ func TestWatchEtcd(t *testing.T) {
 	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         api.EncodeOrDie(&api.ContainerManifestList{}),
+				Value:         runtime.EncodeOrDie(&api.ContainerManifestList{}),
 				ModifiedIndex: 2,
 			},
 		},

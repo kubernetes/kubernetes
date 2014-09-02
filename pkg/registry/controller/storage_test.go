@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestListControllersError(t *testing.T) {
@@ -111,13 +112,13 @@ func TestControllerDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := api.Encode(controller)
+	body, err := runtime.Encode(controller)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	controllerOut := storage.New()
-	if err := api.DecodeInto(body, controllerOut); err != nil {
+	if err := runtime.DecodeInto(body, controllerOut); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

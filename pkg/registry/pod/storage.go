@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -68,7 +69,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 		pod.ID = uuid.NewUUID().String()
 	}
 	pod.DesiredState.Manifest.ID = pod.ID
-	if errs := api.ValidatePod(pod); len(errs) > 0 {
+	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, apiserver.NewInvalidErr("pod", pod.ID, errs)
 	}
 
@@ -135,7 +136,7 @@ func (rs RegistryStorage) New() interface{} {
 
 func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	pod := obj.(*api.Pod)
-	if errs := api.ValidatePod(pod); len(errs) > 0 {
+	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, apiserver.NewInvalidErr("pod", pod.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {

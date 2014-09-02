@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestNewBindingStorage(t *testing.T) {
@@ -37,12 +38,12 @@ func TestNewBindingStorage(t *testing.T) {
 		PodID: "foo",
 		Host:  "bar",
 	}
-	body, err := api.Encode(binding)
+	body, err := runtime.Encode(binding)
 	if err != nil {
 		t.Fatalf("Unexpected encode error %v", err)
 	}
 	obj := b.New()
-	err = api.DecodeInto(body, obj)
+	err = runtime.DecodeInto(body, obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

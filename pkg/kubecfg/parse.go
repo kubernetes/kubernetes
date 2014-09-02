@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type Parser struct {
@@ -44,11 +44,11 @@ func (p *Parser) ToWireFormat(data []byte, storage string) ([]byte, error) {
 	}
 
 	obj := reflect.New(prototypeType).Interface()
-	err := api.DecodeInto(data, obj)
+	err := runtime.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	return api.Encode(obj)
+	return runtime.Encode(obj)
 }
 
 func (p *Parser) SupportedWireStorage() []string {
