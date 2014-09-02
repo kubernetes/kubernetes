@@ -86,7 +86,9 @@ EOF
   #
   # This is used to inform the cloud provider used in the vagrant cluster
   yum install -y salt-api
-  systemctl enable salt-api
+  # Set log level to a level higher than "info" to prevent the message about
+  # enabling the service (which is not an error) from being printed to stderr.
+  SYSTEMD_LOG_LEVEL=notice systemctl enable salt-api
   systemctl start salt-api
 
 fi
