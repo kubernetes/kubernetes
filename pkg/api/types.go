@@ -128,8 +128,8 @@ type EnvVar struct {
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
 
-// HTTPGetProbe describes a liveness probe based on HTTP Get requests.
-type HTTPGetProbe struct {
+// HTTPGetAction describes an action based on HTTP Get requests.
+type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
 	// Required: Name or number of the port to access on the container.
@@ -138,14 +138,14 @@ type HTTPGetProbe struct {
 	Host string `yaml:"host,omitempty" json:"host,omitempty"`
 }
 
-// TCPSocketProbe describes a liveness probe based on opening a socket.
-type TCPSocketProbe struct {
+// TCPSocketAction describes an action based on opening a socket
+type TCPSocketAction struct {
 	// Required: Port to connect to.
 	Port util.IntOrString `yaml:"port,omitempty" json:"port,omitempty"`
 }
 
-// ExecProbe describes a "run in container" health probe.
-type ExecProbe struct {
+// ExecAction describes a "run in container" action.
+type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
@@ -154,15 +154,16 @@ type ExecProbe struct {
 }
 
 // LivenessProbe describes a liveness probe to be examined to the container.
+// TODO: pass structured data to the actions, and document that data here.
 type LivenessProbe struct {
 	// Type of liveness probe.  Current legal values "http", "tcp"
 	Type string `yaml:"type,omitempty" json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'http'
-	HTTPGet *HTTPGetProbe `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+	HTTPGet *HTTPGetAction `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
 	// TCPSocketProbe parameter, required if Type == 'tcp'
-	TCPSocket *TCPSocketProbe `yaml:"tcpSocket,omitempty" json:"tcpSocket,omitempty"`
+	TCPSocket *TCPSocketAction `yaml:"tcpSocket,omitempty" json:"tcpSocket,omitempty"`
 	// ExecProbe parameter, required if Type == 'exec'
-	Exec *ExecProbe `yaml:"exec,omitempty" json:"exec,omitempty"`
+	Exec *ExecAction `yaml:"exec,omitempty" json:"exec,omitempty"`
 	// Length of time before health checking is activated.  In seconds.
 	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
 }
@@ -186,6 +187,29 @@ type Container struct {
 	CPU           int            `yaml:"cpu,omitempty" json:"cpu,omitempty"`
 	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
+	Lifecycle     *Lifecycle     `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty"`
+}
+
+// Handler defines a specific action that should be taken
+// TODO: pass structured data to these actions, and document that data here.
+type Handler struct {
+	// One and only one of the following should be specified.
+	// Exec specifies the action to take.
+	Exec *ExecAction `yaml:"exec,omitempty" json:"exec,omitempty"`
+	// HTTPGet specifies the http request to perform.
+	HTTPGet *HTTPGetAction `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
+}
+
+// Lifecycle describes actions that the management system should take in response to container lifecycle
+// events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
+// until the action is complete, unless the container process fails, in which case the handler is aborted.
+type Lifecycle struct {
+	// PostStart is called immediately after a container is created.  If the handler fails, the container
+	// is terminated and restarted.
+	PostStart *Handler `yaml:"postStart,omitempty" json:"postStart,omitempty"`
+	// PreStop is called immediately before a container is terminated.  The reason for termination is
+	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
+	PreStop *Handler `yaml:"preStop,omitempty" json:"preStop,omitempty"`
 }
 
 // Event is the representation of an event logged to etcd backends.
