@@ -72,8 +72,9 @@ func TestOperation(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	if waited != waiters {
-		t.Errorf("Multiple waiters doesn't work, only %v finished", waited)
+	finished := atomic.LoadInt32(&waited)
+	if finished != waiters {
+		t.Errorf("Multiple waiters doesn't work, only %v finished", finished)
 	}
 
 	if op.expired(time.Now().Add(-time.Second)) {
