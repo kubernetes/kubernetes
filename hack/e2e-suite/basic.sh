@@ -24,7 +24,7 @@ source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
 source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 # Launch a container
-$CLOUDCFG -p 8080:80 run dockerfile/nginx 2 myNginx
+$KUBECFG -p 8080:80 run dockerfile/nginx 2 myNginx
 
 function remove-quotes() {
   local in=$1
@@ -35,13 +35,13 @@ function remove-quotes() {
 
 function teardown() {
   echo "Cleaning up test artifacts"
-  $CLOUDCFG stop myNginx
-  $CLOUDCFG rm myNginx
+  $KUBECFG stop myNginx
+  $KUBECFG rm myNginx
 }
 
 trap "teardown" EXIT
 
-POD_ID_LIST=$($CLOUDCFG '-template={{range.Items}}{{.ID}} {{end}}' -l name=myNginx list pods)
+POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l name=myNginx list pods)
 # Container turn up on a clean cluster can take a while for the docker image pull.
 ALL_RUNNING=0
 while [ $ALL_RUNNING -ne 1 ]; do
@@ -49,7 +49,7 @@ while [ $ALL_RUNNING -ne 1 ]; do
   sleep 5
   ALL_RUNNING=1
   for id in $POD_ID_LIST; do
-    CURRENT_STATUS=$($CLOUDCFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
+    CURRENT_STATUS=$($KUBECFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
     if [ "$CURRENT_STATUS" != "true" ]; then
       ALL_RUNNING=0
     fi

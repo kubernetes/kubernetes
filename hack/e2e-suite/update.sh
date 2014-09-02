@@ -24,7 +24,7 @@ source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
 source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 function validate() {
-    POD_ID_LIST=$($CLOUDCFG '-template={{range.Items}}{{.ID}} {{end}}' -l name=$controller list pods)
+    POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l name=$controller list pods)
     # Container turn up on a clean cluster can take a while for the docker image pull.
     ALL_RUNNING=0
     while [ $ALL_RUNNING -ne 1 ]; do
@@ -32,7 +32,7 @@ function validate() {
 	sleep 5
 	ALL_RUNNING=1
 	for id in $POD_ID_LIST; do
-	    CURRENT_STATUS=$($CLOUDCFG -template '{{and .CurrentState.Info.datacontroller.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
+	    CURRENT_STATUS=$($KUBECFG -template '{{and .CurrentState.Info.datacontroller.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
 	    if [ "$CURRENT_STATUS" != "true" ]; then
 		ALL_RUNNING=0
 	    fi
@@ -49,28 +49,28 @@ function validate() {
 controller=dataController
 
 # Launch a container
-$CLOUDCFG -p 8080:80 run brendanburns/data 2 $controller
+$KUBECFG -p 8080:80 run brendanburns/data 2 $controller
 
 function teardown() {
   echo "Cleaning up test artifacts"
-  $CLOUDCFG stop $controller
-  $CLOUDCFG rm $controller
+  $KUBECFG stop $controller
+  $KUBECFG rm $controller
 }
 
 trap "teardown" EXIT
 
 validate 2
 
-$CLOUDCFG resize $controller 1
+$KUBECFG resize $controller 1
 sleep 2
 validate 1
 
-$CLOUDCFG resize $controller 2
+$KUBECFG resize $controller 2
 sleep 2
 validate 2
 
 # TODO: test rolling update here, but to do so, we need to make the update blocking
-# $CLOUDCFG -u=20s rollingupdate $controller
+# $KUBECFG -u=20s rollingupdate $controller
 #
 # Wait for the replica controller to recreate
 # sleep 10
