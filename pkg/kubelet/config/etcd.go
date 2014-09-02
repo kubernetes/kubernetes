@@ -60,48 +60,77 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 	return config
 }
 
-// run loops forever looking for changes to a key in etcd
+// run fetches the current state of the config from etcd before establishing
+// a long-running etcd watcher. run will exit only when an unrecoverable error occurs.
 func (s *SourceEtcd) run() {
-	index := uint64(0)
+	response, err := s.getCurrentState()
+	if err != nil {
+		glog.Errorf("Unexpected error from etcd (%s): %v", s.key, err)
+		return
+	}
+	if response == nil {
+		return
+	}
+
+	err = s.handleResponse(response)
+	if err != nil {
+		glog.Errorf("Failed parsing response from etcd (%s): %v", s.key, err)
+		return
+	}
+
+	// watch must start from zero since the ModifiedIndex of the state may
+	// already be too far in the past for the etcd event queue
+	watchIndex := uint64(0)
 	for {
-		nextIndex, err := s.fetchNextState(index)
+		response, err = s.watchForNextState(watchIndex)
 		if err != nil {
-			if !tools.IsEtcdNotFound(err) {
-				glog.Errorf("Unable to extract from the response (%s): %%v", s.key, err)
-			}
+			glog.Errorf("Unexpected error from etcd watch (%s): %v", s.key, err)
+			break
+		}
+		if response == nil {
 			return
 		}
-		index = nextIndex
+
+		err = s.handleResponse(response)
+		if err != nil {
+			glog.Errorf("Failed parsing response from etcd watch (%s): %v", s.key, err)
+			return
+		}
+
+		watchIndex = response.Node.ModifiedIndex + 1
 	}
 }
 
-// fetchNextState fetches the key (or waits for a change to a key) and then returns
-// the nextIndex to read.  It will watch no longer than s.waitDuration and then return
-func (s *SourceEtcd) fetchNextState(fromIndex uint64) (nextIndex uint64, err error) {
-	var response *etcd.Response
-
-	if fromIndex == 0 {
-		response, err = s.client.Get(s.key, true, false)
-	} else {
-		response, err = s.client.Watch(s.key, fromIndex, false, nil, stopChannel(s.timeout))
-		if tools.IsEtcdWatchStoppedByUser(err) {
-			return fromIndex, nil
-		}
-	}
-	if err != nil {
-		return fromIndex, err
+func (s *SourceEtcd) getCurrentState() (response *etcd.Response, err error) {
+	response, err = s.client.Get(s.key, true, false)
+	if err != nil && tools.IsEtcdNotFound(err) {
+		response = nil
+		err = nil
 	}
 
+	return
+}
+
+func (s *SourceEtcd) watchForNextState(watchIndex uint64) (response *etcd.Response, err error) {
+	response, err = s.client.Watch(s.key, watchIndex, false, nil, stopChannel(s.timeout))
+	if err != nil && (tools.IsEtcdNotFound(err) || tools.IsEtcdWatchStoppedByUser(err)) {
+		response = nil
+		err = nil
+	}
+
+	return
+}
+
+func (s *SourceEtcd) handleResponse(response *etcd.Response) error {
 	pods, err := responseToPods(response)
 	if err != nil {
-		glog.Infof("Response was in error: %#v", response)
-		return 0, fmt.Errorf("error parsing response: %#v", err)
+		return fmt.Errorf("error parsing response: %#v", err)
 	}
 
 	glog.Infof("Got state from etcd: %+v", pods)
 	s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
 
-	return response.Node.ModifiedIndex + 1, nil
+	return nil
 }
 
 // responseToPods takes an etcd Response object, and turns it into a structured list of containers.
