@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INSTANCE_PREFIX=kubernetes
+INSTANCE_PREFIX=kubenertes
 AZ_LOCATION='West US'
 TAG=testing
 
