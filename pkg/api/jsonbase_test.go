@@ -68,11 +68,10 @@ func TestGenericJSONBase(t *testing.T) {
 }
 
 func TestResourceVersionerOfAPI(t *testing.T) {
-	type T struct {
+	testCases := map[string]struct {
 		Object   interface{}
 		Expected uint64
-	}
-	testCases := map[string]T{
+	}{
 		"empty api object":                   {Service{}, 0},
 		"api object with version":            {Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
 		"pointer to api object with version": {&Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
@@ -88,13 +87,48 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		}
 	}
 
-	failingCases := map[string]T{
+	failingCases := map[string]struct {
+		Object   interface{}
+		Expected uint64
+	}{
 		"not a valid object to try": {JSONBase{ResourceVersion: 1}, 1},
 	}
 	for key, testCase := range failingCases {
 		_, err := versioning.ResourceVersion(testCase.Object)
 		if err == nil {
 			t.Errorf("%s: expected error, got nil", key)
+		}
+	}
+
+	setCases := map[string]struct {
+		Object   interface{}
+		Expected uint64
+	}{
+		"pointer to api object with version": {&Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+	}
+	for key, testCase := range setCases {
+		if err := versioning.SetResourceVersion(testCase.Object, 5); err != nil {
+			t.Errorf("%s: unexpected error %#v", key, err)
+		}
+		actual, err := versioning.ResourceVersion(testCase.Object)
+		if err != nil {
+			t.Errorf("%s: unexpected error %#v", key, err)
+		}
+		if actual != 5 {
+			t.Errorf("%s: expected %d, got %d", key, 5, actual)
+		}
+	}
+
+	failingSetCases := map[string]struct {
+		Object   interface{}
+		Expected uint64
+	}{
+		"empty api object":        {Service{}, 0},
+		"api object with version": {Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+	}
+	for key, testCase := range failingSetCases {
+		if err := versioning.SetResourceVersion(testCase.Object, 5); err == nil {
+			t.Errorf("%s: unexpected non-error", key)
 		}
 	}
 }
