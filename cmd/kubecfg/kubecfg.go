@@ -34,7 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
-	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
 )
 

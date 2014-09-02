@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )

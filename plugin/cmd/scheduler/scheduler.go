@@ -21,7 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 	"github.com/golang/glog"

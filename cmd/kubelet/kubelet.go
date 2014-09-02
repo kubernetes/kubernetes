@@ -36,7 +36,7 @@ import (
 	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	verflag "github.com/GoogleCloudPlatform/kubernetes/pkg/version/flag"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
