@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
-// VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster
+// VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster.
 type VagrantCloud struct {
 	saltURL  string
 	saltUser string
@@ -40,26 +40,26 @@ func init() {
 	cloudprovider.RegisterCloudProvider("vagrant", func() (cloudprovider.Interface, error) { return newVagrantCloud() })
 }
 
-// SaltToken is an authorization token required by Salt REST API
+// SaltToken is an authorization token required by Salt REST API.
 type SaltToken struct {
 	Token string `json:"token"`
 	User  string `json:"user"`
 	EAuth string `json:"eauth"`
 }
 
-// SaltLoginResponse is the response object for a /login operation against Salt REST API
+// SaltLoginResponse is the response object for a /login operation against Salt REST API.
 type SaltLoginResponse struct {
 	Data []SaltToken `json:"return"`
 }
 
-// SaltMinion is a machine managed by the Salt service
+// SaltMinion is a machine managed by the Salt service.
 type SaltMinion struct {
 	Roles []string `json:"roles"`
 	IP    string   `json:"minion_ip"`
 	Host  string   `json:"host"`
 }
 
-// SaltMinions is a map of minion name to machine information
+// SaltMinions is a map of minion name to machine information.
 type SaltMinions map[string]SaltMinion
 
 // SaltMinionsResponse is the response object for a /minions operation against Salt REST API
@@ -77,28 +77,28 @@ func newVagrantCloud() (*VagrantCloud, error) {
 	}, nil
 }
 
-// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud
+// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.
 func (v *VagrantCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
 }
 
-// Instances returns an implementation of Instances for Vagrant cloud
+// Instances returns an implementation of Instances for Vagrant cloud.
 func (v *VagrantCloud) Instances() (cloudprovider.Instances, bool) {
 	return v, true
 }
 
-// Zones returns an implementation of Zones for Vagrant cloud
+// Zones returns an implementation of Zones for Vagrant cloud.
 func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-// IPAddress returns the address of a particular machine instance
+// IPAddress returns the address of a particular machine instance.
 func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
 	// since the instance now is the IP in the vagrant env, this is trivial no-op
 	return net.ParseIP(instance), nil
 }
 
-// saltMinionsByRole filters a list of minions that have a matching role
+// saltMinionsByRole filters a list of minions that have a matching role.
 func (v *VagrantCloud) saltMinionsByRole(minions []SaltMinion, role string) []SaltMinion {
 	var filteredMinions []SaltMinion
 	for _, value := range minions {
@@ -110,7 +110,7 @@ func (v *VagrantCloud) saltMinionsByRole(minions []SaltMinion, role string) []Sa
 	return filteredMinions
 }
 
-// saltMinions invokes the Salt API for minions using provided token
+// saltMinions invokes the Salt API for minions using provided token.
 func (v *VagrantCloud) saltMinions(token SaltToken) ([]SaltMinion, error) {
 	var minions []SaltMinion
 
@@ -139,7 +139,7 @@ func (v *VagrantCloud) saltMinions(token SaltToken) ([]SaltMinion, error) {
 	return minions, nil
 }
 
-// saltLogin invokes the Salt API to get an authorization token
+// saltLogin invokes the Salt API to get an authorization token.
 func (v *VagrantCloud) saltLogin() (SaltToken, error) {
 	url := v.saltURL + "/login"
 	data := neturl.Values{
@@ -172,7 +172,7 @@ func (v *VagrantCloud) saltLogin() (SaltToken, error) {
 	return loginResp.Data[0], nil
 }
 
-// List enumerates the set of minions instances known by the cloud provider
+// List enumerates the set of minions instances known by the cloud provider.
 func (v *VagrantCloud) List(filter string) ([]string, error) {
 	token, err := v.saltLogin()
 	if err != nil {

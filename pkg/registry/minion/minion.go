@@ -26,7 +26,7 @@ import (
 
 var ErrDoesNotExist = fmt.Errorf("The requested resource does not exist.")
 
-// Keep track of a set of minions. Safe for concurrent reading/writing.
+// Registry keeps track of a set of minions. Safe for concurrent reading/writing.
 type Registry interface {
 	List() (currentMinions []string, err error)
 	Insert(minion string) error
@@ -34,7 +34,7 @@ type Registry interface {
 	Contains(minion string) (bool, error)
 }
 
-// Initialize a minion registry with a list of minions.
+// NewRegistry initializes a minion registry with a list of minions.
 func NewRegistry(minions []string) Registry {
 	m := &minionList{
 		minions: util.StringSet{},

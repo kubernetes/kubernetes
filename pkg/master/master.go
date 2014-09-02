@@ -130,7 +130,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	}
 }
 
-// API_v1beta1 returns the resources and codec for API version v1beta1
+// API_v1beta1 returns the resources and codec for API version v1beta1.
 func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, apiserver.Codec) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {

@@ -28,17 +28,17 @@ import (
 	"github.com/golang/glog"
 )
 
-// PodConfigNotificationMode describes how changes are sent to the update channel
+// PodConfigNotificationMode describes how changes are sent to the update channel.
 type PodConfigNotificationMode int
 
 const (
 	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
-	// any change occurs
+	// any change occurs.
 	PodConfigNotificationSnapshot = iota
-	// PodConfigNotificationSetsAndUpdates delivers an UPDATE message whenever pods are
+	// PodConfigNotificationSnapshotAndUpdates delivers an UPDATE message whenever pods are
 	// changed, and a SET message if there are any additions or removals.
 	PodConfigNotificationSnapshotAndUpdates
-	// PodConfigNotificationIncremental delivers ADD, UPDATE, and REMOVE to the update channel
+	// PodConfigNotificationIncremental delivers ADD, UPDATE, and REMOVE to the update channel.
 	PodConfigNotificationIncremental
 )
 
@@ -267,7 +267,7 @@ func filterInvalidPods(pods []kubelet.Pod, source string) (filtered []*kubelet.P
 	return
 }
 
-// Sync sends a copy of the current state through the update channel
+// Sync sends a copy of the current state through the update channel.
 func (s *podStorage) Sync() {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()

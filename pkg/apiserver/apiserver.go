@@ -31,8 +31,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Codec defines methods for serializing and deserializing API
-// objects.
+// Codec defines methods for serializing and deserializing API objects.
 type Codec interface {
 	Encode(obj interface{}) (data []byte, err error)
 	Decode(data []byte) (interface{}, error)
@@ -117,7 +116,7 @@ func InstallSupport(mux mux) {
 	mux.HandleFunc("/", handleIndex)
 }
 
-// RecoverPanics wraps an http Handler to recover and log panics
+// RecoverPanics wraps an http Handler to recover and log panics.
 func RecoverPanics(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
@@ -142,12 +141,12 @@ func RecoverPanics(handler http.Handler) http.Handler {
 	})
 }
 
-// handleVersionReq writes the server's version information.
+// handleVersion writes the server's version information.
 func handleVersion(w http.ResponseWriter, req *http.Request) {
 	writeRawJSON(http.StatusOK, version.Get(), w)
 }
 
-// writeJSON renders an object as JSON to the response
+// writeJSON renders an object as JSON to the response.
 func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
 	if err != nil {
@@ -159,7 +158,7 @@ func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseW
 	w.Write(output)
 }
 
-// errorJSON renders an error to the response
+// errorJSON renders an error to the response.
 func errorJSON(err error, codec Codec, w http.ResponseWriter) {
 	status := errToAPIStatus(err)
 	writeJSON(status.Code, codec, status, w)
@@ -193,7 +192,7 @@ func readBody(req *http.Request) ([]byte, error) {
 	return ioutil.ReadAll(req.Body)
 }
 
-// splitPath returns the segments for a URL path
+// splitPath returns the segments for a URL path.
 func splitPath(path string) []string {
 	path = strings.Trim(path, "/")
 	if path == "" {

@@ -168,7 +168,7 @@ func (metaInsertion) Interpret(in interface{}) (version, kind string) {
 	return m.Version, m.Kind
 }
 
-// DataAPIVersionAndKind will return the APIVersion and Kind of the given wire-format
+// DataVersionAndKind will return the APIVersion and Kind of the given wire-format
 // enconding of an API Object, or an error.
 func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
 	findKind := s.MetaInsertionFactory.Create("", "")
@@ -217,8 +217,8 @@ func maybeCopy(obj interface{}) interface{} {
 	return v2.Interface()
 }
 
-// Ensures that obj is a pointer of some sort. Returns a reflect.Value of the
-// dereferenced pointer, ensuring that it is settable/addressable.
+// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value
+// of the dereferenced pointer, ensuring that it is settable/addressable.
 // Returns an error if this is not possible.
 func enforcePtr(obj interface{}) (reflect.Value, error) {
 	v := reflect.ValueOf(obj)

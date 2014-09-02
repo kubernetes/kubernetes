@@ -29,12 +29,12 @@ type MinionLister interface {
 // FakeMinionLister implements MinionLister on a []string for test purposes.
 type FakeMinionLister []string
 
-// List returns minions as a []string
+// List returns minions as a []string.
 func (f FakeMinionLister) List() ([]string, error) {
 	return []string(f), nil
 }
 
-// PodLister interface represents anything that can list pods for a scheduler
+// PodLister interface represents anything that can list pods for a scheduler.
 type PodLister interface {
 	// TODO: make this exactly the same as client's ListPods() method...
 	ListPods(labels.Selector) ([]api.Pod, error)

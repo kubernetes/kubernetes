@@ -201,7 +201,7 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
-// This is hacky, compute the delta between hostame and hostname -f
+// fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
 func fqdnSuffix() (string, error) {
 	fullHostname, err := exec.Command("hostname", "-f").Output()
 	if err != nil {
@@ -253,7 +253,8 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 	}, nil
 }
 
-// gce zone names are of the form: ${region-name}-${ix}.
+// getGceRegion returns region of the gce zone. Zone names
+// are of the form: ${region-name}-${ix}.
 // For example "us-central1-b" has a region of "us-central1".
 // So we look for the last '-' and trim to just before that.
 func getGceRegion(zone string) (string, error) {

@@ -88,7 +88,7 @@ func NewIntOrStringFromInt(val int) IntOrString {
 	return IntOrString{Kind: IntstrInt, IntVal: val}
 }
 
-// NewIntOrStringFromInt creates an IntOrString object with a string value.
+// NewIntOrStringFromString creates an IntOrString object with a string value.
 func NewIntOrStringFromString(val string) IntOrString {
 	return IntOrString{Kind: IntstrString, StrVal: val}
 }

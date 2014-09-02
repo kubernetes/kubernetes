@@ -181,7 +181,7 @@ type minionEnumerator struct {
 	*api.MinionList
 }
 
-// Returns the number of items in the pod list.
+// Len returns the number of items in the pod list.
 func (me *minionEnumerator) Len() int {
 	if me.MinionList == nil {
 		return 0
@@ -189,7 +189,7 @@ func (me *minionEnumerator) Len() int {
 	return len(me.Items)
 }
 
-// Returns the item (and ID) with the particular index.
+// Get returns the item (and ID) with the particular index.
 func (me *minionEnumerator) Get(index int) (string, interface{}) {
 	return me.Items[index].ID, &me.Items[index]
 }

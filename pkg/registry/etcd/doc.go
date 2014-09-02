@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 is the v1beta1 version of the API.
-package v1beta1
+// Package etcd provides etcd backend implementation for storing
+// PodRegistry, ControllerRegistry and ServiceRegistry api objects.
+package etcd

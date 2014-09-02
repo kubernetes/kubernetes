@@ -30,7 +30,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// A EndpointController manages service endpoints.
+// EndpointController manages service endpoints.
 type EndpointController struct {
 	client          *client.Client
 	serviceRegistry service.Registry

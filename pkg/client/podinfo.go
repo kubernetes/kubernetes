@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// ErrPodInfoNotAvailable may be returned when the requested pod info is not available
+// ErrPodInfoNotAvailable may be returned when the requested pod info is not available.
 var ErrPodInfoNotAvailable = errors.New("no pod info available")
 
 // PodInfoGetter is an interface for things that can get information about a pod's containers.
@@ -39,7 +39,7 @@ type PodInfoGetter interface {
 	GetPodInfo(host, podID string) (api.PodInfo, error)
 }
 
-// HTTPPodInfoGetter is the default implementation of PodInfoGetter, accesses the kubelet over HTTP
+// HTTPPodInfoGetter is the default implementation of PodInfoGetter, accesses the kubelet over HTTP.
 type HTTPPodInfoGetter struct {
 	Client *http.Client
 	Port   uint

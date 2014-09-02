@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 is the v1beta1 version of the API.
-package v1beta1
+// Package vagrant_cloud is an implementation of Interface, TCPLoadBalancer
+// and Instances for developer managed Vagrant cluster.
+package vagrant_cloud

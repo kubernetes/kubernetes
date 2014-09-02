@@ -16,8 +16,6 @@ limitations under the License.
 
 package watch
 
-import ()
-
 // FilterFunc should take an event, possibly modify it in some way, and return
 // the modified event. If the event should be ignored, then return keep=false.
 type FilterFunc func(in Event) (out Event, keep bool)

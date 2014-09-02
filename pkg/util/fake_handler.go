@@ -24,7 +24,7 @@ import (
 )
 
 // TestInterface is a simple interface providing Errorf, to make injection for
-// testing easier (insert 'yo dawg' meme here)
+// testing easier (insert 'yo dawg' meme here).
 type TestInterface interface {
 	Errorf(format string, args ...interface{})
 }

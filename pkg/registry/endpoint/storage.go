@@ -37,12 +37,12 @@ func NewStorage(registry Registry) apiserver.RESTStorage {
 	}
 }
 
-// Get satisfies the RESTStorage interface but is unimplemented
+// Get satisfies the RESTStorage interface but is unimplemented.
 func (rs *Storage) Get(id string) (interface{}, error) {
 	return rs.registry.GetEndpoints(id)
 }
 
-// List satisfies the RESTStorage interface but is unimplemented
+// List satisfies the RESTStorage interface but is unimplemented.
 func (rs *Storage) List(selector labels.Selector) (interface{}, error) {
 	return nil, errors.New("unimplemented")
 }
@@ -53,22 +53,22 @@ func (rs *Storage) Watch(label, field labels.Selector, resourceVersion uint64) (
 	return rs.registry.WatchEndpoints(label, field, resourceVersion)
 }
 
-// Create satisfies the RESTStorage interface but is unimplemented
+// Create satisfies the RESTStorage interface but is unimplemented.
 func (rs *Storage) Create(obj interface{}) (<-chan interface{}, error) {
 	return nil, errors.New("unimplemented")
 }
 
-// Update satisfies the RESTStorage interface but is unimplemented
+// Update satisfies the RESTStorage interface but is unimplemented.
 func (rs *Storage) Update(obj interface{}) (<-chan interface{}, error) {
 	return nil, errors.New("unimplemented")
 }
 
-// Delete satisfies the RESTStorage interface but is unimplemented
+// Delete satisfies the RESTStorage interface but is unimplemented.
 func (rs *Storage) Delete(id string) (<-chan interface{}, error) {
 	return nil, errors.New("unimplemented")
 }
 
-// New implements the RESTStorage interface
+// New implements the RESTStorage interface.
 func (rs Storage) New() interface{} {
 	return &api.Endpoints{}
 }

@@ -31,7 +31,7 @@ type BindingStorage struct {
 	registry Registry
 }
 
-// NewBindingStorage makes a new BindingStorage backed by the given bindingRegistry.
+// NewBindingStorage creates a new BindingStorage backed by the given bindingRegistry.
 func NewBindingStorage(bindingRegistry Registry) *BindingStorage {
 	return &BindingStorage{
 		registry: bindingRegistry,

@@ -27,7 +27,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// Watcher is the interface needed to receive changes to services and endpoints
+// Watcher is the interface needed to receive changes to services and endpoints.
 type Watcher interface {
 	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
@@ -44,7 +44,7 @@ type SourceAPI struct {
 	reconnectDuration time.Duration
 }
 
-// NewSourceAPI creates a config source that watches for changes to the services and endpoints
+// NewSourceAPI creates a config source that watches for changes to the services and endpoints.
 func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceUpdate, endpoints chan<- EndpointsUpdate) *SourceAPI {
 	config := &SourceAPI{
 		client:    client,
@@ -68,7 +68,7 @@ func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceU
 	return config
 }
 
-// runServices loops forever looking for changes to services
+// runServices loops forever looking for changes to services.
 func (s *SourceAPI) runServices(resourceVersion *uint64) {
 	watcher, err := s.client.WatchServices(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
@@ -82,7 +82,7 @@ func (s *SourceAPI) runServices(resourceVersion *uint64) {
 	handleServicesWatch(resourceVersion, ch, s.services)
 }
 
-// handleServicesWatch loops over an event channel and delivers config changes to an update channel
+// handleServicesWatch loops over an event channel and delivers config changes to an update channel.
 func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates chan<- ServiceUpdate) {
 	for {
 		select {
@@ -106,7 +106,7 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 	}
 }
 
-// runEndpoints loops forever looking for changes to endpoints
+// runEndpoints loops forever looking for changes to endpoints.
 func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
 	watcher, err := s.client.WatchEndpoints(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
@@ -120,7 +120,7 @@ func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
 	handleEndpointsWatch(resourceVersion, ch, s.endpoints)
 }
 
-// handleEndpointsWatch loops over an event channel and delivers config changes to an update channel
+// handleEndpointsWatch loops over an event channel and delivers config changes to an update channel.
 func handleEndpointsWatch(resourceVersion *uint64, ch <-chan watch.Event, updates chan<- EndpointsUpdate) {
 	for {
 		select {

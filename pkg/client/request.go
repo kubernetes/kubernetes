@@ -39,7 +39,7 @@ import (
 // are therefore not allowed to set manually.
 var specialParams = util.NewStringSet("sync", "timeout")
 
-// Verb begins a request with a verb (GET, POST, PUT, DELETE)
+// Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of Client's request building interface:
 // auth, err := LoadAuth(filename)
@@ -114,7 +114,7 @@ func (r *Request) Path(item string) *Request {
 	return r
 }
 
-// Sync sets sync/async call status by setting the "sync" parameter to "true"/"false"
+// Sync sets sync/async call status by setting the "sync" parameter to "true"/"false".
 func (r *Request) Sync(sync bool) *Request {
 	if r.err != nil {
 		return r
@@ -245,7 +245,8 @@ func (r *Request) finalURL() string {
 	return finalURL
 }
 
-// Attempts to begin watching the requested location. Returns a watch.Interface, or an error.
+// Watch attempts to begin watching the requested location.
+// Returns a watch.Interface, or an error.
 func (r *Request) Watch() (watch.Interface, error) {
 	if r.err != nil {
 		return nil, r.err
@@ -319,7 +320,7 @@ func (r Result) Get() (interface{}, error) {
 	return api.Decode(r.body)
 }
 
-// Into stores the result into obj, if possible..
+// Into stores the result into obj, if possible.
 func (r Result) Into(obj interface{}) error {
 	if r.err != nil {
 		return r.err
@@ -327,7 +328,7 @@ func (r Result) Into(obj interface{}) error {
 	return api.DecodeInto(r.body, obj)
 }
 
-// Returns the error executing the request, nil if no error occurred.
+// Error returns the error executing the request, nil if no error occurred.
 func (r Result) Error() error {
 	return r.err
 }

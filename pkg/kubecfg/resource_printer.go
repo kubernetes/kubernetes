@@ -31,14 +31,14 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-// ResourcePrinter is an interface that knows how to print API resources
+// ResourcePrinter is an interface that knows how to print API resources.
 type ResourcePrinter interface {
-	// Print receives an arbitrary JSON body, formats it and prints it to a writer
+	// Print receives an arbitrary JSON body, formats it and prints it to a writer.
 	Print([]byte, io.Writer) error
 	PrintObj(interface{}, io.Writer) error
 }
 
-// IdentityPrinter is an implementation of ResourcePrinter which simply copies the body out to the output stream
+// IdentityPrinter is an implementation of ResourcePrinter which simply copies the body out to the output stream.
 type IdentityPrinter struct{}
 
 // Print is an implementation of ResourcePrinter.Print which simply writes the data to the Writer.
@@ -56,7 +56,7 @@ func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
 	return i.Print(data, output)
 }
 
-// YAMLPrinter is an implementation of ResourcePrinter which parsess JSON, and re-formats as YAML
+// YAMLPrinter is an implementation of ResourcePrinter which parsess JSON, and re-formats as YAML.
 type YAMLPrinter struct{}
 
 // Print parses the data as JSON, re-formats as YAML and prints the YAML.
@@ -93,15 +93,15 @@ type HumanReadablePrinter struct {
 	handlerMap map[reflect.Type]*handlerEntry
 }
 
-// NewHumanReadablePrinter creates a HumanReadablePrinter
+// NewHumanReadablePrinter creates a HumanReadablePrinter.
 func NewHumanReadablePrinter() *HumanReadablePrinter {
 	printer := &HumanReadablePrinter{make(map[reflect.Type]*handlerEntry)}
 	printer.addDefaultHandlers()
 	return printer
 }
 
-// Handler adds a print handler with a given set of columns to HumanReadablePrinter instance
-// printFunc is the function that will be called to print an object
+// Handler adds a print handler with a given set of columns to HumanReadablePrinter instance.
+// printFunc is the function that will be called to print an object.
 // It must be of the following type:
 //  func printFunc(object ObjectType, w io.Writer) error
 // where ObjectType is the type of the object that will be printed.
@@ -142,7 +142,7 @@ var serviceColumns = []string{"Name", "Labels", "Selector", "Port"}
 var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
 
-// handleDefaultTypes adds print handlers for default Kubernetes types
+// addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, printPod)
 	h.Handler(podColumns, printPodList)

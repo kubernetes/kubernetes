@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 is the v1beta1 version of the API.
-package v1beta1
+// Package fake_cloud is a test-double implementation of cloudprovider
+// Interface, TCPLoadBalancer and Instances. It is useful for testing.
+package fake_cloud
