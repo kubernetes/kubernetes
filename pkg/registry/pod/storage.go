@@ -108,7 +108,10 @@ func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
 	pods, err := rs.registry.ListPods(selector)
 	if err == nil {
 		for i := range pods.Items {
-			rs.fillPodInfo(&pods.Items[i])
+			pod := &pods.Items[i]
+			rs.fillPodInfo(pod)
+			pod.CurrentState.Status = getPodStatus(pod)
+			pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
 		}
 	}
 	return pods, err
