@@ -39,6 +39,7 @@ var (
 	port                        = flag.Uint("port", 8080, "The port to listen on.  Default 8080.")
 	address                     = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
 	apiPrefix                   = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
+	enableCORS                  = flag.Bool("enable_cors", false, "If true, the basic CORS implementation will be enabled. [default false]")
 	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	cloudConfigFile             = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	minionRegexp                = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
@@ -134,7 +135,7 @@ func main() {
 	storage, codec := m.API_v1beta1()
 	s := &http.Server{
 		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
-		Handler:        apiserver.Handle(storage, codec, *apiPrefix),
+		Handler:        apiserver.Handle(storage, codec, *apiPrefix, *enableCORS),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,

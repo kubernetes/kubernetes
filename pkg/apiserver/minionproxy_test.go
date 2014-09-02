@@ -127,7 +127,7 @@ func TestApiServerMinionProxy(t *testing.T) {
 	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(req.URL.Path))
 	}))
-	server := httptest.NewServer(Handle(nil, nil, "/prefix"))
+	server := httptest.NewServer(Handle(nil, nil, "/prefix", false))
 	proxy, _ := url.Parse(proxyServer.URL)
 	resp, err := http.Get(fmt.Sprintf("%s/proxy/minion/%s%s", server.URL, proxy.Host, "/test"))
 	if err != nil {

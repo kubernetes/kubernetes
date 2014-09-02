@@ -30,7 +30,7 @@ func TestRedirect(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version")
+	}, codec, "/prefix/version", false)
 	server := httptest.NewServer(handler)
 
 	dontFollow := errors.New("don't follow")

@@ -41,7 +41,7 @@ func TestClient(t *testing.T) {
 	})
 
 	storage, codec := m.API_v1beta1()
-	s := httptest.NewServer(apiserver.Handle(storage, codec, "/api/v1beta1/"))
+	s := httptest.NewServer(apiserver.Handle(storage, codec, "/api/v1beta1/", false))
 
 	client := client.NewOrDie(s.URL, nil)
 

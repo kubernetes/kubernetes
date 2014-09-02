@@ -116,7 +116,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		PodInfoGetter: fakePodInfoGetter{},
 	})
 	storage, codec := m.API_v1beta1()
-	handler.delegate = apiserver.Handle(storage, codec, "/api/v1beta1")
+	handler.delegate = apiserver.Handle(storage, codec, "/api/v1beta1", false)
 
 	// Scheduler
 	scheduler.New((&factory.ConfigFactory{cl}).Create()).Run()
