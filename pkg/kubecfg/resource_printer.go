@@ -26,8 +26,8 @@ import (
 	"text/template"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
@@ -50,7 +50,7 @@ func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
-	data, err := apitools.Encode(obj)
+	data, err := runtime.Encode(obj)
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 		return fmt.Errorf("unexpected object with no 'kind' field: %s", data)
 	}
 
-	obj, err := apitools.Decode(data)
+	obj, err := runtime.Decode(data)
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ type TemplatePrinter struct {
 
 // Print parses the data as JSON, and re-formats it with the Go Template.
 func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
-	obj, err := apitools.Decode(data)
+	obj, err := runtime.Decode(data)
 	if err != nil {
 		return err
 	}

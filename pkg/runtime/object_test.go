@@ -14,14 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package runtime
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 )
 
 func TestObject(t *testing.T) {
@@ -30,8 +28,8 @@ func TestObject(t *testing.T) {
 		Object      Object `yaml:"object,omitempty" json:"object,omitempty"`
 		EmptyObject Object `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 	}
-	apitools.AddKnownTypes("", EmbeddedTest{})
-	apitools.AddKnownTypes("v1beta1", EmbeddedTest{})
+	AddKnownTypes("", EmbeddedTest{})
+	AddKnownTypes("v1beta1", EmbeddedTest{})
 
 	outer := &EmbeddedTest{
 		JSONBase: JSONBase{ID: "outer"},
@@ -42,14 +40,14 @@ func TestObject(t *testing.T) {
 		},
 	}
 
-	wire, err := apitools.Encode(outer)
+	wire, err := Encode(outer)
 	if err != nil {
 		t.Fatalf("Unexpected encode error '%v'", err)
 	}
 
 	t.Logf("Wire format is:\n%v\n", string(wire))
 
-	decoded, err := apitools.Decode(wire)
+	decoded, err := Decode(wire)
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
@@ -58,7 +56,7 @@ func TestObject(t *testing.T) {
 		t.Errorf("Expected: %#v but got %#v", e, a)
 	}
 
-	// test JSON decoding, too, since apitools.Decode uses yaml unmarshalling.
+	// test JSON decoding, too, since Decode uses yaml unmarshalling.
 	var decodedViaJSON EmbeddedTest
 	err = json.Unmarshal(wire, &decodedViaJSON)
 	if err != nil {

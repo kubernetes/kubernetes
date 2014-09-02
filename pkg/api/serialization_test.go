@@ -25,7 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/gofuzz"
@@ -108,20 +108,20 @@ func objDiff(a, b interface{}) string {
 func runTest(t *testing.T, source interface{}) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
-	j, err := apitools.FindJSONBase(source)
+	j, err := runtime.FindJSONBase(source)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, source)
 	}
 	j.SetKind("")
 	j.SetAPIVersion("")
 
-	data, err := apitools.Encode(source)
+	data, err := runtime.Encode(source)
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
 
-	obj2, err := apitools.Decode(data)
+	obj2, err := runtime.Decode(data)
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
 		return
@@ -132,7 +132,7 @@ func runTest(t *testing.T, source interface{}) {
 		}
 	}
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface()
-	err = apitools.DecodeInto(data, obj3)
+	err = runtime.DecodeInto(data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
@@ -174,8 +174,8 @@ func TestEncode_NonPtr(t *testing.T) {
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := interface{}(pod)
-	data, err := apitools.Encode(obj)
-	obj2, err2 := apitools.Decode(data)
+	data, err := runtime.Encode(obj)
+	obj2, err2 := runtime.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -192,8 +192,8 @@ func TestEncode_Ptr(t *testing.T) {
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := interface{}(pod)
-	data, err := apitools.Encode(obj)
-	obj2, err2 := apitools.Decode(data)
+	data, err := runtime.Encode(obj)
+	obj2, err2 := runtime.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -207,11 +207,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := apitools.Decode(badJSONMissingKind); err == nil {
+	if _, err := runtime.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := apitools.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)

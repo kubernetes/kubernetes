@@ -17,11 +17,11 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func init() {
-	apitools.AddKnownTypes("",
+	runtime.AddKnownTypes("",
 		PodList{},
 		Pod{},
 		ReplicationControllerList{},

@@ -24,9 +24,9 @@ import (
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/common"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -113,7 +113,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 			}
 			err := websocket.JSON.Send(ws, &api.WatchEvent{
 				Type:   event.Type,
-				Object: common.Object{event.Object},
+				Object: runtime.Object{event.Object},
 			})
 			if err != nil {
 				// Client disconnect.
@@ -160,7 +160,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			err := encoder.Encode(&api.WatchEvent{
 				Type:   event.Type,
-				Object: common.Object{event.Object},
+				Object: runtime.Object{event.Object},
 			})
 			if err != nil {
 				// Client disconnect.

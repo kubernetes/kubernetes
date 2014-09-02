@@ -26,8 +26,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
@@ -309,7 +309,7 @@ func TestCreateController(t *testing.T) {
 
 func body(obj interface{}, raw *string) *string {
 	if obj != nil {
-		bs, _ := apitools.Encode(obj)
+		bs, _ := runtime.Encode(obj)
 		body := string(bs)
 		return &body
 	}
@@ -471,7 +471,7 @@ func TestDoRequest(t *testing.T) {
 
 func TestDoRequestAccepted(t *testing.T) {
 	status := api.Status{Status: api.StatusWorking}
-	expectedBody, _ := apitools.Encode(status)
+	expectedBody, _ := runtime.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
 		ResponseBody: string(expectedBody),
@@ -508,7 +508,7 @@ func TestDoRequestAccepted(t *testing.T) {
 
 func TestDoRequestAcceptedSuccess(t *testing.T) {
 	status := api.Status{Status: api.StatusSuccess}
-	expectedBody, _ := apitools.Encode(status)
+	expectedBody, _ := runtime.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
 		ResponseBody: string(expectedBody),
@@ -528,7 +528,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	statusOut, err := apitools.Decode(body)
+	statusOut, err := runtime.Decode(body)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

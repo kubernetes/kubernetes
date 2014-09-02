@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -41,8 +41,8 @@ type TestResource struct {
 }
 
 var scheme *conversion.Scheme
-var codec = apitools.Codec
-var versioner = apitools.ResourceVersioner
+var codec = runtime.Codec
+var versioner = runtime.ResourceVersioner
 
 func init() {
 	scheme = conversion.NewScheme()
@@ -191,7 +191,7 @@ func TestSetObjWithVersion(t *testing.T) {
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         apitools.EncodeOrDie(obj),
+				Value:         runtime.EncodeOrDie(obj),
 				ModifiedIndex: 1,
 			},
 		},
@@ -236,7 +236,7 @@ func TestAtomicUpdate(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	codec := scheme
-	helper := EtcdHelper{fakeClient, codec, apitools.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, runtime.NewJSONBaseResourceVersioner()}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -290,7 +290,7 @@ func TestAtomicUpdate(t *testing.T) {
 func TestAtomicUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, scheme, apitools.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, scheme, runtime.NewJSONBaseResourceVersioner()}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -322,7 +322,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	codec := scheme
-	helper := EtcdHelper{fakeClient, codec, apitools.NewJSONBaseResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, runtime.NewJSONBaseResourceVersioner()}
 
 	fakeClient.ExpectNotFoundGet("/some/key")
 

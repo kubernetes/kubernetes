@@ -14,16 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package runtime
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+// Note that the types provided in this file are not versioned and are intended to be
+// safe to use from within all versions of every API object.
+
 // JSONBase is shared by all top level objects. The proper way to use it is to inline it in your type,
 // like this:
 // type MyAwesomeAPIObject struct {
-// 	common.JSONBase    `yaml:",inline" json:",inline"`
+// 	runtime.JSONBase    `yaml:",inline" json:",inline"`
 // 	... // other fields
 // }
 //

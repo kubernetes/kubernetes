@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package apitools includes helper functions for working with API objects
+// Package runtime includes helper functions for working with API objects
 // that follow the kubernetes API object conventions, which are:
 //
 // 0. Your API objects have a common metadata struct member, JSONBase.
@@ -33,10 +33,12 @@ limitations under the License.
 // 7. All of your serializations and deserializations are handled in a
 //    centralized place.
 //
-// Package apitools provides a conversion helper to make 5 easy, and the
+// Package runtime provides a conversion helper to make 5 easy, and the
 // Encode/Decode/DecodeInto trio to accomplish 7. You can also register
 // additional "codecs" which use a version of your choice. It's
-// recommended that you register your types with apitools in your
+// recommended that you register your types with runtime in your
 // package's init function.
 //
-package apitools
+// As a bonus, a few common types useful from all api objects and versions
+// are provided in types.go.
+package runtime

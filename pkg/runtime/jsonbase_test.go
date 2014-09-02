@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apitools
+package runtime
 
 import (
 	"reflect"
@@ -126,7 +126,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		Object   interface{}
 		Expected uint64
 	}{
-		"pointer to api object with version": {&Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+		"pointer to api object with version": {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
 	}
 	for key, testCase := range setCases {
 		if err := versioning.SetResourceVersion(testCase.Object, 5); err != nil {
@@ -145,8 +145,8 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		Object   interface{}
 		Expected uint64
 	}{
-		"empty api object":        {Service{}, 0},
-		"api object with version": {Service{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+		"empty api object":        {MyAPIObject{}, 0},
+		"api object with version": {MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
 	}
 	for key, testCase := range failingSetCases {
 		if err := versioning.SetResourceVersion(testCase.Object, 5); err == nil {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apitools_test
+package runtime_test
 
 import (
 	"reflect"
@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestEncode_NonPtr(t *testing.T) {
@@ -30,8 +30,8 @@ func TestEncode_NonPtr(t *testing.T) {
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := interface{}(pod)
-	data, err := apitools.Encode(obj)
-	obj2, err2 := apitools.Decode(data)
+	data, err := runtime.Encode(obj)
+	obj2, err2 := runtime.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -48,8 +48,8 @@ func TestEncode_Ptr(t *testing.T) {
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := interface{}(pod)
-	data, err := apitools.Encode(obj)
-	obj2, err2 := apitools.Decode(data)
+	data, err := runtime.Encode(obj)
+	obj2, err2 := runtime.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -63,11 +63,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := apitools.Decode(badJSONMissingKind); err == nil {
+	if _, err := runtime.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := apitools.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)

@@ -29,9 +29,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/common"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apitools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -39,7 +38,7 @@ import (
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := apitools.Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -72,9 +71,9 @@ func TestDoRequestNewWay(t *testing.T) {
 
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := apitools.Encode(reqObj)
+	reqBodyExpected, _ := runtime.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := apitools.Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -109,9 +108,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := apitools.Encode(reqObj)
+	reqBodyExpected, _ := runtime.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := apitools.Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -145,7 +144,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, err := apitools.Encode(reqObj)
+	reqBodyExpected, err := runtime.Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -161,7 +160,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := apitools.Encode(expectedObj)
+	expectedBody, _ := runtime.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -296,7 +295,7 @@ func TestPolling(t *testing.T) {
 
 	callNumber := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data, err := apitools.Encode(objects[callNumber])
+		data, err := runtime.Encode(objects[callNumber])
 		if err != nil {
 			t.Errorf("Unexpected encode error")
 		}
@@ -402,7 +401,7 @@ func TestWatch(t *testing.T) {
 
 		encoder := json.NewEncoder(w)
 		for _, item := range table {
-			encoder.Encode(&api.WatchEvent{item.t, common.Object{item.obj}})
+			encoder.Encode(&api.WatchEvent{item.t, runtime.Object{item.obj}})
 			flusher.Flush()
 		}
 	}))
