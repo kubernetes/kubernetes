@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/adler32"
+	"net/http"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -30,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
@@ -344,6 +346,59 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.lock.Unlock()
+}
+
+func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	fakeHttp := fakeHTTP{}
+	kubelet.httpClient = &fakeHttp
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			// network container
+			Names: []string{"/k8s--net--foo.test--"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.SyncPods([]Pod{
+		{
+			Name:      "foo",
+			Namespace: "test",
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{
+						Name: "bar",
+						Lifecycle: &api.Lifecycle{
+							PostStart: &api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Host: "foo",
+									Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+									Path: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "list", "inspect", "create", "start"})
+
+	fakeDocker.lock.Lock()
+	if len(fakeDocker.Created) != 1 ||
+		!matchString(t, "k8s--bar\\.[a-f0-9]+--foo.test--", fakeDocker.Created[0]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.lock.Unlock()
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("Unexpected handler: %s", fakeHttp.url)
+	}
 }
 
 func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
@@ -1124,5 +1179,157 @@ func TestParseImageName(t *testing.T) {
 		if name != tt.name || tag != tt.tag {
 			t.Errorf("Expected name/tag: %s/%s, got %s/%s", tt.name, tt.tag, name, tag)
 		}
+	}
+}
+
+func TestRunHandlerExec(t *testing.T) {
+	fakeCommandRunner := fakeContainerCommandRunner{}
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.runner = &fakeCommandRunner
+
+	containerID := "abc1234"
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+
+	fakeDocker.containerList = []docker.APIContainers{
+		{
+			ID:    containerID,
+			Names: []string{"/k8s--" + containerName + "--" + podName + "." + podNamespace + "--1234"},
+		},
+	}
+
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{
+				Exec: &api.ExecAction{
+					Command: []string{"ls", "-a"},
+				},
+			},
+		},
+	}
+	err := kubelet.runHandler(podName+"."+podNamespace, &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeCommandRunner.ID != containerID ||
+		!reflect.DeepEqual(container.Lifecycle.PostStart.Exec.Command, fakeCommandRunner.Cmd) {
+		t.Errorf("unexpected commands: %v", fakeCommandRunner)
+	}
+}
+
+type fakeHTTP struct {
+	url string
+	err error
+}
+
+func (f *fakeHTTP) Get(url string) (*http.Response, error) {
+	f.url = url
+	return nil, f.err
+}
+
+func TestRunHandlerHttp(t *testing.T) {
+	fakeHttp := fakeHTTP{}
+
+	kubelet, _, _ := newTestKubelet(t)
+	kubelet.httpClient = &fakeHttp
+
+	podName := "podFoo"
+	podNamespace := "etcd"
+	containerName := "containerFoo"
+
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{
+				HTTPGet: &api.HTTPGetAction{
+					Host: "foo",
+					Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+					Path: "bar",
+				},
+			},
+		},
+	}
+	err := kubelet.runHandler(podName+"."+podNamespace, &container, container.Lifecycle.PostStart)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+}
+
+func TestNewHandler(t *testing.T) {
+	kubelet, _, _ := newTestKubelet(t)
+	handler := &api.Handler{
+		HTTPGet: &api.HTTPGetAction{
+			Host: "foo",
+			Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+			Path: "bar",
+		},
+	}
+	actionHandler := kubelet.newActionHandler(handler)
+	if actionHandler == nil {
+		t.Error("unexpected nil action handler.")
+	}
+
+	handler = &api.Handler{
+		Exec: &api.ExecAction{
+			Command: []string{"ls", "-l"},
+		},
+	}
+	actionHandler = kubelet.newActionHandler(handler)
+	if actionHandler == nil {
+		t.Error("unexpected nil action handler.")
+	}
+
+	handler = &api.Handler{}
+	actionHandler = kubelet.newActionHandler(handler)
+	if actionHandler != nil {
+		t.Errorf("unexpected non-nil action handler: %v", actionHandler)
+	}
+}
+
+func TestSyncPodEventHandlerFails(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.httpClient = &fakeHTTP{
+		err: fmt.Errorf("test error"),
+	}
+	dockerContainers := DockerContainers{
+		"9876": &docker.APIContainers{
+			// network container
+			Names: []string{"/k8s--net--foo.test--"},
+			ID:    "9876",
+		},
+	}
+	err := kubelet.syncPod(&Pod{
+		Name:      "foo",
+		Namespace: "test",
+		Manifest: api.ContainerManifest{
+			ID: "foo",
+			Containers: []api.Container{
+				{Name: "bar",
+					Lifecycle: &api.Lifecycle{
+						PostStart: &api.Handler{
+							HTTPGet: &api.HTTPGetAction{
+								Host: "does.no.exist",
+								Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
+								Path: "bar",
+							},
+						},
+					},
+				},
+			},
+		},
+	}, dockerContainers)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	verifyCalls(t, fakeDocker, []string{"list", "create", "start", "stop"})
+
+	if len(fakeDocker.stopped) != 1 {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)
 	}
 }
