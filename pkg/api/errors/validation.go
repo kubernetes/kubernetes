@@ -75,28 +75,28 @@ func (v ValidationError) Error() string {
 	return fmt.Sprintf("%s: %v '%v'", v.Field, ValueOf(v.Type), v.BadValue)
 }
 
-// NewInvalid returns a ValidationError indicating "value required"
-func NewRequired(field string, value interface{}) ValidationError {
+// NewFieldRequired returns a ValidationError indicating "value required"
+func NewFieldRequired(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeRequired, field, value}
 }
 
-// NewInvalid returns a ValidationError indicating "invalid value"
-func NewInvalid(field string, value interface{}) ValidationError {
+// NewFieldInvalid returns a ValidationError indicating "invalid value"
+func NewFieldInvalid(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeInvalid, field, value}
 }
 
-// NewNotSupported returns a ValidationError indicating "unsupported value"
-func NewNotSupported(field string, value interface{}) ValidationError {
+// NewFieldNotSupported returns a ValidationError indicating "unsupported value"
+func NewFieldNotSupported(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeNotSupported, field, value}
 }
 
-// NewDuplicate returns a ValidationError indicating "duplicate value"
-func NewDuplicate(field string, value interface{}) ValidationError {
+// NewFieldDuplicate returns a ValidationError indicating "duplicate value"
+func NewFieldDuplicate(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeDuplicate, field, value}
 }
 
-// NewNotFound returns a ValidationError indicating "value not found"
-func NewNotFound(field string, value interface{}) ValidationError {
+// NewFieldNotFound returns a ValidationError indicating "value not found"
+func NewFieldNotFound(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeNotFound, field, value}
 }
 

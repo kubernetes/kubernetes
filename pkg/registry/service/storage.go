@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -51,7 +52,7 @@ func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machin
 func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
-		return nil, apiserver.NewInvalidErr("service", srv.ID, errs)
+		return nil, errors.NewInvalid("service", srv.ID, errs)
 	}
 
 	srv.CreationTimestamp = util.Now()
@@ -157,7 +158,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
-		return nil, apiserver.NewInvalidErr("service", srv.ID, errs)
+		return nil, errors.NewInvalid("service", srv.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		// TODO: check to see if external load balancer status changed

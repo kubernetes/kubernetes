@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -627,7 +627,7 @@ func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
 			ID: "foo",
 		},
 	})
-	if !apiserver.IsAlreadyExists(err) {
+	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %#v", err)
 	}
 }
@@ -716,7 +716,7 @@ func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 	err := registry.CreateService(api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 	})
-	if !apiserver.IsAlreadyExists(err) {
+	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %#v", err)
 	}
 }

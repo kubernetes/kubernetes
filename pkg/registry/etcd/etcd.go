@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -184,7 +184,7 @@ func (r *Registry) DeletePod(podID string) error {
 	podKey := makePodKey(podID)
 	err := r.ExtractObj(podKey, &pod, false)
 	if tools.IsEtcdNotFound(err) {
-		return apiserver.NewNotFoundErr("pod", podID)
+		return errors.NewNotFound("pod", podID)
 	}
 	if err != nil {
 		return err
@@ -193,7 +193,7 @@ func (r *Registry) DeletePod(podID string) error {
 	// machine and attempt to put it somewhere.
 	err = r.Delete(podKey, true)
 	if tools.IsEtcdNotFound(err) {
-		return apiserver.NewNotFoundErr("pod", podID)
+		return errors.NewNotFound("pod", podID)
 	}
 	if err != nil {
 		return err
@@ -249,7 +249,7 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 	key := makeControllerKey(controllerID)
 	err := r.ExtractObj(key, &controller, false)
 	if tools.IsEtcdNotFound(err) {
-		return nil, apiserver.NewNotFoundErr("replicationController", controllerID)
+		return nil, errors.NewNotFound("replicationController", controllerID)
 	}
 	if err != nil {
 		return nil, err
@@ -261,7 +261,7 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 func (r *Registry) CreateController(controller api.ReplicationController) error {
 	err := r.CreateObj(makeControllerKey(controller.ID), controller)
 	if tools.IsEtcdNodeExist(err) {
-		return apiserver.NewAlreadyExistsErr("replicationController", controller.ID)
+		return errors.NewAlreadyExists("replicationController", controller.ID)
 	}
 	return err
 }
@@ -276,7 +276,7 @@ func (r *Registry) DeleteController(controllerID string) error {
 	key := makeControllerKey(controllerID)
 	err := r.Delete(key, false)
 	if tools.IsEtcdNotFound(err) {
-		return apiserver.NewNotFoundErr("replicationController", controllerID)
+		return errors.NewNotFound("replicationController", controllerID)
 	}
 	return err
 }
@@ -296,7 +296,7 @@ func (r *Registry) ListServices() (*api.ServiceList, error) {
 func (r *Registry) CreateService(svc api.Service) error {
 	err := r.CreateObj(makeServiceKey(svc.ID), svc)
 	if tools.IsEtcdNodeExist(err) {
-		return apiserver.NewAlreadyExistsErr("service", svc.ID)
+		return errors.NewAlreadyExists("service", svc.ID)
 	}
 	return err
 }
@@ -307,7 +307,7 @@ func (r *Registry) GetService(name string) (*api.Service, error) {
 	var svc api.Service
 	err := r.ExtractObj(key, &svc, false)
 	if tools.IsEtcdNotFound(err) {
-		return nil, apiserver.NewNotFoundErr("service", name)
+		return nil, errors.NewNotFound("service", name)
 	}
 	if err != nil {
 		return nil, err
@@ -321,7 +321,7 @@ func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
 	var endpoints api.Endpoints
 	err := r.ExtractObj(key, &endpoints, false)
 	if tools.IsEtcdNotFound(err) {
-		return nil, apiserver.NewNotFoundErr("endpoints", name)
+		return nil, errors.NewNotFound("endpoints", name)
 	}
 	if err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (r *Registry) DeleteService(name string) error {
 	key := makeServiceKey(name)
 	err := r.Delete(key, true)
 	if tools.IsEtcdNotFound(err) {
-		return apiserver.NewNotFoundErr("service", name)
+		return errors.NewNotFound("service", name)
 	}
 	if err != nil {
 		return err

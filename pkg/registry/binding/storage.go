@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
@@ -40,17 +41,17 @@ func NewBindingStorage(bindingRegistry Registry) *BindingStorage {
 
 // List returns an error because bindings are write-only objects.
 func (*BindingStorage) List(selector labels.Selector) (interface{}, error) {
-	return nil, apiserver.NewNotFoundErr("binding", "list")
+	return nil, errors.NewNotFound("binding", "list")
 }
 
 // Get returns an error because bindings are write-only objects.
 func (*BindingStorage) Get(id string) (interface{}, error) {
-	return nil, apiserver.NewNotFoundErr("binding", id)
+	return nil, errors.NewNotFound("binding", id)
 }
 
 // Delete returns an error because bindings are write-only objects.
 func (*BindingStorage) Delete(id string) (<-chan interface{}, error) {
-	return nil, apiserver.NewNotFoundErr("binding", id)
+	return nil, errors.NewNotFound("binding", id)
 }
 
 // New returns a new binding object fit for having data unmarshalled into it.

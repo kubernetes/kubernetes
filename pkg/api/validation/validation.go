@@ -37,11 +37,11 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 			el = validateSource(vol.Source).Prefix("source")
 		}
 		if len(vol.Name) == 0 {
-			el = append(el, errs.NewRequired("name", vol.Name))
+			el = append(el, errs.NewFieldRequired("name", vol.Name))
 		} else if !util.IsDNSLabel(vol.Name) {
-			el = append(el, errs.NewInvalid("name", vol.Name))
+			el = append(el, errs.NewFieldInvalid("name", vol.Name))
 		} else if allNames.Has(vol.Name) {
-			el = append(el, errs.NewDuplicate("name", vol.Name))
+			el = append(el, errs.NewFieldDuplicate("name", vol.Name))
 		}
 		if len(el) == 0 {
 			allNames.Insert(vol.Name)
@@ -64,7 +64,7 @@ func validateSource(source *api.VolumeSource) errs.ErrorList {
 		//EmptyDirs have nothing to validate
 	}
 	if numVolumes != 1 {
-		allErrs = append(allErrs, errs.NewInvalid("", source))
+		allErrs = append(allErrs, errs.NewFieldInvalid("", source))
 	}
 	return allErrs
 }
@@ -88,25 +88,25 @@ func validatePorts(ports []api.Port) errs.ErrorList {
 		port := &ports[i] // so we can set default values
 		if len(port.Name) > 0 {
 			if len(port.Name) > 63 || !util.IsDNSLabel(port.Name) {
-				pErrs = append(pErrs, errs.NewInvalid("name", port.Name))
+				pErrs = append(pErrs, errs.NewFieldInvalid("name", port.Name))
 			} else if allNames.Has(port.Name) {
-				pErrs = append(pErrs, errs.NewDuplicate("name", port.Name))
+				pErrs = append(pErrs, errs.NewFieldDuplicate("name", port.Name))
 			} else {
 				allNames.Insert(port.Name)
 			}
 		}
 		if port.ContainerPort == 0 {
-			pErrs = append(pErrs, errs.NewRequired("containerPort", port.ContainerPort))
+			pErrs = append(pErrs, errs.NewFieldRequired("containerPort", port.ContainerPort))
 		} else if !util.IsValidPortNum(port.ContainerPort) {
-			pErrs = append(pErrs, errs.NewInvalid("containerPort", port.ContainerPort))
+			pErrs = append(pErrs, errs.NewFieldInvalid("containerPort", port.ContainerPort))
 		}
 		if port.HostPort != 0 && !util.IsValidPortNum(port.HostPort) {
-			pErrs = append(pErrs, errs.NewInvalid("hostPort", port.HostPort))
+			pErrs = append(pErrs, errs.NewFieldInvalid("hostPort", port.HostPort))
 		}
 		if len(port.Protocol) == 0 {
 			port.Protocol = "TCP"
 		} else if !supportedPortProtocols.Has(strings.ToUpper(port.Protocol)) {
-			pErrs = append(pErrs, errs.NewNotSupported("protocol", port.Protocol))
+			pErrs = append(pErrs, errs.NewFieldNotSupported("protocol", port.Protocol))
 		}
 		allErrs = append(allErrs, pErrs.PrefixIndex(i)...)
 	}
@@ -120,10 +120,10 @@ func validateEnv(vars []api.EnvVar) errs.ErrorList {
 		vErrs := errs.ErrorList{}
 		ev := &vars[i] // so we can set default values
 		if len(ev.Name) == 0 {
-			vErrs = append(vErrs, errs.NewRequired("name", ev.Name))
+			vErrs = append(vErrs, errs.NewFieldRequired("name", ev.Name))
 		}
 		if !util.IsCIdentifier(ev.Name) {
-			vErrs = append(vErrs, errs.NewInvalid("name", ev.Name))
+			vErrs = append(vErrs, errs.NewFieldInvalid("name", ev.Name))
 		}
 		allErrs = append(allErrs, vErrs.PrefixIndex(i)...)
 	}
@@ -137,12 +137,12 @@ func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs
 		mErrs := errs.ErrorList{}
 		mnt := &mounts[i] // so we can set default values
 		if len(mnt.Name) == 0 {
-			mErrs = append(mErrs, errs.NewRequired("name", mnt.Name))
+			mErrs = append(mErrs, errs.NewFieldRequired("name", mnt.Name))
 		} else if !volumes.Has(mnt.Name) {
 			mErrs = append(mErrs, errs.NewNotFound("name", mnt.Name))
 		}
 		if len(mnt.MountPath) == 0 {
-			mErrs = append(mErrs, errs.NewRequired("mountPath", mnt.MountPath))
+			mErrs = append(mErrs, errs.NewFieldRequired("mountPath", mnt.MountPath))
 		}
 		allErrs = append(allErrs, mErrs.PrefixIndex(i)...)
 	}
@@ -163,7 +163,7 @@ func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool,
 				continue
 			}
 			if accumulator[port] {
-				cErrs = append(cErrs, errs.NewDuplicate("Port", port))
+				cErrs = append(cErrs, errs.NewFieldDuplicate("Port", port))
 			} else {
 				accumulator[port] = true
 			}
@@ -188,16 +188,16 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs := errs.ErrorList{}
 		ctr := &containers[i] // so we can set default values
 		if len(ctr.Name) == 0 {
-			cErrs = append(cErrs, errs.NewRequired("name", ctr.Name))
+			cErrs = append(cErrs, errs.NewFieldRequired("name", ctr.Name))
 		} else if !util.IsDNSLabel(ctr.Name) {
-			cErrs = append(cErrs, errs.NewInvalid("name", ctr.Name))
+			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name))
 		} else if allNames.Has(ctr.Name) {
-			cErrs = append(cErrs, errs.NewDuplicate("name", ctr.Name))
+			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
 		if len(ctr.Image) == 0 {
-			cErrs = append(cErrs, errs.NewRequired("image", ctr.Image))
+			cErrs = append(cErrs, errs.NewFieldRequired("image", ctr.Image))
 		}
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
@@ -224,9 +224,9 @@ func ValidateManifest(manifest *api.ContainerManifest) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
 	if len(manifest.Version) == 0 {
-		allErrs = append(allErrs, errs.NewRequired("version", manifest.Version))
+		allErrs = append(allErrs, errs.NewFieldRequired("version", manifest.Version))
 	} else if !supportedManifestVersions.Has(strings.ToLower(manifest.Version)) {
-		allErrs = append(allErrs, errs.NewNotSupported("version", manifest.Version))
+		allErrs = append(allErrs, errs.NewFieldNotSupported("version", manifest.Version))
 	}
 	allVolumes, errs := validateVolumes(manifest.Volumes)
 	allErrs = append(allErrs, errs.Prefix("volumes")...)
@@ -241,7 +241,7 @@ func ValidatePodState(podState *api.PodState) errs.ErrorList {
 	} else if podState.RestartPolicy.Type != api.RestartAlways &&
 		podState.RestartPolicy.Type != api.RestartOnFailure &&
 		podState.RestartPolicy.Type != api.RestartNever {
-		allErrs = append(allErrs, errs.NewNotSupported("restartPolicy.type", podState.RestartPolicy.Type))
+		allErrs = append(allErrs, errs.NewFieldNotSupported("restartPolicy.type", podState.RestartPolicy.Type))
 	}
 
 	return allErrs
@@ -251,7 +251,7 @@ func ValidatePodState(podState *api.PodState) errs.ErrorList {
 func ValidatePod(pod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(pod.ID) == 0 {
-		allErrs = append(allErrs, errs.NewRequired("id", pod.ID))
+		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
 	return allErrs
@@ -261,15 +261,15 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 func ValidateService(service *api.Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(service.ID) == 0 {
-		allErrs = append(allErrs, errs.NewRequired("id", service.ID))
+		allErrs = append(allErrs, errs.NewFieldRequired("id", service.ID))
 	} else if !util.IsDNS952Label(service.ID) {
-		allErrs = append(allErrs, errs.NewInvalid("id", service.ID))
+		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
 	}
 	if !util.IsValidPortNum(service.Port) {
-		allErrs = append(allErrs, errs.NewInvalid("Service.Port", service.Port))
+		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewRequired("selector", service.Selector))
+		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Selector))
 	}
 	return allErrs
 }
@@ -278,18 +278,18 @@ func ValidateService(service *api.Service) errs.ErrorList {
 func ValidateReplicationController(controller *api.ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(controller.ID) == 0 {
-		allErrs = append(allErrs, errs.NewRequired("id", controller.ID))
+		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
 	}
 	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewRequired("desiredState.replicaSelector", controller.DesiredState.ReplicaSelector))
+		allErrs = append(allErrs, errs.NewFieldRequired("desiredState.replicaSelector", controller.DesiredState.ReplicaSelector))
 	}
 	selector := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 	labels := labels.Set(controller.DesiredState.PodTemplate.Labels)
 	if !selector.Matches(labels) {
-		allErrs = append(allErrs, errs.NewInvalid("desiredState.podTemplate.labels", controller.DesiredState.PodTemplate))
+		allErrs = append(allErrs, errs.NewFieldInvalid("desiredState.podTemplate.labels", controller.DesiredState.PodTemplate))
 	}
 	if controller.DesiredState.Replicas < 0 {
-		allErrs = append(allErrs, errs.NewInvalid("desiredState.replicas", controller.DesiredState.Replicas))
+		allErrs = append(allErrs, errs.NewFieldInvalid("desiredState.replicas", controller.DesiredState.Replicas))
 	}
 	allErrs = append(allErrs, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest).Prefix("desiredState.podTemplate.desiredState.manifest")...)
 	return allErrs

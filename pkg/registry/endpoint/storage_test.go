@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -45,13 +45,13 @@ func TestGetEndpoints(t *testing.T) {
 
 func TestGetEndpointsMissingService(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
-		Err: apiserver.NewNotFoundErr("service", "foo"),
+		Err: errors.NewNotFound("service", "foo"),
 	}
 	storage := NewStorage(registry)
 
 	// returns service not found
 	_, err := storage.Get("foo")
-	if !apiserver.IsNotFound(err) || !reflect.DeepEqual(err, apiserver.NewNotFoundErr("service", "foo")) {
+	if !errors.IsNotFound(err) || !reflect.DeepEqual(err, errors.NewNotFound("service", "foo")) {
 		t.Errorf("expected NotFound error, got %#v", err)
 	}
 

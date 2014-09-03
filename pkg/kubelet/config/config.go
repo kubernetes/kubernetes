@@ -251,7 +251,7 @@ func filterInvalidPods(pods []kubelet.Pod, source string) (filtered []*kubelet.P
 	for i := range pods {
 		var errors []error
 		if names.Has(pods[i].Name) {
-			errors = append(errors, apierrs.NewDuplicate("Pod.Name", pods[i].Name))
+			errors = append(errors, apierrs.NewFieldDuplicate("name", pods[i].Name))
 		} else {
 			names.Insert(pods[i].Name)
 		}

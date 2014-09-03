@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -331,7 +332,7 @@ func TestGet(t *testing.T) {
 func TestGetMissing(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"get": NewNotFoundErr("simple", "id")},
+		errors: map[string]error{"get": apierrs.NewNotFound("simple", "id")},
 	}
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version")
@@ -371,7 +372,7 @@ func TestDeleteMissing(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"delete": NewNotFoundErr("simple", ID)},
+		errors: map[string]error{"delete": apierrs.NewNotFound("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version")
@@ -421,7 +422,7 @@ func TestUpdateMissing(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
-		errors: map[string]error{"update": NewNotFoundErr("simple", ID)},
+		errors: map[string]error{"update": apierrs.NewNotFound("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version")
@@ -490,7 +491,7 @@ func TestCreateNotFound(t *testing.T) {
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
 			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
-			errors: map[string]error{"create": NewNotFoundErr("simple", "id")},
+			errors: map[string]error{"create": apierrs.NewNotFound("simple", "id")},
 		},
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
@@ -597,41 +598,10 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *a
 	return &status
 }
 
-func TestErrorsToAPIStatus(t *testing.T) {
-	cases := map[error]api.Status{
-		NewAlreadyExistsErr("foo", "bar"): {
-			Status:  api.StatusFailure,
-			Code:    http.StatusConflict,
-			Reason:  "already_exists",
-			Message: "foo \"bar\" already exists",
-			Details: &api.StatusDetails{
-				Kind: "foo",
-				ID:   "bar",
-			},
-		},
-		NewConflictErr("foo", "bar", errors.New("failure")): {
-			Status:  api.StatusFailure,
-			Code:    http.StatusConflict,
-			Reason:  "conflict",
-			Message: "foo \"bar\" cannot be updated: failure",
-			Details: &api.StatusDetails{
-				Kind: "foo",
-				ID:   "bar",
-			},
-		},
-	}
-	for k, v := range cases {
-		actual := errToAPIStatus(k)
-		if !reflect.DeepEqual(actual, &v) {
-			t.Errorf("Expected %#v, Got %#v", v, actual)
-		}
-	}
-}
-
 func TestAsyncDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
-			return nil, NewAlreadyExistsErr("foo", "bar")
+			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
 	}
 	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
@@ -649,7 +619,7 @@ func TestAsyncCreateError(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj interface{}) (interface{}, error) {
 			<-ch
-			return nil, NewAlreadyExistsErr("foo", "bar")
+			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
 	}
 	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version")
@@ -673,7 +643,7 @@ func TestAsyncCreateError(t *testing.T) {
 	time.Sleep(time.Millisecond)
 
 	finalStatus := expectApiStatus(t, "GET", fmt.Sprintf("%s/prefix/version/operations/%s?after=1", server.URL, status.Details.ID), []byte{}, http.StatusOK)
-	expectedErr := NewAlreadyExistsErr("foo", "bar")
+	expectedErr := apierrs.NewAlreadyExists("foo", "bar")
 	expectedStatus := &api.Status{
 		Status:  api.StatusFailure,
 		Code:    http.StatusConflict,

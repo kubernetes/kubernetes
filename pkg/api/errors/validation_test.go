@@ -28,23 +28,23 @@ func TestMakeFuncs(t *testing.T) {
 		expected ValidationErrorType
 	}{
 		{
-			func() ValidationError { return NewInvalid("f", "v") },
+			func() ValidationError { return NewFieldInvalid("f", "v") },
 			ValidationErrorTypeInvalid,
 		},
 		{
-			func() ValidationError { return NewNotSupported("f", "v") },
+			func() ValidationError { return NewFieldNotSupported("f", "v") },
 			ValidationErrorTypeNotSupported,
 		},
 		{
-			func() ValidationError { return NewDuplicate("f", "v") },
+			func() ValidationError { return NewFieldDuplicate("f", "v") },
 			ValidationErrorTypeDuplicate,
 		},
 		{
-			func() ValidationError { return NewNotFound("f", "v") },
+			func() ValidationError { return NewFieldNotFound("f", "v") },
 			ValidationErrorTypeNotFound,
 		},
 		{
-			func() ValidationError { return NewRequired("f", "v") },
+			func() ValidationError { return NewFieldRequired("f", "v") },
 			ValidationErrorTypeRequired,
 		},
 	}
@@ -58,7 +58,7 @@ func TestMakeFuncs(t *testing.T) {
 }
 
 func TestValidationError(t *testing.T) {
-	s := NewInvalid("foo", "bar").Error()
+	s := NewFieldInvalid("foo", "bar").Error()
 	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
 		t.Errorf("error message did not contain expected values, got %s", s)
 	}
@@ -72,7 +72,7 @@ func TestErrorList(t *testing.T) {
 	if a := errorListInternal(errList).Error(); a != "" {
 		t.Errorf("expected empty string, got %v", a)
 	}
-	errList = append(errList, NewInvalid("field", "value"))
+	errList = append(errList, NewFieldInvalid("field", "value"))
 	// The fact that this compiles is the test.
 }
 
@@ -108,15 +108,15 @@ func TestErrListPrefix(t *testing.T) {
 		Expected string
 	}{
 		{
-			NewNotFound("[0].bar", "value"),
+			NewFieldNotFound("[0].bar", "value"),
 			"foo[0].bar",
 		},
 		{
-			NewInvalid("field", "value"),
+			NewFieldInvalid("field", "value"),
 			"foo.field",
 		},
 		{
-			NewDuplicate("", "value"),
+			NewFieldDuplicate("", "value"),
 			"foo",
 		},
 	}
@@ -138,15 +138,15 @@ func TestErrListPrefixIndex(t *testing.T) {
 		Expected string
 	}{
 		{
-			NewNotFound("[0].bar", "value"),
+			NewFieldNotFound("[0].bar", "value"),
 			"[1][0].bar",
 		},
 		{
-			NewInvalid("field", "value"),
+			NewFieldInvalid("field", "value"),
 			"[1].field",
 		},
 		{
-			NewDuplicate("", "value"),
+			NewFieldDuplicate("", "value"),
 			"[1]",
 		},
 	}

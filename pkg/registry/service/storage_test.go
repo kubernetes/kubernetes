@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -79,7 +80,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
-		if !apiserver.IsInvalid(err) {
+		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
 
@@ -140,7 +141,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
-		if !apiserver.IsInvalid(err) {
+		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
 	}
