@@ -24,7 +24,7 @@ import (
 
 func ValidatePod(pod *Pod) (errors []error) {
 	if !util.IsDNSSubdomain(pod.Name) {
-		errors = append(errors, apierrs.NewInvalid("Pod.Name", pod.Name))
+		errors = append(errors, apierrs.NewFieldInvalid("name", pod.Name))
 	}
 	if errs := validation.ValidateManifest(&pod.Manifest); len(errs) != 0 {
 		errors = append(errors, errs...)

@@ -17,147 +17,117 @@ limitations under the License.
 package errors
 
 import (
+	"errors"
 	"fmt"
-	"strings"
+	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func TestMakeFuncs(t *testing.T) {
+func TestErrorNew(t *testing.T) {
+	err := NewAlreadyExists("test", "1")
+	if !IsAlreadyExists(err) {
+		t.Errorf("expected to be already_exists")
+	}
+	if IsConflict(err) {
+		t.Errorf("expected to not be confict")
+	}
+	if IsNotFound(err) {
+		t.Errorf(fmt.Sprintf("expected to not be %s", api.StatusReasonNotFound))
+	}
+	if IsInvalid(err) {
+		t.Errorf("expected to not be invalid")
+	}
+
+	if !IsConflict(NewConflict("test", "2", errors.New("message"))) {
+		t.Errorf("expected to be conflict")
+	}
+	if !IsNotFound(NewNotFound("test", "3")) {
+		t.Errorf("expected to be not found")
+	}
+	if !IsInvalid(NewInvalid("test", "2", nil)) {
+		t.Errorf("expected to be invalid")
+	}
+}
+
+func TestNewInvalid(t *testing.T) {
 	testCases := []struct {
-		fn       func() ValidationError
-		expected ValidationErrorType
+		Err     ValidationError
+		Details *api.StatusDetails
 	}{
 		{
-			func() ValidationError { return NewInvalid("f", "v") },
-			ValidationErrorTypeInvalid,
+			NewFieldDuplicate("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueDuplicate,
+					Field: "field[0].name",
+				}},
+			},
 		},
 		{
-			func() ValidationError { return NewNotSupported("f", "v") },
-			ValidationErrorTypeNotSupported,
+			NewFieldInvalid("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueInvalid,
+					Field: "field[0].name",
+				}},
+			},
 		},
 		{
-			func() ValidationError { return NewDuplicate("f", "v") },
-			ValidationErrorTypeDuplicate,
+			NewFieldNotFound("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueNotFound,
+					Field: "field[0].name",
+				}},
+			},
 		},
 		{
-			func() ValidationError { return NewNotFound("f", "v") },
-			ValidationErrorTypeNotFound,
+			NewFieldNotSupported("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueNotSupported,
+					Field: "field[0].name",
+				}},
+			},
 		},
 		{
-			func() ValidationError { return NewRequired("f", "v") },
-			ValidationErrorTypeRequired,
+			NewFieldRequired("field[0].name", "bar"),
+			&api.StatusDetails{
+				Kind: "kind",
+				ID:   "name",
+				Causes: []api.StatusCause{{
+					Type:  api.CauseTypeFieldValueRequired,
+					Field: "field[0].name",
+				}},
+			},
 		},
 	}
-
-	for _, testCase := range testCases {
-		err := testCase.fn()
-		if err.Type != testCase.expected {
-			t.Errorf("expected Type %q, got %q", testCase.expected, err.Type)
+	for i, testCase := range testCases {
+		vErr, expected := testCase.Err, testCase.Details
+		expected.Causes[0].Message = vErr.Error()
+		err := NewInvalid("kind", "name", ErrorList{vErr})
+		status := err.(*statusError).Status()
+		if status.Code != 422 || status.Reason != api.StatusReasonInvalid {
+			t.Errorf("%d: unexpected status: %#v", i, status)
+		}
+		if !reflect.DeepEqual(expected, status.Details) {
+			t.Errorf("%d: expected %#v, got %#v", expected, status.Details)
 		}
 	}
 }
 
-func TestValidationError(t *testing.T) {
-	s := NewInvalid("foo", "bar").Error()
-	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
-		t.Errorf("error message did not contain expected values, got %s", s)
-	}
-}
-
-func TestErrorList(t *testing.T) {
-	errList := ErrorList{}
-	if a := errList.ToError(); a != nil {
-		t.Errorf("unexpected non-nil error for empty list: %v", a)
-	}
-	if a := errorListInternal(errList).Error(); a != "" {
-		t.Errorf("expected empty string, got %v", a)
-	}
-	errList = append(errList, NewInvalid("field", "value"))
-	// The fact that this compiles is the test.
-}
-
-func TestErrorListToError(t *testing.T) {
-	errList := ErrorList{}
-	err := errList.ToError()
-	if err != nil {
-		t.Errorf("expected nil, got %v", err)
-	}
-
-	testCases := []struct {
-		errs     ErrorList
-		expected string
-	}{
-		{ErrorList{fmt.Errorf("abc")}, "abc"},
-		{ErrorList{fmt.Errorf("abc"), fmt.Errorf("123")}, "abc; 123"},
-	}
-	for _, testCase := range testCases {
-		err := testCase.errs.ToError()
-		if err == nil {
-			t.Errorf("expected an error, got nil: ErrorList=%v", testCase)
-			continue
-		}
-		if err.Error() != testCase.expected {
-			t.Errorf("expected %q, got %q", testCase.expected, err.Error())
-		}
-	}
-}
-
-func TestErrListPrefix(t *testing.T) {
-	testCases := []struct {
-		Err      ValidationError
-		Expected string
-	}{
-		{
-			NewNotFound("[0].bar", "value"),
-			"foo[0].bar",
-		},
-		{
-			NewInvalid("field", "value"),
-			"foo.field",
-		},
-		{
-			NewDuplicate("", "value"),
-			"foo",
-		},
-	}
-	for _, testCase := range testCases {
-		errList := ErrorList{testCase.Err}
-		prefix := errList.Prefix("foo")
-		if prefix == nil || len(prefix) != len(errList) {
-			t.Errorf("Prefix should return self")
-		}
-		if e, a := testCase.Expected, errList[0].(ValidationError).Field; e != a {
-			t.Errorf("expected %s, got %s", e, a)
-		}
-	}
-}
-
-func TestErrListPrefixIndex(t *testing.T) {
-	testCases := []struct {
-		Err      ValidationError
-		Expected string
-	}{
-		{
-			NewNotFound("[0].bar", "value"),
-			"[1][0].bar",
-		},
-		{
-			NewInvalid("field", "value"),
-			"[1].field",
-		},
-		{
-			NewDuplicate("", "value"),
-			"[1]",
-		},
-	}
-	for _, testCase := range testCases {
-		errList := ErrorList{testCase.Err}
-		prefix := errList.PrefixIndex(1)
-		if prefix == nil || len(prefix) != len(errList) {
-			t.Errorf("PrefixIndex should return self")
-		}
-		if e, a := testCase.Expected, errList[0].(ValidationError).Field; e != a {
-			t.Errorf("expected %s, got %s", e, a)
-		}
+func Test_reasonForError(t *testing.T) {
+	if e, a := api.StatusReasonUnknown, reasonForError(nil); e != a {
+		t.Errorf("unexpected reason type: %#v", a)
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -61,7 +62,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	// Pod Manifest ID should be assigned by the pod API
 	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, apiserver.NewInvalidErr("replicationController", controller.ID, errs)
+		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
 	}
 
 	controller.CreationTimestamp = util.Now()
@@ -120,7 +121,7 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, apiserver.NewInvalidErr("replicationController", controller.ID, errs)
+		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (interface{}, error) {
 		err := rs.registry.UpdateController(*controller)
