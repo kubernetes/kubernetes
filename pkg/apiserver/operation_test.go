@@ -107,7 +107,7 @@ func TestOperationsList(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", false)
+	}, codec, "/prefix/version")
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
@@ -163,7 +163,7 @@ func TestOpGet(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", false)
+	}, codec, "/prefix/version")
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}

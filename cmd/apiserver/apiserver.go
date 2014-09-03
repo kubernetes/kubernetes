@@ -36,22 +36,25 @@ import (
 )
 
 var (
-	port                        = flag.Uint("port", 8080, "The port to listen on.  Default 8080.")
-	address                     = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
-	apiPrefix                   = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
-	enableCORS                  = flag.Bool("enable_cors", false, "If true, the basic CORS implementation will be enabled. [default false]")
-	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
-	cloudConfigFile             = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	minionRegexp                = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
-	minionPort                  = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
-	healthCheckMinions          = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
-	minionCacheTTL              = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. [default 30 seconds]")
-	etcdServerList, machineList util.StringList
+	port                  = flag.Uint("port", 8080, "The port to listen on.  Default 8080.")
+	address               = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
+	apiPrefix             = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
+	enableCORS            = flag.Bool("enable_cors", false, "If true, the basic CORS implementation will be enabled. [default false]")
+	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	cloudConfigFile       = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	minionRegexp          = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
+	minionPort            = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
+	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
+	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. [default 30 seconds]")
+	etcdServerList        util.StringList
+	machineList           util.StringList
+	corsAllowedOriginList util.StringList
 )
 
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
+	flag.Var(&corsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 }
 
 func verifyMinionFlags() {
@@ -133,9 +136,15 @@ func main() {
 	})
 
 	storage, codec := m.API_v1beta1()
+
+	handler := apiserver.Handle(storage, codec, *apiPrefix)
+	if len(corsAllowedOriginList) > 0 {
+		handler = apiserver.CORS(handler, corsAllowedOriginList, nil, nil, "true")
+	}
+
 	s := &http.Server{
 		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
-		Handler:        apiserver.Handle(storage, codec, *apiPrefix, *enableCORS),
+		Handler:        handler,
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,

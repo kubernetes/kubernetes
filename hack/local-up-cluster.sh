@@ -39,7 +39,8 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
-API_ENABLE_CORS=${API_ENABLE_CORS:-false}
+# By default only allow CORS for requests on localhost
+API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-127.0.0.1:.*,localhost:.*}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 
 GO_OUT=$(dirname $0)/../_output/go/bin
@@ -50,7 +51,7 @@ APISERVER_LOG=/tmp/apiserver.log
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
   --machines="127.0.0.1" \
-  --enable_cors="${API_ENABLE_CORS}" >"${APISERVER_LOG}" 2>&1 &
+  --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
 APISERVER_PID=$!
 
 CTLRMGR_LOG=/tmp/controller-manager.log

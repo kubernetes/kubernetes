@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -58,13 +59,25 @@ func RecoverPanics(handler http.Handler) http.Handler {
 // For a more detailed implementation use https://github.com/martini-contrib/cors
 // or implement CORS at your proxy layer
 // Pass nil for allowedMethods and allowedHeaders to use the defaults
-func CORS(handler http.Handler, allowedOriginPatterns []string, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
+func CORS(handler http.Handler, allowedOriginPatterns util.StringList, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
+	// Compile the regular expressions once upfront
+	allowedOriginRegexps := []*regexp.Regexp{}
+	for _, allowedOrigin := range allowedOriginPatterns {
+		allowedOriginRegexp, err := regexp.Compile(allowedOrigin)
+		if err != nil {
+			glog.Fatalf("Invalid CORS allowed origin regexp: %v", err)
+		}
+		allowedOriginRegexps = append(allowedOriginRegexps, allowedOriginRegexp)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		origin := req.Header.Get("Origin")
 		if origin != "" {
 			allowed := false
-			for _, pattern := range allowedOriginPatterns {
-				allowed, _ = regexp.MatchString(pattern, origin)
+			for _, pattern := range allowedOriginRegexps {
+				if allowed = pattern.MatchString(origin); allowed {
+					break
+				}
 			}
 			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)

@@ -55,11 +55,7 @@ func Handle(storage map[string]RESTStorage, codec runtime.Codec, prefix string) 
 	mux := http.NewServeMux()
 	group.InstallREST(mux, prefix)
 	InstallSupport(mux)
-	handler := RecoverPanics(mux)
-	if enableCORS {
-		handler = CORS(handler, []string{".*"}, nil, nil, "true")
-	}
-	return &defaultAPIServer{handler, group}
+	return &defaultAPIServer{RecoverPanics(mux), group}
 }
 
 // APIGroup is a http.Handler that exposes multiple RESTStorage objects
