@@ -131,7 +131,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`
 }
 ```
 
-to create the service by running:
+to create the replication controller by running:
 
 ```shell
 $ cluster/kubecfg.sh -c examples/guestbook/redis-slave-controller.json create replicationControllers
