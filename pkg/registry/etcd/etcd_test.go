@@ -679,7 +679,7 @@ func TestEtcdListServices(t *testing.T) {
 	}
 
 	if len(services.Items) != 2 || services.Items[0].ID != "foo" || services.Items[1].ID != "bar" {
-		t.Errorf("Unexpected pod list: %#v", services)
+		t.Errorf("Unexpected service list: %#v", services)
 	}
 }
 
@@ -801,6 +801,35 @@ func TestEtcdUpdateService(t *testing.T) {
 	testService.ResourceVersion = 0
 	if !reflect.DeepEqual(*svc, testService) {
 		t.Errorf("Unexpected service: got\n %#v\n, wanted\n %#v", svc, testService)
+	}
+}
+
+func TestEtcdListEndpoints(t *testing.T) {
+	fakeClient := tools.NewFakeEtcdClient(t)
+	key := "/registry/services/endpoints"
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: runtime.EncodeOrDie(api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:8345"}}),
+					},
+					{
+						Value: runtime.EncodeOrDie(api.Endpoints{JSONBase: api.JSONBase{ID: "bar"}}),
+					},
+				},
+			},
+		},
+		E: nil,
+	}
+	registry := NewTestEtcdRegistry(fakeClient)
+	services, err := registry.ListEndpoints()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(services.Items) != 2 || services.Items[0].ID != "foo" || services.Items[1].ID != "bar" {
+		t.Errorf("Unexpected endpoints list: %#v", services)
 	}
 }
 

@@ -32,10 +32,13 @@ type FakeAction struct {
 // implementation. This makes faking out just the method you want to test easier.
 type Fake struct {
 	// Fake by default keeps a simple list of the methods that have been called.
-	Actions []FakeAction
-	Pods    api.PodList
-	Ctrl    api.ReplicationController
-	Watch   watch.Interface
+	Actions       []FakeAction
+	Pods          api.PodList
+	Ctrl          api.ReplicationController
+	ServiceList   api.ServiceList
+	EndpointsList api.EndpointsList
+	Err           error
+	Watch         watch.Interface
 }
 
 func (c *Fake) ListPods(selector labels.Selector) (api.PodList, error) {
@@ -93,6 +96,11 @@ func (c *Fake) WatchReplicationControllers(label, field labels.Selector, resourc
 	return c.Watch, nil
 }
 
+func (c *Fake) ListServices(selector labels.Selector) (api.ServiceList, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "list-services"})
+	return c.ServiceList, c.Err
+}
+
 func (c *Fake) GetService(name string) (api.Service, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-service", Value: name})
 	return api.Service{}, nil
@@ -115,12 +123,17 @@ func (c *Fake) DeleteService(service string) error {
 
 func (c *Fake) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-services", Value: resourceVersion})
-	return c.Watch, nil
+	return c.Watch, c.Err
+}
+
+func (c *Fake) ListEndpoints(selector labels.Selector) (api.EndpointsList, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "list-endpoints"})
+	return c.EndpointsList, c.Err
 }
 
 func (c *Fake) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
-	return c.Watch, nil
+	return c.Watch, c.Err
 }
 
 func (c *Fake) ServerVersion() (*version.Info, error) {

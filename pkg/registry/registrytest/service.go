@@ -27,10 +27,11 @@ func NewServiceRegistry() *ServiceRegistry {
 }
 
 type ServiceRegistry struct {
-	List      api.ServiceList
-	Service   *api.Service
-	Err       error
-	Endpoints api.Endpoints
+	List          api.ServiceList
+	Service       *api.Service
+	Err           error
+	Endpoints     api.Endpoints
+	EndpointsList api.EndpointsList
 
 	DeletedID string
 	GottenID  string
@@ -64,6 +65,10 @@ func (r *ServiceRegistry) UpdateService(svc api.Service) error {
 
 func (r *ServiceRegistry) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return nil, r.Err
+}
+
+func (r *ServiceRegistry) ListEndpoints() (*api.EndpointsList, error) {
+	return &r.EndpointsList, r.Err
 }
 
 func (r *ServiceRegistry) GetEndpoints(id string) (*api.Endpoints, error) {
