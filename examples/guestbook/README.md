@@ -52,9 +52,9 @@ cluster/kubecfg.sh list pods
 You'll see a single redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds).
 
 ```
-  ID                Image(s)            Host                                          Labels
-----------          ----------          ----------                                    ----------
-redis-master-2      dockerfile/redis    kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
+  ID                Image(s)            Host                                          Labels                 Status
+----------          ----------          ----------                                    ----------             ----------
+redis-master-2      dockerfile/redis    kubernetes-minion-3.c.briandpe-api.internal   name=redis-master      Running
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
@@ -106,7 +106,7 @@ Although the redis master is a single pod, the redis read slaves are a 'replicat
 Use the file `examples/guestbook/redis-slave-controller.json`
 
 ```js
-{ 
+{
   "id": "redisSlaveController",
   "kind": "ReplicationController",
   "apiVersion": "v1beta1",
@@ -150,11 +150,11 @@ Once that's up you can list the pods in the cluster, to verify that the master a
 
 ```shell
 $ cluster/kubecfg.sh list pods
-  ID                Image(s)                   Host                                          Labels
-----------          ----------                 ----------                                    ----------
-redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
-4d65822107fcfd52    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
-78629a0f5f3f164f    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
+  ID                Image(s)                   Host                                          Labels                                                          Status
+----------          ----------                 ----------                                    ----------                                                      ----------
+redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master                                               Running
+4d65822107fcfd52    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController      Running
+78629a0f5f3f164f    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController      Running
 ```
 
 You will see a single redis master pod and two redis slave pods.
@@ -234,14 +234,14 @@ Once that's up (it may take ten to thirty seconds to create the pods) you can li
 
 ```shell
 $ cluster/kubecfg.sh list pods
-  ID                Image(s)                   Host                                          Labels
-----------          ----------                 ----------                                    ----------
-redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master
-4d65822107fcfd52    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
-380704bb7b4d7c03    brendanburns/php-redis     kubernetes-minion-3.c.briandpe-api.internal   name=frontend,replicationController=frontendController
-55104dc76695721d    brendanburns/php-redis     kubernetes-minion-2.c.briandpe-api.internal   name=frontend,replicationController=frontendController
-365a858149c6e2d1    brendanburns/php-redis     kubernetes-minion-1.c.briandpe-api.internal   name=frontend,replicationController=frontendController
-78629a0f5f3f164f    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController
+  ID                Image(s)                   Host                                          Labels                                                         Status
+----------          ----------                 ----------                                    ----------                                                     ----------
+redis-master-2      dockerfile/redis           kubernetes-minion-3.c.briandpe-api.internal   name=redis-master                                              Running
+4d65822107fcfd52    brendanburns/redis-slave   kubernetes-minion-3.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController     Running
+380704bb7b4d7c03    brendanburns/php-redis     kubernetes-minion-3.c.briandpe-api.internal   name=frontend,replicationController=frontendController         Running
+55104dc76695721d    brendanburns/php-redis     kubernetes-minion-2.c.briandpe-api.internal   name=frontend,replicationController=frontendController         Running
+365a858149c6e2d1    brendanburns/php-redis     kubernetes-minion-1.c.briandpe-api.internal   name=frontend,replicationController=frontendController         Running
+78629a0f5f3f164f    brendanburns/redis-slave   kubernetes-minion-4.c.briandpe-api.internal   name=redisslave,replicationController=redisSlaveController     Running
 ```
 
 You will see a single redis master pod, two redis slaves, and three frontend pods.
@@ -288,7 +288,7 @@ if (isset($_GET['cmd']) === true) {
 } ?>
 ```
 
-To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:8000`. 
+To play with the service itself, find the name of a frontend, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:8000`.
 
 ```shell
 $ gcutil listinstances
