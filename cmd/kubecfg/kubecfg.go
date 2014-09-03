@@ -66,21 +66,24 @@ var parser = kubecfg.NewParser(map[string]interface{}{
 })
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `usage: kubecfg -h [-c config/file.json] [-p :,..., :] <method>
+	fmt.Fprintf(os.Stderr, `Usage: kubecfg -h [-c config/file.json] <method>
 
-  Kubernetes REST API:
+Kubernetes REST API:
+
   kubecfg [OPTIONS] get|list|create|delete|update <%s>[/<id>]
 
-  Manage replication controllers:
+Manage replication controllers:
+
   kubecfg [OPTIONS] stop|rm <controller>
-  kubecfg [OPTIONS] [-u <time>] [-image image] rollingupdate <controller>
+  kubecfg [OPTIONS] [-u <time>] [-image <image>] rollingupdate <controller>
   kubecfg [OPTIONS] resize <controller> <replicas>
 
-  Launch a simple ReplicationController with a single container based
-  on the given image:
+Launch a simple ReplicationController with a single container based
+on the given image:
+
   kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
 
-  Options:
+Options:
 `, prettyWireStorage())
 	flag.PrintDefaults()
 
