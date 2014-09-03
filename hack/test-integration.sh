@@ -36,7 +36,8 @@ trap cleanup EXIT SIGINT
 echo
 echo Integration test cases ...
 echo
-$(dirname $0)/../hack/test-go.sh test/integration -tags 'integration no-docker'
+GOFLAGS="-tags 'integration no-docker'" \
+    $(dirname $0)/../hack/test-go.sh test/integration
 # leave etcd running if integration tests fail
 trap "echo etcd still running" EXIT
 
