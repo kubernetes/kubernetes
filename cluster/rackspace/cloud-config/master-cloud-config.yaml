@@ -6,6 +6,7 @@ write_files:
       roles:
         - kubernetes-master
       cloud: rackspace
+      etcd_servers: KUBE_MASTER
   path: /etc/salt/minion.d/grains.conf
 - content: |
     auto_accept: True

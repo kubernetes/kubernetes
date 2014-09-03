@@ -31,6 +31,7 @@ echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
 verify-prereqs
 kube-up
 
-source $(dirname $0)/validate-cluster.sh
+# skipping validation for now until since machines show up as private IPs
+# source $(dirname $0)/validate-cluster.sh
 
 echo "Done"
