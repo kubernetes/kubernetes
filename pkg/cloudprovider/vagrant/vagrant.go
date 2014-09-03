@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -38,7 +39,7 @@ type VagrantCloud struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("vagrant", func() (cloudprovider.Interface, error) { return newVagrantCloud() })
+	cloudprovider.RegisterCloudProvider("vagrant", func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
 }
 
 // SaltToken is an authorization token required by Salt REST API.

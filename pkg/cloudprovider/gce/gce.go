@@ -18,6 +18,7 @@ package gce_cloud
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -40,7 +41,7 @@ type GCECloud struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("gce", func() (cloudprovider.Interface, error) { return newGCECloud() })
+	cloudprovider.RegisterCloudProvider("gce", func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud() })
 }
 
 func getProjectAndZone() (string, string, error) {

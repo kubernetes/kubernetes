@@ -22,6 +22,7 @@ import (
 	"flag"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -39,6 +40,7 @@ var (
 	address                     = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
 	apiPrefix                   = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
 	cloudProvider               = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	cloudConfigFile             = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	minionRegexp                = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
 	minionPort                  = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
 	healthCheckMinions          = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
@@ -63,6 +65,37 @@ func verifyMinionFlags() {
 	}
 }
 
+func initCloudProvider(name string, configFilePath string) cloudprovider.Interface {
+	var config *os.File
+
+	if name == "" {
+		glog.Info("No cloud provider specified.")
+		return nil
+	}
+
+	if configFilePath != "" {
+		var err error
+
+		config, err = os.Open(configFilePath)
+		if err != nil {
+			glog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
+				configFilePath, err)
+		}
+
+		defer config.Close()
+	}
+
+	cloud, err := cloudprovider.GetCloudProvider(name, config)
+	if err != nil {
+		glog.Fatalf("Couldn't init cloud provider %q: %#v", name, err)
+	}
+	if cloud == nil {
+		glog.Fatalf("Unknown cloud provider: %s", name)
+	}
+
+	return cloud
+}
+
 func main() {
 	flag.Parse()
 	util.InitLogs()
@@ -75,17 +108,7 @@ func main() {
 		glog.Fatalf("-etcd_servers flag is required.")
 	}
 
-	cloud, err := cloudprovider.GetCloudProvider(*cloudProvider)
-	if err != nil {
-		glog.Fatalf("Couldn't init cloud provider %q: %#v", *cloudProvider, err)
-	}
-	if cloud == nil {
-		if len(*cloudProvider) > 0 {
-			glog.Fatalf("Unknown cloud provider: %s", *cloudProvider)
-		} else {
-			glog.Info("No cloud provider specified.")
-		}
-	}
+	cloud := initCloudProvider(*cloudProvider, *cloudConfigFile)
 
 	podInfoGetter := &client.HTTPPodInfoGetter{
 		Client: http.DefaultClient,
