@@ -47,8 +47,8 @@ type Interface interface {
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
 	ListPods(selector labels.Selector) (api.PodList, error)
-	GetPod(name string) (api.Pod, error)
-	DeletePod(name string) error
+	GetPod(id string) (api.Pod, error)
+	DeletePod(id string) error
 	CreatePod(api.Pod) (api.Pod, error)
 	UpdatePod(api.Pod) (api.Pod, error)
 }
@@ -56,7 +56,7 @@ type PodInterface interface {
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
 	ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error)
-	GetReplicationController(name string) (api.ReplicationController, error)
+	GetReplicationController(id string) (api.ReplicationController, error)
 	CreateReplicationController(api.ReplicationController) (api.ReplicationController, error)
 	UpdateReplicationController(api.ReplicationController) (api.ReplicationController, error)
 	DeleteReplicationController(string) error
@@ -65,7 +65,7 @@ type ReplicationControllerInterface interface {
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	GetService(name string) (api.Service, error)
+	GetService(id string) (api.Service, error)
 	CreateService(api.Service) (api.Service, error)
 	UpdateService(api.Service) (api.Service, error)
 	DeleteService(string) error
@@ -247,15 +247,15 @@ func (c *Client) ListPods(selector labels.Selector) (result api.PodList, err err
 	return
 }
 
-// GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs.
-func (c *Client) GetPod(name string) (result api.Pod, err error) {
-	err = c.Get().Path("pods").Path(name).Do().Into(&result)
+// GetPod takes the id of the pod, and returns the corresponding Pod object, and an error if it occurs
+func (c *Client) GetPod(id string) (result api.Pod, err error) {
+	err = c.Get().Path("pods").Path(id).Do().Into(&result)
 	return
 }
 
-// DeletePod takes the name of the pod, and returns an error if one occurs.
-func (c *Client) DeletePod(name string) error {
-	return c.Delete().Path("pods").Path(name).Do().Error()
+// DeletePod takes the id of the pod, and returns an error if one occurs
+func (c *Client) DeletePod(id string) error {
+	return c.Delete().Path("pods").Path(id).Do().Error()
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
@@ -281,8 +281,8 @@ func (c *Client) ListReplicationControllers(selector labels.Selector) (result ap
 }
 
 // GetReplicationController returns information about a particular replication controller.
-func (c *Client) GetReplicationController(name string) (result api.ReplicationController, err error) {
-	err = c.Get().Path("replicationControllers").Path(name).Do().Into(&result)
+func (c *Client) GetReplicationController(id string) (result api.ReplicationController, err error) {
+	err = c.Get().Path("replicationControllers").Path(id).Do().Into(&result)
 	return
 }
 
@@ -303,8 +303,8 @@ func (c *Client) UpdateReplicationController(controller api.ReplicationControlle
 }
 
 // DeleteReplicationController deletes an existing replication controller.
-func (c *Client) DeleteReplicationController(name string) error {
-	return c.Delete().Path("replicationControllers").Path(name).Do().Error()
+func (c *Client) DeleteReplicationController(id string) error {
+	return c.Delete().Path("replicationControllers").Path(id).Do().Error()
 }
 
 // WatchReplicationControllers returns a watch.Interface that watches the requested controllers.
@@ -324,8 +324,8 @@ func (c *Client) ListServices(selector labels.Selector) (list api.ServiceList, e
 }
 
 // GetService returns information about a particular service.
-func (c *Client) GetService(name string) (result api.Service, err error) {
-	err = c.Get().Path("services").Path(name).Do().Into(&result)
+func (c *Client) GetService(id string) (result api.Service, err error) {
+	err = c.Get().Path("services").Path(id).Do().Into(&result)
 	return
 }
 
@@ -346,8 +346,8 @@ func (c *Client) UpdateService(svc api.Service) (result api.Service, err error) 
 }
 
 // DeleteService deletes an existing service.
-func (c *Client) DeleteService(name string) error {
-	return c.Delete().Path("services").Path(name).Do().Error()
+func (c *Client) DeleteService(id string) error {
+	return c.Delete().Path("services").Path(id).Do().Error()
 }
 
 // WatchServices returns a watch.Interface that watches the requested services.
