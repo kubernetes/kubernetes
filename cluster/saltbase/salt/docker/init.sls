@@ -44,7 +44,7 @@ docker-io:
 docker:
   service.running:
     - enable: True
-    - require: 
+    - require:
       - pkg: docker-io
 
 {% else %}
@@ -61,19 +61,13 @@ docker:
 lxc-docker:
   pkg.installed
 
-# There is a race here, I think.  As the package is installed, it will start
-# docker.  If it doesn't write its pid file fast enough then this next stanza
-# will try to ensure that docker is running.  That might start another copy of
-# docker causing the thing to get wedged.
-#
-# See docker issue https://github.com/dotcloud/docker/issues/6184
-
-# docker:
-#   service.running:
-#     - enable: True
-#     - require:
-#       - pkg: lxc-docker
-#     - watch:
-#       - file: /etc/default/docker
+docker:
+  service.running:
+    - enable: True
+    - require:
+      - pkg: lxc-docker
+    - watch:
+      - file: {{ environment_file }}
+      - container_bridge: cbr0
 
 {% endif %}
