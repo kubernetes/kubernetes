@@ -94,6 +94,17 @@ shift $((OPTIND - 1))
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${GOFLAGS:-})"
 
+# Filter out arguments that start with "-" and move them to goflags.
+testcases=()
+for arg; do
+  if [[ "${arg}" == -* ]]; then
+    goflags+=("${arg}")
+  else
+    testcases+=("${arg}")
+  fi
+done
+set -- ${testcases[@]+"${testcases[@]}"}
+
 if [[ "${iterations}" -gt 1 ]]; then
   if [[ $# -eq 0 ]]; then
     set -- $(find_test_dirs)
