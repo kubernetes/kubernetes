@@ -102,7 +102,7 @@ Service endpoints are currently found through [Docker-links-compatible](https://
 
 ## The Kubernetes Control Plane
 
-The Kubernetes control plane is split into a set of components, but they all run on a single _master_ node.  These work together to provide an unified view of the cluster.
+The Kubernetes control plane is split into a set of components, but they all run on a single _master_ node.  These work together to provide a unified view of the cluster.
 
 ### etcd
 
