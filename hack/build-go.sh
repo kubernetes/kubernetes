@@ -44,13 +44,18 @@ if [[ $# == 0 ]]; then
       plugin/cmd/scheduler
 fi
 
-binaries=()
-for arg; do
-  binaries+=("${KUBE_GO_PACKAGE}/${arg}")
-done
-
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${GOFLAGS:-})"
+
+binaries=()
+for arg; do
+  if [[ "${arg}" == -* ]]; then
+    # Assume arguments starting with a dash are flags to pass to go.
+    goflags+=("${arg}")
+  else
+    binaries+=("${KUBE_GO_PACKAGE}/${arg}")
+  fi
+done
 
 # Note that the flags to 'go build' are duplicated in the salt build setup
 # (release/build-release.sh) for our cluster deploy.  If we add more command
