@@ -47,7 +47,28 @@ kube::version_ldflags() {
 
       # Use git describe to find the version based on annotated tags.
       if git_version=$(git describe --abbrev=14 "${git_commit}^{commit}" 2>/dev/null); then
+        if [[ "${git_tree_state}" == "dirty" ]]; then
+          # git describe --dirty only considers changes to existing files, but
+          # that is problematic since new untracked .go files affect the build,
+          # so use our idea of "dirty" from git status instead.
+          git_version+="-dirty"
+        fi
         ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${git_version}")
+
+        # Try to match the "git describe" output to a regex to try to extract
+        # the "major" and "minor" versions and whether this is the exact tagged
+        # version or whether the tree is between two tagged versions.
+        if [[ "${git_version}" =~ ^v([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
+          git_major=${BASH_REMATCH[1]}
+          git_minor=${BASH_REMATCH[2]}
+          if [[ -n "${BASH_REMATCH[3]}" ]]; then
+            git_minor+="+"
+          fi
+          ldflags+=(
+            -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${git_major}"
+            -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${git_minor}"
+          )
+        fi
       fi
     fi
 
