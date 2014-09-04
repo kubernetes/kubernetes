@@ -57,6 +57,7 @@ for arg; do
   fi
 done
 
+echo "Building local go components"
 # Note that the flags to 'go build' are duplicated in the salt build setup
 # (release/build-release.sh) for our cluster deploy.  If we add more command
 # line options to our standard build we'll want to duplicate them there.  As we
