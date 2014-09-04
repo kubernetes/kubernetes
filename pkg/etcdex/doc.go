@@ -16,18 +16,19 @@ limitations under the License.
 
 // Package etcdex provides a read-only "coherent" in-memory content-addressible cache of etcd content.
 //
-// It assumes that etcd is being according to the following extended analogy:
-// Etcd concept                 : Relation Database Concept :: 
-// 
+// It assumes that etcd is being used according to the following extended analogy:
+// Etcd concept                 : Relational Database Concept ::
+//
 // tree rooted at "dir"         : Table ::
 // etcd file part after "dir"   : Primary Key ::
 // etcd value (must be JSON)    : Row (except Primary Key) ::
-// union of all fully qualified 
-// JSON property names of etcd 
-// values in "dir"              : Columns of a Table ::
+// union of all fully qualified
+// JSON property names of etcd
+// values in "dir"              : Columns of a Table
 //
 // It provides for the creation of "indexes" of "tables" stored in etcd.
 // The name is a contraction of etcd and index.
 // It is not intended to be a completehttp://en.wikipedia.org/wiki/Object-relational_mapping
 // It watches etcd to keep its indexes up to date.
-//
+
+package etcdex

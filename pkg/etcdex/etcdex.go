@@ -61,7 +61,7 @@ type Client inteface {
 
 // New makes a new Client to etcd and allow for creation of, and holds, indexes.
 // TODO: be able to dedup redundant Clients and/or Indexes at the go Package Level
- func newConnection(p etcdConnectionParams) Connection
+ func NewConnection(p etcdConnectionParams) Connection
 
 // TODO: make a transaction object, and have any index lookups done while that transaction is open
 // cause the indexes state to be recorded, and then at commit time, do writes to etcd conditional 
@@ -91,12 +91,12 @@ func (*client) IndexKeys(etcdPatchPfx string) *Set {
 
 type set struct {
   data map[string]bool
-
 }
 // Similarly for Map and MultiMap ...
 
 func (*set) Contains(key string) {
   // Acquire lock.
+  // defer release lock.
   return data[key]
 }
 // Similarly for Map and MultiMap ...
