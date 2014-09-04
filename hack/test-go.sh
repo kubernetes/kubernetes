@@ -44,6 +44,11 @@ find_test_pkgs() {
   find_test_dirs | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
 }
 
+# there is currently a race in the coverage code in tip.  Remove this when it is fixed
+# see https://code.google.com/p/go/issues/detail?id=8630 for details.
+if [[ "${TRAVIS_GO_VERSION}" -eq "tip" ]]; then
+  KUBE_COVER=""
+fi
 # -covermode=atomic becomes default with -race in Go >=1.3
 KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 30s}
