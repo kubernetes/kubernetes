@@ -27,12 +27,47 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"code.google.com/p/go.net/html"
-	"code.google.com/p/go.net/html/atom"
 	"github.com/golang/glog"
 )
 
+// tagsToAttrs states which attributes of which tags require URL substitution.
+// Sources: http://www.w3.org/TR/REC-html40/index/attributes.html
+//          http://www.w3.org/html/wg/drafts/html/master/index.html#attributes-1
+var tagsToAttrs = map[string]util.StringSet{
+	"a":          util.NewStringSet("href"),
+	"applet":     util.NewStringSet("codebase"),
+	"area":       util.NewStringSet("href"),
+	"audio":      util.NewStringSet("src"),
+	"base":       util.NewStringSet("href"),
+	"blockquote": util.NewStringSet("cite"),
+	"body":       util.NewStringSet("background"),
+	"button":     util.NewStringSet("formaction"),
+	"command":    util.NewStringSet("icon"),
+	"del":        util.NewStringSet("cite"),
+	"embed":      util.NewStringSet("src"),
+	"form":       util.NewStringSet("action"),
+	"frame":      util.NewStringSet("longdesc", "src"),
+	"head":       util.NewStringSet("profile"),
+	"html":       util.NewStringSet("manifest"),
+	"iframe":     util.NewStringSet("longdesc", "src"),
+	"img":        util.NewStringSet("longdesc", "src", "usemap"),
+	"input":      util.NewStringSet("src", "usemap", "formaction"),
+	"ins":        util.NewStringSet("cite"),
+	"link":       util.NewStringSet("href"),
+	"object":     util.NewStringSet("classid", "codebase", "data", "usemap"),
+	"q":          util.NewStringSet("cite"),
+	"script":     util.NewStringSet("src"),
+	"source":     util.NewStringSet("src"),
+	"video":      util.NewStringSet("poster", "src"),
+
+	// TODO: css URLs hidden in style elements.
+}
+
+// ProxyHandler provides a http.Handler which will proxy traffic to locations
+// specified by items implementing Redirector.
 type ProxyHandler struct {
 	prefix  string
 	storage map[string]RESTStorage
@@ -105,10 +140,7 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := http.DefaultTransport.RoundTrip(req)
 
 	if err != nil {
-		message := err.Error() + "\n" + req.URL.String()
-		if strings.Contains(err.Error(), "connection refused") {
-			message = fmt.Sprintf("Failed to connect to %s (%s)", req.URL.Host, err)
-		}
+		message := fmt.Sprintf("Error: '%s'\nTrying to reach: '%v'", err.Error(), req.URL.String())
 		resp = &http.Response{
 			StatusCode: http.StatusServiceUnavailable,
 			Body:       ioutil.NopCloser(strings.NewReader(message)),
@@ -118,64 +150,65 @@ func (t *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if resp.Header.Get("Content-Type") != "text/html" {
 		// Do nothing, simply pass through
-		return resp, err
+		return resp, nil
 	}
 
-	resp, err = t.fixLinks(req, resp)
-	return resp, err
+	return t.fixLinks(req, resp)
+}
+
+// updateURLs checks and updates any of n's attributes that are listed in tagsToAttrs.
+// Any URLs found are, if they're relative, updated with the necessary changes to make
+// a visit to that URL also go through the proxy.
+// sourceURL is the URL of the page which we're currently on; it's required to make
+// relative links work.
+func (t *proxyTransport) updateURLs(n *html.Node, sourceURL *url.URL) {
+	if n.Type != html.ElementNode {
+		return
+	}
+	attrs, ok := tagsToAttrs[n.Data]
+	if !ok {
+		return
+	}
+	for i, attr := range n.Attr {
+		if !attrs.Has(attr.Key) {
+			continue
+		}
+		url, err := url.Parse(attr.Val)
+		if err != nil {
+			continue
+		}
+		// Is this URL relative?
+		if url.Host == "" || url.Host == sourceURL.Host {
+			url.Scheme = t.proxyScheme
+			url.Host = t.proxyHost
+			url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path, "/")
+			n.Attr[i].Val = url.String()
+		}
+	}
+}
+
+// scan recursively calls f for every n and every subnode of n.
+func (t *proxyTransport) scan(n *html.Node, f func(*html.Node)) {
+	f(n)
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		t.scan(c, f)
+	}
 }
 
 // fixLinks modifies links in an HTML file such that they will be redirected through the proxy if needed.
 func (t *proxyTransport) fixLinks(req *http.Request, resp *http.Response) (*http.Response, error) {
-	body, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		// copying the response body did not work
-		return nil, err
-	}
+	defer resp.Body.Close()
 
-	bodyNode := &html.Node{
-		Type:     html.ElementNode,
-		Data:     "body",
-		DataAtom: atom.Body,
-	}
-	nodes, err := html.ParseFragment(bytes.NewBuffer(body), bodyNode)
+	doc, err := html.Parse(resp.Body)
 	if err != nil {
-		glog.Errorf("Failed to found <body> node: %v", err)
+		glog.Errorf("Parse failed: %v", err)
 		return resp, err
 	}
 
-	// Define the method to traverse the doc tree and update href node to
-	// point to correct minion
-	var updateHRef func(*html.Node)
-	updateHRef = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "a" {
-			for i, attr := range n.Attr {
-				if attr.Key == "href" {
-					url, err := url.Parse(attr.Val)
-					if err != nil {
-						continue
-					}
-					url.Scheme = t.proxyScheme
-					url.Host = t.proxyHost
-					url.Path = path.Join(t.proxyPathPrepend, path.Dir(req.URL.Path), url.Path, "/")
-					n.Attr[i].Val = url.String()
-					break
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			updateHRef(c)
-		}
-	}
-
 	newContent := &bytes.Buffer{}
-	for _, n := range nodes {
-		updateHRef(n)
-		err = html.Render(newContent, n)
-		if err != nil {
-			glog.Errorf("Failed to render: %v", err)
-		}
+	t.scan(doc, func(n *html.Node) { t.updateURLs(n, req.URL) })
+	if err := html.Render(newContent, doc); err != nil {
+		glog.Errorf("Failed to render: %v", err)
 	}
 
 	resp.Body = ioutil.NopCloser(newContent)
