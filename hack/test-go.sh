@@ -46,7 +46,7 @@ find_test_pkgs() {
 
 # there is currently a race in the coverage code in tip.  Remove this when it is fixed
 # see https://code.google.com/p/go/issues/detail?id=8630 for details.
-if [[ ${TRAVIS_GO_VERSION} eq "tip" ]]; then
+if [[ "${TRAVIS_GO_VERSION}" -eq "tip" ]]; then
   KUBE_COVER=""
 fi
 # -covermode=atomic becomes default with -race in Go >=1.3
