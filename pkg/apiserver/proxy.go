@@ -178,10 +178,15 @@ func (t *proxyTransport) updateURLs(n *html.Node, sourceURL *url.URL) {
 			continue
 		}
 		// Is this URL relative?
-		if url.Host == "" || url.Host == sourceURL.Host {
+		if url.Host == "" {
 			url.Scheme = t.proxyScheme
 			url.Host = t.proxyHost
 			url.Path = path.Join(t.proxyPathPrepend, path.Dir(sourceURL.Path), url.Path, "/")
+			n.Attr[i].Val = url.String()
+		} else if url.Host == sourceURL.Host {
+			url.Scheme = t.proxyScheme
+			url.Host = t.proxyHost
+			url.Path = path.Join(t.proxyPathPrepend, url.Path)
 			n.Attr[i].Val = url.String()
 		}
 	}
