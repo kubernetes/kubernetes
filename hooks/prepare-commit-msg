@@ -4,7 +4,7 @@ KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0"
 
 files_need_gofmt=""
 files_need_boilerplate=""
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v "third_party"); do
+for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"); do
   # Check for files that fail gofmt.
   diff="$(git show ":${file}" | gofmt -s -d)"
   if [[ -n "$diff" ]]; then
