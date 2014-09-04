@@ -7,7 +7,7 @@ go:
 
 install: 
   - go get code.google.com/p/go.tools/cmd/cover
-  - go get github.com/coreos/etcd
+  - ./hack/install-etcd.sh
   - ./hack/verify-gofmt.sh
   - ./hack/verify-boilerplate.sh
   - ./hack/install-std-race.sh
@@ -16,7 +16,7 @@ install:
 script:
   - ./hack/test-go.sh
   - PATH=$HOME/gopath/bin:$PATH ./hack/test-cmd.sh
-  - PATH=$HOME/gopath/bin:$PATH ./hack/test-integration.sh
+  - PATH=$HOME/gopath/bin:$HOME/etcd/bin:$PATH ./hack/test-integration.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"
