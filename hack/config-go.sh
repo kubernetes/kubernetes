@@ -34,19 +34,21 @@ kube::version_ldflags() {
     cd "${KUBE_REPO_ROOT}"
 
     declare -a ldflags=()
-    if KUBE_GIT_COMMIT=$(git rev-parse "HEAD^{commit}" 2>/dev/null); then
+    if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$(git rev-parse "HEAD^{commit}" 2>/dev/null); then
       ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
 
-      # Check if the tree is dirty.
-      if git_status=$(git status --porcelain) && [[ -z "${git_status}" ]]; then
-        KUBE_GIT_TREE_STATE="clean"
-      else
-        KUBE_GIT_TREE_STATE="dirty"
+      if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
+        # Check if the tree is dirty.  default to dirty
+        if git_status=$(git status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
+          KUBE_GIT_TREE_STATE="clean"
+        else
+          KUBE_GIT_TREE_STATE="dirty"
+        fi
       fi
       ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
 
       # Use git describe to find the version based on annotated tags.
-      if KUBE_GIT_VERSION=$(git describe --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+      if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$(git describe --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
         if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
           # git describe --dirty only considers changes to existing files, but
           # that is problematic since new untracked .go files affect the build,
