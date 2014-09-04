@@ -137,7 +137,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 	return nil
 }
 
-var podColumns = []string{"ID", "Image(s)", "Host", "Labels"}
+var podColumns = []string{"ID", "Image(s)", "Host", "Labels", "Status"}
 var replicationControllerColumns = []string{"ID", "Image(s)", "Selector", "Replicas"}
 var serviceColumns = []string{"ID", "Labels", "Selector", "Port"}
 var minionColumns = []string{"Minion identifier"}
@@ -182,9 +182,10 @@ func makeImageList(manifest api.ContainerManifest) string {
 }
 
 func printPod(pod *api.Pod, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.ID, makeImageList(pod.DesiredState.Manifest),
-		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP, labels.Set(pod.Labels))
+		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP,
+		labels.Set(pod.Labels), pod.CurrentState.Status)
 	return err
 }
 
