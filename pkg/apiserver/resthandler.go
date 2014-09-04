@@ -42,7 +42,7 @@ func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	storage := h.storage[parts[0]]
 	if storage == nil {
-		httplog.LogOf(w).Addf("'%v' has no storage object", parts[0])
+		httplog.FindOrCreateLogOf(req, &w).Addf("'%v' has no storage object", parts[0])
 		notFound(w, req)
 		return
 	}

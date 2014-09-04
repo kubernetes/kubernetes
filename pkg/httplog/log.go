@@ -95,6 +95,15 @@ func LogOf(w http.ResponseWriter) *respLogger {
 	panic("Logger not installed yet!")
 }
 
+// Returns the existing logger hiding in w. If there is not an existing logger
+// then one will be created.
+func FindOrCreateLogOf(req *http.Request, w *http.ResponseWriter) *respLogger {
+	if _, exists := (*w).(*respLogger); !exists {
+		NewLogged(req, w)
+	}
+	return LogOf(*w)
+}
+
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
 func Unlogged(w http.ResponseWriter) http.ResponseWriter {
 	if rl, ok := w.(*respLogger); ok {

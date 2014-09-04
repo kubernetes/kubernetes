@@ -127,7 +127,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 // ServeHTTP serves a series of JSON encoded events via straight HTTP with
 // Transfer-Encoding: chunked.
 func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	loggedW := httplog.LogOf(w)
+	loggedW := httplog.FindOrCreateLogOf(req, &w)
 	w = httplog.Unlogged(w)
 
 	cn, ok := w.(http.CloseNotifier)

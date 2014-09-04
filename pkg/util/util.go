@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"runtime"
 	"time"
 
@@ -161,4 +162,17 @@ func StringDiff(a, b string) string {
 	out = append(out, bb[i:]...)
 	out = append(out, []byte("\n\n")...)
 	return string(out)
+}
+
+// Takes a list of strings and compiles them into a list of regular expressions
+func CompileRegexps(regexpStrings StringList) ([]*regexp.Regexp, error) {
+	regexps := []*regexp.Regexp{}
+	for _, regexpStr := range regexpStrings {
+		r, err := regexp.Compile(regexpStr)
+		if err != nil {
+			return []*regexp.Regexp{}, err
+		}
+		regexps = append(regexps, r)
+	}
+	return regexps, nil
 }

@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -59,22 +58,12 @@ func RecoverPanics(handler http.Handler) http.Handler {
 // For a more detailed implementation use https://github.com/martini-contrib/cors
 // or implement CORS at your proxy layer
 // Pass nil for allowedMethods and allowedHeaders to use the defaults
-func CORS(handler http.Handler, allowedOriginPatterns util.StringList, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
-	// Compile the regular expressions once upfront
-	allowedOriginRegexps := []*regexp.Regexp{}
-	for _, allowedOrigin := range allowedOriginPatterns {
-		allowedOriginRegexp, err := regexp.Compile(allowedOrigin)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin regexp: %v", err)
-		}
-		allowedOriginRegexps = append(allowedOriginRegexps, allowedOriginRegexp)
-	}
-
+func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		origin := req.Header.Get("Origin")
 		if origin != "" {
 			allowed := false
-			for _, pattern := range allowedOriginRegexps {
+			for _, pattern := range allowedOriginPatterns {
 				if allowed = pattern.MatchString(origin); allowed {
 					break
 				}
@@ -86,7 +75,7 @@ func CORS(handler http.Handler, allowedOriginPatterns util.StringList, allowedMe
 					allowedMethods = []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"}
 				}
 				if allowedHeaders == nil {
-					allowedHeaders = []string{"Accept", "Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization"}
+					allowedHeaders = []string{"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization", "X-Requested-With", "If-Modified-Since"}
 				}
 				w.Header().Set("Access-Control-Allow-Methods", strings.Join(allowedMethods, ", "))
 				w.Header().Set("Access-Control-Allow-Headers", strings.Join(allowedHeaders, ", "))

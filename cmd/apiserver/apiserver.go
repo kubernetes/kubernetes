@@ -139,12 +139,16 @@ func main() {
 
 	handler := apiserver.Handle(storage, codec, *apiPrefix)
 	if len(corsAllowedOriginList) > 0 {
-		handler = apiserver.CORS(handler, corsAllowedOriginList, nil, nil, "true")
+		allowedOriginRegexps, err := util.CompileRegexps(corsAllowedOriginList)
+		if err != nil {
+			glog.Fatalf("Invalid CORS allowed origin: %v", err)
+		}
+		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
 
 	s := &http.Server{
 		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
-		Handler:        handler,
+		Handler:        apiserver.RecoverPanics(handler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,

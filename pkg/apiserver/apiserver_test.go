@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -733,7 +734,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 }
 
 func TestCORSAllowedOrigin(t *testing.T) {
-	handler := CORS(Handle(map[string]RESTStorage{}, codec, "/prefix/version"), []string{"example.com"}, nil, nil, "true")
+	handler := CORS(Handle(map[string]RESTStorage{}, codec, "/prefix/version"), []*regexp.Regexp{regexp.MustCompile("example.com")}, nil, nil, "true")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
@@ -766,7 +767,7 @@ func TestCORSAllowedOrigin(t *testing.T) {
 }
 
 func TestCORSUnallowedOrigin(t *testing.T) {
-	handler := CORS(Handle(map[string]RESTStorage{}, codec, "/prefix/version"), []string{"example.com"}, nil, nil, "true")
+	handler := CORS(Handle(map[string]RESTStorage{}, codec, "/prefix/version"), []*regexp.Regexp{regexp.MustCompile("example.com")}, nil, nil, "true")
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
