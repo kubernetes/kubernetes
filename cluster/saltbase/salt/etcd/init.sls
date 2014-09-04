@@ -4,9 +4,9 @@ etcd-install:
     - name: git://github.com/coreos/etcd
   cmd.wait:
     - cwd: /var/src/etcd
-    - names:
-      - git checkout ab4bcc18694644d12f0c038339d8d039072502b1  
-      - ./build
+    - name: |
+        git checkout ab4bcc18694644d12f0c038339d8d039072502b1  
+        ./build
     - env:
       - PATH: {{ grains['path'] }}:/usr/local/bin
     - watch:

@@ -46,11 +46,12 @@ find_test_pkgs() {
 
 # there is currently a race in the coverage code in tip.  Remove this when it is fixed
 # see https://code.google.com/p/go/issues/detail?id=8630 for details.
-if [[ "${TRAVIS_GO_VERSION}" -eq "tip" ]]; then
+if [ "${TRAVIS_GO_VERSION}" == "tip" ]; then
   KUBE_COVER=""
+else
+  # -covermode=atomic becomes default with -race in Go >=1.3
+  KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
 fi
-# -covermode=atomic becomes default with -race in Go >=1.3
-KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 30s}
 
 cd "${KUBE_TARGET}"
