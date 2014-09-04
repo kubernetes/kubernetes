@@ -58,12 +58,14 @@ type DockerPuller interface {
 // dockerPuller is the default implementation of DockerPuller.
 type dockerPuller struct {
 	client DockerInterface
+	auth   docker.AuthConfiguration
 }
 
 // NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client DockerInterface) DockerPuller {
+func NewDockerPuller(client DockerInterface, auth docker.AuthConfiguration) DockerPuller {
 	return dockerPuller{
 		client: client,
+		auth:   auth,
 	}
 }
 
@@ -103,7 +105,7 @@ func (p dockerPuller) Pull(image string) error {
 		Repository: image,
 		Tag:        tag,
 	}
-	return p.client.PullImage(opts, docker.AuthConfiguration{})
+	return p.client.PullImage(opts, p.auth)
 }
 
 // DockerContainers is a map of containers
