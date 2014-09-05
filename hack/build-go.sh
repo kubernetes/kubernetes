@@ -39,7 +39,9 @@ eval "goflags=(${GOFLAGS:-})"
 
 targets=()
 for arg; do
-  if [[ "${arg}" == -* ]]; then
+  if [[ "${arg}" == "--build" ]]; then
+    USE_BUILD=true
+  elif [[ "${arg}" == -* ]]; then
     # Assume arguments starting with a dash are flags to pass to go.
     goflags+=("${arg}")
   else
@@ -68,6 +70,17 @@ echo "Building local go components"
 # (release/build-release.sh) for our cluster deploy.  If we add more command
 # line options to our standard build we'll want to duplicate them there.  As we
 # move to distributing pre- built binaries we can eliminate this duplication.
-go install "${goflags[@]:+${goflags[@]}}" \
-    -ldflags "${version_ldflags}" \
-    "${binaries[@]}"
+if [[ -n ${USE_BUILD-} ]]; then
+  for bin in "${binaries[@]}"; do
+    echo "+++ Building ${bin}"
+    binary_name=$(basename "${bin}")
+    go build -o "${KUBE_TARGET}/bin/${binary_name}" \
+	    "${goflags[@]:+${goflags[@]}}" \
+	    -ldflags "${version_ldflags}" \
+	    "${bin}"
+  done
+else
+  go install "${goflags[@]:+${goflags[@]}}" \
+      -ldflags "${version_ldflags}" \
+      "${binaries[@]}"
+fi
