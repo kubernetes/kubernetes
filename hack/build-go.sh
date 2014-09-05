@@ -34,27 +34,33 @@ kube::setup_go_environment
 # Fetch the version.
 version_ldflags=$(kube::version_ldflags)
 
-if [[ $# == 0 ]]; then
-  # Update $@ with the default list of targets to build.
-  set -- \
-      cmd/proxy \
-      cmd/apiserver \
-      cmd/controller-manager \
-      cmd/kubelet cmd/kubecfg \
-      plugin/cmd/scheduler
-fi
-
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${GOFLAGS:-})"
 
-binaries=()
+targets=()
 for arg; do
   if [[ "${arg}" == -* ]]; then
     # Assume arguments starting with a dash are flags to pass to go.
     goflags+=("${arg}")
   else
-    binaries+=("${KUBE_GO_PACKAGE}/${arg}")
+    targets+=("${arg}")
   fi
+done
+
+if [[ ${#targets[@]} -eq 0 ]]; then
+  targets=(
+    cmd/proxy
+    cmd/apiserver
+    cmd/controller-manager
+    cmd/kubelet
+    cmd/kubecfg
+    plugin/cmd/scheduler
+  )
+fi
+
+binaries=()
+for target in ${targets[@]}; do
+  binaries+=("${KUBE_GO_PACKAGE}/${target}")
 done
 
 echo "Building local go components"
