@@ -114,6 +114,15 @@ kube::setup_go_environment() {
 }
 
 
+# kube::default_build_targets return list of all build targets
+kube::default_build_targets() {
+  echo "cmd/proxy"
+  echo "cmd/apiserver"
+  echo "cmd/controller-manager"
+  echo "cmd/kubelet"
+  echo "cmd/kubecfg"
+  echo "plugin/cmd/scheduler"
+}
 # --- Environment Variables ---
 
 # KUBE_REPO_ROOT  - Path to the top of the build tree.

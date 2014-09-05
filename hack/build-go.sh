@@ -48,14 +48,7 @@ for arg; do
 done
 
 if [[ ${#targets[@]} -eq 0 ]]; then
-  targets=(
-    cmd/proxy
-    cmd/apiserver
-    cmd/controller-manager
-    cmd/kubelet
-    cmd/kubecfg
-    plugin/cmd/scheduler
-  )
+  targets=($(kube::default_build_targets))
 fi
 
 binaries=()
