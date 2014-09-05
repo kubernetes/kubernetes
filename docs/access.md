@@ -111,8 +111,8 @@ the authentication details are unknown to K8s.
 Initial Features:
 - there is no superuser `userAccount`
 - `userAccount` objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
-- `userAccount` can have a default `project`.  If API call does not specify a `project`, the default `project` for that caller is assumed.
-- `userAccount` is global.  A single human with access to multiple projects is recommended to only have one userAccount.
+- `userAccount` can have a default `namespace`.  If API call does not specify a `namespace`, the default `namespace` for that caller is assumed.
+- `userAccount` is global.  A single human with access to multiple namespaces is recommended to only have one userAccount.
 
 Improvements:
 - Make `userAccount` part of a separate API group from core K8s objects like `pod`.  Facilitates plugging in alternate Access Management.
@@ -138,51 +138,29 @@ Improvements:
 - requires docker to integrate user namespace support, and deciding what getpwnam() does for these uids.
 - any features that help users avoid use of privileged containers (https://github.com/GoogleCloudPlatform/kubernetes/issues/391)
 
-###project
-K8s will have a have a `project` API object.
+###Namespaces
+K8s will have a have a `namespace` API object.  It is similar to a Google Compute Engine `project`.  It provides a namespace for objects created by a group of people co-operating together, preventing name collisions with non-cooperating groups.  It also serves as a reference point for authorization policies.
 
-Initial Features:
-- `project` object is immutable.
-- `project` objects are statically populated in the K8s API store by reading a config file.  Only a K8s Cluster Admin can do this.
-- In order to allow using `project` name as namespace for objects under that `project`, and to ensure the compound names are still DNS-compatible names, `project` names must be DNS label format.  
-
-Improvements:
-- have API calls to create and delete `project` objects.
-
-Most API objects have an associated `project`:
-- pods have a `project`.
-- `project`s don't have a `project`, nor do `userAccount`s
-   -  or else they belong to a special global `project`? 
-- An object's `project` cannot be changed after creation.
+Namespaces are described in [namespace.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md),
+or will be once [#1114](https://github.com/GoogleCloudPlatform/kubernetes/pull/1114) is merged.
 
 In the Enterprise Profile:
-   - a `userAccount` may have permission to access several `project`s.  API calls need to specify a `project`.  Client libs may fill this in using a stored preference.
+   - a `userAccount` may have permission to access several `namespace`s. 
 
 In the Simple Profile:
-   - There is a single default `project`.  No need to specify `project` when making an API call.
+   - There is a single `namespace` used by the single user.
 
-Project versus userAccount vs Labels:
-- `userAccount`s are intended for audit logging (both name and UID should be logged), and to define who has access to `project`s.
+Namespaces versus userAccount vs Labels:
+- `userAccount`s are intended for audit logging (both name and UID should be logged), and to define who has access to `namespace`s.
 - `labels` (see docs/labels.md) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.  
-- `project`s provide a namespace for objects.
+- `namespace`s prevent name collisions between uncoordinated groups of people, and provide a place to attach common policies for co-operating groups of people.
 
-
-*To Be Determined*
-How is project selected when making a REST call?
-- subdomain, e.g. http://myproject.kubernetes.example.com
-  - In hosted environment, may need to avoid profane or vanity names.
-  - Requires that the apiservers be tied into DNS, which is onerous to configure in some environments. Nice in some contexts.
-- query parameter
-  - e.g. `/pods/<name>?project=<projectid>`
-  - tedious to add to every request, but necessary to disambiguate object names 
-- project in resource name 
-  - e.g. `/projects/<id>/<kubernetes api>`
 
 ## Authentication
 
 Goals for K8s authentication:
 - Include a built-in authentication system with no configuration required to use in single-user mode, and little configuration required to add several user accounts, and no https proxy required.
-- Allow for authentication to be handled by a system external to Kubernetes, to allow integration with existing to enterprise authorization systems.  The kubernetes project itself should avoid taking contributions of multiple authorization schemes.  Instead, a trusted proxy in front of the apiserver can be used to authenticate users.
+- Allow for authentication to be handled by a system external to Kubernetes, to allow integration with existing to enterprise authorization systems.  The kubernetes namespace itself should avoid taking contributions of multiple authorization schemes.  Instead, a trusted proxy in front of the apiserver can be used to authenticate users.
   - For organizations whose security requirements only allow FIPS compliant implementations (e.g. apache) for authentication.
   - So the proxy can terminate SSL, and isolate the CA-signed certificate from less trusted, higher-touch APIserver.
   - For organizations that already have existing SaaS web services (e.g. storage, VMs) and want a common authentication portal. 
@@ -230,30 +208,31 @@ Authorization policy is set by creating a set of Policy objects.
 
 The API Server will be the Enforcement Point for Policy. For each API call that it receives, it will construct the Attributes needed to evaluate the policy (what user is making the call, what resource they are accessing, what they are trying to do that resource, etc) and pass those attribytes to a Decision Point.  The Decision Point code evaluates the Attributes against all the Policies and allows or denys the API call.  The system will be modular enough that the Decision Point code can either be linked into the APIserver binary, or be another service that the apiserver calls for each Decision (with appropriate time-limited caching as needed for performance).
 
-Policy objects may be applicable only to a single project; K8s Project Admins would be able to create those as needed.  Other Policy objects may be applicable to all projects; a K8s Cluster Admin might create those in order to authorize a new type of controller to be used by all projects, or to make a K8s User into a K8s Project Admin.)
+Policy objects may be applicable only to a single namespace or to all namespaces; K8s Project Admins would be able to create those as needed.  Other Policy objects may be applicable to all namespaces; a K8s Cluster Admin might create those in order to authorize a new type of controller to be used by all namespaces, or to make a K8s User into a K8s Project Admin.)
+ 
 
 ## Accounting
 
 The API should have a `quota` concept (see (https://github.com/GoogleCloudPlatform/kubernetes/issues/442
-).  A quota object relates a project (and optionally a label selector) to a maximum quantity of resources that may be used (see resources.md).
+).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see resources.md).
 
 Initially:
 - a `quota` object is immutable.
 - for hosted K8s systems that do billing, Project is recommended level for billing accounts.
-- Every object that consumes resources should have a `project` so that Resource usage stats are roll-up-able to `project`. 
+- Every object that consumes resources should have a `namespace` so that Resource usage stats are roll-up-able to `namespace`. 
 - K8s Cluster Admin sets quota objects by writing a config file.
 
 Improvements:
-- allow one project to charge the quota for one or more other projects.  This would be controlled by a policy which allows changing a billing_project= label on an object.
-- allow quota to be set by project owners for (project x label) combinations (e.g. let "webserver" project use 100 cores, but to prevent accidents, don't allow "webserver" project and "instance=test" use more than 10 cores.
-- tools to help write consistent quota config files based on number of minions, historical project usages, QoS needs, etc.
+- allow one namespace to charge the quota for one or more other namespaces.  This would be controlled by a policy which allows changing a billing_namespace= label on an object.
+- allow quota to be set by namespace owners for (namespace x label) combinations (e.g. let "webserver" namespace use 100 cores, but to prevent accidents, don't allow "webserver" namespace and "instance=test" use more than 10 cores.
+- tools to help write consistent quota config files based on number of minions, historical namespace usages, QoS needs, etc.
 - way for K8s Cluster Admin to incrementally adjust Quota objects.
 
 Simple profile:
-   - a single `project` with infinite resource limits.
+   - a single `namespace` with infinite resource limits.
 
 Enterprise profile:
-   - multiple projects
+   - multiple namespaces each with their own limits.
 
 Issues:
 - need for locking or "eventual consistency" when multiple apiserver goroutines are accessing the object store and handling pod creations.
