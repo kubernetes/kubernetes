@@ -18,12 +18,24 @@
 set -e
 source $(dirname $0)/provision-config.sh
 
+# Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
+minion_ip_array=(${MINION_IPS//,/ })
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  minion=${MINION_NAMES[$i]}
+  ip=${minion_ip_array[$i]}  
+  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
+    echo "Adding $minion to hosts file"
+    echo "$ip $minion" >> /etc/hosts
+  fi  
+done
+
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
+  node_ip: $MASTER_IP
   master_ip: $MASTER_IP
   etcd_servers: $MASTER_IP
   cloud_provider: vagrant

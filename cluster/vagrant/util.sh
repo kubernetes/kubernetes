@@ -40,6 +40,7 @@ function verify-prereqs {
 
 # Instantiate a kubernetes cluster
 function kube-up {		
+
   get-password
   vagrant up
 
@@ -73,10 +74,11 @@ function kube-up {
       done
     done
   done
-
+  
   echo
   echo "Waiting for each minion to be registered with cloud provider"
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    MACHINE="${MINION_NAMES[$i]}"
     COUNT="0"
     until [ "$COUNT" -eq "1" ]; do
       $(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > /tmp/minions
