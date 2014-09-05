@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -96,7 +96,7 @@ func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool)
 func (r *Registry) GetPod(podID string) (*api.Pod, error) {
 	var pod api.Pod
 	if err := r.ExtractObj(makePodKey(podID), &pod, false); err != nil {
-		return nil, err
+		return nil, etcderr.InterpretGetError(err, "pod", podID)
 	}
 	// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 	// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
@@ -117,12 +117,13 @@ func (r *Registry) CreatePod(pod *api.Pod) error {
 	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
 	pod.DesiredState.Status = api.PodRunning
 	pod.DesiredState.Host = ""
-	return r.CreateObj(makePodKey(pod.ID), pod)
+	err := r.CreateObj(makePodKey(pod.ID), pod)
+	return etcderr.InterpretCreateError(err, "pod", pod.ID)
 }
 
 // ApplyBinding implements binding's registry
 func (r *Registry) ApplyBinding(binding *api.Binding) error {
-	return r.assignPod(binding.PodID, binding.Host)
+	return etcderr.InterpretCreateError(r.assignPod(binding.PodID, binding.Host), "binding", "")
 }
 
 // setPodHostTo sets the given pod's host to 'machine' iff it was previously 'oldMachine'.
@@ -183,20 +184,14 @@ func (r *Registry) DeletePod(podID string) error {
 	var pod api.Pod
 	podKey := makePodKey(podID)
 	err := r.ExtractObj(podKey, &pod, false)
-	if tools.IsEtcdNotFound(err) {
-		return errors.NewNotFound("pod", podID)
-	}
 	if err != nil {
-		return err
+		return etcderr.InterpretDeleteError(err, "pod", podID)
 	}
 	// First delete the pod, so a scheduler doesn't notice it getting removed from the
 	// machine and attempt to put it somewhere.
 	err = r.Delete(podKey, true)
-	if tools.IsEtcdNotFound(err) {
-		return errors.NewNotFound("pod", podID)
-	}
 	if err != nil {
-		return err
+		return etcderr.InterpretDeleteError(err, "pod", podID)
 	}
 	machine := pod.DesiredState.Host
 	if machine == "" {
@@ -248,11 +243,8 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
 	err := r.ExtractObj(key, &controller, false)
-	if tools.IsEtcdNotFound(err) {
-		return nil, errors.NewNotFound("replicationController", controllerID)
-	}
 	if err != nil {
-		return nil, err
+		return nil, etcderr.InterpretGetError(err, "replicationController", controllerID)
 	}
 	return &controller, nil
 }
@@ -260,25 +252,20 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 // CreateController creates a new ReplicationController.
 func (r *Registry) CreateController(controller *api.ReplicationController) error {
 	err := r.CreateObj(makeControllerKey(controller.ID), controller)
-	if tools.IsEtcdNodeExist(err) {
-		return errors.NewAlreadyExists("replicationController", controller.ID)
-	}
-	return err
+	return etcderr.InterpretCreateError(err, "replicationController", controller.ID)
 }
 
 // UpdateController replaces an existing ReplicationController.
 func (r *Registry) UpdateController(controller *api.ReplicationController) error {
-	return r.SetObj(makeControllerKey(controller.ID), controller)
+	err := r.SetObj(makeControllerKey(controller.ID), controller)
+	return etcderr.InterpretUpdateError(err, "replicationController", controller.ID)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
 func (r *Registry) DeleteController(controllerID string) error {
 	key := makeControllerKey(controllerID)
 	err := r.Delete(key, false)
-	if tools.IsEtcdNotFound(err) {
-		return errors.NewNotFound("replicationController", controllerID)
-	}
-	return err
+	return etcderr.InterpretDeleteError(err, "replicationController", controllerID)
 }
 
 func makeServiceKey(name string) string {
@@ -295,10 +282,7 @@ func (r *Registry) ListServices() (*api.ServiceList, error) {
 // CreateService creates a new Service.
 func (r *Registry) CreateService(svc *api.Service) error {
 	err := r.CreateObj(makeServiceKey(svc.ID), svc)
-	if tools.IsEtcdNodeExist(err) {
-		return errors.NewAlreadyExists("service", svc.ID)
-	}
-	return err
+	return etcderr.InterpretCreateError(err, "service", svc.ID)
 }
 
 // GetService obtains a Service specified by its name.
@@ -306,11 +290,8 @@ func (r *Registry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
 	err := r.ExtractObj(key, &svc, false)
-	if tools.IsEtcdNotFound(err) {
-		return nil, errors.NewNotFound("service", name)
-	}
 	if err != nil {
-		return nil, err
+		return nil, etcderr.InterpretGetError(err, "service", name)
 	}
 	return &svc, nil
 }
@@ -320,11 +301,8 @@ func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
 	key := makeServiceEndpointsKey(name)
 	var endpoints api.Endpoints
 	err := r.ExtractObj(key, &endpoints, false)
-	if tools.IsEtcdNotFound(err) {
-		return nil, errors.NewNotFound("endpoints", name)
-	}
 	if err != nil {
-		return nil, err
+		return nil, etcderr.InterpretGetError(err, "endpoints", name)
 	}
 	return &endpoints, nil
 }
@@ -337,23 +315,23 @@ func makeServiceEndpointsKey(name string) string {
 func (r *Registry) DeleteService(name string) error {
 	key := makeServiceKey(name)
 	err := r.Delete(key, true)
-	if tools.IsEtcdNotFound(err) {
-		return errors.NewNotFound("service", name)
-	}
 	if err != nil {
-		return err
+		return etcderr.InterpretDeleteError(err, "service", name)
 	}
+
+	// TODO: can leave dangling endpoints, and potentially return incorrect
+	// endpoints if a new service is created with the same name
 	key = makeServiceEndpointsKey(name)
-	err = r.Delete(key, true)
-	if !tools.IsEtcdNotFound(err) {
-		return err
+	if err := r.Delete(key, true); err != nil && !tools.IsEtcdNotFound(err) {
+		return etcderr.InterpretDeleteError(err, "endpoints", name)
 	}
 	return nil
 }
 
 // UpdateService replaces an existing Service.
 func (r *Registry) UpdateService(svc *api.Service) error {
-	return r.SetObj(makeServiceKey(svc.ID), svc)
+	err := r.SetObj(makeServiceKey(svc.ID), svc)
+	return etcderr.InterpretUpdateError(err, "service", svc.ID)
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
@@ -380,11 +358,12 @@ func (r *Registry) ListEndpoints() (*api.EndpointsList, error) {
 // UpdateEndpoints update Endpoints of a Service.
 func (r *Registry) UpdateEndpoints(e *api.Endpoints) error {
 	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
-	return r.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{},
+	err := r.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{},
 		func(input runtime.Object) (runtime.Object, error) {
 			// TODO: racy - label query is returning different results for two simultaneous updaters
 			return e, nil
 		})
+	return etcderr.InterpretUpdateError(err, "endpoints", e.ID)
 }
 
 // WatchEndpoints begins watching for new, changed, or deleted endpoint configurations.
