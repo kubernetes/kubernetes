@@ -42,11 +42,11 @@ function validate() {
       CURRENT_STATUS=$($KUBECFG -template "${TEMPLATE_STRING}" get pods/$id)
       if [ "$CURRENT_STATUS" != "true" ]; then
         ALL_RUNNING=0
-      fi
-
-      CURRENT_IMAGE=$($KUBECFG -template "{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Config.Image}}" get pods/$id)
-      if [ "$CURRENT_IMAGE" != "${DOCKER_HUB_USER}/update-demo:${CONTAINER_IMAGE_VERSION}" ]; then
-        ALL_RUNNING=0
+      else
+        CURRENT_IMAGE=$($KUBECFG -template "{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Config.Image}}" get pods/$id)
+        if [ "$CURRENT_IMAGE" != "${DOCKER_HUB_USER}/update-demo:${CONTAINER_IMAGE_VERSION}" ]; then
+          ALL_RUNNING=0
+        fi
       fi
     done
   done
@@ -58,7 +58,7 @@ function validate() {
   fi
 }
 
-DOCKER_HUB_USER=jbeda
+export DOCKER_HUB_USER=jbeda
 
 # Launch a container
 ${KUBE_REPO_ROOT}/examples/update-demo/1-create-replication-controller.sh
