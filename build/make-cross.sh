@@ -23,6 +23,6 @@ set -e
 
 source $(dirname $0)/common.sh
 
-verify-prereqs
-build-image
-run-build-command build/build-image/make-cross.sh
+kube::build::verify-prereqs
+kube::build::build-image
+kube::build::run-build-command build/build-image/make-cross.sh

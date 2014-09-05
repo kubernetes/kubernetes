@@ -51,7 +51,7 @@ readonly RELEASE_DIR="${KUBE_REPO_ROOT}/_output/release"
 # Basic setup functions
 
 # Verify that the right utilities and such are installed for building Kube.
-function verify-prereqs() {
+function kube::build::verify-prereqs() {
   if [[ -z "$(which docker)" ]]; then
     echo "Can't find 'docker' in PATH, please fix and retry." >&2
     echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
@@ -83,7 +83,7 @@ function verify-prereqs() {
 }
 
 # Verify things are set up for uploading to GCS
-function verify-gcs-prereqs() {
+function kube::build::verify-gcs-prereqs() {
   if [[ -z "$(which gsutil)" || -z "$(which gcloud)" ]]; then
     echo "Releasing Kubernetes requires gsutil and gcloud.  Please download,"
     echo "install and authorize through the Google Cloud SDK: "
@@ -115,7 +115,7 @@ function verify-gcs-prereqs() {
 # Building
 
 # Set up the context directory for the kube-build image and build it.
-function build-image() {
+function kube::build::build-image() {
   local -r BUILD_CONTEXT_DIR="${KUBE_REPO_ROOT}/_output/images/${KUBE_BUILD_IMAGE}"
   local -r SOURCE="
     api
@@ -125,20 +125,20 @@ function build-image() {
     Godeps
     hack
     LICENSE
-    README.md
     pkg
     plugin
+    README.md
     third_party
   "
   mkdir -p ${BUILD_CONTEXT_DIR}
   tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz ${SOURCE}
   cp build/build-image/Dockerfile ${BUILD_CONTEXT_DIR}/Dockerfile
-  docker-build "${KUBE_BUILD_IMAGE}" "${BUILD_CONTEXT_DIR}"
+  kube::build::docker-build "${KUBE_BUILD_IMAGE}" "${BUILD_CONTEXT_DIR}"
 }
 
 # Builds the runtime image.  Assumes that the appropriate binaries are already
 # built and in _output/build/.
-function run-image() {
+function kube::build::run-image() {
   local -r BUILD_CONTEXT_BASE="${KUBE_REPO_ROOT}/_output/images/${KUBE_RUN_IMAGE_BASE}"
 
   # First build the base image.  This one brings in all of the binaries.
@@ -147,20 +147,20 @@ function run-image() {
     -C "_output/build/linux/amd64" \
     ${KUBE_RUN_BINARIES}
   cp -R build/run-images/base/* "${BUILD_CONTEXT_BASE}/"
-  docker-build "${KUBE_RUN_IMAGE_BASE}" "${BUILD_CONTEXT_BASE}"
+  kube::build::docker-build "${KUBE_RUN_IMAGE_BASE}" "${BUILD_CONTEXT_BASE}"
 
   for b in $KUBE_RUN_BINARIES ; do
     local SUB_CONTEXT_DIR="${BUILD_CONTEXT_BASE}-$b"
     mkdir -p "${SUB_CONTEXT_DIR}"
     cp -R build/run-images/$b/* "${SUB_CONTEXT_DIR}/"
-    docker-build "${KUBE_RUN_IMAGE_BASE}-$b" "${SUB_CONTEXT_DIR}"
+    kube::build::docker-build "${KUBE_RUN_IMAGE_BASE}-$b" "${SUB_CONTEXT_DIR}"
   done
 }
 
 # Build a docker image from a Dockerfile.
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
-function docker-build() {
+function kube::build::docker-build() {
   local -r IMAGE=$1
   local -r CONTEXT_DIR=$2
   local -r BUILD_CMD="docker build -t ${IMAGE} ${CONTEXT_DIR}"
@@ -185,7 +185,7 @@ function docker-build() {
 
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
-function run-build-command() {
+function kube::build::run-build-command() {
   [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
 
   local -r DOCKER="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
@@ -196,7 +196,7 @@ function run-build-command() {
 }
 
 # If the Docker server is remote, copy the results back out.
-function copy-output() {
+function kube::build::copy-output() {
   if [[ "$OSTYPE" == "darwin"* ]]; then
     # When we are on the Mac with boot2docker we need to copy the results back
     # out.  Ideally we would leave the container around and use 'docker cp' to
@@ -232,7 +232,7 @@ function copy-output() {
 # Release
 
 # Create a unique bucket name for releasing Kube and make sure it exists.
-function ensure-gcs-release-bucket() {
+function kube::build::ensure-gcs-release-bucket() {
   if which md5 > /dev/null 2>&1; then
     HASH=$(md5 -q -s "$GCLOUD_PROJECT")
   else
@@ -249,7 +249,7 @@ function ensure-gcs-release-bucket() {
   fi
 }
 
-function ensure-gcs-docker-registry() {
+function kube::build::ensure-gcs-docker-registry() {
   local -r REG_CONTAINER_NAME="gcs-registry"
 
   local -r RUNNING=$(docker inspect ${REG_CONTAINER_NAME} 2>/dev/null \
@@ -283,8 +283,8 @@ function ensure-gcs-docker-registry() {
   sleep 5
 }
 
-function push-images-to-gcs() {
-  ensure-gcs-docker-registry
+function kube::build::push-images-to-gcs() {
+  kube::build::ensure-gcs-docker-registry
 
   # Tag each of our run binaries with the right registry and push
   for b in ${KUBE_RUN_BINARIES} ; do
@@ -296,7 +296,7 @@ function push-images-to-gcs() {
 }
 
 # Package up all of the cross compiled clients
-function package-tarballs() {
+function kube::build::package-tarballs() {
   mkdir -p "${RELEASE_DIR}"
 
   # Find all of the built kubecfg binaries
@@ -318,7 +318,7 @@ function package-tarballs() {
   done
 }
 
-function copy-release-to-gcs() {
+function kube::build::copy-release-to-gcs() {
   # TODO: This isn't atomic.  There will be points in time where there will be
   # no active release.  Also, if something fails, the release could be half-
   # copied.  The real way to do this would perhaps to have some sort of release
