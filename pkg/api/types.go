@@ -552,5 +552,5 @@ type WatchEvent struct {
 
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
-	Object runtime.Object
+	Object runtime.EmbeddedObject
 }

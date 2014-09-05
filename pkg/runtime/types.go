@@ -42,7 +42,7 @@ type JSONBase struct {
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
 
-// Object has appropriate encoder and decoder functions, such that on the wire, it's
+// EmbeddedObject has appropriate encoder and decoder functions, such that on the wire, it's
 // stored as a []byte, but in memory, the contained object is accessable as an interface{}
 // via the Get() function. Only objects having a JSONBase may be stored via Object.
 // The purpose of this is to allow an API object of type known only at runtime to be
@@ -52,7 +52,7 @@ type JSONBase struct {
 //
 // Note that objects will be serialized into the api package's default external versioned type;
 // this should be fixed in the future to use the version of the current Codec instead.
-type Object struct {
+type EmbeddedObject struct {
 	Object interface{}
 }
 

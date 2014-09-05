@@ -45,14 +45,14 @@ func TestEventToPods(t *testing.T) {
 			input: watch.Event{
 				Object: &api.ContainerManifestList{
 					Items: []api.ContainerManifest{
-						api.ContainerManifest{ID: "foo"},
-						api.ContainerManifest{ID: "bar"},
+						{ID: "foo"},
+						{ID: "bar"},
 					},
 				},
 			},
 			pods: []kubelet.Pod{
-				kubelet.Pod{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}},
-				kubelet.Pod{Name: "bar", Manifest: api.ContainerManifest{ID: "bar"}},
+				{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}},
+				{Name: "bar", Manifest: api.ContainerManifest{ID: "bar"}},
 			},
 			fail: false,
 		},
@@ -60,14 +60,14 @@ func TestEventToPods(t *testing.T) {
 			input: watch.Event{
 				Object: &api.ContainerManifestList{
 					Items: []api.ContainerManifest{
-						api.ContainerManifest{ID: ""},
-						api.ContainerManifest{ID: ""},
+						{ID: ""},
+						{ID: ""},
 					},
 				},
 			},
 			pods: []kubelet.Pod{
-				kubelet.Pod{Name: "1", Manifest: api.ContainerManifest{ID: ""}},
-				kubelet.Pod{Name: "2", Manifest: api.ContainerManifest{ID: ""}},
+				{Name: "1", Manifest: api.ContainerManifest{ID: ""}},
+				{Name: "2", Manifest: api.ContainerManifest{ID: ""}},
 			},
 			fail: false,
 		},

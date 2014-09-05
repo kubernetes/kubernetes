@@ -36,7 +36,7 @@ func TestDecoder(t *testing.T) {
 
 	expect := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	go func() {
-		err := encoder.Encode(api.WatchEvent{watch.Added, runtime.Object{expect}})
+		err := encoder.Encode(api.WatchEvent{watch.Added, runtime.EmbeddedObject{expect}})
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}

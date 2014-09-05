@@ -401,7 +401,7 @@ func TestWatch(t *testing.T) {
 
 		encoder := json.NewEncoder(w)
 		for _, item := range table {
-			encoder.Encode(&api.WatchEvent{item.t, runtime.Object{item.obj}})
+			encoder.Encode(&api.WatchEvent{item.t, runtime.EmbeddedObject{item.obj}})
 			flusher.Flush()
 		}
 	}))
