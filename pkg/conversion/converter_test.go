@@ -93,7 +93,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 
 func TestConverter_fuzz(t *testing.T) {
 	newAnonType := func() interface{} {
-		return reflect.New(reflect.TypeOf(externalTypeReturn())).Interface()
+		return reflect.New(reflect.TypeOf(externalTypeReturn()).Elem()).Interface()
 	}
 	// Use the same types from the scheme test.
 	table := []struct {

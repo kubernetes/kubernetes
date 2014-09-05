@@ -85,8 +85,8 @@ func NewScheme() *Scheme {
 
 // AddKnownTypes registers all types passed in 'types' as being members of version 'version.
 // Encode() will refuse objects unless their type has been registered with AddKnownTypes.
-// All objects passed to types should be structs, not pointers to structs. The name that go
-// reports for the struct becomes the "kind" field when encoding.
+// All objects passed to types should be pointers to structs. The name that go reports for
+// the struct becomes the "kind" field when encoding.
 func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 	knownTypes, found := s.versionMap[version]
 	if !found {
@@ -95,8 +95,12 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 	}
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
+		if t.Kind() != reflect.Ptr {
+			panic("All types must be pointers to structs.")
+		}
+		t = t.Elem()
 		if t.Kind() != reflect.Struct {
-			panic("All types must be structs.")
+			panic("All types must be pointers to structs.")
 		}
 		knownTypes[t.Name()] = t
 		s.typeToVersion[t] = version

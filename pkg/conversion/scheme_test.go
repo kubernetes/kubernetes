@@ -90,7 +90,7 @@ func externalTypeReturn() interface{} {
 		O                                     *TestType2           `yaml:"O,omitempty" json:"O,omitempty"`
 		P                                     []TestType2          `yaml:"Q,omitempty" json:"Q,omitempty"`
 	}
-	return TestType1{}
+	return &TestType1{}
 }
 
 type ExternalInternalSame struct {
@@ -124,8 +124,8 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *Scheme {
 	s := NewScheme()
-	s.AddKnownTypes("", TestType1{}, ExternalInternalSame{})
-	s.AddKnownTypes("v1", externalTypeReturn(), ExternalInternalSame{})
+	s.AddKnownTypes("", &TestType1{}, &ExternalInternalSame{})
+	s.AddKnownTypes("v1", externalTypeReturn(), &ExternalInternalSame{})
 	s.ExternalVersion = "v1"
 	s.InternalVersion = ""
 	s.MetaInsertionFactory = testMetaInsertionFactory{}
