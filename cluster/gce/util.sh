@@ -59,7 +59,7 @@ function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcutil listinstances --format=csv --sort=external-ip \
-      --columns=external-ip --filter="name eq ${MINION_NAMES[$i]}" \
+      --columns=external-ip --zone ${ZONE} --filter="name eq ${MINION_NAMES[$i]}" \
       | tail -n 1)
     echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
     KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
@@ -74,7 +74,7 @@ function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [ -z "$KUBE_MASTER_IP" ]; then
     KUBE_MASTER_IP=$(gcutil listinstances --format=csv --sort=external-ip \
-      --columns=external-ip --filter="name eq ${MASTER_NAME}" \
+      --columns=external-ip --zone ${ZONE} --filter="name eq ${MASTER_NAME}" \
       | tail -n 1)
   fi
   if [ -z "$KUBE_MASTER_IP" ]; then
