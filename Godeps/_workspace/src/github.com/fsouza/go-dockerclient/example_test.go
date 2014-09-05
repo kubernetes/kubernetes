@@ -8,10 +8,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"github.com/fsouza/go-dockerclient"
 	"io"
 	"log"
 	"time"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 func ExampleClient_AttachToContainer() {

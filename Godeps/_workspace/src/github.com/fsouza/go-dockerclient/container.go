@@ -28,25 +28,25 @@ type ListContainersOptions struct {
 }
 
 type APIPort struct {
-	PrivatePort int64
-	PublicPort  int64
-	Type        string
-	IP          string
+	PrivatePort int64  `json:"PrivatePort,omitempty" yaml:"PrivatePort,omitempty"`
+	PublicPort  int64  `json:"PublicPort,omitempty" yaml:"PublicPort,omitempty"`
+	Type        string `json:"Type,omitempty" yaml:"Type,omitempty"`
+	IP          string `json:"IP,omitempty" yaml:"IP,omitempty"`
 }
 
 // APIContainers represents a container.
 //
 // See http://goo.gl/QeFH7U for more details.
 type APIContainers struct {
-	ID         string `json:"Id"`
-	Image      string
-	Command    string
-	Created    int64
-	Status     string
-	Ports      []APIPort
-	SizeRw     int64
-	SizeRootFs int64
-	Names      []string
+	ID         string    `json:"Id" yaml:"Id"`
+	Image      string    `json:"Image,omitempty" yaml:"Image,omitempty"`
+	Command    string    `json:"Command,omitempty" yaml:"Command,omitempty"`
+	Created    int64     `json:"Created,omitempty" yaml:"Created,omitempty"`
+	Status     string    `json:"Status,omitempty" yaml:"Status,omitempty"`
+	Ports      []APIPort `json:"Ports,omitempty" yaml:"Ports,omitempty"`
+	SizeRw     int64     `json:"SizeRw,omitempty" yaml:"SizeRw,omitempty"`
+	SizeRootFs int64     `json:"SizeRootFs,omitempty" yaml:"SizeRootFs,omitempty"`
+	Names      []string  `json:"Names,omitempty" yaml:"Names,omitempty"`
 }
 
 // ListContainers returns a slice of containers matching the given criteria.
@@ -86,12 +86,12 @@ func (p Port) Proto() string {
 
 // State represents the state of a container.
 type State struct {
-	Running    bool
-	Paused     bool
-	Pid        int
-	ExitCode   int
-	StartedAt  time.Time
-	FinishedAt time.Time
+	Running    bool      `json:"Running,omitempty" yaml:"Running,omitempty"`
+	Paused     bool      `json:"Paused,omitempty" yaml:"Paused,omitempty"`
+	Pid        int       `json:"Pid,omitempty" yaml:"Pid,omitempty"`
+	ExitCode   int       `json:"ExitCode,omitempty" yaml:"ExitCode,omitempty"`
+	StartedAt  time.Time `json:"StartedAt,omitempty" yaml:"StartedAt,omitempty"`
+	FinishedAt time.Time `json:"FinishedAt,omitempty" yaml:"FinishedAt,omitempty"`
 }
 
 // String returns the string representation of a state.
@@ -106,19 +106,19 @@ func (s *State) String() string {
 }
 
 type PortBinding struct {
-	HostIp   string
-	HostPort string
+	HostIp   string `json:"HostIP,omitempty" yaml:"HostIP,omitempty"`
+	HostPort string `json:"HostPort,omitempty" yaml:"HostPort,omitempty"`
 }
 
 type PortMapping map[string]string
 
 type NetworkSettings struct {
-	IPAddress   string
-	IPPrefixLen int
-	Gateway     string
-	Bridge      string
-	PortMapping map[string]PortMapping
-	Ports       map[Port][]PortBinding
+	IPAddress   string                 `json:"IPAddress,omitempty" yaml:"IPAddress,omitempty"`
+	IPPrefixLen int                    `json:"IPPrefixLen,omitempty" yaml:"IPPrefixLen,omitempty"`
+	Gateway     string                 `json:"Gateway,omitempty" yaml:"Gateway,omitempty"`
+	Bridge      string                 `json:"Bridge,omitempty" yaml:"Bridge,omitempty"`
+	PortMapping map[string]PortMapping `json:"PortMapping,omitempty" yaml:"PortMapping,omitempty"`
+	Ports       map[Port][]PortBinding `json:"Ports,omitempty" yaml:"Ports,omitempty"`
 }
 
 func (settings *NetworkSettings) PortMappingAPI() []APIPort {
@@ -155,55 +155,55 @@ func parsePort(rawPort string) (int, error) {
 }
 
 type Config struct {
-	Hostname        string
-	Domainname      string
-	User            string
-	Memory          int64
-	MemorySwap      int64
-	CpuShares       int64
-	AttachStdin     bool
-	AttachStdout    bool
-	AttachStderr    bool
-	PortSpecs       []string
-	ExposedPorts    map[Port]struct{}
-	Tty             bool
-	OpenStdin       bool
-	StdinOnce       bool
-	Env             []string
-	Cmd             []string
-	Dns             []string // For Docker API v1.9 and below only
-	Image           string
-	Volumes         map[string]struct{}
-	VolumesFrom     string
-	WorkingDir      string
-	Entrypoint      []string
-	NetworkDisabled bool
+	Hostname        string              `json:"Hostname,omitempty" yaml:"Hostname,omitempty"`
+	Domainname      string              `json:"Domainname,omitempty" yaml:"Domainname,omitempty"`
+	User            string              `json:"User,omitempty" yaml:"User,omitempty"`
+	Memory          int64               `json:"Memory,omitempty" yaml:"Memory,omitempty"`
+	MemorySwap      int64               `json:"MemorySwap,omitempty" yaml:"MemorySwap,omitempty"`
+	CpuShares       int64               `json:"CpuShares,omitempty" yaml:"CpuShares,omitempty"`
+	AttachStdin     bool                `json:"AttachStdin,omitempty" yaml:"AttachStdin,omitempty"`
+	AttachStdout    bool                `json:"AttachStdout,omitempty" yaml:"AttachStdout,omitempty"`
+	AttachStderr    bool                `json:"AttachStderr,omitempty" yaml:"AttachStderr,omitempty"`
+	PortSpecs       []string            `json:"PortSpecs,omitempty" yaml:"PortSpecs,omitempty"`
+	ExposedPorts    map[Port]struct{}   `json:"ExposedPorts,omitempty" yaml:"ExposedPorts,omitempty"`
+	Tty             bool                `json:"Tty,omitempty" yaml:"Tty,omitempty"`
+	OpenStdin       bool                `json:"OpenStdin,omitempty" yaml:"OpenStdin,omitempty"`
+	StdinOnce       bool                `json:"StdinOnce,omitempty" yaml:"StdinOnce,omitempty"`
+	Env             []string            `json:"Env,omitempty" yaml:"Env,omitempty"`
+	Cmd             []string            `json:"Cmd,omitempty" yaml:"Cmd,omitempty"`
+	Dns             []string            `json:"Dns,omitempty" yaml:"Dns,omitempty"` // For Docker API v1.9 and below only
+	Image           string              `json:"Image,omitempty" yaml:"Image,omitempty"`
+	Volumes         map[string]struct{} `json:"Volumes,omitempty" yaml:"Volumes,omitempty"`
+	VolumesFrom     string              `json:"VolumesFrom,omitempty" yaml:"VolumesFrom,omitempty"`
+	WorkingDir      string              `json:"WorkingDir,omitempty" yaml:"WorkingDir,omitempty"`
+	Entrypoint      []string            `json:"Entrypoint,omitempty" yaml:"Entrypoint,omitempty"`
+	NetworkDisabled bool                `json:"NetworkDisabled,omitempty" yaml:"NetworkDisabled,omitempty"`
 }
 
 type Container struct {
-	ID string
+	ID string `json:"Id" yaml:"Id"`
 
-	Created time.Time
+	Created time.Time `json:"Created,omitempty" yaml:"Created,omitempty"`
 
-	Path string
-	Args []string
+	Path string   `json:"Path,omitempty" yaml:"Path,omitempty"`
+	Args []string `json:"Args,omitempty" yaml:"Args,omitempty"`
 
-	Config *Config
-	State  State
-	Image  string
+	Config *Config `json:"Config,omitempty" yaml:"Config,omitempty"`
+	State  State   `json:"State,omitempty" yaml:"State,omitempty"`
+	Image  string  `json:"Image,omitempty" yaml:"Image,omitempty"`
 
-	NetworkSettings *NetworkSettings
+	NetworkSettings *NetworkSettings `json:"NetworkSettings,omitempty" yaml:"NetworkSettings,omitempty"`
 
-	SysInitPath    string
-	ResolvConfPath string
-	HostnamePath   string
-	HostsPath      string
-	Name           string
-	Driver         string
+	SysInitPath    string `json:"SysInitPath,omitempty" yaml:"SysInitPath,omitempty"`
+	ResolvConfPath string `json:"ResolvConfPath,omitempty" yaml:"ResolvConfPath,omitempty"`
+	HostnamePath   string `json:"HostnamePath,omitempty" yaml:"HostnamePath,omitempty"`
+	HostsPath      string `json:"HostsPath,omitempty" yaml:"HostsPath,omitempty"`
+	Name           string `json:"Name,omitempty" yaml:"Name,omitempty"`
+	Driver         string `json:"Driver,omitempty" yaml:"Driver,omitempty"`
 
-	Volumes    map[string]string
-	VolumesRW  map[string]bool
-	HostConfig *HostConfig
+	Volumes    map[string]string `json:"Volumes,omitempty" yaml:"Volumes,omitempty"`
+	VolumesRW  map[string]bool   `json:"VolumesRW,omitempty" yaml:"VolumesRW,omitempty"`
+	HostConfig *HostConfig       `json:"HostConfig,omitempty" yaml:"HostConfig,omitempty"`
 }
 
 // InspectContainer returns information about a container by its ID.
@@ -279,22 +279,56 @@ func (c *Client) CreateContainer(opts CreateContainerOptions) (*Container, error
 }
 
 type KeyValuePair struct {
-	Key   string
-	Value string
+	Key   string `json:"Key,omitempty" yaml:"Key,omitempty"`
+	Value string `json:"Value,omitempty" yaml:"Value,omitempty"`
+}
+
+// RestartPolicy represents the policy for automatically restarting a container.
+//
+// Possible values are:
+//
+//   - always: the docker daemon will always restart the container
+//   - on-failure: the docker daemon will restart the container on failures, at
+//                 most MaximumRetryCount times
+//   - no: the docker daemon will not restart the container automatically
+type RestartPolicy struct {
+	Name              string `json:"Name,omitempty" yaml:"Name,omitempty"`
+	MaximumRetryCount int    `json:"MaximumRetryCount,omitempty" yaml:"MaximumRetryCount,omitempty"`
+}
+
+// AlwaysRestart returns a restart policy that tells the Docker daemon to
+// always restart the container.
+func AlwaysRestart() RestartPolicy {
+	return RestartPolicy{Name: "always"}
+}
+
+// RestartOnFailure returns a restart policy that tells the Docker daemon to
+// restart the container on failures, trying at most maxRetry times.
+func RestartOnFailure(maxRetry int) RestartPolicy {
+	return RestartPolicy{Name: "on-failure", MaximumRetryCount: maxRetry}
+}
+
+// NeverRestart returns a restart policy that tells the Docker daemon to never
+// restart the container on failures.
+func NeverRestart() RestartPolicy {
+	return RestartPolicy{Name: "no"}
 }
 
 type HostConfig struct {
-	Binds           []string
-	ContainerIDFile string
-	LxcConf         []KeyValuePair
-	Privileged      bool
-	PortBindings    map[Port][]PortBinding
-	Links           []string
-	PublishAllPorts bool
-	Dns             []string // For Docker API v1.10 and above only
-	DnsSearch       []string
-	VolumesFrom     []string
-	NetworkMode     string
+	Binds           []string               `json:"Binds,omitempty" yaml:"Binds,omitempty"`
+	CapAdd          []string               `json:"CapAdd,omitempty" yaml:"CapAdd,omitempty"`
+	CapDrop         []string               `json:"CapDrop,omitempty" yaml:"CapDrop,omitempty"`
+	ContainerIDFile string                 `json:"ContainerIDFile,omitempty" yaml:"ContainerIDFile,omitempty"`
+	LxcConf         []KeyValuePair         `json:"LxcConf,omitempty" yaml:"LxcConf,omitempty"`
+	Privileged      bool                   `json:"Privileged,omitempty" yaml:"Privileged,omitempty"`
+	PortBindings    map[Port][]PortBinding `json:"PortBindings,omitempty" yaml:"PortBindings,omitempty"`
+	Links           []string               `json:"Links,omitempty" yaml:"Links,omitempty"`
+	PublishAllPorts bool                   `json:"PublishAllPorts,omitempty" yaml:"PublishAllPorts,omitempty"`
+	Dns             []string               `json:"Dns,omitempty" yaml:"Dns,omitempty"` // For Docker API v1.10 and above only
+	DnsSearch       []string               `json:"DnsSearch,omitempty" yaml:"DnsSearch,omitempty"`
+	VolumesFrom     []string               `json:"VolumesFrom,omitempty" yaml:"VolumesFrom,omitempty"`
+	NetworkMode     string                 `json:"NetworkMode,omitempty" yaml:"NetworkMode,omitempty"`
+	RestartPolicy   RestartPolicy          `json:"RestartPolicy,omitempty" yaml:"RestartPolicy,omitempty"`
 }
 
 // StartContainer starts a container, returning an error in case of failure.
@@ -308,6 +342,9 @@ func (c *Client) StartContainer(id string, hostConfig *HostConfig) error {
 	_, status, err := c.do("POST", path, hostConfig)
 	if status == http.StatusNotFound {
 		return &NoSuchContainer{ID: id}
+	}
+	if status == http.StatusNotModified {
+		return &ContainerAlreadyRunning{ID: id}
 	}
 	if err != nil {
 		return err
@@ -324,6 +361,9 @@ func (c *Client) StopContainer(id string, timeout uint) error {
 	_, status, err := c.do("POST", path, nil)
 	if status == http.StatusNotFound {
 		return &NoSuchContainer{ID: id}
+	}
+	if status == http.StatusNotModified {
+		return &ContainerNotRunning{ID: id}
 	}
 	if err != nil {
 		return err
@@ -590,7 +630,7 @@ func (c *Client) Logs(opts LogsOptions) error {
 		opts.Tail = "all"
 	}
 	path := "/containers/" + opts.Container + "/logs?" + queryString(opts)
-	return c.stream("GET", path, opts.RawTerminal, nil, nil, opts.OutputStream, opts.ErrorStream)
+	return c.stream("GET", path, opts.RawTerminal, false, nil, nil, opts.OutputStream, opts.ErrorStream)
 }
 
 // ResizeContainerTTY resizes the terminal to the given height and width.
@@ -617,10 +657,10 @@ type ExportContainerOptions struct {
 // See http://goo.gl/Lqk0FZ for more details.
 func (c *Client) ExportContainer(opts ExportContainerOptions) error {
 	if opts.ID == "" {
-		return NoSuchContainer{ID: opts.ID}
+		return &NoSuchContainer{ID: opts.ID}
 	}
 	url := fmt.Sprintf("/containers/%s/export", opts.ID)
-	return c.stream("GET", url, true, nil, nil, opts.OutputStream, nil)
+	return c.stream("GET", url, true, false, nil, nil, opts.OutputStream, nil)
 }
 
 // NoSuchContainer is the error returned when a given container does not exist.
@@ -628,6 +668,26 @@ type NoSuchContainer struct {
 	ID string
 }
 
-func (err NoSuchContainer) Error() string {
+func (err *NoSuchContainer) Error() string {
 	return "No such container: " + err.ID
+}
+
+// ContainerAlreadyRunning is the error returned when a given container is
+// already running.
+type ContainerAlreadyRunning struct {
+	ID string
+}
+
+func (err *ContainerAlreadyRunning) Error() string {
+	return "Container already running: " + err.ID
+}
+
+// ContainerNotRunning is the error returned when a given container is not
+// running.
+type ContainerNotRunning struct {
+	ID string
+}
+
+func (err *ContainerNotRunning) Error() string {
+	return "Container not running: " + err.ID
 }

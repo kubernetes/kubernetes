@@ -264,7 +264,7 @@ func (c *Client) do(method, path string, data interface{}) ([]byte, int, error) 
 	return body, resp.StatusCode, nil
 }
 
-func (c *Client) stream(method, path string, setRawTerminal bool, headers map[string]string, in io.Reader, stdout, stderr io.Writer) error {
+func (c *Client) stream(method, path string, setRawTerminal, rawJSONStream bool, headers map[string]string, in io.Reader, stdout, stderr io.Writer) error {
 	if (method == "POST" || method == "PUT") && in == nil {
 		in = bytes.NewReader(nil)
 	}
@@ -320,6 +320,12 @@ func (c *Client) stream(method, path string, setRawTerminal bool, headers map[st
 		return newError(resp.StatusCode, body)
 	}
 	if resp.Header.Get("Content-Type") == "application/json" {
+		// if we want to get raw json stream, just copy it back to output
+		// without decoding it
+		if rawJSONStream {
+			_, err = io.Copy(stdout, resp.Body)
+			return err
+		}
 		dec := json.NewDecoder(resp.Body)
 		for {
 			var m jsonMessage

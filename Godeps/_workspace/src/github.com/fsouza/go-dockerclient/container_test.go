@@ -493,6 +493,15 @@ func TestStartContainerNotFound(t *testing.T) {
 	}
 }
 
+func TestStartContainerAlreadyRunning(t *testing.T) {
+	client := newTestClient(&FakeRoundTripper{message: "container already running", status: http.StatusNotModified})
+	err := client.StartContainer("a2334", &HostConfig{})
+	expected := &ContainerAlreadyRunning{ID: "a2334"}
+	if !reflect.DeepEqual(err, expected) {
+		t.Errorf("StartContainer: Wrong error returned. Want %#v. Got %#v.", expected, err)
+	}
+}
+
 func TestStopContainer(t *testing.T) {
 	fakeRT := &FakeRoundTripper{message: "", status: http.StatusNoContent}
 	client := newTestClient(fakeRT)
@@ -515,6 +524,15 @@ func TestStopContainerNotFound(t *testing.T) {
 	client := newTestClient(&FakeRoundTripper{message: "no such container", status: http.StatusNotFound})
 	err := client.StopContainer("a2334", 10)
 	expected := &NoSuchContainer{ID: "a2334"}
+	if !reflect.DeepEqual(err, expected) {
+		t.Errorf("StopContainer: Wrong error returned. Want %#v. Got %#v.", expected, err)
+	}
+}
+
+func TestStopContainerNotRunning(t *testing.T) {
+	client := newTestClient(&FakeRoundTripper{message: "container not running", status: http.StatusNotModified})
+	err := client.StopContainer("a2334", 10)
+	expected := &ContainerNotRunning{ID: "a2334"}
 	if !reflect.DeepEqual(err, expected) {
 		t.Errorf("StopContainer: Wrong error returned. Want %#v. Got %#v.", expected, err)
 	}
@@ -1313,8 +1331,12 @@ func TestExportContainerNoId(t *testing.T) {
 	client := Client{}
 	out := stdoutMock{bytes.NewBufferString("")}
 	err := client.ExportContainer(ExportContainerOptions{OutputStream: out})
-	if err != (NoSuchContainer{}) {
-		t.Errorf("ExportContainer: wrong error. Want %#v. Got %#v.", NoSuchContainer{}, err)
+	e, ok := err.(*NoSuchContainer)
+	if !ok {
+		t.Errorf("ExportContainer: wrong error. Want NoSuchContainer. Got %#v.", e)
+	}
+	if e.ID != "" {
+		t.Errorf("ExportContainer: wrong ID. Want %q. Got %q", "", e.ID)
 	}
 }
 
@@ -1359,5 +1381,36 @@ func TestPassingNameOptToCreateContainerReturnsItInContainer(t *testing.T) {
 	}
 	if container.Name != "TestCreateContainer" {
 		t.Errorf("Container name expected to be TestCreateContainer, was %s", container.Name)
+	}
+}
+
+func TestAlwaysRestart(t *testing.T) {
+	policy := AlwaysRestart()
+	if policy.Name != "always" {
+		t.Errorf("AlwaysRestart(): wrong policy name. Want %q. Got %q", "always", policy.Name)
+	}
+	if policy.MaximumRetryCount != 0 {
+		t.Errorf("AlwaysRestart(): wrong MaximumRetryCount. Want 0. Got %d", policy.MaximumRetryCount)
+	}
+}
+
+func TestRestartOnFailure(t *testing.T) {
+	const retry = 5
+	policy := RestartOnFailure(retry)
+	if policy.Name != "on-failure" {
+		t.Errorf("RestartOnFailure(%d): wrong policy name. Want %q. Got %q", retry, "on-failure", policy.Name)
+	}
+	if policy.MaximumRetryCount != retry {
+		t.Errorf("RestartOnFailure(%d): wrong MaximumRetryCount. Want %d. Got %d", retry, retry, policy.MaximumRetryCount)
+	}
+}
+
+func TestNeverRestart(t *testing.T) {
+	policy := NeverRestart()
+	if policy.Name != "no" {
+		t.Errorf("NeverRestart(): wrong policy name. Want %q. Got %q", "always", policy.Name)
+	}
+	if policy.MaximumRetryCount != 0 {
+		t.Errorf("NeverRestart(): wrong MaximumRetryCount. Want 0. Got %d", policy.MaximumRetryCount)
 	}
 }
