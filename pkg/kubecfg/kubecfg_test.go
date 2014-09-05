@@ -26,10 +26,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T) {
-	if expectedAction != actualAction {
+	if !reflect.DeepEqual(expectedAction, actualAction) {
 		t.Errorf("Unexpected Action: %#v, expected: %#v", actualAction, expectedAction)
 	}
 }
@@ -43,7 +44,7 @@ func TestUpdateWithPods(t *testing.T) {
 			},
 		},
 	}
-	Update("foo", &fakeClient, 0)
+	Update("foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 5 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -57,12 +58,51 @@ func TestUpdateWithPods(t *testing.T) {
 
 func TestUpdateNoPods(t *testing.T) {
 	fakeClient := client.Fake{}
-	Update("foo", &fakeClient, 0)
+	Update("foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
 	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[1], t)
+}
+
+func TestUpdateWithNewImage(t *testing.T) {
+	fakeClient := client.Fake{
+		Pods: api.PodList{
+			Items: []api.Pod{
+				{JSONBase: api.JSONBase{ID: "pod-1"}},
+				{JSONBase: api.JSONBase{ID: "pod-2"}},
+			},
+		},
+		Ctrl: api.ReplicationController{
+			DesiredState: api.ReplicationControllerState{
+				PodTemplate: api.PodTemplate{
+					DesiredState: api.PodState{
+						Manifest: api.ContainerManifest{
+							Containers: []api.Container{
+								{Image: "fooImage:1"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	Update("foo", &fakeClient, 0, "fooImage:2")
+	if len(fakeClient.Actions) != 6 {
+		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
+	}
+	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
+
+	newCtrl := *runtime.CopyOrDie(fakeClient.Ctrl).(*api.ReplicationController)
+	newCtrl.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = "fooImage:2"
+	validateAction(client.FakeAction{Action: "update-controller", Value: newCtrl}, fakeClient.Actions[1], t)
+
+	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[2], t)
+	// Update deletes the pods, it relies on the replication controller to replace them.
+	validateAction(client.FakeAction{Action: "delete-pod", Value: "pod-1"}, fakeClient.Actions[3], t)
+	validateAction(client.FakeAction{Action: "delete-pod", Value: "pod-2"}, fakeClient.Actions[4], t)
+	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[5], t)
 }
 
 func TestRunController(t *testing.T) {

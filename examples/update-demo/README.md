@@ -27,7 +27,7 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
 This example also assumes that you have [Docker](http://docker.io) installed on your local machine.
 
-It also assumes that ```$DOCKER_USER``` is set to your docker user id.
+It also assumes that `$DOCKER_HUB_USER` is set to your Docker user id.  We use this to upload the docker images that are used in the demo.
 
 You may need to open the firewall for port 8080 using the [console][cloud-console] or the `gcutil` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
 
@@ -37,57 +37,66 @@ $ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernet
 
 ### Step One: Build the image
 
-    $ cd kubernetes/examples/update-demo/image
-    $ docker build -t $DOCKER_USER/data .
-    $ docker push $DOCKER_USER/data
+```shell
+$ cd kubernetes/examples/update-demo
+$ ./build-images.sh
+```
 
-### Step Two: Run the controller
-Now we will turn up two replicas of that image.  They all serve on port 8080, mapped to internal port 80
+### Step Two: Turn up the UX for the demo
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh -p 8080:80 run $DOCKER_USER/data 2 dataController
+```shell
+$ ./0-run-web-proxy.sh &
+```
 
-### Step Three: Turn up the UX for the demo
-In a different terminal:
+This can sometimes spew to the output so you could also run it in a different terminal.
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh -proxy -www examples/update-demo/local/
+Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
-Now visit the the [demo website](http://localhost:8001/static/index.html).  You should see two light blue squares with pod IDs and ip addresses.
+### Step Three: Run the controller
+Now we will turn up two replicas of an image.  They all serve on port 8080, mapped to internal port 80
+
+```shell
+$ ./1-create-replication-controller.sh
+```
+
+After these pull the image (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
 
 ### Step Four: Try resizing the controller
+
 Now we will increase the number of replicas from two to four:
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh resize dataController 4
+```shell
+$ ./2-scale.sh
+```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
 
 ### Step Five: Update the docker image
-We will now update the docker image to serve a different color.
+We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
-    $ cd kubernetes/examples/update-demo/image
-    $ ${EDITOR} data.json
-
-Edit the ```color``` value so that it is a new color.  For example:
-```js
-{
-  "color": "#F00"
-}
+```shell
+$ ./3-rolling-update
 ```
-Will set the color to red.
+The rollingUpdate command in kubecfg will do 2 things:
 
-Once you are happy with the color, build a new image:
+1. Update the template in the replication controller to the new image (`$DOCKER_HUB_USER/update-demo:kitten`)
+2. Kill each of the pods one by one.  It'll let the replication controller create new pods to replace those that were killed.
 
-    $ docker build -t $DOCKER_USER/data .
-    $ docker push $DOCKER_USER/data
+Watch the UX, it will update one pod every 10 seconds until all of the pods have the new image.
 
-### Step Six: Roll the update out to your servers
-We will now update the servers that are running out in your cluster.
+### Step Five: Bring down the pods
 
-    $ cd kubernetes
-    $ cluster/kubecfg.sh -u=30s rollingupdate dataController
+```shell
+$ ./4-down.sh
+```
 
-Watch the UX, it will update one pod every 30 seconds until all of the pods have the new color.
+This will first 'stop' the replication controller by turning the target number of replicas to 0.  It'll then delete that controller.
 
 [cloud-console]: https://console.developer.google.com
+
+### Image Copyright
+
+Note that he images included here are public domain.
+
+* [kitten](http://commons.wikimedia.org/wiki/File:Kitten-stare.jpg)
+* [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)

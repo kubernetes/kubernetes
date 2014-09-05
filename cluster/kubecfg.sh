@@ -17,8 +17,8 @@
 source $(dirname $0)/kube-env.sh
 source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
 
-CLOUDCFG=$(dirname $0)/../_output/go/bin/kubecfg
-if [ ! -x $CLOUDCFG ]; then
+KUBECFG=$(dirname $0)/../_output/go/bin/kubecfg
+if [ ! -x $KUBECFG ]; then
   echo "Could not find kubecfg binary. Run hack/build-go.sh to build it."
   exit 1
 fi
@@ -40,4 +40,4 @@ if [ "$KUBE_MASTER_IP" != "" ] && [ "$KUBERNETES_MASTER" == "" ]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-$CLOUDCFG $AUTH_CONFIG "$@"
+$KUBECFG $AUTH_CONFIG "$@"

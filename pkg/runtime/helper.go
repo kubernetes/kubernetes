@@ -194,6 +194,24 @@ func DecodeInto(data []byte, obj interface{}) error {
 	return conversionScheme.DecodeInto(data, obj)
 }
 
+// Does a deep copy of an API object.  Useful mostly for tests.
+// TODO(dbsmith): implement directly instead of via Encode/Decode
+func Copy(obj interface{}) (interface{}, error) {
+	data, err := Encode(obj)
+	if err != nil {
+		return nil, err
+	}
+	return Decode(data)
+}
+
+func CopyOrDie(obj interface{}) interface{} {
+	newObj, err := Copy(obj)
+	if err != nil {
+		panic(err)
+	}
+	return newObj
+}
+
 // metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
 // package figure out how to encode our object's types and versions. These fields are
 // located in our JSONBase.

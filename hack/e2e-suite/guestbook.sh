@@ -26,23 +26,23 @@ source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 GUESTBOOK="${KUBE_REPO_ROOT}/examples/guestbook"
 
 # Launch the guestbook example
-$CLOUDCFG -c "${GUESTBOOK}/redis-master.json" create /pods
-$CLOUDCFG -c "${GUESTBOOK}/redis-master-service.json" create /services
-$CLOUDCFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
+$KUBECFG -c "${GUESTBOOK}/redis-master.json" create /pods
+$KUBECFG -c "${GUESTBOOK}/redis-master-service.json" create /services
+$KUBECFG -c "${GUESTBOOK}/redis-slave-controller.json" create /replicationControllers
 
 sleep 5
 
-POD_LIST_1=$($CLOUDCFG '-template={{range.Items}}{{.ID}} {{end}}' list pods)
+POD_LIST_1=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' list pods)
 echo "Pods running: ${POD_LIST_1}"
 
-$CLOUDCFG stop redisSlaveController
+$KUBECFG stop redisSlaveController
 # Needed until issue #103 gets fixed
 sleep 25
-$CLOUDCFG rm redisSlaveController
-$CLOUDCFG delete services/redismaster
-$CLOUDCFG delete pods/redis-master-2
+$KUBECFG rm redisSlaveController
+$KUBECFG delete services/redismaster
+$KUBECFG delete pods/redis-master-2
 
-POD_LIST_2=$($CLOUDCFG '-template={{range.Items}}{{.ID}} {{end}}' list pods)
+POD_LIST_2=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' list pods)
 echo "Pods running after shutdown: ${POD_LIST_2}"
 
 exit 0

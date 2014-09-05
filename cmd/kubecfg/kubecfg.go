@@ -55,6 +55,7 @@ var (
 	www           = flag.String("www", "", "If -proxy is true, use this directory to serve static files")
 	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
+	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 )
 
 var parser = kubecfg.NewParser(map[string]interface{}{
@@ -65,17 +66,24 @@ var parser = kubecfg.NewParser(map[string]interface{}{
 })
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `usage: kubecfg -h [-c config/file.json] [-p :,..., :] <method>
+	fmt.Fprintf(os.Stderr, `Usage: kubecfg -h [-c config/file.json] <method>
 
-  Kubernetes REST API:
+Kubernetes REST API:
+
   kubecfg [OPTIONS] get|list|create|delete|update <%s>[/<id>]
 
-  Manage replication controllers:
-  kubecfg [OPTIONS] stop|rm|rollingupdate <controller>
-  kubecfg [OPTIONS] run <image> <replicas> <controller>
+Manage replication controllers:
+
+  kubecfg [OPTIONS] stop|rm <controller>
+  kubecfg [OPTIONS] [-u <time>] [-image <image>] rollingupdate <controller>
   kubecfg [OPTIONS] resize <controller> <replicas>
 
-  Options:
+Launch a simple ReplicationController with a single container based
+on the given image:
+
+  kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
+
+Options:
 `, prettyWireStorage())
 	flag.PrintDefaults()
 
@@ -337,7 +345,7 @@ func executeControllerRequest(method string, c *client.Client) bool {
 	case "rm":
 		err = kubecfg.DeleteController(parseController(), c)
 	case "rollingupdate":
-		err = kubecfg.Update(parseController(), c, *updatePeriod)
+		err = kubecfg.Update(parseController(), c, *updatePeriod, *imageName)
 	case "run":
 		if len(flag.Args()) != 4 {
 			glog.Fatal("usage: kubecfg [OPTIONS] run <image> <replicas> <controller>")

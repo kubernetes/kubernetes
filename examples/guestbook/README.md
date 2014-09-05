@@ -81,6 +81,7 @@ The pod that you created in Step One has the label `name=redis-master`. The sele
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 10000,
+  "containerPort": 6379,
   "selector": {
     "name": "redis-master"
   }
@@ -169,6 +170,7 @@ Just like the master, we want to have a service to proxy connections to the read
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 10001,
+  "containerPort": 6379,
   "labels": {
     "name": "redisslave"
   },

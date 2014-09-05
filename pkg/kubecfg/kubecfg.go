@@ -78,11 +78,24 @@ func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
 // 'name' points to a replication controller.
 // 'client' is used for updating pods.
 // 'updatePeriod' is the time between pod updates.
-func Update(name string, client client.Interface, updatePeriod time.Duration) error {
+// 'imageName' is the new image to update for the template.  This will work
+//     with the first container in the pod.  There is no support yet for
+//     updating more complex replication controllers.  If this is blank then no
+//     update of the image is performed.
+func Update(name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
 	controller, err := client.GetReplicationController(name)
 	if err != nil {
 		return err
 	}
+
+	if len(imageName) != 0 {
+		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = imageName
+		controller, err = client.UpdateReplicationController(controller)
+		if err != nil {
+			return err
+		}
+	}
+
 	s := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 
 	podList, err := client.ListPods(s)
@@ -168,7 +181,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
 			ReplicaSelector: map[string]string{
-				"name": name,
+				"replicationController": name,
 			},
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
@@ -184,12 +197,9 @@ func RunController(image, name string, replicas int, client client.Interface, po
 					},
 				},
 				Labels: map[string]string{
-					"name": name,
+					"replicationController": name,
 				},
 			},
-		},
-		Labels: map[string]string{
-			"name": name,
 		},
 	}
 
