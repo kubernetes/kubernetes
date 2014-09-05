@@ -30,8 +30,8 @@ type execActionHandler struct {
 	kubelet *Kubelet
 }
 
-func (e *execActionHandler) Run(podFullName string, container *api.Container, handler *api.Handler) error {
-	_, err := e.kubelet.RunInContainer(podFullName, container.Name, handler.Exec.Command)
+func (e *execActionHandler) Run(podFullName, uuid string, container *api.Container, handler *api.Handler) error {
+	_, err := e.kubelet.RunInContainer(podFullName, uuid, container.Name, handler.Exec.Command)
 	return err
 }
 
@@ -65,11 +65,11 @@ func ResolvePort(portReference util.IntOrString, container *api.Container) (int,
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (h *httpActionHandler) Run(podFullName string, container *api.Container, handler *api.Handler) error {
+func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		var info api.PodInfo
-		info, err := h.kubelet.GetPodInfo(podFullName)
+		info, err := h.kubelet.GetPodInfo(podFullName, uuid)
 		if err != nil {
 			glog.Errorf("unable to get pod info, event handlers may be invalid.")
 			return err

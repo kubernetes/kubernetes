@@ -109,21 +109,24 @@ func (p dockerPuller) Pull(image string) error {
 // DockerContainers is a map of containers
 type DockerContainers map[DockerID]*docker.APIContainers
 
-func (c DockerContainers) FindPodContainer(podFullName, containerName string) (*docker.APIContainers, bool, uint64) {
+func (c DockerContainers) FindPodContainer(podFullName, uuid, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
-		dockerManifestID, dockerContainerName, hash := parseDockerName(dockerContainer.Names[0])
-		if dockerManifestID == podFullName && dockerContainerName == containerName {
+		dockerManifestID, dockerUUID, dockerContainerName, hash := parseDockerName(dockerContainer.Names[0])
+		if dockerManifestID == podFullName &&
+			(uuid == "" || dockerUUID == uuid) &&
+			dockerContainerName == containerName {
 			return dockerContainer, true, hash
 		}
 	}
 	return nil, false, 0
 }
 
+// Note, this might return containers belong to a different Pod instance with the same name
 func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[string]*docker.APIContainers {
 	containers := make(map[string]*docker.APIContainers)
 
 	for _, dockerContainer := range c {
-		dockerManifestID, dockerContainerName, _ := parseDockerName(dockerContainer.Names[0])
+		dockerManifestID, _, dockerContainerName, _ := parseDockerName(dockerContainer.Names[0])
 		if dockerManifestID == podFullName {
 			containers[dockerContainerName] = dockerContainer
 		}
@@ -154,7 +157,7 @@ func getKubeletDockerContainers(client DockerInterface) (DockerContainers, error
 var ErrNoContainersInPod = errors.New("no containers exist for this pod")
 
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
-func getDockerPodInfo(client DockerInterface, podFullName string) (api.PodInfo, error) {
+func getDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
 	containers, err := client.ListContainers(docker.ListContainersOptions{})
@@ -163,8 +166,11 @@ func getDockerPodInfo(client DockerInterface, podFullName string) (api.PodInfo, 
 	}
 
 	for _, value := range containers {
-		dockerManifestID, dockerContainerName, _ := parseDockerName(value.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, _ := parseDockerName(value.Names[0])
 		if dockerManifestID != podFullName {
+			continue
+		}
+		if uuid != "" && dockerUUID != uuid {
 			continue
 		}
 		inspectResult, err := client.InspectContainer(value.ID)
@@ -211,12 +217,25 @@ func hashContainer(container *api.Container) uint64 {
 func buildDockerName(pod *Pod, container *api.Container) string {
 	containerName := escapeDash(container.Name) + "." + strconv.FormatUint(hashContainer(container), 16)
 	// Note, manifest.ID could be blank.
-	return fmt.Sprintf("%s--%s--%s--%08x", containerNamePrefix, containerName, escapeDash(GetPodFullName(pod)), rand.Uint32())
+	if len(pod.Manifest.UUID) == 0 {
+		return fmt.Sprintf("%s--%s--%s--%08x",
+			containerNamePrefix,
+			containerName,
+			escapeDash(GetPodFullName(pod)),
+			rand.Uint32())
+	} else {
+		return fmt.Sprintf("%s--%s--%s--%s--%08x",
+			containerNamePrefix,
+			containerName,
+			escapeDash(GetPodFullName(pod)),
+			escapeDash(pod.Manifest.UUID),
+			rand.Uint32())
+	}
 }
 
 // Upacks a container name, returning the pod full name and container name we would have used to
 // construct the docker name. If the docker name isn't one we created, we may return empty strings.
-func parseDockerName(name string) (podFullName, containerName string, hash uint64) {
+func parseDockerName(name string) (podFullName, uuid, containerName string, hash uint64) {
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
 	if name[0] == '/' {
@@ -240,11 +259,14 @@ func parseDockerName(name string) (podFullName, containerName string, hash uint6
 	if len(parts) > 2 {
 		podFullName = unescapeDash(parts[2])
 	}
+	if len(parts) > 4 {
+		uuid = unescapeDash(parts[3])
+	}
 	return
 }
 
 // Parses image name including a tag and returns image name and tag.
-// TODO: Future Docker versions can parse the tag on daemon side, see:
+// TODO: Future Docker versions can parse the tag on daemon side, see
 // https://github.com/dotcloud/docker/issues/6876
 // So this can be deprecated at some point.
 func parseImageName(image string) (string, string) {

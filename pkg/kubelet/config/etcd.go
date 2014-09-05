@@ -99,7 +99,9 @@ func eventToPods(ev watch.Event) ([]kubelet.Pod, error) {
 		if name == "" {
 			name = fmt.Sprintf("%d", i+1)
 		}
-		pods = append(pods, kubelet.Pod{Name: name, Manifest: manifest})
+		pods = append(pods, kubelet.Pod{
+			Name:     name,
+			Manifest: manifest})
 	}
 
 	return pods, nil

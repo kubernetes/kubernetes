@@ -54,7 +54,11 @@ type ContainerManifest struct {
 	Version string `yaml:"version" json:"version"`
 	// Required: This must be a DNS_SUBDOMAIN.
 	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID         string      `yaml:"id" json:"id"`
+	ID string `yaml:"id" json:"id"`
+	// TODO: UUID on Manifest is deprecated in the future once we are done
+	// with the API refactoring. It is required for now to determine the instance
+	// of a Pod.
+	UUID       string      `yaml:"uuid,omitempty" json:"uuid,omitempty"`
 	Volumes    []Volume    `yaml:"volumes" json:"volumes"`
 	Containers []Container `yaml:"containers" json:"containers"`
 }

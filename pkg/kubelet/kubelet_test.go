@@ -84,7 +84,7 @@ func verifyPackUnpack(t *testing.T, podNamespace, podName, containerName string)
 		container,
 	)
 	podFullName := fmt.Sprintf("%s.%s", podName, podNamespace)
-	returnedPodFullName, returnedContainerName, hash := parseDockerName(name)
+	returnedPodFullName, _, returnedContainerName, hash := parseDockerName(name)
 	if podFullName != returnedPodFullName || containerName != returnedContainerName || computedHash != hash {
 		t.Errorf("For (%s, %s, %d), unpacked (%s, %s, %d)", podFullName, containerName, computedHash, returnedPodFullName, returnedContainerName, hash)
 	}
@@ -108,7 +108,7 @@ func TestContainerManifestNaming(t *testing.T) {
 	name := fmt.Sprintf("k8s--%s--%s.%s--12345", container.Name, pod.Name, pod.Namespace)
 
 	podFullName := fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
-	returnedPodFullName, returnedContainerName, hash := parseDockerName(name)
+	returnedPodFullName, _, returnedContainerName, hash := parseDockerName(name)
 	if returnedPodFullName != podFullName || returnedContainerName != container.Name || hash != 0 {
 		t.Errorf("unexpected parse: %s %s %d", returnedPodFullName, returnedContainerName, hash)
 	}
@@ -139,13 +139,13 @@ func TestGetContainerID(t *testing.T) {
 		t.Errorf("Expected %#v, Got %#v", fakeDocker.containerList, dockerContainers)
 	}
 	verifyCalls(t, fakeDocker, []string{"list"})
-	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux", "foo")
+	dockerContainer, found, _ := dockerContainers.FindPodContainer("qux", "", "foo")
 	if dockerContainer == nil || !found {
 		t.Errorf("Failed to find container %#v", dockerContainer)
 	}
 
 	fakeDocker.clearCalls()
-	dockerContainer, found, _ = dockerContainers.FindPodContainer("foobar", "foo")
+	dockerContainer, found, _ = dockerContainers.FindPodContainer("foobar", "", "foo")
 	verifyCalls(t, fakeDocker, []string{})
 	if dockerContainer != nil || found {
 		t.Errorf("Should not have found container %#v", dockerContainer)
@@ -943,7 +943,7 @@ func TestGetContainerInfo(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1009,11 +1009,11 @@ func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
 			ID: "foobar",
 			// pod id: qux
 			// container id: foo
-			Names: []string{"/k8s--foo--qux--1234"},
+			Names: []string{"/k8s--foo--qux--uuid--1234"},
 		},
 	}
 
-	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
+	stats, _ := kubelet.GetContainerInfo("qux", "uuid", "foo", nil)
 	// When there's no cAdvisor, the stats should be either nil or empty
 	if stats == nil {
 		return
@@ -1047,11 +1047,11 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 			ID: containerID,
 			// pod id: qux
 			// container id: foo
-			Names: []string{"/k8s--foo--qux--1234"},
+			Names: []string{"/k8s--foo--qux--uuid--1234"},
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", req)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
@@ -1072,7 +1072,7 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 	kubelet.cadvisorClient = mockCadvisor
 	fakeDocker.containerList = []docker.APIContainers{}
 
-	stats, _ := kubelet.GetContainerInfo("qux", "foo", nil)
+	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if stats != nil {
 		t.Errorf("non-nil stats on non exist container")
 	}
@@ -1102,6 +1102,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
 		GetPodFullName(&Pod{Name: podName, Namespace: podNamespace}),
+		"",
 		containerName,
 		[]string{"ls"})
 	if output != nil {
@@ -1132,6 +1133,7 @@ func TestRunInContainer(t *testing.T) {
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer(
 		GetPodFullName(&Pod{Name: podName, Namespace: podNamespace}),
+		"",
 		containerName,
 		cmd)
 	if fakeCommandRunner.ID != containerID {
@@ -1209,7 +1211,7 @@ func TestRunHandlerExec(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.runHandler(podName+"."+podNamespace, &container, container.Lifecycle.PostStart)
+	err := kubelet.runHandler(podName+"."+podNamespace, "", &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1251,7 +1253,7 @@ func TestRunHandlerHttp(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.runHandler(podName+"."+podNamespace, &container, container.Lifecycle.PostStart)
+	err := kubelet.runHandler(podName+"."+podNamespace, "", &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
