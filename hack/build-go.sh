@@ -51,10 +51,7 @@ if [[ ${#targets[@]} -eq 0 ]]; then
   targets=($(kube::default_build_targets))
 fi
 
-binaries=()
-for target in ${targets[@]}; do
-  binaries+=("${KUBE_GO_PACKAGE}/${target}")
-done
+binaries=($(kube::binaries_from_targets "${targets[@]}"))
 
 echo "Building local go components"
 # Note that the flags to 'go build' are duplicated in the salt build setup
