@@ -34,31 +34,33 @@ kube::version_ldflags() {
     cd "${KUBE_REPO_ROOT}"
 
     declare -a ldflags=()
-    if git_commit=$(git rev-parse "HEAD^{commit}" 2>/dev/null); then
-      ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${git_commit}")
+    if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$(git rev-parse "HEAD^{commit}" 2>/dev/null); then
+      ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
 
-      # Check if the tree is dirty.
-      if git_status=$(git status --porcelain) && [[ -z "${git_status}" ]]; then
-        git_tree_state="clean"
-      else
-        git_tree_state="dirty"
+      if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
+        # Check if the tree is dirty.  default to dirty
+        if git_status=$(git status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
+          KUBE_GIT_TREE_STATE="clean"
+        else
+          KUBE_GIT_TREE_STATE="dirty"
+        fi
       fi
-      ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${git_tree_state}")
+      ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
 
       # Use git describe to find the version based on annotated tags.
-      if git_version=$(git describe --abbrev=14 "${git_commit}^{commit}" 2>/dev/null); then
-        if [[ "${git_tree_state}" == "dirty" ]]; then
+      if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$(git describe --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+        if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
           # git describe --dirty only considers changes to existing files, but
           # that is problematic since new untracked .go files affect the build,
           # so use our idea of "dirty" from git status instead.
-          git_version+="-dirty"
+          KUBE_GIT_VERSION+="-dirty"
         fi
-        ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${git_version}")
+        ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}")
 
         # Try to match the "git describe" output to a regex to try to extract
         # the "major" and "minor" versions and whether this is the exact tagged
         # version or whether the tree is between two tagged versions.
-        if [[ "${git_version}" =~ ^v([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
+        if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
           git_major=${BASH_REMATCH[1]}
           git_minor=${BASH_REMATCH[2]}
           if [[ -n "${BASH_REMATCH[3]}" ]]; then
