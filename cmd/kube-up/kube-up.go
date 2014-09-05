@@ -18,6 +18,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -28,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	compute "code.google.com/p/google-api-go-client/compute/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kube_updown"
 	"github.com/golang/glog"
 )
@@ -38,15 +39,13 @@ const (
 	numMinions = 4
 )
 
-var (
-	project = flag.String("project", defaultProject(), "Default GCE Project.")
-)
+var project = flag.String("project", defaultProject(), "Default GCE Project.")
 
 func defaultProject() string {
 	if proj := projectFromEnv(); proj != "" {
 		return proj
 	}
-	if proj := projectFromGcloud(); proj != "" {
+	if proj := projectFromGCloud(); proj != "" {
 		return proj
 	}
 	return ""
@@ -56,20 +55,20 @@ func projectFromEnv() string {
 	return os.Getenv("PROJECT")
 }
 
-func projectFromGcloud() string {
+func projectFromGCloud() string {
 	cmd := exec.Command("gcloud", "config", "list", "project")
 	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return ""
 	}
-	if err = cmd.Start(); err != nil {
+	if err := cmd.Start(); err != nil {
 		return ""
 	}
 	contents, err := ioutil.ReadAll(outPipe)
 	if err != nil {
 		return ""
 	}
-	if err = cmd.Wait(); err != nil {
+	if err := cmd.Wait(); err != nil {
 		return ""
 	}
 	prjReg, err := regexp.Compile(`project = (.*)\n`)
@@ -85,103 +84,114 @@ func projectFromGcloud() string {
 }
 
 func main() {
+	flag.Set("stderrthreshold", "INFO")
 	flag.Parse()
-	fmt.Printf("Project: %v\n", *project)
-
-	c := kube_updown.GetOAuthClient()
-	svc, err := compute.New(c)
+	cloud, err := gce_cloud.CreateGCECloud(*project, zone)
 	if err != nil {
-		glog.Fatalf("couldn't create compute api client: %v", err)
+		glog.Fatalf("failed to create cloud: %v", err)
 	}
-
-	fmt.Printf("Starting VMs and configuring firewalls\n")
-	zoneOps := make([]*compute.Operation, 1+numMinions)
-	globalOps := make([]*compute.Operation, 1+2*numMinions)
-
-	fmt.Printf("Creating firewall kubernetes-master-https\n")
-	globalOps[0], err = kube_updown.AddMasterFirewall(svc, *project)
+	glog.Info("Starting VMs and configuring firewalls\n")
+	ops, err := deployMaster(cloud)
 	if err != nil {
-		glog.Fatalf("couldn't start operation: %v", err)
-	}
-	fmt.Printf("Creating instance kubernetes-master\n")
-	zoneOps[0], err = kube_updown.AddMaster(svc, *project, zone)
-	if err != nil {
-		glog.Fatalf("couldn't start operation: %v", err)
+		glog.Fatal(err)
 	}
 
 	for i := 1; i <= numMinions; i++ {
-		fmt.Printf("Creating firewall kubernetes-minion-%v-all\n", i)
-		globalOps[i], err = kube_updown.AddMinionFirewall(svc, *project, i)
+		newOps, err := deployMinion(cloud, i)
 		if err != nil {
-			glog.Fatalf("couldn't create firewall-rule insert operation: %v", err)
+			glog.Fatal(err)
 		}
-		fmt.Printf("Creating instance kubernetes-minion-%v\n", i)
-		zoneOps[i], err = kube_updown.AddMinion(svc, *project, zone, i)
-		if err != nil {
-			glog.Fatalf("couldn't create instance insert operation: %v", err)
-		}
-		fmt.Printf("Creating route kubernetes-minion-%v\n", i)
-		globalOps[numMinions+i], err = kube_updown.AddMinionRoute(svc, *project, zone, i)
-		if err != nil {
-			glog.Fatalf("couldn't create route insert operation: %v", err)
-		}
+		ops = append(ops, newOps...)
 	}
-	// Wait for all operations to complete
-	for _, op := range zoneOps {
-		target, resource := targetInfo(op.TargetLink)
-		op, err = svc.ZoneOperations.Get(*project, zone, op.Name).Do()
-		if err != nil {
-			glog.Fatalf("error getting operation: %v\n", err)
-		}
-		for op.Status != "DONE" {
-			fmt.Printf("Waiting 2s for %v of %v %v\n", op.OperationType, resource, target)
-			time.Sleep(2 * time.Second)
-			op, err = svc.ZoneOperations.Get(*project, zone, op.Name).Do()
-			if err != nil {
-				glog.Fatalf("error getting operation: %v\n", err)
-			}
-		}
-		if op.Error != nil {
-			glog.Errorf("errors in operation %v:\n", op.Name)
-			for _, err := range op.Error.Errors {
-				glog.Errorf(err.Message)
-			}
-		}
-		fmt.Printf("%v of %v %v has completed\n", op.OperationType, resource, target)
+	if err := waitForOps(cloud, ops); err != nil {
+		glog.Fatal(err)
 	}
-	for _, op := range globalOps {
-		target, resource := targetInfo(op.TargetLink)
-		op, err = svc.GlobalOperations.Get(*project, op.Name).Do()
-		if err != nil {
-			glog.Fatalf("error getting operation: %v\n", err)
-		}
-		for op.Status != "DONE" {
-			fmt.Printf("Waiting 2s for %v of %v %v\n", op.OperationType, resource, target)
-			time.Sleep(2 * time.Second)
-			if err != nil {
-				glog.Fatalf("error getting operation: %v\n", err)
-			}
-		}
-		if op.Error != nil {
-			glog.Errorf("errors in operation %v:\n", op.Name)
-			for _, err := range op.Error.Errors {
-				glog.Errorf(err.Message)
-			}
-		}
-		fmt.Printf("%v of %v %v has completed\n", op.OperationType, resource, target)
+	if err := checkMaster(cloud); err != nil {
+		glog.Fatal(err)
 	}
+	if err := checkMinions(); err != nil {
+		glog.Fatal(err)
+	}
+	glog.Info("Kubernetes cluster is running\n")
+	glog.Info("Security note: The server above uses a self signed certificate.  This is\n")
+	glog.Info("    subject to \"Man in the middle\" type attacks.\n")
+}
 
-	// Attempt to contact kube-master until it responds
-	kubeMasterIP, err := kube_updown.GetMasterIP(svc, *project, zone)
+func deployMaster(cloud *gce_cloud.GCECloud) ([]*gce_cloud.GCEOp, error) {
+	var ops []*gce_cloud.GCEOp
+	glog.Info("Creating firewall kubernetes-master-https\n")
+	op, err := kube_updown.CreateMasterFirewall(cloud)
 	if err != nil {
-		glog.Fatalf("error getting IP: %v\n", err)
+		return ops, fmt.Errorf("couldn't start operation: %v", err)
 	}
-	fmt.Printf("Using master: %v (external IP: %v)\n", kube_updown.MasterName, kubeMasterIP)
+	ops = append(ops, op)
+	glog.Info("Creating instance kubernetes-master\n")
+	op, err = kube_updown.CreateMaster(cloud, *project)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't start operation: %v", err)
+	}
+	ops = append(ops, op)
+	return ops, nil
+}
+
+func deployMinion(cloud *gce_cloud.GCECloud, i int) ([]*gce_cloud.GCEOp, error) {
+	var ops []*gce_cloud.GCEOp
+	glog.Infof("Creating firewall kubernetes-minion-%v-all\n", i)
+	op, err := kube_updown.CreateMinionFirewall(cloud, i)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't create firewall-rule insert operation: %v", err)
+	}
+	ops = append(ops, op)
+	glog.Infof("Creating instance kubernetes-minion-%v\n", i)
+	op, err = kube_updown.CreateMinion(cloud, i)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't create instance insert operation: %v", err)
+	}
+	ops = append(ops, op)
+	glog.Infof("Creating route kubernetes-minion-%v\n", i)
+	op, err = kube_updown.CreateMinionRoute(cloud, *project, zone, i)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't create route insert operation: %v", err)
+	}
+	ops = append(ops, op)
+	return ops, nil
+}
+
+func waitForOps(cloud *gce_cloud.GCECloud, ops []*gce_cloud.GCEOp) error {
+	// Wait for all operations to complete
+	for _, op := range ops {
+		op, err := cloud.PollOp(op)
+		if err != nil {
+			return err
+		}
+		for op.Status() != "DONE" {
+			glog.Infof("Waiting 2s for %v of %v %v\n", op.OperationType(), op.Resource(), op.Target())
+			time.Sleep(2 * time.Second)
+			op, err = cloud.PollOp(op)
+			if err != nil {
+				return err
+			}
+		}
+		if op.Errors() != nil {
+			return errors.New("errors in operation:\n" + strings.Join(op.Errors(), "\n"))
+		}
+		glog.Infof("%v of %v %v has completed\n", op.OperationType(), op.Resource(), op.Target())
+	}
+	return nil
+}
+
+func checkMaster(cloud *gce_cloud.GCECloud) error {
+	// Attempt to contact kube-master until it responds
+	kubeMasterIP, err := cloud.IPAddress(kube_updown.MasterName)
+	if err != nil {
+		return fmt.Errorf("error getting master IP: %v\n", err)
+	}
+	glog.Infof("Using master: %v (external IP: %v)\n", kube_updown.MasterName, kubeMasterIP)
 	url := fmt.Sprintf("https://%v/api/v1beta1/pods", kubeMasterIP)
 	usr, pass := kube_updown.GetCredentials()
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		glog.Fatalf("error creating request: %v\n", err)
+		return err
 	}
 	req.SetBasicAuth(usr, pass)
 	tr := &http.Transport{
@@ -189,45 +199,39 @@ func main() {
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-	fmt.Printf("Waiting for cluster initialization.\n\n")
-	fmt.Printf("  This will continually check to see if the API for kubernetes is reachable.\n")
-	fmt.Printf("  This might loop forever if there was some uncaught error during start up.\n\n")
+	glog.Info("Waiting for cluster initialization.\n")
+	glog.Info("  This will continually check to see if the API for kubernetes is reachable.\n")
+	glog.Info("  This might loop forever if there was some uncaught error during start up.\n")
+	t := 0
 	for {
 		resp, err := client.Do(req)
-		if err != nil {
-			fmt.Printf(".")
-		} else {
-			//fmt.Printf("\n\nStatus: %v\n\n", resp.Status)
+		if err == nil {
 			if resp.StatusCode != 200 {
-				fmt.Printf("Response status was %v. Something might be wrong.\n", resp.StatusCode)
+				glog.Infof("\nResponse status was %v. Something might be wrong.\n", resp.Status)
 			}
 			break
 		}
 		time.Sleep(2 * time.Second)
+		t = t + 2
+		if t%10 == 0 {
+			glog.Infof("%v seconds elapsed", t)
+		}
 	}
-	fmt.Printf("\nKubernetes cluster created.\n")
-	fmt.Printf("Sanity checking cluster...\n")
+	glog.Info("Kubernetes master is running.  Access at:\n")
+	glog.Infof("  https://%v:%v@%v\n", usr, pass, kubeMasterIP)
+	return nil
+}
 
+func checkMinions() error {
+	glog.Info("Sanity checking minions...\n")
 	// Check each minion for successful installation of docker
 	for i := 1; i <= numMinions; i++ {
 		name := fmt.Sprintf("%v-%v", kube_updown.MinionPrefix, i)
-		err = exec.Command("gcutil", "ssh", name, "which", "docker").Run()
-		if err != nil {
-			fmt.Printf("Docker failed to install on %v. You're cluster is unlikely to work correctly.\n", name)
-			fmt.Printf("Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)\n")
-			os.Exit(1)
+		if err := exec.Command("gcutil", "ssh", name, "which", "docker").Run(); err != nil {
+			return fmt.Errorf("Docker failed to install on %v. You're cluster is unlikely to work correctly.\n"+
+				"Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)\n", name)
+
 		}
 	}
-	fmt.Print("Kubernetes cluster is running.  Access the master at:\n\n")
-	fmt.Printf("  https://%v:%v@%v\n\n", usr, pass, kubeMasterIP)
-	fmt.Print("Security note: The server above uses a self signed certificate.  This is\n")
-	fmt.Print("    subject to \"Man in the middle\" type attacks.\n")
-}
-
-func targetInfo(targetLink string) (target, resourceType string) {
-	i := strings.LastIndex(targetLink, "/")
-	target = targetLink[i+1:]
-	j := strings.LastIndex(targetLink[:i], "/")
-	resourceType = targetLink[j+1 : i-1]
-	return target, resourceType
+	return nil
 }
