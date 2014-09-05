@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	runtime.AddConversionFuncs(
+	runtime.DefaultScheme.AddConversionFuncs(
 		// EnvVar's Key is deprecated in favor of Name.
 		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
 			out.Value = in.Value

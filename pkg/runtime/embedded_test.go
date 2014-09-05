@@ -22,14 +22,19 @@ import (
 	"testing"
 )
 
+type EmbeddedTest struct {
+	JSONBase    `yaml:",inline" json:",inline"`
+	Object      EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
+	EmptyObject EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+}
+
+func (*EmbeddedTest) IsAnAPIObject() {}
+
 func TestEmbeddedObject(t *testing.T) {
-	type EmbeddedTest struct {
-		JSONBase    `yaml:",inline" json:",inline"`
-		Object      EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
-		EmptyObject EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
-	}
-	AddKnownTypes("", EmbeddedTest{})
-	AddKnownTypes("v1beta1", EmbeddedTest{})
+	// TODO(dbsmith) fix EmbeddedObject to not use DefaultScheme.
+	s := DefaultScheme
+	s.AddKnownTypes("", &EmbeddedTest{})
+	s.AddKnownTypes("v1beta1", &EmbeddedTest{})
 
 	outer := &EmbeddedTest{
 		JSONBase: JSONBase{ID: "outer"},
@@ -40,14 +45,14 @@ func TestEmbeddedObject(t *testing.T) {
 		},
 	}
 
-	wire, err := Encode(outer)
+	wire, err := s.Encode(outer)
 	if err != nil {
 		t.Fatalf("Unexpected encode error '%v'", err)
 	}
 
 	t.Logf("Wire format is:\n%v\n", string(wire))
 
-	decoded, err := Decode(wire)
+	decoded, err := s.Decode(wire)
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}

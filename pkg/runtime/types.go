@@ -20,6 +20,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+// All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
+// burden. Implement it with a pointer reciever; this will allow us to use the go compiler to check the
+// one thing about our objects that it's capable of checking for us.
+type Object interface {
+	// This function is used only to enforce membership. It's never called.
+	// TODO: Consider mass rename in the future to make it do something useful.
+	IsAnAPIObject()
+}
+
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
@@ -29,8 +38,9 @@ import (
 // 	runtime.JSONBase    `yaml:",inline" json:",inline"`
 // 	... // other fields
 // }
+// func (*MyAwesomeAPIObject) IsAnAPIObject() {}
 //
-// JSONBase is provided here for convenience. You may use it directlly from this package or define
+// JSONBase is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 //
 type JSONBase struct {
@@ -43,17 +53,16 @@ type JSONBase struct {
 }
 
 // EmbeddedObject has appropriate encoder and decoder functions, such that on the wire, it's
-// stored as a []byte, but in memory, the contained object is accessable as an interface{}
-// via the Get() function. Only objects having a JSONBase may be stored via Object.
+// stored as a []byte, but in memory, the contained object is accessable as an Object
+// via the Get() function. Only valid API objects may be stored via EmbeddedObject.
 // The purpose of this is to allow an API object of type known only at runtime to be
 // embedded within other API objects.
 //
 // Note that object assumes that you've registered all of your api types with the api package.
 //
-// Note that objects will be serialized into the api package's default external versioned type;
-// this should be fixed in the future to use the version of the current Codec instead.
+// TODO(dbsmith): Stop using runtime.Codec, use the codec appropriate for the conversion (I have a plan).
 type EmbeddedObject struct {
-	Object interface{}
+	Object
 }
 
 // Extension allows api objects with unknown types to be passed-through. This can be used
@@ -61,4 +70,8 @@ type EmbeddedObject struct {
 // JSONBase features-- kind, version, resourceVersion, etc.
 // TODO: Not implemented yet
 type Extension struct {
+	JSONBase `yaml:",inline" json:",inline"`
+	// RawJSON to go here.
 }
+
+func (*Extension) IsAnAPIObject() {}

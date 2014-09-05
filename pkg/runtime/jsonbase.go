@@ -29,7 +29,7 @@ func NewJSONBaseResourceVersioner() resourceVersioner {
 
 type jsonBaseResourceVersioner struct{}
 
-func (v jsonBaseResourceVersioner) ResourceVersion(obj interface{}) (uint64, error) {
+func (v jsonBaseResourceVersioner) ResourceVersion(obj Object) (uint64, error) {
 	json, err := FindJSONBase(obj)
 	if err != nil {
 		return 0, err
@@ -37,7 +37,7 @@ func (v jsonBaseResourceVersioner) ResourceVersion(obj interface{}) (uint64, err
 	return json.ResourceVersion(), nil
 }
 
-func (v jsonBaseResourceVersioner) SetResourceVersion(obj interface{}, version uint64) error {
+func (v jsonBaseResourceVersioner) SetResourceVersion(obj Object, version uint64) error {
 	json, err := FindJSONBase(obj)
 	if err != nil {
 		return err
