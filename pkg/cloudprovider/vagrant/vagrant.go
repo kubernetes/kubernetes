@@ -19,6 +19,7 @@ package vagrant_cloud
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -55,7 +56,7 @@ type SaltLoginResponse struct {
 // SaltMinion is a machine managed by the Salt service.
 type SaltMinion struct {
 	Roles []string `json:"roles"`
-	IP    string   `json:"minion_ip"`
+	IP    string   `json:"node_ip"`
 	Host  string   `json:"host"`
 }
 
@@ -94,8 +95,22 @@ func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 
 // IPAddress returns the address of a particular machine instance.
 func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
-	// since the instance now is the IP in the vagrant env, this is trivial no-op
-	return net.ParseIP(instance), nil
+	token, err := v.saltLogin()
+	if err != nil {
+		return nil, err
+	}
+	minions, err := v.saltMinions(token)
+	if err != nil {
+		return nil, err
+	}
+	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
+	for _, minion := range filteredMinions {
+		fmt.Println("Minion: ", minion.Host, " , ", instance, " IP: ", minion.IP)
+		if minion.Host == instance {
+			return net.ParseIP(minion.IP), nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find IP address for instance:", instance)
 }
 
 // saltMinionsByRole filters a list of minions that have a matching role.
@@ -187,7 +202,7 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
 	var instances []string
 	for _, instance := range filteredMinions {
-		instances = append(instances, instance.IP)
+		instances = append(instances, instance.Host)
 	}
 
 	return instances, nil

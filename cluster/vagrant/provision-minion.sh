@@ -20,11 +20,22 @@ source $(dirname $0)/provision-config.sh
 
 MINION_IP=$4
 
-# make sure each minion has an entry in hosts file for master
+# Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
-  echo "Adding host entry for $MASTER_NAME"
+  echo "Adding $MASTER_NAME to hosts file"
   echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 fi
+
+# Setup hosts file to support ping by hostname to each minion in the cluster
+minion_ip_array=(${MINION_IPS//,/ })
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+  minion=${MINION_NAMES[$i]}
+  ip=${minion_ip_array[$i]}  
+  if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
+    echo "Adding $minion to hosts file"
+    echo "$ip $minion" >> /etc/hosts
+  fi  
+done
 
 # Let the minion know who its master is
 mkdir -p /etc/salt/minion.d
@@ -33,7 +44,7 @@ echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  minion_ip: $MINION_IP
+  node_ip: $MINION_IP
   etcd_servers: $MASTER_IP
   roles:
     - kubernetes-pool

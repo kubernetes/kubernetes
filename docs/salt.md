@@ -57,6 +57,8 @@ cloud_provider | (Optional) The cloud_provider used by apiserver: *gce*, *azure*
 etcd_servers | (Required) Comma-delimited list of IP addresses the apiserver and kubelet use to reach etcd
 hostnamef | (Optional) The full host name of the machine, i.e. hostname -f
 master_ip | (Optional) The IP address that the apiserver will bind against
+node_ip | (Optional) The IP address to use to address this node
+minion_ip | (Optional) Mapped to the kubelet hostname_override, K8S TODO - change this name
 roles | (Required) 1. **kubernetes-master** means this machine is the master in the kubernetes cluster.  2. **kubernetes-pool** means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
 
 These keys may be leveraged by the Salt sls files to branch behavior.
