@@ -7,7 +7,6 @@ package testing
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fsouza/go-dockerclient"
 	"math/rand"
 	"net"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fsouza/go-dockerclient"
 )
 
 func TestNewServer(t *testing.T) {

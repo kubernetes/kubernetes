@@ -20,10 +20,10 @@ import (
 
 // APIEvents represents an event returned by the API.
 type APIEvents struct {
-	Status string
-	ID     string
-	From   string
-	Time   int64
+	Status string `json:"Status,omitempty" yaml:"Status,omitempty"`
+	ID     string `json:"ID,omitempty" yaml:"ID,omitempty"`
+	From   string `json:"From,omitempty" yaml:"From,omitempty"`
+	Time   int64  `json:"Time,omitempty" yaml:"Time,omitempty"`
 }
 
 type eventMonitoringState struct {

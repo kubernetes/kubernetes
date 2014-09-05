@@ -248,16 +248,22 @@ func TestPingFailingWrongStatus(t *testing.T) {
 type FakeRoundTripper struct {
 	message  string
 	status   int
+	header   map[string]string
 	requests []*http.Request
 }
 
 func (rt *FakeRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	body := strings.NewReader(rt.message)
 	rt.requests = append(rt.requests, r)
-	return &http.Response{
+	res := &http.Response{
 		StatusCode: rt.status,
 		Body:       ioutil.NopCloser(body),
-	}, nil
+		Header:     make(http.Header),
+	}
+	for k, v := range rt.header {
+		res.Header.Set(k, v)
+	}
+	return res, nil
 }
 
 func (rt *FakeRoundTripper) Reset() {
