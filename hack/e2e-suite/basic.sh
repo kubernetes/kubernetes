@@ -41,7 +41,7 @@ function teardown() {
 
 trap "teardown" EXIT
 
-POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l name=myNginx list pods)
+POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=myNginx list pods)
 # Container turn up on a clean cluster can take a while for the docker image pull.
 ALL_RUNNING=0
 while [ $ALL_RUNNING -ne 1 ]; do
