@@ -76,6 +76,7 @@ func NewMainKubelet(
 		resyncInterval: ri,
 		podWorkers:     newPodWorkers(),
 		runner:         NewDockerContainerCommandRunner(),
+		httpClient:     &http.Client{},
 	}
 }
 
@@ -93,6 +94,10 @@ func NewIntegrationTestKubelet(hn string, dc DockerInterface) *Kubelet {
 
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
+}
+
+type httpGetInterface interface {
+	Get(url string) (*http.Response, error)
 }
 
 // Kubelet is the main kubelet implementation.
@@ -115,6 +120,8 @@ type Kubelet struct {
 	logServer http.Handler
 	// Optional, defaults to simple Docker implementation
 	runner ContainerCommandRunner
+	// Optional, client for http requests, defaults to empty client
+	httpClient httpGetInterface
 }
 
 // Run starts the kubelet reacting to config updates
@@ -283,6 +290,31 @@ func (kl *Kubelet) mountExternalVolumes(manifest *api.ContainerManifest) (volume
 	return podVolumes, nil
 }
 
+// A basic interface that knows how to execute handlers
+type actionHandler interface {
+	Run(podFullName string, container *api.Container, handler *api.Handler) error
+}
+
+func (kl *Kubelet) newActionHandler(handler *api.Handler) actionHandler {
+	switch {
+	case handler.Exec != nil:
+		return &execActionHandler{kubelet: kl}
+	case handler.HTTPGet != nil:
+		return &httpActionHandler{client: kl.httpClient, kubelet: kl}
+	default:
+		glog.Errorf("Invalid handler: %v")
+		return nil
+	}
+}
+
+func (kl *Kubelet) runHandler(podFullName string, container *api.Container, handler *api.Handler) error {
+	actionHandler := kl.newActionHandler(handler)
+	if actionHandler == nil {
+		return fmt.Errorf("invalid handler")
+	}
+	return actionHandler.Run(podFullName, container, handler)
+}
+
 // Run a single container from a pod. Returns the docker container ID
 func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes volumeMap, netMode string) (id DockerID, err error) {
 	envVariables := makeEnvironmentVariables(container)
@@ -311,14 +343,28 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 		Binds:        binds,
 		NetworkMode:  netMode,
 	})
+	if err == nil && container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
+		handlerErr := kl.runHandler(GetPodFullName(pod), container, container.Lifecycle.PostStart)
+		if handlerErr != nil {
+			kl.killContainerByID(dockerContainer.ID, "")
+			return DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
+		}
+	}
 	return DockerID(dockerContainer.ID), err
 }
 
 // Kill a docker container
 func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
-	glog.Infof("Killing: %s", dockerContainer.ID)
-	err := kl.dockerClient.StopContainer(dockerContainer.ID, 10)
-	podFullName, containerName, _ := parseDockerName(dockerContainer.Names[0])
+	return kl.killContainerByID(dockerContainer.ID, dockerContainer.Names[0])
+}
+
+func (kl *Kubelet) killContainerByID(ID, name string) error {
+	glog.Infof("Killing: %s", ID)
+	err := kl.dockerClient.StopContainer(ID, 10)
+	if len(name) == 0 {
+		return err
+	}
+	podFullName, containerName, _ := parseDockerName(name)
 	kl.LogEvent(&api.Event{
 		Event: "STOP",
 		Manifest: &api.ContainerManifest{
