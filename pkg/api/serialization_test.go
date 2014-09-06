@@ -85,7 +85,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	},
 )
 
-func objDiff(a, b interface{}) string {
+func objDiff(a, b runtime.Object) string {
 	ab, err := json.Marshal(a)
 	if err != nil {
 		panic("a")
@@ -105,7 +105,7 @@ func objDiff(a, b interface{}) string {
 	)
 }
 
-func runTest(t *testing.T, source interface{}) {
+func runTest(t *testing.T, source runtime.Object) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
 	j, err := runtime.FindJSONBase(source)
@@ -115,13 +115,13 @@ func runTest(t *testing.T, source interface{}) {
 	j.SetKind("")
 	j.SetAPIVersion("")
 
-	data, err := runtime.Encode(source)
+	data, err := runtime.Codec.Encode(source)
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
 
-	obj2, err := runtime.Decode(data)
+	obj2, err := runtime.Codec.Decode(data)
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
 		return
@@ -131,8 +131,8 @@ func runTest(t *testing.T, source interface{}) {
 			return
 		}
 	}
-	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface()
-	err = runtime.DecodeInto(data, obj3)
+	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface().(runtime.Object)
+	err = runtime.Codec.DecodeInto(data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
@@ -145,7 +145,7 @@ func runTest(t *testing.T, source interface{}) {
 }
 
 func TestTypes(t *testing.T) {
-	table := []interface{}{
+	table := []runtime.Object{
 		&api.PodList{},
 		&api.Pod{},
 		&api.ServiceList{},
@@ -169,31 +169,13 @@ func TestTypes(t *testing.T) {
 	}
 }
 
-func TestEncode_NonPtr(t *testing.T) {
-	pod := api.Pod{
-		Labels: map[string]string{"name": "foo"},
-	}
-	obj := interface{}(pod)
-	data, err := runtime.Encode(obj)
-	obj2, err2 := runtime.Decode(data)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v'", err, err2)
-	}
-	if _, ok := obj2.(*api.Pod); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if !reflect.DeepEqual(obj2, &pod) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &pod, obj2)
-	}
-}
-
 func TestEncode_Ptr(t *testing.T) {
 	pod := &api.Pod{
 		Labels: map[string]string{"name": "foo"},
 	}
-	obj := interface{}(pod)
-	data, err := runtime.Encode(obj)
-	obj2, err2 := runtime.Decode(data)
+	obj := runtime.Object(pod)
+	data, err := runtime.Codec.Encode(obj)
+	obj2, err2 := runtime.Codec.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -207,11 +189,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := runtime.Decode(badJSONMissingKind); err == nil {
+	if _, err := runtime.Codec.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := runtime.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.Codec.Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)
