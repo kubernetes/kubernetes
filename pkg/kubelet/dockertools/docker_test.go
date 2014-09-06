@@ -151,3 +151,59 @@ func TestParseImageName(t *testing.T) {
 		}
 	}
 }
+
+func TestDockerKeyringLookup(t *testing.T) {
+	empty := docker.AuthConfiguration{}
+
+	ada := docker.AuthConfiguration{
+		Username: "ada",
+		Password: "smash",
+		Email:    "ada@example.com",
+	}
+
+	grace := docker.AuthConfiguration{
+		Username: "grace",
+		Password: "squash",
+		Email:    "grace@example.com",
+	}
+
+	dk := newDockerKeyring()
+	dk.add("bar.example.com/pong", grace)
+	dk.add("bar.example.com", ada)
+
+	tests := []struct {
+		image string
+		match docker.AuthConfiguration
+		ok    bool
+	}{
+		// direct match
+		{"bar.example.com", ada, true},
+
+		// direct match deeper than other possible matches
+		{"bar.example.com/pong", grace, true},
+
+		// no direct match, deeper path ignored
+		{"bar.example.com/ping", ada, true},
+
+		// match first part of path token
+		{"bar.example.com/pongz", grace, true},
+
+		// match regardless of sub-path
+		{"bar.example.com/pong/pang", grace, true},
+
+		// no host match
+		{"example.com", empty, false},
+		{"foo.example.com", empty, false},
+	}
+
+	for i, tt := range tests {
+		match, ok := dk.lookup(tt.image)
+		if tt.ok != ok {
+			t.Errorf("case %d: expected ok=%t, got %t", i, tt.ok, ok)
+		}
+
+		if !reflect.DeepEqual(tt.match, match) {
+			t.Errorf("case %d: expected match=%#v, got %#v", i, tt.match, match)
+		}
+	}
+}
