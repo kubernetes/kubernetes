@@ -24,24 +24,9 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-// codec defines methods for serializing and deserializing API
-// objects.
-type codec interface {
-	Encode(obj Object) (data []byte, err error)
-	Decode(data []byte) (Object, error)
-	DecodeInto(data []byte, obj Object) error
-}
-
-// resourceVersioner provides methods for setting and retrieving
-// the resource version from an API object.
-type resourceVersioner interface {
-	SetResourceVersion(obj Object, version uint64) error
-	ResourceVersion(obj Object) (uint64, error)
-}
-
-var ResourceVersioner resourceVersioner = NewJSONBaseResourceVersioner()
+var DefaultResourceVersioner ResourceVersioner = NewJSONBaseResourceVersioner()
 var DefaultScheme = NewScheme("", "v1beta1")
-var Codec codec = DefaultScheme
+var DefaultCodec Codec = DefaultScheme
 
 // Scheme defines methods for serializing and deserializing API objects. It
 // is an adaptation of conversion's Scheme for our API objects.

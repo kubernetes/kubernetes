@@ -53,7 +53,7 @@ func (s *ProxyServer) Serve() error {
 func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Add("Content-type", "application/json")
-	data, _ := runtime.Encode(api.Status{
+	data, _ := runtime.DefaultCodec.Encode(api.Status{
 		Status:  api.StatusFailure,
 		Message: fmt.Sprintf("internal error: %#v", err),
 	})

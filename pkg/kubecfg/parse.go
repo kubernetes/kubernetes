@@ -44,11 +44,11 @@ func (p *Parser) ToWireFormat(data []byte, storage string) ([]byte, error) {
 	}
 
 	obj := reflect.New(prototypeType).Interface()
-	err := runtime.DecodeInto(data, obj)
+	err := runtime.DefaultCodec.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	return runtime.Encode(obj)
+	return runtime.DefaultCodec.Encode(obj)
 }
 
 func (p *Parser) SupportedWireStorage() []string {

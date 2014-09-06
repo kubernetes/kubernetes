@@ -42,7 +42,7 @@ func convert(obj interface{}) (interface{}, error) {
 	return obj, nil
 }
 
-var codec = runtime.Codec
+var codec = runtime.DefaultCodec
 
 func init() {
 	runtime.AddKnownTypes("", Simple{}, SimpleList{})
@@ -667,7 +667,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		type T struct {
 			Value string
 		}
-		writeJSON(http.StatusOK, runtime.Codec, &T{"Undecodable"}, w)
+		writeJSON(http.StatusOK, runtime.DefaultCodec, &T{"Undecodable"}, w)
 	}))
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != api.StatusReasonUnknown {

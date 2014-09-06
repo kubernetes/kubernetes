@@ -309,7 +309,7 @@ func TestCreateController(t *testing.T) {
 
 func body(obj interface{}, raw *string) *string {
 	if obj != nil {
-		bs, _ := runtime.Encode(obj)
+		bs, _ := runtime.DefaultCodec.Encode(obj)
 		body := string(bs)
 		return &body
 	}
@@ -522,7 +522,7 @@ func TestDoRequest(t *testing.T) {
 
 func TestDoRequestAccepted(t *testing.T) {
 	status := api.Status{Status: api.StatusWorking}
-	expectedBody, _ := runtime.Encode(status)
+	expectedBody, _ := runtime.DefaultCodec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
 		ResponseBody: string(expectedBody),
@@ -559,7 +559,7 @@ func TestDoRequestAccepted(t *testing.T) {
 
 func TestDoRequestAcceptedSuccess(t *testing.T) {
 	status := api.Status{Status: api.StatusSuccess}
-	expectedBody, _ := runtime.Encode(status)
+	expectedBody, _ := runtime.DefaultCodec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
 		ResponseBody: string(expectedBody),
@@ -579,7 +579,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	statusOut, err := runtime.Decode(body)
+	statusOut, err := runtime.DefaultCodec.Decode(body)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

@@ -23,7 +23,7 @@ import (
 
 // NewJSONBaseResourceVersioner returns a resourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from JSONBase.
-func NewJSONBaseResourceVersioner() resourceVersioner {
+func NewJSONBaseResourceVersioner() ResourceVersioner {
 	return &jsonBaseResourceVersioner{}
 }
 

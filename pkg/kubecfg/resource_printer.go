@@ -50,7 +50,7 @@ func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
-	data, err := runtime.Encode(obj)
+	data, err := runtime.DefaultCodec.Encode(obj)
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 		return fmt.Errorf("unexpected object with no 'kind' field: %s", data)
 	}
 
-	obj, err := runtime.Decode(data)
+	obj, err := runtime.DefaultCodec.Decode(data)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ type TemplatePrinter struct {
 
 // Print parses the data as JSON, and re-formats it with the Go Template.
 func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
-	obj, err := runtime.Decode(data)
+	obj, err := runtime.DefaultCodec.Decode(data)
 	if err != nil {
 		return err
 	}

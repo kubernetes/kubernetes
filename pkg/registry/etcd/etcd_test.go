@@ -108,7 +108,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &pod)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &manifests)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &manifests)
 	if len(manifests.Items) != 1 || manifests.Items[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
@@ -235,7 +235,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &pod)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &manifests)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &manifests)
 	if len(manifests.Items) != 1 || manifests.Items[0].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
@@ -300,7 +300,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var pod api.Pod
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &pod)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &manifests)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &manifests)
 	if len(manifests.Items) != 2 || manifests.Items[1].ID != "foo" {
 		t.Errorf("Unexpected manifest list: %#v", manifests)
 	}
@@ -350,7 +350,7 @@ func TestEtcdDeletePod(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var manifests api.ContainerManifestList
-	runtime.DecodeInto([]byte(response.Node.Value), &manifests)
+	runtime.DefaultCodec.DecodeInto([]byte(response.Node.Value), &manifests)
 	if len(manifests.Items) != 0 {
 		t.Errorf("Unexpected container set: %s, expected empty", response.Node.Value)
 	}
@@ -388,7 +388,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var manifests api.ContainerManifestList
-	runtime.DecodeInto([]byte(response.Node.Value), &manifests)
+	runtime.DefaultCodec.DecodeInto([]byte(response.Node.Value), &manifests)
 	if len(manifests.Items) != 1 {
 		t.Fatalf("Unexpected manifest set: %#v, expected empty", manifests)
 	}
@@ -607,7 +607,7 @@ func TestEtcdCreateController(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var ctrl api.ReplicationController
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &ctrl)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &ctrl)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -699,7 +699,7 @@ func TestEtcdCreateService(t *testing.T) {
 	}
 
 	var service api.Service
-	err = runtime.DecodeInto([]byte(resp.Node.Value), &service)
+	err = runtime.DefaultCodec.DecodeInto([]byte(resp.Node.Value), &service)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -874,7 +874,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	var endpointsOut api.Endpoints
-	err = runtime.DecodeInto([]byte(response.Node.Value), &endpointsOut)
+	err = runtime.DefaultCodec.DecodeInto([]byte(response.Node.Value), &endpointsOut)
 	if !reflect.DeepEqual(endpoints, endpointsOut) {
 		t.Errorf("Unexpected endpoints: %#v, expected %#v", endpointsOut, endpoints)
 	}

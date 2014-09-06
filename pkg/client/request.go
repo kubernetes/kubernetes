@@ -205,7 +205,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	default:
-		data, err := runtime.Encode(obj)
+		data, err := runtime.DefaultCodec.Encode(obj)
 		if err != nil {
 			r.err = err
 			return r
@@ -318,7 +318,7 @@ func (r Result) Get() (interface{}, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return runtime.Decode(r.body)
+	return runtime.DefaultCodec.Decode(r.body)
 }
 
 // Into stores the result into obj, if possible.
@@ -326,7 +326,7 @@ func (r Result) Into(obj interface{}) error {
 	if r.err != nil {
 		return r.err
 	}
-	return runtime.DecodeInto(r.body, obj)
+	return runtime.DefaultCodec.DecodeInto(r.body, obj)
 }
 
 // Error returns the error executing the request, nil if no error occurred.

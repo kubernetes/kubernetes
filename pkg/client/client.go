@@ -222,7 +222,7 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
-	if err := runtime.DecodeInto(body, &status); err == nil && status.Status != "" {
+	if err := runtime.DefaultCodec.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
 

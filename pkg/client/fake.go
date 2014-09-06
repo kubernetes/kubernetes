@@ -44,7 +44,7 @@ type Fake struct {
 
 func (c *Fake) ListPods(selector labels.Selector) (api.PodList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-pods"})
-	return *runtime.CopyOrDie(c.Pods).(*api.PodList), nil
+	return *runtime.DefaultScheme.CopyOrDie(&c.Pods).(*api.PodList), nil
 }
 
 func (c *Fake) GetPod(name string) (api.Pod, error) {
@@ -74,7 +74,7 @@ func (c *Fake) ListReplicationControllers(selector labels.Selector) (api.Replica
 
 func (c *Fake) GetReplicationController(name string) (api.ReplicationController, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-controller", Value: name})
-	return *runtime.CopyOrDie(c.Ctrl).(*api.ReplicationController), nil
+	return *runtime.DefaultScheme.CopyOrDie(&c.Ctrl).(*api.ReplicationController), nil
 }
 
 func (c *Fake) CreateReplicationController(controller api.ReplicationController) (api.ReplicationController, error) {

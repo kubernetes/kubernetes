@@ -33,7 +33,7 @@ func TestParseBadStorage(t *testing.T) {
 }
 
 func DoParseTest(t *testing.T, storage string, obj interface{}, p *Parser) {
-	jsonData, _ := runtime.Encode(obj)
+	jsonData, _ := runtime.DefaultCodec.Encode(obj)
 	yamlData, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))

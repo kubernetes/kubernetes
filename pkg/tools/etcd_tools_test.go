@@ -41,8 +41,8 @@ type TestResource struct {
 }
 
 var scheme *conversion.Scheme
-var codec = runtime.Codec
-var versioner = runtime.ResourceVersioner
+var codec = runtime.DefaultCodec
+var versioner = runtime.DefaultResourceVersioner
 
 func init() {
 	scheme = conversion.NewScheme()

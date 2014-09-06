@@ -136,5 +136,5 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, apiserver.Code
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, runtime.Codec
+	return storage, runtime.DefaultCodec
 }

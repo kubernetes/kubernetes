@@ -178,13 +178,13 @@ func TestPodDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := runtime.Encode(expected)
+	body, err := runtime.DefaultCodec.Encode(expected)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := runtime.DecodeInto(body, actual); err != nil {
+	if err := runtime.DefaultCodec.DecodeInto(body, actual); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

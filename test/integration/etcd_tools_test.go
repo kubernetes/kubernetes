@@ -84,7 +84,7 @@ func TestExtractObj(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := newEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: runtime.Codec, ResourceVersioner: runtime.ResourceVersioner}
+	helper := tools.EtcdHelper{Client: client, Codec: runtime.DefaultCodec, ResourceVersioner: runtime.DefaultResourceVersioner}
 	withEtcdKey(func(key string) {
 		resp, err := client.Set(key, runtime.EncodeOrDie(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 		if err != nil {

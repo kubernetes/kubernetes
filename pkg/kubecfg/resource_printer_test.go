@@ -96,7 +96,7 @@ func TestIdentityPrinter(t *testing.T) {
 	}
 	buff.Reset()
 	printer.PrintObj(obj, buff)
-	objOut, err := runtime.Decode([]byte(buff.String()))
+	objOut, err := runtime.DefaultCodec.Decode([]byte(buff.String()))
 	if err != nil {
 		t.Errorf("Unexpeted error: %#v", err)
 	}
