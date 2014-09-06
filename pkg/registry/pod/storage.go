@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -64,7 +65,7 @@ func NewRegistryStorage(config *RegistryStorageConfig) apiserver.RESTStorage {
 	}
 }
 
-func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	if len(pod.ID) == 0 {
 		pod.ID = uuid.NewUUID().String()
@@ -76,21 +77,21 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 
 	pod.CreationTimestamp = util.Now()
 
-	return apiserver.MakeAsync(func() (interface{}, error) {
-		if err := rs.registry.CreatePod(*pod); err != nil {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		if err := rs.registry.CreatePod(pod); err != nil {
 			return nil, err
 		}
 		return rs.registry.GetPod(pod.ID)
 	}), nil
 }
 
-func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() (interface{}, error) {
+func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(id)
 	}), nil
 }
 
-func (rs *RegistryStorage) Get(id string) (interface{}, error) {
+func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	pod, err := rs.registry.GetPod(id)
 	if err != nil {
 		return pod, err
@@ -106,7 +107,7 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 	return pod, err
 }
 
-func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
+func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
 	pods, err := rs.registry.ListPods(selector)
 	if err == nil {
 		for i := range pods.Items {
@@ -131,17 +132,17 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 	})
 }
 
-func (rs RegistryStorage) New() interface{} {
+func (rs RegistryStorage) New() runtime.Object {
 	return &api.Pod{}
 }
 
-func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
 	}
-	return apiserver.MakeAsync(func() (interface{}, error) {
-		if err := rs.registry.UpdatePod(*pod); err != nil {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		if err := rs.registry.UpdatePod(pod); err != nil {
 			return nil, err
 		}
 		return rs.registry.GetPod(pod.ID)
@@ -235,7 +236,7 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 	}
 }
 
-func (rs *RegistryStorage) waitForPodRunning(pod api.Pod) (interface{}, error) {
+func (rs *RegistryStorage) waitForPodRunning(pod *api.Pod) (runtime.Object, error) {
 	for {
 		podObj, err := rs.Get(pod.ID)
 		if err != nil || podObj == nil {

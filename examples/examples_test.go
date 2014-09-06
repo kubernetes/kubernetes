@@ -31,7 +31,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func validateObject(obj interface{}) (errors []error) {
+func validateObject(obj runtime.Object) (errors []error) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		errors = validation.ValidateManifest(&t.DesiredState.PodTemplate.DesiredState.Manifest)
@@ -85,7 +85,7 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 }
 
 func TestApiExamples(t *testing.T) {
-	expected := map[string]interface{}{
+	expected := map[string]runtime.Object{
 		"controller":       &api.ReplicationController{},
 		"controller-list":  &api.ReplicationControllerList{},
 		"pod":              &api.Pod{},
@@ -120,7 +120,7 @@ func TestApiExamples(t *testing.T) {
 }
 
 func TestExamples(t *testing.T) {
-	expected := map[string]interface{}{
+	expected := map[string]runtime.Object{
 		"frontend-controller":    &api.ReplicationController{},
 		"redis-slave-controller": &api.ReplicationController{},
 		"redis-master":           &api.Pod{},

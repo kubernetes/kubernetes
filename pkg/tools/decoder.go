@@ -22,6 +22,7 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -42,7 +43,7 @@ func NewAPIEventDecoder(stream io.ReadCloser) *APIEventDecoder {
 
 // Decode blocks until it can return the next object in the stream. Returns an error
 // if the stream is closed or an object can't be decoded.
-func (d *APIEventDecoder) Decode() (action watch.EventType, object interface{}, err error) {
+func (d *APIEventDecoder) Decode() (action watch.EventType, object runtime.Object, err error) {
 	var got api.WatchEvent
 	err = d.decoder.Decode(&got)
 	if err != nil {

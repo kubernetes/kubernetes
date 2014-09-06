@@ -17,18 +17,19 @@ limitations under the License.
 package apiserver
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // WorkFunc is used to perform any time consuming work for an api call, after
 // the input has been validated. Pass one of these to MakeAsync to create an
 // appropriate return value for the Update, Delete, and Create methods.
-type WorkFunc func() (result interface{}, err error)
+type WorkFunc func() (result runtime.Object, err error)
 
 // MakeAsync takes a function and executes it, delivering the result in the way required
 // by RESTStorage's Update, Delete, and Create methods.
-func MakeAsync(fn WorkFunc) <-chan interface{} {
-	channel := make(chan interface{})
+func MakeAsync(fn WorkFunc) <-chan runtime.Object {
+	channel := make(chan runtime.Object)
 	go func() {
 		defer util.HandleCrash()
 		obj, err := fn()

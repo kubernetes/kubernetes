@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -37,7 +38,7 @@ func NewRegistryStorage(m Registry) apiserver.RESTStorage {
 	}
 }
 
-func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	minion, ok := obj.(*api.Minion)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
@@ -48,7 +49,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 
 	minion.CreationTimestamp = util.Now()
 
-	return apiserver.MakeAsync(func() (interface{}, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.Insert(minion.ID)
 		if err != nil {
 			return nil, err
@@ -64,7 +65,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	}), nil
 }
 
-func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
 	exists, err := rs.registry.Contains(id)
 	if !exists {
 		return nil, ErrDoesNotExist
@@ -72,12 +73,12 @@ func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return apiserver.MakeAsync(func() (interface{}, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(id)
 	}), nil
 }
 
-func (rs *RegistryStorage) Get(id string) (interface{}, error) {
+func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	exists, err := rs.registry.Contains(id)
 	if !exists {
 		return nil, ErrDoesNotExist
@@ -85,26 +86,26 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 	return rs.toApiMinion(id), err
 }
 
-func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
+func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
 	nameList, err := rs.registry.List()
 	if err != nil {
 		return nil, err
 	}
 	var list api.MinionList
 	for _, name := range nameList {
-		list.Items = append(list.Items, rs.toApiMinion(name))
+		list.Items = append(list.Items, *rs.toApiMinion(name))
 	}
-	return list, nil
+	return &list, nil
 }
 
-func (rs RegistryStorage) New() interface{} {
+func (rs RegistryStorage) New() runtime.Object {
 	return &api.Minion{}
 }
 
-func (rs *RegistryStorage) Update(minion interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Update(minion runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
 }
 
-func (rs *RegistryStorage) toApiMinion(name string) api.Minion {
-	return api.Minion{JSONBase: api.JSONBase{ID: name}}
+func (rs *RegistryStorage) toApiMinion(name string) *api.Minion {
+	return &api.Minion{JSONBase: api.JSONBase{ID: name}}
 }

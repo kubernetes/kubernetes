@@ -19,6 +19,7 @@ package watch
 import (
 	"sync"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -27,7 +28,7 @@ type Decoder interface {
 	// Decode should return the type of event, the decoded object, or an error.
 	// An error will cause StreamWatcher to call Close(). Decode should block until
 	// it has data or an error occurs.
-	Decode() (action EventType, object interface{}, err error)
+	Decode() (action EventType, object runtime.Object, err error)
 
 	// Close should close the underlying io.Reader, signalling to the source of
 	// the stream that it is no longer being watched. Close() must cause any

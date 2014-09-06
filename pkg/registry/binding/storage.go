@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // BindingStorage implements the RESTStorage interface. When bindings are written, it
@@ -40,32 +41,32 @@ func NewBindingStorage(bindingRegistry Registry) *BindingStorage {
 }
 
 // List returns an error because bindings are write-only objects.
-func (*BindingStorage) List(selector labels.Selector) (interface{}, error) {
+func (*BindingStorage) List(selector labels.Selector) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", "list")
 }
 
 // Get returns an error because bindings are write-only objects.
-func (*BindingStorage) Get(id string) (interface{}, error) {
+func (*BindingStorage) Get(id string) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
 // Delete returns an error because bindings are write-only objects.
-func (*BindingStorage) Delete(id string) (<-chan interface{}, error) {
+func (*BindingStorage) Delete(id string) (<-chan runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
 // New returns a new binding object fit for having data unmarshalled into it.
-func (*BindingStorage) New() interface{} {
+func (*BindingStorage) New() runtime.Object {
 	return &api.Binding{}
 }
 
 // Create attempts to make the assignment indicated by the binding it recieves.
-func (b *BindingStorage) Create(obj interface{}) (<-chan interface{}, error) {
+func (b *BindingStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	binding, ok := obj.(*api.Binding)
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
 	}
-	return apiserver.MakeAsync(func() (interface{}, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := b.registry.ApplyBinding(binding); err != nil {
 			return nil, err
 		}
@@ -74,6 +75,6 @@ func (b *BindingStorage) Create(obj interface{}) (<-chan interface{}, error) {
 }
 
 // Update returns an error-- this object may not be updated.
-func (b *BindingStorage) Update(obj interface{}) (<-chan interface{}, error) {
+func (b *BindingStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Bindings may not be changed.")
 }

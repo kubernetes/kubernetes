@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -37,19 +38,6 @@ var (
 	EtcdErrorNodeExist     = &etcd.EtcdError{ErrorCode: EtcdErrorCodeNodeExist}
 	EtcdErrorValueRequired = &etcd.EtcdError{ErrorCode: EtcdErrorCodeValueRequired}
 )
-
-// Codec provides methods for transforming Etcd values into objects and back.
-type Codec interface {
-	Encode(obj interface{}) (data []byte, err error)
-	Decode(data []byte) (interface{}, error)
-	DecodeInto(data []byte, obj interface{}) error
-}
-
-// ResourceVersioner provides methods for managing object modification tracking.
-type ResourceVersioner interface {
-	SetResourceVersion(obj interface{}, version uint64) error
-	ResourceVersion(obj interface{}) (uint64, error)
-}
 
 // EtcdClient is an injectable interface for testing.
 type EtcdClient interface {
@@ -77,9 +65,9 @@ type EtcdGetSet interface {
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
 	Client EtcdGetSet
-	Codec  Codec
+	Codec  runtime.Codec
 	// optional, no atomic operations can be performed without this interface
-	ResourceVersioner ResourceVersioner
+	ResourceVersioner runtime.ResourceVersioner
 }
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.
@@ -151,9 +139,9 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 	v := pv.Elem()
 	for _, node := range nodes {
 		obj := reflect.New(v.Type().Elem())
-		err = h.Codec.DecodeInto([]byte(node.Value), obj.Interface())
+		err = h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object))
 		if h.ResourceVersioner != nil {
-			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface(), node.ModifiedIndex)
+			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
 			// being unable to set the version does not prevent the object from being extracted
 		}
 		if err != nil {
@@ -167,12 +155,12 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 // ExtractObj unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
-func (h *EtcdHelper) ExtractObj(key string, objPtr interface{}, ignoreNotFound bool) error {
+func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error {
 	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
 	return err
 }
 
-func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
+func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) (body string, modifiedIndex uint64, err error) {
 	response, err := h.Client.Get(key, false, false)
 
 	if err != nil && !IsEtcdNotFound(err) {
@@ -198,7 +186,7 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr interface{}, ignoreNot
 }
 
 // CreateObj adds a new object at a key unless it already exists.
-func (h *EtcdHelper) CreateObj(key string, obj interface{}) error {
+func (h *EtcdHelper) CreateObj(key string, obj runtime.Object) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
@@ -221,7 +209,7 @@ func (h *EtcdHelper) Delete(key string, recursive bool) error {
 
 // SetObj marshals obj via json, and stores under key. Will do an
 // atomic update if obj's ResourceVersion field is set.
-func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
+func (h *EtcdHelper) SetObj(key string, obj runtime.Object) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
@@ -240,7 +228,7 @@ func (h *EtcdHelper) SetObj(key string, obj interface{}) error {
 
 // Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
 // See the comment for AtomicUpdate for more detail.
-type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
+type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error)
 
 // AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
 // Note, tryUpdate may be called more than once.
@@ -248,7 +236,7 @@ type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
 // Example:
 //
 // h := &util.EtcdHelper{client, encoding, versioning}
-// err := h.AtomicUpdate("myKey", &MyType{}, func(input interface{}) (interface{}, error) {
+// err := h.AtomicUpdate("myKey", &MyType{}, func(input runtime.Object) (runtime.Object, error) {
 //	// Before this function is called, currentObj has been reset to etcd's current
 //	// contents for "myKey".
 //
@@ -261,14 +249,14 @@ type EtcdUpdateFunc func(input interface{}) (output interface{}, err error)
 //	return cur, nil
 // })
 //
-func (h *EtcdHelper) AtomicUpdate(key string, ptrToType interface{}, tryUpdate EtcdUpdateFunc) error {
+func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, tryUpdate EtcdUpdateFunc) error {
 	pt := reflect.TypeOf(ptrToType)
 	if pt.Kind() != reflect.Ptr {
 		// Panic is appropriate, because this is a programming error.
 		panic("need ptr to type")
 	}
 	for {
-		obj := reflect.New(pt.Elem()).Interface()
+		obj := reflect.New(pt.Elem()).Interface().(runtime.Object)
 		origBody, index, err := h.bodyAndExtractObj(key, obj, true)
 		if err != nil {
 			return err

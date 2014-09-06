@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -51,7 +52,7 @@ func NewRegistryStorage(registry Registry, podRegistry pod.Registry) apiserver.R
 }
 
 // Create registers the given ReplicationController.
-func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -67,8 +68,8 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 
 	controller.CreationTimestamp = util.Now()
 
-	return apiserver.MakeAsync(func() (interface{}, error) {
-		err := rs.registry.CreateController(*controller)
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		err := rs.registry.CreateController(controller)
 		if err != nil {
 			return nil, err
 		}
@@ -77,14 +78,14 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
-func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
-	return apiserver.MakeAsync(func() (interface{}, error) {
+func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(id)
 	}), nil
 }
 
 // Get obtains the ReplicationController specified by its id.
-func (rs *RegistryStorage) Get(id string) (interface{}, error) {
+func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	controller, err := rs.registry.GetController(id)
 	if err != nil {
 		return nil, err
@@ -93,7 +94,7 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
+func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
 	controllers, err := rs.registry.ListControllers()
 	if err != nil {
 		return nil, err
@@ -109,13 +110,13 @@ func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
 }
 
 // New creates a new ReplicationController for use with Create and Update.
-func (rs RegistryStorage) New() interface{} {
+func (rs RegistryStorage) New() runtime.Object {
 	return &api.ReplicationController{}
 }
 
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
-func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -123,8 +124,8 @@ func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
 	}
-	return apiserver.MakeAsync(func() (interface{}, error) {
-		err := rs.registry.UpdateController(*controller)
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		err := rs.registry.UpdateController(controller)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +149,7 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 	}), nil
 }
 
-func (rs *RegistryStorage) waitForController(ctrl api.ReplicationController) (interface{}, error) {
+func (rs *RegistryStorage) waitForController(ctrl *api.ReplicationController) (runtime.Object, error) {
 	for {
 		pods, err := rs.podRegistry.ListPods(labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
 		if err != nil {

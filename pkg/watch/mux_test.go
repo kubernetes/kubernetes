@@ -22,16 +22,19 @@ import (
 	"testing"
 )
 
+type myType struct {
+	ID    string
+	Value string
+}
+
+func (*myType) IsAnAPIObject() {}
+
 func TestMux(t *testing.T) {
-	type myType struct {
-		ID    string
-		Value string
-	}
 	table := []Event{
-		{Added, myType{"foo", "hello world 1"}},
-		{Added, myType{"bar", "hello world 2"}},
-		{Modified, myType{"foo", "goodbye world 3"}},
-		{Deleted, myType{"bar", "hello world 4"}},
+		{Added, &myType{"foo", "hello world 1"}},
+		{Added, &myType{"bar", "hello world 2"}},
+		{Modified, &myType{"foo", "goodbye world 3"}},
+		{Deleted, &myType{"bar", "hello world 4"}},
 	}
 
 	// The mux we're testing

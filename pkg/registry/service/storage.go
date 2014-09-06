@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -49,7 +50,7 @@ func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machin
 	}
 }
 
-func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -57,7 +58,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 
 	srv.CreationTimestamp = util.Now()
 
-	return apiserver.MakeAsync(func() (interface{}, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
 		if srv.CreateExternalLoadBalancer {
@@ -85,7 +86,7 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 				return nil, err
 			}
 		}
-		err := rs.registry.CreateService(*srv)
+		err := rs.registry.CreateService(srv)
 		if err != nil {
 			return nil, err
 		}
@@ -93,18 +94,18 @@ func (rs *RegistryStorage) Create(obj interface{}) (<-chan interface{}, error) {
 	}), nil
 }
 
-func (rs *RegistryStorage) Delete(id string) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
 	service, err := rs.registry.GetService(id)
 	if err != nil {
 		return nil, err
 	}
-	return apiserver.MakeAsync(func() (interface{}, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		rs.deleteExternalLoadBalancer(service)
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(id)
 	}), nil
 }
 
-func (rs *RegistryStorage) Get(id string) (interface{}, error) {
+func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	s, err := rs.registry.GetService(id)
 	if err != nil {
 		return nil, err
@@ -112,7 +113,7 @@ func (rs *RegistryStorage) Get(id string) (interface{}, error) {
 	return s, err
 }
 
-func (rs *RegistryStorage) List(selector labels.Selector) (interface{}, error) {
+func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
 	list, err := rs.registry.ListServices()
 	if err != nil {
 		return nil, err
@@ -133,7 +134,7 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 	return rs.registry.WatchServices(label, field, resourceVersion)
 }
 
-func (rs RegistryStorage) New() interface{} {
+func (rs RegistryStorage) New() runtime.Object {
 	return &api.Service{}
 }
 
@@ -155,14 +156,14 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 	return result, nil
 }
 
-func (rs *RegistryStorage) Update(obj interface{}) (<-chan interface{}, error) {
+func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
 	}
-	return apiserver.MakeAsync(func() (interface{}, error) {
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		// TODO: check to see if external load balancer status changed
-		err := rs.registry.UpdateService(*srv)
+		err := rs.registry.UpdateService(srv)
 		if err != nil {
 			return nil, err
 		}

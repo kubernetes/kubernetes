@@ -20,11 +20,12 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type RedirectHandler struct {
 	storage map[string]RESTStorage
-	codec   Codec
+	codec   runtime.Codec
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {

@@ -43,7 +43,7 @@ func (p *Parser) ToWireFormat(data []byte, storage string) ([]byte, error) {
 		return nil, fmt.Errorf("unknown storage type: %v", storage)
 	}
 
-	obj := reflect.New(prototypeType).Interface()
+	obj := reflect.New(prototypeType).Interface().(runtime.Object)
 	err := runtime.DefaultCodec.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err

@@ -187,7 +187,8 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.
 // If obj is an io.Reader, use it directly.
-// Otherwise, assume obj is an api type and marshall it correctly.
+// If obj is a runtime.Object, marshal it correctly.
+// Otherwise, set an error.
 func (r *Request) Body(obj interface{}) *Request {
 	if r.err != nil {
 		return r
@@ -204,13 +205,15 @@ func (r *Request) Body(obj interface{}) *Request {
 		r.body = bytes.NewBuffer(t)
 	case io.Reader:
 		r.body = t
-	default:
-		data, err := runtime.DefaultCodec.Encode(obj)
+	case runtime.Object:
+		data, err := runtime.DefaultCodec.Encode(t)
 		if err != nil {
 			r.err = err
 			return r
 		}
 		r.body = bytes.NewBuffer(data)
+	default:
+		r.err = fmt.Errorf("Unknown type used for body: %#v", obj)
 	}
 	return r
 }
@@ -314,7 +317,7 @@ func (r Result) Raw() ([]byte, error) {
 }
 
 // Get returns the result as an object.
-func (r Result) Get() (interface{}, error) {
+func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -322,7 +325,7 @@ func (r Result) Get() (interface{}, error) {
 }
 
 // Into stores the result into obj, if possible.
-func (r Result) Into(obj interface{}) error {
+func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
 	}

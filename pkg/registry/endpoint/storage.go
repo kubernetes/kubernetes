@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -38,12 +39,12 @@ func NewStorage(registry Registry) apiserver.RESTStorage {
 }
 
 // Get satisfies the RESTStorage interface.
-func (rs *Storage) Get(id string) (interface{}, error) {
+func (rs *Storage) Get(id string) (runtime.Object, error) {
 	return rs.registry.GetEndpoints(id)
 }
 
 // List satisfies the RESTStorage interface.
-func (rs *Storage) List(selector labels.Selector) (interface{}, error) {
+func (rs *Storage) List(selector labels.Selector) (runtime.Object, error) {
 	if !selector.Empty() {
 		return nil, errors.New("label selectors are not supported on endpoints")
 	}
@@ -57,21 +58,21 @@ func (rs *Storage) Watch(label, field labels.Selector, resourceVersion uint64) (
 }
 
 // Create satisfies the RESTStorage interface but is unimplemented.
-func (rs *Storage) Create(obj interface{}) (<-chan interface{}, error) {
+func (rs *Storage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Update satisfies the RESTStorage interface but is unimplemented.
-func (rs *Storage) Update(obj interface{}) (<-chan interface{}, error) {
+func (rs *Storage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Delete satisfies the RESTStorage interface but is unimplemented.
-func (rs *Storage) Delete(id string) (<-chan interface{}, error) {
+func (rs *Storage) Delete(id string) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // New implements the RESTStorage interface.
-func (rs Storage) New() interface{} {
+func (rs Storage) New() runtime.Object {
 	return &api.Endpoints{}
 }
