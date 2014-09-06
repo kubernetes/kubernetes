@@ -22,18 +22,18 @@ import (
 	"testing"
 )
 
-func TestObject(t *testing.T) {
+func TestEmbeddedObject(t *testing.T) {
 	type EmbeddedTest struct {
 		JSONBase    `yaml:",inline" json:",inline"`
-		Object      Object `yaml:"object,omitempty" json:"object,omitempty"`
-		EmptyObject Object `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+		Object      EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
+		EmptyObject EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 	}
 	AddKnownTypes("", EmbeddedTest{})
 	AddKnownTypes("v1beta1", EmbeddedTest{})
 
 	outer := &EmbeddedTest{
 		JSONBase: JSONBase{ID: "outer"},
-		Object: Object{
+		Object: EmbeddedObject{
 			&EmbeddedTest{
 				JSONBase: JSONBase{ID: "inner"},
 			},

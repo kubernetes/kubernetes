@@ -113,7 +113,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 			}
 			err := websocket.JSON.Send(ws, &api.WatchEvent{
 				Type:   event.Type,
-				Object: runtime.Object{event.Object},
+				Object: runtime.EmbeddedObject{event.Object},
 			})
 			if err != nil {
 				// Client disconnect.
@@ -160,7 +160,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			err := encoder.Encode(&api.WatchEvent{
 				Type:   event.Type,
-				Object: runtime.Object{event.Object},
+				Object: runtime.EmbeddedObject{event.Object},
 			})
 			if err != nil {
 				// Client disconnect.
