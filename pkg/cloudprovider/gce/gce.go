@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -36,40 +37,65 @@ type GCECloud struct {
 	service    *compute.Service
 	projectID  string
 	zone       string
-	instanceRE string
+	instanceID string
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("gce", func() (cloudprovider.Interface, error) { return newGCECloud() })
+	cloudprovider.RegisterCloudProvider("gce", func() (cloudprovider.Interface, error) { return NewGCECloud() })
 }
 
-func getProjectAndZone() (string, string, error) {
+func getMetadata(url string) (string, error) {
 	client := http.Client{}
-	url := "http://metadata/computeMetadata/v1/instance/zone"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	req.Header.Add("X-Google-Metadata-Request", "True")
 	res, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	defer res.Body.Close()
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func getProjectAndZone() (string, string, error) {
+	url := "http://metadata/computeMetadata/v1/instance/zone"
+	result, err := getMetadata(url)
+	if err != nil {
 		return "", "", err
 	}
-	parts := strings.Split(string(data), "/")
+	parts := strings.Split(result, "/")
 	if len(parts) != 4 {
-		return "", "", fmt.Errorf("Unexpected response: %s", string(data))
+		return "", "", fmt.Errorf("Unexpected response: %s", result)
 	}
 	return parts[1], parts[3], nil
 }
 
+func getInstanceID() (string, error) {
+	url := "http://metadata/computeMetadata/v1/instance/hostname"
+	result, err := getMetadata(url)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(result, ".")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("Unexpected response: %s", result)
+	}
+	return parts[0], nil
+}
+
 // newGCECloud creates a new instance of GCECloud.
-func newGCECloud() (*GCECloud, error) {
+func NewGCECloud() (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
+	if err != nil {
+		return nil, err
+	}
+	instanceID, err := getInstanceID()
 	if err != nil {
 		return nil, err
 	}
@@ -82,9 +108,10 @@ func newGCECloud() (*GCECloud, error) {
 		return nil, err
 	}
 	return &GCECloud{
-		service:   svc,
-		projectID: projectID,
-		zone:      zone,
+		service:    svc,
+		projectID:  projectID,
+		zone:       zone,
+		instanceID: instanceID,
 	}, nil
 }
 
@@ -253,6 +280,29 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 	}, nil
 }
 
+func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
+	disk, err := gce.getDisk(diskName)
+	if err != nil {
+		return err
+	}
+	readWrite := "READ_WRITE"
+	if readOnly {
+		readWrite = "READ_ONLY"
+	}
+	attachedDisk := gce.convertDiskToAttachedDisk(disk, readWrite)
+	_, err = gce.service.Instances.AttachDisk(gce.projectID, gce.zone, gce.instanceID, attachedDisk).Do()
+	return err
+}
+
+func (gce *GCECloud) DetachDisk(devicePath string) error {
+	_, err := gce.service.Instances.DetachDisk(gce.projectID, gce.zone, gce.instanceID, devicePath).Do()
+	return err
+}
+
+func (gce *GCECloud) getDisk(diskName string) (*compute.Disk, error) {
+	return gce.service.Disks.Get(gce.projectID, gce.zone, diskName).Do()
+}
+
 // getGceRegion returns region of the gce zone. Zone names
 // are of the form: ${region-name}-${ix}.
 // For example "us-central1-b" has a region of "us-central1".
@@ -263,4 +313,15 @@ func getGceRegion(zone string) (string, error) {
 		return "", fmt.Errorf("unexpected zone: %s", zone)
 	}
 	return zone[:ix], nil
+}
+
+// Converts a Disk resource to an AttachedDisk resource.
+func (gce *GCECloud) convertDiskToAttachedDisk(disk *compute.Disk, readWrite string) *compute.AttachedDisk {
+	return &compute.AttachedDisk{
+		DeviceName: disk.Name,
+		Kind:       disk.Kind,
+		Mode:       readWrite,
+		Source:     "https://" + path.Join("www.googleapis.com/compute/v1/projects/", gce.projectID, "zones", gce.zone, "disks", disk.Name),
+		Type:       "PERSISTENT",
+	}
 }
