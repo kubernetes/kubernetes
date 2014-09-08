@@ -32,7 +32,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
+func expectApiStatusError(t *testing.T, ch <-chan runtime.Object, msg string) {
 	out := <-ch
 	status, ok := out.(*api.Status)
 	if !ok {
@@ -44,7 +44,7 @@ func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
 	}
 }
 
-func expectPod(t *testing.T, ch <-chan interface{}) (*api.Pod, bool) {
+func expectPod(t *testing.T, ch <-chan runtime.Object) (*api.Pod, bool) {
 	out := <-ch
 	pod, ok := out.(*api.Pod)
 	if !ok || pod == nil {

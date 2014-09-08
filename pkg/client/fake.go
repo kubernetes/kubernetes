@@ -129,7 +129,7 @@ func (c *Fake) WatchServices(label, field labels.Selector, resourceVersion uint6
 
 func (c *Fake) ListEndpoints(selector labels.Selector) (*api.EndpointsList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-endpoints"})
-	return runtime.DefaultScheme.CopyOrDie(&c.EndpointsList).(*api.EndpointsList), nil
+	return runtime.DefaultScheme.CopyOrDie(&c.EndpointsList).(*api.EndpointsList), c.Err
 }
 
 func (c *Fake) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {

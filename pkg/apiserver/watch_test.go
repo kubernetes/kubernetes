@@ -26,12 +26,13 @@ import (
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 var watchTestTable = []struct {
 	t   watch.EventType
-	obj interface{}
+	obj runtime.Object
 }{
 	{watch.Added, &Simple{Name: "A Name"}},
 	{watch.Modified, &Simple{Name: "Another Name"}},
@@ -56,7 +57,7 @@ func TestWatchWebsocket(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	try := func(action watch.EventType, object interface{}) {
+	try := func(action watch.EventType, object runtime.Object) {
 		// Send
 		simpleStorage.fakeWatch.Action(action, object)
 		// Test receive
@@ -113,7 +114,7 @@ func TestWatchHTTP(t *testing.T) {
 
 	decoder := json.NewDecoder(response.Body)
 
-	try := func(action watch.EventType, object interface{}) {
+	try := func(action watch.EventType, object runtime.Object) {
 		// Send
 		simpleStorage.fakeWatch.Action(action, object)
 		// Test receive

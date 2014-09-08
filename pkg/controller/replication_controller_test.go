@@ -85,7 +85,7 @@ func newReplicationController(replicas int) api.ReplicationController {
 	}
 }
 
-func newPodList(count int) api.PodList {
+func newPodList(count int) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
@@ -94,7 +94,7 @@ func newPodList(count int) api.PodList {
 			},
 		})
 	}
-	return api.PodList{
+	return &api.PodList{
 		Items: pods,
 	}
 }
@@ -169,7 +169,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(api.Pod{})
+	body, _ := runtime.DefaultCodec.Encode(&api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -292,7 +292,7 @@ func TestSyncronize(t *testing.T) {
 	}
 	fakeControllerHandler := util.FakeHandler{
 		StatusCode: 200,
-		ResponseBody: runtime.EncodeOrDie(&api.ReplicationControllerList{
+		ResponseBody: runtime.DefaultScheme.EncodeOrDie(&api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				controllerSpec1,
 				controllerSpec2,

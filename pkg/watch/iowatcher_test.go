@@ -20,13 +20,15 @@ import (
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type fakeDecoder struct {
 	items chan Event
 }
 
-func (f fakeDecoder) Decode() (action EventType, object interface{}, err error) {
+func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err error) {
 	item, open := <-f.items
 	if !open {
 		return action, nil, io.EOF
@@ -40,7 +42,7 @@ func (f fakeDecoder) Close() {
 
 func TestStreamWatcher(t *testing.T) {
 	table := []Event{
-		{Added, "foo"},
+		{Added, testType("foo")},
 	}
 
 	fd := fakeDecoder{make(chan Event, 5)}

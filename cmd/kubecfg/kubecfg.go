@@ -58,11 +58,11 @@ var (
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 )
 
-var parser = kubecfg.NewParser(map[string]interface{}{
-	"pods":                   api.Pod{},
-	"services":               api.Service{},
-	"replicationControllers": api.ReplicationController{},
-	"minions":                api.Minion{},
+var parser = kubecfg.NewParser(map[string]runtime.Object{
+	"pods":                   &api.Pod{},
+	"services":               &api.Service{},
+	"replicationControllers": &api.ReplicationController{},
+	"minions":                &api.Minion{},
 })
 
 func usage() {

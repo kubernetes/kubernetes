@@ -62,7 +62,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// get a validation error
-	pod := api.Pod{
+	pod := &api.Pod{
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta2",

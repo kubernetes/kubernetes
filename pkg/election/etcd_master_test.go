@@ -31,7 +31,7 @@ func TestEtcdMasterOther(t *testing.T) {
 	master := NewEtcdMasterElector(etcd)
 	w := master.Elect(path, "bar")
 	result := <-w.ResultChan()
-	if result.Type != watch.Modified || result.Object.(string) != "baz" {
+	if result.Type != watch.Modified || result.Object.(Master) != "baz" {
 		t.Errorf("unexpected event: %#v", result)
 	}
 	w.Stop()
@@ -52,7 +52,7 @@ func TestEtcdMasterNoOther(t *testing.T) {
 	master := NewEtcdMasterElector(e)
 	w := master.Elect(path, "bar")
 	result := <-w.ResultChan()
-	if result.Type != watch.Modified || result.Object.(string) != "bar" {
+	if result.Type != watch.Modified || result.Object.(Master) != "bar" {
 		t.Errorf("unexpected event: %#v", result)
 	}
 	w.Stop()
@@ -91,7 +91,7 @@ func TestEtcdMasterNoOtherThenConflict(t *testing.T) {
 	master := NewEtcdMasterElector(e)
 	w := master.Elect(path, "bar")
 	result := <-w.ResultChan()
-	if result.Type != watch.Modified || result.Object.(string) != "bar" {
+	if result.Type != watch.Modified || result.Object.(Master) != "bar" {
 		t.Errorf("unexpected event: %#v", result)
 	}
 	w.Stop()

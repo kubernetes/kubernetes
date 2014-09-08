@@ -27,10 +27,11 @@ type Parser struct {
 	storageToType map[string]reflect.Type
 }
 
-func NewParser(objectMap map[string]interface{}) *Parser {
+// NewParser creates a new parser.
+func NewParser(objectMap map[string]runtime.Object) *Parser {
 	typeMap := make(map[string]reflect.Type)
 	for name, obj := range objectMap {
-		typeMap[name] = reflect.TypeOf(obj)
+		typeMap[name] = reflect.TypeOf(obj).Elem()
 	}
 	return &Parser{typeMap}
 }

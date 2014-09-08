@@ -113,7 +113,7 @@ func TestPollMinions(t *testing.T) {
 		ml := &api.MinionList{Items: item.minions}
 		handler := util.FakeHandler{
 			StatusCode:   200,
-			ResponseBody: runtime.EncodeOrDie(ml),
+			ResponseBody: runtime.DefaultScheme.EncodeOrDie(ml),
 			T:            t,
 		}
 		mux := http.NewServeMux()
@@ -140,7 +140,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	handler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(testPod),
+		ResponseBody: runtime.DefaultScheme.EncodeOrDie(testPod),
 		T:            t,
 	}
 	mux := http.NewServeMux()
@@ -259,7 +259,7 @@ func TestBind(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(item.binding)
+		expectedBody := runtime.DefaultScheme.EncodeOrDie(item.binding)
 		handler.ValidateRequest(t, "/api/v1beta1/bindings", "POST", &expectedBody)
 	}
 }

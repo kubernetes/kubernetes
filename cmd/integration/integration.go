@@ -179,7 +179,7 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := c.CreateReplicationController(controllerRequest); err != nil {
+	if _, err := c.CreateReplicationController(&controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
@@ -194,7 +194,7 @@ func runReplicationControllerTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}
-	if err := wait.Poll(time.Second, time.Second*10, podsOnMinions(c, pods)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*10, podsOnMinions(c, *pods)); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 
@@ -204,7 +204,7 @@ func runReplicationControllerTest(c *client.Client) {
 func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
-		api.Service{
+		&api.Service{
 			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: "v1beta1"},
 			Port:     12345,
 			Labels: map[string]string{

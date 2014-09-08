@@ -68,19 +68,19 @@ func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {
 	return r.Pod, r.Err
 }
 
-func (r *PodRegistry) CreatePod(pod api.Pod) error {
+func (r *PodRegistry) CreatePod(pod *api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
-	r.Pod = &pod
-	r.mux.Action(watch.Added, &pod)
+	r.Pod = pod
+	r.mux.Action(watch.Added, pod)
 	return r.Err
 }
 
-func (r *PodRegistry) UpdatePod(pod api.Pod) error {
+func (r *PodRegistry) UpdatePod(pod *api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
-	r.Pod = &pod
-	r.mux.Action(watch.Modified, &pod)
+	r.Pod = pod
+	r.mux.Action(watch.Modified, pod)
 	return r.Err
 }
 

@@ -62,7 +62,7 @@ type YAMLPrinter struct{}
 
 // Print parses the data as JSON, re-formats as YAML and prints the YAML.
 func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
-	var obj runtime.Object
+	var obj interface{}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
