@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"net"
@@ -429,13 +430,14 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
-func fqProj(proj string) string {
+// FullQualProj returns the full URL for the specified project.
+func FullQualProj(proj string) string {
 	return "https://www.googleapis.com/compute/v1/projects/" + proj
 }
 
 // CreateInstance creates the specified instance.
 func (gce *GCECloud) CreateInstance(name, size, image, tag, startupScript string, ipFwd bool, scopes []string) (*GCEOp, error) {
-	fqp := fqProj(gce.projectID)
+	fqp := FullQualProj(gce.projectID)
 	var serviceAccounts []*compute.ServiceAccount
 	if len(scopes) > 0 {
 		serviceAccounts = []*compute.ServiceAccount{
@@ -545,7 +547,7 @@ func (gce *GCECloud) CreateRoute(name, nextHop, ipRange string) (*GCEOp, error) 
 	route := &compute.Route{
 		DestRange:       ipRange,
 		Name:            name,
-		Network:         fqProj(gce.projectID) + "/global/networks/default",
+		Network:         FullQualProj(gce.projectID) + "/global/networks/default",
 		NextHopInstance: nextHop,
 		Priority:        1000,
 	}
@@ -557,13 +559,13 @@ func (gce *GCECloud) CreateRoute(name, nextHop, ipRange string) (*GCEOp, error) 
 	return op, err
 }
 
-// Creates the specified firewall rule
+// CreateFirewall creates the specified firewall rule
 func (gce *GCECloud) CreateFirewall(name, sourceRange, tag, allowed string) (*GCEOp, error) {
 	fwAllowed, err := parseAllowed(allowed)
 	if err != nil {
 		return nil, err
 	}
-	prefix := fqProj(gce.projectID)
+	prefix := FullQualProj(gce.projectID)
 	firewall := &compute.Firewall{
 		Name:    name,
 		Network: prefix + "/global/networks/default",

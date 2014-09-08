@@ -26,17 +26,28 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+	"unsafe"
 
 	compute "code.google.com/p/google-api-go-client/compute/v1"
+	"code.google.com/p/google-api-go-client/googleapi"
+	storage "code.google.com/p/google-api-go-client/storage/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	"github.com/golang/glog"
 )
+
+// #cgo LDFLAGS: -lcrypt
+// #define _GNU_SOURCE
+// #include <crypt.h>
+// #include <stdlib.h>
+import "C"
 
 const (
 	instancePrefix = "kubernetes"
@@ -47,7 +58,12 @@ const (
 	masterSize     = "g1-small"
 	minionSize     = "g1-small"
 	image          = "https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/backports-debian-7-wheezy-v20140814"
+	minionIPs      = "10.244.%v.0/24"
 )
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
 
 // CreateMasterFirewall creates a firewall rule to allow https to the kube-master from anywhere.
 func CreateMasterFirewall(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
@@ -57,13 +73,17 @@ func CreateMasterFirewall(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
 // CreateMinionFirewall creates a firewall rule to allow communication on the internal IPs.
 func CreateMinionFirewall(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
 	name := fmt.Sprintf("%v-%v-all", MinionPrefix, i)
-	ipRange := fmt.Sprintf("10.244.%v.0/24", i)
+	ipRange := fmt.Sprintf(minionIPs, i)
 	return gce.CreateFirewall(name, ipRange, minionTag, "tcp,udp,icmp,esp,ah,sctp")
 }
 
 // CreateMaster spins up the kube-master instance.
 func CreateMaster(gce *gce_cloud.GCECloud, project string) (*gce_cloud.GCEOp, error) {
-	masterStartup := masterStartupScript(project)
+	release, err := getReleaseName(gce, project)
+	if err != nil {
+		return nil, err
+	}
+	masterStartup := masterStartupScript(project, release)
 	scopes := []string{
 		compute.DevstorageRead_onlyScope,
 		compute.ComputeScope,
@@ -81,41 +101,25 @@ func CreateMinion(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
 // CreateMinionRoute adds the minion routing rule to allow forwarding to the pods
 func CreateMinionRoute(gce *gce_cloud.GCECloud, project, zone string, i int) (*gce_cloud.GCEOp, error) {
 	name := fmt.Sprintf("%v-%v", MinionPrefix, i)
-	nextHop := fmt.Sprintf("%v/zones/%v/instances/%v-%v", fqProj(project), zone, MinionPrefix, i)
+	nextHop := fmt.Sprintf("%v/zones/%v/instances/%v", gce_cloud.FullQualProj(project), zone, name)
 	ipRange := fmt.Sprintf("10.244.%v.0/24", i)
 	return gce.CreateRoute(name, nextHop, ipRange)
-}
-
-// GetMasterIP gets the IP address of the cluster's master.
-func GetMasterIP(svc *compute.Service, project, zone string) (string, error) {
-	inst, err := svc.Instances.Get(project, zone, MasterName).Do()
-	if err != nil {
-		return "", err
-	}
-	nwIntf := inst.NetworkInterfaces[0]
-	if nwIntf == nil {
-		return "", errors.New("No network interfaces found")
-	}
-	axCfg := nwIntf.AccessConfigs[0]
-	if axCfg == nil {
-		return "", errors.New("No access configurations found")
-	}
-	ip := axCfg.NatIP
-	return ip, nil
 }
 
 // GetCredentials gets the credentials stored in the .kubernetes_auth file (or create and store new credentials).
 func GetCredentials() (string, string) {
 	usr, err := user.Current()
 	var homeDir string
-	if err != nil {
+	if err == nil {
+		homeDir = usr.HomeDir
+	} else {
 		homeDir = "."
 	}
-	homeDir = usr.HomeDir
+
 	fileName := filepath.Join(homeDir, ".kubernetes_auth")
 	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		usr := "admin"
-		passwd := randAlphaNumString(16)
+		passwd := randAlphaNumString(16, false)
 		a := authFile{
 			User:     usr,
 			Password: passwd,
@@ -140,23 +144,6 @@ func GetCredentials() (string, string) {
 	return a.User, a.Password
 }
 
-func addFirewall(svc *compute.Service, project, name, sourceRange, tag string, allowed []*compute.FirewallAllowed) (*compute.Operation, error) {
-	prefix := fqProj(project)
-	firewall := &compute.Firewall{
-		Name:    name,
-		Network: prefix + "/global/networks/default",
-		Allowed: allowed,
-		SourceRanges: []string{
-			sourceRange,
-		},
-		TargetTags: []string{
-			tag,
-		},
-	}
-
-	return svc.Firewalls.Insert(project, firewall).Do()
-}
-
 func rmHashComments(input []byte) []byte {
 	rmCmnts, err := regexp.Compile(`(?m)^#.*\n`)
 	if err != nil {
@@ -166,14 +153,13 @@ func rmHashComments(input []byte) []byte {
 	return rmCmnts.ReplaceAllLiteral(input, []byte{})
 }
 
-func masterStartupScript(project string) []byte {
+func masterStartupScript(project, releaseName string) []byte {
 	htpasswd := getHtpasswd()
-	releaseName := getReleaseName(project)
 	masterStartup := []byte(
 		"#! /bin/bash\n" +
 			"MASTER_NAME=" + MasterName + "\n" +
 			"MASTER_RELEASE_TAR=" + releaseName + "\n" +
-			"MASTER_HTPASSWD='" + strings.TrimSpace(string(htpasswd)) + "'\n")
+			"MASTER_HTPASSWD='" + htpasswd + "'\n")
 	dr, err := ioutil.ReadFile("cluster/templates/download-release.sh")
 	if err != nil {
 		glog.Fatalf("failed to read download-release.sh: %v", err)
@@ -191,7 +177,7 @@ func masterStartupScript(project string) []byte {
 }
 
 func minionStartupScript(i int) []byte {
-	ipRange := fmt.Sprintf("10.244.%v.0/24", i)
+	ipRange := fmt.Sprintf(minionIPs, i)
 	minionStartup := []byte(
 		"#! /bin/bash\n" +
 			"MASTER_NAME=" + MasterName + "\n" +
@@ -205,81 +191,82 @@ func minionStartupScript(i int) []byte {
 	return bytes.Join([][]byte{minionStartup, sm}, nil)
 }
 
-func getHtpasswd() []byte {
-	kubeTemp, err := ioutil.TempDir(os.TempDir(), "kubernetes")
-	if err != nil {
-		glog.Fatalf("failed to create temp directory: %v", err)
-		return nil
-	}
-	defer os.RemoveAll(kubeTemp)
+func getHtpasswd() string {
 	usr, passwd := GetCredentials()
-	glog.Infof("Using password: %v:%v\n", usr, passwd)
-	// TODO: kube-master auth (this will break if run out of diff dir)
-	hPy, _ := filepath.Abs("third_party/htpasswd/htpasswd.py")
-	hFile := filepath.Join(kubeTemp, "htpasswd")
-	err = exec.Command("python", hPy, "-b", "-c", hFile, usr, passwd).Run()
-	if err != nil {
-		glog.Fatalf("failed to execute htpasswd: %v", err)
-		return nil
-	}
-	htpasswd, err := ioutil.ReadFile(hFile)
-	if err != nil {
-		glog.Fatalf("failed to read htpasswd file: %v", err)
-		return nil
-	}
-	return htpasswd
+	salt := randAlphaNumString(2, true)
+	// This directly wraps the libc version of crypt
+	data := C.struct_crypt_data{}
+	cPasswd := C.CString(passwd)
+	cSalt := C.CString(salt)
+	htpasswd := C.GoString(C.crypt_r(cPasswd, cSalt, &data))
+	C.free(unsafe.Pointer(cPasswd))
+	C.free(unsafe.Pointer(cSalt))
+	return fmt.Sprintf("%v:%v", usr, htpasswd)
 }
 
-func getReleaseName(project string) string {
+func getReleaseName(gce *gce_cloud.GCECloud, project string) (string, error) {
 	// TODO: retrieval of releases only works for the dev flow right now
 	bucketHash := fmt.Sprintf("%x", md5.Sum([]byte(project)))[:5]
 	u, err := user.Current()
 	if err != nil {
-		glog.Fatalf("failed to obtain current user: %v", err)
-		return ""
+		return "", err
 	}
 	tagName := fmt.Sprintf("gs://kubernetes-releases-%v/devel/%v/testing", bucketHash, u.Username)
-	releaseNameBytes, err := readFromGsUrl(tagName)
+	releaseNameBytes, err := readFromGCS(tagName)
 	if err != nil {
-		glog.Fatalf("failed to read from Google Storage url: %v", err)
-		return ""
+		return "", err
 	}
-	return strings.TrimSpace(string(releaseNameBytes)) + "/master-release.tgz"
+	release := strings.TrimSpace(string(releaseNameBytes)) + "/master-release.tgz"
+
+	return release, nil
 	// TODO: Check whether there is actually a release there (gce storage API)
 }
 
-func readFromGsUrl(url string) ([]byte, error) {
-	cmd := exec.Command("gsutil", "-q", "cat", url)
-	outPipe, err := cmd.StdoutPipe()
+// readFromGCS expects locations in the form gs://bucket/path/to/object
+func readFromGCS(loc string) ([]byte, error) {
+	c := gce_cloud.CreateOAuthClient()
+	svc, err := storage.New(c)
 	if err != nil {
 		return nil, err
 	}
-	if err = cmd.Start(); err != nil {
-		return nil, err
-	}
-	contents, err := ioutil.ReadAll(outPipe)
+	bucket, objName := parseGCSPath(loc)
+	object, err := svc.Objects.Get(bucket, objName).Do()
 	if err != nil {
 		return nil, err
 	}
-	if err = cmd.Wait(); err != nil {
+	req, err := http.NewRequest("GET", object.MediaLink, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.URL.Path = strings.Replace(req.URL.Path, bucket, url.QueryEscape(bucket), 1)
+	req.URL.Path = strings.Replace(req.URL.Path, objName, url.QueryEscape(objName), 1)
+	googleapi.SetOpaque(req.URL)
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
+	}
+
+	contents, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
 	return contents, nil
 }
 
-func toMetadataItems(m map[string]string) []*compute.MetadataItems {
-	mdi := make([]*compute.MetadataItems, len(m))
-	for k, v := range m {
-		mdi[0] = &compute.MetadataItems{
-			Key:   k,
-			Value: v,
-		}
+func parseGCSPath(loc string) (string, string) {
+	if strings.EqualFold("gs://", loc[:5]) {
+		loc = loc[5:]
 	}
-	return mdi
-}
-
-func fqProj(proj string) string {
-	return "https://www.googleapis.com/compute/v1/projects/" + proj
+	i := strings.Index(loc, "/")
+	if i == -1 {
+		return "", ""
+	}
+	bucket := loc[:i]
+	objName := loc[i+1:]
+	return bucket, objName
 }
 
 type authFile struct {
@@ -287,8 +274,11 @@ type authFile struct {
 	Password string
 }
 
-func randAlphaNumString(n int) string {
-	const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+func randAlphaNumString(n int, includePunc bool) string {
+	alphanum := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	if includePunc {
+		alphanum = alphanum + "./"
+	}
 	var randString = make([]byte, n)
 	for i := range randString {
 		randString[i] = alphanum[rand.Int31n(int32(len(alphanum)))]

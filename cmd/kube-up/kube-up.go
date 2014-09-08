@@ -86,6 +86,7 @@ func projectFromGCloud() string {
 func main() {
 	flag.Set("stderrthreshold", "INFO")
 	flag.Parse()
+
 	cloud, err := gce_cloud.CreateGCECloud(*project, zone)
 	if err != nil {
 		glog.Fatalf("failed to create cloud: %v", err)
@@ -95,7 +96,6 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-
 	for i := 1; i <= numMinions; i++ {
 		newOps, err := deployMinion(cloud, i)
 		if err != nil {
@@ -109,9 +109,9 @@ func main() {
 	if err := checkMaster(cloud); err != nil {
 		glog.Fatal(err)
 	}
-	if err := checkMinions(); err != nil {
-		glog.Fatal(err)
-	}
+	//	if err := checkMinions(); err != nil {
+	//		glog.Fatal(err)
+	//	}
 	glog.Info("Kubernetes cluster is running\n")
 	glog.Info("Security note: The server above uses a self signed certificate.  This is\n")
 	glog.Info("    subject to \"Man in the middle\" type attacks.\n")
