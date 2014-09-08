@@ -22,4 +22,8 @@ source $(dirname $0)/common.sh
 
 kube::build::verify-prereqs
 kube::build::build-image
+
+echo "+++ Cleaning out _output/build/*"
 kube::build::run-build-command rm -rf _output/build/*
+
+kube::build::clean-images

@@ -38,11 +38,13 @@ readonly DOCKER_CONTAINER_NAME=kube-build
 readonly DOCKER_MOUNT="-v ${LOCAL_OUTPUT_DIR}:${REMOTE_OUTPUT_DIR}"
 
 readonly KUBE_RUN_IMAGE_BASE="kubernetes"
-readonly KUBE_RUN_BINARIES="
-    apiserver
-    controller-manager
-    proxy
-  "
+readonly KUBE_RUN_BINARIES=(
+  apiserver
+  controller-manager
+  proxy
+  scheduler
+)
+
 
 # This is where the final release artifacts are created locally
 readonly RELEASE_DIR="${KUBE_REPO_ROOT}/_output/release"
@@ -88,7 +90,7 @@ function kube::build::verify-prereqs() {
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build-image() {
   local -r BUILD_CONTEXT_DIR="${KUBE_REPO_ROOT}/_output/images/${KUBE_BUILD_IMAGE}"
-  local -r SOURCE="
+  local -r SOURCE=(
     api
     build
     cmd
@@ -100,9 +102,9 @@ function kube::build::build-image() {
     plugin
     README.md
     third_party
-  "
+  )
   mkdir -p ${BUILD_CONTEXT_DIR}
-  tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz ${SOURCE}
+  tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz "${SOURCE[@]}"
   cp build/build-image/Dockerfile ${BUILD_CONTEXT_DIR}/Dockerfile
   kube::build::docker-build "${KUBE_BUILD_IMAGE}" "${BUILD_CONTEXT_DIR}"
 }
@@ -116,15 +118,26 @@ function kube::build::run-image() {
   mkdir -p "${BUILD_CONTEXT_BASE}"
   tar czf ${BUILD_CONTEXT_BASE}/kube-bins.tar.gz \
     -C "_output/build/linux/amd64" \
-    ${KUBE_RUN_BINARIES}
+    "${KUBE_RUN_BINARIES[@]}"
   cp -R build/run-images/base/* "${BUILD_CONTEXT_BASE}/"
   kube::build::docker-build "${KUBE_RUN_IMAGE_BASE}" "${BUILD_CONTEXT_BASE}"
 
-  for b in $KUBE_RUN_BINARIES ; do
+  local b
+  for b in "${KUBE_RUN_BINARIES[@]}" ; do
     local SUB_CONTEXT_DIR="${BUILD_CONTEXT_BASE}-$b"
     mkdir -p "${SUB_CONTEXT_DIR}"
     cp -R build/run-images/$b/* "${SUB_CONTEXT_DIR}/"
     kube::build::docker-build "${KUBE_RUN_IMAGE_BASE}-$b" "${SUB_CONTEXT_DIR}"
+  done
+}
+
+function kube::build::clean-images() {
+  # Clean the build image
+  kube::build::clean-image "${KUBE_BUILD_IMAGE}"
+
+  local b
+  for b in "${KUBE_RUN_BINARIES[@]}" ; do
+    kube::build::clean-image "${KUBE_RUN_IMAGE_BASE}-${b}"
   done
 }
 
@@ -152,6 +165,13 @@ function kube::build::docker-build() {
     return 1
   fi
   set -e
+}
+
+function kube::build::clean-image() {
+  local -r IMAGE=$1
+
+  echo "+++ Deleting docker image ${IMAGE}"
+  docker rmi ${IMAGE} 2> /dev/null || true
 }
 
 # Run a command in the kube-build image.  This assumes that the image has
@@ -325,7 +345,8 @@ function kube::release::gcs::push-images() {
   kube::release::gcs::ensure-docker-registry
 
   # Tag each of our run binaries with the right registry and push
-  for b in ${KUBE_RUN_BINARIES} ; do
+  local b
+  for b in "${KUBE_RUN_BINARIES[@]}" ; do
     echo "+++ Tagging and pushing ${KUBE_RUN_IMAGE_BASE}-$b to GCS bucket ${KUBE_RELEASE_BUCKET}"
     docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
     docker push "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"

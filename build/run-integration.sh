@@ -22,5 +22,5 @@ source $(dirname $0)/common.sh
 
 kube::build::verify-prereqs
 kube::build::build-image
-kube::build::run-build-command build/build-image/make-binaries.sh "integration"
+kube::build::run-build-command build/build-image/make-binaries.sh "./cmd/integration"
 kube::build::run-build-command build/build-image/run-integration.sh
