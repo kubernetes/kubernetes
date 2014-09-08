@@ -63,8 +63,8 @@ func TestEtcdGetPodNotFound(t *testing.T) {
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
 	_, err := registry.GetPod("foo")
-	if err == nil {
-		t.Errorf("Unexpected non-error.")
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 
@@ -144,8 +144,8 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 			ID: "foo",
 		},
 	})
-	if err == nil {
-		t.Error("Unexpected non-error")
+	if !errors.IsAlreadyExists(err) {
+		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 		R: &etcd.Response{
 			Node: nil,
 		},
-		E: tools.EtcdErrorValueRequired,
+		E: tools.EtcdErrorNodeExist, // validate that ApplyBinding is translating Create errors
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(&api.Pod{
@@ -176,8 +176,8 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 
 	// Suddenly, a wild scheduler appears:
 	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
-	if err == nil {
-		t.Fatalf("Unexpected non error.")
+	if !errors.IsAlreadyExists(err) {
+		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
 	existingPod, err := registry.GetPod("foo")
@@ -185,7 +185,7 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	if existingPod.DesiredState.Host == "machine" {
-		t.Fatal("Pod's host changed in response to an unappliable binding.")
+		t.Fatal("Pod's host changed in response to an non-apply-able binding.")
 	}
 }
 
@@ -568,8 +568,8 @@ func TestEtcdGetControllerNotFound(t *testing.T) {
 	if ctrl != nil {
 		t.Errorf("Unexpected non-nil controller: %#v", ctrl)
 	}
-	if err == nil {
-		t.Error("Unexpected non-error.")
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 
@@ -745,8 +745,8 @@ func TestEtcdGetServiceNotFound(t *testing.T) {
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
 	_, err := registry.GetService("foo")
-	if err == nil {
-		t.Errorf("Unexpected non-error.")
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 
