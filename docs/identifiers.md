@@ -37,12 +37,8 @@ name
 FIXME: Should this be more agnostic to resource type, and talk about pod as a particular case?
 ## Design
 
-1) Each apiserver must be assigned a Namespace string (a DNS_SUBDOMAIN).
-   1) must be non-empty and unique across all apiservers that share minions
-   Example: "k8s.example.com"
-
-2) When an object is created on an apiserver, a Name string (a DNS_SUBDOMAIN) must be provided.
-   1) must be non-empty and unique within the apiserver's Namespace
+1) When an object is created on an apiserver, a Name string (a DNS_SUBDOMAIN) must be provided.
+   1) must be non-empty and unique within the apiserver
    2) enables idempotent and space-unique creation
       1) generating random names will defeat idempotentcy
    3) other parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffic) to create a unique Name
@@ -50,23 +46,22 @@ FIXME: Should this be more agnostic to resource type, and talk about pod as a pa
    Example: "backend-x4eb1"
 
 FIXME: final debate on having master default a name. Alternative: set "autosetName"=true
-FIXME: how long can <name>+<namespace> be?  We previously had FullName, making it the apiserver's problem to truncate long names to DNS_DOMAIN len.
 
-3) Upon acceptance at the apiserver, a pod is assigned a uid (a UUID).
+2) Upon acceptance at the apiserver, a pod is assigned a uid (a UUID).
    1) must be non-empty and unique across space and time
    Example: "01234567-89ab-cdef-0123-456789abcdef"
 
-4) Each container within a pod must have a Name string (a DNS_LABEL).
+3) Each container within a pod must have a Name string (a DNS_LABEL).
    1) must be non-empty and unique within the pod
    Example: "frontend"
 
-5) When a pod is bound to a node, the node is told the pod's uid.
+4) When a pod is bound to a node, the node is told the pod's uid.
    1) if not provided, the kubelet will generate one
    2) provides for pods from node-local config files
 
-6) When a pod is bound to a node, the node is told the pod's Namespace, and Name.
-   1) if Namespace is not provided, the kubelet will generate one
-   2) generated Namespaces must be deterministic
+6) When a pod is bound to a node, the node is told the pod's Name.
+   1) kubelet will namespace pods from distinct sources (e.g. files vs apiserver)
+   2) namespaces must be deterministic
    3) provides a cluster-wide space-unique name
    Example: Namespace="k8s.example.com" Name="guestbook.user"
    Example: Namespace="k8s.example.com" Name="backend-x4eb1"
