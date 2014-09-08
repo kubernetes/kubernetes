@@ -24,9 +24,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-func TestMinionRegistryStorage(t *testing.T) {
+func TestMinionREST(t *testing.T) {
 	m := NewRegistry([]string{"foo", "bar"})
-	ms := NewRegistryStorage(m)
+	ms := NewREST(m)
 
 	if obj, err := ms.Get("foo"); err != nil || obj.(*api.Minion).ID != "foo" {
 		t.Errorf("missing expected object")

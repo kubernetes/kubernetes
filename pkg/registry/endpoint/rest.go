@@ -20,31 +20,30 @@ import (
 	"errors"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// Storage adapts endpoints into apiserver's RESTStorage model.
-type Storage struct {
+// REST adapts endpoints into apiserver's RESTStorage model.
+type REST struct {
 	registry Registry
 }
 
-// NewStorage returns a new Storage implementation for endpoints
-func NewStorage(registry Registry) apiserver.RESTStorage {
-	return &Storage{
+// NewREST returns a new apiserver.RESTStorage implementation for endpoints
+func NewREST(registry Registry) *REST {
+	return &REST{
 		registry: registry,
 	}
 }
 
 // Get satisfies the RESTStorage interface.
-func (rs *Storage) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(id string) (runtime.Object, error) {
 	return rs.registry.GetEndpoints(id)
 }
 
 // List satisfies the RESTStorage interface.
-func (rs *Storage) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 	if !selector.Empty() {
 		return nil, errors.New("label selectors are not supported on endpoints")
 	}
@@ -53,26 +52,26 @@ func (rs *Storage) List(selector labels.Selector) (runtime.Object, error) {
 
 // Watch returns Endpoint events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *Storage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return rs.registry.WatchEndpoints(label, field, resourceVersion)
 }
 
 // Create satisfies the RESTStorage interface but is unimplemented.
-func (rs *Storage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Update satisfies the RESTStorage interface but is unimplemented.
-func (rs *Storage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Delete satisfies the RESTStorage interface but is unimplemented.
-func (rs *Storage) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // New implements the RESTStorage interface.
-func (rs Storage) New() runtime.Object {
+func (rs REST) New() runtime.Object {
 	return &api.Endpoints{}
 }

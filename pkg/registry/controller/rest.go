@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -33,26 +32,29 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 )
 
-// RegistryStorage stores data for the replication controller service.
-// It implements apiserver.RESTStorage.
-type RegistryStorage struct {
-	registry    Registry
-	podRegistry pod.Registry
-	pollPeriod  time.Duration
+// PodLister is anything that knows how to list pods.
+type PodLister interface {
+	ListPods(labels.Selector) (*api.PodList, error)
 }
 
-// NewRegistryStorage returns a new apiserver.RESTStorage for the given
-// registry and podRegistry.
-func NewRegistryStorage(registry Registry, podRegistry pod.Registry) apiserver.RESTStorage {
-	return &RegistryStorage{
-		registry:    registry,
-		podRegistry: podRegistry,
-		pollPeriod:  time.Second * 10,
+// REST implements apiserver.RESTStorage for the replication controller service.
+type REST struct {
+	registry   Registry
+	podLister  PodLister
+	pollPeriod time.Duration
+}
+
+// NewREST returns a new apiserver.RESTStorage for the given registry and PodLister.
+func NewREST(registry Registry, podLister PodLister) *REST {
+	return &REST{
+		registry:   registry,
+		podLister:  podLister,
+		pollPeriod: time.Second * 10,
 	}
 }
 
 // Create registers the given ReplicationController.
-func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -78,14 +80,14 @@ func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, er
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
-func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(id)
 	}), nil
 }
 
 // Get obtains the ReplicationController specified by its id.
-func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(id string) (runtime.Object, error) {
 	controller, err := rs.registry.GetController(id)
 	if err != nil {
 		return nil, err
@@ -94,7 +96,7 @@ func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 	controllers, err := rs.registry.ListControllers()
 	if err != nil {
 		return nil, err
@@ -110,13 +112,13 @@ func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error
 }
 
 // New creates a new ReplicationController for use with Create and Update.
-func (rs RegistryStorage) New() runtime.Object {
+func (*REST) New() runtime.Object {
 	return &api.ReplicationController{}
 }
 
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
-func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -135,7 +137,7 @@ func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, er
 
 // Watch returns ReplicationController events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}
@@ -149,9 +151,9 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 	}), nil
 }
 
-func (rs *RegistryStorage) waitForController(ctrl *api.ReplicationController) (runtime.Object, error) {
+func (rs *REST) waitForController(ctrl *api.ReplicationController) (runtime.Object, error) {
 	for {
-		pods, err := rs.podRegistry.ListPods(labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+		pods, err := rs.podLister.ListPods(labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
 		if err != nil {
 			return ctrl, err
 		}

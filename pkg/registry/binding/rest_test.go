@@ -28,11 +28,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-func TestNewBindingStorage(t *testing.T) {
+func TestNewREST(t *testing.T) {
 	mockRegistry := MockRegistry{
 		OnApplyBinding: func(b *api.Binding) error { return nil },
 	}
-	b := NewBindingStorage(mockRegistry)
+	b := NewREST(mockRegistry)
 
 	binding := &api.Binding{
 		PodID: "foo",
@@ -52,11 +52,11 @@ func TestNewBindingStorage(t *testing.T) {
 	}
 }
 
-func TestBindingStorageUnsupported(t *testing.T) {
+func TestRESTUnsupported(t *testing.T) {
 	mockRegistry := MockRegistry{
 		OnApplyBinding: func(b *api.Binding) error { return nil },
 	}
-	b := NewBindingStorage(mockRegistry)
+	b := NewREST(mockRegistry)
 	if _, err := b.Delete("binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -75,7 +75,7 @@ func TestBindingStorageUnsupported(t *testing.T) {
 	}
 }
 
-func TestBindingStoragePost(t *testing.T) {
+func TestRESTPost(t *testing.T) {
 	table := []struct {
 		b   *api.Binding
 		err error
@@ -94,7 +94,7 @@ func TestBindingStoragePost(t *testing.T) {
 				return item.err
 			},
 		}
-		b := NewBindingStorage(mockRegistry)
+		b := NewREST(mockRegistry)
 		resultChan, err := b.Create(item.b)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)

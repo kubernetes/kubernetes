@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -35,7 +36,7 @@ func TestListControllersError(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{
 		Err: fmt.Errorf("test error"),
 	}
-	storage := RegistryStorage{
+	storage := REST{
 		registry: &mockRegistry,
 	}
 	controllers, err := storage.List(nil)
@@ -49,7 +50,7 @@ func TestListControllersError(t *testing.T) {
 
 func TestListEmptyControllerList(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{JSONBase: api.JSONBase{ResourceVersion: 1}}}
-	storage := RegistryStorage{
+	storage := REST{
 		registry: &mockRegistry,
 	}
 	controllers, err := storage.List(labels.Everything())
@@ -82,7 +83,7 @@ func TestListControllerList(t *testing.T) {
 			},
 		},
 	}
-	storage := RegistryStorage{
+	storage := REST{
 		registry: &mockRegistry,
 	}
 	controllersObj, err := storage.List(labels.Everything())
@@ -104,7 +105,7 @@ func TestListControllerList(t *testing.T) {
 
 func TestControllerDecode(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
-	storage := RegistryStorage{
+	storage := REST{
 		registry: &mockRegistry,
 	}
 	controller := &api.ReplicationController{
@@ -226,10 +227,10 @@ func TestCreateController(t *testing.T) {
 			},
 		},
 	}
-	storage := RegistryStorage{
-		registry:    &mockRegistry,
-		podRegistry: &mockPodRegistry,
-		pollPeriod:  time.Millisecond * 1,
+	storage := REST{
+		registry:   &mockRegistry,
+		podLister:  &mockPodRegistry,
+		pollPeriod: time.Millisecond * 1,
 	}
 	controller := &api.ReplicationController{
 		JSONBase: api.JSONBase{ID: "test"},
@@ -257,10 +258,10 @@ func TestCreateController(t *testing.T) {
 
 func TestControllerStorageValidatesCreate(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
-	storage := RegistryStorage{
-		registry:    &mockRegistry,
-		podRegistry: nil,
-		pollPeriod:  time.Millisecond * 1,
+	storage := REST{
+		registry:   &mockRegistry,
+		podLister:  nil,
+		pollPeriod: time.Millisecond * 1,
 	}
 
 	failureCases := map[string]api.ReplicationController{
@@ -288,10 +289,10 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 
 func TestControllerStorageValidatesUpdate(t *testing.T) {
 	mockRegistry := registrytest.ControllerRegistry{}
-	storage := RegistryStorage{
-		registry:    &mockRegistry,
-		podRegistry: nil,
-		pollPeriod:  time.Millisecond * 1,
+	storage := REST{
+		registry:   &mockRegistry,
+		podLister:  nil,
+		pollPeriod: time.Millisecond * 1,
 	}
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
