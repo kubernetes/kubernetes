@@ -34,8 +34,8 @@ package version
 
 var (
 	gitMajor     string = "0"              // major version, always numeric
-	gitMinor     string = "1+"             // minor version, numeric possibly followed by "+"
-	gitVersion   string = "v0.1+"          // version from git, output of $(git describe)
+	gitMinor     string = "2+"             // minor version, numeric possibly followed by "+"
+	gitVersion   string = "v0.2+"          // version from git, output of $(git describe)
 	gitCommit    string = ""               // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = "not a git tree" // state of git tree, either "clean" or "dirty"
 )
