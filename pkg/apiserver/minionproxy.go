@@ -31,6 +31,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// TODO: replace with proxy handler on minions
 func handleProxyMinion(w http.ResponseWriter, req *http.Request) {
 	path := strings.TrimLeft(req.URL.Path, "/")
 	rawQuery := req.URL.RawQuery

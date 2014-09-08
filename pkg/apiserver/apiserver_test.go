@@ -77,8 +77,9 @@ type SimpleRESTStorage struct {
 	requestedFieldSelector   labels.Selector
 	requestedResourceVersion uint64
 
-	// The location
+	// The id requested, and location to return for ResourceLocation
 	requestedResourceLocationID string
+	resourceLocation            string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
@@ -157,7 +158,7 @@ func (storage *SimpleRESTStorage) ResourceLocation(id string) (string, error) {
 	if err := storage.errors["resourceLocation"]; err != nil {
 		return "", err
 	}
-	return id, nil
+	return storage.resourceLocation, nil
 }
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
