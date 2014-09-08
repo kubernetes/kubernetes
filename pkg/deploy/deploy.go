@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package kube_updown provides functions for deploying a kubernetes cluster
 // on Google Compute Engine
-package kube_updown
+package deploy
 
 import (
 	"bytes"

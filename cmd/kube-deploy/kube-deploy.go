@@ -18,13 +18,14 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kube_updown"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/deploy"
 	"github.com/golang/glog"
 )
 
@@ -71,42 +72,72 @@ func projectFromGCloud() string {
 	}
 	project := prjReg.FindStringSubmatch(string(contents))
 	// element 1 is the submatch
-	if project == nil {
+	if project == nil || len(project) < 2 {
 		return ""
 	}
 	return project[1]
 }
 
+func usage() {
+	fmt.Fprint(os.Stdout, "Usage: kube-deploy up|down|push")
+}
+
 func main() {
 	flag.Set("stderrthreshold", "INFO")
+	if len(os.Args) != 2 {
+		usage()
+		os.Exit(1)
+	}
+
 	flag.Parse()
 
+	switch os.Args[1] {
+	case "up":
+		up()
+	case "down":
+		down()
+	case "push":
+		push()
+	default:
+		usage()
+	}
+}
+
+func up() {
 	cloud, err := gce_cloud.CreateGCECloud(*project, zone)
 	if err != nil {
 		glog.Fatalf("failed to create cloud: %v", err)
 	}
 	glog.Info("Starting VMs and configuring firewalls\n")
-	ops, err := kube_updown.DeployMaster(cloud)
+	ops, err := deploy.DeployMaster(cloud)
 	if err != nil {
 		glog.Fatal(err)
 	}
 	for i := 1; i <= numMinions; i++ {
-		newOps, err := kube_updown.DeployMinion(cloud, i)
+		newOps, err := deploy.DeployMinion(cloud, i)
 		if err != nil {
 			glog.Fatal(err)
 		}
 		ops = append(ops, newOps...)
 	}
-	if err := kube_updown.WaitForOps(cloud, ops); err != nil {
+	if err := deploy.WaitForOps(cloud, ops); err != nil {
 		glog.Fatal(err)
 	}
-	if err := kube_updown.CheckMaster(cloud); err != nil {
+	if err := deploy.CheckMaster(cloud); err != nil {
 		glog.Fatal(err)
 	}
-	//	if err := kube_updown.CheckMinions(); err != nil {
+	//	if err := deploy.CheckMinions(); err != nil {
 	//		glog.Fatal(err)
 	//	}
 	glog.Info("Kubernetes cluster is running\n")
 	glog.Info("Security note: The server above uses a self signed certificate.  This is\n")
 	glog.Info("    subject to \"Man in the middle\" type attacks.\n")
+}
+
+func down() {
+
+}
+
+func push() {
+
 }
