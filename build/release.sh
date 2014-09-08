@@ -23,8 +23,6 @@ set -e
 source $(dirname $0)/common.sh
 
 kube::build::verify-prereqs
-kube::build::verify-gcs-prereqs
-kube::build::ensure-gcs-release-bucket
 kube::build::build-image
 kube::build::run-build-command build/build-image/make-binaries.sh
 kube::build::run-build-command build/build-image/make-cross.sh
@@ -33,5 +31,4 @@ kube::build::run-build-command build/build-image/run-integration.sh
 kube::build::copy-output
 kube::build::run-image
 kube::build::package-tarballs
-kube::build::push-images-to-gcs
-kube::build::copy-release-to-gcs
+kube::release::gcs::release

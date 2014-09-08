@@ -82,35 +82,6 @@ function kube::build::verify-prereqs() {
   fi
 }
 
-# Verify things are set up for uploading to GCS
-function kube::build::verify-gcs-prereqs() {
-  if [[ -z "$(which gsutil)" || -z "$(which gcloud)" ]]; then
-    echo "Releasing Kubernetes requires gsutil and gcloud.  Please download,"
-    echo "install and authorize through the Google Cloud SDK: "
-    echo
-    echo "  https://developers.google.com/cloud/sdk/"
-    return 1
-  fi
-
-  FIND_ACCOUNT="gcloud auth list 2>/dev/null | grep '(active)' | awk '{ print \$2 }'"
-  GCLOUD_ACCOUNT=${GCLOUD_ACCOUNT-$(eval ${FIND_ACCOUNT})}
-  if [[ -z "${GCLOUD_ACCOUNT}" ]]; then
-    echo "No account authorized through gcloud.  Please fix with:"
-    echo
-    echo "  gcloud auth login"
-    return 1
-  fi
-
-  FIND_PROJECT="gcloud config list project | tail -n 1 | awk '{ print \$3 }'"
-  GCLOUD_PROJECT=${GCLOUD_PROJECT-$(eval ${FIND_PROJECT})}
-  if [[ -z "${GCLOUD_PROJECT}" ]]; then
-    echo "No account authorized through gcloud.  Please fix with:"
-    echo
-    echo "  gcloud config set project <project id>"
-    return 1
-  fi
-}
-
 # ---------------------------------------------------------------------------
 # Building
 
@@ -229,17 +200,84 @@ function kube::build::copy-output() {
 }
 
 # ---------------------------------------------------------------------------
-# Release
+# Build final release artifacts
+
+# Package up all of the cross compiled clients
+function kube::build::package-tarballs() {
+  mkdir -p "${RELEASE_DIR}"
+
+  # Find all of the built kubecfg binaries
+  local platform
+  for platform in _output/build/*/* ; do
+    local PLATFORM_TAG=${platform}
+    PLATFORM_TAG=${PLATFORM_TAG#*/*/}  # remove the first two path components
+    PLATFORM_TAG=${PLATFORM_TAG/\//-}  # Replace a "/" for a "-"
+    echo "+++ Building client package for $PLATFORM_TAG"
+
+    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/_output/release-stage/${PLATFORM_TAG}/kubernetes"
+    mkdir -p "${CLIENT_RELEASE_STAGE}"
+    mkdir -p "${CLIENT_RELEASE_STAGE}/bin"
+
+    cp "${platform}"/* "${CLIENT_RELEASE_STAGE}/bin"
+
+    local CLIENT_PACKAGE_NAME="${RELEASE_DIR}/kubernetes-${PLATFORM_TAG}.tar.gz"
+    tar czf "${CLIENT_PACKAGE_NAME}" \
+      -C "${CLIENT_RELEASE_STAGE}/.." \
+      .
+  done
+}
+
+# ---------------------------------------------------------------------------
+# GCS Release
+
+function kube::release::gcs::release() {
+  kube::release::gcs::verify-prereqs
+  kube::release::gcs::ensure-release-bucket
+  kube::release::gcs::push-images
+  kube::release::gcs::copy-release-tarballs
+}
+
+# Verify things are set up for uploading to GCS
+function kube::release::gcs::verify-prereqs() {
+  if [[ -z "$(which gsutil)" || -z "$(which gcloud)" ]]; then
+    echo "Releasing Kubernetes requires gsutil and gcloud.  Please download,"
+    echo "install and authorize through the Google Cloud SDK: "
+    echo
+    echo "  https://developers.google.com/cloud/sdk/"
+    return 1
+  fi
+
+  if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
+    GCLOUD_ACCOUNT=$(gcloud auth list 2>/dev/null | awk '/(active)/ { print $2 }')
+  fi
+  if [[ -z "${GCLOUD_ACCOUNT}" ]]; then
+    echo "No account authorized through gcloud.  Please fix with:"
+    echo
+    echo "  gcloud auth login"
+    return 1
+  fi
+
+  if [[ -z "${GCLOUD_PROJECT-}" ]]; then
+    GCLOUD_PROJECT=$(gcloud config list project | awk '{project = $3} END {print project}')
+  fi
+  if [[ -z "${GCLOUD_PROJECT}" ]]; then
+    echo "No account authorized through gcloud.  Please fix with:"
+    echo
+    echo "  gcloud config set project <project id>"
+    return 1
+  fi
+}
 
 # Create a unique bucket name for releasing Kube and make sure it exists.
-function kube::build::ensure-gcs-release-bucket() {
+function kube::release::gcs::ensure-release-bucket() {
+  local project_hash
   if which md5 > /dev/null 2>&1; then
-    HASH=$(md5 -q -s "$GCLOUD_PROJECT")
+    project_hash=$(md5 -q -s "$GCLOUD_PROJECT")
   else
-    HASH=$(echo -n "$GCLOUD_PROJECT" | md5sum)
+    project_hash=$(echo -n "$GCLOUD_PROJECT" | md5sum)
   fi
-  HASH=${HASH:0:5}
-  KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-$HASH}
+  project_hash=${project_hash:0:5}
+  KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-${project_hash}}
   KUBE_RELEASE_PREFIX=${KUBE_RELEASE_PREFIX-devel/}
   KUBE_DOCKER_REG_PREFIX=${KUBE_DOCKER_REG_PREFIX-docker-reg/}
 
@@ -249,7 +287,7 @@ function kube::build::ensure-gcs-release-bucket() {
   fi
 }
 
-function kube::build::ensure-gcs-docker-registry() {
+function kube::release::gcs::ensure-docker-registry() {
   local -r REG_CONTAINER_NAME="gcs-registry"
 
   local -r RUNNING=$(docker inspect ${REG_CONTAINER_NAME} 2>/dev/null \
@@ -283,8 +321,8 @@ function kube::build::ensure-gcs-docker-registry() {
   sleep 5
 }
 
-function kube::build::push-images-to-gcs() {
-  kube::build::ensure-gcs-docker-registry
+function kube::release::gcs::push-images() {
+  kube::release::gcs::ensure-docker-registry
 
   # Tag each of our run binaries with the right registry and push
   for b in ${KUBE_RUN_BINARIES} ; do
@@ -295,30 +333,7 @@ function kube::build::push-images-to-gcs() {
   done
 }
 
-# Package up all of the cross compiled clients
-function kube::build::package-tarballs() {
-  mkdir -p "${RELEASE_DIR}"
-
-  # Find all of the built kubecfg binaries
-  for platform in _output/build/*/* ; do
-    echo $platform
-    local PLATFORM_TAG=$(echo $platform | awk -F / '{ printf "%s-%s", $3, $4 }')
-    echo "+++ Building client package for $PLATFORM_TAG"
-
-    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/_output/release-stage/${PLATFORM_TAG}/kubernetes"
-    mkdir -p "${CLIENT_RELEASE_STAGE}"
-    mkdir -p "${CLIENT_RELEASE_STAGE}/bin"
-
-    cp $platform/* "${CLIENT_RELEASE_STAGE}/bin"
-
-    local CLIENT_PACKAGE_NAME="${RELEASE_DIR}/kubernetes-${PLATFORM_TAG}.tar.gz"
-    tar czf ${CLIENT_PACKAGE_NAME} \
-      -C "${CLIENT_RELEASE_STAGE}/.." \
-      .
-  done
-}
-
-function kube::build::copy-release-to-gcs() {
+function kube::release::gcs::copy-release-tarballs() {
   # TODO: This isn't atomic.  There will be points in time where there will be
   # no active release.  Also, if something fails, the release could be half-
   # copied.  The real way to do this would perhaps to have some sort of release
