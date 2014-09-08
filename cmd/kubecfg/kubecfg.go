@@ -20,6 +20,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"sort"
@@ -42,7 +44,7 @@ var (
 	serverVersion = flag.Bool("server_version", false, "Print the server's version number.")
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
 	httpServer    = flag.String("h", "", "The host to connect to.")
-	config        = flag.String("c", "", "Path to the config file.")
+	config        = flag.String("c", "", "Path or URL to the config file.")
 	selector      = flag.String("l", "", "Selector (label query) to use for listing")
 	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
 	portSpec      = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
@@ -101,11 +103,28 @@ func readConfig(storage string) []byte {
 	if len(*config) == 0 {
 		glog.Fatal("Need config file (-c)")
 	}
-	data, err := ioutil.ReadFile(*config)
-	if err != nil {
-		glog.Fatalf("Unable to read %v: %v\n", *config, err)
+
+	var data []byte
+	if url, err := url.Parse(*config); err == nil && (url.Scheme == "http" || url.Scheme == "https") {
+		resp, err := http.Get(url.String())
+		if err != nil {
+			glog.Fatalf("Unable to access URL %v: %v\n", url, err)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			glog.Fatalf("Unable to read URL %v: %v\n", url, err)
+		}
+		data = body
+
+	} else {
+		body, err := ioutil.ReadFile(*config)
+		if err != nil {
+			glog.Fatalf("Unable to read %v: %v\n", *config, err)
+		}
+		data = body
 	}
-	data, err = parser.ToWireFormat(data, storage)
+
+	data, err := parser.ToWireFormat(data, storage)
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
 	}
