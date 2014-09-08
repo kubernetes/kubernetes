@@ -34,23 +34,23 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// RegistryStorage adapts a service registry into apiserver's RESTStorage model.
-type RegistryStorage struct {
+// REST adapts a service registry into apiserver's RESTStorage model.
+type REST struct {
 	registry Registry
 	cloud    cloudprovider.Interface
 	machines minion.Registry
 }
 
-// NewRegistryStorage returns a new RegistryStorage.
-func NewRegistryStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry) apiserver.RESTStorage {
-	return &RegistryStorage{
+// NewREST returns a new REST.
+func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry) *REST {
+	return &REST{
 		registry: registry,
 		cloud:    cloud,
 		machines: machines,
 	}
 }
 
-func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -94,7 +94,7 @@ func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, er
 	}), nil
 }
 
-func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	service, err := rs.registry.GetService(id)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(id string) (runtime.Object, error) {
 	s, err := rs.registry.GetService(id)
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	return s, err
 }
 
-func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 	list, err := rs.registry.ListServices()
 	if err != nil {
 		return nil, err
@@ -130,11 +130,11 @@ func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error
 
 // Watch returns Services events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return rs.registry.WatchServices(label, field, resourceVersion)
 }
 
-func (rs RegistryStorage) New() runtime.Object {
+func (*REST) New() runtime.Object {
 	return &api.Service{}
 }
 
@@ -156,7 +156,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 	return result, nil
 }
 
-func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -172,7 +172,7 @@ func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, er
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *RegistryStorage) ResourceLocation(id string) (string, error) {
+func (rs *REST) ResourceLocation(id string) (string, error) {
 	e, err := rs.registry.GetEndpoints(id)
 	if err != nil {
 		return "", err
@@ -183,7 +183,7 @@ func (rs *RegistryStorage) ResourceLocation(id string) (string, error) {
 	return "http://" + e.Endpoints[rand.Intn(len(e.Endpoints))], nil
 }
 
-func (rs *RegistryStorage) deleteExternalLoadBalancer(service *api.Service) error {
+func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
 	if !service.CreateExternalLoadBalancer || rs.cloud == nil {
 		return nil
 	}

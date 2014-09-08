@@ -26,42 +26,42 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// BindingStorage implements the RESTStorage interface. When bindings are written, it
+// REST implements the RESTStorage interface for bindings. When bindings are written, it
 // changes the location of the affected pods. This information is eventually reflected
 // in the pod's CurrentState.Host field.
-type BindingStorage struct {
+type REST struct {
 	registry Registry
 }
 
-// NewBindingStorage creates a new BindingStorage backed by the given bindingRegistry.
-func NewBindingStorage(bindingRegistry Registry) *BindingStorage {
-	return &BindingStorage{
+// NewREST creates a new REST backed by the given bindingRegistry.
+func NewREST(bindingRegistry Registry) *REST {
+	return &REST{
 		registry: bindingRegistry,
 	}
 }
 
 // List returns an error because bindings are write-only objects.
-func (*BindingStorage) List(selector labels.Selector) (runtime.Object, error) {
+func (*REST) List(selector labels.Selector) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", "list")
 }
 
 // Get returns an error because bindings are write-only objects.
-func (*BindingStorage) Get(id string) (runtime.Object, error) {
+func (*REST) Get(id string) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
 // Delete returns an error because bindings are write-only objects.
-func (*BindingStorage) Delete(id string) (<-chan runtime.Object, error) {
+func (*REST) Delete(id string) (<-chan runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
 // New returns a new binding object fit for having data unmarshalled into it.
-func (*BindingStorage) New() runtime.Object {
+func (*REST) New() runtime.Object {
 	return &api.Binding{}
 }
 
 // Create attempts to make the assignment indicated by the binding it recieves.
-func (b *BindingStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	binding, ok := obj.(*api.Binding)
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
@@ -75,6 +75,6 @@ func (b *BindingStorage) Create(obj runtime.Object) (<-chan runtime.Object, erro
 }
 
 // Update returns an error-- this object may not be updated.
-func (b *BindingStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Bindings may not be changed.")
 }

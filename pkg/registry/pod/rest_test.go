@@ -57,7 +57,7 @@ func expectPod(t *testing.T, ch <-chan runtime.Object) (*api.Pod, bool) {
 func TestCreatePodRegistryError(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	desiredState := api.PodState{
@@ -76,7 +76,7 @@ func TestCreatePodRegistryError(t *testing.T) {
 func TestCreatePodSetsIds(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	desiredState := api.PodState{
@@ -102,7 +102,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 func TestCreatePodSetsUUIDs(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	desiredState := api.PodState{
@@ -125,7 +125,7 @@ func TestCreatePodSetsUUIDs(t *testing.T) {
 func TestListPodsError(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	pods, err := storage.List(labels.Everything())
@@ -139,7 +139,7 @@ func TestListPodsError(t *testing.T) {
 
 func TestListEmptyPodList(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(&api.PodList{JSONBase: api.JSONBase{ResourceVersion: 1}})
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	pods, err := storage.List(labels.Everything())
@@ -171,7 +171,7 @@ func TestListPodList(t *testing.T) {
 			},
 		},
 	}
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	podsObj, err := storage.List(labels.Everything())
@@ -193,7 +193,7 @@ func TestListPodList(t *testing.T) {
 
 func TestPodDecode(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	expected := &api.Pod{
@@ -219,7 +219,7 @@ func TestPodDecode(t *testing.T) {
 func TestGetPod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	obj, err := storage.Get("foo")
@@ -237,7 +237,7 @@ func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	storage := RegistryStorage{
+	storage := REST{
 		registry:      podRegistry,
 		cloudProvider: fakeCloud,
 	}
@@ -352,7 +352,7 @@ func TestMakePodStatus(t *testing.T) {
 func TestPodStorageValidatesCreate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	pod := &api.Pod{}
@@ -368,7 +368,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 func TestPodStorageValidatesUpdate(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")
-	storage := RegistryStorage{
+	storage := REST{
 		registry: podRegistry,
 	}
 	pod := &api.Pod{}
@@ -389,7 +389,7 @@ func TestCreatePod(t *testing.T) {
 			Host: "machine",
 		},
 	}
-	storage := RegistryStorage{
+	storage := REST{
 		registry:      podRegistry,
 		podPollPeriod: time.Millisecond * 100,
 	}
@@ -437,7 +437,7 @@ func TestFillPodInfo(t *testing.T) {
 			},
 		},
 	}
-	storage := RegistryStorage{
+	storage := REST{
 		podCache: &fakeGetter,
 	}
 	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
@@ -460,7 +460,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 			},
 		},
 	}
-	storage := RegistryStorage{
+	storage := REST{
 		podCache: &fakeGetter,
 	}
 	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}

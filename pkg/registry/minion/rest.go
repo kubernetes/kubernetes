@@ -26,19 +26,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-// RegistryStorage implements the RESTStorage interface, backed by a MinionRegistry.
-type RegistryStorage struct {
+// REST implements the RESTStorage interface, backed by a MinionRegistry.
+type REST struct {
 	registry Registry
 }
 
-// NewRegistryStorage returns a new RegistryStorage.
-func NewRegistryStorage(m Registry) apiserver.RESTStorage {
-	return &RegistryStorage{
+// NewREST returns a new REST.
+func NewREST(m Registry) *REST {
+	return &REST{
 		registry: m,
 	}
 }
 
-func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	minion, ok := obj.(*api.Minion)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
@@ -65,7 +65,7 @@ func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, er
 	}), nil
 }
 
-func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	exists, err := rs.registry.Contains(id)
 	if !exists {
 		return nil, ErrDoesNotExist
@@ -78,7 +78,7 @@ func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(id string) (runtime.Object, error) {
 	exists, err := rs.registry.Contains(id)
 	if !exists {
 		return nil, ErrDoesNotExist
@@ -86,7 +86,7 @@ func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	return rs.toApiMinion(id), err
 }
 
-func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 	nameList, err := rs.registry.List()
 	if err != nil {
 		return nil, err
@@ -98,14 +98,14 @@ func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error
 	return &list, nil
 }
 
-func (rs RegistryStorage) New() runtime.Object {
+func (*REST) New() runtime.Object {
 	return &api.Minion{}
 }
 
-func (rs *RegistryStorage) Update(minion runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(minion runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
 }
 
-func (rs *RegistryStorage) toApiMinion(name string) *api.Minion {
+func (rs *REST) toApiMinion(name string) *api.Minion {
 	return &api.Minion{JSONBase: api.JSONBase{ID: name}}
 }

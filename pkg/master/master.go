@@ -114,19 +114,19 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	m.storage = map[string]apiserver.RESTStorage{
-		"pods": pod.NewRegistryStorage(&pod.RegistryStorageConfig{
+		"pods": pod.NewREST(&pod.RESTConfig{
 			CloudProvider: cloud,
 			PodCache:      podCache,
 			PodInfoGetter: podInfoGetter,
 			Registry:      m.podRegistry,
 		}),
-		"replicationControllers": controller.NewRegistryStorage(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewRegistryStorage(m.serviceRegistry, cloud, m.minionRegistry),
-		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
-		"minions":                minion.NewRegistryStorage(m.minionRegistry),
+		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
+		"services":               service.NewREST(m.serviceRegistry, cloud, m.minionRegistry),
+		"endpoints":              endpoint.NewREST(m.endpointRegistry),
+		"minions":                minion.NewREST(m.minionRegistry),
 
 		// TODO: should appear only in scheduler API group.
-		"bindings": binding.NewBindingStorage(m.bindingRegistry),
+		"bindings": binding.NewREST(m.bindingRegistry),
 	}
 }
 

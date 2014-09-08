@@ -33,7 +33,7 @@ func TestGetEndpoints(t *testing.T) {
 			Endpoints: []string{"127.0.0.1:9000"},
 		},
 	}
-	storage := NewStorage(registry)
+	storage := NewREST(registry)
 	obj, err := storage.Get("foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
@@ -47,7 +47,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Err: errors.NewNotFound("service", "foo"),
 	}
-	storage := NewStorage(registry)
+	storage := NewREST(registry)
 
 	// returns service not found
 	_, err := storage.Get("foo")
@@ -71,7 +71,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 
 func TestEndpointsRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	storage := NewStorage(registry)
+	storage := NewREST(registry)
 	registry.EndpointsList = api.EndpointsList{
 		JSONBase: api.JSONBase{ResourceVersion: 1},
 		Items: []api.Endpoints{

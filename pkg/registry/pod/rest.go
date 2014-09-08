@@ -37,8 +37,8 @@ import (
 	"github.com/golang/glog"
 )
 
-// RegistryStorage implements the RESTStorage interface in terms of a PodRegistry.
-type RegistryStorage struct {
+// REST implements the RESTStorage interface in terms of a PodRegistry.
+type REST struct {
 	cloudProvider cloudprovider.Interface
 	mu            sync.Mutex
 	podCache      client.PodInfoGetter
@@ -47,16 +47,16 @@ type RegistryStorage struct {
 	registry      Registry
 }
 
-type RegistryStorageConfig struct {
+type RESTConfig struct {
 	CloudProvider cloudprovider.Interface
 	PodCache      client.PodInfoGetter
 	PodInfoGetter client.PodInfoGetter
 	Registry      Registry
 }
 
-// NewRegistryStorage returns a new RegistryStorage.
-func NewRegistryStorage(config *RegistryStorageConfig) apiserver.RESTStorage {
-	return &RegistryStorage{
+// NewREST returns a new REST.
+func NewREST(config *RESTConfig) *REST {
+	return &REST{
 		cloudProvider: config.CloudProvider,
 		podCache:      config.PodCache,
 		podInfoGetter: config.PodInfoGetter,
@@ -65,7 +65,7 @@ func NewRegistryStorage(config *RegistryStorageConfig) apiserver.RESTStorage {
 	}
 }
 
-func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
 	if len(pod.ID) == 0 {
@@ -86,13 +86,13 @@ func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, er
 	}), nil
 }
 
-func (rs *RegistryStorage) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(id)
 	}), nil
 }
 
-func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(id string) (runtime.Object, error) {
 	pod, err := rs.registry.GetPod(id)
 	if err != nil {
 		return pod, err
@@ -108,7 +108,7 @@ func (rs *RegistryStorage) Get(id string) (runtime.Object, error) {
 	return pod, err
 }
 
-func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 	pods, err := rs.registry.ListPods(selector)
 	if err == nil {
 		for i := range pods.Items {
@@ -122,7 +122,7 @@ func (rs *RegistryStorage) List(selector labels.Selector) (runtime.Object, error
 }
 
 // Watch begins watching for new, changed, or deleted pods.
-func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return rs.registry.WatchPods(resourceVersion, func(pod *api.Pod) bool {
 		fields := labels.Set{
 			"ID": pod.ID,
@@ -133,11 +133,11 @@ func (rs *RegistryStorage) Watch(label, field labels.Selector, resourceVersion u
 	})
 }
 
-func (rs RegistryStorage) New() runtime.Object {
+func (*REST) New() runtime.Object {
 	return &api.Pod{}
 }
 
-func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
@@ -150,7 +150,7 @@ func (rs *RegistryStorage) Update(obj runtime.Object) (<-chan runtime.Object, er
 	}), nil
 }
 
-func (rs *RegistryStorage) fillPodInfo(pod *api.Pod) {
+func (rs *REST) fillPodInfo(pod *api.Pod) {
 	pod.CurrentState.Host = pod.DesiredState.Host
 	if pod.CurrentState.Host == "" {
 		return
@@ -237,7 +237,7 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 	}
 }
 
-func (rs *RegistryStorage) waitForPodRunning(pod *api.Pod) (runtime.Object, error) {
+func (rs *REST) waitForPodRunning(pod *api.Pod) (runtime.Object, error) {
 	for {
 		podObj, err := rs.Get(pod.ID)
 		if err != nil || podObj == nil {
