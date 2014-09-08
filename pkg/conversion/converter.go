@@ -37,7 +37,7 @@ type Converter struct {
 	// do the conversion.
 	funcs map[typePair]reflect.Value
 
-	// If true, print helpful debugging info. Quite verbose.
+	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
 }
 
@@ -48,29 +48,43 @@ func NewConverter() *Converter {
 	}
 }
 
+// Scope is passed to conversion funcs to allow them to continue an ongoing conversion.
+// If multiple converters exist in the system, Scope will allow you to use the correct one
+// from a conversion function--that is, the one your conversion function was called by.
+type Scope interface {
+	// Call Convert to convert sub-objects. Note that if you call it with your own exact
+	// parameters, you'll run out of stack space before anything useful happens.
+	Convert(src, dest interface{}, flags FieldMatchingFlags) error
+}
+
 // Register registers a conversion func with the Converter. conversionFunc must take
-// two parameters, the input and output type. It must take a pointer to each. It must
-// return an error.
+// three parameters: a pointer to the input type, a pointer to the output type, and
+// a conversion.Scope (which should be used if recursive conversion calls are desired).
+// It must return an error.
 //
 // Example:
-// c.Register(func(in *Pod, out *v1beta1.Pod) error { ... return nil })
+// c.Register(func(in *Pod, out *v1beta1.Pod, s Scope) error { ... return nil })
 func (c *Converter) Register(conversionFunc interface{}) error {
 	fv := reflect.ValueOf(conversionFunc)
 	ft := fv.Type()
 	if ft.Kind() != reflect.Func {
 		return fmt.Errorf("expected func, got: %v", ft)
 	}
-	if ft.NumIn() != 2 {
-		return fmt.Errorf("expected two in params, got: %v", ft)
+	if ft.NumIn() != 3 {
+		return fmt.Errorf("expected three 'in' params, got: %v", ft)
 	}
 	if ft.NumOut() != 1 {
-		return fmt.Errorf("expected one out param, got: %v", ft)
+		return fmt.Errorf("expected one 'out' param, got: %v", ft)
 	}
 	if ft.In(0).Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer arg for in param 0, got: %v", ft)
+		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
 	}
 	if ft.In(1).Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer arg for in param 1, got: %v", ft)
+		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
+	}
+	scopeType := Scope(c)
+	if e, a := reflect.TypeOf(&scopeType).Elem(), ft.In(2); e != a {
+		return fmt.Errorf("expected '%v' arg for 'in' param 2, got '%v' (%v)", e, a, ft)
 	}
 	var forErrorType error
 	// This convolution is necessary, otherwise TypeOf picks up on the fact
@@ -138,7 +152,8 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
-		ret := fv.Call([]reflect.Value{sv.Addr(), dv.Addr()})[0].Interface()
+		args := []reflect.Value{sv.Addr(), dv.Addr(), reflect.ValueOf(Scope(c))}
+		ret := fv.Call(args)[0].Interface()
 		// This convolution is necssary because nil interfaces won't convert
 		// to errors.
 		if ret == nil {
