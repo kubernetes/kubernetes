@@ -99,6 +99,29 @@ func TestCreatePodSetsIds(t *testing.T) {
 	}
 }
 
+func TestCreatePodSetsUUIDs(t *testing.T) {
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Err = fmt.Errorf("test error")
+	storage := RegistryStorage{
+		registry: podRegistry,
+	}
+	desiredState := api.PodState{
+		Manifest: api.ContainerManifest{
+			Version: "v1beta1",
+		},
+	}
+	pod := &api.Pod{DesiredState: desiredState}
+	ch, err := storage.Create(pod)
+	if err != nil {
+		t.Errorf("Expected %#v, Got %#v", nil, err)
+	}
+	expectApiStatusError(t, ch, podRegistry.Err.Error())
+
+	if len(podRegistry.Pod.DesiredState.Manifest.UUID) == 0 {
+		t.Errorf("Expected pod UUID to be set, Got %#v", pod)
+	}
+}
+
 func TestListPodsError(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Err = fmt.Errorf("test error")

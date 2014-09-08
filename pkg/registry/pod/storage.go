@@ -67,8 +67,9 @@ func NewRegistryStorage(config *RegistryStorageConfig) apiserver.RESTStorage {
 
 func (rs *RegistryStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
+	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
 	if len(pod.ID) == 0 {
-		pod.ID = uuid.NewUUID().String()
+		pod.ID = pod.DesiredState.Manifest.UUID
 	}
 	pod.DesiredState.Manifest.ID = pod.ID
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {

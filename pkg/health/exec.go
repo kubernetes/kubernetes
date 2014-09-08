@@ -27,7 +27,7 @@ import (
 const defaultHealthyRegex = "^OK$"
 
 type CommandRunner interface {
-	RunInContainer(podFullName, containerName string, cmd []string) ([]byte, error)
+	RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
 }
 
 type ExecHealthChecker struct {
@@ -47,7 +47,7 @@ func (e *ExecHealthChecker) HealthCheck(podFullName string, currentState api.Pod
 	if container.LivenessProbe.Exec == nil {
 		return Unknown, fmt.Errorf("Missing exec parameters")
 	}
-	data, err := e.runner.RunInContainer(podFullName, container.Name, container.LivenessProbe.Exec.Command)
+	data, err := e.runner.RunInContainer(podFullName, currentState.Manifest.UUID, container.Name, container.LivenessProbe.Exec.Command)
 	glog.V(1).Infof("container %s failed health check: %s", podFullName, string(data))
 	if err != nil {
 		if IsExitError(err) {

@@ -62,11 +62,11 @@ func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{},
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
-	GetContainerInfo(podFullName, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetContainerInfo(podFullName, uuid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo() (*info.MachineInfo, error)
-	GetPodInfo(name string) (api.PodInfo, error)
-	RunInContainer(name, container string, cmd []string) ([]byte, error)
+	GetPodInfo(name, uuid string) (api.PodInfo, error)
+	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
@@ -150,6 +150,7 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	podID := u.Query().Get("podID")
+	podUUID := u.Query().Get("UUID")
 	if len(podID) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
@@ -157,7 +158,7 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	}
 	// TODO: backwards compatibility with existing API, needs API change
 	podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
-	info, err := s.host.GetPodInfo(podFullName)
+	info, err := s.host.GetPodInfo(podFullName, podUUID)
 	if err == ErrNoContainersInPod {
 		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
@@ -211,15 +212,21 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	parts := strings.Split(u.Path, "/")
-	if len(parts) != 4 {
+	var podID, uuid, container string
+	if len(parts) == 4 {
+		podID = parts[2]
+		container = parts[3]
+	} else if len(parts) == 5 {
+		podID = parts[2]
+		uuid = parts[3]
+		container = parts[4]
+	} else {
 		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
 		return
 	}
-	podID := parts[2]
-	container := parts[3]
 	podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
 	command := strings.Split(u.Query().Get("cmd"), " ")
-	data, err := s.host.RunInContainer(podFullName, container, command)
+	data, err := s.host.RunInContainer(podFullName, uuid, container, command)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -241,7 +248,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // serveStats implements stats logic.
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// /stats/<podfullname>/<containerName>
+	// /stats/<podfullname>/<containerName> or /stats/<podfullname>/<uuid>/<containerName>
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
 	var stats *info.ContainerInfo
 	var err error
@@ -260,7 +267,10 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		// TODO(monnand) Implement this
 		errors.New("pod level status currently unimplemented")
 	case 3:
-		stats, err = s.host.GetContainerInfo(components[1], components[2], &query)
+		// Backward compatibility without uuid information
+		stats, err = s.host.GetContainerInfo(components[1], "", components[2], &query)
+	case 4:
+		stats, err = s.host.GetContainerInfo(components[1], components[2], components[2], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return
