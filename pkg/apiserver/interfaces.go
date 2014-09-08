@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -25,25 +26,25 @@ import (
 // Resources which are exported to the RESTful API of apiserver need to implement this interface.
 type RESTStorage interface {
 	// New returns an empty object that can be used with Create and Update after request data has been put into it.
-	// This object must be a pointer type for use with Codec.DecodeInto([]byte, interface{})
-	New() interface{}
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
+	New() runtime.Object
 
 	// List selects resources in the storage which match to the selector.
 	// TODO: add field selector in addition to label selector.
-	List(labels.Selector) (interface{}, error)
+	List(labels.Selector) (runtime.Object, error)
 
 	// Get finds a resource in the storage by id and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Get(id string) (interface{}, error)
+	Get(id string) (runtime.Object, error)
 
 	// Delete finds a resource in the storage and deletes it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Delete(id string) (<-chan interface{}, error)
+	Delete(id string) (<-chan runtime.Object, error)
 
-	Create(interface{}) (<-chan interface{}, error)
-	Update(interface{}) (<-chan interface{}, error)
+	Create(runtime.Object) (<-chan runtime.Object, error)
+	Update(runtime.Object) (<-chan runtime.Object, error)
 }
 
 // ResourceWatcher should be implemented by all RESTStorage objects that

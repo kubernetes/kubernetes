@@ -46,7 +46,7 @@ func TestUpdateWithPods(t *testing.T) {
 	}
 	Update("foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 5 {
-		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
+		t.Fatalf("Unexpected action list %#v", fakeClient.Actions)
 	}
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
 	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[1], t)
@@ -94,7 +94,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 	}
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
 
-	newCtrl := *runtime.CopyOrDie(fakeClient.Ctrl).(*api.ReplicationController)
+	newCtrl := runtime.DefaultScheme.CopyOrDie(&fakeClient.Ctrl).(*api.ReplicationController)
 	newCtrl.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = "fooImage:2"
 	validateAction(client.FakeAction{Action: "update-controller", Value: newCtrl}, fakeClient.Actions[1], t)
 
@@ -114,7 +114,7 @@ func TestRunController(t *testing.T) {
 	if len(fakeClient.Actions) != 1 || fakeClient.Actions[0].Action != "create-controller" {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
-	controller := fakeClient.Actions[0].Value.(api.ReplicationController)
+	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
 	if controller.ID != name ||
 		controller.DesiredState.Replicas != replicas ||
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
@@ -133,7 +133,7 @@ func TestRunControllerWithService(t *testing.T) {
 		fakeClient.Actions[1].Action != "create-service" {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
-	controller := fakeClient.Actions[0].Value.(api.ReplicationController)
+	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
 	if controller.ID != name ||
 		controller.DesiredState.Replicas != replicas ||
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
@@ -152,7 +152,7 @@ func TestStopController(t *testing.T) {
 		fakeClient.Actions[0].Value.(string) != name {
 		t.Errorf("Unexpected Action: %#v", fakeClient.Actions[0])
 	}
-	controller := fakeClient.Actions[1].Value.(api.ReplicationController)
+	controller := fakeClient.Actions[1].Value.(*api.ReplicationController)
 	if fakeClient.Actions[1].Action != "update-controller" ||
 		controller.DesiredState.Replicas != 0 {
 		t.Errorf("Unexpected Action: %#v", fakeClient.Actions[1])
@@ -171,7 +171,7 @@ func TestResizeController(t *testing.T) {
 		fakeClient.Actions[0].Value.(string) != name {
 		t.Errorf("Unexpected Action: %#v", fakeClient.Actions[0])
 	}
-	controller := fakeClient.Actions[1].Value.(api.ReplicationController)
+	controller := fakeClient.Actions[1].Value.(*api.ReplicationController)
 	if fakeClient.Actions[1].Action != "update-controller" ||
 		controller.DesiredState.Replicas != 17 {
 		t.Errorf("Unexpected Action: %#v", fakeClient.Actions[1])

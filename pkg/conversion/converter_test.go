@@ -27,28 +27,30 @@ import (
 func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	type A struct {
 		Foo string
+		Baz int
 	}
 	type B struct {
 		Bar string
+		Baz int
 	}
 	type C struct{}
 	c := NewConverter()
-	err := c.Register(func(in *A, out *B) error {
+	err := c.Register(func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
-		return nil
+		return s.Convert(&in.Baz, &out.Baz, 0)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
-	err = c.Register(func(in *B, out *A) error {
+	err = c.Register(func(in *B, out *A, s Scope) error {
 		out.Foo = in.Bar
-		return nil
+		return s.Convert(&in.Baz, &out.Baz, 0)
 	})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
-	x := A{"hello, intrepid test reader!"}
+	x := A{"hello, intrepid test reader!", 3}
 	y := B{}
 
 	err = c.Convert(&x, &y, 0)
@@ -58,8 +60,11 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	if e, a := x.Foo, y.Bar; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := x.Baz, y.Baz; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
-	z := B{"all your test are belong to us"}
+	z := B{"all your test are belong to us", 42}
 	w := A{}
 
 	err = c.Convert(&z, &w, 0)
@@ -69,8 +74,11 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	if e, a := z.Bar, w.Foo; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := z.Baz, w.Baz; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
-	err = c.Register(func(in *A, out *C) error {
+	err = c.Register(func(in *A, out *C, s Scope) error {
 		return fmt.Errorf("C can't store an A, silly")
 	})
 	if err != nil {
@@ -85,7 +93,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 
 func TestConverter_fuzz(t *testing.T) {
 	newAnonType := func() interface{} {
-		return reflect.New(reflect.TypeOf(externalTypeReturn())).Interface()
+		return reflect.New(reflect.TypeOf(externalTypeReturn()).Elem()).Interface()
 	}
 	// Use the same types from the scheme test.
 	table := []struct {

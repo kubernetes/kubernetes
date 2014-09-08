@@ -19,22 +19,20 @@ package v1beta1
 import (
 	// Alias this so it can be easily changed when we cut the next version.
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func init() {
-	// Shortcut for sub-conversions. TODO: This should possibly be refactored
-	// such that this convert function is passed to each conversion func.
-	Convert := runtime.Convert
-	runtime.AddConversionFuncs(
+	runtime.DefaultScheme.AddConversionFuncs(
 		// EnvVar's Key is deprecated in favor of Name.
-		func(in *newer.EnvVar, out *EnvVar) error {
+		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
 			out.Value = in.Value
 			out.Key = in.Name
 			out.Name = in.Name
 			return nil
 		},
-		func(in *EnvVar, out *newer.EnvVar) error {
+		func(in *EnvVar, out *newer.EnvVar, s conversion.Scope) error {
 			out.Value = in.Value
 			if in.Name != "" {
 				out.Name = in.Name
@@ -45,7 +43,7 @@ func init() {
 		},
 
 		// Path & MountType are deprecated.
-		func(in *newer.VolumeMount, out *VolumeMount) error {
+		func(in *newer.VolumeMount, out *VolumeMount, s conversion.Scope) error {
 			out.Name = in.Name
 			out.ReadOnly = in.ReadOnly
 			out.MountPath = in.MountPath
@@ -53,7 +51,7 @@ func init() {
 			out.MountType = "" // MountType is ignored.
 			return nil
 		},
-		func(in *VolumeMount, out *newer.VolumeMount) error {
+		func(in *VolumeMount, out *newer.VolumeMount, s conversion.Scope) error {
 			out.Name = in.Name
 			out.ReadOnly = in.ReadOnly
 			if in.MountPath == "" {
@@ -65,18 +63,18 @@ func init() {
 		},
 
 		// MinionList.Items had a wrong name in v1beta1
-		func(in *newer.MinionList, out *MinionList) error {
-			Convert(&in.JSONBase, &out.JSONBase)
-			Convert(&in.Items, &out.Items)
+		func(in *newer.MinionList, out *MinionList, s conversion.Scope) error {
+			s.Convert(&in.JSONBase, &out.JSONBase, 0)
+			s.Convert(&in.Items, &out.Items, 0)
 			out.Minions = out.Items
 			return nil
 		},
-		func(in *MinionList, out *newer.MinionList) error {
-			Convert(&in.JSONBase, &out.JSONBase)
+		func(in *MinionList, out *newer.MinionList, s conversion.Scope) error {
+			s.Convert(&in.JSONBase, &out.JSONBase, 0)
 			if len(in.Items) == 0 {
-				Convert(&in.Minions, &out.Items)
+				s.Convert(&in.Minions, &out.Items, 0)
 			} else {
-				Convert(&in.Items, &out.Items)
+				s.Convert(&in.Items, &out.Items, 0)
 			}
 			return nil
 		},

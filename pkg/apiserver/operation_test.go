@@ -28,12 +28,13 @@ import (
 	// TODO: remove dependency on api, apiserver should be generic
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestOperation(t *testing.T) {
 	ops := NewOperations()
 
-	c := make(chan interface{})
+	c := make(chan runtime.Object)
 	op := ops.NewOperation(c)
 	// Allow context switch, so that op's ID can get added to the map and Get will work.
 	// This is just so we can test Get. Ordinary users have no need to call Get immediately
@@ -41,7 +42,7 @@ func TestOperation(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		c <- "All done"
+		c <- &Simple{JSONBase: api.JSONBase{ID: "All done"}}
 	}()
 
 	if op.expired(time.Now().Add(-time.Minute)) {
@@ -89,7 +90,7 @@ func TestOperation(t *testing.T) {
 		t.Errorf("expire failed to remove the operation %#v", ops)
 	}
 
-	if op.result.(string) != "All done" {
+	if op.result.(*Simple).ID != "All done" {
 		t.Errorf("Got unexpected result: %#v", op.result)
 	}
 }
@@ -98,7 +99,7 @@ func TestOperationsList(t *testing.T) {
 	testOver := make(chan struct{})
 	defer close(testOver)
 	simpleStorage := &SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			// Eliminate flakes by ensuring the create operation takes longer than this test.
 			<-testOver
 			return obj, nil
@@ -111,7 +112,7 @@ func TestOperationsList(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{
+	simple := &Simple{
 		Name: "foo",
 	}
 	data, err := codec.Encode(simple)
@@ -154,7 +155,7 @@ func TestOpGet(t *testing.T) {
 	testOver := make(chan struct{})
 	defer close(testOver)
 	simpleStorage := &SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			// Eliminate flakes by ensuring the create operation takes longer than this test.
 			<-testOver
 			return obj, nil
@@ -167,7 +168,7 @@ func TestOpGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{
+	simple := &Simple{
 		Name: "foo",
 	}
 	data, err := codec.Encode(simple)

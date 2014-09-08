@@ -33,7 +33,7 @@ func TestWatchInterpretations(t *testing.T) {
 	podFoo := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	podBar := &api.Pod{JSONBase: api.JSONBase{ID: "bar"}}
 	podBaz := &api.Pod{JSONBase: api.JSONBase{ID: "baz"}}
-	firstLetterIsB := func(obj interface{}) bool {
+	firstLetterIsB := func(obj runtime.Object) bool {
 		return obj.(*api.Pod).ID[0] == 'b'
 	}
 
@@ -44,66 +44,66 @@ func TestWatchInterpretations(t *testing.T) {
 		nodeValue     string
 		expectEmit    bool
 		expectType    watch.EventType
-		expectObject  interface{}
+		expectObject  runtime.Object
 	}{
 		"create": {
 			actions:      []string{"create", "get"},
-			nodeValue:    runtime.EncodeOrDie(podBar),
+			nodeValue:    runtime.DefaultScheme.EncodeOrDie(podBar),
 			expectEmit:   true,
 			expectType:   watch.Added,
 			expectObject: podBar,
 		},
 		"create but filter blocks": {
 			actions:    []string{"create", "get"},
-			nodeValue:  runtime.EncodeOrDie(podFoo),
+			nodeValue:  runtime.DefaultScheme.EncodeOrDie(podFoo),
 			expectEmit: false,
 		},
 		"delete": {
 			actions:       []string{"delete"},
-			prevNodeValue: runtime.EncodeOrDie(podBar),
+			prevNodeValue: runtime.DefaultScheme.EncodeOrDie(podBar),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
 			expectObject:  podBar,
 		},
 		"delete but filter blocks": {
 			actions:    []string{"delete"},
-			nodeValue:  runtime.EncodeOrDie(podFoo),
+			nodeValue:  runtime.DefaultScheme.EncodeOrDie(podFoo),
 			expectEmit: false,
 		},
 		"modify appears to create 1": {
 			actions:      []string{"set", "compareAndSwap"},
-			nodeValue:    runtime.EncodeOrDie(podBar),
+			nodeValue:    runtime.DefaultScheme.EncodeOrDie(podBar),
 			expectEmit:   true,
 			expectType:   watch.Added,
 			expectObject: podBar,
 		},
 		"modify appears to create 2": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: runtime.EncodeOrDie(podFoo),
-			nodeValue:     runtime.EncodeOrDie(podBar),
+			prevNodeValue: runtime.DefaultScheme.EncodeOrDie(podFoo),
+			nodeValue:     runtime.DefaultScheme.EncodeOrDie(podBar),
 			expectEmit:    true,
 			expectType:    watch.Added,
 			expectObject:  podBar,
 		},
 		"modify appears to delete": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: runtime.EncodeOrDie(podBar),
-			nodeValue:     runtime.EncodeOrDie(podFoo),
+			prevNodeValue: runtime.DefaultScheme.EncodeOrDie(podBar),
+			nodeValue:     runtime.DefaultScheme.EncodeOrDie(podFoo),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
 			expectObject:  podBar, // Should return last state that passed the filter!
 		},
 		"modify modifies": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: runtime.EncodeOrDie(podBar),
-			nodeValue:     runtime.EncodeOrDie(podBaz),
+			prevNodeValue: runtime.DefaultScheme.EncodeOrDie(podBar),
+			nodeValue:     runtime.DefaultScheme.EncodeOrDie(podBaz),
 			expectEmit:    true,
 			expectType:    watch.Modified,
 			expectObject:  podBaz,
 		},
 		"modify ignores": {
 			actions:    []string{"set", "compareAndSwap"},
-			nodeValue:  runtime.EncodeOrDie(podFoo),
+			nodeValue:  runtime.DefaultScheme.EncodeOrDie(podFoo),
 			expectEmit: false,
 		},
 	}
@@ -259,7 +259,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value: string(runtime.DefaultScheme.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 					},
 				},
 			},
@@ -273,12 +273,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.DefaultScheme.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.DefaultScheme.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -295,7 +295,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(runtime.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+							Value:         string(runtime.DefaultScheme.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -308,12 +308,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.DefaultScheme.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.DefaultScheme.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -370,7 +370,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
-						Value:         runtime.EncodeOrDie(pod),
+						Value:         runtime.DefaultScheme.EncodeOrDie(pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -385,7 +385,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
-						Value:         runtime.EncodeOrDie(pod),
+						Value:         runtime.DefaultScheme.EncodeOrDie(pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
@@ -443,13 +443,13 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 				Dir: true,
 				Nodes: etcd.Nodes{
 					&etcd.Node{
-						Value:         runtime.EncodeOrDie(pod),
+						Value:         runtime.DefaultScheme.EncodeOrDie(pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 						Nodes:         etcd.Nodes{},
 					},
 					&etcd.Node{
-						Value:         runtime.EncodeOrDie(pod),
+						Value:         runtime.DefaultScheme.EncodeOrDie(pod),
 						CreatedIndex:  2,
 						ModifiedIndex: 2,
 						Nodes:         etcd.Nodes{},

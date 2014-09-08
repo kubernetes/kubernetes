@@ -33,17 +33,22 @@ func init() {
 
 type stringCodec struct{}
 
-func (c stringCodec) Encode(obj interface{}) ([]byte, error) {
-	return []byte(obj.(string)), nil
+type fakeAPIObject string
+
+func (*fakeAPIObject) IsAnAPIObject() {}
+
+func (c stringCodec) Encode(obj runtime.Object) ([]byte, error) {
+	return []byte(*obj.(*fakeAPIObject)), nil
 }
 
-func (c stringCodec) Decode(data []byte) (interface{}, error) {
-	return string(data), nil
+func (c stringCodec) Decode(data []byte) (runtime.Object, error) {
+	o := fakeAPIObject(data)
+	return &o, nil
 }
 
-func (c stringCodec) DecodeInto(data []byte, obj interface{}) error {
-	o := obj.(*string)
-	*o = string(data)
+func (c stringCodec) DecodeInto(data []byte, obj runtime.Object) error {
+	o := obj.(*fakeAPIObject)
+	*o = fakeAPIObject(data)
 	return nil
 }
 
@@ -51,7 +56,8 @@ func TestSetObj(t *testing.T) {
 	client := newEtcdClient()
 	helper := tools.EtcdHelper{Client: client, Codec: stringCodec{}}
 	withEtcdKey(func(key string) {
-		if err := helper.SetObj(key, "object"); err != nil {
+		fakeObject := fakeAPIObject("object")
+		if err := helper.SetObj(key, &fakeObject); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		resp, err := client.Get(key, false, false)
@@ -72,7 +78,7 @@ func TestExtractObj(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		s := ""
+		s := fakeAPIObject("")
 		if err := helper.ExtractObj(key, &s, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -84,9 +90,9 @@ func TestExtractObj(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := newEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: runtime.Codec, ResourceVersioner: runtime.ResourceVersioner}
+	helper := tools.EtcdHelper{Client: client, Codec: runtime.DefaultCodec, ResourceVersioner: runtime.DefaultResourceVersioner}
 	withEtcdKey(func(key string) {
-		resp, err := client.Set(key, runtime.EncodeOrDie(api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+		resp, err := client.Set(key, runtime.DefaultScheme.EncodeOrDie(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

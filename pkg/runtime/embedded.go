@@ -33,7 +33,7 @@ func (a *EmbeddedObject) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 
-	obj, err := Decode(b)
+	obj, err := DefaultCodec.Decode(b)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (a EmbeddedObject) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return Encode(a.Object)
+	return DefaultCodec.Encode(a.Object)
 }
 
 // SetYAML implements the yaml.Setter interface.
@@ -67,7 +67,7 @@ func (a *EmbeddedObject) SetYAML(tag string, value interface{}) bool {
 	if err != nil {
 		panic("yaml can't reverse its own object")
 	}
-	obj, err := Decode(b)
+	obj, err := DefaultCodec.Decode(b)
 	if err != nil {
 		return false
 	}
@@ -82,7 +82,7 @@ func (a EmbeddedObject) GetYAML() (tag string, value interface{}) {
 		return
 	}
 	// Encode returns JSON, which is conveniently a subset of YAML.
-	v, err := Encode(a.Object)
+	v, err := DefaultCodec.Encode(a.Object)
 	if err != nil {
 		panic("impossible to encode API object!")
 	}

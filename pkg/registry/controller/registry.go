@@ -26,7 +26,7 @@ type Registry interface {
 	ListControllers() (*api.ReplicationControllerList, error)
 	WatchControllers(resourceVersion uint64) (watch.Interface, error)
 	GetController(controllerID string) (*api.ReplicationController, error)
-	CreateController(controller api.ReplicationController) error
-	UpdateController(controller api.ReplicationController) error
+	CreateController(controller *api.ReplicationController) error
+	UpdateController(controller *api.ReplicationController) error
 	DeleteController(controllerID string) error
 }

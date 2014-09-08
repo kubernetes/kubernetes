@@ -25,15 +25,15 @@ import (
 )
 
 func TestParseBadStorage(t *testing.T) {
-	p := NewParser(map[string]interface{}{})
+	p := NewParser(map[string]runtime.Object{})
 	_, err := p.ToWireFormat([]byte("{}"), "badstorage")
 	if err == nil {
 		t.Errorf("Expected error, received none")
 	}
 }
 
-func DoParseTest(t *testing.T, storage string, obj interface{}, p *Parser) {
-	jsonData, _ := runtime.Encode(obj)
+func DoParseTest(t *testing.T, storage string, obj runtime.Object, p *Parser) {
+	jsonData, _ := runtime.DefaultCodec.Encode(obj)
 	yamlData, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))
@@ -56,14 +56,14 @@ func DoParseTest(t *testing.T, storage string, obj interface{}, p *Parser) {
 	}
 }
 
-var testParser = NewParser(map[string]interface{}{
-	"pods":                   api.Pod{},
-	"services":               api.Service{},
-	"replicationControllers": api.ReplicationController{},
+var testParser = NewParser(map[string]runtime.Object{
+	"pods":                   &api.Pod{},
+	"services":               &api.Service{},
+	"replicationControllers": &api.ReplicationController{},
 })
 
 func TestParsePod(t *testing.T) {
-	DoParseTest(t, "pods", api.Pod{
+	DoParseTest(t, "pods", &api.Pod{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "test pod", Kind: "Pod"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
@@ -80,7 +80,7 @@ func TestParsePod(t *testing.T) {
 }
 
 func TestParseService(t *testing.T) {
-	DoParseTest(t, "services", api.Service{
+	DoParseTest(t, "services", &api.Service{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "my service", Kind: "Service"},
 		Port:     8080,
 		Labels: map[string]string{
@@ -93,7 +93,7 @@ func TestParseService(t *testing.T) {
 }
 
 func TestParseController(t *testing.T) {
-	DoParseTest(t, "replicationControllers", api.ReplicationController{
+	DoParseTest(t, "replicationControllers", &api.ReplicationController{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "my controller", Kind: "ReplicationController"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 9001,
@@ -119,13 +119,15 @@ type TestParseType struct {
 	Data         string `json:"data" yaml:"data"`
 }
 
+func (*TestParseType) IsAnAPIObject() {}
+
 func TestParseCustomType(t *testing.T) {
-	runtime.AddKnownTypes("", TestParseType{})
-	runtime.AddKnownTypes("v1beta1", TestParseType{})
-	parser := NewParser(map[string]interface{}{
-		"custom": TestParseType{},
+	runtime.DefaultScheme.AddKnownTypes("", &TestParseType{})
+	runtime.DefaultScheme.AddKnownTypes("v1beta1", &TestParseType{})
+	parser := NewParser(map[string]runtime.Object{
+		"custom": &TestParseType{},
 	})
-	DoParseTest(t, "custom", TestParseType{
+	DoParseTest(t, "custom", &TestParseType{
 		JSONBase: api.JSONBase{APIVersion: "", ID: "my custom object", Kind: "TestParseType"},
 		Data:     "test data",
 	}, parser)

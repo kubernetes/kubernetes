@@ -29,8 +29,8 @@ import (
 
 // Watcher is the interface needed to receive changes to services and endpoints.
 type Watcher interface {
-	ListServices(label labels.Selector) (api.ServiceList, error)
-	ListEndpoints(label labels.Selector) (api.EndpointsList, error)
+	ListServices(label labels.Selector) (*api.ServiceList, error)
+	ListEndpoints(label labels.Selector) (*api.EndpointsList, error)
 	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }

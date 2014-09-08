@@ -23,11 +23,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type RESTHandler struct {
 	storage     map[string]RESTStorage
-	codec       Codec
+	codec       runtime.Codec
 	ops         *Operations
 	asyncOpWait time.Duration
 }
@@ -158,7 +159,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 }
 
 // createOperation creates an operation to process a channel response.
-func (h *RESTHandler) createOperation(out <-chan interface{}, sync bool, timeout time.Duration) *Operation {
+func (h *RESTHandler) createOperation(out <-chan runtime.Object, sync bool, timeout time.Duration) *Operation {
 	op := h.ops.NewOperation(out)
 	if sync {
 		op.WaitFor(timeout)
@@ -175,11 +176,6 @@ func (h *RESTHandler) finishReq(op *Operation, w http.ResponseWriter) {
 	if complete {
 		status := http.StatusOK
 		switch stat := obj.(type) {
-		case api.Status:
-			httplog.LogOf(w).Addf("programmer error: use *api.Status as a result, not api.Status.")
-			if stat.Code != 0 {
-				status = stat.Code
-			}
 		case *api.Status:
 			if stat.Code != 0 {
 				status = stat.Code

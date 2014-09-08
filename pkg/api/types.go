@@ -65,6 +65,8 @@ type ContainerManifestList struct {
 	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
+func (*ContainerManifestList) IsAnAPIObject() {}
+
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
@@ -287,6 +289,8 @@ type PodList struct {
 	Items    []Pod `json:"items" yaml:"items,omitempty"`
 }
 
+func (*PodList) IsAnAPIObject() {}
+
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	JSONBase     `json:",inline" yaml:",inline"`
@@ -294,6 +298,8 @@ type Pod struct {
 	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
 }
+
+func (*Pod) IsAnAPIObject() {}
 
 // ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get).
 type ReplicationControllerState struct {
@@ -308,12 +314,16 @@ type ReplicationControllerList struct {
 	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
+func (*ReplicationControllerList) IsAnAPIObject() {}
+
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
 	JSONBase     `json:",inline" yaml:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
+
+func (*ReplicationController) IsAnAPIObject() {}
 
 // PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
@@ -326,6 +336,8 @@ type ServiceList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Service `json:"items" yaml:"items"`
 }
+
+func (*ServiceList) IsAnAPIObject() {}
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
@@ -346,6 +358,8 @@ type Service struct {
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 }
 
+func (*Service) IsAnAPIObject() {}
+
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
@@ -353,11 +367,15 @@ type Endpoints struct {
 	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }
 
+func (*Endpoints) IsAnAPIObject() {}
+
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Endpoints `json:"items,omitempty" yaml:"items,omitempty"`
 }
+
+func (*EndpointsList) IsAnAPIObject() {}
 
 // Minion is a worker node in Kubernetenes.
 // The name of the minion according to etcd is in JSONBase.ID.
@@ -367,11 +385,15 @@ type Minion struct {
 	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 }
 
+func (*Minion) IsAnAPIObject() {}
+
 // MinionList is a list of minions.
 type MinionList struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	Items    []Minion `json:"items,omitempty" yaml:"items,omitempty"`
 }
+
+func (*MinionList) IsAnAPIObject() {}
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
 type Binding struct {
@@ -379,6 +401,8 @@ type Binding struct {
 	PodID    string `json:"podID" yaml:"podID"`
 	Host     string `json:"host" yaml:"host"`
 }
+
+func (*Binding) IsAnAPIObject() {}
 
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
@@ -402,6 +426,8 @@ type Status struct {
 	// Suggested HTTP return code for this status, 0 if not set.
 	Code int `json:"code,omitempty" yaml:"code,omitempty"`
 }
+
+func (*Status) IsAnAPIObject() {}
 
 // StatusDetails is a set of additional properties that MAY be set by the
 // server to provide additional information about a response. The Reason
@@ -539,11 +565,15 @@ type ServerOp struct {
 	JSONBase `yaml:",inline" json:",inline"`
 }
 
+func (*ServerOp) IsAnAPIObject() {}
+
 // ServerOpList is a list of operations, as delivered to API clients.
 type ServerOpList struct {
 	JSONBase `yaml:",inline" json:",inline"`
 	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
 }
+
+func (*ServerOpList) IsAnAPIObject() {}
 
 // WatchEvent objects are streamed from the api server in response to a watch request.
 type WatchEvent struct {

@@ -38,7 +38,7 @@ import (
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.Encode(expectedObj)
+	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -71,9 +71,9 @@ func TestDoRequestNewWay(t *testing.T) {
 
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := runtime.Encode(reqObj)
+	reqBodyExpected, _ := runtime.DefaultCodec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.Encode(expectedObj)
+	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -108,9 +108,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := runtime.Encode(reqObj)
+	reqBodyExpected, _ := runtime.DefaultCodec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.Encode(expectedObj)
+	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -144,7 +144,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, err := runtime.Encode(reqObj)
+	reqBodyExpected, err := runtime.DefaultCodec.Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.Encode(expectedObj)
+	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -285,7 +285,7 @@ func TestSetPollPeriod(t *testing.T) {
 }
 
 func TestPolling(t *testing.T) {
-	objects := []interface{}{
+	objects := []runtime.Object{
 		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
 		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
 		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
@@ -295,7 +295,7 @@ func TestPolling(t *testing.T) {
 
 	callNumber := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data, err := runtime.Encode(objects[callNumber])
+		data, err := runtime.DefaultCodec.Encode(objects[callNumber])
 		if err != nil {
 			t.Errorf("Unexpected encode error")
 		}
@@ -380,7 +380,7 @@ func checkAuth(t *testing.T, expect AuthInfo, r *http.Request) {
 func TestWatch(t *testing.T) {
 	var table = []struct {
 		t   watch.EventType
-		obj interface{}
+		obj runtime.Object
 	}{
 		{watch.Added, &api.Pod{JSONBase: api.JSONBase{ID: "first"}}},
 		{watch.Modified, &api.Pod{JSONBase: api.JSONBase{ID: "second"}}},

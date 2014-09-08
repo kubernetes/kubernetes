@@ -27,5 +27,5 @@ type Registry interface {
 	ListEndpoints() (*api.EndpointsList, error)
 	GetEndpoints(name string) (*api.Endpoints, error)
 	WatchEndpoints(labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
-	UpdateEndpoints(e api.Endpoints) error
+	UpdateEndpoints(e *api.Endpoints) error
 }

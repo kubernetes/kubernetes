@@ -24,41 +24,44 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-// codec defines methods for serializing and deserializing API
-// objects.
-type codec interface {
-	Encode(obj interface{}) (data []byte, err error)
-	Decode(data []byte) (interface{}, error)
-	DecodeInto(data []byte, obj interface{}) error
+var DefaultResourceVersioner ResourceVersioner = NewJSONBaseResourceVersioner()
+var DefaultScheme = NewScheme("", "v1beta1")
+var DefaultCodec Codec = DefaultScheme
+
+// Scheme defines methods for serializing and deserializing API objects. It
+// is an adaptation of conversion's Scheme for our API objects.
+type Scheme struct {
+	raw *conversion.Scheme
 }
 
-// resourceVersioner provides methods for setting and retrieving
-// the resource version from an API object.
-type resourceVersioner interface {
-	SetResourceVersion(obj interface{}, version uint64) error
-	ResourceVersion(obj interface{}) (uint64, error)
-}
-
-var ResourceVersioner resourceVersioner = NewJSONBaseResourceVersioner()
-var conversionScheme = conversion.NewScheme()
-var Codec codec = conversionScheme
-
-func init() {
-	conversionScheme.InternalVersion = ""
-	conversionScheme.ExternalVersion = "v1beta1"
-	conversionScheme.MetaInsertionFactory = metaInsertion{}
+// NewScheme creates a new Scheme. A default scheme is provided and accessible
+// as the "DefaultScheme" variable.
+func NewScheme(internalVersion, externalVersion string) *Scheme {
+	s := &Scheme{conversion.NewScheme()}
+	s.raw.InternalVersion = internalVersion
+	s.raw.ExternalVersion = externalVersion
+	s.raw.MetaInsertionFactory = metaInsertion{}
+	return s
 }
 
 // AddKnownTypes registers the types of the arguments to the marshaller of the package api.
 // Encode() refuses the object unless its type is registered with AddKnownTypes.
-func AddKnownTypes(version string, types ...interface{}) {
-	conversionScheme.AddKnownTypes(version, types...)
+func (s *Scheme) AddKnownTypes(version string, types ...Object) {
+	interfaces := make([]interface{}, len(types))
+	for i := range types {
+		interfaces[i] = types[i]
+	}
+	s.raw.AddKnownTypes(version, interfaces...)
 }
 
 // New returns a new API object of the given version ("" for internal
 // representation) and name, or an error if it hasn't been registered.
-func New(versionName, typeName string) (interface{}, error) {
-	return conversionScheme.NewObject(versionName, typeName)
+func (s *Scheme) New(versionName, typeName string) (Object, error) {
+	obj, err := s.raw.NewObject(versionName, typeName)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(Object), nil
 }
 
 // AddConversionFuncs adds a function to the list of conversion functions. The given
@@ -73,20 +76,20 @@ func New(versionName, typeName string) (interface{}, error) {
 // sanely copy fields that have the same names. It's OK if the destination type has
 // extra fields, but it must not remove any. So you only need to add a conversion
 // function for things with changed/removed fields.
-func AddConversionFuncs(conversionFuncs ...interface{}) error {
-	return conversionScheme.AddConversionFuncs(conversionFuncs...)
+func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
+	return s.raw.AddConversionFuncs(conversionFuncs...)
 }
 
-// Convert will attempt to convert in into out. Both must be pointers to API objects.
+// Convert will attempt to convert in into out. Both must be pointers.
 // For easy testing of conversion functions. Returns an error if the conversion isn't
 // possible.
-func Convert(in, out interface{}) error {
-	return conversionScheme.Convert(in, out)
+func (s *Scheme) Convert(in, out interface{}) error {
+	return s.raw.Convert(in, out)
 }
 
 // FindJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
 // obj must be a pointer to an api type.
-func FindJSONBase(obj interface{}) (JSONBaseInterface, error) {
+func FindJSONBase(obj Object) (JSONBaseInterface, error) {
 	v, err := enforcePtr(obj)
 	if err != nil {
 		return nil, err
@@ -108,8 +111,8 @@ func FindJSONBase(obj interface{}) (JSONBaseInterface, error) {
 }
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func EncodeOrDie(obj interface{}) string {
-	return conversionScheme.EncodeOrDie(obj)
+func (s *Scheme) EncodeOrDie(obj Object) string {
+	return s.raw.EncodeOrDie(obj)
 }
 
 // Encode turns the given api object into an appropriate JSON string.
@@ -146,14 +149,14 @@ func EncodeOrDie(obj interface{}) string {
 // default will be needed, to allow operating in clusters that haven't yet
 // upgraded.
 //
-func Encode(obj interface{}) (data []byte, err error) {
-	return conversionScheme.Encode(obj)
+func (s *Scheme) Encode(obj Object) (data []byte, err error) {
+	return s.raw.Encode(obj)
 }
 
 // enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
 // dereferenced pointer, ensuring that it is settable/addressable.
 // Returns an error if this is not possible.
-func enforcePtr(obj interface{}) (reflect.Value, error) {
+func enforcePtr(obj Object) (reflect.Value, error) {
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Ptr {
 		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
@@ -181,8 +184,12 @@ func VersionAndKind(data []byte) (version, kind string, err error) {
 // Deduces the type based upon the APIVersion and Kind fields, which are set
 // by Encode. Only versioned objects (APIVersion != "") are accepted. The object
 // will be converted into the in-memory unversioned type before being returned.
-func Decode(data []byte) (interface{}, error) {
-	return conversionScheme.Decode(data)
+func (s *Scheme) Decode(data []byte) (Object, error) {
+	obj, err := s.raw.Decode(data)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(Object), nil
 }
 
 // DecodeInto parses a YAML or JSON string and stores it in obj. Returns an error
@@ -190,22 +197,22 @@ func Decode(data []byte) (interface{}, error) {
 // pointer to an api type.
 // If obj's APIVersion doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
-func DecodeInto(data []byte, obj interface{}) error {
-	return conversionScheme.DecodeInto(data, obj)
+func (s *Scheme) DecodeInto(data []byte, obj Object) error {
+	return s.raw.DecodeInto(data, obj)
 }
 
 // Does a deep copy of an API object.  Useful mostly for tests.
 // TODO(dbsmith): implement directly instead of via Encode/Decode
-func Copy(obj interface{}) (interface{}, error) {
-	data, err := Encode(obj)
+func (s *Scheme) Copy(obj Object) (Object, error) {
+	data, err := s.Encode(obj)
 	if err != nil {
 		return nil, err
 	}
-	return Decode(data)
+	return s.Decode(data)
 }
 
-func CopyOrDie(obj interface{}) interface{} {
-	newObj, err := Copy(obj)
+func (s *Scheme) CopyOrDie(obj Object) Object {
+	newObj, err := s.Copy(obj)
 	if err != nil {
 		panic(err)
 	}

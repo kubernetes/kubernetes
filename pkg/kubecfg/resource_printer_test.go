@@ -67,7 +67,7 @@ func TestYAMLPrinterPrint(t *testing.T) {
 		t.Errorf("Test data and unmarshaled data are not equal: %#v vs %#v", poutput, testData)
 	}
 
-	obj := api.Pod{
+	obj := &api.Pod{
 		JSONBase: api.JSONBase{ID: "foo"},
 	}
 	buf.Reset()
@@ -77,8 +77,8 @@ func TestYAMLPrinterPrint(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpeted error: %#v", err)
 	}
-	if !reflect.DeepEqual(obj, objOut) {
-		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)
+	if !reflect.DeepEqual(obj, &objOut) {
+		t.Errorf("Unexpected inequality: %#v vs %#v", obj, &objOut)
 	}
 }
 
@@ -91,16 +91,16 @@ func TestIdentityPrinter(t *testing.T) {
 		t.Errorf("Bytes are not equal: %s vs %s", str, buff.String())
 	}
 
-	obj := api.Pod{
+	obj := &api.Pod{
 		JSONBase: api.JSONBase{ID: "foo"},
 	}
 	buff.Reset()
 	printer.PrintObj(obj, buff)
-	objOut, err := runtime.Decode([]byte(buff.String()))
+	objOut, err := runtime.DefaultCodec.Decode([]byte(buff.String()))
 	if err != nil {
 		t.Errorf("Unexpeted error: %#v", err)
 	}
-	if !reflect.DeepEqual(&obj, objOut) {
+	if !reflect.DeepEqual(obj, objOut) {
 		t.Errorf("Unexpected inequality: %#v vs %#v", obj, objOut)
 	}
 }
@@ -109,7 +109,11 @@ type TestPrintType struct {
 	Data string
 }
 
+func (*TestPrintType) IsAnAPIObject() {}
+
 type TestUnknownType struct{}
+
+func (*TestUnknownType) IsAnAPIObject() {}
 
 func PrintCustomType(obj *TestPrintType, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s", obj.Data)

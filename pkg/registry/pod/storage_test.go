@@ -32,7 +32,7 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
+func expectApiStatusError(t *testing.T, ch <-chan runtime.Object, msg string) {
 	out := <-ch
 	status, ok := out.(*api.Status)
 	if !ok {
@@ -44,7 +44,7 @@ func expectApiStatusError(t *testing.T, ch <-chan interface{}, msg string) {
 	}
 }
 
-func expectPod(t *testing.T, ch <-chan interface{}) (*api.Pod, bool) {
+func expectPod(t *testing.T, ch <-chan runtime.Object) (*api.Pod, bool) {
 	out := <-ch
 	pod, ok := out.(*api.Pod)
 	if !ok || pod == nil {
@@ -178,13 +178,13 @@ func TestPodDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := runtime.Encode(expected)
+	body, err := runtime.DefaultCodec.Encode(expected)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	actual := storage.New()
-	if err := runtime.DecodeInto(body, actual); err != nil {
+	if err := runtime.DefaultCodec.DecodeInto(body, actual); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

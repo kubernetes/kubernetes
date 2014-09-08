@@ -31,9 +31,9 @@ type Registry interface {
 	// Get a specific pod
 	GetPod(podID string) (*api.Pod, error)
 	// Create a pod based on a specification.
-	CreatePod(pod api.Pod) error
+	CreatePod(pod *api.Pod) error
 	// Update an existing pod
-	UpdatePod(pod api.Pod) error
+	UpdatePod(pod *api.Pod) error
 	// Delete an existing pod
 	DeletePod(podID string) error
 }

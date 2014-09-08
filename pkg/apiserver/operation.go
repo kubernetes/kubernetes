@@ -25,12 +25,13 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type OperationHandler struct {
 	ops   *Operations
-	codec Codec
+	codec runtime.Codec
 }
 
 func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -63,8 +64,8 @@ func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Operation represents an ongoing action which the server is performing.
 type Operation struct {
 	ID       string
-	result   interface{}
-	awaiting <-chan interface{}
+	result   runtime.Object
+	awaiting <-chan runtime.Object
 	finished *time.Time
 	lock     sync.Mutex
 	notify   chan struct{}
@@ -90,7 +91,7 @@ func NewOperations() *Operations {
 }
 
 // NewOperation adds a new operation. It is lock-free.
-func (ops *Operations) NewOperation(from <-chan interface{}) *Operation {
+func (ops *Operations) NewOperation(from <-chan runtime.Object) *Operation {
 	id := atomic.AddInt64(&ops.lastID, 1)
 	op := &Operation{
 		ID:       strconv.FormatInt(id, 10),
@@ -110,7 +111,7 @@ func (ops *Operations) insert(op *Operation) {
 }
 
 // List lists operations for an API client.
-func (ops *Operations) List() api.ServerOpList {
+func (ops *Operations) List() *api.ServerOpList {
 	ops.lock.Lock()
 	defer ops.lock.Unlock()
 
@@ -119,7 +120,7 @@ func (ops *Operations) List() api.ServerOpList {
 		ids = append(ids, id)
 	}
 	sort.StringSlice(ids).Sort()
-	ol := api.ServerOpList{}
+	ol := &api.ServerOpList{}
 	for _, id := range ids {
 		ol.Items = append(ol.Items, api.ServerOp{JSONBase: api.JSONBase{ID: id}})
 	}
@@ -185,7 +186,7 @@ func (op *Operation) expired(limitTime time.Time) bool {
 
 // StatusOrResult returns status information or the result of the operation if it is complete,
 // with a bool indicating true in the latter case.
-func (op *Operation) StatusOrResult() (description interface{}, finished bool) {
+func (op *Operation) StatusOrResult() (description runtime.Object, finished bool) {
 	op.lock.Lock()
 	defer op.lock.Unlock()
 

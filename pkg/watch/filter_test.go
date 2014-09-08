@@ -23,16 +23,16 @@ import (
 
 func TestFilter(t *testing.T) {
 	table := []Event{
-		{Added, "foo"},
-		{Added, "bar"},
-		{Added, "baz"},
-		{Added, "qux"},
-		{Added, "zoo"},
+		{Added, testType("foo")},
+		{Added, testType("bar")},
+		{Added, testType("baz")},
+		{Added, testType("qux")},
+		{Added, testType("zoo")},
 	}
 
 	source := NewFake()
 	filtered := Filter(source, func(e Event) (Event, bool) {
-		return e, e.Object.(string)[0] != 'b'
+		return e, e.Object.(testType)[0] != 'b'
 	})
 
 	go func() {
@@ -48,7 +48,7 @@ func TestFilter(t *testing.T) {
 		if !ok {
 			break
 		}
-		got = append(got, event.Object.(string))
+		got = append(got, string(event.Object.(testType)))
 	}
 
 	if e, a := []string{"foo", "qux", "zoo"}, got; !reflect.DeepEqual(e, a) {
@@ -59,11 +59,11 @@ func TestFilter(t *testing.T) {
 func TestFilterStop(t *testing.T) {
 	source := NewFake()
 	filtered := Filter(source, func(e Event) (Event, bool) {
-		return e, e.Object.(string)[0] != 'b'
+		return e, e.Object.(testType)[0] != 'b'
 	})
 
 	go func() {
-		source.Add("foo")
+		source.Add(testType("foo"))
 		filtered.Stop()
 	}()
 
@@ -73,7 +73,7 @@ func TestFilterStop(t *testing.T) {
 		if !ok {
 			break
 		}
-		got = append(got, event.Object.(string))
+		got = append(got, string(event.Object.(testType)))
 	}
 
 	if e, a := []string{"foo"}, got; !reflect.DeepEqual(e, a) {

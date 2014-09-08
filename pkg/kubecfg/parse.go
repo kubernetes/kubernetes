@@ -27,10 +27,11 @@ type Parser struct {
 	storageToType map[string]reflect.Type
 }
 
-func NewParser(objectMap map[string]interface{}) *Parser {
+// NewParser creates a new parser.
+func NewParser(objectMap map[string]runtime.Object) *Parser {
 	typeMap := make(map[string]reflect.Type)
 	for name, obj := range objectMap {
-		typeMap[name] = reflect.TypeOf(obj)
+		typeMap[name] = reflect.TypeOf(obj).Elem()
 	}
 	return &Parser{typeMap}
 }
@@ -43,12 +44,12 @@ func (p *Parser) ToWireFormat(data []byte, storage string) ([]byte, error) {
 		return nil, fmt.Errorf("unknown storage type: %v", storage)
 	}
 
-	obj := reflect.New(prototypeType).Interface()
-	err := runtime.DecodeInto(data, obj)
+	obj := reflect.New(prototypeType).Interface().(runtime.Object)
+	err := runtime.DefaultCodec.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	return runtime.Encode(obj)
+	return runtime.DefaultCodec.Encode(obj)
 }
 
 func (p *Parser) SupportedWireStorage() []string {

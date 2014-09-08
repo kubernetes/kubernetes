@@ -35,11 +35,11 @@ func (r *ControllerRegistry) GetController(ID string) (*api.ReplicationControlle
 	return &api.ReplicationController{}, r.Err
 }
 
-func (r *ControllerRegistry) CreateController(controller api.ReplicationController) error {
+func (r *ControllerRegistry) CreateController(controller *api.ReplicationController) error {
 	return r.Err
 }
 
-func (r *ControllerRegistry) UpdateController(controller api.ReplicationController) error {
+func (r *ControllerRegistry) UpdateController(controller *api.ReplicationController) error {
 	return r.Err
 }
 

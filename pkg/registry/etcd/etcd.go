@@ -45,8 +45,8 @@ func NewRegistry(client tools.EtcdClient) *Registry {
 	registry := &Registry{
 		EtcdHelper: tools.EtcdHelper{
 			client,
-			runtime.Codec,
-			runtime.ResourceVersioner,
+			runtime.DefaultCodec,
+			runtime.DefaultResourceVersioner,
 		},
 	}
 	registry.manifestFactory = &BasicManifestFactory{
@@ -82,7 +82,7 @@ func (r *Registry) ListPods(selector labels.Selector) (*api.PodList, error) {
 
 // WatchPods begins watching for new, changed, or deleted pods.
 func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
-	return r.WatchList("/registry/pods", resourceVersion, func(obj interface{}) bool {
+	return r.WatchList("/registry/pods", resourceVersion, func(obj runtime.Object) bool {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			glog.Errorf("Unexpected object during pod watch: %#v", obj)
@@ -110,14 +110,14 @@ func makeContainerKey(machine string) string {
 }
 
 // CreatePod creates a pod based on a specification.
-func (r *Registry) CreatePod(pod api.Pod) error {
+func (r *Registry) CreatePod(pod *api.Pod) error {
 	// Set current status to "Waiting".
 	pod.CurrentState.Status = api.PodWaiting
 	pod.CurrentState.Host = ""
 	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
 	pod.DesiredState.Status = api.PodRunning
 	pod.DesiredState.Host = ""
-	return r.CreateObj(makePodKey(pod.ID), &pod)
+	return r.CreateObj(makePodKey(pod.ID), pod)
 }
 
 // ApplyBinding implements binding's registry
@@ -129,7 +129,7 @@ func (r *Registry) ApplyBinding(binding *api.Binding) error {
 // Returns the current state of the pod, or an error.
 func (r *Registry) setPodHostTo(podID, oldMachine, machine string) (finalPod *api.Pod, err error) {
 	podKey := makePodKey(podID)
-	err = r.AtomicUpdate(podKey, &api.Pod{}, func(obj interface{}) (interface{}, error) {
+	err = r.AtomicUpdate(podKey, &api.Pod{}, func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
@@ -156,13 +156,13 @@ func (r *Registry) assignPod(podID string, machine string) error {
 		return err
 	}
 	contKey := makeContainerKey(machine)
-	err = r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
+	err = r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in runtime.Object) (runtime.Object, error) {
 		manifests := *in.(*api.ContainerManifestList)
 		manifests.Items = append(manifests.Items, manifest)
 		if !constraint.Allowed(manifests.Items) {
 			return nil, fmt.Errorf("The assignment would cause a constraint violation")
 		}
-		return manifests, nil
+		return &manifests, nil
 	})
 	if err != nil {
 		// Put the pod's host back the way it was. This is a terrible hack that
@@ -174,7 +174,7 @@ func (r *Registry) assignPod(podID string, machine string) error {
 	return err
 }
 
-func (r *Registry) UpdatePod(pod api.Pod) error {
+func (r *Registry) UpdatePod(pod *api.Pod) error {
 	return fmt.Errorf("unimplemented!")
 }
 
@@ -205,7 +205,7 @@ func (r *Registry) DeletePod(podID string) error {
 	}
 	// Next, remove the pod from the machine atomically.
 	contKey := makeContainerKey(machine)
-	return r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in interface{}) (interface{}, error) {
+	return r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in runtime.Object) (runtime.Object, error) {
 		manifests := in.(*api.ContainerManifestList)
 		newManifests := make([]api.ContainerManifest, 0, len(manifests.Items))
 		found := false
@@ -258,7 +258,7 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 }
 
 // CreateController creates a new ReplicationController.
-func (r *Registry) CreateController(controller api.ReplicationController) error {
+func (r *Registry) CreateController(controller *api.ReplicationController) error {
 	err := r.CreateObj(makeControllerKey(controller.ID), controller)
 	if tools.IsEtcdNodeExist(err) {
 		return errors.NewAlreadyExists("replicationController", controller.ID)
@@ -267,8 +267,8 @@ func (r *Registry) CreateController(controller api.ReplicationController) error 
 }
 
 // UpdateController replaces an existing ReplicationController.
-func (r *Registry) UpdateController(controller api.ReplicationController) error {
-	return r.SetObj(makeControllerKey(controller.ID), &controller)
+func (r *Registry) UpdateController(controller *api.ReplicationController) error {
+	return r.SetObj(makeControllerKey(controller.ID), controller)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
@@ -293,7 +293,7 @@ func (r *Registry) ListServices() (*api.ServiceList, error) {
 }
 
 // CreateService creates a new Service.
-func (r *Registry) CreateService(svc api.Service) error {
+func (r *Registry) CreateService(svc *api.Service) error {
 	err := r.CreateObj(makeServiceKey(svc.ID), svc)
 	if tools.IsEtcdNodeExist(err) {
 		return errors.NewAlreadyExists("service", svc.ID)
@@ -352,8 +352,8 @@ func (r *Registry) DeleteService(name string) error {
 }
 
 // UpdateService replaces an existing Service.
-func (r *Registry) UpdateService(svc api.Service) error {
-	return r.SetObj(makeServiceKey(svc.ID), &svc)
+func (r *Registry) UpdateService(svc *api.Service) error {
+	return r.SetObj(makeServiceKey(svc.ID), svc)
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
@@ -378,10 +378,10 @@ func (r *Registry) ListEndpoints() (*api.EndpointsList, error) {
 }
 
 // UpdateEndpoints update Endpoints of a Service.
-func (r *Registry) UpdateEndpoints(e api.Endpoints) error {
+func (r *Registry) UpdateEndpoints(e *api.Endpoints) error {
 	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
 	return r.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{},
-		func(input interface{}) (interface{}, error) {
+		func(input runtime.Object) (runtime.Object, error) {
 			// TODO: racy - label query is returning different results for two simultaneous updaters
 			return e, nil
 		})

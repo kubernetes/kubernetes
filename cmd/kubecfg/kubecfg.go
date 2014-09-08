@@ -58,11 +58,11 @@ var (
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 )
 
-var parser = kubecfg.NewParser(map[string]interface{}{
-	"pods":                   api.Pod{},
-	"services":               api.Service{},
-	"replicationControllers": api.ReplicationController{},
-	"minions":                api.Minion{},
+var parser = kubecfg.NewParser(map[string]runtime.Object{
+	"pods":                   &api.Pod{},
+	"services":               &api.Service{},
+	"replicationControllers": &api.ReplicationController{},
+	"minions":                &api.Minion{},
 })
 
 func usage() {
@@ -266,7 +266,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 	if setBody {
 		if version != 0 {
 			data := readConfig(storage)
-			obj, err := runtime.Decode(data)
+			obj, err := runtime.DefaultCodec.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
@@ -275,7 +275,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
 			jsonBase.SetResourceVersion(version)
-			data, err = runtime.Encode(obj)
+			data, err = runtime.DefaultCodec.Encode(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}

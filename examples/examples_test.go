@@ -31,7 +31,7 @@ import (
 	"github.com/golang/glog"
 )
 
-func validateObject(obj interface{}) (errors []error) {
+func validateObject(obj runtime.Object) (errors []error) {
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		errors = validation.ValidateManifest(&t.DesiredState.PodTemplate.DesiredState.Manifest)
@@ -85,7 +85,7 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 }
 
 func TestApiExamples(t *testing.T) {
-	expected := map[string]interface{}{
+	expected := map[string]runtime.Object{
 		"controller":       &api.ReplicationController{},
 		"controller-list":  &api.ReplicationControllerList{},
 		"pod":              &api.Pod{},
@@ -103,7 +103,7 @@ func TestApiExamples(t *testing.T) {
 			return
 		}
 		tested += 1
-		if err := runtime.DecodeInto(data, expectedType); err != nil {
+		if err := runtime.DefaultCodec.DecodeInto(data, expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
@@ -120,7 +120,7 @@ func TestApiExamples(t *testing.T) {
 }
 
 func TestExamples(t *testing.T) {
-	expected := map[string]interface{}{
+	expected := map[string]runtime.Object{
 		"frontend-controller":    &api.ReplicationController{},
 		"redis-slave-controller": &api.ReplicationController{},
 		"redis-master":           &api.Pod{},
@@ -137,7 +137,7 @@ func TestExamples(t *testing.T) {
 			return
 		}
 		tested += 1
-		if err := runtime.DecodeInto(data, expectedType); err != nil {
+		if err := runtime.DefaultCodec.DecodeInto(data, expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
@@ -168,14 +168,14 @@ func TestReadme(t *testing.T) {
 	}
 	for _, json := range match[1:] {
 		expectedType := &api.Pod{}
-		if err := runtime.DecodeInto([]byte(json), expectedType); err != nil {
+		if err := runtime.DefaultCodec.DecodeInto([]byte(json), expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
 		if errors := validateObject(expectedType); len(errors) > 0 {
 			t.Errorf("%s did not validate correctly: %v", path, errors)
 		}
-		encoded, err := runtime.Encode(expectedType)
+		encoded, err := runtime.DefaultCodec.Encode(expectedType)
 		if err != nil {
 			t.Errorf("Could not encode object: %v", err)
 			continue

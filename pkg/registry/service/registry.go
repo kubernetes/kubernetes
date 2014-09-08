@@ -26,10 +26,10 @@ import (
 // Registry is an interface for things that know how to store services.
 type Registry interface {
 	ListServices() (*api.ServiceList, error)
-	CreateService(svc api.Service) error
+	CreateService(svc *api.Service) error
 	GetService(name string) (*api.Service, error)
 	DeleteService(name string) error
-	UpdateService(svc api.Service) error
+	UpdateService(svc *api.Service) error
 	WatchServices(labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
 
 	// TODO: endpoints and their implementation should be separated, setting endpoints should be

@@ -32,7 +32,7 @@ import (
 
 type WatchHandler struct {
 	storage map[string]RESTStorage
-	codec   Codec
+	codec   runtime.Codec
 }
 
 func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion uint64) {

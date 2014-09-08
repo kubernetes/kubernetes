@@ -77,20 +77,20 @@ func TestGenericJSONBase(t *testing.T) {
 	}
 }
 
+type MyAPIObject struct {
+	JSONBase `yaml:",inline" json:",inline"`
+}
+
+func (*MyAPIObject) IsAnAPIObject() {}
+
+type MyIncorrectlyMarkedAsAPIObject struct {
+}
+
+func (*MyIncorrectlyMarkedAsAPIObject) IsAnAPIObject() {}
+
 func TestResourceVersionerOfAPI(t *testing.T) {
-	type JSONBase struct {
-		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
-		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-		ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}
-	type MyAPIObject struct {
-		JSONBase `yaml:",inline" json:",inline"`
-	}
 	type T struct {
-		Object   interface{}
+		Object
 		Expected uint64
 	}
 	testCases := map[string]T{
@@ -110,10 +110,10 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 
 	failingCases := map[string]struct {
-		Object   interface{}
+		Object
 		Expected uint64
 	}{
-		"not a valid object to try": {JSONBase{ResourceVersion: 1}, 1},
+		"not a valid object to try": {&MyIncorrectlyMarkedAsAPIObject{}, 1},
 	}
 	for key, testCase := range failingCases {
 		_, err := versioning.ResourceVersion(testCase.Object)
@@ -123,7 +123,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 
 	setCases := map[string]struct {
-		Object   interface{}
+		Object
 		Expected uint64
 	}{
 		"pointer to api object with version": {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
@@ -138,19 +138,6 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		}
 		if actual != 5 {
 			t.Errorf("%s: expected %d, got %d", key, 5, actual)
-		}
-	}
-
-	failingSetCases := map[string]struct {
-		Object   interface{}
-		Expected uint64
-	}{
-		"empty api object":        {MyAPIObject{}, 0},
-		"api object with version": {MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
-	}
-	for key, testCase := range failingSetCases {
-		if err := versioning.SetResourceVersion(testCase.Object, 5); err == nil {
-			t.Errorf("%s: unexpected non-error", key)
 		}
 	}
 }

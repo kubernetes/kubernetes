@@ -36,7 +36,7 @@ import (
 type ResourcePrinter interface {
 	// Print receives an arbitrary JSON body, formats it and prints it to a writer.
 	Print([]byte, io.Writer) error
-	PrintObj(interface{}, io.Writer) error
+	PrintObj(runtime.Object, io.Writer) error
 }
 
 // IdentityPrinter is an implementation of ResourcePrinter which simply copies the body out to the output stream.
@@ -49,8 +49,8 @@ func (i *IdentityPrinter) Print(data []byte, w io.Writer) error {
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
-func (i *IdentityPrinter) PrintObj(obj interface{}, output io.Writer) error {
-	data, err := runtime.Encode(obj)
+func (i *IdentityPrinter) PrintObj(obj runtime.Object, output io.Writer) error {
+	data, err := runtime.DefaultCodec.Encode(obj)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (y *YAMLPrinter) Print(data []byte, w io.Writer) error {
 }
 
 // PrintObj prints the data as YAML.
-func (y *YAMLPrinter) PrintObj(obj interface{}, w io.Writer) error {
+func (y *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	output, err := yaml.Marshal(obj)
 	if err != nil {
 		return err
@@ -251,7 +251,7 @@ func printStatus(status *api.Status, w io.Writer) error {
 // Print parses the data as JSON, then prints the parsed data in a human-friendly
 // format according to the type of the data.
 func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
-	var mapObj map[string]interface{}
+	var mapObj map[string]runtime.Object
 	if err := json.Unmarshal([]byte(data), &mapObj); err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 		return fmt.Errorf("unexpected object with no 'kind' field: %s", data)
 	}
 
-	obj, err := runtime.Decode(data)
+	obj, err := runtime.DefaultCodec.Decode(data)
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func (h *HumanReadablePrinter) Print(data []byte, output io.Writer) error {
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
-func (h *HumanReadablePrinter) PrintObj(obj interface{}, output io.Writer) error {
+func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()
 	if handler := h.handlerMap[reflect.TypeOf(obj)]; handler != nil {
@@ -292,7 +292,7 @@ type TemplatePrinter struct {
 
 // Print parses the data as JSON, and re-formats it with the Go Template.
 func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
-	obj, err := runtime.Decode(data)
+	obj, err := runtime.DefaultCodec.Decode(data)
 	if err != nil {
 		return err
 	}
@@ -300,6 +300,6 @@ func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
 }
 
 // PrintObj formats the obj with the Go Template.
-func (t *TemplatePrinter) PrintObj(obj interface{}, w io.Writer) error {
+func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return t.Template.Execute(w, obj)
 }

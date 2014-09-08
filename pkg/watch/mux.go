@@ -18,6 +18,8 @@ package watch
 
 import (
 	"sync"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // Mux distributes event notifications among any number of watchers. Every event
@@ -88,7 +90,7 @@ func (m *Mux) closeAll() {
 }
 
 // Action distributes the given event among all watchers.
-func (m *Mux) Action(action EventType, obj interface{}) {
+func (m *Mux) Action(action EventType, obj runtime.Object) {
 	m.incoming <- Event{action, obj}
 }
 

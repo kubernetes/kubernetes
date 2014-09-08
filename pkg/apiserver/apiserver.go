@@ -27,16 +27,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/golang/glog"
 )
-
-// Codec defines methods for serializing and deserializing API objects.
-type Codec interface {
-	Encode(obj interface{}) (data []byte, err error)
-	Decode(data []byte) (interface{}, error)
-	DecodeInto(data []byte, obj interface{}) error
-}
 
 // mux is an object that can register http handlers.
 type mux interface {
@@ -53,7 +47,7 @@ type defaultAPIServer struct {
 // Handle returns a Handler function that expose the provided storage interfaces
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
-func Handle(storage map[string]RESTStorage, codec Codec, prefix string) http.Handler {
+func Handle(storage map[string]RESTStorage, codec runtime.Codec, prefix string) http.Handler {
 	group := NewAPIGroup(storage, codec)
 
 	mux := http.NewServeMux()
@@ -78,7 +72,7 @@ type APIGroup struct {
 // This is a helper method for registering multiple sets of REST handlers under different
 // prefixes onto a server.
 // TODO: add multitype codec serialization
-func NewAPIGroup(storage map[string]RESTStorage, codec Codec) *APIGroup {
+func NewAPIGroup(storage map[string]RESTStorage, codec runtime.Codec) *APIGroup {
 	return &APIGroup{RESTHandler{
 		storage: storage,
 		codec:   codec,
@@ -147,7 +141,7 @@ func handleVersion(w http.ResponseWriter, req *http.Request) {
 }
 
 // writeJSON renders an object as JSON to the response.
-func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseWriter) {
+func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
 	if err != nil {
 		errorJSON(err, codec, w)
@@ -159,7 +153,7 @@ func writeJSON(statusCode int, codec Codec, object interface{}, w http.ResponseW
 }
 
 // errorJSON renders an error to the response.
-func errorJSON(err error, codec Codec, w http.ResponseWriter) {
+func errorJSON(err error, codec runtime.Codec, w http.ResponseWriter) {
 	status := errToAPIStatus(err)
 	writeJSON(status.Code, codec, status, w)
 }

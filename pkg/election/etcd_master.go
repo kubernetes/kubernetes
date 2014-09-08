@@ -27,6 +27,15 @@ import (
 	"github.com/golang/glog"
 )
 
+// Master is used to announce the current elected master.
+type Master string
+
+// IsAnAPIObject is used solely so we can work with the watch package.
+// TODO: Either fix watch so this isn't necessary, or make this a real API Object.
+// TODO: when it becomes clear how this package will be used, move these declarations to
+// to the proper place.
+func (Master) IsAnAPIObject() {}
+
 // NewEtcdMasterElector returns an implementation of election.MasterElector backed by etcd.
 func NewEtcdMasterElector(h tools.EtcdGetSet) MasterElector {
 	return &etcdMasterElector{etcd: h}
@@ -58,7 +67,7 @@ func (e *etcdMasterElector) run(path, id string) {
 		case m := <-masters:
 			e.events <- watch.Event{
 				Type:   watch.Modified,
-				Object: m,
+				Object: Master(m),
 			}
 		case e := <-errors:
 			glog.Errorf("error in election: %v", e)

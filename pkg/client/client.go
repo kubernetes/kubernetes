@@ -46,36 +46,36 @@ type Interface interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	ListPods(selector labels.Selector) (api.PodList, error)
-	GetPod(id string) (api.Pod, error)
+	ListPods(selector labels.Selector) (*api.PodList, error)
+	GetPod(id string) (*api.Pod, error)
 	DeletePod(id string) error
-	CreatePod(api.Pod) (api.Pod, error)
-	UpdatePod(api.Pod) (api.Pod, error)
+	CreatePod(*api.Pod) (*api.Pod, error)
+	UpdatePod(*api.Pod) (*api.Pod, error)
 }
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	ListReplicationControllers(selector labels.Selector) (api.ReplicationControllerList, error)
-	GetReplicationController(id string) (api.ReplicationController, error)
-	CreateReplicationController(api.ReplicationController) (api.ReplicationController, error)
-	UpdateReplicationController(api.ReplicationController) (api.ReplicationController, error)
+	ListReplicationControllers(selector labels.Selector) (*api.ReplicationControllerList, error)
+	GetReplicationController(id string) (*api.ReplicationController, error)
+	CreateReplicationController(*api.ReplicationController) (*api.ReplicationController, error)
+	UpdateReplicationController(*api.ReplicationController) (*api.ReplicationController, error)
 	DeleteReplicationController(string) error
 	WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	ListServices(selector labels.Selector) (api.ServiceList, error)
-	GetService(id string) (api.Service, error)
-	CreateService(api.Service) (api.Service, error)
-	UpdateService(api.Service) (api.Service, error)
+	ListServices(selector labels.Selector) (*api.ServiceList, error)
+	GetService(id string) (*api.Service, error)
+	CreateService(*api.Service) (*api.Service, error)
+	UpdateService(*api.Service) (*api.Service, error)
 	DeleteService(string) error
 	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
-	ListEndpoints(selector labels.Selector) (api.EndpointsList, error)
+	ListEndpoints(selector labels.Selector) (*api.EndpointsList, error)
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
@@ -85,7 +85,7 @@ type VersionInterface interface {
 }
 
 type MinionInterface interface {
-	ListMinions() (api.MinionList, error)
+	ListMinions() (*api.MinionList, error)
 }
 
 // Client is the actual implementation of a Kubernetes client.
@@ -222,7 +222,7 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
-	if err := runtime.DecodeInto(body, &status); err == nil && status.Status != "" {
+	if err := runtime.DefaultCodec.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
 
@@ -247,14 +247,16 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector.
-func (c *Client) ListPods(selector labels.Selector) (result api.PodList, err error) {
-	err = c.Get().Path("pods").SelectorParam("labels", selector).Do().Into(&result)
+func (c *Client) ListPods(selector labels.Selector) (result *api.PodList, err error) {
+	result = &api.PodList{}
+	err = c.Get().Path("pods").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetPod takes the id of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (c *Client) GetPod(id string) (result api.Pod, err error) {
-	err = c.Get().Path("pods").Path(id).Do().Into(&result)
+func (c *Client) GetPod(id string) (result *api.Pod, err error) {
+	result = &api.Pod{}
+	err = c.Get().Path("pods").Path(id).Do().Into(result)
 	return
 }
 
@@ -264,46 +266,52 @@ func (c *Client) DeletePod(id string) error {
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *Client) CreatePod(pod api.Pod) (result api.Pod, err error) {
-	err = c.Post().Path("pods").Body(pod).Do().Into(&result)
+func (c *Client) CreatePod(pod *api.Pod) (result *api.Pod, err error) {
+	result = &api.Pod{}
+	err = c.Post().Path("pods").Body(pod).Do().Into(result)
 	return
 }
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *Client) UpdatePod(pod api.Pod) (result api.Pod, err error) {
+func (c *Client) UpdatePod(pod *api.Pod) (result *api.Pod, err error) {
+	result = &api.Pod{}
 	if pod.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
 		return
 	}
-	err = c.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(&result)
+	err = c.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(result)
 	return
 }
 
 // ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector.
-func (c *Client) ListReplicationControllers(selector labels.Selector) (result api.ReplicationControllerList, err error) {
-	err = c.Get().Path("replicationControllers").SelectorParam("labels", selector).Do().Into(&result)
+func (c *Client) ListReplicationControllers(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
+	result = &api.ReplicationControllerList{}
+	err = c.Get().Path("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetReplicationController returns information about a particular replication controller.
-func (c *Client) GetReplicationController(id string) (result api.ReplicationController, err error) {
-	err = c.Get().Path("replicationControllers").Path(id).Do().Into(&result)
+func (c *Client) GetReplicationController(id string) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.Get().Path("replicationControllers").Path(id).Do().Into(result)
 	return
 }
 
 // CreateReplicationController creates a new replication controller.
-func (c *Client) CreateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
-	err = c.Post().Path("replicationControllers").Body(controller).Do().Into(&result)
+func (c *Client) CreateReplicationController(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.Post().Path("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
 // UpdateReplicationController updates an existing replication controller.
-func (c *Client) UpdateReplicationController(controller api.ReplicationController) (result api.ReplicationController, err error) {
+func (c *Client) UpdateReplicationController(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
 	if controller.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
 		return
 	}
-	err = c.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(&result)
+	err = c.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(result)
 	return
 }
 
@@ -324,30 +332,34 @@ func (c *Client) WatchReplicationControllers(label, field labels.Selector, resou
 }
 
 // ListServices takes a selector, and returns the list of services that match that selector
-func (c *Client) ListServices(selector labels.Selector) (result api.ServiceList, err error) {
-	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(&result)
+func (c *Client) ListServices(selector labels.Selector) (result *api.ServiceList, err error) {
+	result = &api.ServiceList{}
+	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetService returns information about a particular service.
-func (c *Client) GetService(id string) (result api.Service, err error) {
-	err = c.Get().Path("services").Path(id).Do().Into(&result)
+func (c *Client) GetService(id string) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.Get().Path("services").Path(id).Do().Into(result)
 	return
 }
 
 // CreateService creates a new service.
-func (c *Client) CreateService(svc api.Service) (result api.Service, err error) {
-	err = c.Post().Path("services").Body(svc).Do().Into(&result)
+func (c *Client) CreateService(svc *api.Service) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.Post().Path("services").Body(svc).Do().Into(result)
 	return
 }
 
 // UpdateService updates an existing service.
-func (c *Client) UpdateService(svc api.Service) (result api.Service, err error) {
+func (c *Client) UpdateService(svc *api.Service) (result *api.Service, err error) {
+	result = &api.Service{}
 	if svc.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
-	err = c.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(&result)
+	err = c.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(result)
 	return
 }
 
@@ -368,8 +380,9 @@ func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uin
 }
 
 // ListEndpoints takes a selector, and returns the list of endpoints that match that selector
-func (c *Client) ListEndpoints(selector labels.Selector) (result api.EndpointsList, err error) {
-	err = c.Get().Path("endpoints").SelectorParam("labels", selector).Do().Into(&result)
+func (c *Client) ListEndpoints(selector labels.Selector) (result *api.EndpointsList, err error) {
+	result = &api.EndpointsList{}
+	err = c.Get().Path("endpoints").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
@@ -399,7 +412,8 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 }
 
 // ListMinions lists all the minions in the cluster.
-func (c *Client) ListMinions() (minionList api.MinionList, err error) {
-	err = c.Get().Path("minions").Do().Into(&minionList)
+func (c *Client) ListMinions() (result *api.MinionList, err error) {
+	result = &api.MinionList{}
+	err = c.Get().Path("minions").Do().Into(result)
 	return
 }

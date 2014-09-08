@@ -38,15 +38,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-func convert(obj interface{}) (interface{}, error) {
+func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-var codec = runtime.Codec
+var codec = runtime.DefaultCodec
 
 func init() {
-	runtime.AddKnownTypes("", Simple{}, SimpleList{})
-	runtime.AddKnownTypes("v1beta1", Simple{}, SimpleList{})
+	runtime.DefaultScheme.AddKnownTypes("", &Simple{}, &SimpleList{})
+	runtime.DefaultScheme.AddKnownTypes("v1beta1", &Simple{}, &SimpleList{})
 }
 
 type Simple struct {
@@ -54,10 +54,14 @@ type Simple struct {
 	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
 }
 
+func (*Simple) IsAnAPIObject() {}
+
 type SimpleList struct {
 	api.JSONBase `yaml:",inline" json:",inline"`
 	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
 }
+
+func (*SimpleList) IsAnAPIObject() {}
 
 type SimpleRESTStorage struct {
 	errors  map[string]error
@@ -78,43 +82,43 @@ type SimpleRESTStorage struct {
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
-	injectedFunction func(obj interface{}) (returnObj interface{}, err error)
+	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(labels.Selector) (interface{}, error) {
+func (storage *SimpleRESTStorage) List(labels.Selector) (runtime.Object, error) {
 	result := &SimpleList{
 		Items: storage.list,
 	}
 	return result, storage.errors["list"]
 }
 
-func (storage *SimpleRESTStorage) Get(id string) (interface{}, error) {
-	return storage.item, storage.errors["get"]
+func (storage *SimpleRESTStorage) Get(id string) (runtime.Object, error) {
+	return runtime.DefaultScheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) Delete(id string) (<-chan interface{}, error) {
+func (storage *SimpleRESTStorage) Delete(id string) (<-chan runtime.Object, error) {
 	storage.deleted = id
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
 	}
-	return MakeAsync(func() (interface{}, error) {
+	return MakeAsync(func() (runtime.Object, error) {
 		if storage.injectedFunction != nil {
-			return storage.injectedFunction(id)
+			return storage.injectedFunction(&Simple{JSONBase: api.JSONBase{ID: id}})
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil
 	}), nil
 }
 
-func (storage *SimpleRESTStorage) New() interface{} {
+func (storage *SimpleRESTStorage) New() runtime.Object {
 	return &Simple{}
 }
 
-func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, error) {
+func (storage *SimpleRESTStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	storage.created = obj.(*Simple)
 	if err := storage.errors["create"]; err != nil {
 		return nil, err
 	}
-	return MakeAsync(func() (interface{}, error) {
+	return MakeAsync(func() (runtime.Object, error) {
 		if storage.injectedFunction != nil {
 			return storage.injectedFunction(obj)
 		}
@@ -122,12 +126,12 @@ func (storage *SimpleRESTStorage) Create(obj interface{}) (<-chan interface{}, e
 	}), nil
 }
 
-func (storage *SimpleRESTStorage) Update(obj interface{}) (<-chan interface{}, error) {
+func (storage *SimpleRESTStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	storage.updated = obj.(*Simple)
 	if err := storage.errors["update"]; err != nil {
 		return nil, err
 	}
-	return MakeAsync(func() (interface{}, error) {
+	return MakeAsync(func() (runtime.Object, error) {
 		if storage.injectedFunction != nil {
 			return storage.injectedFunction(obj)
 		}
@@ -156,7 +160,7 @@ func (storage *SimpleRESTStorage) ResourceLocation(id string) (string, error) {
 	return id, nil
 }
 
-func extractBody(response *http.Response, object interface{}) (string, error) {
+func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
@@ -398,7 +402,7 @@ func TestUpdate(t *testing.T) {
 	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
-	item := Simple{
+	item := &Simple{
 		Name: "bar",
 	}
 	body, err := codec.Encode(item)
@@ -428,7 +432,7 @@ func TestUpdateMissing(t *testing.T) {
 	handler := Handle(storage, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
-	item := Simple{
+	item := &Simple{
 		Name: "bar",
 	}
 	body, err := codec.Encode(item)
@@ -457,7 +461,7 @@ func TestCreate(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{
+	simple := &Simple{
 		Name: "foo",
 	}
 	data, _ := codec.Encode(simple)
@@ -497,7 +501,7 @@ func TestCreateNotFound(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{Name: "foo"}
+	simple := &Simple{Name: "foo"}
 	data, _ := codec.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/simple", bytes.NewBuffer(data))
 	if err != nil {
@@ -528,7 +532,7 @@ func TestParseTimeout(t *testing.T) {
 
 func TestSyncCreate(t *testing.T) {
 	storage := SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			time.Sleep(5 * time.Millisecond)
 			return obj, nil
 		},
@@ -539,7 +543,7 @@ func TestSyncCreate(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := Simple{
+	simple := &Simple{
 		Name: "foo",
 	}
 	data, _ := codec.Encode(simple)
@@ -566,7 +570,7 @@ func TestSyncCreate(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(itemOut, simple) {
+	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
 	if response.StatusCode != http.StatusOK {
@@ -600,7 +604,7 @@ func expectApiStatus(t *testing.T, method, url string, data []byte, code int) *a
 
 func TestAsyncDelayReturnsError(t *testing.T) {
 	storage := SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
 	}
@@ -617,7 +621,7 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 func TestAsyncCreateError(t *testing.T) {
 	ch := make(chan struct{})
 	storage := SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			<-ch
 			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
@@ -626,7 +630,7 @@ func TestAsyncCreateError(t *testing.T) {
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 
-	simple := Simple{Name: "foo"}
+	simple := &Simple{Name: "foo"}
 	data, _ := codec.Encode(simple)
 
 	status := expectApiStatus(t, "POST", fmt.Sprintf("%s/prefix/version/foo", server.URL), data, http.StatusAccepted)
@@ -662,18 +666,21 @@ func TestAsyncCreateError(t *testing.T) {
 	}
 }
 
+type UnregisteredAPIObject struct {
+	Value string
+}
+
+func (*UnregisteredAPIObject) IsAnAPIObject() {}
+
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		type T struct {
-			Value string
-		}
-		writeJSON(http.StatusOK, runtime.Codec, &T{"Undecodable"}, w)
+		writeJSON(http.StatusOK, runtime.DefaultCodec, &UnregisteredAPIObject{"Undecodable"}, w)
 	}))
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != api.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
-	if !strings.Contains(status.Message, "type apiserver.T is not registered") {
+	if !strings.Contains(status.Message, "type apiserver.UnregisteredAPIObject is not registered") {
 		t.Errorf("unexpected message %#v", status)
 	}
 }
@@ -705,7 +712,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	testOver := make(chan struct{})
 	defer close(testOver)
 	storage := SimpleRESTStorage{
-		injectedFunction: func(obj interface{}) (interface{}, error) {
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			// Eliminate flakes by ensuring the create operation takes longer than this test.
 			<-testOver
 			return obj, nil
@@ -716,7 +723,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	}, codec, "/prefix/version")
 	server := httptest.NewServer(handler)
 
-	simple := Simple{Name: "foo"}
+	simple := &Simple{Name: "foo"}
 	data, _ := codec.Encode(simple)
 	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
 	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {

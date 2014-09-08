@@ -25,31 +25,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-func TestEncode_NonPtr(t *testing.T) {
-	pod := api.Pod{
-		Labels: map[string]string{"name": "foo"},
-	}
-	obj := interface{}(pod)
-	data, err := runtime.Encode(obj)
-	obj2, err2 := runtime.Decode(data)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v'", err, err2)
-	}
-	if _, ok := obj2.(*api.Pod); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if !reflect.DeepEqual(obj2, &pod) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", &pod, obj2)
-	}
-}
-
-func TestEncode_Ptr(t *testing.T) {
+func TestEncode(t *testing.T) {
 	pod := &api.Pod{
 		Labels: map[string]string{"name": "foo"},
 	}
-	obj := interface{}(pod)
-	data, err := runtime.Encode(obj)
-	obj2, err2 := runtime.Decode(data)
+	obj := runtime.Object(pod)
+	data, err := runtime.DefaultScheme.Encode(obj)
+	obj2, err2 := runtime.DefaultScheme.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -63,11 +45,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := runtime.Decode(badJSONMissingKind); err == nil {
+	if _, err := runtime.DefaultScheme.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := runtime.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := runtime.DefaultScheme.Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)

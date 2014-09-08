@@ -28,10 +28,10 @@ func TestMinionRegistryStorage(t *testing.T) {
 	m := NewRegistry([]string{"foo", "bar"})
 	ms := NewRegistryStorage(m)
 
-	if obj, err := ms.Get("foo"); err != nil || obj.(api.Minion).ID != "foo" {
+	if obj, err := ms.Get("foo"); err != nil || obj.(*api.Minion).ID != "foo" {
 		t.Errorf("missing expected object")
 	}
-	if obj, err := ms.Get("bar"); err != nil || obj.(api.Minion).ID != "bar" {
+	if obj, err := ms.Get("bar"); err != nil || obj.(*api.Minion).ID != "bar" {
 		t.Errorf("missing expected object")
 	}
 	if _, err := ms.Get("baz"); err != ErrDoesNotExist {
@@ -43,10 +43,10 @@ func TestMinionRegistryStorage(t *testing.T) {
 		t.Errorf("insert failed")
 	}
 	obj := <-c
-	if m, ok := obj.(api.Minion); !ok || m.ID != "baz" {
+	if m, ok := obj.(*api.Minion); !ok || m.ID != "baz" {
 		t.Errorf("insert return value was weird: %#v", obj)
 	}
-	if obj, err := ms.Get("baz"); err != nil || obj.(api.Minion).ID != "baz" {
+	if obj, err := ms.Get("baz"); err != nil || obj.(*api.Minion).ID != "baz" {
 		t.Errorf("insert didn't actually insert")
 	}
 
@@ -78,7 +78,7 @@ func TestMinionRegistryStorage(t *testing.T) {
 			JSONBase: api.JSONBase{ID: "foo"},
 		},
 	}
-	if !reflect.DeepEqual(list.(api.MinionList).Items, expect) {
+	if !reflect.DeepEqual(list.(*api.MinionList).Items, expect) {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
 }

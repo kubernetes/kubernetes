@@ -42,9 +42,9 @@ func (r *ServiceRegistry) ListServices() (*api.ServiceList, error) {
 	return &r.List, r.Err
 }
 
-func (r *ServiceRegistry) CreateService(svc api.Service) error {
-	r.Service = &svc
-	r.List.Items = append(r.List.Items, svc)
+func (r *ServiceRegistry) CreateService(svc *api.Service) error {
+	r.Service = svc
+	r.List.Items = append(r.List.Items, *svc)
 	return r.Err
 }
 
@@ -58,7 +58,7 @@ func (r *ServiceRegistry) DeleteService(id string) error {
 	return r.Err
 }
 
-func (r *ServiceRegistry) UpdateService(svc api.Service) error {
+func (r *ServiceRegistry) UpdateService(svc *api.Service) error {
 	r.UpdatedID = svc.ID
 	return r.Err
 }
@@ -76,8 +76,8 @@ func (r *ServiceRegistry) GetEndpoints(id string) (*api.Endpoints, error) {
 	return &r.Endpoints, r.Err
 }
 
-func (r *ServiceRegistry) UpdateEndpoints(e api.Endpoints) error {
-	r.Endpoints = e
+func (r *ServiceRegistry) UpdateEndpoints(e *api.Endpoints) error {
+	r.Endpoints = *e
 	return r.Err
 }
 

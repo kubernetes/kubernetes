@@ -24,6 +24,11 @@ type FilterFunc func(in Event) (out Event, keep bool)
 // Putting a filter on a watch, as an unavoidable side-effect due to the way
 // go channels work, effectively causes the watch's event channel to have its
 // queue length increased by one.
+//
+// WARNING: filter has a fatal flaw, in that it can't properly update the
+// Type field (Add/Modified/Deleted) to reflect items beginning to pass the
+// filter when they previously didn't.
+//
 func Filter(w Interface, f FilterFunc) Interface {
 	fw := &filteredWatch{
 		incoming: w,
