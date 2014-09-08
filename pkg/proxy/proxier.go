@@ -43,13 +43,16 @@ type Proxier struct {
 	loadBalancer LoadBalancer
 	mu           sync.Mutex // protects serviceMap
 	serviceMap   map[string]*serviceInfo
+	address      string
 }
 
-// NewProxier returns a new Proxier given a LoadBalancer.
-func NewProxier(loadBalancer LoadBalancer) *Proxier {
+// NewProxier returns a new Proxier given a LoadBalancer and an
+// address on which to listen
+func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 	return &Proxier{
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[string]*serviceInfo),
+		address:      address,
 	}
 }
 
@@ -152,7 +155,7 @@ var unusedPortLock sync.Mutex
 func (proxier *Proxier) addServiceOnUnusedPort(service string) (string, error) {
 	unusedPortLock.Lock()
 	defer unusedPortLock.Unlock()
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", fmt.Sprintf("%s:0", proxier.address))
 	if err != nil {
 		return "", err
 	}
@@ -194,7 +197,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			proxier.StopProxy(service.ID)
 		}
 		glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", service.Port))
+		listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", proxier.address, service.Port))
 		if err != nil {
 			glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
 			continue

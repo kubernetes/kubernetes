@@ -79,7 +79,7 @@ func TestProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, "127.0.0.1")
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo")
 	if err != nil {
@@ -92,7 +92,7 @@ func TestProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, "127.0.0.1")
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo")
 	if err != nil {
@@ -115,7 +115,7 @@ func TestProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, "127.0.0.1")
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo")
 	if err != nil {
@@ -137,7 +137,7 @@ func TestProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, "127.0.0.1")
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo")
 	if err != nil {
@@ -164,7 +164,7 @@ func TestProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, "127.0.0.1")
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo")
 	if err != nil {
@@ -197,7 +197,7 @@ func TestProxyUpdatePortLetsGoOfOldPort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
 
-	p := NewProxier(lb)
+	p := NewProxier(lb, "127.0.0.1")
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo")
 	if err != nil {

@@ -33,6 +33,7 @@ var (
 	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
 	master         = flag.String("master", "", "The address of the Kubernetes API server (optional)")
 	etcdServerList util.StringList
+	address        = flag.String("address", "0.0.0.0", "The address for the proxy server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
 )
 
 func init() {
@@ -84,7 +85,7 @@ func main() {
 	glog.Infof("Using configuration file %s", *configFile)
 
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer)
+	proxier := proxy.NewProxier(loadBalancer, *address)
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services
