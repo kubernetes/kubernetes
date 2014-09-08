@@ -37,6 +37,7 @@ cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   node_ip: $MASTER_IP
   master_ip: $MASTER_IP
+  network_mode: openvswitch
   etcd_servers: $MASTER_IP
   cloud_provider: vagrant
   roles:

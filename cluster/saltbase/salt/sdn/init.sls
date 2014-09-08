@@ -1,4 +1,4 @@
-{% if grains['os_family'] == 'RedHat' %}
+{% if grains.network_mode is defined and grains.network_mode == 'openvswitch' %}
 
 openvswitch:
   pkg:

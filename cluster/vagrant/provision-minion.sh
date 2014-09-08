@@ -44,6 +44,7 @@ echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
+  network_mode: openvswitch
   node_ip: $MINION_IP
   etcd_servers: $MASTER_IP
   roles:
