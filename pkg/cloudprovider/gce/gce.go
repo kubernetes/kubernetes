@@ -430,6 +430,16 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
+// ProjectName returns the Google Cloud project being used for this GCECloud
+func (gce *GCECloud) ProjectID() string {
+	return gce.projectID
+}
+
+// ProjectName returns the Google Cloud project being used for this GCECloud
+func (gce *GCECloud) Zone() string {
+	return gce.zone
+}
+
 // FullQualProj returns the full URL for the specified project.
 func FullQualProj(proj string) string {
 	return "https://www.googleapis.com/compute/v1/projects/" + proj
