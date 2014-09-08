@@ -155,7 +155,7 @@ var unusedPortLock sync.Mutex
 func (proxier *Proxier) addServiceOnUnusedPort(service string) (string, error) {
 	unusedPortLock.Lock()
 	defer unusedPortLock.Unlock()
-	l, err := net.Listen("tcp", fmt.Sprintf("%s:0", proxier.address))
+	l, err := net.Listen("tcp", net.JoinHostPort(proxier.address, "0"))
 	if err != nil {
 		return "", err
 	}
@@ -197,7 +197,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			proxier.StopProxy(service.ID)
 		}
 		glog.Infof("Adding a new service %s on port %d", service.ID, service.Port)
-		listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", proxier.address, service.Port))
+		listener, err := net.Listen("tcp", net.JoinHostPort(proxier.address, strconv.Itoa(service.Port)))
 		if err != nil {
 			glog.Infof("Failed to start listening for %s on %d", service.ID, service.Port)
 			continue
