@@ -17,13 +17,17 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"io"
 	"sync"
 
 	"github.com/golang/glog"
 )
 
 // Factory is a function that returns a cloudprovider.Interface.
-type Factory func() (Interface, error)
+// The config parameter provides an io.Reader handler to the factory in
+// order to load specific configurations. If no configuration is provided
+// the parameter is nil.
+type Factory func(config io.Reader) (Interface, error)
 
 // All registered cloud providers.
 var providersMutex sync.Mutex
@@ -44,13 +48,15 @@ func RegisterCloudProvider(name string, cloud Factory) {
 
 // GetCloudProvider creates an instance of the named cloud provider, or nil if
 // the name is not known.  The error return is only used if the named provider
-// was known but failed to initialize.
-func GetCloudProvider(name string) (Interface, error) {
+// was known but failed to initialize. The config parameter specifies the
+// io.Reader handler of the configuration file for the cloud provider, or nil
+// for no configuation.
+func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
 	f, found := providers[name]
 	if !found {
 		return nil, nil
 	}
-	return f()
+	return f(config)
 }
