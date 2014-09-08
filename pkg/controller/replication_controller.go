@@ -58,7 +58,7 @@ func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) 
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
-	pod := api.Pod{
+	pod := &api.Pod{
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	}

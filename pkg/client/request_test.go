@@ -285,7 +285,7 @@ func TestSetPollPeriod(t *testing.T) {
 }
 
 func TestPolling(t *testing.T) {
-	objects := []interface{}{
+	objects := []runtime.Object{
 		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
 		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
 		&api.Status{Status: api.StatusWorking, Details: &api.StatusDetails{ID: "1234"}},
@@ -380,7 +380,7 @@ func checkAuth(t *testing.T, expect AuthInfo, r *http.Request) {
 func TestWatch(t *testing.T) {
 	var table = []struct {
 		t   watch.EventType
-		obj interface{}
+		obj runtime.Object
 	}{
 		{watch.Added, &api.Pod{JSONBase: api.JSONBase{ID: "first"}}},
 		{watch.Modified, &api.Pod{JSONBase: api.JSONBase{ID: "second"}}},

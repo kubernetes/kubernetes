@@ -174,7 +174,7 @@ func portsFromString(spec string) []api.Port {
 
 // RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'.
 func RunController(image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
-	controller := api.ReplicationController{
+	controller := &api.ReplicationController{
 		JSONBase: api.JSONBase{
 			ID: name,
 		},
@@ -227,8 +227,8 @@ func RunController(image, name string, replicas int, client client.Interface, po
 	return nil
 }
 
-func createService(name string, port int, client client.Interface) (api.Service, error) {
-	svc := api.Service{
+func createService(name string, port int, client client.Interface) (*api.Service, error) {
+	svc := &api.Service{
 		JSONBase: api.JSONBase{ID: name},
 		Port:     port,
 		Labels: map[string]string{

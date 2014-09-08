@@ -73,7 +73,7 @@ func TestValidatesHostParameter(t *testing.T) {
 func TestListEmptyPods(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/pods"},
-		Response: Response{StatusCode: 200, Body: api.PodList{}},
+		Response: Response{StatusCode: 200, Body: &api.PodList{}},
 	}
 	podList, err := c.Setup().ListPods(labels.Everything())
 	c.Validate(t, podList, err)
@@ -83,7 +83,7 @@ func TestListPods(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200,
-			Body: api.PodList{
+			Body: &api.PodList{
 				Items: []api.Pod{
 					{
 						CurrentState: api.PodState{
@@ -113,7 +113,7 @@ func TestListPodsLabels(t *testing.T) {
 		Request: testRequest{Method: "GET", Path: "/pods", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
 		Response: Response{
 			StatusCode: 200,
-			Body: api.PodList{
+			Body: &api.PodList{
 				Items: []api.Pod{
 					{
 						CurrentState: api.PodState{
@@ -140,7 +140,7 @@ func TestGetPod(t *testing.T) {
 		Request: testRequest{Method: "GET", Path: "/pods/foo"},
 		Response: Response{
 			StatusCode: 200,
-			Body: api.Pod{
+			Body: &api.Pod{
 				CurrentState: api.PodState{
 					Status: "Foobar",
 				},
@@ -165,7 +165,7 @@ func TestDeletePod(t *testing.T) {
 }
 
 func TestCreatePod(t *testing.T) {
-	requestPod := api.Pod{
+	requestPod := &api.Pod{
 		CurrentState: api.PodState{
 			Status: "Foobar",
 		},
@@ -186,7 +186,7 @@ func TestCreatePod(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	requestPod := api.Pod{
+	requestPod := &api.Pod{
 		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1},
 		CurrentState: api.PodState{
 			Status: "Foobar",
@@ -208,7 +208,7 @@ func TestListControllers(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/replicationControllers"},
 		Response: Response{StatusCode: 200,
-			Body: api.ReplicationControllerList{
+			Body: &api.ReplicationControllerList{
 				Items: []api.ReplicationController{
 					{
 						JSONBase: api.JSONBase{ID: "foo"},
@@ -234,7 +234,7 @@ func TestGetController(t *testing.T) {
 		Request: testRequest{Method: "GET", Path: "/replicationControllers/foo"},
 		Response: Response{
 			StatusCode: 200,
-			Body: api.ReplicationController{
+			Body: &api.ReplicationController{
 				JSONBase: api.JSONBase{ID: "foo"},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
@@ -251,14 +251,14 @@ func TestGetController(t *testing.T) {
 }
 
 func TestUpdateController(t *testing.T) {
-	requestController := api.ReplicationController{
+	requestController := &api.ReplicationController{
 		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: "/replicationControllers/foo"},
 		Response: Response{
 			StatusCode: 200,
-			Body: api.ReplicationController{
+			Body: &api.ReplicationController{
 				JSONBase: api.JSONBase{ID: "foo"},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
@@ -284,14 +284,14 @@ func TestDeleteController(t *testing.T) {
 }
 
 func TestCreateController(t *testing.T) {
-	requestController := api.ReplicationController{
+	requestController := &api.ReplicationController{
 		JSONBase: api.JSONBase{ID: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: "/replicationControllers", Body: requestController},
 		Response: Response{
 			StatusCode: 200,
-			Body: api.ReplicationController{
+			Body: &api.ReplicationController{
 				JSONBase: api.JSONBase{ID: "foo"},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
@@ -307,7 +307,7 @@ func TestCreateController(t *testing.T) {
 	c.Validate(t, receivedController, err)
 }
 
-func body(obj interface{}, raw *string) *string {
+func body(obj runtime.Object, raw *string) *string {
 	if obj != nil {
 		bs, _ := runtime.DefaultCodec.Encode(obj)
 		body := string(bs)
@@ -321,13 +321,13 @@ type testRequest struct {
 	Path    string
 	Header  string
 	Query   url.Values
-	Body    interface{}
+	Body    runtime.Object
 	RawBody *string
 }
 
 type Response struct {
 	StatusCode int
-	Body       interface{}
+	Body       runtime.Object
 	RawBody    *string
 }
 
@@ -338,7 +338,6 @@ type testClient struct {
 	Error    bool
 	server   *httptest.Server
 	handler  *util.FakeHandler
-	Target   interface{}
 	// For query args, an optional function to validate the contents
 	// useful when the contents can change but still be correct.
 	// Maps from query arg key to validator.
@@ -363,7 +362,23 @@ func (c *testClient) Setup() *testClient {
 	return c
 }
 
-func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
+func (c *testClient) Validate(t *testing.T, received runtime.Object, err error) {
+	c.ValidateCommon(t, err)
+
+	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
+		t.Errorf("bad response for request %#v: expected %s, got %s", c.Request, c.Response.Body, received)
+	}
+}
+
+func (c *testClient) ValidateRaw(t *testing.T, received []byte, err error) {
+	c.ValidateCommon(t, err)
+
+	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
+		t.Errorf("bad response for request %#v: expected %s, got %s", c.Request, c.Response.Body, received)
+	}
+}
+
+func (c *testClient) ValidateCommon(t *testing.T, err error) {
 	defer c.server.Close()
 
 	if c.Error {
@@ -401,17 +416,13 @@ func (c *testClient) Validate(t *testing.T, received interface{}, err error) {
 	if expected, received := requestBody, c.handler.RequestBody; expected != nil && *expected != received {
 		t.Errorf("bad body for request %#v: expected %s, got %s", c.Request, *expected, received)
 	}
-
-	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
-		t.Errorf("bad response for request %#v: expected %s, got %s", c.Request, c.Response.Body, received)
-	}
 }
 
 func TestListServices(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/services"},
 		Response: Response{StatusCode: 200,
-			Body: api.ServiceList{
+			Body: &api.ServiceList{
 				Items: []api.Service{
 					{
 						JSONBase: api.JSONBase{ID: "name"},
@@ -435,7 +446,7 @@ func TestListServicesLabels(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/services", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
 		Response: Response{StatusCode: 200,
-			Body: api.ServiceList{
+			Body: &api.ServiceList{
 				Items: []api.Service{
 					{
 						JSONBase: api.JSONBase{ID: "name"},
@@ -464,7 +475,7 @@ func TestGetService(t *testing.T) {
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}
 	response, err := c.Setup().GetService("1")
-	c.Validate(t, &response, err)
+	c.Validate(t, response, err)
 }
 
 func TestCreateService(t *testing.T) {
@@ -472,18 +483,18 @@ func TestCreateService(t *testing.T) {
 		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}).Setup()
-	response, err := c.Setup().CreateService(api.Service{JSONBase: api.JSONBase{ID: "service-1"}})
-	c.Validate(t, &response, err)
+	response, err := c.Setup().CreateService(&api.Service{JSONBase: api.JSONBase{ID: "service-1"}})
+	c.Validate(t, response, err)
 }
 
 func TestUpdateService(t *testing.T) {
-	svc := api.Service{JSONBase: api.JSONBase{ID: "service-1", ResourceVersion: 1}}
+	svc := &api.Service{JSONBase: api.JSONBase{ID: "service-1", ResourceVersion: 1}}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: &svc},
-		Response: Response{StatusCode: 200, Body: &svc},
+		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: svc},
+		Response: Response{StatusCode: 200, Body: svc},
 	}
 	response, err := c.Setup().UpdateService(svc)
-	c.Validate(t, &response, err)
+	c.Validate(t, response, err)
 }
 
 func TestDeleteService(t *testing.T) {
@@ -503,8 +514,8 @@ func TestDoRequest(t *testing.T) {
 		{Client: NewOrDie("localhost", &AuthInfo{"foo", "bar"}), Request: testRequest{Method: "GET", Path: "auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
 		{Client: &Client{&RESTClient{httpClient: http.DefaultClient}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "error"}, Response: Response{StatusCode: 500}, Error: true},
-		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}, Target: &struct{}{}},
-		{Request: testRequest{Method: "GET", Path: "failread"}, Response: Response{StatusCode: 200, RawBody: &invalid}, Target: &struct{}{}},
+		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
+		{Request: testRequest{Method: "GET", Path: "failread"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
 	}
 	for _, c := range testClients {
 		client := c.Setup()
@@ -516,12 +527,12 @@ func TestDoRequest(t *testing.T) {
 			URL:    prefix,
 		}
 		response, err := client.doRequest(request)
-		c.Validate(t, response, err)
+		c.ValidateRaw(t, response, err)
 	}
 }
 
 func TestDoRequestAccepted(t *testing.T) {
-	status := api.Status{Status: api.StatusWorking}
+	status := &api.Status{Status: api.StatusWorking}
 	expectedBody, _ := runtime.DefaultCodec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
@@ -548,7 +559,7 @@ func TestDoRequestAccepted(t *testing.T) {
 		t.Errorf("Unexpected kind of error: %#v", err)
 		return
 	}
-	if !reflect.DeepEqual(se.Status, status) {
+	if !reflect.DeepEqual(&se.Status, status) {
 		t.Errorf("Unexpected status: %#v", se.Status)
 	}
 	if body != nil {
@@ -558,7 +569,7 @@ func TestDoRequestAccepted(t *testing.T) {
 }
 
 func TestDoRequestAcceptedSuccess(t *testing.T) {
-	status := api.Status{Status: api.StatusSuccess}
+	status := &api.Status{Status: api.StatusSuccess}
 	expectedBody, _ := runtime.DefaultCodec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
@@ -583,7 +594,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	if !reflect.DeepEqual(&status, statusOut) {
+	if !reflect.DeepEqual(status, statusOut) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
 	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
@@ -622,5 +633,5 @@ func TestListMinions(t *testing.T) {
 		Response: Response{StatusCode: 200, Body: &api.MinionList{JSONBase: api.JSONBase{ID: "minion-1"}}},
 	}
 	response, err := c.Setup().ListMinions()
-	c.Validate(t, &response, err)
+	c.Validate(t, response, err)
 }
