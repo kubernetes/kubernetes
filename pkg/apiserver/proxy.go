@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"code.google.com/p/go.net/html"
@@ -71,7 +72,7 @@ var tagsToAttrs = map[string]util.StringSet{
 type ProxyHandler struct {
 	prefix  string
 	storage map[string]RESTStorage
-	codec   Codec
+	codec   runtime.Codec
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
