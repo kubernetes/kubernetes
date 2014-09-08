@@ -25,6 +25,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Rackspace](docs/getting-started-guides/rackspace.md)
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
+* [Kubernetes Client Libraries](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/client-libraries.md)
 * [Discussion and Community Support](#community-discussion-and-support)
 * [Hacking on Kubernetes](#development)
 * [Hacking on Kubernetes Salt configuration](docs/salt.md)
