@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"reflect"
 	"sort"
@@ -42,7 +43,7 @@ var (
 	serverVersion = flag.Bool("server_version", false, "Print the server's version number.")
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
 	httpServer    = flag.String("h", "", "The host to connect to.")
-	config        = flag.String("c", "", "Path to the config file.")
+	config        = flag.String("c", "", "Path or URL to the config file.")
 	selector      = flag.String("l", "", "Selector (label query) to use for listing")
 	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
 	portSpec      = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
@@ -95,17 +96,41 @@ func prettyWireStorage() string {
 	return strings.Join(types, "|")
 }
 
+// readConfigData reads the bytes from the specified filesytem or network location associated with the *config flag
+func readConfigData() []byte {
+	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
+	if strings.Index(*config, "http://") == 0 || strings.Index(*config, "https://") == 0 {
+		resp, err := http.Get(*config)
+		if err != nil {
+			glog.Fatalf("Unable to access URL %v: %v\n", *config, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			glog.Fatalf("Unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
+		}
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			glog.Fatalf("Unable to read URL %v: %v\n", *config, err)
+		}
+		return data
+	} else {
+		data, err := ioutil.ReadFile(*config)
+		if err != nil {
+			glog.Fatalf("Unable to read %v: %v\n", *config, err)
+		}
+		return data
+	}
+}
+
 // readConfig reads and parses pod, replicationController, and service
 // configuration files. If any errors log and exit non-zero.
 func readConfig(storage string) []byte {
 	if len(*config) == 0 {
 		glog.Fatal("Need config file (-c)")
 	}
-	data, err := ioutil.ReadFile(*config)
-	if err != nil {
-		glog.Fatalf("Unable to read %v: %v\n", *config, err)
-	}
-	data, err = parser.ToWireFormat(data, storage, runtime.DefaultCodec)
+
+	data, err := parser.ToWireFormat(readConfigData(), storage, runtime.DefaultCodec)
+
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
 	}
