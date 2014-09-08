@@ -62,5 +62,8 @@ RUN touch /kube-build-image
 
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
 
+# Propagate the git tree version into the build image
+ADD kube-version-defs /kube-version-defs
+
 # Upload Kubernetes source
 ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes

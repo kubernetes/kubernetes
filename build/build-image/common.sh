@@ -25,7 +25,13 @@ readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 mkdir -p "${KUBE_TARGET}"
 
 if [[ ! -f "/kube-build-image" ]]; then
-  echo "WARNING: This script should be run in the kube-build conrtainer image!" >&2
+  echo "WARNING: This script should be run in the kube-build container image!" >&2
+fi
+
+if [[ -f "/kube-version-defs" ]]; then
+  source "/kube-version-defs"
+else
+  echo "WARNING: No version information provided in build image"
 fi
 
 function make-binary() {
@@ -34,7 +40,7 @@ function make-binary() {
 
   echo "+++ Building ${bin} for ${GOOS}/${GOARCH}"
   pushd "${KUBE_REPO_ROOT}"
-  godep go build -o "${ARCH_TARGET}/${bin}" "${gopkg}"
+  godep go build -ldflags "${KUBE_LD_FLAGS-}" -o "${ARCH_TARGET}/${bin}" "${gopkg}"
   popd
 }
 

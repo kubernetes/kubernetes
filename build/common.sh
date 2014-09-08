@@ -17,6 +17,9 @@
 # Common utilties, variables and checks for all build scripts.
 
 cd $(dirname "${BASH_SOURCE}")/..
+
+source hack/config-go.sh
+
 readonly KUBE_REPO_ROOT="${PWD}"
 
 readonly KUBE_GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -105,6 +108,9 @@ function kube::build::build-image() {
   )
   mkdir -p ${BUILD_CONTEXT_DIR}
   tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz "${SOURCE[@]}"
+  cat >${BUILD_CONTEXT_DIR}/kube-version-defs <<EOF
+KUBE_LD_FLAGS="$(kube::version_ldflags)"
+EOF
   cp build/build-image/Dockerfile ${BUILD_CONTEXT_DIR}/Dockerfile
   kube::build::docker-build "${KUBE_BUILD_IMAGE}" "${BUILD_CONTEXT_DIR}"
 }
@@ -139,6 +145,9 @@ function kube::build::clean-images() {
   for b in "${KUBE_RUN_BINARIES[@]}" ; do
     kube::build::clean-image "${KUBE_RUN_IMAGE_BASE}-${b}"
   done
+
+  echo "+++ Cleaning all other untagged docker images"
+  docker rmi $(docker images | grep "^<none>" | awk '{print $3}') 2> /dev/null
 }
 
 # Build a docker image from a Dockerfile.
