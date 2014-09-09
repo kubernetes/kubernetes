@@ -24,6 +24,9 @@
   {% set cloud_provider = "-cloud_provider=gce" %}
   {% set machines = "-machines " + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) %}
 {% endif %}
+{% if grains.cloud == 'aws' %}
+  {% set machines = "-machines " + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) %}
+{% endif %}
 {% if grains.cloud == 'azure' %}
   MACHINES="{{ salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values()|join(',', attribute='hostnamef') }}"
   {% set machines = "-machines $MACHINES" %}
