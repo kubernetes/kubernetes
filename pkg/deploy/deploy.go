@@ -109,6 +109,48 @@ func DeployMinion(cloud *gce_cloud.GCECloud, i int) ([]*gce_cloud.GCEOp, error) 
 	return ops, nil
 }
 
+// DownMaster removes the firewall rules and instance for the kube master.
+func DownMaster(gce *gce_cloud.GCECloud) ([]*gce_cloud.GCEOp, error) {
+	var ops []*gce_cloud.GCEOp
+	glog.Info("Removing firewall kubernetes-master-https\n")
+	op, err := deleteMasterFirewall(gce)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't start operation: %v", err)
+	}
+	ops = append(ops, op)
+	glog.Info("Removing instance kubernetes-master\n")
+	op, err = deleteMaster(gce)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't start operation: %v", err)
+	}
+	ops = append(ops, op)
+	return ops, nil
+}
+
+// DeployMinion removes the firewall rules, instance, and route for the specified minion.
+func DownMinion(cloud *gce_cloud.GCECloud, i int) ([]*gce_cloud.GCEOp, error) {
+	var ops []*gce_cloud.GCEOp
+	glog.Infof("Removing firewall kubernetes-minion-%v-all\n", i)
+	op, err := deleteMinionFirewall(cloud, i)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't remove firewall-rule insert operation: %v", err)
+	}
+	ops = append(ops, op)
+	glog.Infof("Removing instance kubernetes-minion-%v\n", i)
+	op, err = deleteMinion(cloud, i)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't remove instance insert operation: %v", err)
+	}
+	ops = append(ops, op)
+	glog.Infof("Removing route kubernetes-minion-%v\n", i)
+	op, err = deleteMinionRoute(cloud, i)
+	if err != nil {
+		return ops, fmt.Errorf("couldn't remove route insert operation: %v", err)
+	}
+	ops = append(ops, op)
+	return ops, nil
+}
+
 // WaitForOps polls the status of the specified operations until they are all "DONE"
 func WaitForOps(cloud *gce_cloud.GCECloud, ops []*gce_cloud.GCEOp) error {
 	// Wait for all operations to complete
@@ -222,12 +264,40 @@ func createMinion(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
 	return gce.CreateInstance(name, minionSize, image, minionTag, string(minionStartup), true, []string{})
 }
 
-// createMinionRoute adds the minion routing rule to allow forwarding to the pods
+// createMinionRoute adds the minion routing rule to allow forwarding to the pods.
 func createMinionRoute(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
 	name := fmt.Sprintf("%v-%v", minionPrefix, i)
 	nextHop := fmt.Sprintf("%v/zones/%v/instances/%v", gce_cloud.FullQualProj(gce.ProjectID()), gce.Zone(), name)
 	ipRange := fmt.Sprintf("10.244.%v.0/24", i)
 	return gce.CreateRoute(name, nextHop, ipRange)
+}
+
+// deleteMasterFirewall removes the master firewall rule.
+func deleteMasterFirewall(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
+	return gce.DeleteFirewall(masterName + "-https")
+}
+
+// deleteMinionFirewall removes the specified minion firewall rule.
+func deleteMinionFirewall(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+	name := fmt.Sprintf("%v-%v-all", minionPrefix, i)
+	return gce.DeleteFirewall(name)
+}
+
+// deleteMaster removes the kube-master instance.
+func deleteMaster(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
+	return gce.DeleteInstance(masterName)
+}
+
+// deleteMinion removes the specified minion instance.
+func deleteMinion(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+	name := fmt.Sprintf("%v-%v", minionPrefix, i)
+	return gce.DeleteInstance(name)
+}
+
+// deleteMinionRoute removes the minion routing rule.
+func deleteMinionRoute(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+	name := fmt.Sprintf("%v-%v", minionPrefix, i)
+	return gce.DeleteRoute(name)
 }
 
 // getCredentials gets the credentials stored in the .kubernetes_auth file (or create and store new credentials).

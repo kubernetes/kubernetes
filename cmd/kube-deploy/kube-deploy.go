@@ -79,7 +79,7 @@ func projectFromGCloud() string {
 }
 
 func usage() {
-	fmt.Fprint(os.Stdout, "Usage: kube-deploy up|down|push")
+	fmt.Fprint(os.Stderr, "Usage: kube-deploy up|down|push\n")
 }
 
 func main() {
@@ -135,9 +135,27 @@ func up() {
 }
 
 func down() {
-
+	cloud, err := gce_cloud.CreateGCECloud(*project, zone)
+	if err != nil {
+		glog.Fatalf("failed to create cloud: %v", err)
+	}
+	ops, err := deploy.DownMaster(cloud)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	for i := 1; i <= numMinions; i++ {
+		newOps, err := deploy.DownMinion(cloud, i)
+		if err != nil {
+			glog.Fatal(err)
+		}
+		ops = append(ops, newOps...)
+	}
+	if err := deploy.WaitForOps(cloud, ops); err != nil {
+		glog.Fatal(err)
+	}
+	glog.Info("Kubernetes cluster succcessfully taken down.\n")
 }
 
 func push() {
-
+	fmt.Println("Not yet implemented!")
 }

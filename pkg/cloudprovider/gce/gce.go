@@ -511,6 +511,16 @@ func (gce *GCECloud) CreateInstance(name, size, image, tag, startupScript string
 	return op, err
 }
 
+// DeleteInstance deletes the specified instance
+func (gce *GCECloud) DeleteInstance(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Instances.Delete(gce.projectID, gce.zone, name).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: ZONE,
+	}
+	return op, err
+}
+
 // fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
 func fqdnSuffix() (string, error) {
 	fullHostname, err := exec.Command("hostname", "-f").Output()
@@ -569,6 +579,15 @@ func (gce *GCECloud) CreateRoute(name, nextHop, ipRange string) (*GCEOp, error) 
 	return op, err
 }
 
+func (gce *GCECloud) DeleteRoute(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Routes.Delete(gce.projectID, name).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: GLOBAL,
+	}
+	return op, err
+}
+
 // CreateFirewall creates the specified firewall rule
 func (gce *GCECloud) CreateFirewall(name, sourceRange, tag, allowed string) (*GCEOp, error) {
 	fwAllowed, err := parseAllowed(allowed)
@@ -588,6 +607,16 @@ func (gce *GCECloud) CreateFirewall(name, sourceRange, tag, allowed string) (*GC
 		},
 	}
 	computeOp, err := gce.service.Firewalls.Insert(gce.projectID, firewall).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: GLOBAL,
+	}
+	return op, err
+}
+
+// DeleteFirewall deletes the firewall specified by "name".
+func (gce *GCECloud) DeleteFirewall(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Firewalls.Delete(gce.projectID, name).Do()
 	op := &GCEOp{
 		op:    computeOp,
 		scope: GLOBAL,
