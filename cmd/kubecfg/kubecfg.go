@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	serverVersion = flag.Bool("server_version", false, "Print the server's version number.")
+	serverVersion = verflag.Version("server_version", verflag.VersionFalse, "Print the server's version information and quit")
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
 	httpServer    = flag.String("h", "", "The host to connect to.")
 	config        = flag.String("c", "", "Path to the config file.")
@@ -152,14 +152,19 @@ func main() {
 		}
 	}
 
-	if *serverVersion {
+	if *serverVersion != verflag.VersionFalse {
 		got, err := kubeClient.ServerVersion()
 		if err != nil {
 			fmt.Printf("Couldn't read version from server: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Server Version: %#v\n", got)
-		os.Exit(0)
+		if *serverVersion == verflag.VersionRaw {
+			fmt.Printf("%#v\n", *got)
+			os.Exit(0)
+		} else {
+			fmt.Printf("Server: Kubernetes %s\n", got)
+			os.Exit(0)
+		}
 	}
 
 	if *preventSkew {
