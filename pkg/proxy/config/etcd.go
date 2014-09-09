@@ -120,10 +120,12 @@ func (s ConfigSourceEtcd) Run() {
 func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) {
 	response, err := s.client.Get(registryRoot+"/specs", true, false)
 	if err != nil {
-		glog.V(1).Infof("Failed to get the key %s: %v", registryRoot, err)
 		if tools.IsEtcdNotFound(err) {
-			return []api.Service{}, []api.Endpoints{}, err
+			glog.V(1).Infof("Failed to get the key %s: %v", registryRoot, err)
+		} else {
+			glog.Errorf("Failed to contact etcd for key %s: %v", registryRoot, err)
 		}
+		return []api.Service{}, []api.Endpoints{}, err
 	}
 	if response.Node.Dir == true {
 		retServices := make([]api.Service, len(response.Node.Nodes))
