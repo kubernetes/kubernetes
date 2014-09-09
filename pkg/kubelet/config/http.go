@@ -62,6 +62,9 @@ func (s *SourceURL) extractFromURL() error {
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("%v: %v", s.url, resp.Status)
+	}
 	if len(data) == 0 {
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
