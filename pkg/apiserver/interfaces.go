@@ -30,20 +30,20 @@ type RESTStorage interface {
 	New() runtime.Object
 
 	// List selects resources in the storage which match to the selector.
-	List(label, field labels.Selector) (runtime.Object, error)
+	List(namespace string, label, field labels.Selector) (runtime.Object, error)
 
 	// Get finds a resource in the storage by id and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Get(id string) (runtime.Object, error)
+	Get(namespace string, id string) (runtime.Object, error)
 
 	// Delete finds a resource in the storage and deletes it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Delete(id string) (<-chan runtime.Object, error)
+	Delete(namespace string, id string) (<-chan runtime.Object, error)
 
-	Create(runtime.Object) (<-chan runtime.Object, error)
-	Update(runtime.Object) (<-chan runtime.Object, error)
+	Create(namespace string, obj runtime.Object) (<-chan runtime.Object, error)
+	Update(namespace string, obj runtime.Object) (<-chan runtime.Object, error)
 }
 
 // ResourceWatcher should be implemented by all RESTStorage objects that
@@ -59,5 +59,5 @@ type ResourceWatcher interface {
 // Redirector know how to return a remote resource's location.
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, or an error.
-	ResourceLocation(id string) (remoteLocation string, err error)
+	ResourceLocation(namespace string, id string) (remoteLocation string, err error)
 }

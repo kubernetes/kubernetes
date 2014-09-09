@@ -50,8 +50,11 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 	}
 }
 
-func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(namespace string, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
+	if len(srv.Namespace) == 0 {
+		srv.Namespace = namespace
+	}
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
 	}
@@ -90,23 +93,23 @@ func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetService(srv.ID)
+		return rs.registry.GetService(srv.Namespace, srv.ID)
 	}), nil
 }
 
-func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
-	service, err := rs.registry.GetService(id)
+func (rs *REST) Delete(namespace string, id string) (<-chan runtime.Object, error) {
+	service, err := rs.registry.GetService(namespace, id)
 	if err != nil {
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		rs.deleteExternalLoadBalancer(service)
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(namespace, id)
 	}), nil
 }
 
-func (rs *REST) Get(id string) (runtime.Object, error) {
-	s, err := rs.registry.GetService(id)
+func (rs *REST) Get(namespace string, id string) (runtime.Object, error) {
+	s, err := rs.registry.GetService(namespace, id)
 	if err != nil {
 		return nil, err
 	}
@@ -114,8 +117,8 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 }
 
 // TODO: implement field selector?
-func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
-	list, err := rs.registry.ListServices()
+func (rs *REST) List(namespace string, label, field labels.Selector) (runtime.Object, error) {
+	list, err := rs.registry.ListServices(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +146,7 @@ func (*REST) New() runtime.Object {
 // in the container environment to get access to services.
 func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.EnvVar, error) {
 	var result []api.EnvVar
-	services, err := registry.ListServices()
+	services, err := registry.ListServices(api.NamespaceAll)
 	if err != nil {
 		return result, err
 	}
@@ -157,7 +160,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 	return result, nil
 }
 
-func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(namespace string, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -168,13 +171,13 @@ func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetService(srv.ID)
+		return rs.registry.GetService(srv.Namespace, srv.ID)
 	}), nil
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(id string) (string, error) {
-	e, err := rs.registry.GetEndpoints(id)
+func (rs *REST) ResourceLocation(namespace string, id string) (string, error) {
+	e, err := rs.registry.GetEndpoints(namespace, id)
 	if err != nil {
 		return "", err
 	}

@@ -32,7 +32,7 @@ type fakeBinder struct {
 func (fb fakeBinder) Bind(binding *api.Binding) error { return fb.b(binding) }
 
 func podWithID(id string) *api.Pod {
-	return &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	return &api.Pod{JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault}}
 }
 
 type mockScheduler struct {
@@ -60,7 +60,7 @@ func TestScheduler(t *testing.T) {
 		{
 			sendPod:    podWithID("foo"),
 			algo:       mockScheduler{"machine1", nil},
-			expectBind: &api.Binding{PodID: "foo", Host: "machine1"},
+			expectBind: &api.Binding{JSONBase: api.JSONBase{Namespace: api.NamespaceDefault}, PodID: "foo", Host: "machine1"},
 		}, {
 			sendPod:        podWithID("foo"),
 			algo:           mockScheduler{"machine1", errS},
@@ -69,7 +69,7 @@ func TestScheduler(t *testing.T) {
 		}, {
 			sendPod:         podWithID("foo"),
 			algo:            mockScheduler{"machine1", nil},
-			expectBind:      &api.Binding{PodID: "foo", Host: "machine1"},
+			expectBind:      &api.Binding{JSONBase: api.JSONBase{Namespace: api.NamespaceDefault}, PodID: "foo", Host: "machine1"},
 			injectBindError: errB,
 			expectError:     errB,
 			expectErrorPod:  podWithID("foo"),

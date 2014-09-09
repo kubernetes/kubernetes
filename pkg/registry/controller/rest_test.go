@@ -39,7 +39,8 @@ func TestListControllersError(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(labels.Everything(), labels.Everything())
+	controllers, err := storage.List(api.NamespaceDefault, labels.Everything(), labels.Everything())
+
 	if err != mockRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
 	}
@@ -53,7 +54,9 @@ func TestListEmptyControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(labels.Everything(), labels.Everything())
+
+	controllers, err := storage.List(api.NamespaceDefault, labels.Everything(), labels.Everything())
+
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -72,12 +75,14 @@ func TestListControllerList(t *testing.T) {
 			Items: []api.ReplicationController{
 				{
 					JSONBase: api.JSONBase{
-						ID: "foo",
+						ID:        "foo",
+						Namespace: api.NamespaceDefault,
 					},
 				},
 				{
 					JSONBase: api.JSONBase{
-						ID: "bar",
+						ID:        "bar",
+						Namespace: api.NamespaceDefault,
 					},
 				},
 			},
@@ -86,7 +91,7 @@ func TestListControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllersObj, err := storage.List(labels.Everything(), labels.Everything())
+	controllersObj, err := storage.List(api.NamespaceDefault, labels.Everything(), labels.Everything())
 	controllers := controllersObj.(*api.ReplicationControllerList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -216,12 +221,13 @@ var validPodTemplate = api.PodTemplate{
 }
 
 func TestCreateController(t *testing.T) {
+	ns := api.NamespaceDefault
 	mockRegistry := registrytest.ControllerRegistry{}
 	mockPodRegistry := registrytest.PodRegistry{
 		Pods: &api.PodList{
 			Items: []api.Pod{
 				{
-					JSONBase: api.JSONBase{ID: "foo"},
+					JSONBase: api.JSONBase{ID: "foo", Namespace: ns},
 					Labels:   map[string]string{"a": "b"},
 				},
 			},
@@ -233,14 +239,14 @@ func TestCreateController(t *testing.T) {
 		pollPeriod: time.Millisecond * 1,
 	}
 	controller := &api.ReplicationController{
-		JSONBase: api.JSONBase{ID: "test"},
+		JSONBase: api.JSONBase{ID: "test", Namespace: ns},
 		DesiredState: api.ReplicationControllerState{
 			Replicas:        2,
 			ReplicaSelector: map[string]string{"a": "b"},
 			PodTemplate:     validPodTemplate,
 		},
 	}
-	channel, err := storage.Create(controller)
+	channel, err := storage.Create(ns, controller)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -257,6 +263,7 @@ func TestCreateController(t *testing.T) {
 }
 
 func TestControllerStorageValidatesCreate(t *testing.T) {
+	ns := api.NamespaceDefault
 	mockRegistry := registrytest.ControllerRegistry{}
 	storage := REST{
 		registry:   &mockRegistry,
@@ -266,18 +273,18 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
-			JSONBase: api.JSONBase{ID: ""},
+			JSONBase: api.JSONBase{ID: "", Namespace: ns},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			JSONBase:     api.JSONBase{ID: "abc"},
+			JSONBase:     api.JSONBase{ID: "abc", Namespace: ns},
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(&failureCase)
+		c, err := storage.Create(ns, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -288,6 +295,7 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 }
 
 func TestControllerStorageValidatesUpdate(t *testing.T) {
+	ns := api.NamespaceDefault
 	mockRegistry := registrytest.ControllerRegistry{}
 	storage := REST{
 		registry:   &mockRegistry,
@@ -307,7 +315,7 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(&failureCase)
+		c, err := storage.Update(ns, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -320,10 +328,12 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 type fakePodLister struct {
 	e error
 	l api.PodList
+	n string
 	s labels.Selector
 }
 
-func (f *fakePodLister) ListPods(s labels.Selector) (*api.PodList, error) {
+func (f *fakePodLister) ListPods(namespace string, s labels.Selector) (*api.PodList, error) {
+	f.n = namespace
 	f.s = s
 	return &f.l, f.e
 }
