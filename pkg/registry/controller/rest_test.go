@@ -316,3 +316,44 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 		}
 	}
 }
+
+type fakePodLister struct {
+	e error
+	l api.PodList
+	s labels.Selector
+}
+
+func (f *fakePodLister) ListPods(s labels.Selector) (*api.PodList, error) {
+	f.s = s
+	return &f.l, f.e
+}
+
+func TestFillCurrentState(t *testing.T) {
+	fakeLister := fakePodLister{
+		l: api.PodList{
+			Items: []api.Pod{
+				{JSONBase: api.JSONBase{ID: "foo"}},
+				{JSONBase: api.JSONBase{ID: "bar"}},
+			},
+		},
+	}
+	mockRegistry := registrytest.ControllerRegistry{}
+	storage := REST{
+		registry:  &mockRegistry,
+		podLister: &fakeLister,
+	}
+	controller := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			ReplicaSelector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+	storage.fillCurrentState(&controller)
+	if controller.CurrentState.Replicas != 2 {
+		t.Errorf("expected 2, got: %d", controller.CurrentState.Replicas)
+	}
+	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()) {
+		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.DesiredState.ReplicaSelector).AsSelector(), fakeLister.s)
+	}
+}
