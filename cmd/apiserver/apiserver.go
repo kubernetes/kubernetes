@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -141,7 +142,7 @@ func main() {
 	if len(corsAllowedOriginList) > 0 {
 		allowedOriginRegexps, err := util.CompileRegexps(corsAllowedOriginList)
 		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin: %v", err)
+			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(corsAllowedOriginList, ","), err)
 		}
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}

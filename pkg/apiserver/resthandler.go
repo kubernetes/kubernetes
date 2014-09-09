@@ -42,7 +42,7 @@ func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	storage := h.storage[parts[0]]
 	if storage == nil {
-		httplog.FindOrCreateLogOf(req, &w).Addf("'%v' has no storage object", parts[0])
+		httplog.LogOf(req, w).Addf("'%v' has no storage object", parts[0])
 		notFound(w, req)
 		return
 	}
@@ -114,7 +114,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			return
 		}
 		op := h.createOperation(out, sync, timeout)
-		h.finishReq(op, w)
+		h.finishReq(op, req, w)
 
 	case "DELETE":
 		if len(parts) != 2 {
@@ -127,7 +127,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			return
 		}
 		op := h.createOperation(out, sync, timeout)
-		h.finishReq(op, w)
+		h.finishReq(op, req, w)
 
 	case "PUT":
 		if len(parts) != 2 {
@@ -151,7 +151,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			return
 		}
 		op := h.createOperation(out, sync, timeout)
-		h.finishReq(op, w)
+		h.finishReq(op, req, w)
 
 	default:
 		notFound(w, req)
@@ -171,7 +171,7 @@ func (h *RESTHandler) createOperation(out <-chan runtime.Object, sync bool, time
 
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to receive the result and returning its ID down the writer.
-func (h *RESTHandler) finishReq(op *Operation, w http.ResponseWriter) {
+func (h *RESTHandler) finishReq(op *Operation, req *http.Request, w http.ResponseWriter) {
 	obj, complete := op.StatusOrResult()
 	if complete {
 		status := http.StatusOK
