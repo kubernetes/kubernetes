@@ -14,14 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copies any built binaries off the Docker machine.
-#
-# This is a no-op on Linux when the Docker daemon is local.  This is only
-# necessary on Mac OS X with boot2docker.
-
-set -e
-
-source $(dirname $0)/common.sh
-
-kube::build::verify_prereqs
-kube::build::copy_output
+./scheduler -master="${API_SERVER}"

@@ -23,8 +23,8 @@ set -e
 
 source $(dirname $0)/common.sh
 
-verify-prereqs
-build-image
-run-build-command build/build-image/make-binaries.sh "$@"
-copy-output
-run-image
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command build/build-image/make-binaries.sh "$@"
+kube::build::copy_output
+kube::build::run_image

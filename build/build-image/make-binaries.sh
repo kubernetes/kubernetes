@@ -14,10 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This and builds all go components.
-
 set -e
 
 source $(dirname $0)/common.sh
 
-make-binaries "$@"
+kube::build::make_binaries "$@"

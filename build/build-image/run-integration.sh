@@ -18,13 +18,15 @@ set -e
 
 source $(dirname $0)/common.sh
 
-ETCD_DIR="${KUBE_REPO_ROOT}/_output/etcd"
+kube::build::make_binaries "./cmd/integration"
+
+readonly ETCD_DIR="${KUBE_REPO_ROOT}/_output/etcd"
 mkdir -p "${ETCD_DIR}"
 
 echo "+++ Running integration test"
 
 etcd -name test -data-dir ${ETCD_DIR} > "${KUBE_REPO_ROOT}/_output/etcd.log" &
-ETCD_PID=$!
+readonly ETCD_PID=$!
 
 sleep 5
 

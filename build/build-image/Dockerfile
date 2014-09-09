@@ -49,13 +49,21 @@ ENV GOPATH  /go
 ENV GOOS    linux
 ENV GOARCH  amd64
 
-# Get the code coverage tool and etcd for integration tests
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/coreos/etcd github.com/tools/godep
+# Get the code coverage tool and godep
+RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
+
+RUN mkdir -p /go/src/github.com/coreos/etcd && \
+    cd /go/src/github.com/coreos/etcd && \
+    git clone https://github.com/coreos/etcd.git . -b v0.4.6 --depth=1 && \
+    go install github.com/coreos/etcd
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+
+# Propagate the git tree version into the build image
+ADD kube-version-defs /kube-version-defs
 
 # Upload Kubernetes source
 ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes

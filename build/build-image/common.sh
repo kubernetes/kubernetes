@@ -25,34 +25,53 @@ readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 mkdir -p "${KUBE_TARGET}"
 
 if [[ ! -f "/kube-build-image" ]]; then
-  echo "WARNING: This script should be run in the kube-build conrtainer image!" >&2
+  echo "WARNING: This script should be run in the kube-build container image!" >&2
 fi
 
-function make-binaries() {
-  readonly BINARIES="
-    proxy
-    integration
-    apiserver
-    controller-manager
-    kubelet
-    kubecfg"
+if [[ -f "/kube-version-defs" ]]; then
+  source "/kube-version-defs"
+else
+  echo "WARNING: No version information provided in build image"
+fi
+
+function kube::build::make_binary() {
+  local -r gopkg=$1
+  local -r bin=${gopkg##*/}
+
+  echo "+++ Building ${bin} for ${GOOS}/${GOARCH}"
+  pushd "${KUBE_REPO_ROOT}" >/dev/null
+  godep go build -ldflags "${KUBE_LD_FLAGS-}" -o "${ARCH_TARGET}/${bin}" "${gopkg}"
+  popd >/dev/null
+}
+
+function kube::build::make_binaries() {
+  if [[ ${#targets[@]} -eq 0 ]]; then
+    targets=(
+      cmd/proxy
+      cmd/apiserver
+      cmd/controller-manager
+      cmd/kubelet
+      cmd/kubecfg
+      plugin/cmd/scheduler
+    )
+  fi
+
+  binaries=()
+  local target
+  for target in "${targets[@]}"; do
+    binaries+=("${KUBE_GO_PACKAGE}/${target}")
+  done
 
   ARCH_TARGET="${KUBE_TARGET}/${GOOS}/${GOARCH}"
   mkdir -p "${ARCH_TARGET}"
 
-  function make-binary() {
-    echo "+++ Building $1 for ${GOOS}/${GOARCH}"
-    godep go build \
-      -o "${ARCH_TARGET}/$1" \
-      github.com/GoogleCloudPlatform/kubernetes/cmd/$1
-  }
-
-  if [[ -n $1 ]]; then
-    make-binary $1
+  if [[ -n "$1" ]]; then
+    kube::build::make_binary "$1"
     exit 0
   fi
 
-  for b in ${BINARIES}; do
-    make-binary $b
+  local b
+  for b in "${binaries[@]}"; do
+    kube::build::make_binary "$b"
   done
 }

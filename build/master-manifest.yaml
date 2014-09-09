@@ -8,7 +8,7 @@ containers:
   - name: registry
     image: google/docker-registry
     ports:
-      - name: registry 
+      - name: registry
         hostPort: 5000
         containerPort: 5000
     env:
@@ -44,6 +44,6 @@ containers:
         value: http://127.0.0.1:4001
       - key: API_SERVER
         value: 127.0.0.1:8090
-    
+
 volumes:
   - name: etcddata
