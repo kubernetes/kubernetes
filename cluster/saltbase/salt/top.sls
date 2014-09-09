@@ -10,6 +10,7 @@ base:
     - kube-proxy
     - cadvisor
     - nsinit
+    - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn-client
 {% else %}
@@ -24,6 +25,7 @@ base:
     - controller-manager
     - scheduler
     - nginx
+    - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}
