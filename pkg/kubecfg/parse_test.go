@@ -26,7 +26,7 @@ import (
 
 func TestParseBadStorage(t *testing.T) {
 	p := NewParser(map[string]runtime.Object{})
-	_, err := p.ToWireFormat([]byte("{}"), "badstorage")
+	_, err := p.ToWireFormat([]byte("{}"), "badstorage", runtime.DefaultCodec)
 	if err == nil {
 		t.Errorf("Expected error, received none")
 	}
@@ -37,8 +37,8 @@ func DoParseTest(t *testing.T, storage string, obj runtime.Object, p *Parser) {
 	yamlData, _ := yaml.Marshal(obj)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))
-	jsonGot, jsonErr := p.ToWireFormat(jsonData, storage)
-	yamlGot, yamlErr := p.ToWireFormat(yamlData, storage)
+	jsonGot, jsonErr := p.ToWireFormat(jsonData, storage, runtime.DefaultCodec)
+	yamlGot, yamlErr := p.ToWireFormat(yamlData, storage, runtime.DefaultCodec)
 
 	if jsonErr != nil {
 		t.Errorf("json err: %#v", jsonErr)

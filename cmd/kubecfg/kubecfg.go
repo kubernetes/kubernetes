@@ -105,7 +105,7 @@ func readConfig(storage string) []byte {
 	if err != nil {
 		glog.Fatalf("Unable to read %v: %v\n", *config, err)
 	}
-	data, err = parser.ToWireFormat(data, storage)
+	data, err = parser.ToWireFormat(data, storage, runtime.DefaultCodec)
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
 	}

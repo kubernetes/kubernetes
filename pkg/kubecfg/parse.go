@@ -38,18 +38,18 @@ func NewParser(objectMap map[string]runtime.Object) *Parser {
 
 // ToWireFormat takes input 'data' as either json or yaml, checks that it parses as the
 // appropriate object type, and returns json for sending to the API or an error.
-func (p *Parser) ToWireFormat(data []byte, storage string) ([]byte, error) {
+func (p *Parser) ToWireFormat(data []byte, storage string, c runtime.Codec) ([]byte, error) {
 	prototypeType, found := p.storageToType[storage]
 	if !found {
 		return nil, fmt.Errorf("unknown storage type: %v", storage)
 	}
 
 	obj := reflect.New(prototypeType).Interface().(runtime.Object)
-	err := runtime.DefaultCodec.DecodeInto(data, obj)
+	err := c.DecodeInto(data, obj)
 	if err != nil {
 		return nil, err
 	}
-	return runtime.DefaultCodec.Encode(obj)
+	return c.Encode(obj)
 }
 
 func (p *Parser) SupportedWireStorage() []string {
