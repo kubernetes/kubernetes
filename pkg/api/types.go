@@ -276,6 +276,8 @@ type PodState struct {
 	Host     string            `json:"host,omitempty" yaml:"host,omitempty"`
 	HostIP   string            `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 	PodIP    string            `json:"podIP,omitempty" yaml:"podIP,omitempty"`
+	Stdout   string            `json:"stdout,omitempty" yaml:"stdout,omitempty"`
+	Stderr   string            `json:"stderr,omitempty" yaml:"stderr,omitempty"`
 
 	// The key of this map is the *name* of the container within the manifest; it has one
 	// entry per container in the manifest. The value of this map is currently the output
