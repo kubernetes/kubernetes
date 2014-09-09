@@ -115,9 +115,7 @@ function kube-up() {
     grep -v "^#" $(dirname $0)/templates/salt-master.sh
     ) > ${KUBE_TEMP}/master-start.sh
 
-    echo $(dirname $0)
-
-    $AWS_CMD run-instances \
+    master_id=$($AWS_CMD run-instances \
     --image-id $IMAGE \
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
@@ -125,8 +123,9 @@ function kube-up() {
     --key-name kubernetes \
     --security-group-ids $SEC_GROUP_ID \
     --associate-public-ip-address \
-    --user-data file://${KUBE_TEMP}/master-start.sh \
-    > /dev/null
+    --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
+
+    $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=kubernetes-master > /dev/null
 
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
@@ -136,7 +135,7 @@ function kube-up() {
       grep -v "^#" $(dirname $0)/templates/salt-minion.sh
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
-        $AWS_CMD run-instances \
+        minion_id=$($AWS_CMD run-instances \
         --image-id $IMAGE \
         --instance-type $MINION_SIZE \
         --subnet-id $SUBNET_ID \
@@ -144,7 +143,8 @@ function kube-up() {
         --key-name kubernetes \
         --security-group-ids $SEC_GROUP_ID \
         --associate-public-ip-address \
-        --user-data file://${KUBE_TEMP}/minion-start-${i}.sh \
-        > /dev/null
+        --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
+
+        $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=kubernetes-minion-$i > /dev/null
     done
 }
