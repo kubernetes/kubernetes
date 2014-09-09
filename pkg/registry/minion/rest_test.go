@@ -21,11 +21,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
 func TestMinionREST(t *testing.T) {
-	m := NewRegistry([]string{"foo", "bar"}, api.NodeResources{})
-	ms := NewREST(m)
+	ms := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
 	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Minion).ID != "foo" {
 		t.Errorf("missing expected object")
@@ -72,13 +72,22 @@ func TestMinionREST(t *testing.T) {
 	}
 	expect := []api.Minion{
 		{
-			TypeMeta: api.TypeMeta{ID: "baz"},
-		}, {
 			TypeMeta: api.TypeMeta{ID: "foo"},
+		}, {
+			TypeMeta: api.TypeMeta{ID: "baz"},
 		},
 	}
 	nodeList := list.(*api.MinionList)
 	if len(expect) != len(nodeList.Items) || !contains(nodeList, "foo") || !contains(nodeList, "baz") {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
+}
+
+func contains(nodes *api.MinionList, nodeID string) bool {
+	for _, node := range nodes.Items {
+		if node.ID == nodeID {
+			return true
+		}
+	}
+	return false
 }

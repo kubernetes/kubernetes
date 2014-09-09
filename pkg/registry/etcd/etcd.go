@@ -34,8 +34,7 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// Registry implements PodRegistry, ControllerRegistry and ServiceRegistry
-// with backed by etcd.
+// Registry implements PodRegistry, ControllerRegistry, ServiceRegistry and  MinionRegitry, backed by etcd.
 type Registry struct {
 	tools.EtcdHelper
 	manifestFactory pod.ManifestFactory
@@ -381,4 +380,41 @@ func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector,
 		return r.WatchList("/registry/services/endpoints", resourceVersion, tools.Everything)
 	}
 	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
+}
+
+func makeMinionKey(minionID string) string {
+	return "/registry/minions/" + minionID
+}
+
+func (r *Registry) ListMinions(ctx api.Context) (*api.MinionList, error) {
+	minions := &api.MinionList{}
+	err := r.ExtractList("/registry/minions", &minions.Items, &minions.ResourceVersion)
+	return minions, err
+}
+
+func (r *Registry) InsertMinion(ctx api.Context, minion *api.Minion) error {
+	err := r.CreateObj(makeMinionKey(minion.ID), minion, 0)
+	return etcderr.InterpretCreateError(err, "minion", minion.ID)
+}
+
+func (r *Registry) ContainsMinion(ctx api.Context, minionID string) (bool, error) {
+	var minion api.Minion
+	key := makeMinionKey(minionID)
+	err := r.ExtractObj(key, &minion, false)
+	if err == nil {
+		return true, nil
+	} else if tools.IsEtcdNotFound(err) {
+		return false, nil
+	} else {
+		return false, etcderr.InterpretGetError(err, "minion", minion.ID)
+	}
+}
+
+func (r *Registry) DeleteMinion(ctx api.Context, minionID string) error {
+	key := makeMinionKey(minionID)
+	err := r.Delete(key, true)
+	if err != nil {
+		return etcderr.InterpretDeleteError(err, "minion", minionID)
+	}
+	return nil
 }

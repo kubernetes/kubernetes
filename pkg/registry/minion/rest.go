@@ -38,6 +38,8 @@ func NewREST(m Registry) *REST {
 	}
 }
 
+var ErrDoesNotExist = fmt.Errorf("The requested resource does not exist.")
+
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	minion, ok := obj.(*api.Minion)
 	if !ok {
@@ -50,11 +52,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	minion.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Insert(minion.ID)
+		err := rs.registry.InsertMinion(ctx, minion)
 		if err != nil {
 			return nil, err
 		}
-		contains, err := rs.registry.Contains(minion.ID)
+		contains, err := rs.registry.ContainsMinion(ctx, minion.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +68,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
-	exists, err := rs.registry.Contains(id)
+	exists, err := rs.registry.ContainsMinion(ctx, id)
 	if !exists {
 		return nil, ErrDoesNotExist
 	}
@@ -74,12 +76,12 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteMinion(ctx, id)
 	}), nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	exists, err := rs.registry.Contains(id)
+	exists, err := rs.registry.ContainsMinion(ctx, id)
 	if !exists {
 		return nil, ErrDoesNotExist
 	}
@@ -87,10 +89,10 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	return rs.registry.List()
+	return rs.registry.ListMinions(ctx)
 }
 
-func (*REST) New() runtime.Object {
+func (rs *REST) New() runtime.Object {
 	return &api.Minion{}
 }
 
