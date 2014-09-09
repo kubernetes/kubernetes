@@ -1,0 +1,1 @@
+logrotate /etc/logrotate.conf

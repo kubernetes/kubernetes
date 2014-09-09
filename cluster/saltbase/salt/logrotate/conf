@@ -1,0 +1,11 @@
+/var/log/{{ file }}.log {
+    rotate 5
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize 100m
+    daily
+    create 0644 root root
+}
+
