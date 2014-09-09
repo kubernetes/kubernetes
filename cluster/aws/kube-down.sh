@@ -14,10 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'aws', 'azure', 'vagrant', 'local', 'vsphere'
+# Tear down a Kubernetes cluster.
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+# exit on any error
+set -e
+
+source $(dirname $0)/../kube-env.sh
+source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
+
+echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
+
+verify-prereqs
+kube-down
+
+echo "Done"

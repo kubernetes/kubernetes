@@ -14,10 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'aws', 'azure', 'vagrant', 'local', 'vsphere'
+ZONE=eu-west-1
+MASTER_SIZE=t2.small
+MINION_SIZE=t2.small
+NUM_MINIONS=4
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+IMAGE=ami-0307d674
+INSTANCE_PREFIX=kubernetes
+AWS_SSH_KEY=$HOME/.ssh/kube_aws_rsa
+
+MASTER_NAME="ip-172-20-0-9.$ZONE.compute.internal"
+MASTER_TAG="${INSTANCE_PREFIX}-master"
+MINION_TAG="${INSTANCE_PREFIX}-minion"
+MINION_NAMES=($(eval echo ip-172-20-0-1{0..$(($NUM_MINIONS-1))}.$ZONE.compute.internal))
+MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
+MINION_SCOPES=""
