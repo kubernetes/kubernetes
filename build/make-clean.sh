@@ -20,10 +20,10 @@ set -e
 
 source $(dirname $0)/common.sh
 
-kube::build::verify-prereqs
-kube::build::build-image
+kube::build::verify_prereqs
+kube::build::build_image
 
 echo "+++ Cleaning out _output/build/*"
-kube::build::run-build-command rm -rf _output/build/*
+kube::build::run_build_command rm -rf _output/build/*
 
-kube::build::clean-images
+kube::build::clean_images

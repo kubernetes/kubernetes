@@ -23,5 +23,5 @@ set -e
 
 source $(dirname $0)/common.sh
 
-kube::build::verify-prereqs
-kube::build::copy-output
+kube::build::verify_prereqs
+kube::build::copy_output

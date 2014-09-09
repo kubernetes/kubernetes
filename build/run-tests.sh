@@ -20,6 +20,6 @@ set -e
 
 source $(dirname $0)/common.sh
 
-kube::build::verify-prereqs
-kube::build::build-image
-kube::build::run-build-command build/build-image/run-tests.sh "$@"
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command build/build-image/run-tests.sh "$@"

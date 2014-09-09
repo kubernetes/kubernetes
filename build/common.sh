@@ -56,7 +56,7 @@ readonly RELEASE_DIR="${KUBE_REPO_ROOT}/_output/release"
 # Basic setup functions
 
 # Verify that the right utilities and such are installed for building Kube.
-function kube::build::verify-prereqs() {
+function kube::build::verify_prereqs() {
   if [[ -z "$(which docker)" ]]; then
     echo "Can't find 'docker' in PATH, please fix and retry." >&2
     echo "See https://docs.docker.com/installation/#installation for installation instructions." >&2
@@ -91,9 +91,9 @@ function kube::build::verify-prereqs() {
 # Building
 
 # Set up the context directory for the kube-build image and build it.
-function kube::build::build-image() {
-  local -r BUILD_CONTEXT_DIR="${KUBE_REPO_ROOT}/_output/images/${KUBE_BUILD_IMAGE}"
-  local -r SOURCE=(
+function kube::build::build_image() {
+  local -r build_context_dir="${KUBE_REPO_ROOT}/_output/images/${KUBE_BUILD_IMAGE}"
+  local -r source=(
     api
     build
     cmd
@@ -106,97 +106,98 @@ function kube::build::build-image() {
     README.md
     third_party
   )
-  mkdir -p ${BUILD_CONTEXT_DIR}
-  tar czf ${BUILD_CONTEXT_DIR}/kube-source.tar.gz "${SOURCE[@]}"
-  cat >${BUILD_CONTEXT_DIR}/kube-version-defs <<EOF
+  mkdir -p "${build_context_dir}"
+  tar czf "${build_context_dir}/kube-source.tar.gz" "${source[@]}"
+  cat >"${build_context_dir}/kube-version-defs" <<EOF
 KUBE_LD_FLAGS="$(kube::version_ldflags)"
 EOF
-  cp build/build-image/Dockerfile ${BUILD_CONTEXT_DIR}/Dockerfile
-  kube::build::docker-build "${KUBE_BUILD_IMAGE}" "${BUILD_CONTEXT_DIR}"
+  cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}"
 }
 
 # Builds the runtime image.  Assumes that the appropriate binaries are already
 # built and in _output/build/.
-function kube::build::run-image() {
-  local -r BUILD_CONTEXT_BASE="${KUBE_REPO_ROOT}/_output/images/${KUBE_RUN_IMAGE_BASE}"
+function kube::build::run_image() {
+  local -r build_context_base="${KUBE_REPO_ROOT}/_output/images/${KUBE_RUN_IMAGE_BASE}"
 
   # First build the base image.  This one brings in all of the binaries.
-  mkdir -p "${BUILD_CONTEXT_BASE}"
-  tar czf ${BUILD_CONTEXT_BASE}/kube-bins.tar.gz \
+  mkdir -p "${build_context_base}"
+  tar czf "${build_context_base}/kube-bins.tar.gz" \
     -C "_output/build/linux/amd64" \
     "${KUBE_RUN_BINARIES[@]}"
-  cp -R build/run-images/base/* "${BUILD_CONTEXT_BASE}/"
-  kube::build::docker-build "${KUBE_RUN_IMAGE_BASE}" "${BUILD_CONTEXT_BASE}"
+  cp -R build/run-images/base/* "${build_context_base}/"
+  kube::build::docker_build "${KUBE_RUN_IMAGE_BASE}" "${build_context_base}"
 
   local b
   for b in "${KUBE_RUN_BINARIES[@]}" ; do
-    local SUB_CONTEXT_DIR="${BUILD_CONTEXT_BASE}-$b"
-    mkdir -p "${SUB_CONTEXT_DIR}"
-    cp -R build/run-images/$b/* "${SUB_CONTEXT_DIR}/"
-    kube::build::docker-build "${KUBE_RUN_IMAGE_BASE}-$b" "${SUB_CONTEXT_DIR}"
+    local sub_context_dir="${build_context_base}-$b"
+    mkdir -p "${sub_context_dir}"
+    cp -R build/run-images/$b/* "${sub_context_dir}/"
+    kube::build::docker_build "${KUBE_RUN_IMAGE_BASE}-$b" "${sub_context_dir}"
   done
 }
 
-function kube::build::clean-images() {
-  # Clean the build image
-  kube::build::clean-image "${KUBE_BUILD_IMAGE}"
+function kube::build::clean_images() {
+  kube::build::clean_image "${KUBE_BUILD_IMAGE}"
+
+  kube::build::clean_image "${KUBE_RUN_IMAGE_BASE}"
 
   local b
   for b in "${KUBE_RUN_BINARIES[@]}" ; do
-    kube::build::clean-image "${KUBE_RUN_IMAGE_BASE}-${b}"
+    kube::build::clean_image "${KUBE_RUN_IMAGE_BASE}-${b}"
   done
 
   echo "+++ Cleaning all other untagged docker images"
-  docker rmi $(docker images | grep "^<none>" | awk '{print $3}') 2> /dev/null
+  docker rmi $(docker images | awk '/^<none>/ {print $3}') 2> /dev/null || true
 }
 
 # Build a docker image from a Dockerfile.
 # $1 is the name of the image to build
 # $2 is the location of the "context" directory, with the Dockerfile at the root.
-function kube::build::docker-build() {
-  local -r IMAGE=$1
-  local -r CONTEXT_DIR=$2
-  local -r BUILD_CMD="docker build -t ${IMAGE} ${CONTEXT_DIR}"
+function kube::build::docker_build() {
+  local -r image=$1
+  local -r context_dir=$2
+  local -r build_cmd="docker build -t ${image} ${context_dir}"
 
-  echo "+++ Building Docker image ${IMAGE}. This can take a while."
+  echo "+++ Building Docker image ${image}. This can take a while."
   set +e # We are handling the error here manually
-  local -r DOCKER_OUTPUT="$(${BUILD_CMD} 2>&1)"
+  local -r docker_output="$(${build_cmd} 2>&1)"
   if [ $? -ne 0 ]; then
     set -e
-    echo "+++ Docker build command failed for ${IMAGE}" >&2
+    echo "+++ Docker build command failed for ${image}" >&2
     echo >&2
-    echo "${DOCKER_OUTPUT}" >&2
+    echo "${docker_output}" >&2
     echo >&2
     echo "To retry manually, run:" >&2
     echo >&2
-    echo "  ${DOCKER_BUILD_CMD}" >&2
+    echo "  ${build_cmd}" >&2
     echo >&2
     return 1
   fi
   set -e
 }
 
-function kube::build::clean-image() {
-  local -r IMAGE=$1
+function kube::build::clean_image() {
+  local -r image=$1
 
-  echo "+++ Deleting docker image ${IMAGE}"
-  docker rmi ${IMAGE} 2> /dev/null || true
+  echo "+++ Deleting docker image ${image}"
+  docker rmi ${image} 2> /dev/null || true
 }
 
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
-function kube::build::run-build-command() {
+function kube::build::run_build_command() {
   [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
 
-  local -r DOCKER="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+  local -r docker="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
   docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 
-  ${DOCKER} "$@"
+  ${docker} "$@"
 }
 
 # If the Docker server is remote, copy the results back out.
-function kube::build::copy-output() {
+function kube::build::copy_output() {
   if [[ "$OSTYPE" == "darwin"* ]]; then
     # When we are on the Mac with boot2docker we need to copy the results back
     # out.  Ideally we would leave the container around and use 'docker cp' to
@@ -207,7 +208,7 @@ function kube::build::copy-output() {
     # The easiest thing I (jbeda) could figure out was to launch another
     # container pointed at the same volume, tar the output directory and ship
     # that tar over stdou.
-    local DOCKER="docker run -a stdout --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+    local -r docker="docker run -a stdout --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
     # Kill any leftover container
     docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
@@ -215,7 +216,7 @@ function kube::build::copy-output() {
     echo "+++ Syncing back _output directory from boot2docker VM"
     mkdir -p "${LOCAL_OUTPUT_DIR}"
     rm -rf "${LOCAL_OUTPUT_DIR}/*"
-    ${DOCKER} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} ."  \
+    ${docker} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} ."  \
       | tar xv -C "${LOCAL_OUTPUT_DIR}"
 
     # I (jbeda) also tried getting rsync working using 'docker run' as the
@@ -232,27 +233,25 @@ function kube::build::copy-output() {
 # Build final release artifacts
 
 # Package up all of the cross compiled clients
-function kube::build::package-tarballs() {
+function kube::build::package_tarballs() {
   mkdir -p "${RELEASE_DIR}"
 
   # Find all of the built kubecfg binaries
   local platform
   for platform in _output/build/*/* ; do
-    local PLATFORM_TAG=${platform}
-    PLATFORM_TAG=${PLATFORM_TAG#*/*/}  # remove the first two path components
-    PLATFORM_TAG=${PLATFORM_TAG/\//-}  # Replace a "/" for a "-"
-    echo "+++ Building client package for $PLATFORM_TAG"
+    local platform_tag=${platform}
+    platform_tag=${platform_tag#*/*/}  # remove the first two path components
+    platform_tag=${platform_tag/\//-}  # Replace a "/" for a "-"
+    echo "+++ Building client package for $platform_tag"
 
-    local CLIENT_RELEASE_STAGE="${KUBE_REPO_ROOT}/_output/release-stage/${PLATFORM_TAG}/kubernetes"
-    mkdir -p "${CLIENT_RELEASE_STAGE}"
-    mkdir -p "${CLIENT_RELEASE_STAGE}/bin"
+    local client_release_stage="${KUBE_REPO_ROOT}/_output/release-stage/${platform_tag}/kubernetes"
+    mkdir -p "${client_release_stage}"
+    mkdir -p "${client_release_stage}/bin"
 
-    cp "${platform}"/* "${CLIENT_RELEASE_STAGE}/bin"
+    cp "${platform}"/* "${client_release_stage}/bin"
 
-    local CLIENT_PACKAGE_NAME="${RELEASE_DIR}/kubernetes-${PLATFORM_TAG}.tar.gz"
-    tar czf "${CLIENT_PACKAGE_NAME}" \
-      -C "${CLIENT_RELEASE_STAGE}/.." \
-      .
+    local client_package_name="${RELEASE_DIR}/kubernetes-${platform_tag}.tar.gz"
+    tar czf "${client_package_name}" -C "${client_release_stage}/.." .
   done
 }
 
@@ -260,14 +259,14 @@ function kube::build::package-tarballs() {
 # GCS Release
 
 function kube::release::gcs::release() {
-  kube::release::gcs::verify-prereqs
-  kube::release::gcs::ensure-release-bucket
-  kube::release::gcs::push-images
-  kube::release::gcs::copy-release-tarballs
+  kube::release::gcs::verify_prereqs
+  kube::release::gcs::ensure_release_bucket
+  kube::release::gcs::push_images
+  kube::release::gcs::copy_release_tarballs
 }
 
 # Verify things are set up for uploading to GCS
-function kube::release::gcs::verify-prereqs() {
+function kube::release::gcs::verify_prereqs() {
   if [[ -z "$(which gsutil)" || -z "$(which gcloud)" ]]; then
     echo "Releasing Kubernetes requires gsutil and gcloud.  Please download,"
     echo "install and authorize through the Google Cloud SDK: "
@@ -298,7 +297,7 @@ function kube::release::gcs::verify-prereqs() {
 }
 
 # Create a unique bucket name for releasing Kube and make sure it exists.
-function kube::release::gcs::ensure-release-bucket() {
+function kube::release::gcs::ensure_release_bucket() {
   local project_hash
   if which md5 > /dev/null 2>&1; then
     project_hash=$(md5 -q -s "$GCLOUD_PROJECT")
@@ -316,65 +315,66 @@ function kube::release::gcs::ensure-release-bucket() {
   fi
 }
 
-function kube::release::gcs::ensure-docker-registry() {
-  local -r REG_CONTAINER_NAME="gcs-registry"
+function kube::release::gcs::ensure_docker_registry() {
+  local -r reg_container_name="gcs-registry"
 
-  local -r RUNNING=$(docker inspect ${REG_CONTAINER_NAME} 2>/dev/null \
+  local -r running=$(docker inspect ${reg_container_name} 2>/dev/null \
     | build/json-extractor.py 0.State.Running 2>/dev/null)
 
-  [[ "$RUNNING" != "true" ]] || return 0
+  [[ "$running" != "true" ]] || return 0
 
   # Grovel around and find the OAuth token in the gcloud config
-  local -r BOTO=~/.config/gcloud/legacy_credentials/${GCLOUD_ACCOUNT}/.boto
-  local -r REFRESH_TOKEN=$(grep 'gs_oauth2_refresh_token =' $BOTO | awk '{ print $3 }')
+  local -r boto=~/.config/gcloud/legacy_credentials/${GCLOUD_ACCOUNT}/.boto
+  local -r refresh_token=$(grep 'gs_oauth2_refresh_token =' $boto | awk '{ print $3 }')
 
-  if [[ -z $REFRESH_TOKEN ]]; then
-    echo "Couldn't find OAuth 2 refresh token in ${BOTO}" >&2
+  if [[ -z "$refresh_token" ]]; then
+    echo "Couldn't find OAuth 2 refresh token in ${boto}" >&2
     return 1
   fi
 
   # If we have an old one sitting around, remove it
-  docker rm ${REG_CONTAINER_NAME} >/dev/null 2>&1 || true
+  docker rm ${reg_container_name} >/dev/null 2>&1 || true
 
   echo "+++ Starting GCS backed Docker registry"
-  local DOCKER="docker run -d --name=${REG_CONTAINER_NAME} "
-  DOCKER+="-e GCS_BUCKET=${KUBE_RELEASE_BUCKET} "
-  DOCKER+="-e STORAGE_PATH=${KUBE_DOCKER_REG_PREFIX} "
-  DOCKER+="-e GCP_OAUTH2_REFRESH_TOKEN=${REFRESH_TOKEN} "
-  DOCKER+="-p 127.0.0.1:5000:5000 "
-  DOCKER+="google/docker-registry"
+  local docker="docker run -d --name=${reg_container_name} "
+  docker+="-e GCS_BUCKET=${KUBE_RELEASE_BUCKET} "
+  docker+="-e STORAGE_PATH=${KUBE_DOCKER_REG_PREFIX} "
+  docker+="-e GCP_OAUTH2_REFRESH_TOKEN=${refresh_token} "
+  docker+="-p 127.0.0.1:5000:5000 "
+  docker+="google/docker-registry"
 
-  ${DOCKER}
+  ${docker}
 
   # Give it time to spin up before we start throwing stuff at it
   sleep 5
 }
 
-function kube::release::gcs::push-images() {
-  kube::release::gcs::ensure-docker-registry
+function kube::release::gcs::push_images() {
+  kube::release::gcs::ensure_docker_registry
 
   # Tag each of our run binaries with the right registry and push
-  local b
+  local b image_name
   for b in "${KUBE_RUN_BINARIES[@]}" ; do
-    echo "+++ Tagging and pushing ${KUBE_RUN_IMAGE_BASE}-$b to GCS bucket ${KUBE_RELEASE_BUCKET}"
-    docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
-    docker push "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
-    docker rmi "localhost:5000/${KUBE_RUN_IMAGE_BASE}-$b"
+    image_name="${KUBE_RUN_IMAGE_BASE}-${b}"
+    echo "+++ Tagging and pushing ${image_name} to GCS bucket ${KUBE_RELEASE_BUCKET}"
+    docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${image_name}"
+    docker push "localhost:5000/${image_name}"
+    docker rmi "localhost:5000/${image_name}"
   done
 }
 
-function kube::release::gcs::copy-release-tarballs() {
+function kube::release::gcs::copy_release_tarballs() {
   # TODO: This isn't atomic.  There will be points in time where there will be
   # no active release.  Also, if something fails, the release could be half-
   # copied.  The real way to do this would perhaps to have some sort of release
   # version so that we are never overwriting a destination.
-  local -r GCS_DESTINATION="gs://${KUBE_RELEASE_BUCKET}/${KUBE_RELEASE_PREFIX}"
+  local -r gcs_destination="gs://${KUBE_RELEASE_BUCKET}/${KUBE_RELEASE_PREFIX}"
 
-  echo "+++ Copying client tarballs to ${GCS_DESTINATION}"
+  echo "+++ Copying client tarballs to ${gcs_destination}"
 
   # First delete all objects at the destination
-  gsutil -q rm -f -R "${GCS_DESTINATION}" >/dev/null 2>&1 || true
+  gsutil -q rm -f -R "${gcs_destination}" >/dev/null 2>&1 || true
 
   # Now upload everything in release directory
-  gsutil -m cp -r "${RELEASE_DIR}" "${GCS_DESTINATION}" >/dev/null 2>&1
+  gsutil -m cp -r "${RELEASE_DIR}" "${gcs_destination}" >/dev/null 2>&1
 }

@@ -34,17 +34,17 @@ else
   echo "WARNING: No version information provided in build image"
 fi
 
-function make-binary() {
+function kube::build::make_binary() {
   local -r gopkg=$1
   local -r bin=${gopkg##*/}
 
   echo "+++ Building ${bin} for ${GOOS}/${GOARCH}"
-  pushd "${KUBE_REPO_ROOT}"
+  pushd "${KUBE_REPO_ROOT}" >/dev/null
   godep go build -ldflags "${KUBE_LD_FLAGS-}" -o "${ARCH_TARGET}/${bin}" "${gopkg}"
-  popd
+  popd >/dev/null
 }
 
-function make-binaries() {
+function kube::build::make_binaries() {
   if [[ ${#targets[@]} -eq 0 ]]; then
     targets=(
       cmd/proxy
@@ -66,12 +66,12 @@ function make-binaries() {
   mkdir -p "${ARCH_TARGET}"
 
   if [[ -n "$1" ]]; then
-    make-binary "$1"
+    kube::build::make_binary "$1"
     exit 0
   fi
 
   local b
   for b in "${binaries[@]}"; do
-    make-binary "$b"
+    kube::build::make_binary "$b"
   done
 }
