@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Fix hostname resolution
+echo "10.244.0.251 ip-10-244-0-251" >> /etc/hosts
+for i in $(seq 1 $NUM_MINIONS); do
+    echo "10.244.0.10$i ip-10-244-0-10$i" >> /etc/hosts
+done
+
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
 echo "master: 10.244.0.251" > /etc/salt/minion.d/master.conf

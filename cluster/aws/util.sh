@@ -95,7 +95,7 @@ function kube-up() {
 
     AWS_CMD="aws --output json ec2"
     
-    $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1
+    $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1 || true
     VPC_ID=$($AWS_CMD create-vpc --cidr-block 10.244.0.0/16 | json_val '["Vpc"]["VpcId"]')
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 10.244.0.0/24 --vpc-id $VPC_ID | json_val '["Subnet"]["SubnetId"]')
     IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
@@ -111,6 +111,7 @@ function kube-up() {
     echo "MASTER_NAME=${MASTER_NAME}"
     echo "MASTER_RELEASE_TAR=${RELEASE_FULL_HTTP_PATH}/master-release.tgz"
     echo "MASTER_HTPASSWD='${HTPASSWD}'"
+    echo "NUM_MINIONS=${NUM_MINIONS}"
     grep -v "^#" $(dirname $0)/templates/download-release.sh
     grep -v "^#" $(dirname $0)/templates/salt-master.sh
     ) > ${KUBE_TEMP}/master-start.sh
@@ -127,10 +128,11 @@ function kube-up() {
 
     $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=kubernetes-master > /dev/null
 
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    for i in $(seq 1 $NUM_MINIONS); do
     (
       echo "#! /bin/bash"
       echo "MASTER_NAME=${MASTER_NAME}"
+      echo "NUM_MINIONS=${NUM_MINIONS}"
       echo "MINION_IP_RANGE=${MINION_IP_RANGE}"
       grep -v "^#" $(dirname $0)/templates/salt-minion.sh
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
