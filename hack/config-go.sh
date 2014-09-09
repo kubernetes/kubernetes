@@ -109,7 +109,7 @@ kube::setup_go_environment() {
   GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/Godeps/_workspace"
   export GOPATH
 
-  # Unset GOBIN in case it already exsits in the current session.
+  # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 }
 
