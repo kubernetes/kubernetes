@@ -38,16 +38,16 @@ func NewREST(registry Registry) *REST {
 }
 
 // Get satisfies the RESTStorage interface.
-func (rs *REST) Get(id string) (runtime.Object, error) {
-	return rs.registry.GetEndpoints(id)
+func (rs *REST) Get(namespace string, id string) (runtime.Object, error) {
+	return rs.registry.GetEndpoints(namespace, id)
 }
 
 // List satisfies the RESTStorage interface.
-func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(namespace string, label, field labels.Selector) (runtime.Object, error) {
 	if !label.Empty() || !field.Empty() {
 		return nil, errors.New("label/field selectors are not supported on endpoints")
 	}
-	return rs.registry.ListEndpoints()
+	return rs.registry.ListEndpoints(namespace)
 }
 
 // Watch returns Endpoint events via a watch.Interface.
@@ -57,17 +57,17 @@ func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (wat
 }
 
 // Create satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(namespace string, obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Update satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(namespace string, obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Delete satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(namespace string, id string) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 

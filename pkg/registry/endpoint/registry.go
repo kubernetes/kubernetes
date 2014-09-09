@@ -24,8 +24,8 @@ import (
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListEndpoints() (*api.EndpointsList, error)
-	GetEndpoints(name string) (*api.Endpoints, error)
+	ListEndpoints(namespace string) (*api.EndpointsList, error)
+	GetEndpoints(namespace string, name string) (*api.Endpoints, error)
 	WatchEndpoints(labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
 	UpdateEndpoints(e *api.Endpoints) error
 }

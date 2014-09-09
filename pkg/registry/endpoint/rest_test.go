@@ -29,12 +29,12 @@ import (
 func TestGetEndpoints(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
-			JSONBase:  api.JSONBase{ID: "foo"},
+			JSONBase:  api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 			Endpoints: []string{"127.0.0.1:9000"},
 		},
 	}
 	storage := NewREST(registry)
-	obj, err := storage.Get("foo")
+	obj, err := storage.Get(api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -50,7 +50,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	storage := NewREST(registry)
 
 	// returns service not found
-	_, err := storage.Get("foo")
+	_, err := storage.Get(api.NamespaceDefault, "foo")
 	if !errors.IsNotFound(err) || !reflect.DeepEqual(err, errors.NewNotFound("service", "foo")) {
 		t.Errorf("expected NotFound error, got %#v", err)
 	}
@@ -58,9 +58,9 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	// returns empty endpoints
 	registry.Err = nil
 	registry.Service = &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 	}
-	obj, err := storage.Get("foo")
+	obj, err := storage.Get(api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,11 +75,11 @@ func TestEndpointsRegistryList(t *testing.T) {
 	registry.EndpointsList = api.EndpointsList{
 		JSONBase: api.JSONBase{ResourceVersion: 1},
 		Items: []api.Endpoints{
-			{JSONBase: api.JSONBase{ID: "foo"}},
-			{JSONBase: api.JSONBase{ID: "bar"}},
+			{JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault}},
+			{JSONBase: api.JSONBase{ID: "bar", Namespace: api.NamespaceDefault}},
 		},
 	}
-	s, _ := storage.List(labels.Everything(), labels.Everything())
+	s, _ := storage.List(api.NamespaceDefault, labels.Everything(), labels.Everything())
 	sl := s.(*api.EndpointsList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))

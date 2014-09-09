@@ -19,6 +19,7 @@ package apiserver
 import (
 	"net/http"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -29,6 +30,7 @@ type RedirectHandler struct {
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	namespace := api.NamespaceDefault
 	parts := splitPath(req.URL.Path)
 	if len(parts) != 2 || req.Method != "GET" {
 		notFound(w, req)
@@ -50,7 +52,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, err := redirector.ResourceLocation(id)
+	location, err := redirector.ResourceLocation(namespace, id)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)

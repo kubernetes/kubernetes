@@ -71,8 +71,9 @@ func (s *Scheduler) scheduleOne() {
 		return
 	}
 	b := &api.Binding{
-		PodID: pod.ID,
-		Host:  dest,
+		JSONBase: api.JSONBase{Namespace: pod.Namespace},
+		PodID:    pod.ID,
+		Host:     dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		s.config.Error(pod, err)

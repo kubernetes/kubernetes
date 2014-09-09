@@ -59,6 +59,7 @@ func (r RealPodControl) createReplica(controllerSpec api.ReplicationController) 
 		labels["replicationController"] = controllerSpec.ID
 	}
 	pod := &api.Pod{
+		JSONBase:     api.JSONBase{Namespace: controllerSpec.Namespace},
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	}

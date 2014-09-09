@@ -27,11 +27,11 @@ type ControllerRegistry struct {
 	Controllers *api.ReplicationControllerList
 }
 
-func (r *ControllerRegistry) ListControllers() (*api.ReplicationControllerList, error) {
+func (r *ControllerRegistry) ListControllers(namespace string) (*api.ReplicationControllerList, error) {
 	return r.Controllers, r.Err
 }
 
-func (r *ControllerRegistry) GetController(ID string) (*api.ReplicationController, error) {
+func (r *ControllerRegistry) GetController(namespace string, ID string) (*api.ReplicationController, error) {
 	return &api.ReplicationController{}, r.Err
 }
 
@@ -43,7 +43,7 @@ func (r *ControllerRegistry) UpdateController(controller *api.ReplicationControl
 	return r.Err
 }
 
-func (r *ControllerRegistry) DeleteController(ID string) error {
+func (r *ControllerRegistry) DeleteController(namespace string, ID string) error {
 	return r.Err
 }
 
