@@ -4,10 +4,7 @@
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
 3. Get the Kubernetes source:
-
-```
-git clone https://github.com/GoogleCloudPlatform/kubernetes.git
-```
+   * Kubernetes 0.2 [tar.gz](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.2.tar.gz) [zip](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.2.zip)
 
 ### Setup
 
