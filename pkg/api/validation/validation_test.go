@@ -322,50 +322,54 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidateService(t *testing.T) {
-	// This test should fail because the port number is invalid i.e.
-	// the Port field has a default value of 0.
-	errs := ValidateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
-		Selector: map[string]string{
-			"foo": "bar",
+	tests := []struct {
+		s          *api.Service
+		errorCount int
+	}{
+		{
+			// This test should fail because the port number is invalid i.e.
+			// the Port field has a default value of 0.
+			&api.Service{
+				JSONBase: api.JSONBase{ID: "foo"},
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+			},
+			1,
+		}, {
+			&api.Service{
+				Port:     6502,
+				JSONBase: api.JSONBase{ID: "foo"},
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+			},
+			0,
+		}, {
+			&api.Service{
+				Port: 6502,
+				Selector: map[string]string{
+					"foo": "bar",
+				},
+			},
+			1,
+		}, {
+			&api.Service{
+				Port:     6502,
+				JSONBase: api.JSONBase{ID: "foo"},
+			},
+			1,
+		}, {
+			&api.Service{},
+			3,
 		},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
 	}
 
-	errs = ValidateService(&api.Service{
-		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
-		Selector: map[string]string{
-			"foo": "bar",
-		},
-	})
-	if len(errs) != 0 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
-	}
-
-	errs = ValidateService(&api.Service{
-		Port: 6502,
-		Selector: map[string]string{
-			"foo": "bar",
-		},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
-	}
-
-	errs = ValidateService(&api.Service{
-		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
-	}
-
-	errs = ValidateService(&api.Service{})
-	if len(errs) != 3 {
-		t.Errorf("Unexpected error list: %#v", errs)
+	for _, test := range tests {
+		errs := ValidateService(test.s)
+		if len(errs) != test.errorCount {
+			t.Errorf("Unexpected error list: %#v, expected %v errors, for service %v", errs, test.e, test.s)
+		}
 	}
 }
 
