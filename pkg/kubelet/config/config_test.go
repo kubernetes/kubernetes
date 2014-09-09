@@ -52,7 +52,8 @@ func CreateValidPod(name, namespace string) kubelet.Pod {
 		Name:      name,
 		Namespace: namespace,
 		Manifest: api.ContainerManifest{
-			Version: "v1beta1",
+			Version:       "v1beta1",
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 		},
 	}
 }

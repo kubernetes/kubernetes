@@ -105,8 +105,12 @@ func TestExtractFromHTTP(t *testing.T) {
 			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.Pod{
-					Name:     "foo",
-					Manifest: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
+					Name: "foo",
+					Manifest: api.ContainerManifest{
+						Version:       "v1beta1",
+						ID:            "foo",
+						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
+					},
 				}),
 		},
 		{
