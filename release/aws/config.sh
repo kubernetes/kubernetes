@@ -18,7 +18,11 @@ else
     MD5_FUNC=md5sum
 fi
 
-INSTANCE_PREFIX=kubenertes
+function json_val () {
+    python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
+}
+
+INSTANCE_PREFIX=kubernetes
 
 AWS_HASH=$(aws --output json iam list-access-keys | json_val '["AccessKeyMetadata"][0]["AccessKeyId"]' | $MD5_FUNC)
 AWS_HASH=${AWS_HASH:0:5}
@@ -34,10 +38,6 @@ RELEASE_TAR_FILE=master-release.tgz
 
 RELEASE_FULL_PATH=$RELEASE_BUCKET$RELEASE_PREFIX$RELEASE_NAME
 RELEASE_FULL_TAG_PATH=$RELEASE_BUCKET$RELEASE_PREFIX$RELEASE_TAG
-
-function json_val () {
-    python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
-}
 
 # Takes a release path ($1 if passed, otherwise $RELEASE_FULL_TAG_PATH) and
 # computes the normalized release path. Results are stored in
