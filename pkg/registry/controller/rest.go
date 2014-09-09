@@ -92,6 +92,7 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+	rs.fillCurrentState(&controller)
 	return controller, err
 }
 
@@ -104,6 +105,7 @@ func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 	filtered := []api.ReplicationController{}
 	for _, controller := range controllers.Items {
 		if selector.Matches(labels.Set(controller.Labels)) {
+			rs.fillCurrentState(&controller)
 			filtered = append(filtered, controller)
 		}
 	}
@@ -163,4 +165,12 @@ func (rs *REST) waitForController(ctrl *api.ReplicationController) (runtime.Obje
 		time.Sleep(rs.pollPeriod)
 	}
 	return ctrl, nil
+}
+
+func (rs *REST) fillCurrentState(ctrl *api.ReplicationController) error {
+	list, err := rs.podLister.ListPods(ctrl.DesiredState.ReplicaSelector)
+	if err != nil {
+		return err
+	}
+	ctrl.CurrentState.Replicas = len(list.Items)
 }
