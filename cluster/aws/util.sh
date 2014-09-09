@@ -95,7 +95,7 @@ function kube-up() {
 
     AWS_CMD="aws --output json ec2"
     
-    $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null || true
+    $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1
     VPC_ID=$($AWS_CMD create-vpc --cidr-block 10.244.0.0/16 | json_val '["Vpc"]["VpcId"]')
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 10.244.0.0/24 --vpc-id $VPC_ID | json_val '["Subnet"]["SubnetId"]')
     IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
