@@ -105,8 +105,13 @@ kube::setup_go_environment() {
     fi
   fi
 
+  GOPATH=${KUBE_TARGET}
+  # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
+  if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
+    GOPATH=${GOPATH}:${KUBE_EXTRA_GOPATH}
+  fi
   # Set GOPATH to point to the tree maintained by `godep`.
-  GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/Godeps/_workspace"
+  GOPATH="${GOPATH}:${KUBE_REPO_ROOT}/Godeps/_workspace"
   export GOPATH
 
   # Unset GOBIN in case it already exists in the current session.
