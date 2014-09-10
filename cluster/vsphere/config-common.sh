@@ -24,11 +24,11 @@ function public-key {
     fi
   done
 
-  echo "Can't find public key file..."
+  echo "Can't find public key file..." 1>&2
   exit 1
 }
 
-DISK=kube.vmdk
+DISK=./kube/kube.vmdk
 GUEST_ID=debian7_64Guest
 PUBLIC_KEY_FILE=${PUBLIC_KEY_FILE-$(public-key)}
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
@@ -40,3 +40,7 @@ SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 #export GOVC_RESOURCE_POOL=
 #export GOVC_NETWORK=
 #export GOVC_GUEST_LOGIN='kube:kube'
+
+# Set GOVC_INSECURE if the host in GOVC_URL is using a certificate that cannot
+# be verified (i.e. a self-signed certificate), but IS trusted.
+#export GOVC_INSECURE=1
