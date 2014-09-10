@@ -14,16 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ -z "$DOCKER_HUB_USER" ] ; then
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
   echo "Please set DOCKER_HUB_USER to your Docker hub account"
   exit 1
 fi
 
-NEW_IMAGE=${1:-kitten}
-TIMING=${2:-10s}
 export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
 export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
 
 set -x
 
-$KUBECFG -image $DOCKER_HUB_USER/update-demo:$NEW_IMAGE -u $TIMING rollingupdate update-demo
+$KUBECFG -p 8080:80 run $DOCKER_HUB_USER/update-demo:nautilus 2 update-demo

@@ -8,6 +8,11 @@ The example combines a web frontend, a redis master for storage and a replicated
 
 This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
 
+```shell
+$ cd kubernetes
+$ hack/dev-build-and-up.sh
+```
+
 ### Step One: Turn up the redis master.
 
 Use the file `examples/guestbook/redis-master.json` which describes a single pod running a redis key-value server in a container.
@@ -307,3 +312,11 @@ For details about limiting traffic to specific sources, see the [gcutil document
 
 [cloud-console]: https://console.developer.google.com
 [gcutil-docs]: https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall
+
+### Step Six: Cleanup
+
+To turn down a Kubernetes cluster:
+
+```shell
+$ cluster/kube-down.sh
+```
