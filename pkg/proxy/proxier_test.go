@@ -30,7 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func waitForClosedPort(p *Proxier, proxyPort string) error {
+func waitForClosedPortTCP(p *Proxier, proxyPort string) error {
 	for i := 0; i < 50; i++ {
 		_, err := net.Dial("tcp", net.JoinHostPort("127.0.0.1", proxyPort))
 		if err != nil {
@@ -41,7 +41,7 @@ func waitForClosedPort(p *Proxier, proxyPort string) error {
 	return fmt.Errorf("port %s still open", proxyPort)
 }
 
-var port string
+var tcpServerPort string
 
 func init() {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,13 +52,13 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	_, port, err = net.SplitHostPort(u.Host)
+	_, tcpServerPort, err = net.SplitHostPort(u.Host)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
 }
 
-func testEchoConnection(t *testing.T, address, port string) {
+func testEchoTCP(t *testing.T, address, port string) {
 	path := "aaaaa"
 	res, err := http.Get("http://" + address + ":" + port + "/" + path)
 	if err != nil {
@@ -74,27 +74,36 @@ func testEchoConnection(t *testing.T, address, port string) {
 	}
 }
 
-func TestProxy(t *testing.T) {
+func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
-		{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+		{
+			JSONBase:  api.JSONBase{ID: "echo"},
+			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
-	testEchoConnection(t, "127.0.0.1", proxyPort)
+	testEchoTCP(t, "127.0.0.1", proxyPort)
 }
 
-func TestProxyStop(t *testing.T) {
+func TestTCPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			JSONBase:  api.JSONBase{ID: "echo"},
+			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -106,18 +115,23 @@ func TestProxyStop(t *testing.T) {
 
 	p.StopProxy("echo")
 	// Wait for the port to really close.
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
 }
 
-func TestProxyUpdateDelete(t *testing.T) {
+func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			JSONBase:  api.JSONBase{ID: "echo"},
+			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -128,18 +142,23 @@ func TestProxyUpdateDelete(t *testing.T) {
 	conn.Close()
 
 	p.OnUpdate([]api.Service{})
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
 }
 
-func TestProxyUpdateDeleteUpdate(t *testing.T) {
+func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			JSONBase:  api.JSONBase{ID: "echo"},
+			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -150,23 +169,28 @@ func TestProxyUpdateDeleteUpdate(t *testing.T) {
 	conn.Close()
 
 	p.OnUpdate([]api.Service{})
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
 	proxyPortNum, _ := strconv.Atoi(proxyPort)
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum},
+		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum, Protocol: "TCP"},
 	})
-	testEchoConnection(t, "127.0.0.1", proxyPort)
+	testEchoTCP(t, "127.0.0.1", proxyPort)
 }
 
-func TestProxyUpdatePort(t *testing.T) {
+func TestTCPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
+	lb.OnUpdate([]api.Endpoints{
+		{
+			JSONBase:  api.JSONBase{ID: "echo"},
+			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+		},
+	})
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -174,62 +198,28 @@ func TestProxyUpdatePort(t *testing.T) {
 	// add a new dummy listener in order to get a port that is free
 	l, _ := net.Listen("tcp", ":0")
 	_, newPort, _ := net.SplitHostPort(l.Addr().String())
-	portNum, _ := strconv.Atoi(newPort)
+	newPortNum, _ := strconv.Atoi(newPort)
 	l.Close()
 
 	// Wait for the socket to actually get free.
-	if err := waitForClosedPort(p, newPort); err != nil {
+	if err := waitForClosedPortTCP(p, newPort); err != nil {
 		t.Fatalf(err.Error())
 	}
 	if proxyPort == newPort {
 		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
+		{JSONBase: api.JSONBase{ID: "echo"}, Port: newPortNum, Protocol: "TCP"},
 	})
-	if err := waitForClosedPort(p, proxyPort); err != nil {
+	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
 	}
-	testEchoConnection(t, "127.0.0.1", newPort)
-}
+	testEchoTCP(t, "127.0.0.1", newPort)
 
-func TestProxyUpdatePortLetsGoOfOldPort(t *testing.T) {
-	lb := NewLoadBalancerRR()
-	lb.OnUpdate([]api.Endpoints{{JSONBase: api.JSONBase{ID: "echo"}, Endpoints: []string{net.JoinHostPort("127.0.0.1", port)}}})
-
-	p := NewProxier(lb, "127.0.0.1")
-
-	proxyPort, err := p.addServiceOnUnusedPort("echo")
+	// Ensure the old port is released and re-usable.
+	l, err = net.Listen("tcp", net.JoinHostPort("", proxyPort))
 	if err != nil {
-		t.Fatalf("error adding new service: %#v", err)
+		t.Fatalf("can't claim released port: %s", err)
 	}
-
-	// add a new dummy listener in order to get a port that is free
-	l, _ := net.Listen("tcp", ":0")
-	_, newPort, _ := net.SplitHostPort(l.Addr().String())
-	portNum, _ := strconv.Atoi(newPort)
 	l.Close()
-
-	// Wait for the socket to actually get free.
-	if err := waitForClosedPort(p, newPort); err != nil {
-		t.Fatalf(err.Error())
-	}
-	if proxyPort == newPort {
-		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
-	}
-	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: portNum},
-	})
-	if err := waitForClosedPort(p, proxyPort); err != nil {
-		t.Fatalf(err.Error())
-	}
-	testEchoConnection(t, "127.0.0.1", newPort)
-	proxyPortNum, _ := strconv.Atoi(proxyPort)
-	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum},
-	})
-	if err := waitForClosedPort(p, newPort); err != nil {
-		t.Fatalf(err.Error())
-	}
-	testEchoConnection(t, "127.0.0.1", proxyPort)
 }
