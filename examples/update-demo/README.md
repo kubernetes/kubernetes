@@ -23,7 +23,6 @@ This example assumes that you have forked the repository and [turned up a Kubern
 
     $ cd kubernetes
     $ hack/dev-build-and-up.sh
-    $ hack/build-go.sh
 
 This example also assumes that you have [Docker](http://docker.io) installed on your local machine.
 
@@ -39,7 +38,7 @@ $ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernet
 
 ```shell
 $ cd kubernetes/examples/update-demo
-$ ./build-images.sh
+$ images/build-images.sh
 ```
 
 ### Step Two: Turn up the UX for the demo
