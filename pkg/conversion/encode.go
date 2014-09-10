@@ -81,7 +81,7 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		if err != nil {
 			return nil, err
 		}
-		err = s.converter.Convert(obj, objOut, 0)
+		err = s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(objVersion, destVersion))
 		if err != nil {
 			return nil, err
 		}

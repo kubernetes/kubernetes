@@ -35,6 +35,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	}
 	type C struct{}
 	c := NewConverter()
+	c.Debug = t
 	err := c.Register(func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		return s.Convert(&in.Baz, &out.Baz, 0)
@@ -53,7 +54,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	x := A{"hello, intrepid test reader!", 3}
 	y := B{}
 
-	err = c.Convert(&x, &y, 0)
+	err = c.Convert(&x, &y, 0, nil)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -67,7 +68,7 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	z := B{"all your test are belong to us", 42}
 	w := A{}
 
-	err = c.Convert(&z, &w, 0)
+	err = c.Convert(&z, &w, 0, nil)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -85,36 +86,43 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 
-	err = c.Convert(&A{}, &C{}, 0)
+	err = c.Convert(&A{}, &C{}, 0, nil)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestConverter_fuzz(t *testing.T) {
-	newAnonType := func() interface{} {
-		return reflect.New(reflect.TypeOf(externalTypeReturn()).Elem()).Interface()
-	}
 	// Use the same types from the scheme test.
 	table := []struct {
 		from, to, check interface{}
 	}{
-		{&TestType1{}, newAnonType(), &TestType1{}},
-		{newAnonType(), &TestType1{}, newAnonType()},
+		{&TestType1{}, &ExternalTestType1{}, &TestType1{}},
+		{&ExternalTestType1{}, &TestType1{}, &ExternalTestType1{}},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
+	c.Name = func(t reflect.Type) string {
+		// Hide the fact that we don't have separate packages for these things.
+		return map[reflect.Type]string{
+			reflect.TypeOf(TestType1{}):         "TestType1",
+			reflect.TypeOf(ExternalTestType1{}): "TestType1",
+			reflect.TypeOf(TestType2{}):         "TestType2",
+			reflect.TypeOf(ExternalTestType2{}): "TestType2",
+		}[t]
+	}
+	c.Debug = t
 
 	for i, item := range table {
 		for j := 0; j < *fuzzIters; j++ {
 			f.Fuzz(item.from)
-			err := c.Convert(item.from, item.to, 0)
+			err := c.Convert(item.from, item.to, 0, nil)
 			if err != nil {
 				t.Errorf("(%v, %v): unexpected error: %v", i, j, err)
 				continue
 			}
-			err = c.Convert(item.to, item.check, 0)
+			err = c.Convert(item.to, item.check, 0, nil)
 			if err != nil {
 				t.Errorf("(%v, %v): unexpected error: %v", i, j, err)
 				continue
@@ -123,6 +131,72 @@ func TestConverter_fuzz(t *testing.T) {
 				t.Errorf("(%v, %v): unexpected diff: %v", i, j, objDiff(e, a))
 			}
 		}
+	}
+}
+
+func TestConverter_tags(t *testing.T) {
+	type Foo struct {
+		A string `test:"foo"`
+	}
+	type Bar struct {
+		A string `test:"bar"`
+	}
+	c := NewConverter()
+	c.Debug = t
+	err := c.Register(
+		func(in *string, out *string, s Scope) error {
+			if e, a := "foo", s.SrcTag().Get("test"); e != a {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			if e, a := "bar", s.DestTag().Get("test"); e != a {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	c.Convert(&Foo{}, &Bar{}, 0, nil)
+}
+
+func TestConverter_meta(t *testing.T) {
+	type Foo struct{ A string }
+	type Bar struct{ A string }
+	c := NewConverter()
+	c.Debug = t
+	checks := 0
+	err := c.Register(
+		func(in *Foo, out *Bar, s Scope) error {
+			if s.Meta()["test"] != "passes" {
+				t.Errorf("Meta did not get passed!")
+			}
+			checks++
+			s.Convert(&in.A, &out.A, 0)
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	err = c.Register(
+		func(in *string, out *string, s Scope) error {
+			if s.Meta()["test"] != "passes" {
+				t.Errorf("Meta did not get passed a second time!")
+			}
+			checks++
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	err = c.Convert(&Foo{}, &Bar{}, 0, map[string]interface{}{"test": "passes"})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if checks != 2 {
+		t.Errorf("Registered functions did not get called.")
 	}
 }
 
@@ -199,11 +273,12 @@ func TestConverter_flags(t *testing.T) {
 	}
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
+	c.Debug = t
 
 	for i, item := range table {
 		for j := 0; j < *fuzzIters; j++ {
 			f.Fuzz(item.from)
-			err := c.Convert(item.from, item.to, item.flags)
+			err := c.Convert(item.from, item.to, item.flags, nil)
 			if item.shouldSucceed && err != nil {
 				t.Errorf("(%v, %v): unexpected error: %v", i, j, err)
 				continue

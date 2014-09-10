@@ -58,7 +58,7 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = s.converter.Convert(obj, objOut, 0)
+		err = s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(version, s.InternalVersion))
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 		if err != nil {
 			return err
 		}
-		err = s.converter.Convert(external, obj, 0)
+		err = s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion))
 		if err != nil {
 			return err
 		}

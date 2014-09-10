@@ -39,12 +39,18 @@ type Converter struct {
 
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
+
+	// Name is called to retrieve the name of a type; this name is used for the
+	// purpose of deciding whether two types match or not (i.e., will we attempt to
+	// do a conversion). The default returns the go type name.
+	Name func(t reflect.Type) string
 }
 
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
 		funcs: map[typePair]reflect.Value{},
+		Name:  func(t reflect.Type) string { return t.Name() },
 	}
 }
 
@@ -55,6 +61,72 @@ type Scope interface {
 	// Call Convert to convert sub-objects. Note that if you call it with your own exact
 	// parameters, you'll run out of stack space before anything useful happens.
 	Convert(src, dest interface{}, flags FieldMatchingFlags) error
+
+	// SrcTags and DestTags contain the struct tags that src and dest had, respectively.
+	// If the enclosing object was not a struct, then these will contain no tags, of course.
+	SrcTag() reflect.StructTag
+	DestTag() reflect.StructTag
+
+	// Flags returns the flags with which the conversion was started.
+	Flags() FieldMatchingFlags
+
+	// Meta returns any information originally passed to Convert.
+	Meta() map[string]interface{}
+}
+
+// scope contains information about an ongoing conversion.
+type scope struct {
+	converter    *Converter
+	meta         map[string]interface{}
+	flags        FieldMatchingFlags
+	srcTagStack  []reflect.StructTag
+	destTagStack []reflect.StructTag
+}
+
+// push adds a level to the src/dest tag stacks.
+func (sa *scope) push() {
+	sa.srcTagStack = append(sa.srcTagStack, "")
+	sa.destTagStack = append(sa.destTagStack, "")
+}
+
+// pop removes a level to the src/dest tag stacks.
+func (sa *scope) pop() {
+	n := len(sa.srcTagStack)
+	sa.srcTagStack = sa.srcTagStack[:n-1]
+	sa.destTagStack = sa.destTagStack[:n-1]
+}
+
+func (sa *scope) setSrcTag(tag reflect.StructTag) {
+	sa.srcTagStack[len(sa.srcTagStack)-1] = tag
+}
+
+func (sa *scope) setDestTag(tag reflect.StructTag) {
+	sa.destTagStack[len(sa.destTagStack)-1] = tag
+}
+
+// Convert continues a conversion.
+func (sa *scope) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
+	return sa.converter.Convert(src, dest, flags, sa.meta)
+}
+
+// SrcTag returns the tag of the struct containing the current source item, if any.
+func (sa *scope) SrcTag() reflect.StructTag {
+	return sa.srcTagStack[len(sa.srcTagStack)-1]
+}
+
+// DestTag returns the tag of the struct containing the current dest item, if any.
+func (sa *scope) DestTag() reflect.StructTag {
+	return sa.destTagStack[len(sa.destTagStack)-1]
+}
+
+// Flags returns the flags with which the current conversion was started.
+func (sa *scope) Flags() FieldMatchingFlags {
+	return sa.flags
+}
+
+// Meta returns the meta object that was originally passed to Convert.
+func (sa *scope) Meta() map[string]interface{} {
+	return sa.meta
 }
 
 // Register registers a conversion func with the Converter. conversionFunc must take
@@ -82,7 +154,7 @@ func (c *Converter) Register(conversionFunc interface{}) error {
 	if ft.In(1).Kind() != reflect.Ptr {
 		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
 	}
-	scopeType := Scope(c)
+	scopeType := Scope(nil)
 	if e, a := reflect.TypeOf(&scopeType).Elem(), ft.In(2); e != a {
 		return fmt.Errorf("expected '%v' arg for 'in' param 2, got '%v' (%v)", e, a, ft)
 	}
@@ -127,8 +199,12 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 // Convert will translate src to dest if it knows how. Both must be pointers.
 // If no conversion func is registered and the default copying mechanism
 // doesn't work on this type pair, an error will be returned.
+// Read the comments on the various FieldMatchingFlags constants to understand
+// what the 'flags' parameter does.
+// 'meta' is given to allow you to pass information to conversion functions,
+// it is not used by Convert other than storing it in the scope.
 // Not safe for objects with cyclic references!
-func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
+func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta map[string]interface{}) error {
 	dv, sv := reflect.ValueOf(dest), reflect.ValueOf(src)
 	if dv.Kind() != reflect.Ptr {
 		return fmt.Errorf("Need pointer, but got %#v", dest)
@@ -141,18 +217,24 @@ func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags) err
 	if !dv.CanAddr() {
 		return fmt.Errorf("Can't write to dest")
 	}
-	return c.convert(sv, dv, flags)
+	s := &scope{
+		converter: c,
+		flags:     flags,
+		meta:      meta,
+	}
+	s.push() // Easy way to make SrcTag and DestTag never fail
+	return c.convert(sv, dv, s)
 }
 
 // convert recursively copies sv into dv, calling an appropriate conversion function if
 // one is registered.
-func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) error {
+func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
 	if fv, ok := c.funcs[typePair{st, dt}]; ok {
 		if c.Debug != nil {
 			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
 		}
-		args := []reflect.Value{sv.Addr(), dv.Addr(), reflect.ValueOf(Scope(c))}
+		args := []reflect.Value{sv.Addr(), dv.Addr(), reflect.ValueOf(scope)}
 		ret := fv.Call(args)[0].Interface()
 		// This convolution is necssary because nil interfaces won't convert
 		// to errors.
@@ -162,7 +244,7 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 		return ret.(error)
 	}
 
-	if !flags.IsSet(AllowDifferentFieldTypeNames) && dt.Name() != st.Name() {
+	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.Name(dt) != c.Name(st) {
 		return fmt.Errorf("Can't convert %v to %v because type names don't match.", st, dt)
 	}
 
@@ -180,28 +262,41 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 		c.Debug.Logf("Trying to convert '%v' to '%v'", st, dt)
 	}
 
+	scope.push()
+	defer scope.pop()
+
 	switch dv.Kind() {
 	case reflect.Struct:
 		listType := dt
-		if flags.IsSet(SourceToDest) {
+		if scope.flags.IsSet(SourceToDest) {
 			listType = st
 		}
 		for i := 0; i < listType.NumField(); i++ {
 			f := listType.Field(i)
 			df := dv.FieldByName(f.Name)
 			sf := sv.FieldByName(f.Name)
+			if sf.IsValid() {
+				// No need to check error, since we know it's valid.
+				field, _ := st.FieldByName(f.Name)
+				scope.setSrcTag(field.Tag)
+			}
+			if df.IsValid() {
+				field, _ := dt.FieldByName(f.Name)
+				scope.setDestTag(field.Tag)
+			}
+			// TODO: set top level of scope.src/destTagStack with these field tags here.
 			if !df.IsValid() || !sf.IsValid() {
 				switch {
-				case flags.IsSet(IgnoreMissingFields):
+				case scope.flags.IsSet(IgnoreMissingFields):
 					// No error.
-				case flags.IsSet(SourceToDest):
+				case scope.flags.IsSet(SourceToDest):
 					return fmt.Errorf("%v not present in dest (%v to %v)", f.Name, st, dt)
 				default:
 					return fmt.Errorf("%v not present in src (%v to %v)", f.Name, st, dt)
 				}
 				continue
 			}
-			if err := c.convert(sf, df, flags); err != nil {
+			if err := c.convert(sf, df, scope); err != nil {
 				return err
 			}
 		}
@@ -213,7 +308,7 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 		}
 		dv.Set(reflect.MakeSlice(dt, sv.Len(), sv.Cap()))
 		for i := 0; i < sv.Len(); i++ {
-			if err := c.convert(sv.Index(i), dv.Index(i), flags); err != nil {
+			if err := c.convert(sv.Index(i), dv.Index(i), scope); err != nil {
 				return err
 			}
 		}
@@ -224,7 +319,7 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 			return nil
 		}
 		dv.Set(reflect.New(dt.Elem()))
-		return c.convert(sv.Elem(), dv.Elem(), flags)
+		return c.convert(sv.Elem(), dv.Elem(), scope)
 	case reflect.Map:
 		if sv.IsNil() {
 			// Don't copy a nil ptr!
@@ -234,11 +329,11 @@ func (c *Converter) convert(sv, dv reflect.Value, flags FieldMatchingFlags) erro
 		dv.Set(reflect.MakeMap(dt))
 		for _, sk := range sv.MapKeys() {
 			dk := reflect.New(dt.Key()).Elem()
-			if err := c.convert(sk, dk, flags); err != nil {
+			if err := c.convert(sk, dk, scope); err != nil {
 				return err
 			}
 			dkv := reflect.New(dt.Elem()).Elem()
-			if err := c.convert(sv.MapIndex(sk), dkv, flags); err != nil {
+			if err := c.convert(sv.MapIndex(sk), dkv, scope); err != nil {
 				return err
 			}
 			dv.SetMapIndex(dk, dkv)
