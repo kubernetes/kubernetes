@@ -41,16 +41,17 @@ Upload this VMDK to your vSphere instance:
 
 ```sh
 export GOVC_URL='https://user:pass@hostname/sdk'
+export GOVC_INSECURE=1 # If the host above uses a self-signed cert
 export GOVC_DATASTORE='target datastore'
-export GOVC_RESOURCE_POOL='resource pool with access to datastore'
+export GOVC_RESOURCE_POOL='resource pool or cluster with access to datastore'
 
-govc datastore.import kube.vmdk
+govc import.vmdk kube.vmdk ./kube/
 ```
 
 Verify that the VMDK was correctly uploaded and expanded to 10GiB:
 
 ```sh
-govc datastore.ls
+govc datastore.ls ./kube/
 ```
 
 Take a look at the file `cluster/vsphere/config-common.sh` fill in the required
