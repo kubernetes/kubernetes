@@ -5,7 +5,7 @@
 1. You need a Google Cloud Platform account with billing enabled. Visit
    [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
 2. Make sure you can start up a GCE VM.  At least make sure you can do the [Create an instance](https://developers.google.com/compute/docs/quickstart#addvm) part of the GCE Quickstart.
-3. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled.
+3. You need to have the Google Storage API, and the Google Storage JSON API enabled.
 4. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
 5. You must have the [`gcloud` components](https://developers.google.com/cloud/sdk/) installed.
 6. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.

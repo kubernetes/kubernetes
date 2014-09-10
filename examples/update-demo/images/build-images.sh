@@ -16,18 +16,17 @@
 
 # This script will build and push the images necessary for the demo.
 
-# If a user is provided, then use it. If not, environment var must be set.
-if [ $# -eq 1 ] ; then
-  DOCKER_HUB_USER=$1
-elif [ -z "$DOCKER_HUB_USER" ] ; then
+if (( $# != 1 )); then
   echo "Usage: $0 <docker hub user name>"
   exit 1
 fi
 
+DOCKER_USER=$1
+
 set -x
 
-sudo docker build -t update-demo-base images/base
-sudo docker build -t $DOCKER_HUB_USER/update-demo:kitten images/kitten
-sudo docker build -t $DOCKER_HUB_USER/update-demo:nautilus images/nautilus
+docker build -t update-demo-base base
+docker build -t $DOCKER_USER/update-demo:kitten kitten
+docker build -t $DOCKER_USER/update-demo:nautilus nautilus
 
-sudo docker push $DOCKER_HUB_USER/update-demo
+docker push $DOCKER_USER/update-demo
