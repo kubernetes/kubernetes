@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -89,6 +90,23 @@ func newGCECloud() (*GCECloud, error) {
 	}, nil
 }
 
+// CreateGCECloud creates an instance of GCECloud for use with CLI clients.
+// It uses a locally cached OAuth2 token to allow RO access to Google Storage,
+// and full access to Google Compute. If the token does not exist, it launches
+// the authorization request in a browser window, so a user should be present.
+func CreateGCECloud(projectID, zone string) (*GCECloud, error) {
+	c := createOAuthClient()
+	svc, err := compute.New(c)
+	if err != nil {
+		return nil, err
+	}
+	return &GCECloud{
+		service:   svc,
+		projectID: projectID,
+		zone:      zone,
+	}, nil
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
 func (gce *GCECloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return gce, true
@@ -101,6 +119,11 @@ func (gce *GCECloud) Instances() (cloudprovider.Instances, bool) {
 
 // Zones returns an implementation of Zones for Google Compute Engine.
 func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
+	return gce, true
+}
+
+// Deployer returns an implementation of Deployer for Google Compute Engine.
+func (gce *GCECloud) Deployer() (cloudprovider.Deployer, bool) {
 	return gce, true
 }
 
@@ -141,6 +164,10 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 		}
 	}
 	return nil
+}
+
+func (gce *GCECloud) PollGlobalOp(op *compute.Operation) (*compute.Operation, error) {
+	return gce.service.GlobalOperations.Get(gce.projectID, op.Name).Do()
 }
 
 // TCPLoadBalancerExists is an implementation of TCPLoadBalancer.TCPLoadBalancerExists.
@@ -202,6 +229,11 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
+// fullQualProj returns the full URL for the specified project.
+func fullQualProj(proj string) string {
+	return "https://www.googleapis.com/compute/v1/projects/" + proj
+}
+
 // fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
 func fqdnSuffix() (string, error) {
 	fullHostname, err := exec.Command("hostname", "-f").Output()
@@ -241,6 +273,180 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 		instances = append(instances, instance.Name+suffix)
 	}
 	return instances, nil
+}
+
+type instance struct {
+	Name          string
+	Size          string
+	Image         string
+	Tag           string
+	StartupScript string
+	Scopes        []string
+	CanIPFwd      bool
+}
+
+// createInstance creates the specified instance.
+func (gce *GCECloud) createInstance(inst *instance) (*GCEOp, error) {
+	fqp := fullQualProj(gce.projectID)
+	var serviceAccounts []*compute.ServiceAccount
+	if len(inst.Scopes) > 0 {
+		serviceAccounts = []*compute.ServiceAccount{
+			{
+				Email:  "default",
+				Scopes: inst.Scopes,
+			},
+		}
+	} else {
+		serviceAccounts = nil
+	}
+	instance := &compute.Instance{
+		Name:         inst.Name,
+		MachineType:  fqp + "/zones/" + gce.zone + "/machineTypes/" + inst.Size,
+		CanIpForward: inst.CanIPFwd,
+		Disks: []*compute.AttachedDisk{
+			{
+				AutoDelete: true,
+				Boot:       true,
+				Type:       "PERSISTENT",
+				InitializeParams: &compute.AttachedDiskInitializeParams{
+					DiskName:    inst.Name,
+					SourceImage: inst.Image,
+				},
+			},
+		},
+		Metadata: &compute.Metadata{
+			Items: []*compute.MetadataItems{
+				{
+					Key:   "startup-script",
+					Value: inst.StartupScript,
+				},
+			},
+		},
+		NetworkInterfaces: []*compute.NetworkInterface{
+			{
+				AccessConfigs: []*compute.AccessConfig{
+					{
+						Type: "ONE_TO_ONE_NAT",
+						Name: "external-nat",
+					},
+				},
+				Network: fqp + "/global/networks/default",
+			},
+		},
+		ServiceAccounts: serviceAccounts,
+		Scheduling: &compute.Scheduling{
+			AutomaticRestart: true,
+		},
+		Tags: &compute.Tags{
+			Items: []string{
+				inst.Tag,
+			},
+		},
+	}
+	computeOp, err := gce.service.Instances.Insert(gce.projectID, gce.zone, instance).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: ZONE,
+	}
+	return op, err
+}
+
+// deleteInstance deletes the specified instance
+func (gce *GCECloud) deleteInstance(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Instances.Delete(gce.projectID, gce.zone, name).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: ZONE,
+	}
+	return op, err
+}
+
+// createRoute creates the specified route and adds it to the project's network configuration.
+func (gce *GCECloud) createRoute(name, nextHop, ipRange string) (*GCEOp, error) {
+	route := &compute.Route{
+		DestRange:       ipRange,
+		Name:            name,
+		Network:         fullQualProj(gce.projectID) + "/global/networks/default",
+		NextHopInstance: nextHop,
+		Priority:        1000,
+	}
+	computeOp, err := gce.service.Routes.Insert(gce.projectID, route).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: GLOBAL,
+	}
+	return op, err
+}
+
+func (gce *GCECloud) deleteRoute(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Routes.Delete(gce.projectID, name).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: GLOBAL,
+	}
+	return op, err
+}
+
+// createFirewall creates the specified firewall rule
+func (gce *GCECloud) createFirewall(name, sourceRange, tag, allowed string) (*GCEOp, error) {
+	fwAllowed, err := parseAllowed(allowed)
+	if err != nil {
+		return nil, err
+	}
+	prefix := fullQualProj(gce.projectID)
+	firewall := &compute.Firewall{
+		Name:    name,
+		Network: prefix + "/global/networks/default",
+		Allowed: fwAllowed,
+		SourceRanges: []string{
+			sourceRange,
+		},
+		TargetTags: []string{
+			tag,
+		},
+	}
+	computeOp, err := gce.service.Firewalls.Insert(gce.projectID, firewall).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: GLOBAL,
+	}
+	return op, err
+}
+
+// deleteFirewall deletes the firewall specified by "name".
+func (gce *GCECloud) deleteFirewall(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Firewalls.Delete(gce.projectID, name).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: GLOBAL,
+	}
+	return op, err
+}
+
+func parseAllowed(allowedString string) ([]*compute.FirewallAllowed, error) {
+	parse, err := regexp.Compile(`([a-zA-Z]+)(:([0-9]*(-[0-9]*)?))?`)
+	if err != nil {
+		return nil, err
+	}
+	allowedArr := parse.FindAllStringSubmatch(allowedString, -1)
+	rules := make(map[string][]string)
+	for _, match := range allowedArr {
+		ipProtocol := match[1]
+		ports := match[3]
+		rules[ipProtocol] = append(rules[ipProtocol], ports)
+	}
+
+	var allowed []*compute.FirewallAllowed
+	for ipp, prts := range rules {
+		allow := &compute.FirewallAllowed{
+			IPProtocol: ipp,
+		}
+		if len(prts) > 0 && prts[0] != "" {
+			allow.Ports = prts
+		}
+		allowed = append(allowed, allow)
+	}
+	return allowed, nil
 }
 
 func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {

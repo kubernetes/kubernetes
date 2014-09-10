@@ -41,6 +41,11 @@
 			"Rev": "0923cdda5b82a7dd0dd5c689f824ca5e7d9b60de"
 		},
 		{
+			"ImportPath": "code.google.com/p/google-api-go-client/storage/v1beta2",
+			"Comment": "release-96",
+			"Rev": "0923cdda5b82a7dd0dd5c689f824ca5e7d9b60de"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v0.2.0-rc1-120-g23142f6",
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"

@@ -54,6 +54,7 @@ if [[ ${#targets[@]} -eq 0 ]]; then
     cmd/controller-manager
     cmd/kubelet
     cmd/kubecfg
+    cmd/kube-deploy
     plugin/cmd/scheduler
   )
 fi
