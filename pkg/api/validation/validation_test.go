@@ -365,50 +365,92 @@ func TestValidatePod(t *testing.T) {
 }
 
 func TestValidateService(t *testing.T) {
-	// This test should fail because the port number is invalid i.e.
-	// the Port field has a default value of 0.
-	errs := ValidateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
-		Selector: map[string]string{
-			"foo": "bar",
+	testCases := []struct {
+		name    string
+		svc     api.Service
+		numErrs int
+	}{
+		{
+			name: "missing id",
+			svc: api.Service{
+				Port:     8675,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			// Should fail because the ID is missing.
+			numErrs: 1,
 		},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
-	}
-
-	errs = ValidateService(&api.Service{
-		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
-		Selector: map[string]string{
-			"foo": "bar",
+		{
+			name: "invalid id",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "123abc"},
+				Port:     8675,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			// Should fail because the ID is invalid.
+			numErrs: 1,
 		},
-	})
-	if len(errs) != 0 {
-		t.Errorf("Unexpected non-zero error list: %#v", errs)
-	}
-
-	errs = ValidateService(&api.Service{
-		Port: 6502,
-		Selector: map[string]string{
-			"foo": "bar",
+		{
+			name: "missing port",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "abc123"},
+				Selector: map[string]string{"foo": "bar"},
+			},
+			// Should fail because the port number is missing/invalid.
+			numErrs: 1,
 		},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
+		{
+			name: "invalid port",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "abc123"},
+				Port:     65536,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			// Should fail because the port number is invalid.
+			numErrs: 1,
+		},
+		{
+			name: "missing selector",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "foo"},
+				Port:     8675,
+			},
+			// Should fail because the selector is missing.
+			numErrs: 1,
+		},
+		{
+			name: "valid 1",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "abc123"},
+				Port:     1,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid 2",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "abc123"},
+				Port:     65535,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid 3",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "abc123"},
+				Port:     80,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			numErrs: 0,
+		},
 	}
 
-	errs = ValidateService(&api.Service{
-		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
-	})
-	if len(errs) != 1 {
-		t.Errorf("Unexpected error list: %#v", errs)
-	}
-
-	errs = ValidateService(&api.Service{})
-	if len(errs) != 3 {
-		t.Errorf("Unexpected error list: %#v", errs)
+	for _, tc := range testCases {
+		errs := ValidateService(&tc.svc)
+		if len(errs) != tc.numErrs {
+			t.Errorf("Unexpected error list for case %q: %+v", tc.name, errs)
+		}
 	}
 }
 
