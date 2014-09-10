@@ -105,6 +105,25 @@ func NewInvalid(kind, name string, errs ErrorList) error {
 	}}
 }
 
+// NewInternalError returns an error indicating that some sort of transient error occurred which prevents
+// further processing
+func NewInternalError(kind string, err error) error {
+	return &statusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   http.StatusInternalServerError,
+		Reason: api.StatusReasonUnknown,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			Causes: []api.StatusCause{
+				{
+					Message: err.Error(),
+				},
+			},
+		},
+		Message: fmt.Sprintf("error validating %s: %s", kind, err),
+	}}
+}
+
 // IsNotFound returns true if the specified error was created by NewNotFoundErr.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound

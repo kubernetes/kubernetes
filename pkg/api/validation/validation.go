@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -24,6 +25,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+type ServiceLister interface {
+	ListServices() (*api.ServiceList, error)
+}
 
 func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 	allErrs := errs.ErrorList{}
@@ -272,7 +277,7 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 }
 
 // ValidateService tests if required fields in the service are set.
-func ValidateService(service *api.Service) errs.ErrorList {
+func ValidateService(service *api.Service, lister ServiceLister) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(service.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", service.ID))
@@ -280,10 +285,21 @@ func ValidateService(service *api.Service) errs.ErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
 	}
 	if !util.IsValidPortNum(service.Port) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
+		allErrs = append(allErrs, errs.NewFieldInvalid("port", service.Port))
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Selector))
+	}
+	services, err := lister.ListServices()
+	if err != nil {
+		allErrs = append(allErrs, errs.NewInternalError("port", err))
+		return allErrs
+	}
+	for _, svc := range services.Items {
+		if service.Port == svc.Port && service.ID != svc.ID {
+			allErrs = append(allErrs, errs.NewAlreadyExists("port", fmt.Sprintf("%d", service.Port)))
+			break
+		}
 	}
 	return allErrs
 }
