@@ -14,14 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ -z "$DOCKER_HUB_USER" ] ; then
+# This script will build and push the images necessary for the demo.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
   echo "Please set DOCKER_HUB_USER to your Docker hub account"
   exit 1
 fi
 
-export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
-
 set -x
 
-$KUBECFG -p 8080:80 run $DOCKER_HUB_USER/update-demo:nautilus 2 update-demo
+docker build -t update-demo-base images/base
+docker build -t "${DOCKER_HUB_USER}/update-demo:kitten" images/kitten
+docker build -t "${DOCKER_HUB_USER}/update-demo:nautilus" images/nautilus
+
+docker push "${DOCKER_HUB_USER}/update-demo"
