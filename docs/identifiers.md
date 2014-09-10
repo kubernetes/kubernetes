@@ -40,11 +40,10 @@ Name
    1. must be non-empty and unique within the apiserver
    2. enables idempotent and space-unique creation
       1. generating random names will defeat idempotentcy
+      2. for situations where generating a name is impractical, some or all objects may support a param to auto-generate a name
    3. parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffix) to create a unique Name
    Example: "guestbook.user"
    Example: "backend-x4eb1"
-
-FIXME: final debate on having master default a name. Alternative: set "autosetName"=true
 
 2. Upon acceptance of an object via an api, the object is assigned a UID (a UUID).
    1. must be non-empty and unique across space and time
