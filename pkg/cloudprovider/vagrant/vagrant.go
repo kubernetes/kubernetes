@@ -94,6 +94,11 @@ func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
+// Deployer returns an implementation of Deployer for Vagrant cloud.
+func (v *VagrantCloud) Deployer() (cloudprovider.Deployer, bool) {
+	return nil, false
+}
+
 // IPAddress returns the address of a particular machine instance.
 func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
 	token, err := v.saltLogin()

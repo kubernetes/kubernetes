@@ -28,6 +28,8 @@ type Interface interface {
 	Instances() (Instances, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
+	// Deployer returns a Deployer interface. Also returns true if the interface is supported, false otherwise.
+	Deployer() (Deployer, bool)
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
@@ -61,4 +63,11 @@ type Zone struct {
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
 	GetZone() (Zone, error)
+}
+
+type Deployer interface {
+	// CreateCluster creates a cluster with the specified number of minions.
+	CreateCluster(numMinions int) error
+	// DeleteCluster takes down the current cluster.
+	DeleteCluster(numMinions int) error
 }

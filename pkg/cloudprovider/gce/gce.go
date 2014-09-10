@@ -17,30 +17,20 @@ limitations under the License.
 package gce_cloud
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"code.google.com/p/goauth2/compute/serviceaccount"
-	"code.google.com/p/goauth2/oauth"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/golang/glog"
 )
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -105,7 +95,7 @@ func newGCECloud() (*GCECloud, error) {
 // and full access to Google Compute. If the token does not exist, it launches
 // the authorization request in a browser window, so a user should be present.
 func CreateGCECloud(projectID, zone string) (*GCECloud, error) {
-	c := CreateOAuthClient()
+	c := createOAuthClient()
 	svc, err := compute.New(c)
 	if err != nil {
 		return nil, err
@@ -115,130 +105,6 @@ func CreateGCECloud(projectID, zone string) (*GCECloud, error) {
 		projectID: projectID,
 		zone:      zone,
 	}, nil
-}
-
-var config = &oauth.Config{
-	// this Id & Secret are located under the google-containers project on gce
-	ClientId:     "255964991331-b0l3n9c5pqc0u0ijtniv8vls226d3d5j.apps.googleusercontent.com",
-	ClientSecret: "BWm6fPAY2gS1jaRT-Xn2y-uT",
-	Scope: strings.Join([]string{
-		compute.DevstorageRead_onlyScope,
-		compute.ComputeScope,
-	}, " "),
-	AuthURL:  "https://accounts.google.com/o/oauth2/auth",
-	TokenURL: "https://accounts.google.com/o/oauth2/token",
-}
-
-// CreateOAuth2Client creates an Oauth client either from a cached token or a new token from the web.
-func CreateOAuthClient() *http.Client {
-	cacheFile := tokenCacheFile(config)
-	token, err := loadToken(cacheFile)
-	if err != nil {
-		glog.Warningf("found a token, but couldn't open it.")
-	}
-	if token == nil {
-		token = tokenFromWeb(config)
-		saveToken(cacheFile, token)
-	}
-	t := &oauth.Transport{
-		Token:     token,
-		Config:    config,
-		Transport: http.DefaultTransport,
-	}
-	return t.Client()
-}
-
-func saveToken(file string, token *oauth.Token) error {
-	data, err := json.Marshal(token)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(file, data, 0600)
-}
-
-func tokenFromWeb(config *oauth.Config) *oauth.Token {
-	ch := make(chan string)
-	randState := fmt.Sprintf("st%d", time.Now().UnixNano())
-	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/favicon.ico" {
-			http.Error(rw, "", 404)
-			return
-		}
-		if req.FormValue("state") != randState {
-			glog.Infof("State doesn't match: req = %#v", req)
-			http.Error(rw, "", 500)
-			return
-		}
-		if code := req.FormValue("code"); code != "" {
-			fmt.Fprintf(rw, "<h1>Success</h1>Authorized.")
-			rw.(http.Flusher).Flush()
-			ch <- code
-			return
-		}
-		glog.Infof("no code")
-		http.Error(rw, "", 500)
-	}))
-	defer ts.Close()
-
-	config.RedirectURL = ts.URL
-	authUrl := config.AuthCodeURL(randState)
-	go openURL(authUrl)
-	glog.Infof("Authorize this app at:\n%s", authUrl)
-	code := <-ch
-	glog.Infof("Got code: %s", code)
-
-	t := &oauth.Transport{
-		Config:    config,
-		Transport: http.DefaultTransport,
-	}
-	_, err := t.Exchange(code)
-	if err != nil {
-		glog.Fatalf("Token exchange error: %v", err)
-	}
-	return t.Token
-}
-
-func tokenCacheFile(config *oauth.Config) string {
-	hash := fnv.New32a()
-	hash.Write([]byte(config.ClientId))
-	hash.Write([]byte(config.ClientSecret))
-	hash.Write([]byte(config.Scope))
-	fn := fmt.Sprintf("kube-tok%v", hash.Sum32())
-	return filepath.Join(osUserCacheDir(), url.QueryEscape(fn))
-}
-
-func loadToken(file string) (*oauth.Token, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	var token oauth.Token
-	err = json.Unmarshal(data, &token)
-	return &token, err
-}
-
-func openURL(url string) {
-	try := []string{"xdg-open", "google-chrome", "open"}
-	for _, bin := range try {
-		err := exec.Command(bin, url).Run()
-		if err == nil {
-			return
-		}
-	}
-	glog.Fatalf("Error opening URL in browser.")
-}
-
-func osUserCacheDir() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return filepath.Join(os.Getenv("HOME"), "Library", "Caches")
-	case "linux", "freebsd":
-		return filepath.Join(os.Getenv("HOME"), ".cache")
-	}
-	return "."
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Google Compute Engine.
@@ -253,6 +119,11 @@ func (gce *GCECloud) Instances() (cloudprovider.Instances, bool) {
 
 // Zones returns an implementation of Zones for Google Compute Engine.
 func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
+	return gce, true
+}
+
+// Deployer returns an implementation of Deployer for Google Compute Engine.
+func (gce *GCECloud) Deployer() (cloudprovider.Deployer, bool) {
 	return gce, true
 }
 
@@ -293,78 +164,6 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 		}
 	}
 	return nil
-}
-
-type opScope int
-
-const (
-	REGION opScope = iota
-	ZONE
-	GLOBAL
-)
-
-// GCEOp is an abstraction of GCE's compute.Operation, providing only necessary generic information.
-type GCEOp struct {
-	op    *compute.Operation
-	scope opScope
-}
-
-// Status provides the status of the operation, and will be either "PENDING", "RUNNING", or "DONE".
-func (op *GCEOp) Status() string {
-	return op.op.Status
-}
-
-// Errors provides any errors that the operation encountered.
-func (op *GCEOp) Errors() []string {
-	var errors []string
-	if op.op.Error != nil {
-		for _, err := range op.op.Error.Errors {
-			errors = append(errors, err.Message)
-		}
-	}
-	return errors
-}
-
-// OperationType provides the type of operation represented by op.
-func (op *GCEOp) OperationType() string {
-	return op.op.OperationType
-}
-
-// Target provides the name of the affected resource.
-func (op *GCEOp) Target() string {
-	target, _ := targetInfo(op.op.TargetLink)
-	return target
-}
-
-// Resource provides the type of the affected resource.
-func (op *GCEOp) Resource() string {
-	_, resource := targetInfo(op.op.TargetLink)
-	return resource
-}
-
-func targetInfo(targetLink string) (target, resourceType string) {
-	i := strings.LastIndex(targetLink, "/")
-	target = targetLink[i+1:]
-	j := strings.LastIndex(targetLink[:i], "/")
-	resourceType = targetLink[j+1 : i-1]
-	return target, resourceType
-}
-
-func (gce *GCECloud) PollOp(op *GCEOp) (*GCEOp, error) {
-	var err error
-	switch op.scope {
-	case REGION:
-		region := op.op.Region[strings.LastIndex(op.op.Region, "/")+1:]
-		op.op, err = gce.service.RegionOperations.Get(gce.projectID, region, op.op.Name).Do()
-	case ZONE:
-		zone := op.op.Zone[strings.LastIndex(op.op.Zone, "/")+1:]
-		op.op, err = gce.service.ZoneOperations.Get(gce.projectID, zone, op.op.Name).Do()
-	case GLOBAL:
-		op.op, err = gce.service.GlobalOperations.Get(gce.projectID, op.op.Name).Do()
-	default:
-		err = errors.New("unknown operation scope")
-	}
-	return op, err
 }
 
 func (gce *GCECloud) PollGlobalOp(op *compute.Operation) (*compute.Operation, error) {
@@ -430,95 +229,9 @@ func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
 	return ip, nil
 }
 
-// ProjectName returns the Google Cloud project being used for this GCECloud
-func (gce *GCECloud) ProjectID() string {
-	return gce.projectID
-}
-
-// ProjectName returns the Google Cloud project being used for this GCECloud
-func (gce *GCECloud) Zone() string {
-	return gce.zone
-}
-
-// FullQualProj returns the full URL for the specified project.
-func FullQualProj(proj string) string {
+// fullQualProj returns the full URL for the specified project.
+func fullQualProj(proj string) string {
 	return "https://www.googleapis.com/compute/v1/projects/" + proj
-}
-
-// CreateInstance creates the specified instance.
-func (gce *GCECloud) CreateInstance(name, size, image, tag, startupScript string, ipFwd bool, scopes []string) (*GCEOp, error) {
-	fqp := FullQualProj(gce.projectID)
-	var serviceAccounts []*compute.ServiceAccount
-	if len(scopes) > 0 {
-		serviceAccounts = []*compute.ServiceAccount{
-			{
-				Email:  "default",
-				Scopes: scopes,
-			},
-		}
-	} else {
-		serviceAccounts = nil
-	}
-	instance := &compute.Instance{
-		Name:         name,
-		MachineType:  fqp + "/zones/" + gce.zone + "/machineTypes/" + size,
-		CanIpForward: ipFwd,
-		Disks: []*compute.AttachedDisk{
-			{
-				AutoDelete: true,
-				Boot:       true,
-				Type:       "PERSISTENT",
-				InitializeParams: &compute.AttachedDiskInitializeParams{
-					DiskName:    name,
-					SourceImage: image,
-				},
-			},
-		},
-		Metadata: &compute.Metadata{
-			Items: []*compute.MetadataItems{
-				{
-					Key:   "startup-script",
-					Value: startupScript,
-				},
-			},
-		},
-		NetworkInterfaces: []*compute.NetworkInterface{
-			{
-				AccessConfigs: []*compute.AccessConfig{
-					{
-						Type: "ONE_TO_ONE_NAT",
-						Name: "external-nat",
-					},
-				},
-				Network: fqp + "/global/networks/default",
-			},
-		},
-		ServiceAccounts: serviceAccounts,
-		Scheduling: &compute.Scheduling{
-			AutomaticRestart: true,
-		},
-		Tags: &compute.Tags{
-			Items: []string{
-				tag,
-			},
-		},
-	}
-	computeOp, err := gce.service.Instances.Insert(gce.projectID, gce.zone, instance).Do()
-	op := &GCEOp{
-		op:    computeOp,
-		scope: ZONE,
-	}
-	return op, err
-}
-
-// DeleteInstance deletes the specified instance
-func (gce *GCECloud) DeleteInstance(name string) (*GCEOp, error) {
-	computeOp, err := gce.service.Instances.Delete(gce.projectID, gce.zone, name).Do()
-	op := &GCEOp{
-		op:    computeOp,
-		scope: ZONE,
-	}
-	return op, err
 }
 
 // fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
@@ -562,12 +275,98 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	return instances, nil
 }
 
-// CreateRoute creates the specified route and adds it to the project's network configuration.
-func (gce *GCECloud) CreateRoute(name, nextHop, ipRange string) (*GCEOp, error) {
+type instance struct {
+	Name          string
+	Size          string
+	Image         string
+	Tag           string
+	StartupScript string
+	Scopes        []string
+	CanIPFwd      bool
+}
+
+// createInstance creates the specified instance.
+func (gce *GCECloud) createInstance(inst *instance) (*GCEOp, error) {
+	fqp := fullQualProj(gce.projectID)
+	var serviceAccounts []*compute.ServiceAccount
+	if len(inst.Scopes) > 0 {
+		serviceAccounts = []*compute.ServiceAccount{
+			{
+				Email:  "default",
+				Scopes: inst.Scopes,
+			},
+		}
+	} else {
+		serviceAccounts = nil
+	}
+	instance := &compute.Instance{
+		Name:         inst.Name,
+		MachineType:  fqp + "/zones/" + gce.zone + "/machineTypes/" + inst.Size,
+		CanIpForward: inst.CanIPFwd,
+		Disks: []*compute.AttachedDisk{
+			{
+				AutoDelete: true,
+				Boot:       true,
+				Type:       "PERSISTENT",
+				InitializeParams: &compute.AttachedDiskInitializeParams{
+					DiskName:    inst.Name,
+					SourceImage: inst.Image,
+				},
+			},
+		},
+		Metadata: &compute.Metadata{
+			Items: []*compute.MetadataItems{
+				{
+					Key:   "startup-script",
+					Value: inst.StartupScript,
+				},
+			},
+		},
+		NetworkInterfaces: []*compute.NetworkInterface{
+			{
+				AccessConfigs: []*compute.AccessConfig{
+					{
+						Type: "ONE_TO_ONE_NAT",
+						Name: "external-nat",
+					},
+				},
+				Network: fqp + "/global/networks/default",
+			},
+		},
+		ServiceAccounts: serviceAccounts,
+		Scheduling: &compute.Scheduling{
+			AutomaticRestart: true,
+		},
+		Tags: &compute.Tags{
+			Items: []string{
+				inst.Tag,
+			},
+		},
+	}
+	computeOp, err := gce.service.Instances.Insert(gce.projectID, gce.zone, instance).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: ZONE,
+	}
+	return op, err
+}
+
+// deleteInstance deletes the specified instance
+func (gce *GCECloud) deleteInstance(name string) (*GCEOp, error) {
+	computeOp, err := gce.service.Instances.Delete(gce.projectID, gce.zone, name).Do()
+	op := &GCEOp{
+		op:    computeOp,
+		scope: ZONE,
+	}
+	return op, err
+}
+
+// createRoute creates the specified route and adds it to the project's network configuration.
+func (gce *GCECloud) createRoute(name, nextHop, ipRange string) (*GCEOp, error) {
 	route := &compute.Route{
 		DestRange:       ipRange,
 		Name:            name,
-		Network:         FullQualProj(gce.projectID) + "/global/networks/default",
+		Network:         fullQualProj(gce.projectID) + "/global/networks/default",
 		NextHopInstance: nextHop,
 		Priority:        1000,
 	}
@@ -579,7 +378,7 @@ func (gce *GCECloud) CreateRoute(name, nextHop, ipRange string) (*GCEOp, error) 
 	return op, err
 }
 
-func (gce *GCECloud) DeleteRoute(name string) (*GCEOp, error) {
+func (gce *GCECloud) deleteRoute(name string) (*GCEOp, error) {
 	computeOp, err := gce.service.Routes.Delete(gce.projectID, name).Do()
 	op := &GCEOp{
 		op:    computeOp,
@@ -588,13 +387,13 @@ func (gce *GCECloud) DeleteRoute(name string) (*GCEOp, error) {
 	return op, err
 }
 
-// CreateFirewall creates the specified firewall rule
-func (gce *GCECloud) CreateFirewall(name, sourceRange, tag, allowed string) (*GCEOp, error) {
+// createFirewall creates the specified firewall rule
+func (gce *GCECloud) createFirewall(name, sourceRange, tag, allowed string) (*GCEOp, error) {
 	fwAllowed, err := parseAllowed(allowed)
 	if err != nil {
 		return nil, err
 	}
-	prefix := FullQualProj(gce.projectID)
+	prefix := fullQualProj(gce.projectID)
 	firewall := &compute.Firewall{
 		Name:    name,
 		Network: prefix + "/global/networks/default",
@@ -614,8 +413,8 @@ func (gce *GCECloud) CreateFirewall(name, sourceRange, tag, allowed string) (*GC
 	return op, err
 }
 
-// DeleteFirewall deletes the firewall specified by "name".
-func (gce *GCECloud) DeleteFirewall(name string) (*GCEOp, error) {
+// deleteFirewall deletes the firewall specified by "name".
+func (gce *GCECloud) deleteFirewall(name string) (*GCEOp, error) {
 	computeOp, err := gce.service.Firewalls.Delete(gce.projectID, name).Do()
 	op := &GCEOp{
 		op:    computeOp,

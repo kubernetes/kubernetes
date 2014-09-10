@@ -60,6 +60,11 @@ func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
+// Deployer returns an (nil) implementation of Deployer for the fake cloud.
+func (v *FakeCloud) Deployer() (cloudprovider.Deployer, bool) {
+	return nil, false
+}
+
 // TCPLoadBalancerExists is a stub implementation of TCPLoadBalancer.TCPLoadBalancerExists.
 func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return f.Exists, f.Err

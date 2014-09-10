@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package kube_updown provides functions for deploying a kubernetes cluster
 // on Google Compute Engine
-package deploy
+package gce_cloud
 
 import (
 	"bytes"
@@ -41,7 +41,6 @@ import (
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	"code.google.com/p/google-api-go-client/googleapi"
 	storage "code.google.com/p/google-api-go-client/storage/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	"github.com/golang/glog"
 )
 
@@ -67,17 +66,62 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
+// CreateCluster is an implementation of Deployer.CreateCluster
+func (gce *GCECloud) CreateCluster(numMinions int) error {
+	ops, err := gce.DeployMaster()
+	if err != nil {
+		return err
+	}
+	for i := 1; i <= numMinions; i++ {
+		newOps, err := gce.DeployMinion(i)
+		if err != nil {
+			return err
+		}
+		ops = append(ops, newOps...)
+	}
+	if err := gce.waitForOps(ops); err != nil {
+		return err
+	}
+	if err := gce.checkMaster(); err != nil {
+		return err
+	}
+	//	if err := gce.checkMinions(); err != nil {
+	//		return err
+	//	}
+	return nil
+}
+
+// DeleteCluster is an implementation of Deployer.DeleteCluster
+func (gce *GCECloud) DeleteCluster(numMinions int) error {
+	ops, err := gce.DownMaster()
+	fmt.Printf("Size: %v\n", len(ops))
+	if err != nil {
+		glog.Warning(err)
+	}
+	for i := 1; i <= numMinions; i++ {
+		newOps, err := gce.DownMinion(i)
+		if err != nil {
+			glog.Warning(err)
+		}
+		ops = append(ops, newOps...)
+	}
+	if err := gce.waitForOps(ops); err != nil {
+		glog.Fatal(err)
+	}
+	return nil
+}
+
 // DeployMaster creates the firewall rules and instance for the kube master.
-func DeployMaster(gce *gce_cloud.GCECloud) ([]*gce_cloud.GCEOp, error) {
-	var ops []*gce_cloud.GCEOp
+func (gce *GCECloud) DeployMaster() ([]*GCEOp, error) {
+	var ops []*GCEOp
 	glog.Info("Creating firewall kubernetes-master-https\n")
-	op, err := createMasterFirewall(gce)
+	op, err := gce.createMasterFirewall()
 	if err != nil {
 		return ops, fmt.Errorf("couldn't start operation: %v", err)
 	}
 	ops = append(ops, op)
 	glog.Info("Creating instance kubernetes-master\n")
-	op, err = createMaster(gce)
+	op, err = gce.createMasterInstance()
 	if err != nil {
 		return ops, fmt.Errorf("couldn't start operation: %v", err)
 	}
@@ -86,22 +130,22 @@ func DeployMaster(gce *gce_cloud.GCECloud) ([]*gce_cloud.GCEOp, error) {
 }
 
 // DeployMinion creates the firewall rules, instance, and route for the specified minion.
-func DeployMinion(cloud *gce_cloud.GCECloud, i int) ([]*gce_cloud.GCEOp, error) {
-	var ops []*gce_cloud.GCEOp
+func (gce *GCECloud) DeployMinion(i int) ([]*GCEOp, error) {
+	var ops []*GCEOp
 	glog.Infof("Creating firewall kubernetes-minion-%v-all\n", i)
-	op, err := createMinionFirewall(cloud, i)
+	op, err := gce.createMinionFirewall(i)
 	if err != nil {
 		return ops, fmt.Errorf("couldn't create firewall-rule insert operation: %v", err)
 	}
 	ops = append(ops, op)
 	glog.Infof("Creating instance kubernetes-minion-%v\n", i)
-	op, err = createMinion(cloud, i)
+	op, err = gce.createMinionInstance(i)
 	if err != nil {
 		return ops, fmt.Errorf("couldn't create instance insert operation: %v", err)
 	}
 	ops = append(ops, op)
 	glog.Infof("Creating route kubernetes-minion-%v\n", i)
-	op, err = createMinionRoute(cloud, i)
+	op, err = gce.createMinionRoute(i)
 	if err != nil {
 		return ops, fmt.Errorf("couldn't create route insert operation: %v", err)
 	}
@@ -110,74 +154,66 @@ func DeployMinion(cloud *gce_cloud.GCECloud, i int) ([]*gce_cloud.GCEOp, error) 
 }
 
 // DownMaster removes the firewall rules and instance for the kube master.
-func DownMaster(gce *gce_cloud.GCECloud) ([]*gce_cloud.GCEOp, error) {
-	var ops []*gce_cloud.GCEOp
+func (gce *GCECloud) DownMaster() ([]*GCEOp, error) {
+	var ops []*GCEOp
+	errMsg := ""
 	glog.Info("Removing firewall kubernetes-master-https\n")
-	op, err := deleteMasterFirewall(gce)
+	op, err := gce.deleteMasterFirewall()
 	if err != nil {
-		return ops, fmt.Errorf("couldn't start operation: %v", err)
+		errMsg = errMsg + fmt.Sprintf("couldn't remove firewall-rule: %v\n", err)
+	} else {
+		ops = append(ops, op)
 	}
-	ops = append(ops, op)
+
 	glog.Info("Removing instance kubernetes-master\n")
-	op, err = deleteMaster(gce)
+	op, err = gce.deleteMasterInstance()
 	if err != nil {
-		return ops, fmt.Errorf("couldn't start operation: %v", err)
+		errMsg = errMsg + fmt.Sprintf("couldn't remove instance: %v\n", err)
+	} else {
+		ops = append(ops, op)
 	}
-	ops = append(ops, op)
-	return ops, nil
+	var retErr error
+	if len(errMsg) > 0 {
+		retErr = errors.New(errMsg)
+	}
+	return ops, retErr
 }
 
-// DeployMinion removes the firewall rules, instance, and route for the specified minion.
-func DownMinion(cloud *gce_cloud.GCECloud, i int) ([]*gce_cloud.GCEOp, error) {
-	var ops []*gce_cloud.GCEOp
+// DownMinion removes the firewall rules, instance, and route for the specified minion.
+func (gce *GCECloud) DownMinion(i int) ([]*GCEOp, error) {
+	var ops []*GCEOp
+	var errMsg string
 	glog.Infof("Removing firewall kubernetes-minion-%v-all\n", i)
-	op, err := deleteMinionFirewall(cloud, i)
+	op, err := gce.deleteMinionFirewall(i)
 	if err != nil {
-		return ops, fmt.Errorf("couldn't remove firewall-rule insert operation: %v", err)
+		errMsg = errMsg + fmt.Sprintf("couldn't remove firewall-rule: %v\n", err)
+	} else {
+		ops = append(ops, op)
 	}
-	ops = append(ops, op)
 	glog.Infof("Removing instance kubernetes-minion-%v\n", i)
-	op, err = deleteMinion(cloud, i)
+	op, err = gce.deleteMinionInstance(i)
 	if err != nil {
-		return ops, fmt.Errorf("couldn't remove instance insert operation: %v", err)
+		errMsg = errMsg + fmt.Sprintf("couldn't remove instance: %v\n", err)
+	} else {
+		ops = append(ops, op)
 	}
-	ops = append(ops, op)
 	glog.Infof("Removing route kubernetes-minion-%v\n", i)
-	op, err = deleteMinionRoute(cloud, i)
+	op, err = gce.deleteMinionRoute(i)
 	if err != nil {
-		return ops, fmt.Errorf("couldn't remove route insert operation: %v", err)
+		errMsg = errMsg + fmt.Sprintf("couldn't remove route: %v\n", err)
+	} else {
+		ops = append(ops, op)
 	}
-	ops = append(ops, op)
-	return ops, nil
+	var retErr error
+	if len(errMsg) > 0 {
+		retErr = errors.New(errMsg)
+	}
+	return ops, retErr
 }
 
-// WaitForOps polls the status of the specified operations until they are all "DONE"
-func WaitForOps(cloud *gce_cloud.GCECloud, ops []*gce_cloud.GCEOp) error {
-	// Wait for all operations to complete
-	for _, op := range ops {
-		op, err := cloud.PollOp(op)
-		if err != nil {
-			return err
-		}
-		for op.Status() != "DONE" {
-			glog.Infof("Waiting 2s for %v of %v %v\n", op.OperationType(), op.Resource(), op.Target())
-			time.Sleep(2 * time.Second)
-			op, err = cloud.PollOp(op)
-			if err != nil {
-				return err
-			}
-		}
-		if op.Errors() != nil {
-			return errors.New("errors in operation:\n" + strings.Join(op.Errors(), "\n"))
-		}
-		glog.Infof("%v of %v %v has completed\n", op.OperationType(), op.Resource(), op.Target())
-	}
-	return nil
-}
-
-// CheckMaster attempts to contact the api-server on the master until it successfully responds
-func CheckMaster(cloud *gce_cloud.GCECloud) error {
-	kubeMasterIP, err := cloud.IPAddress(masterName)
+// checkMaster attempts to contact the api-server on the master until it successfully responds
+func (gce *GCECloud) checkMaster() error {
+	kubeMasterIP, err := gce.IPAddress(masterName)
 	if err != nil {
 		return fmt.Errorf("error getting master IP: %v\n", err)
 	}
@@ -217,8 +253,8 @@ func CheckMaster(cloud *gce_cloud.GCECloud) error {
 	return nil
 }
 
-// CheckMinions ssh'es into each minion and verifies that docker installed successfully.
-func CheckMinions(n int) error {
+// checkMinions ssh'es into each minion and verifies that docker installed successfully.
+func (gce *GCECloud) checkMinions(n int) error {
 	glog.Info("Sanity checking minions...\n")
 	for i := 1; i <= n; i++ {
 		name := fmt.Sprintf("%v-%v", minionPrefix, i)
@@ -232,72 +268,90 @@ func CheckMinions(n int) error {
 }
 
 // createMasterFirewall creates a firewall rule to allow https to the kube-master from anywhere.
-func createMasterFirewall(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
-	return gce.CreateFirewall(masterName+"-https", "0.0.0.0/0", masterTag, "tcp:443")
+func (gce *GCECloud) createMasterFirewall() (*GCEOp, error) {
+	return gce.createFirewall(masterName+"-https", "0.0.0.0/0", masterTag, "tcp:443")
 }
 
 // createMinionFirewall creates a firewall rule to allow communication on the internal IPs.
-func createMinionFirewall(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+func (gce *GCECloud) createMinionFirewall(i int) (*GCEOp, error) {
 	name := fmt.Sprintf("%v-%v-all", minionPrefix, i)
 	ipRange := fmt.Sprintf(minionIPs, i)
-	return gce.CreateFirewall(name, ipRange, minionTag, "tcp,udp,icmp,esp,ah,sctp")
+	return gce.createFirewall(name, ipRange, minionTag, "tcp,udp,icmp,esp,ah,sctp")
 }
 
-// createMaster spins up the kube-master instance.
-func createMaster(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
-	release, err := getReleaseName(gce)
+// createMasterInstance spins up the kube-master instance.
+func (gce *GCECloud) createMasterInstance() (*GCEOp, error) {
+	release, err := getReleaseName(gce.projectID)
 	if err != nil {
 		return nil, err
 	}
-	masterStartup := masterStartupScript(gce.ProjectID(), release)
+	masterStartup := masterStartupScript(gce.projectID, release)
 	scopes := []string{
 		compute.DevstorageRead_onlyScope,
 		compute.ComputeScope,
 	}
-	return gce.CreateInstance(masterName, masterSize, image, masterTag, string(masterStartup), false, scopes)
+	instance := &instance{
+		Name:          masterName,
+		Size:          masterSize,
+		Image:         image,
+		Tag:           masterTag,
+		StartupScript: masterStartup,
+		Scopes:        scopes,
+		CanIPFwd:      false,
+	}
+	return gce.createInstance(instance)
 }
 
-// createMinion spins up the specified minion instance.
-func createMinion(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+// createMinionInstance spins up the specified minion instance.
+func (gce *GCECloud) createMinionInstance(i int) (*GCEOp, error) {
 	name := fmt.Sprintf("%v-%v", minionPrefix, i)
 	minionStartup := minionStartupScript(i)
-	return gce.CreateInstance(name, minionSize, image, minionTag, string(minionStartup), true, []string{})
+	instance := &instance{
+		Name:          name,
+		Size:          minionSize,
+		Image:         image,
+		Tag:           minionTag,
+		StartupScript: minionStartup,
+		Scopes:        []string{},
+		CanIPFwd:      true,
+	}
+	return gce.createInstance(instance)
 }
 
 // createMinionRoute adds the minion routing rule to allow forwarding to the pods.
-func createMinionRoute(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+func (gce *GCECloud) createMinionRoute(i int) (*GCEOp, error) {
 	name := fmt.Sprintf("%v-%v", minionPrefix, i)
-	nextHop := fmt.Sprintf("%v/zones/%v/instances/%v", gce_cloud.FullQualProj(gce.ProjectID()), gce.Zone(), name)
-	ipRange := fmt.Sprintf("10.244.%v.0/24", i)
-	return gce.CreateRoute(name, nextHop, ipRange)
+	nextHop := fmt.Sprintf("%v/zones/%v/instances/%v", fullQualProj(gce.projectID), gce.zone, name)
+	ipRange := fmt.Sprintf(minionIPs, i)
+	return gce.createRoute(name, nextHop, ipRange)
 }
 
 // deleteMasterFirewall removes the master firewall rule.
-func deleteMasterFirewall(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
-	return gce.DeleteFirewall(masterName + "-https")
+func (gce *GCECloud) deleteMasterFirewall() (*GCEOp, error) {
+	return gce.deleteFirewall(masterName + "-https")
 }
 
 // deleteMinionFirewall removes the specified minion firewall rule.
-func deleteMinionFirewall(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+func (gce *GCECloud) deleteMinionFirewall(i int) (*GCEOp, error) {
 	name := fmt.Sprintf("%v-%v-all", minionPrefix, i)
-	return gce.DeleteFirewall(name)
+	return gce.deleteFirewall(name)
 }
 
-// deleteMaster removes the kube-master instance.
-func deleteMaster(gce *gce_cloud.GCECloud) (*gce_cloud.GCEOp, error) {
-	return gce.DeleteInstance(masterName)
+// deleteMasterInstance removes the kube-master instance.
+func (gce *GCECloud) deleteMasterInstance() (*GCEOp, error) {
+	return gce.deleteInstance(masterName)
 }
 
-// deleteMinion removes the specified minion instance.
-func deleteMinion(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+// deleteMinionInstance removes the specified minion instance.
+func (gce *GCECloud) deleteMinionInstance(i int) (*GCEOp, error) {
 	name := fmt.Sprintf("%v-%v", minionPrefix, i)
-	return gce.DeleteInstance(name)
+	return gce.deleteInstance(name)
 }
 
 // deleteMinionRoute removes the minion routing rule.
-func deleteMinionRoute(gce *gce_cloud.GCECloud, i int) (*gce_cloud.GCEOp, error) {
+func (gce *GCECloud) deleteMinionRoute(i int) (*GCEOp, error) {
 	name := fmt.Sprintf("%v-%v", minionPrefix, i)
-	return gce.DeleteRoute(name)
+	return gce.deleteRoute(name)
 }
 
 // getCredentials gets the credentials stored in the .kubernetes_auth file (or create and store new credentials).
@@ -347,7 +401,7 @@ func rmHashComments(input []byte) []byte {
 	return rmCmnts.ReplaceAllLiteral(input, []byte{})
 }
 
-func masterStartupScript(project, releaseName string) []byte {
+func masterStartupScript(project, releaseName string) string {
 	htpasswd := getHtpasswd()
 	masterStartup := []byte(
 		"#! /bin/bash\n" +
@@ -357,20 +411,20 @@ func masterStartupScript(project, releaseName string) []byte {
 	dr, err := ioutil.ReadFile("cluster/templates/download-release.sh")
 	if err != nil {
 		glog.Fatalf("failed to read download-release.sh: %v", err)
-		return nil
+		return ""
 	}
 	sm, err := ioutil.ReadFile("cluster/templates/salt-master.sh")
 	if err != nil {
 		glog.Fatalf("failed to read salt-master.sh: %v", err)
-		return nil
+		return ""
 	}
 
 	dr = rmHashComments(dr)
 	sm = rmHashComments(sm)
-	return bytes.Join([][]byte{masterStartup, dr, sm}, nil)
+	return string(bytes.Join([][]byte{masterStartup, dr, sm}, nil))
 }
 
-func minionStartupScript(i int) []byte {
+func minionStartupScript(i int) string {
 	ipRange := fmt.Sprintf(minionIPs, i)
 	minionStartup := []byte(
 		"#! /bin/bash\n" +
@@ -379,10 +433,10 @@ func minionStartupScript(i int) []byte {
 	sm, err := ioutil.ReadFile("cluster/templates/salt-minion.sh")
 	if err != nil {
 		glog.Fatalf("failed to read salt-minion.sh: %v", err)
-		return nil
+		return ""
 	}
 	sm = rmHashComments(sm)
-	return bytes.Join([][]byte{minionStartup, sm}, nil)
+	return string(bytes.Join([][]byte{minionStartup, sm}, nil))
 }
 
 func getHtpasswd() string {
@@ -398,9 +452,9 @@ func getHtpasswd() string {
 	return fmt.Sprintf("%v:%v", usr, htpasswd)
 }
 
-func getReleaseName(gce *gce_cloud.GCECloud) (string, error) {
+func getReleaseName(projectID string) (string, error) {
 	// TODO: retrieval of releases only works for the dev flow right now
-	bucketHash := fmt.Sprintf("%x", md5.Sum([]byte(gce.ProjectID())))[:5]
+	bucketHash := fmt.Sprintf("%x", md5.Sum([]byte(projectID)))[:5]
 	u, err := user.Current()
 	if err != nil {
 		return "", err
@@ -418,7 +472,7 @@ func getReleaseName(gce *gce_cloud.GCECloud) (string, error) {
 
 // readFromGCS expects locations in the form gs://bucket/path/to/object
 func readFromGCS(loc string) ([]byte, error) {
-	c := gce_cloud.CreateOAuthClient()
+	c := createOAuthClient()
 	svc, err := storage.New(c)
 	if err != nil {
 		return nil, err
@@ -442,7 +496,6 @@ func readFromGCS(loc string) ([]byte, error) {
 	if resp.StatusCode != 200 {
 		return nil, errors.New(resp.Status)
 	}
-
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

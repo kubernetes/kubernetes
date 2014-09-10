@@ -25,16 +25,77 @@ import (
 	"regexp"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/deploy"
 	"github.com/golang/glog"
 )
 
-const (
-	zone       = "us-central1-b"
-	numMinions = 4
+var (
+	numMinions = flag.Int("numMinions", 4, "Number of minions in the cluster.")
+	project    = flag.String("project", defaultProject(), "Default GCE Project.")
+	zone       = flag.String("zone", "us-central1-b", "Zone where cluster will be launched.")
 )
 
-var project = flag.String("project", defaultProject(), "Default GCE Project.")
+func usage() {
+	fmt.Fprint(os.Stderr, "Usage: kube-deploy up|down|push\n")
+}
+
+func main() {
+	flag.Set("stderrthreshold", "INFO")
+
+	flag.Parse()
+
+	if len(flag.Args()) != 1 {
+		usage()
+		os.Exit(1)
+	}
+
+	switch flag.Arg(0) {
+	case "up":
+		up()
+	case "down":
+		down()
+	case "push":
+		push()
+	default:
+		usage()
+	}
+}
+
+func up() {
+	cloud, err := gce_cloud.CreateGCECloud(*project, *zone)
+	if err != nil {
+		glog.Fatalf("failed to create cloud: %v", err)
+	}
+	deployer, success := cloud.Deployer()
+	if !success {
+		glog.Fatalf("cloud provider does not support deployment")
+	}
+	glog.Info("Starting VMs and configuring firewalls\n")
+	if err := deployer.CreateCluster(*numMinions); err != nil {
+		glog.Fatalf("failed to bring up cluster: %v", err)
+	}
+	glog.Info("Kubernetes cluster is running\n")
+	glog.Info("Security note: The server above uses a self signed certificate.  This is\n")
+	glog.Info("    subject to \"Man in the middle\" type attacks.\n")
+}
+
+func down() {
+	cloud, err := gce_cloud.CreateGCECloud(*project, *zone)
+	if err != nil {
+		glog.Fatalf("failed to create cloud: %v", err)
+	}
+	deployer, success := cloud.Deployer()
+	if !success {
+		glog.Fatalf("cloud provider does not support deployment")
+	}
+	if err := deployer.DeleteCluster(*numMinions); err != nil {
+		glog.Fatalf("failed to down cluster: %v", err)
+	}
+	glog.Info("Kubernetes cluster successfully taken down.\n")
+}
+
+func push() {
+	fmt.Println("Not yet implemented!")
+}
 
 func defaultProject() string {
 	if proj := projectFromEnv(); proj != "" {
@@ -76,86 +137,4 @@ func projectFromGCloud() string {
 		return ""
 	}
 	return project[1]
-}
-
-func usage() {
-	fmt.Fprint(os.Stderr, "Usage: kube-deploy up|down|push\n")
-}
-
-func main() {
-	flag.Set("stderrthreshold", "INFO")
-	if len(os.Args) != 2 {
-		usage()
-		os.Exit(1)
-	}
-
-	flag.Parse()
-
-	switch os.Args[1] {
-	case "up":
-		up()
-	case "down":
-		down()
-	case "push":
-		push()
-	default:
-		usage()
-	}
-}
-
-func up() {
-	cloud, err := gce_cloud.CreateGCECloud(*project, zone)
-	if err != nil {
-		glog.Fatalf("failed to create cloud: %v", err)
-	}
-	glog.Info("Starting VMs and configuring firewalls\n")
-	ops, err := deploy.DeployMaster(cloud)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	for i := 1; i <= numMinions; i++ {
-		newOps, err := deploy.DeployMinion(cloud, i)
-		if err != nil {
-			glog.Fatal(err)
-		}
-		ops = append(ops, newOps...)
-	}
-	if err := deploy.WaitForOps(cloud, ops); err != nil {
-		glog.Fatal(err)
-	}
-	if err := deploy.CheckMaster(cloud); err != nil {
-		glog.Fatal(err)
-	}
-	//	if err := deploy.CheckMinions(); err != nil {
-	//		glog.Fatal(err)
-	//	}
-	glog.Info("Kubernetes cluster is running\n")
-	glog.Info("Security note: The server above uses a self signed certificate.  This is\n")
-	glog.Info("    subject to \"Man in the middle\" type attacks.\n")
-}
-
-func down() {
-	cloud, err := gce_cloud.CreateGCECloud(*project, zone)
-	if err != nil {
-		glog.Fatalf("failed to create cloud: %v", err)
-	}
-	ops, err := deploy.DownMaster(cloud)
-	if err != nil {
-		glog.Fatal(err)
-	}
-	for i := 1; i <= numMinions; i++ {
-		newOps, err := deploy.DownMinion(cloud, i)
-		if err != nil {
-			glog.Fatal(err)
-		}
-		ops = append(ops, newOps...)
-	}
-	if err := deploy.WaitForOps(cloud, ops); err != nil {
-		glog.Fatal(err)
-	}
-	glog.Info("Kubernetes cluster succcessfully taken down.\n")
-}
-
-func push() {
-	fmt.Println("Not yet implemented!")
 }
