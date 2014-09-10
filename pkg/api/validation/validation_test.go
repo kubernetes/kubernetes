@@ -409,6 +409,17 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "invalid protocol",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "abc123"},
+				Port:     8675,
+				Protocol: "INVALID",
+				Selector: map[string]string{"foo": "bar"},
+			},
+			// Should fail because the protocol is invalid.
+			numErrs: 1,
+		},
+		{
 			name: "missing selector",
 			svc: api.Service{
 				JSONBase: api.JSONBase{ID: "foo"},
@@ -422,6 +433,7 @@ func TestValidateService(t *testing.T) {
 			svc: api.Service{
 				JSONBase: api.JSONBase{ID: "abc123"},
 				Port:     1,
+				Protocol: "TCP",
 				Selector: map[string]string{"foo": "bar"},
 			},
 			numErrs: 0,
@@ -431,6 +443,7 @@ func TestValidateService(t *testing.T) {
 			svc: api.Service{
 				JSONBase: api.JSONBase{ID: "abc123"},
 				Port:     65535,
+				Protocol: "UDP",
 				Selector: map[string]string{"foo": "bar"},
 			},
 			numErrs: 0,
@@ -451,6 +464,19 @@ func TestValidateService(t *testing.T) {
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %+v", tc.name, errs)
 		}
+	}
+
+	svc := api.Service{
+		Port:     6502,
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{"foo": "bar"},
+	}
+	errs := ValidateService(&svc)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	}
+	if svc.Protocol != "TCP" {
+		t.Errorf("Expected default protocol of 'TCP': %#v", errs)
 	}
 }
 
