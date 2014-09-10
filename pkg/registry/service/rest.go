@@ -52,7 +52,7 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 
 func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
-	if errs := validation.ValidateService(srv); len(errs) > 0 {
+	if errs := validation.ValidateService(srv, rs.registry); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
 	}
 
@@ -158,7 +158,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 
 func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
-	if errs := validation.ValidateService(srv); len(errs) > 0 {
+	if errs := validation.ValidateService(srv, rs.registry); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {

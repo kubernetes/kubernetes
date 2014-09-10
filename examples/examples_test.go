@@ -31,7 +31,17 @@ import (
 	"github.com/golang/glog"
 )
 
+type fakeServiceLister struct {
+	l api.ServiceList
+	e error
+}
+
+func (f *fakeServiceLister) ListServices() (*api.ServiceList, error) {
+	return &f.l, f.e
+}
+
 func validateObject(obj runtime.Object) (errors []error) {
+	fakeLister := &fakeServiceLister{}
 	switch t := obj.(type) {
 	case *api.ReplicationController:
 		errors = validation.ValidateManifest(&t.DesiredState.PodTemplate.DesiredState.Manifest)
@@ -40,7 +50,7 @@ func validateObject(obj runtime.Object) (errors []error) {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Service:
-		errors = validation.ValidateService(t)
+		errors = validation.ValidateService(t, fakeLister)
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)

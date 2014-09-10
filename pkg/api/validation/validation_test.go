@@ -364,7 +364,19 @@ func TestValidatePod(t *testing.T) {
 	}
 }
 
+type fakeServiceLister struct {
+	l api.ServiceList
+	e error
+}
+
+func (f *fakeServiceLister) ListServices() (*api.ServiceList, error) {
+	return &f.l, f.e
+}
+
 func TestValidateService(t *testing.T) {
+	lister := &fakeServiceLister{
+		l: api.ServiceList{},
+	}
 	// This test should fail because the port number is invalid i.e.
 	// the Port field has a default value of 0.
 	errs := ValidateService(&api.Service{
@@ -372,7 +384,7 @@ func TestValidateService(t *testing.T) {
 		Selector: map[string]string{
 			"foo": "bar",
 		},
-	})
+	}, lister)
 	if len(errs) != 1 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
@@ -383,7 +395,7 @@ func TestValidateService(t *testing.T) {
 		Selector: map[string]string{
 			"foo": "bar",
 		},
-	})
+	}, lister)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
@@ -393,7 +405,7 @@ func TestValidateService(t *testing.T) {
 		Selector: map[string]string{
 			"foo": "bar",
 		},
-	})
+	}, lister)
 	if len(errs) != 1 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
@@ -401,13 +413,46 @@ func TestValidateService(t *testing.T) {
 	errs = ValidateService(&api.Service{
 		Port:     6502,
 		JSONBase: api.JSONBase{ID: "foo"},
-	})
+	}, lister)
 	if len(errs) != 1 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 
-	errs = ValidateService(&api.Service{})
+	errs = ValidateService(&api.Service{}, lister)
 	if len(errs) != 3 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+
+	lister = &fakeServiceLister{
+		l: api.ServiceList{
+			Items: []api.Service{
+				{
+					JSONBase: api.JSONBase{ID: "foo"},
+					Port:     8080,
+				},
+			},
+		},
+	}
+
+	errs = ValidateService(&api.Service{
+		Port:     8080,
+		JSONBase: api.JSONBase{ID: "bar"},
+		Selector: map[string]string{
+			"foo": "bar",
+		},
+	}, lister)
+	if len(errs) != 1 {
+		t.Errorf("Unexpected error list: %#v", errs)
+	}
+
+	errs = ValidateService(&api.Service{
+		Port:     8080,
+		JSONBase: api.JSONBase{ID: "foo"},
+		Selector: map[string]string{
+			"foo": "bar",
+		},
+	}, lister)
+	if len(errs) != 0 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
 }
