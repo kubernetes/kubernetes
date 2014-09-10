@@ -234,8 +234,8 @@ func (r *Registry) WatchControllers(resourceVersion uint64) (watch.Interface, er
 	return r.WatchList("/registry/controllers", resourceVersion, tools.Everything)
 }
 
-func makeControllerKey(id string) string {
-	return "/registry/controllers/" + id
+func makeControllerKey(controllerID string) string {
+	return "/registry/controllers/" + controllerID
 }
 
 // GetController gets a specific ReplicationController specified by its ID.
@@ -268,8 +268,8 @@ func (r *Registry) DeleteController(controllerID string) error {
 	return etcderr.InterpretDeleteError(err, "replicationController", controllerID)
 }
 
-func makeServiceKey(name string) string {
-	return "/registry/services/specs/" + name
+func makeServiceKey(serviceID string) string {
+	return "/registry/services/specs/" + serviceID
 }
 
 // ListServices obtains a list of Services.
@@ -285,45 +285,45 @@ func (r *Registry) CreateService(svc *api.Service) error {
 	return etcderr.InterpretCreateError(err, "service", svc.ID)
 }
 
-// GetService obtains a Service specified by its name.
-func (r *Registry) GetService(name string) (*api.Service, error) {
-	key := makeServiceKey(name)
+// GetService obtains a Service specified by its id.
+func (r *Registry) GetService(serviceID string) (*api.Service, error) {
+	key := makeServiceKey(serviceID)
 	var svc api.Service
 	err := r.ExtractObj(key, &svc, false)
 	if err != nil {
-		return nil, etcderr.InterpretGetError(err, "service", name)
+		return nil, etcderr.InterpretGetError(err, "service", serviceID)
 	}
 	return &svc, nil
 }
 
-// GetEndpoints obtains the endpoints for the service identified by 'name'.
-func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
-	key := makeServiceEndpointsKey(name)
+// GetEndpoints obtains the endpoints for the service identified by 'serviceID'.
+func (r *Registry) GetEndpoints(serviceID string) (*api.Endpoints, error) {
+	key := makeServiceEndpointsKey(serviceID)
 	var endpoints api.Endpoints
 	err := r.ExtractObj(key, &endpoints, false)
 	if err != nil {
-		return nil, etcderr.InterpretGetError(err, "endpoints", name)
+		return nil, etcderr.InterpretGetError(err, "endpoints", serviceID)
 	}
 	return &endpoints, nil
 }
 
-func makeServiceEndpointsKey(name string) string {
-	return "/registry/services/endpoints/" + name
+func makeServiceEndpointsKey(serviceID string) string {
+	return "/registry/services/endpoints/" + serviceID
 }
 
-// DeleteService deletes a Service specified by its name.
-func (r *Registry) DeleteService(name string) error {
-	key := makeServiceKey(name)
+// DeleteService deletes a Service specified by its serviceID.
+func (r *Registry) DeleteService(serviceID string) error {
+	key := makeServiceKey(serviceID)
 	err := r.Delete(key, true)
 	if err != nil {
-		return etcderr.InterpretDeleteError(err, "service", name)
+		return etcderr.InterpretDeleteError(err, "service", serviceID)
 	}
 
 	// TODO: can leave dangling endpoints, and potentially return incorrect
-	// endpoints if a new service is created with the same name
-	key = makeServiceEndpointsKey(name)
+	// endpoints if a new service is created with the same serviceID
+	key = makeServiceEndpointsKey(serviceID)
 	if err := r.Delete(key, true); err != nil && !tools.IsEtcdNotFound(err) {
-		return etcderr.InterpretDeleteError(err, "endpoints", name)
+		return etcderr.InterpretDeleteError(err, "endpoints", serviceID)
 	}
 	return nil
 }
