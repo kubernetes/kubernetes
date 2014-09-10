@@ -22,16 +22,13 @@ set -e
 
 source $(dirname $0)/common.sh
 
-verify-prereqs
-verify-gcs-prereqs
-ensure-gcs-release-bucket
-build-image
-run-build-command build/build-image/make-binaries.sh
-run-build-command build/build-image/make-cross.sh
-run-build-command build/build-image/run-tests.sh
-run-build-command build/build-image/run-integration.sh
-copy-output
-run-image
-package-tarballs
-push-images-to-gcs
-copy-release-to-gcs
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command build/build-image/make-binaries.sh
+kube::build::run_build_command build/build-image/make-cross.sh
+kube::build::run_build_command build/build-image/run-tests.sh
+kube::build::run_build_command build/build-image/run-integration.sh
+kube::build::copy_output
+kube::build::run_image
+kube::build::package_tarballs
+kube::release::gcs::release

@@ -1,5 +1,3 @@
-#! /bin/bash
-
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copies any built binaries off the Docker machine.
-#
-# This is a no-op on Linux when the Docker daemon is local.  This is only
-# necessary on Mac OS X with boot2docker.
+# This file creates a minimal container for running Kubernetes binaries
 
-set -e
+FROM  kubernetes
+MAINTAINER  Joe Beda <jbeda@google.com>
 
-source $(dirname $0)/common.sh
+ENV API_SERVER   127.0.0.1:8080
 
-kube::build::verify_prereqs
-kube::build::copy_output
+ADD . /kubernetes
+
+CMD ["/kubernetes/run.sh"]

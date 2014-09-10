@@ -16,10 +16,6 @@ limitations under the License.
 
 package version
 
-import (
-	"fmt"
-)
-
 // Info contains versioning information.
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
@@ -47,9 +43,5 @@ func Get() Info {
 
 // String returns info as a human-friendly version string.
 func (info Info) String() string {
-	commit := info.GitCommit
-	if commit == "" {
-		commit = "(unknown)"
-	}
-	return fmt.Sprintf("version %s.%s, build %s", info.Major, info.Minor, commit)
+	return info.GitVersion
 }

@@ -14,22 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This and builds all go components.
-
 set -e
 
 source $(dirname $0)/common.sh
 
-readonly CROSS_BINARIES="
-  kubecfg
-"
+readonly CROSS_BINARIES=(
+  ./cmd/kubecfg
+  )
 
 for platform in ${KUBE_CROSSPLATFORMS}; do
   (
     export GOOS=${platform%/*}
     export GOARCH=${platform##*/}
-    for binary in ${CROSS_BINARIES}; do
-      make-binaries "${binary}"
+    for binary in "${CROSS_BINARIES[@]}"; do
+      kube::build::make_binaries "${binary}"
     done
   )
 done

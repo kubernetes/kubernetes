@@ -228,8 +228,8 @@ func ValidateManifest(manifest *api.ContainerManifest) errs.ErrorList {
 	} else if !supportedManifestVersions.Has(strings.ToLower(manifest.Version)) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("version", manifest.Version))
 	}
-	allVolumes, errs := validateVolumes(manifest.Volumes)
-	allErrs = append(allErrs, errs.Prefix("volumes")...)
+	allVolumes, vErrs := validateVolumes(manifest.Volumes)
+	allErrs = append(allErrs, vErrs.Prefix("volumes")...)
 	allErrs = append(allErrs, validateContainers(manifest.Containers, allVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&manifest.RestartPolicy).Prefix("restartPolicy")...)
 	return allErrs

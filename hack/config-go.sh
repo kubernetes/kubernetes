@@ -114,6 +114,24 @@ kube::setup_go_environment() {
 }
 
 
+# kube::default_build_targets return list of all build targets
+kube::default_build_targets() {
+  echo "cmd/proxy"
+  echo "cmd/apiserver"
+  echo "cmd/controller-manager"
+  echo "cmd/kubelet"
+  echo "cmd/kubecfg"
+  echo "plugin/cmd/scheduler"
+}
+
+# kube::binaries_from_targets take a list of build targets and return the
+# full go package to be built
+kube::binaries_from_targets() {
+  local target
+  for target; do
+    echo "${KUBE_GO_PACKAGE}/${target}"
+  done
+}
 # --- Environment Variables ---
 
 # KUBE_REPO_ROOT  - Path to the top of the build tree.
