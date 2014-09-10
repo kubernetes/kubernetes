@@ -63,6 +63,11 @@ Docker allocates IP addresses from a bridge we create on each node, using its �
 
 2. Create the user containers and specify the name of the network container as their “net” argument. Docker finds the PID of the command running in the network container and attaches to the netns of that PID.
 
+### Other networking implementation examples
+With the primary aim of providing IP-per-pod-model, other implementations exist to serve the purpose outside of GCE.
+  - [OpenVSwitch with GRE/VxLAN](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/ovs-networking.md)
+  - [Rudder](https://github.com/coreos/rudder#rudder)
+
 ## Challenges and future work
 
 ### Docker API

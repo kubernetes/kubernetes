@@ -44,6 +44,10 @@ type defaultAPIServer struct {
 	group *APIGroup
 }
 
+const (
+	StatusUnprocessableEntity = 422
+)
+
 // Handle returns a Handler function that expose the provided storage interfaces
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
@@ -126,9 +130,11 @@ func RecoverPanics(handler http.Handler) http.Handler {
 			httplog.StatusIsNot(
 				http.StatusOK,
 				http.StatusAccepted,
+				http.StatusMovedPermanently,
 				http.StatusTemporaryRedirect,
 				http.StatusConflict,
 				http.StatusNotFound,
+				StatusUnprocessableEntity,
 			),
 		).Log()
 

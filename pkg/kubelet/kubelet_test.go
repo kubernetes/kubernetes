@@ -300,7 +300,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "list", "inspect", "create", "start"})
+		"list", "list", "create", "start", "list", "inspect", "list", "create", "start"})
 
 	fakeDocker.lock.Lock()
 	if len(fakeDocker.Created) != 2 ||
@@ -338,7 +338,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect", "create", "start"})
+		"list", "list", "list", "inspect", "list", "create", "start"})
 
 	fakeDocker.lock.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -388,7 +388,7 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect", "create", "start"})
+		"list", "list", "list", "inspect", "list", "create", "start"})
 
 	fakeDocker.lock.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -428,7 +428,7 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "stop", "create", "start", "list", "list", "inspect", "create", "start"})
+		"list", "list", "stop", "create", "start", "list", "list", "inspect", "list", "create", "start"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -561,7 +561,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -608,7 +608,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -1329,7 +1329,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "create", "start", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "list", "create", "start", "stop"})
 
 	if len(fakeDocker.stopped) != 1 {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.stopped)

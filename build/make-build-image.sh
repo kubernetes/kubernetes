@@ -25,5 +25,5 @@ set -e
 
 source $(dirname $0)/common.sh
 
-verify-prereqs
-build-image
+kube::build::verify_prereqs
+kube::build::build_image

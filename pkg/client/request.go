@@ -206,7 +206,7 @@ func (r *Request) Body(obj interface{}) *Request {
 	case io.Reader:
 		r.body = t
 	case runtime.Object:
-		data, err := runtime.DefaultCodec.Encode(t)
+		data, err := r.c.Codec.Encode(t)
 		if err != nil {
 			r.err = err
 			return r
@@ -301,14 +301,15 @@ func (r *Request) Do() Result {
 				}
 			}
 		}
-		return Result{respBody, err}
+		return Result{respBody, err, r.c.Codec}
 	}
 }
 
 // Result contains the result of calling Request.Do().
 type Result struct {
-	body []byte
-	err  error
+	body  []byte
+	err   error
+	codec runtime.Codec
 }
 
 // Raw returns the raw result.
@@ -321,7 +322,7 @@ func (r Result) Get() (runtime.Object, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return runtime.DefaultCodec.Decode(r.body)
+	return r.codec.Decode(r.body)
 }
 
 // Into stores the result into obj, if possible.
@@ -329,7 +330,7 @@ func (r Result) Into(obj runtime.Object) error {
 	if r.err != nil {
 		return r.err
 	}
-	return runtime.DefaultCodec.DecodeInto(r.body, obj)
+	return r.codec.DecodeInto(r.body, obj)
 }
 
 // Error returns the error executing the request, nil if no error occurred.
