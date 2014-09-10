@@ -252,7 +252,39 @@ const (
 	PodTerminated PodStatus = "Terminated"
 )
 
+type ContainerStateWaiting struct {
+}
+
+type ContainerStateRunning struct {
+}
+
+type ContainerStateTerminated struct {
+	ExitCode int    `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
+	Signal   int    `json:"signal,omitempty" yaml:"signal,omitempty"`
+	Reason   string `json:"reason,omitempty" yaml:"reason,omitempty"`
+}
+
+type ContainerState struct {
+	// Only one of the following ContainerState may be specified.
+	// If none of them is specified, the default on is ContainerStateWaiting.
+	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" yaml:"waiting,omitempty"`
+	Running     *ContainerStateRunning    `json:"running,omitempty" yaml:"running,omitempty"`
+	Termination *ContainerStateTerminated `json:"termination,omitempty" yaml:"termination,omitempty"`
+}
+
+type ContainerStatus struct {
+	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
+	// defined for container?
+	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
+	RestartCount int            `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
+	// TODO(dchen1107): In long run, I think we should replace this with our own struct to remove
+	// the dependency on docker. Also once we have done with integration with cadvisor, resource
+	// usage should be included.
+	DetailInfo docker.Container `json:"detailInfo,omitempty" yaml:"detailInfo,omitempty"`
+}
+
 // PodInfo contains one entry for every container with available info.
+// TODO(dchen1107): Replace docker.Container below with ContainerStatus defined above.
 type PodInfo map[string]docker.Container
 
 type RestartPolicyAlways struct{}
