@@ -33,6 +33,12 @@ detect-minions > /dev/null
 MINIONS_FILE=/tmp/minions
 $(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
+# A stub for AWS
+if [ "$KUBERNETES_PROVIDER" == "aws" ]; then
+    echo "Cluster validation not yet implemetnted. Skipping"
+    exit 0
+fi
+
 # On vSphere, use minion IPs as their names
 if [ "$KUBERNETES_PROVIDER" == "vsphere" ]; then
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do

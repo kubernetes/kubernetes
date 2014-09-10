@@ -16,7 +16,7 @@
 
 # Bring up a Kubernetes cluster.
 #
-# If the full release name (s3://<bucket>/<release>) is passed in then we take
+# If the full release name (gs://<bucket>/<release>) is passed in then we take
 # that directly.  If not then we assume we are doing development stuff and take
 # the defaults in the release config.
 
@@ -26,11 +26,15 @@ set -e
 source $(dirname $0)/../kube-env.sh
 source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
 
-echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
+get-password
+detect-master > /dev/null
+detect-minions > /dev/null
 
-verify-prereqs
-kube-up
+#MINIONS_FILE=/tmp/minions
+#$(dirname $0)/../kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
-source $(dirname $0)/validate-cluster.sh
-
-echo "Done"
+# Stub
+if [ "$KUBERNETES_PROVIDER" == "aws" ]; then
+    echo "Cluster validation not yet implemetnted. Skipping"
+    exit 0
+fi

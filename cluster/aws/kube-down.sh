@@ -14,11 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Bring up a Kubernetes cluster.
-#
-# If the full release name (s3://<bucket>/<release>) is passed in then we take
-# that directly.  If not then we assume we are doing development stuff and take
-# the defaults in the release config.
+# Tear down a Kubernetes cluster.
 
 # exit on any error
 set -e
@@ -26,11 +22,9 @@ set -e
 source $(dirname $0)/../kube-env.sh
 source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
 
-echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
+echo "Bringing down cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
-kube-up
-
-source $(dirname $0)/validate-cluster.sh
+kube-down
 
 echo "Done"

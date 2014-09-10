@@ -41,8 +41,44 @@ function find-release() {
   echo "Release: ${RELEASE_NORMALIZED}"
 }
 
-function json_val () {
+function json_val {
     python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1''
+}
+
+function get_instance_ids {
+  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] for tag in instance["Tags"] if tag["Value"].startswith("kubernetes-minion") or tag["Value"].startswith("kubernetes-master")]; print " ".join(lst)'
+}
+
+function get_vpc_id {
+  python -c 'import json,sys; lst = [str(vpc["VpcId"]) for vpc in json.load(sys.stdin)["Vpcs"] for tag in vpc["Tags"] if tag["Value"] == "kubernetes-vpc"]; print "".join(lst)'
+}
+
+function get_subnet_id {
+  python -c "import json,sys; lst = [str(subnet['SubnetId']) for subnet in json.load(sys.stdin)['Subnets'] if subnet['VpcId'] == '$1']; print ''.join(lst)"
+}
+
+function get_igw_id {
+  python -c "import json,sys; lst = [str(igw['InternetGatewayId']) for igw in json.load(sys.stdin)['InternetGateways'] for attachment in igw['Attachments'] if attachment['VpcId'] == '$1']; print ''.join(lst)"
+}
+
+function get_route_table_id {
+  python -c "import json,sys; lst = [str(route_table['RouteTableId']) for route_table in json.load(sys.stdin)['RouteTables'] if route_table['VpcId'] == '$1']; print ''.join(lst)"
+}
+
+function get_sec_group_id {
+  python -c 'import json,sys; lst = [str(group["GroupId"]) for group in json.load(sys.stdin)["SecurityGroups"] if group["GroupName"] == "kubernetes-sec-group"]; print "".join(lst)'
+}
+
+function get_instance_states {
+  python -c 'import json,sys; lst = [str(instance["InstanceId"]) for reservation in json.load(sys.stdin)["Reservations"] for instance in reservation["Instances"] if instance["State"]["Name"] != "terminated"]; print " ".join(lst)'
+}
+
+function detect-master {
+  echo
+}
+
+function detect-minions {
+  echo
 }
 
 function get-password {
@@ -73,7 +109,7 @@ function verify-prereqs {
   fi
 }
 
-function kube-up() {
+function kube-up {
 
     # Find the release to use.  Generally it will be passed when doing a 'prod'
     # install and will default to the release/config.sh version when doing a
@@ -97,13 +133,15 @@ function kube-up() {
     
     $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1 || true
     VPC_ID=$($AWS_CMD create-vpc --cidr-block 10.244.0.0/16 | json_val '["Vpc"]["VpcId"]')
+    $AWS_CMD create-tags --resources $VPC_ID --tags Key=Name,Value=kubernetes-vpc > /dev/null
     SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 10.244.0.0/24 --vpc-id $VPC_ID | json_val '["Subnet"]["SubnetId"]')
     IGW_ID=$($AWS_CMD create-internet-gateway | json_val '["InternetGateway"]["InternetGatewayId"]')
     $AWS_CMD attach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID > /dev/null
     ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+    $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > /dev/null
     $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > /dev/null
     $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > /dev/null
-    SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes --description kubernetes --vpc-id $VPC_ID | json_val '["GroupId"]')
+    SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes-sec-group --description kubernetes-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
     $AWS_CMD authorize-security-group-ingress --group-id $SEC_GROUP_ID --protocol -1 --port all --cidr 0.0.0.0/0 > /dev/null
 
     (
@@ -149,4 +187,36 @@ function kube-up() {
 
         $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=kubernetes-minion-$i > /dev/null
     done
+}
+
+function kube-down {
+  AWS_CMD="aws --output json ec2"
+  instance_ids=$($AWS_CMD describe-instances | get_instance_ids)
+  $AWS_CMD terminate-instances --instance-ids $instance_ids > /dev/null
+  echo "Waiting for instances deleted"
+  while true; do
+    instance_states=$($AWS_CMD describe-instances --instance-ids $instance_ids | get_instance_states)
+    if [[ "$instance_states" == "" ]]; then
+      echo "All instances terminated"
+      break
+    else
+      echo "Instances not yet terminated: $instance_states"
+      echo "Sleeping for 3 seconds..."
+      sleep 3
+    fi
+  done
+
+  echo "Deleting VPC"
+  vpc_id=$($AWS_CMD describe-vpcs | get_vpc_id)
+  subnet_id=$($AWS_CMD describe-subnets | get_subnet_id $vpc_id)
+  igw_id=$($AWS_CMD describe-internet-gateways | get_igw_id $vpc_id)
+  route_table_id=$($AWS_CMD describe-route-tables | get_route_table_id $vpc_id)
+  sec_group_id=$($AWS_CMD describe-security-groups | get_sec_group_id)
+
+  $AWS_CMD delete-subnet --subnet-id $subnet_id > /dev/null
+  $AWS_CMD detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id > /dev/null
+  $AWS_CMD delete-internet-gateway --internet-gateway-id $igw_id > /dev/null
+  $AWS_CMD delete-security-group --group-id $sec_group_id > /dev/null
+  $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > /dev/null
+  $AWS_CMD delete-vpc --vpc-id $vpc_id > /dev/null
 }
