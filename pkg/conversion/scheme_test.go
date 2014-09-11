@@ -293,10 +293,10 @@ func TestMetaValues(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := s.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			if e, a := "", scope.Meta()["srcVersion"].(string); e != a {
+			if e, a := "", scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "externalVersion", scope.Meta()["destVersion"].(string); e != a {
+			if e, a := "externalVersion", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TestString, &out.TestString, 0)
@@ -304,10 +304,10 @@ func TestMetaValues(t *testing.T) {
 			return nil
 		},
 		func(in *ExternalSimple, out *InternalSimple, scope Scope) error {
-			if e, a := "externalVersion", scope.Meta()["srcVersion"].(string); e != a {
+			if e, a := "externalVersion", scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "", scope.Meta()["destVersion"].(string); e != a {
+			if e, a := "", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TestString, &out.TestString, 0)
@@ -381,10 +381,10 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := s.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			if e, a := "unknown", scope.Meta()["srcVersion"].(string); e != a {
+			if e, a := "unknown", scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "unknown", scope.Meta()["destVersion"].(string); e != a {
+			if e, a := "unknown", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.TestString, &out.TestString, 0)

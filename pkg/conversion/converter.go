@@ -40,17 +40,17 @@ type Converter struct {
 	// If non-nil, will be called to print helpful debugging info. Quite verbose.
 	Debug DebugLogger
 
-	// Name is called to retrieve the name of a type; this name is used for the
+	// NameFunc is called to retrieve the name of a type; this name is used for the
 	// purpose of deciding whether two types match or not (i.e., will we attempt to
 	// do a conversion). The default returns the go type name.
-	Name func(t reflect.Type) string
+	NameFunc func(t reflect.Type) string
 }
 
 // NewConverter creates a new Converter object.
 func NewConverter() *Converter {
 	return &Converter{
-		funcs: map[typePair]reflect.Value{},
-		Name:  func(t reflect.Type) string { return t.Name() },
+		funcs:    map[typePair]reflect.Value{},
+		NameFunc: func(t reflect.Type) string { return t.Name() },
 	}
 }
 
@@ -71,62 +71,70 @@ type Scope interface {
 	Flags() FieldMatchingFlags
 
 	// Meta returns any information originally passed to Convert.
-	Meta() map[string]interface{}
+	Meta() *Meta
+}
+
+// Meta is supplied by Scheme, when it calls Convert.
+type Meta struct {
+	SrcVersion  string
+	DestVersion string
+
+	// TODO: If needed, add a user data field here.
 }
 
 // scope contains information about an ongoing conversion.
 type scope struct {
 	converter    *Converter
-	meta         map[string]interface{}
+	meta         *Meta
 	flags        FieldMatchingFlags
 	srcTagStack  []reflect.StructTag
 	destTagStack []reflect.StructTag
 }
 
 // push adds a level to the src/dest tag stacks.
-func (sa *scope) push() {
-	sa.srcTagStack = append(sa.srcTagStack, "")
-	sa.destTagStack = append(sa.destTagStack, "")
+func (s *scope) push() {
+	s.srcTagStack = append(s.srcTagStack, "")
+	s.destTagStack = append(s.destTagStack, "")
 }
 
 // pop removes a level to the src/dest tag stacks.
-func (sa *scope) pop() {
-	n := len(sa.srcTagStack)
-	sa.srcTagStack = sa.srcTagStack[:n-1]
-	sa.destTagStack = sa.destTagStack[:n-1]
+func (s *scope) pop() {
+	n := len(s.srcTagStack)
+	s.srcTagStack = s.srcTagStack[:n-1]
+	s.destTagStack = s.destTagStack[:n-1]
 }
 
-func (sa *scope) setSrcTag(tag reflect.StructTag) {
-	sa.srcTagStack[len(sa.srcTagStack)-1] = tag
+func (s *scope) setSrcTag(tag reflect.StructTag) {
+	s.srcTagStack[len(s.srcTagStack)-1] = tag
 }
 
-func (sa *scope) setDestTag(tag reflect.StructTag) {
-	sa.destTagStack[len(sa.destTagStack)-1] = tag
+func (s *scope) setDestTag(tag reflect.StructTag) {
+	s.destTagStack[len(s.destTagStack)-1] = tag
 }
 
 // Convert continues a conversion.
-func (sa *scope) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
-	return sa.converter.Convert(src, dest, flags, sa.meta)
+func (s *scope) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
+	return s.converter.Convert(src, dest, flags, s.meta)
 }
 
 // SrcTag returns the tag of the struct containing the current source item, if any.
-func (sa *scope) SrcTag() reflect.StructTag {
-	return sa.srcTagStack[len(sa.srcTagStack)-1]
+func (s *scope) SrcTag() reflect.StructTag {
+	return s.srcTagStack[len(s.srcTagStack)-1]
 }
 
 // DestTag returns the tag of the struct containing the current dest item, if any.
-func (sa *scope) DestTag() reflect.StructTag {
-	return sa.destTagStack[len(sa.destTagStack)-1]
+func (s *scope) DestTag() reflect.StructTag {
+	return s.destTagStack[len(s.destTagStack)-1]
 }
 
 // Flags returns the flags with which the current conversion was started.
-func (sa *scope) Flags() FieldMatchingFlags {
-	return sa.flags
+func (s *scope) Flags() FieldMatchingFlags {
+	return s.flags
 }
 
 // Meta returns the meta object that was originally passed to Convert.
-func (sa *scope) Meta() map[string]interface{} {
-	return sa.meta
+func (s *scope) Meta() *Meta {
+	return s.meta
 }
 
 // Register registers a conversion func with the Converter. conversionFunc must take
@@ -202,9 +210,9 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 // Read the comments on the various FieldMatchingFlags constants to understand
 // what the 'flags' parameter does.
 // 'meta' is given to allow you to pass information to conversion functions,
-// it is not used by Convert other than storing it in the scope.
+// it is not used by Convert() other than storing it in the scope.
 // Not safe for objects with cyclic references!
-func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta map[string]interface{}) error {
+func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
 	dv, sv := reflect.ValueOf(dest), reflect.ValueOf(src)
 	if dv.Kind() != reflect.Ptr {
 		return fmt.Errorf("Need pointer, but got %#v", dest)
@@ -244,7 +252,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		return ret.(error)
 	}
 
-	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.Name(dt) != c.Name(st) {
+	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
 		return fmt.Errorf("Can't convert %v to %v because type names don't match.", st, dt)
 	}
 

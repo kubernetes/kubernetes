@@ -52,10 +52,10 @@ func TestScheme(t *testing.T) {
 	// Register functions to verify that scope.Meta() gets set correctly.
 	err := runtime.DefaultScheme.AddConversionFuncs(
 		func(in *InternalSimple, out *ExternalSimple, scope conversion.Scope) error {
-			if e, a := "", scope.Meta()["srcVersion"].(string); e != a {
+			if e, a := "", scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "externalVersion", scope.Meta()["destVersion"].(string); e != a {
+			if e, a := "externalVersion", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.JSONBase, &out.JSONBase, 0)
@@ -64,10 +64,10 @@ func TestScheme(t *testing.T) {
 			return nil
 		},
 		func(in *ExternalSimple, out *InternalSimple, scope conversion.Scope) error {
-			if e, a := "externalVersion", scope.Meta()["srcVersion"].(string); e != a {
+			if e, a := "externalVersion", scope.Meta().SrcVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			if e, a := "", scope.Meta()["destVersion"].(string); e != a {
+			if e, a := "", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
 			scope.Convert(&in.JSONBase, &out.JSONBase, 0)

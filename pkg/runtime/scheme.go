@@ -54,8 +54,8 @@ func GetScheme(schemeName string) *Scheme {
 // from a conversion.Scope.
 func fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
 	scheme = DefaultScheme
-	inVersion = s.Meta()["srcVersion"].(string)
-	outVersion = s.Meta()["destVersion"].(string)
+	inVersion = s.Meta().SrcVersion
+	outVersion = s.Meta().DestVersion
 	// If a scheme tag was provided, use it. Look at the struct tag corresponding
 	// to version "".
 	if name := s.SrcTag().Get("scheme"); inVersion == "" && name != "" {

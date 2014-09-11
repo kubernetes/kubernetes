@@ -17,6 +17,7 @@ limitations under the License.
 package kubecfg
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -34,7 +35,9 @@ func TestParseBadStorage(t *testing.T) {
 
 func DoParseTest(t *testing.T, storage string, obj runtime.Object, p *Parser) {
 	jsonData, _ := runtime.DefaultCodec.Encode(obj)
-	yamlData, _ := yaml.Marshal(obj)
+	var tmp map[string]interface{}
+	json.Unmarshal(jsonData, &tmp)
+	yamlData, _ := yaml.Marshal(tmp)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))
 	jsonGot, jsonErr := p.ToWireFormat(jsonData, storage, runtime.DefaultCodec)

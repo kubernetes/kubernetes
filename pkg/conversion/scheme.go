@@ -86,13 +86,17 @@ func NewScheme() *Scheme {
 		ExternalVersion:      "v1",
 		MetaInsertionFactory: metaInsertion{},
 	}
-	s.converter.Name = func(t reflect.Type) string {
-		if kind, ok := s.typeToKind[t]; ok {
-			return kind
-		}
-		return t.Name()
-	}
+	s.converter.NameFunc = s.nameFunc
 	return s
+}
+
+// nameFunc returns the name of the type that we wish to use for encoding. Defaults to
+// the go name of the type if the type is not registered.
+func (s *Scheme) nameFunc(t reflect.Type) string {
+	if kind, ok := s.typeToKind[t]; ok {
+		return kind
+	}
+	return t.Name()
 }
 
 // AddKnownTypes registers all types passed in 'types' as being members of version 'version.
@@ -161,21 +165,24 @@ func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
 //
 // Note that, if you need to copy sub-objects that didn't change, you can use the
 // conversion.Scope object that will be passed to your conversion function.
-// Additionally, all conversions started by Scheme will set the "srcVersion" and
-// "destVersion" keys on the meta object. Example:
+// Additionally, all conversions started by Scheme will set the SrcVersion and
+// DestVersion fields on the Meta object. Example:
 //
 // s.AddConversionFuncs(
 //	func(in *InternalObject, out *ExternalObject, scope conversion.Scope) error {
-//		// You can depend on this being set to the source version, e.g., "".
-//		s.Meta()["srcVersion"].(string)
+//		// You can depend on Meta() being non-nil, and this being set to
+//		// the source version, e.g., ""
+//		s.Meta().SrcVersion
 //		// You can depend on this being set to the destination version,
 //		// e.g., "v1beta1".
-//		s.Meta()["destVersion"].(string)
+//		s.Meta().DestVersion
 //		// Call scope.Convert to copy sub-fields.
 //		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
 //		return nil
 //	},
 // )
+//
+// (For more detail about conversion functions, see Converter.Register's comment.)
 //
 // Also note that the default behavior, if you don't add a conversion function, is to
 // sanely copy fields that have the same names and same type names. It's OK if the
@@ -196,7 +203,7 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 // possible. You can call this with types that haven't been registered (for example,
 // a to test conversion of types that are nested within registered types), but in
 // that case, the conversion.Scope object passed to your conversion functions won't
-// have "srcVersion" or "destVersion" keys set correctly in Meta().
+// have SrcVersion or DestVersion fields set correctly in Meta().
 func (s *Scheme) Convert(in, out interface{}) error {
 	inVersion := "unknown"
 	outVersion := "unknown"
@@ -209,11 +216,11 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	return s.converter.Convert(in, out, 0, s.generateConvertMeta(inVersion, outVersion))
 }
 
-// generateConvertMeta assembles a map for the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) map[string]interface{} {
-	return map[string]interface{}{
-		"srcVersion":  srcVersion,
-		"destVersion": destVersion,
+// generateConvertMeta constructs the meta value we pass to Convert.
+func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) *Meta {
+	return &Meta{
+		SrcVersion:  srcVersion,
+		DestVersion: destVersion,
 	}
 }
 

@@ -103,7 +103,7 @@ func TestConverter_fuzz(t *testing.T) {
 
 	f := fuzz.New().NilChance(.5).NumElements(0, 100)
 	c := NewConverter()
-	c.Name = func(t reflect.Type) string {
+	c.NameFunc = func(t reflect.Type) string {
 		// Hide the fact that we don't have separate packages for these things.
 		return map[reflect.Type]string{
 			reflect.TypeOf(TestType1{}):         "TestType1",
@@ -168,7 +168,7 @@ func TestConverter_meta(t *testing.T) {
 	checks := 0
 	err := c.Register(
 		func(in *Foo, out *Bar, s Scope) error {
-			if s.Meta()["test"] != "passes" {
+			if s.Meta() == nil || s.Meta().SrcVersion != "test" || s.Meta().DestVersion != "passes" {
 				t.Errorf("Meta did not get passed!")
 			}
 			checks++
@@ -181,7 +181,7 @@ func TestConverter_meta(t *testing.T) {
 	}
 	err = c.Register(
 		func(in *string, out *string, s Scope) error {
-			if s.Meta()["test"] != "passes" {
+			if s.Meta() == nil || s.Meta().SrcVersion != "test" || s.Meta().DestVersion != "passes" {
 				t.Errorf("Meta did not get passed a second time!")
 			}
 			checks++
@@ -191,7 +191,7 @@ func TestConverter_meta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	err = c.Convert(&Foo{}, &Bar{}, 0, map[string]interface{}{"test": "passes"})
+	err = c.Convert(&Foo{}, &Bar{}, 0, &Meta{SrcVersion: "test", DestVersion: "passes"})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
