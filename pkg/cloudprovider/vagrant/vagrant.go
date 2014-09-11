@@ -106,8 +106,8 @@ func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
 	}
 	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
 	for _, minion := range filteredMinions {
-		fmt.Println("Minion: ", minion.Host, " , ", instance, " IP: ", minion.IP)
-		if minion.Host == instance {
+		// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
+		if minion.IP == instance {
 			return net.ParseIP(minion.IP), nil
 		}
 	}
@@ -203,7 +203,8 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
 	var instances []string
 	for _, instance := range filteredMinions {
-		instances = append(instances, instance.Host)
+		// With no dedicated DNS setup in cluster, IP address is used as hostname
+		instances = append(instances, instance.IP)
 	}
 
 	return instances, nil
