@@ -73,7 +73,11 @@ func TestVagrantCloud(t *testing.T) {
 		t.Fatalf("Incorrect number of instances returned")
 	}
 
-	if instances[0] != "kubernetes-minion-1" {
+	// no DNS in vagrant cluster, so we return IP as hostname
+	expectedInstanceHost := "10.245.2.2"
+	expectedInstanceIP := "10.245.2.2"
+
+	if instances[0] != expectedInstanceHost {
 		t.Fatalf("Invalid instance returned")
 	}
 
@@ -82,7 +86,7 @@ func TestVagrantCloud(t *testing.T) {
 		t.Fatalf("Unexpected error, should have returned a valid IP address: %s", err)
 	}
 
-	if ip.String() != "10.245.2.2" {
+	if ip.String() != expectedInstanceIP {
 		t.Fatalf("Invalid IP address returned")
 	}
 }

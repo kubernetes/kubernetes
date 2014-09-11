@@ -18,7 +18,6 @@ package pod
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -194,10 +193,6 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 	instances, ok := cloud.Instances()
 	if instances == nil || !ok {
 		return ""
-	}
-	ix := strings.Index(host, ".")
-	if ix != -1 {
-		host = host[:ix]
 	}
 	addr, err := instances.IPAddress(host)
 	if err != nil {
