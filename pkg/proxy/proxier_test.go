@@ -146,7 +146,7 @@ func TestTCPProxy(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -164,7 +164,7 @@ func TestUDPProxy(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -182,7 +182,7 @@ func TestTCPProxyStop(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -210,7 +210,7 @@ func TestUDPProxyStop(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -238,7 +238,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -265,7 +265,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -292,7 +292,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -324,7 +324,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -356,7 +356,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -401,7 +401,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 
 	p := NewProxier(lb, "127.0.0.1")
 
-	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP")
+	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -434,3 +434,5 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	}
 	pc.Close()
 }
+
+// TODO: Test UDP timeouts.
