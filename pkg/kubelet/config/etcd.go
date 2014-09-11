@@ -24,9 +24,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -48,7 +47,7 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 	helper := tools.EtcdHelper{
 		client,
 		latest.Codec,
-		runtime.DefaultResourceVersioner,
+		latest.ResourceVersioner,
 	}
 	source := &SourceEtcd{
 		key:     key,

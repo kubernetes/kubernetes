@@ -21,16 +21,7 @@ import (
 	"fmt"
 )
 
-// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func (s *Scheme) EncodeOrDie(obj interface{}) string {
-	bytes, err := s.Encode(obj)
-	if err != nil {
-		panic(err)
-	}
-	return string(bytes)
-}
-
-// Encode turns the given api object into an appropriate JSON string.
+// EncodeToVersion turns the given api object into an appropriate JSON string.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
 // will be made, therefore it's recommended to pass a pointer to a
 // struct. The type must have been registered.
@@ -58,11 +49,6 @@ func (s *Scheme) EncodeOrDie(obj interface{}) string {
 // objects, whether they be in our storage layer (e.g., etcd), or in user's
 // config files.
 //
-func (s *Scheme) Encode(obj interface{}) (data []byte, err error) {
-	return s.EncodeToVersion(obj, s.ExternalVersion)
-}
-
-// EncodeToVersion is like Encode, but you may choose the version.
 func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []byte, err error) {
 	obj = maybeCopy(obj)
 	v, _ := enforcePtr(obj) // maybeCopy guarantees a pointer

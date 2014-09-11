@@ -25,14 +25,14 @@ import (
 // Decode converts a YAML or JSON string back into a pointer to an api object.
 // Deduces the type based upon the fields added by the MetaInsertionFactory
 // technique. The object will be converted, if necessary, into the
-// s.InternalVersion type before being returned. Decode will refuse to decode
-// objects without a version, because that's probably an error.
+// s.InternalVersion type before being returned. Decode will not decode
+// objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	version, kind, err := s.DataVersionAndKind(data)
 	if err != nil {
 		return nil, err
 	}
-	if version == "" {
+	if version == "" && s.InternalVersion != "" {
 		return nil, fmt.Errorf("version not set in '%s'", string(data))
 	}
 	obj, err := s.NewObject(version, kind)

@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -169,7 +171,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	body, _ := latest.Codec.Encode(&api.Pod{})
+	body, _ := v1beta1.Codec.Encode(&api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -209,7 +211,7 @@ func TestCreateReplica(t *testing.T) {
 	expectedPod := api.Pod{
 		JSONBase: api.JSONBase{
 			Kind:       "Pod",
-			APIVersion: "v1beta1",
+			APIVersion: latest.Version,
 		},
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
@@ -287,12 +289,12 @@ func TestSyncronize(t *testing.T) {
 
 	fakePodHandler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "{\"apiVersion\": \"v1beta1\", \"kind\": \"PodList\"}",
+		ResponseBody: "{\"apiVersion\": \"" + latest.Version + "\", \"kind\": \"PodList\"}",
 		T:            t,
 	}
 	fakeControllerHandler := util.FakeHandler{
 		StatusCode: 200,
-		ResponseBody: latest.Codec.EncodeOrDie(&api.ReplicationControllerList{
+		ResponseBody: runtime.EncodeOrDie(latest.Codec, &api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				controllerSpec1,
 				controllerSpec2,

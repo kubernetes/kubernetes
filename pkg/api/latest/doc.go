@@ -14,30 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
-
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-)
-
-var Scheme = runtime.NewScheme()
-
-func init() {
-	Scheme.AddKnownTypes("",
-		&PodList{},
-		&Pod{},
-		&ReplicationControllerList{},
-		&ReplicationController{},
-		&ServiceList{},
-		&Service{},
-		&MinionList{},
-		&Minion{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
-		&ContainerManifestList{},
-		&Endpoints{},
-		&EndpointsList{},
-		&Binding{},
-	)
-}
+// Package latest defines the default output serializations that code should
+// use and imports the required schemas.  It also ensures all previously known
+// and supported API versions are available for conversion.
+package latest

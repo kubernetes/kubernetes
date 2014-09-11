@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -46,8 +47,8 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 var codec = latest.Codec
 
 func init() {
-	latest.Codec.AddKnownTypes("", &Simple{}, &SimpleList{})
-	latest.Codec.AddKnownTypes("v1beta1", &Simple{}, &SimpleList{})
+	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{})
+	api.Scheme.AddKnownTypes(latest.Version, &Simple{}, &SimpleList{})
 }
 
 type Simple struct {
@@ -95,7 +96,7 @@ func (storage *SimpleRESTStorage) List(labels.Selector) (runtime.Object, error) 
 }
 
 func (storage *SimpleRESTStorage) Get(id string) (runtime.Object, error) {
-	return latest.Codec.CopyOrDie(&storage.item), storage.errors["get"]
+	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) Delete(id string) (<-chan runtime.Object, error) {

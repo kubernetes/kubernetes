@@ -26,7 +26,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T) {
@@ -94,7 +93,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 	}
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
 
-	newCtrl := runtime.DefaultScheme.CopyOrDie(&fakeClient.Ctrl).(*api.ReplicationController)
+	newCtrl := api.Scheme.CopyOrDie(&fakeClient.Ctrl).(*api.ReplicationController)
 	newCtrl.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = "fooImage:2"
 	validateAction(client.FakeAction{Action: "update-controller", Value: newCtrl}, fakeClient.Actions[1], t)
 

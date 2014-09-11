@@ -19,7 +19,6 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -44,7 +43,7 @@ type Fake struct {
 
 func (c *Fake) ListPods(selector labels.Selector) (*api.PodList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-pods"})
-	return runtime.DefaultScheme.CopyOrDie(&c.Pods).(*api.PodList), nil
+	return api.Scheme.CopyOrDie(&c.Pods).(*api.PodList), nil
 }
 
 func (c *Fake) GetPod(name string) (*api.Pod, error) {
@@ -74,7 +73,7 @@ func (c *Fake) ListReplicationControllers(selector labels.Selector) (*api.Replic
 
 func (c *Fake) GetReplicationController(name string) (*api.ReplicationController, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-controller", Value: name})
-	return runtime.DefaultScheme.CopyOrDie(&c.Ctrl).(*api.ReplicationController), nil
+	return api.Scheme.CopyOrDie(&c.Ctrl).(*api.ReplicationController), nil
 }
 
 func (c *Fake) CreateReplicationController(controller *api.ReplicationController) (*api.ReplicationController, error) {
@@ -129,7 +128,7 @@ func (c *Fake) WatchServices(label, field labels.Selector, resourceVersion uint6
 
 func (c *Fake) ListEndpoints(selector labels.Selector) (*api.EndpointsList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-endpoints"})
-	return runtime.DefaultScheme.CopyOrDie(&c.EndpointsList).(*api.EndpointsList), c.Err
+	return api.Scheme.CopyOrDie(&c.EndpointsList).(*api.EndpointsList), c.Err
 }
 
 func (c *Fake) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {

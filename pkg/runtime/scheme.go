@@ -17,16 +17,40 @@ limitations under the License.
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"gopkg.in/v1/yaml"
 )
 
-var DefaultResourceVersioner ResourceVersioner = NewJSONBaseResourceVersioner()
-var DefaultScheme = NewScheme("", "v1beta1")
-var DefaultCodec Codec = DefaultScheme
+// codecWrapper implements encoding to an alternative
+// default version for a scheme.
+type codecWrapper struct {
+	*Scheme
+	version string
+}
+
+// Encode implements Codec
+func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
+	return c.Scheme.EncodeToVersion(obj, c.version)
+}
+
+// CodecFor returns a Codec that invokes Encode with the provided version.
+func CodecFor(scheme *Scheme, version string) Codec {
+	return &codecWrapper{scheme, version}
+}
+
+// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
+func EncodeOrDie(codec Codec, obj Object) string {
+	bytes, err := codec.Encode(obj)
+	if err != nil {
+		panic(err)
+	}
+	return string(bytes)
+}
 
 // Scheme defines methods for serializing and deserializing API objects. It
 // is an adaptation of conversion's Scheme for our API objects.
@@ -36,19 +60,11 @@ type Scheme struct {
 
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
-func fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
-	scheme = DefaultScheme
+func (self *Scheme) fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
+	scheme = self
 	inVersion = s.Meta().SrcVersion
 	outVersion = s.Meta().DestVersion
 	return inVersion, outVersion, scheme
-}
-
-func init() {
-	// Set up a generic mapping between RawExtension and EmbeddedObject.
-	DefaultScheme.AddConversionFuncs(
-		embeddedObjectToRawExtension,
-		rawExtensionToEmbeddedObject,
-	)
 }
 
 // emptyPlugin is used to copy the Kind field to and from plugin objects.
@@ -59,14 +75,14 @@ type emptyPlugin struct {
 // embeddedObjectToRawExtension does the conversion you would expect from the name, using the information
 // given in conversion.Scope. It's placed in the DefaultScheme as a ConversionFunc to enable plugins;
 // see the comment for RawExtension.
-func embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExtension, s conversion.Scope) error {
+func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExtension, s conversion.Scope) error {
 	if in.Object == nil {
 		out.RawJSON = []byte("null")
 		return nil
 	}
 
 	// Figure out the type and kind of the output object.
-	_, outVersion, scheme := fromScope(s)
+	_, outVersion, scheme := self.fromScope(s)
 	_, kind, err := scheme.raw.ObjectVersionAndKind(in.Object)
 	if err != nil {
 		return err
@@ -107,13 +123,13 @@ func embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExtension, s conve
 // rawExtensionToEmbeddedObject does the conversion you would expect from the name, using the information
 // given in conversion.Scope. It's placed in the DefaultScheme as a ConversionFunc to enable plugins;
 // see the comment for RawExtension.
-func rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conversion.Scope) error {
+func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conversion.Scope) error {
 	if len(in.RawJSON) == 4 && string(in.RawJSON) == "null" {
 		out.Object = nil
 		return nil
 	}
 	// Figure out the type and kind of the output object.
-	inVersion, outVersion, scheme := fromScope(s)
+	inVersion, outVersion, scheme := self.fromScope(s)
 	_, kind, err := scheme.raw.DataVersionAndKind(in.RawJSON)
 	if err != nil {
 		return err
@@ -153,13 +169,15 @@ func rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conve
 	return nil
 }
 
-// NewScheme creates a new Scheme. A default scheme is provided and accessible
-// as the "DefaultScheme" variable.
-func NewScheme(internalVersion, externalVersion string) *Scheme {
+// NewScheme creates a new Scheme. This scheme is pluggable by default.
+func NewScheme() *Scheme {
 	s := &Scheme{conversion.NewScheme()}
-	s.raw.InternalVersion = internalVersion
-	s.raw.ExternalVersion = externalVersion
+	s.raw.InternalVersion = ""
 	s.raw.MetaInsertionFactory = metaInsertion{}
+	s.raw.AddConversionFuncs(
+		s.embeddedObjectToRawExtension,
+		s.rawExtensionToEmbeddedObject,
+	)
 	return s
 }
 
@@ -178,6 +196,10 @@ func (s *Scheme) AddKnownTypes(version string, types ...Object) {
 // your structs.
 func (s *Scheme) AddKnownTypeWithName(version, kind string, obj Object) {
 	s.raw.AddKnownTypeWithName(version, kind, obj)
+}
+
+func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
+	return s.raw.KnownTypes(version)
 }
 
 // New returns a new API object of the given version ("" for internal
@@ -236,12 +258,7 @@ func FindJSONBase(obj Object) (JSONBaseInterface, error) {
 	return g, nil
 }
 
-// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func (s *Scheme) EncodeOrDie(obj Object) string {
-	return s.raw.EncodeOrDie(obj)
-}
-
-// Encode turns the given api object into an appropriate JSON string.
+// EncodeToVersion turns the given api object into an appropriate JSON string.
 // Will return an error if the object doesn't have an embedded JSONBase.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
 // must be made. If a pointer, the object may be modified before encoding,
@@ -269,17 +286,6 @@ func (s *Scheme) EncodeOrDie(obj Object) string {
 // change the memory format yet not break compatibility with any stored
 // objects, whether they be in our storage layer (e.g., etcd), or in user's
 // config files.
-//
-// TODO/next steps: When we add our second versioned type, this package will
-// need a version of Encode that lets you choose the wire version. A configurable
-// default will be needed, to allow operating in clusters that haven't yet
-// upgraded.
-//
-func (s *Scheme) Encode(obj Object) (data []byte, err error) {
-	return s.raw.Encode(obj)
-}
-
-// EncodeToVersion is like Encode, but lets you specify the destination version.
 func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
 	return s.raw.EncodeToVersion(obj, destVersion)
 }
@@ -332,10 +338,10 @@ func (s *Scheme) DecodeInto(data []byte, obj Object) error {
 	return s.raw.DecodeInto(data, obj)
 }
 
-// Does a deep copy of an API object.  Useful mostly for tests.
+// Copy does a deep copy of an API object.  Useful mostly for tests.
 // TODO(dbsmith): implement directly instead of via Encode/Decode
 func (s *Scheme) Copy(obj Object) (Object, error) {
-	data, err := s.Encode(obj)
+	data, err := s.EncodeToVersion(obj, "")
 	if err != nil {
 		return nil, err
 	}
@@ -348,6 +354,26 @@ func (s *Scheme) CopyOrDie(obj Object) Object {
 		panic(err)
 	}
 	return newObj
+}
+
+func ObjectDiff(a, b Object) string {
+	ab, err := json.Marshal(a)
+	if err != nil {
+		panic(fmt.Sprintf("a: %v", err))
+	}
+	bb, err := json.Marshal(b)
+	if err != nil {
+		panic(fmt.Sprintf("b: %v", err))
+	}
+	return util.StringDiff(string(ab), string(bb))
+
+	// An alternate diff attempt, in case json isn't showing you
+	// the difference. (reflect.DeepEqual makes a distinction between
+	// nil and empty slices, for example.)
+	return util.StringDiff(
+		fmt.Sprintf("%#v", a),
+		fmt.Sprintf("%#v", b),
+	)
 }
 
 // metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion

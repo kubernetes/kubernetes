@@ -17,9 +17,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -55,8 +53,8 @@ type ContainerManifest struct {
 	// Required: This must be a DNS_SUBDOMAIN.
 	// TODO: ID on Manifest is deprecated and will be removed in the future.
 	ID string `yaml:"id" json:"id"`
-	// TODO: UUID on Manifext is deprecated in the future once we are done
-	// with the API refactory. It is required for now to determine the instance
+	// TODO: UUID on Manifest is deprecated in the future once we are done
+	// with the API refactoring. It is required for now to determine the instance
 	// of a Pod.
 	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty"`
 	Volumes       []Volume      `yaml:"volumes" json:"volumes"`
@@ -166,7 +164,6 @@ type ExecAction struct {
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work.  To use
 	// a shell, you need to explicitly call out to that shell.
-	// A return code of zero is treated as 'Healthy', non-zero is 'Unhealthy'
 	Command []string `yaml:"command,omitempty" json:"command,omitempty"`
 }
 
@@ -210,7 +207,6 @@ type Container struct {
 }
 
 // Handler defines a specific action that should be taken
-// TODO: merge this with liveness probing?
 // TODO: pass structured data to these actions, and document that data here.
 type Handler struct {
 	// One and only one of the following should be specified.
@@ -251,8 +247,6 @@ type JSONBase struct {
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
-
-func (*JSONBase) IsAnAPIObject() {}
 
 // PodStatus represents a status of a pod.
 type PodStatus string
@@ -303,18 +297,19 @@ type ContainerStatus struct {
 }
 
 // PodInfo contains one entry for every container with available info.
+// TODO(dchen1107): Replace docker.Container below with ContainerStatus defined above.
 type PodInfo map[string]docker.Container
 
 type RestartPolicyAlways struct{}
 
-// TODO(dchen1107): Define what kinds of failures should restart
+// TODO(dchen1107): Define what kinds of failures should restart.
 // TODO(dchen1107): Decide whether to support policy knobs, and, if so, which ones.
 type RestartPolicyOnFailure struct{}
 
 type RestartPolicyNever struct{}
 
 type RestartPolicy struct {
-	// Only one of the following restart policy may be specified.
+	// Only one of the following restart policies may be specified.
 	// If none of the following policies is specified, the default one
 	// is RestartPolicyAlways.
 	Always    *RestartPolicyAlways    `json:"always,omitempty" yaml:"always,omitempty"`
@@ -333,9 +328,9 @@ type PodState struct {
 	// The key of this map is the *name* of the container within the manifest; it has one
 	// entry per container in the manifest. The value of this map is currently the output
 	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon. To allow marshalling/unmarshalling, we copied the client's structs and added
-	// json/yaml tags.
-	// TODO: Make real decisions about what our info should look like.
+	// upon.
+	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
+	// when we have done this.
 	Info PodInfo `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
@@ -550,14 +545,14 @@ const (
 	//                   resource.
 	//   "id"   string - the identifier of the missing resource
 	// Status code 404
-	StatusReasonNotFound StatusReason = "notFound"
+	StatusReasonNotFound StatusReason = "not_found"
 
 	// StatusReasonAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the conflicting resource
 	//   "id"   string - the identifier of the conflicting resource
 	// Status code 409
-	StatusReasonAlreadyExists StatusReason = "alreadyExists"
+	StatusReasonAlreadyExists StatusReason = "already_exists"
 
 	// StatusReasonConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
@@ -565,6 +560,19 @@ const (
 	// conflict.
 	// Status code 409
 	StatusReasonConflict StatusReason = "conflict"
+
+	// StatusReasonInvalid means the requested create or update operation cannot be
+	// completed due to invalid data provided as part of the request. The client may
+	// need to alter the request. When set, the client may use the StatusDetails
+	// message field as a summary of the issues encountered.
+	// Details (optional):
+	//   "kind" string - the kind attribute of the invalid resource
+	//   "id"   string - the identifier of the invalid resource
+	//   "causes"      - one or more StatusCause entries indicating the data in the
+	//                   provided resource that was invalid.  The code, message, and
+	//                   field attributes will be set.
+	// Status code 422
+	StatusReasonInvalid StatusReason = "invalid"
 )
 
 // StatusCause provides more information about an api.Status failure, including
@@ -625,13 +633,3 @@ type ServerOpList struct {
 }
 
 func (*ServerOpList) IsAnAPIObject() {}
-
-// WatchEvent objects are streamed from the api server in response to a watch request.
-type WatchEvent struct {
-	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType
-
-	// For added or modified objects, this is the new object; for deleted objects,
-	// it's the state of the object immediately prior to its deletion.
-	Object runtime.EmbeddedObject
-}

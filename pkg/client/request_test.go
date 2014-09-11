@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -401,7 +402,13 @@ func TestWatch(t *testing.T) {
 
 		encoder := json.NewEncoder(w)
 		for _, item := range table {
-			encoder.Encode(&api.WatchEvent{item.t, runtime.EmbeddedObject{item.obj}})
+			data, err := api.NewJSONWatchEvent(latest.Codec, watch.Event{item.t, item.obj})
+			if err != nil {
+				panic(err)
+			}
+			if err := encoder.Encode(data); err != nil {
+				panic(err)
+			}
 			flusher.Flush()
 		}
 	}))

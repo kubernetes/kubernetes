@@ -17,14 +17,15 @@ limitations under the License.
 package v1beta2
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// Codec encodes runtime objects to the v1beta2 scheme
-var Codec = runtime.CodecFor(runtime.DefaultScheme, "v1beta2")
+// Codec encodes internal objects to the v1beta2 scheme
+var Codec = runtime.CodecFor(api.Scheme, "v1beta2")
 
 func init() {
-	runtime.DefaultScheme.AddKnownTypes("v1beta2",
+	api.Scheme.AddKnownTypes("v1beta2",
 		&PodList{},
 		&Pod{},
 		&ReplicationControllerList{},

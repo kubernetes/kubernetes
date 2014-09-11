@@ -17,14 +17,14 @@ limitations under the License.
 package api_test
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
@@ -105,27 +105,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	},
 )
 
-func objDiff(a, b runtime.Object) string {
-	ab, err := json.Marshal(a)
-	if err != nil {
-		panic("a")
-	}
-	bb, err := json.Marshal(b)
-	if err != nil {
-		panic("b")
-	}
-	return util.StringDiff(string(ab), string(bb))
-
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
-	return util.StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
-	)
-}
-
-func runTest(t *testing.T, source runtime.Object) {
+func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
 	j, err := runtime.FindJSONBase(source)
@@ -135,30 +115,30 @@ func runTest(t *testing.T, source runtime.Object) {
 	j.SetKind("")
 	j.SetAPIVersion("")
 
-	data, err := latest.Codec.Encode(source)
+	data, err := codec.Encode(source)
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
 
-	obj2, err := latest.Codec.Decode(data)
+	obj2, err := codec.Decode(data)
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj2) {
-			t.Errorf("1: %v: diff: %v", name, objDiff(source, obj2))
+			t.Errorf("1: %v: diff: %v", name, runtime.ObjectDiff(source, obj2))
 			return
 		}
 	}
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface().(runtime.Object)
-	err = latest.Codec.DecodeInto(data, obj3)
+	err = codec.DecodeInto(data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj3) {
-			t.Errorf("3: %v: diff: %v", name, objDiff(source, obj3))
+			t.Errorf("3: %v: diff: %v", name, runtime.ObjectDiff(source, obj3))
 			return
 		}
 	}
@@ -184,7 +164,8 @@ func TestTypes(t *testing.T) {
 	for _, item := range table {
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
-			runTest(t, item)
+			runTest(t, v1beta1.Codec, item)
+			runTest(t, v1beta2.Codec, item)
 		}
 	}
 }

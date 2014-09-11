@@ -23,12 +23,14 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
 )
 
 func TestWatchInterpretations(t *testing.T) {
+	codec := latest.Codec
 	// Declare some pods to make the test cases compact.
 	podFoo := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	podBar := &api.Pod{JSONBase: api.JSONBase{ID: "bar"}}
@@ -48,62 +50,62 @@ func TestWatchInterpretations(t *testing.T) {
 	}{
 		"create": {
 			actions:      []string{"create", "get"},
-			nodeValue:    latest.Codec.EncodeOrDie(podBar),
+			nodeValue:    runtime.EncodeOrDie(codec, podBar),
 			expectEmit:   true,
 			expectType:   watch.Added,
 			expectObject: podBar,
 		},
 		"create but filter blocks": {
 			actions:    []string{"create", "get"},
-			nodeValue:  latest.Codec.EncodeOrDie(podFoo),
+			nodeValue:  runtime.EncodeOrDie(codec, podFoo),
 			expectEmit: false,
 		},
 		"delete": {
 			actions:       []string{"delete"},
-			prevNodeValue: latest.Codec.EncodeOrDie(podBar),
+			prevNodeValue: runtime.EncodeOrDie(codec, podBar),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
 			expectObject:  podBar,
 		},
 		"delete but filter blocks": {
 			actions:    []string{"delete"},
-			nodeValue:  latest.Codec.EncodeOrDie(podFoo),
+			nodeValue:  runtime.EncodeOrDie(codec, podFoo),
 			expectEmit: false,
 		},
 		"modify appears to create 1": {
 			actions:      []string{"set", "compareAndSwap"},
-			nodeValue:    latest.Codec.EncodeOrDie(podBar),
+			nodeValue:    runtime.EncodeOrDie(codec, podBar),
 			expectEmit:   true,
 			expectType:   watch.Added,
 			expectObject: podBar,
 		},
 		"modify appears to create 2": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: latest.Codec.EncodeOrDie(podFoo),
-			nodeValue:     latest.Codec.EncodeOrDie(podBar),
+			prevNodeValue: runtime.EncodeOrDie(codec, podFoo),
+			nodeValue:     runtime.EncodeOrDie(codec, podBar),
 			expectEmit:    true,
 			expectType:    watch.Added,
 			expectObject:  podBar,
 		},
 		"modify appears to delete": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: latest.Codec.EncodeOrDie(podBar),
-			nodeValue:     latest.Codec.EncodeOrDie(podFoo),
+			prevNodeValue: runtime.EncodeOrDie(codec, podBar),
+			nodeValue:     runtime.EncodeOrDie(codec, podFoo),
 			expectEmit:    true,
 			expectType:    watch.Deleted,
 			expectObject:  podBar, // Should return last state that passed the filter!
 		},
 		"modify modifies": {
 			actions:       []string{"set", "compareAndSwap"},
-			prevNodeValue: latest.Codec.EncodeOrDie(podBar),
-			nodeValue:     latest.Codec.EncodeOrDie(podBaz),
+			prevNodeValue: runtime.EncodeOrDie(codec, podBar),
+			nodeValue:     runtime.EncodeOrDie(codec, podBaz),
 			expectEmit:    true,
 			expectType:    watch.Modified,
 			expectObject:  podBaz,
 		},
 		"modify ignores": {
 			actions:    []string{"set", "compareAndSwap"},
-			nodeValue:  latest.Codec.EncodeOrDie(podFoo),
+			nodeValue:  runtime.EncodeOrDie(codec, podFoo),
 			expectEmit: false,
 		},
 	}
@@ -197,6 +199,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
+	codec := latest.Codec
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 	h := EtcdHelper{fakeClient, codec, versioner}
@@ -243,6 +246,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchEtcdState(t *testing.T) {
+	codec := latest.Codec
 	type T struct {
 		Type      watch.EventType
 		Endpoints []string
@@ -259,7 +263,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(latest.Codec.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 					},
 				},
 			},
@@ -273,12 +277,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(latest.Codec.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(latest.Codec.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -295,7 +299,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(latest.Codec.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -308,12 +312,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(latest.Codec.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(latest.Codec.EncodeOrDie(&api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -359,6 +363,7 @@ func TestWatchEtcdState(t *testing.T) {
 }
 
 func TestWatchFromZeroIndex(t *testing.T) {
+	codec := latest.Codec
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 
 	testCases := map[string]struct {
@@ -370,7 +375,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
-						Value:         latest.Codec.EncodeOrDie(pod),
+						Value:         runtime.EncodeOrDie(codec, pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -385,7 +390,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			EtcdResponseWithError{
 				R: &etcd.Response{
 					Node: &etcd.Node{
-						Value:         latest.Codec.EncodeOrDie(pod),
+						Value:         runtime.EncodeOrDie(codec, pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
@@ -434,6 +439,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 }
 
 func TestWatchListFromZeroIndex(t *testing.T) {
+	codec := latest.Codec
 	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 
 	fakeClient := NewFakeEtcdClient(t)
@@ -443,13 +449,13 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 				Dir: true,
 				Nodes: etcd.Nodes{
 					&etcd.Node{
-						Value:         latest.Codec.EncodeOrDie(pod),
+						Value:         runtime.EncodeOrDie(codec, pod),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 						Nodes:         etcd.Nodes{},
 					},
 					&etcd.Node{
-						Value:         latest.Codec.EncodeOrDie(pod),
+						Value:         runtime.EncodeOrDie(codec, pod),
 						CreatedIndex:  2,
 						ModifiedIndex: 2,
 						Nodes:         etcd.Nodes{},

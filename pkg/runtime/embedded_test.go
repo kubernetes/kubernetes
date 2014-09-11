@@ -14,38 +14,72 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package runtime_test
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
+var scheme = runtime.NewScheme()
+var Codec = runtime.CodecFor(scheme, "v1test")
+
+// EmbeddedObject implements a Codec specific version of an
+// embedded object.
+type EmbeddedObject struct {
+	runtime.Object
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (a *EmbeddedObject) UnmarshalJSON(b []byte) error {
+	obj, err := runtime.CodecUnmarshalJSON(Codec, b)
+	a.Object = obj
+	return err
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (a EmbeddedObject) MarshalJSON() ([]byte, error) {
+	return runtime.CodecMarshalJSON(Codec, a.Object)
+}
+
+// SetYAML implements the yaml.Setter interface.
+func (a *EmbeddedObject) SetYAML(tag string, value interface{}) bool {
+	obj, ok := runtime.CodecSetYAML(Codec, tag, value)
+	a.Object = obj
+	return ok
+}
+
+// GetYAML implements the yaml.Getter interface.
+func (a EmbeddedObject) GetYAML() (tag string, value interface{}) {
+	return runtime.CodecGetYAML(Codec, a.Object)
+}
+
 type EmbeddedTest struct {
-	JSONBase    `yaml:",inline" json:",inline"`
-	Object      EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	runtime.JSONBase `yaml:",inline" json:",inline"`
+	Object           EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
+	EmptyObject      EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 }
 
 func (*EmbeddedTest) IsAnAPIObject() {}
 
 func TestEmbeddedObject(t *testing.T) {
-	// TODO(dbsmith) fix EmbeddedObject to not use DefaultScheme.
-	s := DefaultScheme
+	s := scheme
 	s.AddKnownTypes("", &EmbeddedTest{})
-	s.AddKnownTypes("v1beta1", &EmbeddedTest{})
+	s.AddKnownTypes("v1test", &EmbeddedTest{})
 
 	outer := &EmbeddedTest{
-		JSONBase: JSONBase{ID: "outer"},
+		JSONBase: runtime.JSONBase{ID: "outer"},
 		Object: EmbeddedObject{
 			&EmbeddedTest{
-				JSONBase: JSONBase{ID: "inner"},
+				JSONBase: runtime.JSONBase{ID: "inner"},
 			},
 		},
 	}
 
-	wire, err := s.Encode(outer)
+	wire, err := s.EncodeToVersion(outer, "v1test")
 	if err != nil {
 		t.Fatalf("Unexpected encode error '%v'", err)
 	}

@@ -17,14 +17,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	// Alias this so it can be easily changed when we cut the next version.
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func init() {
-	runtime.DefaultScheme.AddConversionFuncs(
+	newer.Scheme.AddConversionFuncs(
 		// EnvVar's Key is deprecated in favor of Name.
 		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
 			out.Value = in.Value
@@ -80,4 +79,34 @@ func init() {
 		},
 	)
 
+}
+
+// EmbeddedObject implements a Codec specific version of an
+// embedded object.
+type EmbeddedObject struct {
+	runtime.Object
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (a *EmbeddedObject) UnmarshalJSON(b []byte) error {
+	obj, err := runtime.CodecUnmarshalJSON(Codec, b)
+	a.Object = obj
+	return err
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (a EmbeddedObject) MarshalJSON() ([]byte, error) {
+	return runtime.CodecMarshalJSON(Codec, a.Object)
+}
+
+// SetYAML implements the yaml.Setter interface.
+func (a *EmbeddedObject) SetYAML(tag string, value interface{}) bool {
+	obj, ok := runtime.CodecSetYAML(Codec, tag, value)
+	a.Object = obj
+	return ok
+}
+
+// GetYAML implements the yaml.Getter interface.
+func (a EmbeddedObject) GetYAML() (tag string, value interface{}) {
+	return runtime.CodecGetYAML(Codec, a.Object)
 }

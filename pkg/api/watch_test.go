@@ -17,27 +17,27 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"encoding/json"
+	"reflect"
+	"testing"
 )
 
-var Scheme = runtime.NewScheme()
+func TestEmbeddedDefaultSerialization(t *testing.T) {
+	expected := WatchEvent{
+		Type:   "foo",
+		Object: EmbeddedObject{&Pod{}},
+	}
+	data, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
-func init() {
-	Scheme.AddKnownTypes("",
-		&PodList{},
-		&Pod{},
-		&ReplicationControllerList{},
-		&ReplicationController{},
-		&ServiceList{},
-		&Service{},
-		&MinionList{},
-		&Minion{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
-		&ContainerManifestList{},
-		&Endpoints{},
-		&EndpointsList{},
-		&Binding{},
-	)
+	actual := WatchEvent{}
+	if err := json.Unmarshal(data, &actual); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Expected %#v, Got %#v", expected, actual)
+	}
 }

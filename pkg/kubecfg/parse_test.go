@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"gopkg.in/v1/yaml"
 )
@@ -125,8 +127,9 @@ type TestParseType struct {
 func (*TestParseType) IsAnAPIObject() {}
 
 func TestParseCustomType(t *testing.T) {
-	latest.Codec.AddKnownTypes("", &TestParseType{})
-	latest.Codec.AddKnownTypes("v1beta1", &TestParseType{})
+	api.Scheme.AddKnownTypes("", &TestParseType{})
+	api.Scheme.AddKnownTypes("v1beta1", &TestParseType{})
+	api.Scheme.AddKnownTypes("v1beta2", &TestParseType{})
 	parser := NewParser(map[string]runtime.Object{
 		"custom": &TestParseType{},
 	})
