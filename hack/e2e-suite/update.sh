@@ -61,26 +61,26 @@ function validate() {
 export DOCKER_HUB_USER=jbeda
 
 # Launch a container
-${KUBE_REPO_ROOT}/examples/update-demo/1-create-replication-controller.sh
+${KUBE_REPO_ROOT}/examples/update-demo/2-create-replication-controller.sh
 
 function teardown() {
   echo "Cleaning up test artifacts"
-  ${KUBE_REPO_ROOT}/examples/update-demo/4-down.sh
+  ${KUBE_REPO_ROOT}/examples/update-demo/5-down.sh
 }
 
 trap "teardown" EXIT
 
 validate 2 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/2-scale.sh 1
+${KUBE_REPO_ROOT}/examples/update-demo/3-scale.sh 1
 sleep 2
 validate 1 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/2-scale.sh 2
+${KUBE_REPO_ROOT}/examples/update-demo/3-scale.sh 2
 sleep 2
 validate 2 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/3-rolling-update.sh kitten 1s
+${KUBE_REPO_ROOT}/examples/update-demo/4-rolling-update.sh kitten 1s
 sleep 2
 validate 2 kitten
 
