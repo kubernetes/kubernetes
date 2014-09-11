@@ -291,8 +291,6 @@ type ContainerStatus struct {
 // TODO(dchen1107): Replace docker.Container below with ContainerStatus defined above.
 type PodInfo map[string]docker.Container
 
-//type PodInfo map[string]docker.Container
-
 type RestartPolicyAlways struct{}
 
 // TODO(dchen1107): Define what kinds of failures should restart.
