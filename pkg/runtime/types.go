@@ -43,6 +43,12 @@ type JSONBase struct {
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
 
+// PluginBase is like JSONBase, but it's intended for plugin objects that won't ever be encoded
+// except while embedded in other objects.
+type PluginBase struct {
+	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+}
+
 // EmbeddedObject has appropriate encoder and decoder functions, such that on the wire, it's
 // stored as a []byte, but in memory, the contained object is accessable as an Object
 // via the Get() function. Only valid API objects may be stored via EmbeddedObject.
@@ -51,18 +57,70 @@ type JSONBase struct {
 //
 // Note that object assumes that you've registered all of your api types with the api package.
 //
-// TODO(dbsmith): Stop using runtime.Codec, use the codec appropriate for the conversion (I have a plan).
+// EmbeddedObject and RawExtension can be used together to allow for API object extensions:
+// see the comment for RawExtension.
 type EmbeddedObject struct {
 	Object
 }
 
-// Extension allows api objects with unknown types to be passed-through. This can be used
-// to deal with the API objects from a plug-in. Extension objects still have functioning
-// JSONBase features-- kind, version, resourceVersion, etc.
-// TODO: Not implemented yet
-type Extension struct {
-	JSONBase `yaml:",inline" json:",inline"`
-	// RawJSON to go here.
+// RawExtension is used with EmbeddedObject to do a two-phase encoding of extension objects.
+//
+// To use this, make a field which has RawExtension as its type in your external, versioned
+// struct, and EmbeddedObject in your internal struct. You also need to register your
+// various plugin types.
+//
+// // Internal package:
+// type MyAPIObject struct {
+// 	runtime.JSONBase `yaml:",inline" json:",inline"`
+//	// The "scheme" tag is optional; if absent, runtime.DefaultScheme will be used.
+//	MyPlugin runtime.EmbeddedObject `scheme:"pluginScheme"`
+// }
+// type PluginA struct {
+// 	runtime.PluginBase `yaml:",inline" json:",inline"`
+//	AOption string `yaml:"aOption" json:"aOption"`
+// }
+//
+// // External package:
+// type MyAPIObject struct {
+// 	runtime.JSONBase `yaml:",inline" json:",inline"`
+//	MyPlugin runtime.RawExtension `json:"myPlugin" yaml:"myPlugin"`
+// }
+// type PluginA struct {
+// 	runtime.PluginBase `yaml:",inline" json:",inline"`
+//	AOption string `yaml:"aOption" json:"aOption"`
+// }
+//
+// // On the wire, the JSON will look something like this:
+// {
+//	"kind":"MyAPIObject",
+//	"apiVersion":"v1beta1",
+//	"myPlugin": {
+//		"kind":"PluginA",
+//		"aOption":"foo",
+//	},
+// }
+//
+// So what happens? Decode first uses json or yaml to unmarshal the serialized data into
+// your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked.
+// The next step is to copy (using pkg/conversion) into the internal struct. The runtime
+// package's DefaultScheme has conversion functions installed which will unpack the
+// JSON stored in RawExtension, turning it into the correct object type, and storing it
+// in the EmbeddedObject. (TODO: In the case where the object is of an unknown type, a
+// runtime.Unknown object will be created and stored.)
+type RawExtension struct {
+	RawJSON []byte
 }
 
-func (*Extension) IsAnAPIObject() {}
+// Unknown allows api objects with unknown types to be passed-through. This can be used
+// to deal with the API objects from a plug-in. Unknown objects still have functioning
+// JSONBase features-- kind, version, resourceVersion, etc.
+// TODO: Not implemented yet!
+type Unknown struct {
+	JSONBase `yaml:",inline" json:",inline"`
+	// RawJSON will hold the complete JSON of the object which couldn't be matched
+	// with a registered type. Most likely, nothing should be done with this
+	// except for passing it through the system.
+	RawJSON []byte
+}
+
+func (*Unknown) IsAnAPIObject() {}
