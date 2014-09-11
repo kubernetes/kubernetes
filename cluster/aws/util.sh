@@ -20,6 +20,8 @@
 # config-default.sh.
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
 
+AWS_CMD="aws --output json ec2"
+
 # Find the release to use.  If passed in, go with that and validate.  If not use
 # the release/config.sh version assuming a dev workflow.
 function find-release() {
@@ -150,8 +152,6 @@ function kube-up {
     if [ ! -f $AWS_SSH_KEY ]; then
         ssh-keygen -f $AWS_SSH_KEY -N ''
     fi
-
-    AWS_CMD="aws --output json ec2"
     
     $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1 || true
     VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
@@ -173,7 +173,6 @@ function kube-up {
     echo "MASTER_NAME=${MASTER_NAME}"
     echo "MASTER_RELEASE_TAR=${RELEASE_FULL_HTTP_PATH}/master-release.tgz"
     echo "MASTER_HTPASSWD='${HTPASSWD}'"
-    #echo "NUM_MINIONS=${NUM_MINIONS}"
     grep -v "^#" $(dirname $0)/templates/download-release.sh
     grep -v "^#" $(dirname $0)/templates/salt-master.sh
     ) > ${KUBE_TEMP}/master-start.sh
@@ -188,13 +187,13 @@ function kube-up {
     --associate-public-ip-address \
     --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
 
-    $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=kubernetes-master > /dev/null
+    $AWS_CMD create-tags --resources $master_id --tags Key=Name,Value=$MASTER_NAME > /dev/null
+    $AWS_CMD create-tags --resources $master_id --tags Key=Role,Value=$MASTER_TAG > /dev/null
 
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
       echo "MASTER_NAME=${MASTER_NAME}"
-      #echo "NUM_MINIONS=${NUM_MINIONS}"
       echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
       grep -v "^#" $(dirname $0)/templates/salt-minion.sh
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
@@ -209,7 +208,8 @@ function kube-up {
         --associate-public-ip-address \
         --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
         
-        $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=kubernetes-minion-$i > /dev/null
+        $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=${MINION_NAMES[$i]} > /dev/null
+        $AWS_CMD create-tags --resources $minion_id --tags Key=Role,Value=$MINION_TAG > /dev/null
         $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > /dev/null
 
         # We are not able to add a route to the instance until that instance is in "running" state.
@@ -218,11 +218,11 @@ function kube-up {
         while true; do
           instance_state=$($AWS_CMD describe-instances --instance-ids $minion_id | expect_instance_states running)
           if [[ "$instance_state" == "" ]]; then
-            echo "Minion kubernetes-minion-$i up and running"
+            echo "Minion ${MINION_NAMES[$i]} running"
             $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block "10.244.$i.0/24" --instance-id $minion_id > /dev/null
             break
           else
-            echo "Minion kubernetes-minion-$i not yet running"
+            echo "Waiting for minion ${MINION_NAMES[$i]} to spawn"
             echo "Sleeping for 3 seconds..."
             sleep 3
           fi

@@ -14,42 +14,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Bring up a Kubernetes cluster.
-#
-# If the full release name (gs://<bucket>/<release>) is passed in then we take
-# that directly.  If not then we assume we are doing development stuff and take
-# the defaults in the release config.
-
 # exit on any error
+set -e
 
-# Disable due to inability to set specific instance hostnames
-# set -e
+source $(dirname $0)/../kube-env.sh
+source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
 
-# source $(dirname $0)/../kube-env.sh
-# source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
+get-password
+detect-master > /dev/null
+detect-minions > /dev/null
 
-# get-password
-# detect-master > /dev/null
-# detect-minions > /dev/null
+MINIONS_FILE=/tmp/minions
+$(dirname $0)/../kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
-# MINIONS_FILE=/tmp/minions
-# $(dirname $0)/../kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
+    count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
+    if [ "$count" == "0" ]; then
+        echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
+        exit 1
+    fi
 
-# for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-#     # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
-#     count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
-#     if [ "$count" == "0" ]; then
-#         echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
-#         exit 1
-#     fi
-
-#     # Make sure the kubelet is healthy
-#     if [ "$(curl --insecure --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
-#         echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
-#         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
-#         exit 1
-#     else
-#         echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
-#     fi
-# done
-# echo "Cluster validation succeeded"
+    # Make sure the kubelet is healthy
+    if [ "$(curl --insecure --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
+        echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
+        echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
+        exit 1
+    else
+        echo "Kubelet is successfully installed on ${MINION_NAMES[$i]}"
+    fi
+done
+echo "Cluster validation succeeded"

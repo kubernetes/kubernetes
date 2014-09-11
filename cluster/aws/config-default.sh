@@ -23,9 +23,9 @@ IMAGE=ami-0307d674
 INSTANCE_PREFIX=kubernetes
 AWS_SSH_KEY=$HOME/.ssh/kube_aws_rsa
 
-MASTER_NAME="${INSTANCE_PREFIX}-master"
+MASTER_NAME="ip-172-20-0-9.$ZONE.compute.internal"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+MINION_NAMES=($(eval echo ip-172-20-0-1{0..$(($NUM_MINIONS-1))}.$ZONE.compute.internal))
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
