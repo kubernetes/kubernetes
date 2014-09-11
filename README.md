@@ -169,11 +169,15 @@ hack/test-integration.sh
 
 ### End-to-End tests
 
-With a GCE account set up for running `cluster/kube-up.sh` (see Setup above):
-
+You can run an end-to-end test which will bring up a master and two minions, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `KUBERNETES_PROVIDER` environment variable to something other than "gce".
 ```
 cd kubernetes
 hack/e2e-test.sh
+```
+
+Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with the magical incantation:
+```
+hack/e2e-test.sh 1 1 1
 ```
 
 ### Testing out flaky tests
