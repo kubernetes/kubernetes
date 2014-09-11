@@ -36,18 +36,14 @@ Name
 
 ## General design
 
-1. When an object is created via an api, a Name string (a DNS_SUBDOMAIN) must be provided.
-   1. must be non-empty and unique within the apiserver
-   2. enables idempotent and space-unique creation
-      1. generating random names will defeat idempotentcy
-      2. for situations where generating a name is impractical, some or all objects may support a param to auto-generate a name
-   3. parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffix) to create a unique Name
-   Example: "guestbook.user"
-   Example: "backend-x4eb1"
+1. When an object is created via an API, a Name string (a DNS_SUBDOMAIN) must be specified.  Name must be non-empty and unique within the apiserver.  This enables idempotent and space-unique creation operations.  Parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffix) to create a unique Name.  For situations where generating a name is impractical, some or all objects may support a param to auto-generate a name.  Generating random names will defeat idempotency.
+   * Examples: "guestbook.user", "backend-x4eb1"
 
-2. Upon acceptance of an object via an api, the object is assigned a UID (a UUID).
-   1. must be non-empty and unique across space and time
-   Example: "01234567-89ab-cdef-0123-456789abcdef"
+2. When an object is created via an api, a Namespace string (a DNS_SUBDOMAIN? format TBD via #1114) may be specified.  Depending on the API receiver, namespaces might be validated (e.g. apiserver might ensure that the namespace actually exists).  If a namespace is not specified, one will be assigned by the API receiver.  This assignment policy might vary across API receivers (e.g. apiserver might have a default, kubelet might generate something semi-random).
+   * Example: "api.k8s.example.com"
+
+3. Upon acceptance of an object via an API, the object is assigned a UID (a UUID).  UID must be non-empty and unique across space and time.
+   * Example: "01234567-89ab-cdef-0123-456789abcdef"
 
 
 ## Case study: Scheduling a pod
@@ -58,40 +54,37 @@ objectives.
 
 ### A pod scheduled by a user through the apiserver
 
-1. A user submits a pod named "guestbook" to the apiserver.
+1. A user submits a pod with Namespace="" and Name="guestbook" to the apiserver.
 
 2. The apiserver validates the input.
-   1. The pod name must be space-unique within the apiserver.
-   2. Each container within the pod has a name which must be space-unique within the pod.
+   1. A default Namespace is assigned.
+   2. The pod name must be space-unique within the Namespace.
+   3. Each container within the pod has a name which must be space-unique within the pod.
 
-3. The pod is accepted and a UID is assigned.
+3. The pod is accepted.
+   1. A new UID is assigned.
 
 4. The pod is bound to a node.
-   1. The kubelet on the node is passed the pod's UID and name.
+   1. The kubelet on the node is passed the pod's UID, Namespace, and Name.
 
 5. Kubelet validates the input.
 
-6. Kubelet further namespaces the pod name with information about the source of the pod.
-   1. E.g. Namespace="api.k8s.example.com"
-
-7. Kubelet runs the pod.
+6. Kubelet runs the pod.
    1. Each container is started up with enough metadata to distinguish the pod from whence it came.
    2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
-      1. This may correspond to Docker's container ID.
+      * This may correspond to Docker's container ID.
 
 ### A pod placed by a config file on the node
 
-1. A config file is stored on the node, containing a pod named "cadvisor" with no UID.
+1. A config file is stored on the node, containing a pod with UID="", Namespace="", and Name="cadvisor".
 
 2. Kubelet validates the input.
    1. Since UID is not provided, kubelet generates one.
+   2. Since Namespace is not provided, kubelet generates one.
+      1. The generated namespace should be deterministic and cluster-unique for the source, such as a hash of the hostname and file path.
+         * E.g. Namespace="file-f4231812554558a718a01ca942782d81"
 
-3. Kubelet further namespaces the pod name with information about the source of the pod.
-   1. The generated namespace should be deterministic and cluster-unique for the source.
-      1. E.g. a hash of the hostname and file path.
-   2. E.g. Namespace="file-f4231812554558a718a01ca942782d81"
-
-4. Kubelet runs the pod.
+3. Kubelet runs the pod.
    1. Each container is started up with enough metadata to distinguish the pod from whence it came.
    2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
       1. This may correspond to Docker's container ID.
