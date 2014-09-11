@@ -40,6 +40,10 @@ func Handler(delegate http.Handler, pred StacktracePred) http.Handler {
 // StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
+type logger interface {
+	Addf(format string, data ...interface{})
+}
+
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
 type respLogger struct {
@@ -52,6 +56,14 @@ type respLogger struct {
 	w   http.ResponseWriter
 
 	logStacktracePred StacktracePred
+}
+
+// Simple logger that logs immediately when Addf is called
+type passthroughLogger struct{}
+
+// Addf logs info immediately.
+func (passthroughLogger) Addf(format string, data ...interface{}) {
+	glog.Infof(format, data...)
 }
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
@@ -86,13 +98,18 @@ func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
 	return rl
 }
 
-// LogOf returns the logger hiding in w. Panics if there isn't such a logger,
-// because NewLogged() must have been previously called for the log to work.
-func LogOf(w http.ResponseWriter) *respLogger {
+// LogOf returns the logger hiding in w. If there is not an existing logger
+// then a passthroughLogger will be created which will log to stdout immediately
+// when Addf is called.
+func LogOf(req *http.Request, w http.ResponseWriter) logger {
+	if _, exists := w.(*respLogger); !exists {
+		pl := &passthroughLogger{}
+		return pl
+	}
 	if rl, ok := w.(*respLogger); ok {
 		return rl
 	}
-	panic("Logger not installed yet!")
+	panic("Unable to find or create the logger!")
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.

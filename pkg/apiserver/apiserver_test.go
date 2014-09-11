@@ -34,6 +34,7 @@ import (
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -729,5 +730,75 @@ func TestSyncCreateTimeout(t *testing.T) {
 	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
 	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
 		t.Errorf("Unexpected status %#v", itemOut)
+	}
+}
+
+func TestCORSAllowedOrigins(t *testing.T) {
+	table := []struct {
+		allowedOrigins util.StringList
+		origin         string
+		allowed        bool
+	}{
+		{[]string{}, "example.com", false},
+		{[]string{"example.com"}, "example.com", true},
+		{[]string{"example.com"}, "not-allowed.com", false},
+		{[]string{"not-matching.com", "example.com"}, "example.com", true},
+		{[]string{".*"}, "example.com", true},
+	}
+
+	for _, item := range table {
+		allowedOriginRegexps, err := util.CompileRegexps(item.allowedOrigins)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		handler := CORS(Handle(map[string]RESTStorage{}, codec, "/prefix/version"), allowedOriginRegexps, nil, nil, "true")
+		server := httptest.NewServer(handler)
+		client := http.Client{}
+
+		request, err := http.NewRequest("GET", server.URL+"/version", nil)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		request.Header.Set("Origin", item.origin)
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if item.allowed {
+			if !reflect.DeepEqual(item.origin, response.Header.Get("Access-Control-Allow-Origin")) {
+				t.Errorf("Expected %#v, Got %#v", item.origin, response.Header.Get("Access-Control-Allow-Origin"))
+			}
+
+			if response.Header.Get("Access-Control-Allow-Credentials") == "" {
+				t.Errorf("Expected Access-Control-Allow-Credentials header to be set")
+			}
+
+			if response.Header.Get("Access-Control-Allow-Headers") == "" {
+				t.Errorf("Expected Access-Control-Allow-Headers header to be set")
+			}
+
+			if response.Header.Get("Access-Control-Allow-Methods") == "" {
+				t.Errorf("Expected Access-Control-Allow-Methods header to be set")
+			}
+		} else {
+			if response.Header.Get("Access-Control-Allow-Origin") != "" {
+				t.Errorf("Expected Access-Control-Allow-Origin header to not be set")
+			}
+
+			if response.Header.Get("Access-Control-Allow-Credentials") != "" {
+				t.Errorf("Expected Access-Control-Allow-Credentials header to not be set")
+			}
+
+			if response.Header.Get("Access-Control-Allow-Headers") != "" {
+				t.Errorf("Expected Access-Control-Allow-Headers header to not be set")
+			}
+
+			if response.Header.Get("Access-Control-Allow-Methods") != "" {
+				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
+			}
+		}
 	}
 }
