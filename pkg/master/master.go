@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -138,4 +139,13 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec)
 		storage[k] = v
 	}
 	return storage, v1beta1.Codec
+}
+
+// API_v1beta2 returns the resources and codec for API version v1beta2.
+func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec) {
+	storage := make(map[string]apiserver.RESTStorage)
+	for k, v := range m.storage {
+		storage[k] = v
+	}
+	return storage, v1beta2.Codec
 }
