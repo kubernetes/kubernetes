@@ -1,11 +1,10 @@
-/var/log/{{ file }}.log {
+/var/lib/docker/containers/*/*-json.log {
     rotate 5
     copytruncate
     missingok
     notifempty
     compress
-    maxsize 100M
+    maxsize 10M
     daily
     create 0644 root root
 }
-
