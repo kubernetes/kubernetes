@@ -91,12 +91,16 @@ func TestLogOf(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		handler := func(w http.ResponseWriter, r *http.Request) {
+			var want string
 			if makeLogger {
 				NewLogged(req, &w)
+				want = "*httplog.respLogger"
+			} else {
+				want = "*httplog.passthroughLogger"
 			}
-			got := reflect.TypeOf(*LogOf(r, w)).String()
-			if got != "httplog.respLogger" {
-				t.Errorf("Expected %v, got %v", "httplog.respLogger", got)
+			got := reflect.TypeOf(LogOf(r, w)).String()
+			if want != got {
+				t.Errorf("Expected %v, got %v", want, got)
 			}
 		}
 		w := httptest.NewRecorder()

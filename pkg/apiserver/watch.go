@@ -133,18 +133,18 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	cn, ok := w.(http.CloseNotifier)
 	if !ok {
 		loggedW.Addf("unable to get CloseNotifier")
-		http.NotFound(loggedW, req)
+		http.NotFound(w, req)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		loggedW.Addf("unable to get Flusher")
-		http.NotFound(loggedW, req)
+		http.NotFound(w, req)
 		return
 	}
 
-	loggedW.Header().Set("Transfer-Encoding", "chunked")
-	loggedW.WriteHeader(http.StatusOK)
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
 	encoder := json.NewEncoder(w)
