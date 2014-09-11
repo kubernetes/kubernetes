@@ -19,6 +19,7 @@ limitations under the License.
 package integration
 
 import (
+	"fmt"
 	"net/http/httptest"
 	"reflect"
 	"testing"
@@ -28,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
@@ -36,72 +38,87 @@ func init() {
 }
 
 func TestClient(t *testing.T) {
+	helper, err := master.NewEtcdHelper(newEtcdClient().GetCluster(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	m := master.New(&master.Config{
-		EtcdServers: newEtcdClient().GetCluster(),
+		EtcdHelper: helper,
 	})
+	s1, c1 := m.API_v1beta1()
+	s2, c2 := m.API_v1beta2()
 
-	storage, codec := m.API_v1beta1()
-	s := httptest.NewServer(apiserver.Handle(storage, codec, "/api/v1beta1/"))
-
-	client := client.NewOrDie(s.URL, nil)
-
-	info, err := client.ServerVersion()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %#v, got %#v", e, a)
+	testCases := map[string]struct {
+		Storage map[string]apiserver.RESTStorage
+		Codec   runtime.Codec
+	}{
+		"v1beta1": {s1, c1},
+		"v1beta2": {s2, c2},
 	}
 
-	pods, err := client.ListPods(labels.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pods.Items) != 0 {
-		t.Errorf("expected no pods, got %#v", pods)
-	}
+	for apiVersion, values := range testCases {
+		deleteAllEtcdKeys()
+		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion)))
+		client := client.NewOrDie(s.URL, apiVersion, nil)
 
-	// get a validation error
-	pod := &api.Pod{
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta2",
-				Containers: []api.Container{
-					{
-						Name: "test",
+		info, err := client.ServerVersion()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %#v, got %#v", e, a)
+		}
+
+		pods, err := client.ListPods(labels.Everything())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pods.Items) != 0 {
+			t.Errorf("expected no pods, got %#v", pods)
+		}
+
+		// get a validation error
+		pod := &api.Pod{
+			DesiredState: api.PodState{
+				Manifest: api.ContainerManifest{
+					Version: "v1beta2",
+					Containers: []api.Container{
+						{
+							Name: "test",
+						},
 					},
 				},
 			},
-		},
-	}
-	got, err := client.CreatePod(pod)
-	if err == nil {
-		t.Fatalf("unexpected non-error: %v", err)
-	}
+		}
+		got, err := client.CreatePod(pod)
+		if err == nil {
+			t.Fatalf("unexpected non-error: %v", err)
+		}
 
-	// get a created pod
-	pod.DesiredState.Manifest.Containers[0].Image = "an-image"
-	got, err = client.CreatePod(pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.ID == "" {
-		t.Errorf("unexpected empty pod ID %v", got)
-	}
+		// get a created pod
+		pod.DesiredState.Manifest.Containers[0].Image = "an-image"
+		got, err = client.CreatePod(pod)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.ID == "" {
+			t.Errorf("unexpected empty pod ID %v", got)
+		}
 
-	// pod is shown, but not scheduled
-	pods, err = client.ListPods(labels.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pods.Items) != 1 {
-		t.Errorf("expected one pod, got %#v", pods)
-	}
-	actual := pods.Items[0]
-	if actual.ID != got.ID {
-		t.Errorf("expected pod %#v, got %#v", got, actual)
-	}
-	if actual.CurrentState.Host != "" {
-		t.Errorf("expected pod to be unscheduled, got %#v", actual)
+		// pod is shown, but not scheduled
+		pods, err = client.ListPods(labels.Everything())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pods.Items) != 1 {
+			t.Errorf("expected one pod, got %#v", pods)
+		}
+		actual := pods.Items[0]
+		if actual.ID != got.ID {
+			t.Errorf("expected pod %#v, got %#v", got, actual)
+		}
+		if actual.CurrentState.Host != "" {
+			t.Errorf("expected pod to be unscheduled, got %#v", actual)
+		}
 	}
 }

@@ -32,7 +32,7 @@ import (
 )
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
-	registry := NewRegistry(client)
+	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, latest.ResourceVersioner})
 	registry.manifestFactory = &BasicManifestFactory{
 		serviceRegistry: &registrytest.ServiceRegistry{},
 	}

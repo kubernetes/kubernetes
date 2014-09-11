@@ -144,3 +144,14 @@ func TestCodec(t *testing.T) {
 		t.Errorf("unexpected unmarshalled object %#v", other)
 	}
 }
+
+func TestInterfacesFor(t *testing.T) {
+	if _, _, err := InterfacesFor(""); err == nil {
+		t.Fatalf("unexpected non-error: %v", err)
+	}
+	for i, version := range append([]string{Version, OldestVersion}, Versions...) {
+		if codec, versioner, err := InterfacesFor(version); err != nil || codec == nil || versioner == nil {
+			t.Fatalf("%d: unexpected result: %v", i, err)
+		}
+	}
+}
