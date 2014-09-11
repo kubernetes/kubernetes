@@ -268,7 +268,7 @@ type ContainerStateTerminated struct {
 
 type ContainerState struct {
 	// Only one of the following ContainerState may be specified.
-	// If none of them is specified, the default on is ContainerStateWaiting.
+	// If none of them is specified, the default one is ContainerStateWaiting.
 	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" yaml:"waiting,omitempty"`
 	Running     *ContainerStateRunning    `json:"running,omitempty" yaml:"running,omitempty"`
 	Termination *ContainerStateTerminated `json:"termination,omitempty" yaml:"termination,omitempty"`
