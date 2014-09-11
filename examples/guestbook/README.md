@@ -6,7 +6,7 @@ The example combines a web frontend, a redis master for storage and a replicated
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#contents):
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
 
 ### Step One: Turn up the redis master.
 
