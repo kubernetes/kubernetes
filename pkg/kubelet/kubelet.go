@@ -67,17 +67,19 @@ func NewMainKubelet(
 	cc CadvisorInterface,
 	ec tools.EtcdClient,
 	rd string,
-	ri time.Duration) *Kubelet {
+	ri time.Duration,
+	privileged bool) *Kubelet {
 	return &Kubelet{
-		hostname:       hn,
-		dockerClient:   dc,
-		cadvisorClient: cc,
-		etcdClient:     ec,
-		rootDirectory:  rd,
-		resyncInterval: ri,
-		podWorkers:     newPodWorkers(),
-		runner:         dockertools.NewDockerContainerCommandRunner(),
-		httpClient:     &http.Client{},
+		hostname:        hn,
+		dockerClient:    dc,
+		cadvisorClient:  cc,
+		etcdClient:      ec,
+		rootDirectory:   rd,
+		resyncInterval:  ri,
+		podWorkers:      newPodWorkers(),
+		runner:          dockertools.NewDockerContainerCommandRunner(),
+		httpClient:      &http.Client{},
+		allowPrivileged: privileged,
 	}
 }
 
@@ -119,6 +121,8 @@ type Kubelet struct {
 	runner dockertools.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
 	httpClient httpGetInterface
+	// Optional, allow privileged containers, defaults to false
+	allowPrivileged bool
 }
 
 // Run starts the kubelet reacting to config updates
@@ -335,11 +339,17 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 	if err != nil {
 		return "", err
 	}
+	privileged := false
+	if kl.allowPrivileged {
+		privileged = container.Privileged
+	} else if container.Privileged {
+		return "", fmt.Errorf("Container requested privileged mode, but it is disallowed globally.")
+	}
 	err = kl.dockerClient.StartContainer(dockerContainer.ID, &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        binds,
 		NetworkMode:  netMode,
-		Privileged:   container.Privileged,
+		Privileged:   privileged,
 	})
 	if err == nil && container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		handlerErr := kl.runHandler(GetPodFullName(pod), pod.Manifest.UUID, container, container.Lifecycle.PostStart)
