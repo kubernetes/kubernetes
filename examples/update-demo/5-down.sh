@@ -14,19 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script will build and push the images necessary for the demo.
+set -o errexit
+set -o nounset
+set -o pipefail
 
-if (( $# != 1 )); then
-  echo "Usage: $0 <docker hub user name>"
-  exit 1
-fi
-
-DOCKER_USER=$1
+export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
+export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
 
 set -x
 
-docker build -t update-demo-base base
-docker build -t $DOCKER_USER/update-demo:kitten kitten
-docker build -t $DOCKER_USER/update-demo:nautilus nautilus
-
-docker push $DOCKER_USER/update-demo
+$KUBECFG stop update-demo
+$KUBECFG rm update-demo
