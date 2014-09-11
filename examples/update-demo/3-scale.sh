@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 NEW_SIZE=${1:-4}
 
 export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}

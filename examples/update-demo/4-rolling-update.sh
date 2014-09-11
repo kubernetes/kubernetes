@@ -14,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ -z "$DOCKER_HUB_USER" ] ; then
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [[ "${DOCKER_HUB_USER+set}" != "set" ]] ; then
   echo "Please set DOCKER_HUB_USER to your Docker hub account"
   exit 1
 fi

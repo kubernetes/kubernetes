@@ -14,9 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 echo "Running local proxy to Kubernetes API Server.  Run this in a "
 echo "separate terminal or run it in the background."
 echo
 echo "    http://localhost:8001/static/"
 echo
+
+set -x
+
 ../../cluster/kubecfg.sh -proxy -www local/
