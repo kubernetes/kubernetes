@@ -7,6 +7,7 @@
 #   clean: Clean up.
 
 OUT_DIR = _output
+GODEPS_PKG_DIR = Godeps/_workspace/pkg
 
 export GOFLAGS
 
@@ -48,4 +49,5 @@ check test:
 #   make clean
 clean:
 	rm -rf $(OUT_DIR)
+	rm -rf $(GODEPS_PKG_DIR)
 .PHONY: clean

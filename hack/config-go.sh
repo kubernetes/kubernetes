@@ -17,6 +17,36 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
+
+# --- Environment Variables used as inputs by config-go.sh ---
+# Function: kube::version_ldflags()
+#  These variables are only needed if you are not building from a clone of the
+#  full kubernetes repository.
+#    KUBE_GIT_COMMIT - Used to set the git commit id corresponding to this
+#		       source code.
+#    KUBE_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
+#			   "dirty" indicates source code changes after the git
+#				   commit id
+#    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
+#
+# Function: kube::setup_go_environment
+#    KUBE_EXTRA_GOPATH - Value will be appended to the GOPATH after this project
+#			 but before the Godeps.
+#    KUBE_NO_GODEPS - If set to any value the Godeps will not be included in
+#		      the final GOPATH.
+
+# --- Environment Variables set by sourcing config-go.sh ---
+# KUBE_REPO_ROOT  - Path to the top of the build tree.
+# KUBE_TARGET     - Path where output Go files are saved.
+# KUBE_GO_PACKAGE - Full name of the Kubernetes Go package.
+
+# --- Environment Variables set by running functions ---
+# Function: kube::setup_go_environment
+#    GOPATH - Will be set to include this project, anything you have you set in
+#	      in ${KUBE_EXTRA_GOPATH}, and the Godeps if ${KUBE_NO_GODEPS} is
+#	      unset.
+
+
 # --- Helper Functions ---
 
 # Function kube::version_ldflags() prints the value that needs to be passed to
@@ -105,8 +135,16 @@ kube::setup_go_environment() {
     fi
   fi
 
-  # Set GOPATH to point to the tree maintained by `godep`.
-  GOPATH="${KUBE_TARGET}:${KUBE_REPO_ROOT}/Godeps/_workspace"
+  GOPATH=${KUBE_TARGET}
+  # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
+  if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
+    GOPATH=${GOPATH}:${KUBE_EXTRA_GOPATH}
+  fi
+  # Append the tree maintained by `godep` to the GOPATH unless KUBE_NO_GODEPS
+  # is defined.
+  if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
+    GOPATH="${GOPATH}:${KUBE_REPO_ROOT}/Godeps/_workspace"
+  fi
   export GOPATH
 
   # Unset GOBIN in case it already exists in the current session.
@@ -114,11 +152,25 @@ kube::setup_go_environment() {
 }
 
 
-# --- Environment Variables ---
+# kube::default_build_targets return list of all build targets
+kube::default_build_targets() {
+  echo "cmd/proxy"
+  echo "cmd/apiserver"
+  echo "cmd/controller-manager"
+  echo "cmd/kubelet"
+  echo "cmd/kubecfg"
+  echo "plugin/cmd/scheduler"
+}
 
-# KUBE_REPO_ROOT  - Path to the top of the build tree.
-# KUBE_TARGET     - Path where output Go files are saved.
-# KUBE_GO_PACKAGE - Full name of the Kubernetes Go package.
+# kube::binaries_from_targets take a list of build targets and return the
+# full go package to be built
+kube::binaries_from_targets() {
+  local target
+  for target; do
+    echo "${KUBE_GO_PACKAGE}/${target}"
+  done
+}
+# --- Environment Variables ---
 
 # Make ${KUBE_REPO_ROOT} an absolute path.
 KUBE_REPO_ROOT=$(
