@@ -14,11 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NEW_SIZE=${1:-4}
+set -o errexit
+set -o nounset
+set -o pipefail
 
-export KUBE_REPO_ROOT=${KUBE_REPO_ROOT-$(dirname $0)/../..}
-export KUBECFG=${KUBECFG-$KUBE_REPO_ROOT/cluster/kubecfg.sh}
+echo "Running local proxy to Kubernetes API Server.  Run this in a "
+echo "separate terminal or run it in the background."
+echo
+echo "    http://localhost:8001/static/"
+echo
 
 set -x
 
-$KUBECFG resize update-demo $NEW_SIZE
+../../cluster/kubecfg.sh -proxy -www local/
