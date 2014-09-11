@@ -253,6 +253,8 @@ const (
 )
 
 type ContainerStateWaiting struct {
+	// Reason could be pulling image,
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
 type ContainerStateRunning struct {
@@ -276,16 +278,20 @@ type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
-	RestartCount int            `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
-	// TODO(dchen1107): In long run, I think we should replace this with our own struct to remove
-	// the dependency on docker. Also once we have done with integration with cadvisor, resource
+	RestartCount int            `json:"restartCount" yaml:"restartCount"`
+	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
+	// TODO(dchen1107): Once we have done with integration with cadvisor, resource
 	// usage should be included.
+	// TODO(dchen1107):  In long run, I think we should replace this with our own struct to remove
+	// the dependency on docker.
 	DetailInfo docker.Container `json:"detailInfo,omitempty" yaml:"detailInfo,omitempty"`
 }
 
 // PodInfo contains one entry for every container with available info.
 // TODO(dchen1107): Replace docker.Container below with ContainerStatus defined above.
 type PodInfo map[string]docker.Container
+
+//type PodInfo map[string]docker.Container
 
 type RestartPolicyAlways struct{}
 
