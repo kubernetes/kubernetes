@@ -213,7 +213,10 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 			return nil, err
 		}
 		activeClients.clients[cliAddr.String()] = svrConn
-		go udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
+		go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
+			defer util.HandleCrash()
+			udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
+		}(cliAddr, svrConn, activeClients, timeout)
 	}
 	return svrConn, nil
 }
@@ -375,7 +378,10 @@ func (proxier *Proxier) addServiceOnUnusedPort(service, protocol string, timeout
 
 func (proxier *Proxier) startAccepting(service string, sock proxySocket) {
 	glog.Infof("Listening for %s on %s:%s", service, sock.Addr().Network(), sock.Addr().String())
-	go sock.ProxyLoop(service, proxier)
+	go func(service string, proxier *Proxier) {
+		defer util.HandleCrash()
+		sock.ProxyLoop(service, proxier)
+	}(service, proxier)
 }
 
 // How long we leave idle UDP connections open.
