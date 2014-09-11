@@ -27,12 +27,14 @@ INSTANCE_PREFIX=kubernetes
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+# Unable to use hostnames yet because DNS is not in cluster, so we revert external look-up name to use the minion IP
+#MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 
 # IP LOCATIONS FOR INTERACTING WITH THE MINIONS
 MINION_IP_BASE="10.245.2."
 for (( i=0; i <${NUM_MINIONS}; i++)) do
   KUBE_MINION_IP_ADDRESSES[$i]="${MINION_IP_BASE}$[$i+2]"
   MINION_IP[$i]="${MINION_IP_BASE}$[$i+2]"
+  MINION_NAMES[$i]="${MINION_IP[$i]}"
   VAGRANT_MINION_NAMES[$i]="minion-$[$i+1]"
 done

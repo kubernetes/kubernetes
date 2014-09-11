@@ -127,24 +127,24 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 // ServeHTTP serves a series of JSON encoded events via straight HTTP with
 // Transfer-Encoding: chunked.
 func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	loggedW := httplog.LogOf(w)
+	loggedW := httplog.LogOf(req, w)
 	w = httplog.Unlogged(w)
 
 	cn, ok := w.(http.CloseNotifier)
 	if !ok {
 		loggedW.Addf("unable to get CloseNotifier")
-		http.NotFound(loggedW, req)
+		http.NotFound(w, req)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		loggedW.Addf("unable to get Flusher")
-		http.NotFound(loggedW, req)
+		http.NotFound(w, req)
 		return
 	}
 
-	loggedW.Header().Set("Transfer-Encoding", "chunked")
-	loggedW.WriteHeader(http.StatusOK)
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
 	encoder := json.NewEncoder(w)

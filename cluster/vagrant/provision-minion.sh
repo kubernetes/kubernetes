@@ -50,6 +50,7 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: $MINION_IP_RANGE
+  minion_ip: $MINION_IP
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time

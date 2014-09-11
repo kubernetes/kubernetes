@@ -180,14 +180,14 @@ func getRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 	return result, nil
 }
 
-// ErrNoContainersInPod is returned when there are no running containers for a given pod
+// ErrNoContainersInPod is returned when there are no containers for a given pod
 var ErrNoContainersInPod = errors.New("no containers exist for this pod")
 
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
 func getDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +200,11 @@ func getDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.Pod
 		if uuid != "" && dockerUUID != uuid {
 			continue
 		}
+		// We assume docker return us a list of containers in time order
+		if _, ok := info[dockerContainerName]; ok {
+			continue
+		}
+
 		inspectResult, err := client.InspectContainer(value.ID)
 		if err != nil {
 			return nil, err
