@@ -23,7 +23,7 @@ var updateImage = function($http, server) {
       console.log(data);
     })
     .error(function(data) {
-      server.image = ""
+      server.image = "";
       console.log(data);
     });
 };
@@ -34,8 +34,9 @@ var updateServer = function($http, server) {
       console.log(data);
       server.ip = data.currentState.hostIP;
       server.labels = data.labels;
-      server.host = data.currentState.host.split('.')[0]
-      server.dockerImage = data.currentState.info["update-demo-container"].Config.Image
+      server.host = data.currentState.host.split('.')[0];
+      server.status = data.currentState.status;
+      server.dockerImage = data.currentState.info["update-demo"].Config.Image;
       updateImage($http, server);
     })
     .error(function(data) {
@@ -84,7 +85,7 @@ var update = function($scope, $http) {
         newServers.push(server);
       }
       $scope.servers = newServers;
-      updateData($scope, $http)
+      updateData($scope, $http);
     })
     .error(function(data) {
       console.log("ERROR: " + data);
