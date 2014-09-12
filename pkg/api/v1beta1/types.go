@@ -111,7 +111,7 @@ type Port struct {
 	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`
-	// Optional: Defaults to "TCP".
+	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
 	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
 	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
@@ -401,7 +401,11 @@ func (*ServiceList) IsAnAPIObject() {}
 // will answer requests sent through the proxy.
 type Service struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	Port     int `json:"port,omitempty" yaml:"port,omitempty"`
+
+	// Required.
+	Port int `json:"port" yaml:"port"`
+	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
+	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 
 	// This service's labels.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`

@@ -282,6 +282,11 @@ func ValidateService(service *api.Service) errs.ErrorList {
 	if !util.IsValidPortNum(service.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
 	}
+	if len(service.Protocol) == 0 {
+		service.Protocol = "TCP"
+	} else if !supportedPortProtocols.Has(strings.ToUpper(service.Protocol)) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", service.Protocol))
+	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Selector))
 	}
