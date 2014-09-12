@@ -1,0 +1,107 @@
+html, body {
+  background: #EEE; }
+
+html, button, input, select, textarea,
+.pure-g [class*="pure-u"],
+.pure-g-r [class*="pure-u"] {
+  font-family: "Helvetica", sans-serif;
+  color: #585A5C;
+  line-height: 1.4;
+  position: relative; }
+
+h1, h2, p, a, .pure-button {
+  margin: 0;
+  color: #585A5C;
+  font-weight: 400; }
+  h1 strong, h2 strong, h3 strong, p strong, li strong, a strong, .pure-button strong {
+    font-weight: 700; }
+
+h1 {
+  font-size: 5em;
+  font-weight: 300;
+  color: #585A5C; }
+
+h2 {
+  font-size: 2.25em;
+  font-weight: 300;
+  color: #585A5C; }
+
+p {
+  font-size: 1.2em;
+  line-height: 1.7; }
+
+input {
+  font-size: 1.125em;
+  outline: none; }
+
+.default-button {
+  position: relative;
+  font-weight: 400;
+  padding: 0.75em 2em;
+  white-space: normal;
+  background: #1699e3;
+  border-radius: 1000px;
+  font-size: 1.25em;
+  color: #FFF;
+  text-transform: uppercase; }
+  .default-button strong {
+    font-weight: 700; }
+
+.section {
+  position: relative;
+  zoom: 1;
+  width: 100%;
+  overflow: hidden; }
+
+.container {
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+  padding: 0 1em;
+  max-width: 64em;
+  text-align: center; }
+
+.section-text-container {
+  max-width: 48em;
+  margin: 0 auto; }
+
+.color-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  opacity: 0.9;
+  -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=" 90 ")";
+  filter: alpha(opacity=90);
+  zoom: 1; }
+
+#header {
+  padding: 2em 0 0 0; }
+  #header h1, #header h2, #header a {
+    color: #585A5C; }
+  #header .color-overlay {
+    background: #eee; }
+  #header .container {
+    overflow: visible; }
+
+#content {
+  background: #eee;
+  padding: 1em 0; }
+  #content form {
+    text-align: center;
+    margin: 3em auto 0 auto;
+    max-width: 20em; }
+  #content input {
+    font-size: 1.25em;
+    display: block;
+    width: 80%;
+    padding: 0.75em 10%;
+    margin-bottom: 1em;
+    border-radius: 1000px;
+    text-align: center;
+    border: 0;
+    box-shadow: inset 0 0 0 2px #ccc;
+    -webkit-appearance: none; }
+  #content button {
+    width: 100%; }
