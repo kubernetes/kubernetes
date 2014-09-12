@@ -180,6 +180,45 @@ func checkHostPortConflicts(containers []api.Container) errs.ErrorList {
 	return AccumulateUniquePorts(containers, allPorts, func(p *api.Port) int { return p.HostPort })
 }
 
+func validateExecAction(exec *api.ExecAction) errs.ErrorList {
+	allErrors := errs.ErrorList{}
+	if len(exec.Command) == 0 {
+		allErrors = append(allErrors, errs.NewFieldRequired("command", exec.Command))
+	}
+	return allErrors
+}
+
+func validateHTTPGetAction(http *api.HTTPGetAction) errs.ErrorList {
+	allErrors := errs.ErrorList{}
+	if len(http.Path) == 0 {
+		allErrors = append(allErrors, errs.NewFieldRequired("path", http.Path))
+	}
+	return allErrors
+}
+
+func validateHandler(handler *api.Handler) errs.ErrorList {
+	allErrors := errs.ErrorList{}
+	if handler.Exec != nil {
+		allErrors = append(allErrors, validateExecAction(handler.Exec).Prefix("exec")...)
+	} else if handler.HTTPGet != nil {
+		allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet).Prefix("httpGet")...)
+	} else {
+		allErrors = append(allErrors, errs.NewFieldInvalid("", handler))
+	}
+	return allErrors
+}
+
+func validateLifecycle(lifecycle *api.Lifecycle) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	if lifecycle.PostStart != nil {
+		allErrs = append(allErrs, validateHandler(lifecycle.PostStart).Prefix("postStart")...)
+	}
+	if lifecycle.PreStop != nil {
+		allErrs = append(allErrs, validateHandler(lifecycle.PreStop).Prefix("preStop")...)
+	}
+	return allErrs
+}
+
 func validateContainers(containers []api.Container, volumes util.StringSet) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
@@ -198,6 +237,9 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		}
 		if len(ctr.Image) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("image", ctr.Image))
+		}
+		if ctr.Lifecycle != nil {
+			cErrs = append(cErrs, validateLifecycle(ctr.Lifecycle).Prefix("lifecycle")...)
 		}
 		cErrs = append(cErrs, validatePorts(ctr.Ports).Prefix("ports")...)
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
