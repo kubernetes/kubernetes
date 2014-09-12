@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
 	"gopkg.in/v1/yaml"
@@ -159,7 +160,7 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	// TODO: backwards compatibility with existing API, needs API change
 	podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
 	info, err := s.host.GetPodInfo(podFullName, podUUID)
-	if err == ErrNoContainersInPod {
+	if err == dockertools.ErrNoContainersInPod {
 		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
 	}
