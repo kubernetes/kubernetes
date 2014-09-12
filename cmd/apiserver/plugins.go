@@ -20,6 +20,7 @@ package main
 // This should probably be part of some configuration fed into the build for a
 // given binary target.
 import (
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
