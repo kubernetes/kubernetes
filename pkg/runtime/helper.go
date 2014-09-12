@@ -243,3 +243,28 @@ func (metaInsertion) Interpret(in interface{}) (version, kind string) {
 	m := in.(*metaInsertion)
 	return m.JSONBase.APIVersion, m.JSONBase.Kind
 }
+
+// Extract list returns obj's Items element as an array of runtime.Objects.
+// Returns an error if obj is not a List type (does not have an Items member).
+func ExtractList(obj Object) ([]Object, error) {
+	v := reflect.ValueOf(obj)
+	if !v.IsValid() {
+		return nil, fmt.Errorf("nil object")
+	}
+	items := v.Elem().FieldByName("Items")
+	if !items.IsValid() {
+		return nil, fmt.Errorf("no Items field")
+	}
+	if items.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("Items field is not a slice")
+	}
+	list := make([]Object, items.Len())
+	for i := range list {
+		item, ok := items.Index(i).Addr().Interface().(Object)
+		if !ok {
+			return nil, fmt.Errorf("item in index %v isn't an object", i)
+		}
+		list[i] = item
+	}
+	return list, nil
+}

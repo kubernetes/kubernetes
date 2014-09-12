@@ -57,3 +57,25 @@ func TestBadJSONRejection(t *testing.T) {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}*/
 }
+
+func TestExtractList(t *testing.T) {
+	pl := &api.PodList{
+		Items: []api.Pod{
+			{JSONBase: api.JSONBase{ID: "1"}},
+			{JSONBase: api.JSONBase{ID: "2"}},
+			{JSONBase: api.JSONBase{ID: "3"}},
+		},
+	}
+	list, err := runtime.ExtractList(pl)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := len(list), len(pl.Items); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+	for i := range list {
+		if e, a := list[i].(*api.Pod).ID, pl.Items[i].ID; e != a {
+			t.Fatalf("Expected %v, got %v", e, a)
+		}
+	}
+}
