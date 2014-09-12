@@ -11,9 +11,9 @@
           "version": "v1beta1",
           "id": "guestbook-controller",
           "containers": [{
-            "image": "gurpartap/guestbook-example",
-            "name": "php-redis",
-            "ports": [{ "containerPort": 3000, "hostPort": 3000 }]
+            "image": "kubernetes/guestbook",
+            "name": "guestbook",
+            "ports": [{ "name": "http-server", "containerPort": 3000 }]
           }],
         }
       },

@@ -4,7 +4,7 @@
   "id": "redis-slave-controller",
   "desiredState": {
     "replicas": 2,
-    "replicaSelector": { "name": "redis-slave" },
+    "replicaSelector": { "name": "redis", "role": "slave" },
     "podTemplate": {
       "desiredState": {
         "manifest": {
@@ -13,13 +13,13 @@
           "containers": [{
             "name": "redis-slave",
             "image": "gurpartap/redis",
-            "command": ["redis-server", "/etc/redis/redis.conf", "--slaveof", "$SERVICE_HOST", "$REDIS_MASTER_SERVICE_SERVICE_PORT"],
-            "ports": [{ "containerPort": 6379, "hostPort": 6379 }]
+            "command": ["sh", "-c", "redis-server /etc/redis/redis.conf --slaveof $SERVICE_HOST $REDIS_MASTER_SERVICE_PORT"],
+            "ports": [{ "name": "redis-server", "containerPort": 6379 }]
           }]
         }
       },
-      "labels": { "name": "redis-slave" }
+      "labels": { "name": "redis", "role": "slave" }
     }
   },
-  "labels": { "name": "redis-slave" }
+  "labels": { "name": "redis", "role": "slave" }
 }

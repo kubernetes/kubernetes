@@ -3,5 +3,6 @@
   "kind": "Service",
   "id": "guestbook",
   "port": 3000,
+  "containerPort": "http-server",
   "selector": { "name": "guestbook" }
 }

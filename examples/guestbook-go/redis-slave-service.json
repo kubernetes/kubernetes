@@ -1,8 +1,9 @@
 {
   "apiVersion": "v1beta1",
   "kind": "Service",
-  "id": "redis-slave-service",
+  "id": "redis-slave",
   "port": 6379,
-  "labels": { "name": "redis-slave" },
-  "selector": { "name": "redis-slave" }
+  "containerPort": "redis-server",
+  "labels": { "name": "redis", "role": "slave" },
+  "selector": { "name": "redis", "role": "slave" }
 }
