@@ -1,0 +1,8 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "Service",
+  "id": "redis-slave-service",
+  "port": 6379,
+  "labels": { "name": "redis-slave" },
+  "selector": { "name": "redis-slave" }
+}
