@@ -5,7 +5,7 @@ A Volume is one of the following types:
 | EmptyDirectory   | yes                | when pod is terminated | node-local | yes            | yes         | implemented |
 | DebugDirectory   | yes                | some time after        | node-local | yes            | yes         | not implemented |
 | CachedDirectory  | maybe.             | K8s api call required  | node-local | yes            | yes         | not implemented |
-| PackageDirectory | no                 | as needed by scheduler | node-local |  yes           | yes by installer, no by pod |  not implemented |
+| PackageDirectory | no                 | as needed by scheduler | node-local | yes           | yes by installer, no by pod |  not implemented |
 | RemoteDirectory  | no                 | never                  | remote     | yes            | maybe       | not implemented |
 
 Use cases and comments:
@@ -20,17 +20,34 @@ Use cases and comments:
 ## API objects
 TODO: figure out why Volume is on ContainerManifest and on podTemplate and which matters for what.
 
-All the *Directory types mentioned above are part of a VolumeSource object.
+All the *Directory types mentioned above are part of a VolumeSource object.  They are not objects in themselves.
 
-A CachedDirectory or PackageDirectory has to be created in the API before it can be reference by a Pod in its VolumeSource section.
+A CachedDirectory and a PackageDirectory refer to a CachedData and a PackageData API object, which 
+has to be created in the API before it can be referenced by a VolumeSource.
+A CachedData and a PackageData are analagous to pods; they all:
+ - have a resource request
+ - have their own lifetime
+ - can be created manually or created by a controller
+ - you create as many of them as you want bound instances.
+ - have labels.
+ - get bound to a machine by the scheduler.
 
-The CachedDirectory, PackageDirectory also have corresponding API objects which represent the actual data itself:
-BoundCachedDirectory, BoundPackageDirectory.  TBD if DebugDirectory has a Bound counterpart.
+A CachedVolumeSource consists of a label selector that matches CachedData objects that can satisfy it.
+Open questions:
+  - what if  more than 1 CachedData on the same machine can satisfy the Pods need?  Arbitrary?
+  - what if two pods could be bound to the same machine, and there is one CachedData that can satisfy either of them.
+    Only one can use it, right? Tricky to represent this choice in the scheduler algorithm?
+  - Consider forcing 1:1 relationship between pod and CachedData?  But that would get complicated if Nodes are flapping.
+
+When the scheduler binds a CachedData or a PackageData, it writes a BoundData object which makes the kubelet set aside
+the resources, and install the data if it is a PackageData.
 
 ## Node outage
 
 If a node has an outage such as a reboot or network drop, the pods on it may die or be terminated when the node rejoins the cluster.
-However, CachedDirectory and PackageDirectory do not.  They represent data that is expensive to install.
+However, CachedData and CachedData do not get deleted.   The scheduler will see this and may decide to bind a dependent
+pod there.  An advanced implementation might reason about the cost of killing an in-progress rebuild of a CachedData
+versus reusing a recently-returned one.
 
 ## CachedDirectory
 
@@ -56,8 +73,13 @@ TODO: consider removing this one, as it is the one I am least sure about.
 
 ## Pod portability
 Using HostDirectory may break pod portability across nodes if nodes have different images.
+If only one node has the right files, you could contrive to pin that pod to that minion, but if something happens to a minion with special data, then your pod cannot run.
+Prefer to use CachedDirectory or RemoteDirectory if possible.
 
-Using RemoteDirectory or CachedDirectory may cause pods to have different behavior on different invokations, and to write bad state which causes future invokations of the pod to crash.  However, using any network-accessible state can cause this too.
+Using RemoteDirectory or CachedDirectory may cause pods to have different behavior on different invokations, and to
+write bad state which causes future invokations of the pod to crash.  However, using any network-accessible state can
+cause this too.  RemoteDirectory and CachedDirectory do allow pods to be mobile while exposing and reducing costs of
+installing large amounts of data.
 
 ## Scaling and migration
 
@@ -87,4 +109,6 @@ However, CachedDirectory and PackageDirectory need names so that a pod can depen
 ## Other use cases
 HDFS running in a pod.  Good case for HostDirectory to store its data on the local disks?
 
-
+## References
+https://github.com/GoogleCloudPlatform/kubernetes/issues/598
+https://github.com/GoogleCloudPlatform/kubernetes/issues/97
