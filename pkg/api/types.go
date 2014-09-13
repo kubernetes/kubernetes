@@ -103,8 +103,7 @@ type VolumeSource struct {
 	// PackageDirectory represents files that one or more pods need readonly access to
 	// and which deletion is to be avoided for performance.
 	PackageDirectory *PackageDirectory
-	// RemoteDirectory represents the ability to access a remote file system.
-	RemoteDirectory *RemoteDirectory
+	// Put RemoteDirectory type things like GCEPersistentDisks here.
 }
 
 // HostDirectory represents bare host directory volume.
@@ -122,11 +121,6 @@ type CachedDirectory struct {
 
 type PackageDirectory struct {
 	InstallCommand string // TODO: needs a pod or at least container?
-}
-
-type RemoteDirectory struct {
-	// need some way to represent a range of remote file
-	// systems, and what to mount, such as NFS, GCE PD, etc.
 }
 
 // Port represents a network port in a single container.
