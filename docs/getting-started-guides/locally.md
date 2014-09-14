@@ -2,10 +2,27 @@
 
 ### Requirements 
 
- - Linux 
- - Docker 1.0.0+
+#### Linux
 
 Not running Linux? Consider running Linux in a local virtual machine with [Vagrant](vagrant.md), or on a cloud provider like [Google Compute Engine](gce.md)
+
+#### Docker
+
+At least Docker 1.0.0+. Ensure the Docker daemon is running and can be contacted by the user you plan to run as (try `docker ps`).
+
+#### etcd
+
+You need an etcd somewhere in your path. To get from head:
+
+```
+go get github.com/coreos/etcd
+go install github.com/coreos/etcd
+sudo ln -s "$GOPATH/bin/etcd" /usr/bin/etcd
+# Or just use the packaged one:
+sudo ln -s "$REPO_ROOT/target/bin/etcd" /usr/bin/etcd
+```
+
+### Starting the cluster
 
 In a separate tab of your terminal, run:
 

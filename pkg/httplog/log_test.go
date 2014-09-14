@@ -91,17 +91,14 @@ func TestLogOf(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			var want *respLogger
+			var want string
 			if makeLogger {
-				want = NewLogged(req, &w)
+				NewLogged(req, &w)
+				want = "*httplog.respLogger"
 			} else {
-				defer func() {
-					if r := recover(); r == nil {
-						t.Errorf("Expected LogOf to panic")
-					}
-				}()
+				want = "*httplog.passthroughLogger"
 			}
-			got := LogOf(w)
+			got := reflect.TypeOf(LogOf(r, w)).String()
 			if want != got {
 				t.Errorf("Expected %v, got %v", want, got)
 			}

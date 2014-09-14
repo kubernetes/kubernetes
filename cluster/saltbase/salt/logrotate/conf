@@ -4,7 +4,7 @@
     missingok
     notifempty
     compress
-    maxsize 100m
+    maxsize 100M
     daily
     create 0644 root root
 }

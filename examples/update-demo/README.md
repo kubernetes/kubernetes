@@ -19,11 +19,12 @@ This example demonstrates the usage of Kubernetes to perform a live update on a 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#setup):
+This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#contents):
 
-    $ cd kubernetes
-    $ hack/dev-build-and-up.sh
-    $ hack/build-go.sh
+```shell
+$ cd kubernetes
+$ hack/dev-build-and-up.sh
+```
 
 This example also assumes that you have [Docker](http://docker.io) installed on your local machine.
 
@@ -35,47 +36,47 @@ You may need to open the firewall for port 8080 using the [console][cloud-consol
 $ gcutil addfirewall --allowed=tcp:8080 --target_tags=kubernetes-minion kubernetes-minion-8080
 ```
 
-### Step One: Build the image
+### Step Zero: Build the image
 
 ```shell
-$ cd kubernetes/examples/update-demo
-$ ./build-images.sh
+$ cd examples/update-demo
+$ ./0-build-images.sh
 ```
 
-### Step Two: Turn up the UX for the demo
+### Step One: Turn up the UX for the demo
 
 ```shell
-$ ./0-run-web-proxy.sh &
+$ ./1-run-web-proxy.sh &
 ```
 
 This can sometimes spew to the output so you could also run it in a different terminal.
 
 Now visit the the [demo website](http://localhost:8001/static).  You won't see anything much quite yet.
 
-### Step Three: Run the controller
+### Step Two: Run the controller
 Now we will turn up two replicas of an image.  They all serve on port 8080, mapped to internal port 80
 
 ```shell
-$ ./1-create-replication-controller.sh
+$ ./2-create-replication-controller.sh
 ```
 
 After these pull the image (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
 
-### Step Four: Try resizing the controller
+### Step Three: Try resizing the controller
 
 Now we will increase the number of replicas from two to four:
 
 ```shell
-$ ./2-scale.sh
+$ ./3-scale.sh
 ```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
 
-### Step Five: Update the docker image
+### Step Four: Update the docker image
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```shell
-$ ./3-rolling-update
+$ ./4-rolling-update
 ```
 The rollingUpdate command in kubecfg will do 2 things:
 
@@ -87,12 +88,21 @@ Watch the UX, it will update one pod every 10 seconds until all of the pods have
 ### Step Five: Bring down the pods
 
 ```shell
-$ ./4-down.sh
+$ ./5-down.sh
 ```
 
 This will first 'stop' the replication controller by turning the target number of replicas to 0.  It'll then delete that controller.
 
 [cloud-console]: https://console.developer.google.com
+
+### Step Six: Cleanup
+
+To turn down a Kubernetes cluster:
+
+```shell
+$ cd ../..  # Up to kubernetes.
+$ cluster/kube-down.sh
+```
 
 ### Image Copyright
 

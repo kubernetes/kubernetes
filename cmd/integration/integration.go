@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -46,7 +47,7 @@ import (
 )
 
 var (
-	fakeDocker1, fakeDocker2 kubelet.FakeDockerClient
+	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
 )
 
 type fakePodInfoGetter struct{}

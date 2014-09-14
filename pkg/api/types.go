@@ -111,7 +111,7 @@ type Port struct {
 	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`
-	// Optional: Defaults to "TCP".
+	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
 	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
 	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
@@ -195,6 +195,8 @@ type Container struct {
 	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 	Lifecycle     *Lifecycle     `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty"`
+	// Optional: Default to false.
+	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -252,7 +254,43 @@ const (
 	PodTerminated PodStatus = "Terminated"
 )
 
+type ContainerStateWaiting struct {
+	// Reason could be pulling image,
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
+}
+
+type ContainerStateRunning struct {
+}
+
+type ContainerStateTerminated struct {
+	ExitCode int    `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
+	Signal   int    `json:"signal,omitempty" yaml:"signal,omitempty"`
+	Reason   string `json:"reason,omitempty" yaml:"reason,omitempty"`
+}
+
+type ContainerState struct {
+	// Only one of the following ContainerState may be specified.
+	// If none of them is specified, the default one is ContainerStateWaiting.
+	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" yaml:"waiting,omitempty"`
+	Running     *ContainerStateRunning    `json:"running,omitempty" yaml:"running,omitempty"`
+	Termination *ContainerStateTerminated `json:"termination,omitempty" yaml:"termination,omitempty"`
+}
+
+type ContainerStatus struct {
+	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
+	// defined for container?
+	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
+	RestartCount int            `json:"restartCount" yaml:"restartCount"`
+	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
+	// TODO(dchen1107): Once we have done with integration with cadvisor, resource
+	// usage should be included.
+	// TODO(dchen1107):  In long run, I think we should replace this with our own struct to remove
+	// the dependency on docker.
+	DetailInfo docker.Container `json:"detailInfo,omitempty" yaml:"detailInfo,omitempty"`
+}
+
 // PodInfo contains one entry for every container with available info.
+// TODO(dchen1107): Replace docker.Container below with ContainerStatus defined above.
 type PodInfo map[string]docker.Container
 
 type RestartPolicyAlways struct{}
@@ -351,7 +389,11 @@ func (*ServiceList) IsAnAPIObject() {}
 // will answer requests sent through the proxy.
 type Service struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	Port     int `json:"port,omitempty" yaml:"port,omitempty"`
+
+	// Required.
+	Port int `json:"port" yaml:"port"`
+	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
+	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 
 	// This service's labels.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`

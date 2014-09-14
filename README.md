@@ -25,6 +25,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Rackspace](docs/getting-started-guides/rackspace.md)
   * [Circle CI](https://circleci.com/docs/docker#google-compute-engine-and-kubernetes)
   * [Digital Ocean](https://github.com/bketelsen/coreos-kubernetes-digitalocean)
+  * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
 * [Kubernetes Client Libraries](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/client-libraries.md)
@@ -39,10 +40,7 @@ Check out examples of Kubernetes in action, and community projects in the larger
 * [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
 * [Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
 * [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
-* [OpenShift 3 and developer focused workflows](https://github.com/openshift/origin)
-* [Kubernetes-on-Mesos framework](https://github.com/mesosphere/kubernetes-mesos)
-* [Configure dynamic container networking with CoreOS Rudder](https://coreos.com/blog/introducing-rudder/)
-* [Azure Kubernetes visualizer](https://github.com/Azure/azure-kubernetes-visualizer)
+* [Community projects](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Kubernetes-Community)
 
 Or fork and start hacking!
 
@@ -58,7 +56,7 @@ If you are a company and are looking for a more formal engagement with Google ar
 
 ### Go development environment
 
-Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH.
+Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
 
 ### Put kubernetes into GOPATH
 
@@ -74,9 +72,11 @@ $ git clone git@github.com:GoogleCloudPlatform/kubernetes.git
 
 The commands above will not work if there are more than one directory in ``$GOPATH``.
 
+(Obviously, clone your own fork of Kubernetes if you plan to do development.)
+
 ### godep and dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree. Please make sure that ``godep`` is installed and in your ``$PATH``.
+Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.
 
 #### Installing godep
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
@@ -86,14 +86,15 @@ source control system).  Use ```apt-get install mercurial``` or ```yum install m
 directly from mercurial.
 2. Create a new GOPATH for your tools and install godep:
 ```
-GOPATH=$HOME/src/go-tools
+export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
 go get github.com/tools/godep
 ```
 
-3. Add $HOME/src/go-tools/bin to your path. Typically you'd add this to your ~/.profile:
+3. Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
 ```
-export PATH=$PATH:$HOME/src/go-tools/bin
+export GOPATH=$HOME/go-tools
+export PATH=$PATH:$GOPATH/bin
 ```
 
 #### Using godep
@@ -169,11 +170,15 @@ hack/test-integration.sh
 
 ### End-to-End tests
 
-With a GCE account set up for running `cluster/kube-up.sh` (see Setup above):
-
+You can run an end-to-end test which will bring up a master and two minions, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `KUBERNETES_PROVIDER` environment variable to something other than "gce".
 ```
 cd kubernetes
 hack/e2e-test.sh
+```
+
+Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with the magical incantation:
+```
+hack/e2e-test.sh 1 1 1
 ```
 
 ### Testing out flaky tests
