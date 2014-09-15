@@ -45,10 +45,6 @@ type fakeKubelet struct {
 	containerLogsFunc  func(containerID, tail string, follow bool, writer io.Writer)  error
 }
 
-func (fk *fakeKubelet) GetKubeletContainerLogs(containerID, tail string, follow bool, writer io.Writer) error {
-	return fk.containerLogsFunc(containerID, tail, follow, writer)
-}
-
 func (fk *fakeKubelet) GetPodInfo(name, uuid string) (api.PodInfo, error) {
 	return fk.infoFunc(name)
 }
@@ -67,6 +63,10 @@ func (fk *fakeKubelet) GetMachineInfo() (*info.MachineInfo, error) {
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
+}
+
+func (fk *fakeKubelet) GetKubeletContainerLogs(containerID, tail string, follow bool, writer io.Writer) error {
+	return fk.containerLogsFunc(containerID, tail, follow, writer)
 }
 
 func (fk *fakeKubelet) RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {

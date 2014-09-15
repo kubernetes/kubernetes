@@ -98,17 +98,17 @@ func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Contain
 	return err
 }
 
-// flusherWriter provides wrapper for responseWriter with HTTP streaming capabilities
+// FlusherWriter provides wrapper for responseWriter with HTTP streaming capabilities
 type FlushWriter struct {
 	flusher http.Flusher
 	writer io.Writer
 }
 
-// Write is a flushWriter implementation of the io.Writer that sends any buffered data to the client.
+// Write is a FlushWriter implementation of the io.Writer that sends any buffered data to the client.
 func (fw *FlushWriter) Write(p []byte) (n int, err error) {
 	n, err = fw.writer.Write(p)
 	if err != nil {
-		return n, err
+		return
 	}
 	if fw.flusher != nil {
 		fw.flusher.Flush()

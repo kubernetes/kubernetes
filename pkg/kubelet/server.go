@@ -145,7 +145,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handleContainerLogs handles containerLogs request againts the Kubelet
+// handleContainerLogs handles containerLogs request against the Kubelet
 func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 	u, err := url.ParseRequestURI(req.RequestURI)
@@ -153,27 +153,21 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
+
 	uriValues := u.Query()
-
-	containerID := uriValues.Get("containerID")
-	follow := uriValues.Get("follow") == "1"
-	tail := uriValues.Get("tail")
-
+	containerID := uriValues.Get("containerid")
 	if len(containerID) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		http.Error(w, "Missing 'containerID=' query entry.", http.StatusBadRequest)
+		http.Error(w, `{"message": "Missing containerID= query entry."}`, http.StatusBadRequest)
 		return
 	}
-	logWriter := httplog.LogOf(req, w)
-	w = httplog.Unlogged(w)
+	follow, _ := strconv.ParseBool(uriValues.Get("follow"))
+	tail := uriValues.Get("tail")
+
 	fw := FlushWriter{writer: w}
 	if flusher, ok := w.(http.Flusher); ok {
 		fw.flusher = flusher
-	} else {
-		logWriter.Addf("unable to get Flusher")
-		http.NotFound(w, req)
-		return
 	}
+
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
 	err = s.host.GetKubeletContainerLogs(containerID, tail, follow, &fw)
