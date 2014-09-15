@@ -184,6 +184,15 @@ func TestValidateContainers(t *testing.T) {
 		{Name: "abc", Image: "image"},
 		{Name: "123", Image: "image"},
 		{Name: "abc-123", Image: "image"},
+		{
+			Name:  "life-123",
+			Image: "image",
+			Lifecycle: &api.Lifecycle{
+				PreStop: &api.Handler{
+					Exec: &api.ExecAction{Command: []string{"ls", "-l"}},
+				},
+			},
+		},
 	}
 	if errs := validateContainers(successCase, volumes); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -207,6 +216,37 @@ func TestValidateContainers(t *testing.T) {
 		},
 		"unknown volume name": {
 			{Name: "abc", Image: "image", VolumeMounts: []api.VolumeMount{{Name: "anything", MountPath: "/foo"}}},
+		},
+		"invalid lifecycle, no exec command.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				Lifecycle: &api.Lifecycle{
+					PreStop: &api.Handler{
+						Exec: &api.ExecAction{},
+					},
+				},
+			},
+		},
+		"invalid lifecycle, no http path.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				Lifecycle: &api.Lifecycle{
+					PreStop: &api.Handler{
+						HTTPGet: &api.HTTPGetAction{},
+					},
+				},
+			},
+		},
+		"invalid lifecycle, no action.": {
+			{
+				Name:  "life-123",
+				Image: "image",
+				Lifecycle: &api.Lifecycle{
+					PreStop: &api.Handler{},
+				},
+			},
 		},
 	}
 	for k, v := range errorCases {
