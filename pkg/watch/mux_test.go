@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 )
 
 type myType struct {
@@ -90,4 +91,25 @@ func TestMuxWatcherClose(t *testing.T) {
 	// Extra stops don't hurt things
 	w.Stop()
 	w2.Stop()
+}
+
+func TestMuxWatcherStopDeadlock(t *testing.T) {
+	defer func(fn func()) { testHookMuxDistribute = fn }(testHookMuxDistribute)
+	sig, done := make(chan bool), make(chan bool)
+	testHookMuxDistribute = func() { sig <- true }
+	m := NewMux(0)
+	go func(w Interface) {
+		// Imagine this goroutine was receiving from w.ResultChan()
+		// until it received some signal and stopped watching.
+		<-sig
+		w.Stop()
+		close(done)
+	}(m.Watch())
+	m.Action(Added, &myType{})
+	select {
+	case <-time.After(5 * time.Second):
+		t.Error("timeout: deadlocked")
+	case <-done:
+	}
+	m.Shutdown()
 }

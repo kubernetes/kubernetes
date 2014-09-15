@@ -115,10 +115,13 @@ func (m *Mux) loop() {
 	m.closeAll()
 }
 
+var testHookMuxDistribute = func() {}
+
 // distribute sends event to all watchers. Blocking.
 func (m *Mux) distribute(event Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	testHookMuxDistribute()
 	for _, w := range m.watchers {
 		select {
 		case w.result <- event:
