@@ -60,7 +60,7 @@ func init() {
 func verifyMinionFlags() {
 	if *cloudProvider == "" || *minionRegexp == "" {
 		if len(machineList) == 0 {
-			glog.Fatal("No machines specified!")
+			glog.Info("No machines specified!")
 		}
 		return
 	}
