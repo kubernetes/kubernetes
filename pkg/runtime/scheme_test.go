@@ -154,27 +154,21 @@ type ExternalExtensionType struct {
 
 type InternalExtensionType struct {
 	JSONBase  `json:",inline" yaml:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension" yaml:"extension" scheme:"testExtension"`
-}
-
-type InternalExtensionTypeNoScheme struct {
-	JSONBase  `json:",inline" yaml:",inline"`
 	Extension runtime.EmbeddedObject `json:"extension" yaml:"extension"`
 }
 
-func (*ExtensionA) IsAnAPIObject()                    {}
-func (*ExtensionB) IsAnAPIObject()                    {}
-func (*ExternalExtensionType) IsAnAPIObject()         {}
-func (*InternalExtensionType) IsAnAPIObject()         {}
-func (*InternalExtensionTypeNoScheme) IsAnAPIObject() {}
+func (*ExtensionA) IsAnAPIObject()            {}
+func (*ExtensionB) IsAnAPIObject()            {}
+func (*ExternalExtensionType) IsAnAPIObject() {}
+func (*InternalExtensionType) IsAnAPIObject() {}
 
-func TestExtensionMappingWithScheme(t *testing.T) {
+func TestExtensionMapping(t *testing.T) {
 	runtime.DefaultScheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionType{})
-	runtime.GetScheme("testExtension").AddKnownTypeWithName("", "A", &ExtensionA{})
-	runtime.GetScheme("testExtension").AddKnownTypeWithName("", "B", &ExtensionB{})
+	runtime.DefaultScheme.AddKnownTypeWithName("", "A", &ExtensionA{})
+	runtime.DefaultScheme.AddKnownTypeWithName("", "B", &ExtensionB{})
 	runtime.DefaultScheme.AddKnownTypeWithName("testExternal", "ExtensionType", &ExternalExtensionType{})
-	runtime.GetScheme("testExtension").AddKnownTypeWithName("testExternal", "A", &ExtensionA{})
-	runtime.GetScheme("testExtension").AddKnownTypeWithName("testExternal", "B", &ExtensionB{})
+	runtime.DefaultScheme.AddKnownTypeWithName("testExternal", "A", &ExtensionA{})
+	runtime.DefaultScheme.AddKnownTypeWithName("testExternal", "B", &ExtensionB{})
 
 	table := []struct {
 		obj     runtime.Object
@@ -209,46 +203,6 @@ func TestExtensionMappingWithScheme(t *testing.T) {
 				eEx = obj.Extension.Object
 			}
 			if obj, ok := a.(*InternalExtensionType); ok {
-				aEx = obj.Extension.Object
-			}
-			t.Errorf("expected %#v, got %#v (%#v, %#v)", e, a, eEx, aEx)
-		}
-	}
-}
-
-func TestExtensionMappingWithoutScheme(t *testing.T) {
-	runtime.DefaultScheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionTypeNoScheme{})
-	runtime.DefaultScheme.AddKnownTypeWithName("", "ExA", &ExtensionA{})
-	runtime.DefaultScheme.AddKnownTypeWithName("testExternal", "ExtensionType", &ExternalExtensionType{})
-	runtime.DefaultScheme.AddKnownTypeWithName("testExternal", "ExA", &ExtensionA{})
-
-	table := []struct {
-		obj     runtime.Object
-		encoded string
-	}{
-		{
-			&InternalExtensionTypeNoScheme{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"ExA","testString":"foo"}}`,
-		},
-	}
-
-	for _, item := range table {
-		gotEncoded, err := runtime.DefaultScheme.EncodeToVersion(item.obj, "testExternal")
-		if err != nil {
-			t.Errorf("unexpected error '%v' (%#v)", err, item.obj)
-		} else if e, a := item.encoded, string(gotEncoded); e != a {
-			t.Errorf("expected %v, got %v", e, a)
-		}
-
-		gotDecoded, err := runtime.DefaultScheme.Decode([]byte(item.encoded))
-		if err != nil {
-			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
-		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
-			var eEx, aEx runtime.Object
-			if obj, ok := e.(*InternalExtensionTypeNoScheme); ok {
-				eEx = obj.Extension.Object
-			}
-			if obj, ok := a.(*InternalExtensionTypeNoScheme); ok {
 				aEx = obj.Extension.Object
 			}
 			t.Errorf("expected %#v, got %#v (%#v, %#v)", e, a, eEx, aEx)

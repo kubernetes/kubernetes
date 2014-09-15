@@ -72,8 +72,7 @@ type EmbeddedObject struct {
 // // Internal package:
 // type MyAPIObject struct {
 // 	runtime.JSONBase `yaml:",inline" json:",inline"`
-//	// The "scheme" tag is optional; if absent, runtime.DefaultScheme will be used.
-//	MyPlugin runtime.EmbeddedObject `scheme:"pluginScheme"`
+//	MyPlugin runtime.EmbeddedObject `json:"myPlugin" yaml:"myPlugin"`
 // }
 // type PluginA struct {
 // 	runtime.PluginBase `yaml:",inline" json:",inline"`

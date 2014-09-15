@@ -34,36 +34,12 @@ type Scheme struct {
 	raw *conversion.Scheme
 }
 
-var namedSchemes map[string]*Scheme
-
-// GetScheme returns the scheme with the given name, creating it if necessary.
-// Important: You may not modify the returned *Scheme except from init() functions.
-func GetScheme(schemeName string) *Scheme {
-	if namedSchemes == nil {
-		namedSchemes = map[string]*Scheme{}
-	}
-	if s, ok := namedSchemes[schemeName]; ok {
-		return s
-	}
-	s := NewScheme("", "")
-	namedSchemes[schemeName] = s
-	return s
-}
-
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
 func fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
 	scheme = DefaultScheme
 	inVersion = s.Meta().SrcVersion
 	outVersion = s.Meta().DestVersion
-	// If a scheme tag was provided, use it. Look at the struct tag corresponding
-	// to version "".
-	if name := s.SrcTag().Get("scheme"); inVersion == "" && name != "" {
-		scheme = GetScheme(name)
-	}
-	if name := s.DestTag().Get("scheme"); outVersion == "" && name != "" {
-		scheme = GetScheme(name)
-	}
 	return inVersion, outVersion, scheme
 }
 
