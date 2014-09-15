@@ -4,7 +4,7 @@ Service deployments and batch processing pipelines are often multi-dimensional e
 
 Therefore, loosely coupled cooperating pods are organized using _labels_, which are key/value pairs.
 
-Label keys take the form: `[namespace "/"] key`.  Key and namespace are both strings conforming to DNS_SUBDOMAIN format (see [docs/identifiers.md]https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/identifiers.md)).  When namespace is not specified, it means "the same namespace as the object this label is attached to".
+Label keys take the form: `[namespace "/"] key`.  Key and namespace are both strings conforming to DNS_SUBDOMAIN format (see [docs/identifiers.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/identifiers.md)).  When namespace is not specified, it means "the same namespace as the object this label is attached to".
 
 Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `service`, `environment` (e.g., with values `dev`, `qa`, or `production`), `tier` (e.g., with values `frontend` or `backend`), and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
 
