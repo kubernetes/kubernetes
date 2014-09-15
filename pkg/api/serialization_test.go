@@ -35,6 +35,26 @@ var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
+	func(j *runtime.PluginBase, c fuzz.Continue) {
+		// Do nothing; this struct has only a Kind field and it must stay blank in memory.
+	},
+	func(j *runtime.JSONBase, c fuzz.Continue) {
+		// We have to customize the randomization of JSONBases because their
+		// APIVersion and Kind must remain blank in memory.
+		j.APIVersion = ""
+		j.Kind = ""
+		j.ID = c.RandString()
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = c.RandUint64() >> 8
+		j.SelfLink = c.RandString()
+
+		var sec, nsec int64
+		c.Fuzz(&sec)
+		c.Fuzz(&nsec)
+		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+	},
 	func(j *api.JSONBase, c fuzz.Continue) {
 		// We have to customize the randomization of JSONBases because their
 		// APIVersion and Kind must remain blank in memory.

@@ -34,6 +34,125 @@ type Scheme struct {
 	raw *conversion.Scheme
 }
 
+// fromScope gets the input version, desired output version, and desired Scheme
+// from a conversion.Scope.
+func fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
+	scheme = DefaultScheme
+	inVersion = s.Meta().SrcVersion
+	outVersion = s.Meta().DestVersion
+	return inVersion, outVersion, scheme
+}
+
+func init() {
+	// Set up a generic mapping between RawExtension and EmbeddedObject.
+	DefaultScheme.AddConversionFuncs(
+		embeddedObjectToRawExtension,
+		rawExtensionToEmbeddedObject,
+	)
+}
+
+// emptyPlugin is used to copy the Kind field to and from plugin objects.
+type emptyPlugin struct {
+	PluginBase `json:",inline" yaml:",inline"`
+}
+
+// embeddedObjectToRawExtension does the conversion you would expect from the name, using the information
+// given in conversion.Scope. It's placed in the DefaultScheme as a ConversionFunc to enable plugins;
+// see the comment for RawExtension.
+func embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExtension, s conversion.Scope) error {
+	if in.Object == nil {
+		out.RawJSON = []byte("null")
+		return nil
+	}
+
+	// Figure out the type and kind of the output object.
+	_, outVersion, scheme := fromScope(s)
+	_, kind, err := scheme.raw.ObjectVersionAndKind(in.Object)
+	if err != nil {
+		return err
+	}
+
+	// Manufacture an object of this type and kind.
+	outObj, err := scheme.New(outVersion, kind)
+	if err != nil {
+		return err
+	}
+
+	// Manually do the conversion.
+	err = s.Convert(in.Object, outObj, 0)
+	if err != nil {
+		return err
+	}
+
+	// Copy the kind field into the ouput object.
+	err = s.Convert(
+		&emptyPlugin{PluginBase: PluginBase{Kind: kind}},
+		outObj,
+		conversion.SourceToDest|conversion.IgnoreMissingFields|conversion.AllowDifferentFieldTypeNames,
+	)
+	if err != nil {
+		return err
+	}
+	// Because we provide the correct version, EncodeToVersion will not attempt a conversion.
+	raw, err := scheme.EncodeToVersion(outObj, outVersion)
+	if err != nil {
+		// TODO: if this fails, create an Unknown-- maybe some other
+		// component will understand it.
+		return err
+	}
+	out.RawJSON = raw
+	return nil
+}
+
+// rawExtensionToEmbeddedObject does the conversion you would expect from the name, using the information
+// given in conversion.Scope. It's placed in the DefaultScheme as a ConversionFunc to enable plugins;
+// see the comment for RawExtension.
+func rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conversion.Scope) error {
+	if len(in.RawJSON) == 4 && string(in.RawJSON) == "null" {
+		out.Object = nil
+		return nil
+	}
+	// Figure out the type and kind of the output object.
+	inVersion, outVersion, scheme := fromScope(s)
+	_, kind, err := scheme.raw.DataVersionAndKind(in.RawJSON)
+	if err != nil {
+		return err
+	}
+
+	// We have to make this object ourselves because we don't store the version field for
+	// plugin objects.
+	inObj, err := scheme.New(inVersion, kind)
+	if err != nil {
+		return err
+	}
+
+	err = scheme.DecodeInto(in.RawJSON, inObj)
+	if err != nil {
+		return err
+	}
+
+	// Make the desired internal version, and do the conversion.
+	outObj, err := scheme.New(outVersion, kind)
+	if err != nil {
+		return err
+	}
+	err = scheme.Convert(inObj, outObj)
+	if err != nil {
+		return err
+	}
+	// Last step, clear the Kind field; that should always be blank in memory.
+	err = s.Convert(
+		&emptyPlugin{PluginBase: PluginBase{Kind: ""}},
+		outObj,
+		conversion.SourceToDest|conversion.IgnoreMissingFields|conversion.AllowDifferentFieldTypeNames,
+	)
+	if err != nil {
+		return err
+	}
+	out.Object = outObj
+	return nil
+}
+
 // NewScheme creates a new Scheme. A default scheme is provided and accessible
 // as the "DefaultScheme" variable.
 func NewScheme(internalVersion, externalVersion string) *Scheme {
@@ -52,6 +171,13 @@ func (s *Scheme) AddKnownTypes(version string, types ...Object) {
 		interfaces[i] = types[i]
 	}
 	s.raw.AddKnownTypes(version, interfaces...)
+}
+
+// AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
+// be encoded as. Useful for testing when you don't want to make multiple packages to define
+// your structs.
+func (s *Scheme) AddKnownTypeWithName(version, kind string, obj Object) {
+	s.raw.AddKnownTypeWithName(version, kind, obj)
 }
 
 // New returns a new API object of the given version ("" for internal
@@ -151,6 +277,11 @@ func (s *Scheme) EncodeOrDie(obj Object) string {
 //
 func (s *Scheme) Encode(obj Object) (data []byte, err error) {
 	return s.raw.Encode(obj)
+}
+
+// EncodeToVersion is like Encode, but lets you specify the destination version.
+func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
+	return s.raw.EncodeToVersion(obj, destVersion)
 }
 
 // enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
