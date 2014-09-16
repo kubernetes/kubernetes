@@ -93,17 +93,6 @@ type VolumeSource struct {
 	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
 	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
 	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
-	// DebugDirectory represents a place to keep output after a pod terminates.
-	// Storage is on a best effort basis.,
-	DebugDirectory *DebugDirectory `yaml:"debugDir" json:"debugDir"`
-	// CachedDirectory represents files that a pod uses which we avoid deleting between
-	// pod restarts, but which can be recreated at some great cost by the pod if necessary
-	// (up to and including have the pod signal for human help.)
-	CachedDirectory *CachedDirectory `yaml:"cachedDir" json:"cachedDir"`
-	// PackageDirectory represents files that one or more pods need readonly access to
-	// and which deletion is to be avoided for performance.
-	PackageDirectory *PackageDirectory
-	// Put RemoteDirectory type things like GCEPersistentDisks here.
 }
 
 // HostDirectory represents bare host directory volume.
@@ -112,16 +101,6 @@ type HostDirectory struct {
 }
 
 type EmptyDirectory struct{}
-
-type DebugDirectory struct{}
-
-type CachedDirectory struct {
-	Selector map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
-}
-
-type PackageDirectory struct {
-	InstallCommand string // TODO: needs a pod or at least container?
-}
 
 // Port represents a network port in a single container.
 type Port struct {
