@@ -19,7 +19,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Vagrant](docs/getting-started-guides/vagrant.md)
   * [Locally](docs/getting-started-guides/locally.md)
   * [CoreOS](docs/getting-started-guides/coreos.md)
-  * [Fedora](docs/getting-started-guides/fedora.md)
+  * Fedora (w/ [Ansible](docs/getting-started-guides/fedora/fedora_ansible_config.md) or [manual](docs/getting-started-guides/fedora/fedora_manual_config.md))
   * [vSphere](docs/getting-started-guides/vsphere.md)
   * [Microsoft Azure](docs/getting-started-guides/azure.md)
   * [Rackspace](docs/getting-started-guides/rackspace.md)
