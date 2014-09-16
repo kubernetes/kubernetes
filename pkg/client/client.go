@@ -99,7 +99,7 @@ type Client struct {
 // to a URL will prepend the server path. Returns an error if host cannot be converted to a
 // valid URL.
 func New(host string, auth *AuthInfo) (*Client, error) {
-	restClient, err := NewRESTClient(host, auth, "/api/v1beta1/", runtime.DefaultCodec)
+	restClient, err := NewRESTClient(host, auth, "/api/v1beta1/", latest.Codec)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
-	if err := runtime.DefaultCodec.DecodeInto(body, &status); err == nil && status.Status != "" {
+	if err := latest.Codec.DecodeInto(body, &status); err == nil && status.Status != "" {
 		isStatusResponse = true
 	}
 

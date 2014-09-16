@@ -129,7 +129,7 @@ func readConfig(storage string) []byte {
 		glog.Fatal("Need config file (-c)")
 	}
 
-	data, err := parser.ToWireFormat(readConfigData(), storage, runtime.DefaultCodec)
+	data, err := parser.ToWireFormat(readConfigData(), storage, latest.Codec)
 
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
@@ -296,7 +296,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 	if setBody {
 		if version != 0 {
 			data := readConfig(storage)
-			obj, err := runtime.DefaultCodec.Decode(data)
+			obj, err := latest.Codec.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
@@ -305,7 +305,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
 			jsonBase.SetResourceVersion(version)
-			data, err = runtime.DefaultCodec.Encode(obj)
+			data, err = latest.Codec.Encode(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}

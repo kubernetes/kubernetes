@@ -103,7 +103,7 @@ func TestApiExamples(t *testing.T) {
 			return
 		}
 		tested += 1
-		if err := runtime.DefaultCodec.DecodeInto(data, expectedType); err != nil {
+		if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
@@ -137,7 +137,7 @@ func TestExamples(t *testing.T) {
 			return
 		}
 		tested += 1
-		if err := runtime.DefaultCodec.DecodeInto(data, expectedType); err != nil {
+		if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
@@ -168,14 +168,14 @@ func TestReadme(t *testing.T) {
 	}
 	for _, json := range match[1:] {
 		expectedType := &api.Pod{}
-		if err := runtime.DefaultCodec.DecodeInto([]byte(json), expectedType); err != nil {
+		if err := latest.Codec.DecodeInto([]byte(json), expectedType); err != nil {
 			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
 			return
 		}
 		if errors := validateObject(expectedType); len(errors) > 0 {
 			t.Errorf("%s did not validate correctly: %v", path, errors)
 		}
-		encoded, err := runtime.DefaultCodec.Encode(expectedType)
+		encoded, err := latest.Codec.Encode(expectedType)
 		if err != nil {
 			t.Errorf("Could not encode object: %v", err)
 			continue

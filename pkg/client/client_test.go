@@ -48,7 +48,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		"host/server":        {"", "", true},
 	}
 	for k, expected := range testCases {
-		c, err := NewRESTClient(k, nil, "/api/v1beta1/", runtime.DefaultCodec)
+		c, err := NewRESTClient(k, nil, "/api/v1beta1/", latest.Codec)
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -309,7 +309,7 @@ func TestCreateController(t *testing.T) {
 
 func body(obj runtime.Object, raw *string) *string {
 	if obj != nil {
-		bs, _ := runtime.DefaultCodec.Encode(obj)
+		bs, _ := latest.Codec.Encode(obj)
 		body := string(bs)
 		return &body
 	}
@@ -533,7 +533,7 @@ func TestDoRequest(t *testing.T) {
 
 func TestDoRequestAccepted(t *testing.T) {
 	status := &api.Status{Status: api.StatusWorking}
-	expectedBody, _ := runtime.DefaultCodec.Encode(status)
+	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
 		ResponseBody: string(expectedBody),
@@ -570,7 +570,7 @@ func TestDoRequestAccepted(t *testing.T) {
 
 func TestDoRequestAcceptedSuccess(t *testing.T) {
 	status := &api.Status{Status: api.StatusSuccess}
-	expectedBody, _ := runtime.DefaultCodec.Encode(status)
+	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   202,
 		ResponseBody: string(expectedBody),
@@ -590,7 +590,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	statusOut, err := runtime.DefaultCodec.Decode(body)
+	statusOut, err := latest.Codec.Decode(body)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

@@ -47,7 +47,7 @@ type SourceEtcd struct {
 func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface{}) *SourceEtcd {
 	helper := tools.EtcdHelper{
 		client,
-		runtime.DefaultCodec,
+		latest.Codec,
 		runtime.DefaultResourceVersioner,
 	}
 	source := &SourceEtcd{

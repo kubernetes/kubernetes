@@ -113,13 +113,13 @@ func TestControllerDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := runtime.DefaultCodec.Encode(controller)
+	body, err := latest.Codec.Encode(controller)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	controllerOut := storage.New()
-	if err := runtime.DefaultCodec.DecodeInto(body, controllerOut); err != nil {
+	if err := latest.Codec.DecodeInto(body, controllerOut); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

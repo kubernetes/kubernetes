@@ -109,7 +109,7 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(newPodList(2))
+	body, _ := latest.Codec.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -129,7 +129,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(newPodList(2))
+	body, _ := latest.Codec.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -149,7 +149,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(newPodList(0))
+	body, _ := latest.Codec.Encode(newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -169,7 +169,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(&api.Pod{})
+	body, _ := latest.Codec.Encode(&api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),

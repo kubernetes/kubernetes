@@ -43,7 +43,7 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-var codec = runtime.DefaultCodec
+var codec = latest.Codec
 
 func init() {
 	runtime.DefaultScheme.AddKnownTypes("", &Simple{}, &SimpleList{})
@@ -676,7 +676,7 @@ func (*UnregisteredAPIObject) IsAnAPIObject() {}
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(http.StatusOK, runtime.DefaultCodec, &UnregisteredAPIObject{"Undecodable"}, w)
+		writeJSON(http.StatusOK, latest.Codec, &UnregisteredAPIObject{"Undecodable"}, w)
 	}))
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != api.StatusReasonUnknown {

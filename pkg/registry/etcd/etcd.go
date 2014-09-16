@@ -45,7 +45,7 @@ func NewRegistry(client tools.EtcdClient) *Registry {
 	registry := &Registry{
 		EtcdHelper: tools.EtcdHelper{
 			client,
-			runtime.DefaultCodec,
+			latest.Codec,
 			runtime.DefaultResourceVersioner,
 		},
 	}

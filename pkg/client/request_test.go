@@ -38,7 +38,7 @@ import (
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
+	expectedBody, _ := latest.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -71,9 +71,9 @@ func TestDoRequestNewWay(t *testing.T) {
 
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := runtime.DefaultCodec.Encode(reqObj)
+	reqBodyExpected, _ := latest.Codec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
+	expectedBody, _ := latest.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -108,9 +108,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := runtime.DefaultCodec.Encode(reqObj)
+	reqBodyExpected, _ := latest.Codec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
+	expectedBody, _ := latest.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -144,7 +144,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, err := runtime.DefaultCodec.Encode(reqObj)
+	reqBodyExpected, err := latest.Codec.Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := runtime.DefaultCodec.Encode(expectedObj)
+	expectedBody, _ := latest.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -295,7 +295,7 @@ func TestPolling(t *testing.T) {
 
 	callNumber := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data, err := runtime.DefaultCodec.Encode(objects[callNumber])
+		data, err := latest.Codec.Encode(objects[callNumber])
 		if err != nil {
 			t.Errorf("Unexpected encode error")
 		}

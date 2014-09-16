@@ -38,12 +38,12 @@ func TestNewREST(t *testing.T) {
 		PodID: "foo",
 		Host:  "bar",
 	}
-	body, err := runtime.DefaultCodec.Encode(binding)
+	body, err := latest.Codec.Encode(binding)
 	if err != nil {
 		t.Fatalf("Unexpected encode error %v", err)
 	}
 	obj := b.New()
-	err = runtime.DefaultCodec.DecodeInto(body, obj)
+	err = latest.Codec.DecodeInto(body, obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

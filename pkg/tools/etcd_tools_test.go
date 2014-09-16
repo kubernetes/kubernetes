@@ -42,7 +42,7 @@ type TestResource struct {
 func (*TestResource) IsAnAPIObject() {}
 
 var scheme *runtime.Scheme
-var codec = runtime.DefaultCodec
+var codec = latest.Codec
 var versioner = runtime.DefaultResourceVersioner
 
 func init() {
