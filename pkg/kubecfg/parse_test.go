@@ -125,8 +125,8 @@ type TestParseType struct {
 func (*TestParseType) IsAnAPIObject() {}
 
 func TestParseCustomType(t *testing.T) {
-	runtime.DefaultScheme.AddKnownTypes("", &TestParseType{})
-	runtime.DefaultScheme.AddKnownTypes("v1beta1", &TestParseType{})
+	latest.Codec.AddKnownTypes("", &TestParseType{})
+	latest.Codec.AddKnownTypes("v1beta1", &TestParseType{})
 	parser := NewParser(map[string]runtime.Object{
 		"custom": &TestParseType{},
 	})

@@ -46,8 +46,8 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 var codec = latest.Codec
 
 func init() {
-	runtime.DefaultScheme.AddKnownTypes("", &Simple{}, &SimpleList{})
-	runtime.DefaultScheme.AddKnownTypes("v1beta1", &Simple{}, &SimpleList{})
+	latest.Codec.AddKnownTypes("", &Simple{}, &SimpleList{})
+	latest.Codec.AddKnownTypes("v1beta1", &Simple{}, &SimpleList{})
 }
 
 type Simple struct {
@@ -95,7 +95,7 @@ func (storage *SimpleRESTStorage) List(labels.Selector) (runtime.Object, error) 
 }
 
 func (storage *SimpleRESTStorage) Get(id string) (runtime.Object, error) {
-	return runtime.DefaultScheme.CopyOrDie(&storage.item), storage.errors["get"]
+	return latest.Codec.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) Delete(id string) (<-chan runtime.Object, error) {

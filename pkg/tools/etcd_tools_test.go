@@ -191,7 +191,7 @@ func TestSetObjWithVersion(t *testing.T) {
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.DefaultScheme.EncodeOrDie(obj),
+				Value:         latest.Codec.EncodeOrDie(obj),
 				ModifiedIndex: 1,
 			},
 		},

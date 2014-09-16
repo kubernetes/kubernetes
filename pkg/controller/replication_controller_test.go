@@ -292,7 +292,7 @@ func TestSyncronize(t *testing.T) {
 	}
 	fakeControllerHandler := util.FakeHandler{
 		StatusCode: 200,
-		ResponseBody: runtime.DefaultScheme.EncodeOrDie(&api.ReplicationControllerList{
+		ResponseBody: latest.Codec.EncodeOrDie(&api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				controllerSpec1,
 				controllerSpec2,

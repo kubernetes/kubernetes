@@ -92,7 +92,7 @@ func TestWatch(t *testing.T) {
 	client := newEtcdClient()
 	helper := tools.EtcdHelper{Client: client, Codec: latest.Codec, ResourceVersioner: runtime.DefaultResourceVersioner}
 	withEtcdKey(func(key string) {
-		resp, err := client.Set(key, runtime.DefaultScheme.EncodeOrDie(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+		resp, err := client.Set(key, latest.Codec.EncodeOrDie(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
