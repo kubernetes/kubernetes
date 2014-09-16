@@ -270,7 +270,7 @@ function kube-up {
         ssh -oStrictHostKeyChecking=no ubuntu@$i -i ~/.ssh/kube_aws_rsa which docker > /dev/null 2>&1
         if [ "$?" != "0" ]; then
             echo "Docker failed to install on $i. Your cluster is unlikely to work correctly."
-            echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
+            echo "Please run ./cluster/aws/kube-down.sh and re-create the cluster. (sorry!)"
             exit 1
         fi
     done
