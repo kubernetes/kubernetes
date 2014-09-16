@@ -1,7 +1,9 @@
 # Volumes
 
-A process in a container sees a file system which is a combination of its Docker images, plus any Volumes attached to
-it.
+A Volume is a directory, possibly with some data in it, which is exposed to a Container. The file system that a
+container experiences is a combination of its Docker image plus any volumes mounted into the container. This is similar
+in most regards to what Docker knows as Volumes, but is different in some of the details of how Volumes are defined and
+managed.
 
 ## Types of Volumes
 
@@ -10,11 +12,8 @@ A Volume is one of the following types:
 | Name               | Purpose  |
 | ------------------ | -------- |
 | HostDirectory      | Escape hatch for access to un-containerized file |
-| EmtpyDirectory     | Scratch disk space. |
-| DebugDirectory     | Stores debugging logs, core dumps |
+| EmptyDirectory     | Scratch disk space. |
 | CachedDirectory    | Stores large sets of files which are too expensive to re-create on each pod restart. |
-| PackageDirectory   | Readonly content to be managed by Kubernetes system. |
-| RemoteDirectory    | Mount network, cluster, or cloud storage as POSIX file system. |
 
 ### HostDirectory
 
@@ -24,14 +23,11 @@ the scheduler and kubelet cannot account for resources used by writing to a Host
 
 ### EmptyDirectory
 
-Same lifetime as pod.  Use this so Containers in the same pod can communicate, and for scratch space.
-
-### DebugDirectory
-
-A DebugDirectory data is mostly the same as an EmptyDirectory, except it is kept after pod termination on a best-effort
-basis.  It is deleted as space is needed by the kubelet for EmptyDirectory, CachedDirectory, or PackageDirectory objects.
-
-TBD: merge this with EmptyDirectory?
+If a container fails health check, then the Pods EmptyDirectory persists.
+If a pod is deleted by the user or a controller (replicationController does not currently delete pods), then the
+EmptyDirectory is deleted.
+If the network container goes away, all the containers are recreated, but the EmptyDirectory persists.
+EmptyDirectories are used to store logs, for scratch space, and so that containers in the same pod can communicate.
 
 ### CachedDirectory
 
@@ -45,54 +41,13 @@ to an admin for help.
 Existing applications being moved to k8s likely already have mechanisms to deal with these issues, so k8s does not try
 to provide its own.
 
-### PackageDirectory
-
-Includes a recipe for installing data which k8s can invoke.  Allows data to be installed before pod is ever started.  Enables:
-   1. faster pod startup in case of sudden need
-   1. sharing of storage space across pods (for resource efficiency, but not for pod-to-pod interaction)
-   1. k8s management of data push workflows.
-   1. temporal reuse without the application-awareness that is required for CachedDirectory.
-
-To enable space sharing, and temporal reuse, the data must be read-only when accessed by the Pod that depends on it.
-
-The recipe for installing data is TBD.  Some considerations:
-   1. For the _install_ phase, the Volume has to be made read-write for the install process..  After it is successfully installed, it enters a
-   _use_ phase where it should only be mounted read-only for dependent pods.
-   1. The install recipe could just be a reference to a Pod or a literal Pod, which knows how to install data into a
-   special sort of EmptyDirectory that does not get deleted.  Successful exit of the Pod makes it transition to _use_
-   phase.
-   1. Problem with generic pod approach is that if users are not careful, they may define a procedure that is not repeatable every time,
-   which is bad. 
-   1. Another approach would be to specify an URL to fetch and untar.  Kubelet would invoke this.  Needs to ensure it
-   cannot create setuid binaries, etc.
-
-A PackageDirectory is similar to a docker image.  However:
-  - Images are composed of layers built on top of a base image which needs to provide certain base linux files.  A Package
-    is monolithic, independent of other packages, and typically does not have _root filesystem structure_.
-  - Packages can reference other K8s objects in their definitions (Pods) and have K8s-defined behaviors.
-  - TODO think more about relationship between these two.
-  - Think about this in the context of  #994.
-
-### RemoteDirectory
-
-A RemoteDirectory is for mounting remote storage as a POSIX file system accessible to Containers.
-This is especially useful for apps ported from the non-container enviroments.  
-Apps written for container environments are encouraged to use direct file api access to cloud storage systems and
-databases.
-
-RemoteDirectory is actually a category, and not a specific type.  The category includes GCEPersistentDisk (see #861).
-
-
 ## Comparison of features
 
 | Name             | Empty at pod start | Deleted at pod exit    | Storage | read-write? | Status      |
 | ---------------- | ------------------ | ---------------------- | ------- | ----------- | ----------- |
 | HostDirectory    | no                 | no                     | local   | yes         | implemented |
 | EmptyDirectory   | yes                | yes                    | local   | yes         | implemented |
-| DebugDirectory   | yes                | not immediately        | local   | yes         | not implemented |
 | CachedDirectory  | maybe              | no;  api call required | local   | yes         | not implemented |
-| PackageDirectory | no                 | depends                | local   | no          | not implemented |
-| RemoteDirectory  | no                 | never                  | remote  | maybe       | not implemented |
 
 ## Data API objects 
 
@@ -107,10 +62,7 @@ table summarizes the types and their corresponding object or reason for lack of 
 | ---------------- | ------------------------------------------ | ----------- |
 | HostDirectory    | n/a | K8s does not manage node files. | 
 | EmptyDirectory   | n/a | Lifetime same as pod, so Pod represents the EmptyDirectory data |
-| DebugDirectory   | BoundDebugData | Represents data that lives after pod. | 
 | CachedDirectory  | BoundCachedData | Represents data that lives independent of pod. | 
-| PackageDirectory | BoundPackageData | Represents data that lives independent of pods. |
-| RemoteDirectory  | n/a | same lifetime as pod, and no associated state. |
 
 The system manages Bound*Data objects for the user.  They are write-only like BoundPods.
 
@@ -126,8 +78,8 @@ The use of selectors:
     unique, so cannot fill this role.)
 
 A CachedData is analagous to a Pod object in that they both:
- - have a resource request
- - represent specific resources allocated/used on a non-specific node.
+ - are expected to have a resource request in a future version of Kubernetes.
+ - represent specific resources requested, and which are allocated on a specific node (once bound).
  - have own lifetime
  - can be created manually or created by a controller
  - have labels.
@@ -138,47 +90,13 @@ Only a CachedDirectory has a corresponding user-visible CachedData object.
 
 | Name        | Who creates | Who deletes |
 | ----------- | ----------- | ----------- |
-| BoundDebugData | Scheduler | kubelet (when space needed) |
 | BoundCachedData | Scheduler | scheduler |
 | CachedData | User or controller | User or controller |
-| BoundPackageData | Scheduler | Scheduler |
-
-In future, we may introduce something user-visible, like a PackageData object, to allow controllers to manage the pre-installation and
-persistence of BoundPackageData.  For now, this is not supported.
 
 Open questions:
   1. what if  more than 1 CachedData on the same machine can satisfy the Pods need?  Arbitrary?
   1. what if two pods could be bound to the same machine, and there is one CachedData that can satisfy either of them.
 
-
-## Resource Requirements
-
-All types except RemoteDirectory and HostDirectory should specify their resource requirements (amount of disk, ssd, ram, etc).
-This allows the scheduler to place them where there will be room.  This is pending support for pods specifying resource
-requirements.
-
-A cluster admin who allows users to start pods that use HostDirectory is responsible for making sure disk space on nodes is not exhausted.
-
-| Name             |  Resource Reqs? | 
-| ---------------- |  -------------- | 
-| HostDirectory    |  no             | 
-| EmptyDirectory   |  yes            | 
-| DebugDirectory   |  yes            | 
-| CachedDirectory  |  yes            | 
-| PackageDirectory |  yes            | 
-| RemoteDirectory  |  TBD            | 
-
-The Kubelet will enforce resource limits on each Volume.  The scheduler will ensure space exists on the node for each
-Volume.
-
-All implementations should support requesting just the disk space resource.  Some implementations may:
-  - provide an SSD-backed volume if just SSD is requested.
-  - provide a tmpfs-backed volume if just RAM is requested.
-  - provide a software hybrid drive if multiple resources are requested.
-  - provide a software managed striping across physical disks if large DTF values are requested.
-  - spread mutliple volume requests across physical device, one per device.
-
-No implementation should support asking for resources that span mutliple physical devices in a way visible to a Volume user.
 
 ## Scheduling
 When scheduling a Pod that needs a CachedVolume, the scheduler needs to recognize when it should
@@ -234,40 +152,46 @@ podTemplate, and ramps up the count for a new podTemplate for the new version.  
 All the CachedData objects have the same `data=videos` label, and both podTemplates make pods whose Volumes include a
 CachedDirectory with Selector `data=videos`.
 
-### Upgrade/rollback use of PackageData
-A web server pod has 10 replicas.  It uses a lot of static content which comes in a single tarball stored in a release
-server. We want to be able to roll out a new version of the static content, and then trigger the servers to restart with
-the new data.  We do not mind if one of the 10 replicas is unavailable during an upgrade, and will do a rolling
-upgrade.  But, we want the ability to roll-back very quickly to version current - 1 or current - 2.
-
-Therefore, we create a podTemplate with 3 volumes, that are PackageDirectories that in turn install tarballs
-`static_content.v11.tgz`, 
-`static_content.v12.tgz`,  and
-`static_content.v13.tgz`.
-The container command line selects `v13`.
-
-To do an emergency rollback, you can update the pods in a rolling fashion to point at `v11`.  No data install delay.
-
-When `v14` is ready, you make a new template that adds `static_content.v13.tgz` and deletes
-`static_content.v11.tgz` from the Volumes list.  
-
-The scheduler should recognize when a machine has most of the packages needed, and strongly prefer to bind the new pod
-there too.
-
-### Autoscaling use of PackageData
-This is the same webserver as the previous example.
-We also want to be able to scale up the servers replication count rapidly in case we are mentioned on slashdot or
-something.  But we do not want to spin up webserver pods and CPU and RAM until that happens.  But we can afford to keep
-the static data installed on some extra node hard drives.
-
-This should be possible by creating dummy pods that use few resources but do trigger package pre-install.
-
 ## References
 https://github.com/GoogleCloudPlatform/kubernetes/issues/598
 https://github.com/GoogleCloudPlatform/kubernetes/issues/97
 
-## TODO
+## Future Work
+The following are examples of possible future work, outlined here only to provide context for the volume types described
+above.
 
+We will want to account for resources required and used by Pods and Volumes (see #168, #442, #617, #502).  This may
+include:
+  - A CachedVolume and a Pod, and maybe an EmptyDirectory,  can specify the amount of resources each requires.
+  - Kubelet to report resource usage of CachedVolumes, Pods, and maybe other kinds of volumes, and to enforce limits on
+    their size.
+  - Scheduler to consider free space when binding Pods and CachedVolumes.
+  - CachedVolume and EmptyVolume can be backed by different media types, such as a single disk, an ssd with a filesystem, or memory (tmpfs).  Maybe even multiple disks
+    combined into a single logical volume, or a hybrid of disk and flash (e.g.[DM-cache](http://en.wikipedia.org/wiki/Dm-cache)).
+
+We may want to introduce one or more kinds of volume that act like a read-only data package.  They might do some of the following:
+  - Hold readonly content, such as static webserver content.
+  - Be automatically installed and uninstalled by K8s as pods depend on it.
+  - Be pre-installed to allow faster scaling of sets of pods that depend on the slow-to-install data.
+  - Allow sharing of storage space across pods (for rourcesource efficiency, but not for pod-to-pod interaction)
+  - Have an associated controller that manages atomically updating and rolling back static content versions while the Pod keeps serving.
+  - Have an associated controller that watches for github changes and updates the pod and volume in response.
+  - Provide functionality similar to Docker `volumes_from`
+Need to determine how this concept relates to Docker images.
+
+We may want to introduce a kind of volume that holds debugging data.  It might do the following:
+  - Start empty, but be kept around after pod termination on a configurable or best-effort basis.
+  - Hold things like core files and large debugging log files, for debugging a failed container.
+Need to determine whether keeping files like this node-locally is necessary, or copying them to a central repository is
+better.
+
+We may want to introduce one or more kinds of volume that represent remote data.  They might do some of the following:
+  - Provide POSIX-type access to remotely-stored data.
+  - Provide access to NFS, GCE Persistent Disks, GCEPersistentDisk (see #861), etc.
+We might rather encourage containerized apps to use direct file api access to cloud storage
+systems (such as S3, GCS) in place of POSIX-type access.
+
+## TODO
 Figure out why Volume is on ContainerManifest and on podTemplate and which matters for what.
 
 File bug to make HostDirectory flag disable-able for people who do not want that insecurity.
