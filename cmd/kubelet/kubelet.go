@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -59,7 +60,7 @@ var (
 	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 	etcdServerList     util.StringList
 	rootDirectory      = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
-	allowPrivileged    = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode.")
+	allowPrivileged    = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
 )
 
 func init() {
@@ -103,6 +104,10 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	etcd.SetLogger(util.NewLogger("etcd "))
+
+	capabilities.InitializeCapabilities(capabilities.Capabilities{
+		AllowPrivileged: *allowPrivileged,
+	})
 
 	dockerClient, err := docker.NewClient(getDockerEndpoint())
 	if err != nil {
@@ -152,8 +157,7 @@ func main() {
 		cadvisorClient,
 		etcdClient,
 		*rootDirectory,
-		*syncFrequency,
-		*allowPrivileged)
+		*syncFrequency)
 
 	health.AddHealthChecker("exec", health.NewExecHealthChecker(k))
 	health.AddHealthChecker("http", health.NewHTTPHealthChecker(&http.Client{}))
