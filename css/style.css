@@ -1,0 +1,77 @@
+.nav-logo {
+  padding: 4px 10px;
+  margin-right: 40px;
+}
+
+#nav-logo-img {
+  height: 42px;
+}
+
+#top-navbar {
+  background-color: #447AE8;
+  border: 0px;
+}
+
+.navbar-nav .active a {
+  color: #FFF;
+  font-weight: bold;
+}
+
+.navbar-nav li a {
+  color: #000;
+  text-shadow: none;
+}
+
+.navbar-nav li a:hover {
+  color: #AAA;
+  background-color:#1A58D6;
+}
+
+.k8s-btn {
+  color: #FFF;
+  background-color: #1A58D6;
+  border-color: #1A58D6;
+}
+
+.k8s-btn:hover {
+  color: #1A58D6;
+  background-color: transparent;
+  border-color: #1A58D6;
+}
+
+.k8s-is-img {
+  height: 120px;
+}
+
+.align-right {
+  text-align: right;
+}
+
+#page-title {
+  font-size: 45px;
+}
+
+.small-jumbotron {
+  padding-bottom: 0px;
+}
+
+.home-jumbotron {
+  padding-top: 96px;
+}
+
+.jumbotron {
+  background: linear-gradient(to bottom, rgba(221,221,221,1) 0%,rgba(225,225,225,0) 21%,rgba(235,235,235,0) 81%,rgba(238,238,238,1) 100%)
+}
+
+.text-center {
+  text-align: center;
+}
+
+.news-title {
+  font-size: 14pt;
+}
+
+.github-logo {
+  background-image: url("/images/github-logo.svg");
+  background-size: 23px;
+}
