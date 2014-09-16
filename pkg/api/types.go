@@ -17,9 +17,7 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -623,13 +621,3 @@ type ServerOpList struct {
 }
 
 func (*ServerOpList) IsAnAPIObject() {}
-
-// WatchEvent objects are streamed from the api server in response to a watch request.
-type WatchEvent struct {
-	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType
-
-	// For added or modified objects, this is the new object; for deleted objects,
-	// it's the state of the object immediately prior to its deletion.
-	Object runtime.EmbeddedObject
-}

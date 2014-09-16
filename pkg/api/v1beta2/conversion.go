@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -78,7 +78,6 @@ func init() {
 			return nil
 		},
 	)
-
 }
 
 // EmbeddedObject implements a Codec specific version of an

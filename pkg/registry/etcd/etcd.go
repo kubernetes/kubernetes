@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -45,8 +46,8 @@ func NewRegistry(client tools.EtcdClient) *Registry {
 	registry := &Registry{
 		EtcdHelper: tools.EtcdHelper{
 			client,
-			runtime.DefaultCodec,
-			runtime.DefaultResourceVersioner,
+			latest.Codec,
+			latest.ResourceVersioner,
 		},
 	}
 	registry.manifestFactory = &BasicManifestFactory{

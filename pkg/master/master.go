@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"time"
 
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -136,5 +136,5 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, runtime.DefaultCodec
+	return storage, v1beta1.Codec
 }

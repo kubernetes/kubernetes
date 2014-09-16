@@ -66,9 +66,6 @@ type Scheme struct {
 	// you use "" for the internal version.
 	InternalVersion string
 
-	// ExternalVersion is the default external version.
-	ExternalVersion string
-
 	// MetaInsertionFactory is used to create an object to store and retrieve
 	// the version and kind information for all objects. The default uses the
 	// keys "version" and "kind" respectively.
@@ -83,7 +80,6 @@ func NewScheme() *Scheme {
 		typeToKind:           map[reflect.Type]string{},
 		converter:            NewConverter(),
 		InternalVersion:      "",
-		ExternalVersion:      "v1",
 		MetaInsertionFactory: metaInsertion{},
 	}
 	s.converter.NameFunc = s.nameFunc
@@ -144,6 +140,19 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
 	knownTypes[kind] = t
 	s.typeToVersion[t] = version
 	s.typeToKind[t] = kind
+}
+
+// KnownTypes returns an array of the types that are known for a particular version.
+func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
+	all, ok := s.versionMap[version]
+	if !ok {
+		return map[string]reflect.Type{}
+	}
+	types := make(map[string]reflect.Type)
+	for k, v := range all {
+		types[k] = v
+	}
+	return types
 }
 
 // NewObject returns a new object of the given version and name,

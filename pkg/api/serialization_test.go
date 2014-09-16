@@ -17,21 +17,21 @@ limitations under the License.
 package api_test
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/gofuzz"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
@@ -105,27 +105,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	},
 )
 
-func objDiff(a, b runtime.Object) string {
-	ab, err := json.Marshal(a)
-	if err != nil {
-		panic("a")
-	}
-	bb, err := json.Marshal(b)
-	if err != nil {
-		panic("b")
-	}
-	return util.StringDiff(string(ab), string(bb))
-
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
-	return util.StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
-	)
-}
-
-func runTest(t *testing.T, source runtime.Object) {
+func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
 	j, err := runtime.FindJSONBase(source)
@@ -135,30 +115,30 @@ func runTest(t *testing.T, source runtime.Object) {
 	j.SetKind("")
 	j.SetAPIVersion("")
 
-	data, err := runtime.DefaultCodec.Encode(source)
+	data, err := codec.Encode(source)
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
 	}
 
-	obj2, err := runtime.DefaultCodec.Decode(data)
+	obj2, err := codec.Decode(data)
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj2) {
-			t.Errorf("1: %v: diff: %v", name, objDiff(source, obj2))
+			t.Errorf("1: %v: diff: %v", name, runtime.ObjectDiff(source, obj2))
 			return
 		}
 	}
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface().(runtime.Object)
-	err = runtime.DefaultCodec.DecodeInto(data, obj3)
+	err = codec.DecodeInto(data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj3) {
-			t.Errorf("3: %v: diff: %v", name, objDiff(source, obj3))
+			t.Errorf("3: %v: diff: %v", name, runtime.ObjectDiff(source, obj3))
 			return
 		}
 	}
@@ -184,7 +164,9 @@ func TestTypes(t *testing.T) {
 	for _, item := range table {
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
-			runTest(t, item)
+			runTest(t, v1beta1.Codec, item)
+			runTest(t, v1beta2.Codec, item)
+			runTest(t, api.Codec, item)
 		}
 	}
 }
@@ -194,8 +176,8 @@ func TestEncode_Ptr(t *testing.T) {
 		Labels: map[string]string{"name": "foo"},
 	}
 	obj := runtime.Object(pod)
-	data, err := runtime.DefaultCodec.Encode(obj)
-	obj2, err2 := runtime.DefaultCodec.Decode(data)
+	data, err := latest.Codec.Encode(obj)
+	obj2, err2 := latest.Codec.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
 	}
@@ -209,11 +191,11 @@ func TestEncode_Ptr(t *testing.T) {
 
 func TestBadJSONRejection(t *testing.T) {
 	badJSONMissingKind := []byte(`{ }`)
-	if _, err := runtime.DefaultCodec.Decode(badJSONMissingKind); err == nil {
+	if _, err := latest.Codec.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
 	}
 	badJSONUnknownType := []byte(`{"kind": "bar"}`)
-	if _, err1 := runtime.DefaultCodec.Decode(badJSONUnknownType); err1 == nil {
+	if _, err1 := latest.Codec.Decode(badJSONUnknownType); err1 == nil {
 		t.Errorf("Did not reject despite use of unknown type: %s", badJSONUnknownType)
 	}
 	/*badJSONKindMismatch := []byte(`{"kind": "Pod"}`)

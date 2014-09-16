@@ -21,8 +21,8 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
@@ -53,7 +53,7 @@ func (s *ProxyServer) Serve() error {
 func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Header().Add("Content-type", "application/json")
-	data, _ := runtime.DefaultCodec.Encode(&api.Status{
+	data, _ := latest.Codec.Encode(&api.Status{
 		Status:  api.StatusFailure,
 		Message: fmt.Sprintf("internal error: %#v", err),
 	})

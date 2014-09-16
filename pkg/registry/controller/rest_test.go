@@ -26,10 +26,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestListControllersError(t *testing.T) {
@@ -113,13 +113,13 @@ func TestControllerDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := runtime.DefaultCodec.Encode(controller)
+	body, err := latest.Codec.Encode(controller)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	controllerOut := storage.New()
-	if err := runtime.DefaultCodec.DecodeInto(body, controllerOut); err != nil {
+	if err := latest.Codec.DecodeInto(body, controllerOut); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

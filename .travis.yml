@@ -14,7 +14,7 @@ install:
   - ./hack/build-go.sh
 
 script:
-  - ./hack/test-go.sh
+  - KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd/bin:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd/bin:$PATH ./hack/test-integration.sh
 

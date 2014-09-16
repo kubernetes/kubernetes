@@ -114,25 +114,21 @@ func TestWatchHTTP(t *testing.T) {
 
 	decoder := json.NewDecoder(response.Body)
 
-	try := func(action watch.EventType, object runtime.Object) {
+	for i, item := range watchTestTable {
 		// Send
-		simpleStorage.fakeWatch.Action(action, object)
+		simpleStorage.fakeWatch.Action(item.t, item.obj)
 		// Test receive
 		var got api.WatchEvent
 		err := decoder.Decode(&got)
 		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
+			t.Fatalf("%d: Unexpected error: %v", i, err)
 		}
-		if got.Type != action {
-			t.Errorf("Unexpected type: %v", got.Type)
+		if got.Type != item.t {
+			t.Errorf("%d: Unexpected type: %v", i, got.Type)
 		}
-		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
+		if e, a := item.obj, got.Object.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("%d: Expected %v, got %v", i, e, a)
 		}
-	}
-
-	for _, item := range watchTestTable {
-		try(item.t, item.obj)
 	}
 	simpleStorage.fakeWatch.Stop()
 

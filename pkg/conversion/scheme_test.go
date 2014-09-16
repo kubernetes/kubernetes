@@ -125,7 +125,6 @@ func GetTestScheme() *Scheme {
 	s.AddKnownTypes("v1", &ExternalInternalSame{})
 	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
 	s.AddKnownTypeWithName("v1", "TestType2", &ExternalTestType2{})
-	s.ExternalVersion = "v1"
 	s.InternalVersion = ""
 	s.MetaInsertionFactory = testMetaInsertionFactory{}
 	return s
@@ -178,7 +177,7 @@ func runTest(t *testing.T, source interface{}) {
 	TestObjectFuzzer.Fuzz(source)
 
 	s := GetTestScheme()
-	data, err := s.Encode(source)
+	data, err := s.EncodeToVersion(source, "v1")
 	if err != nil {
 		t.Errorf("%v: %v (%#v)", name, err, source)
 		return
@@ -221,7 +220,7 @@ func TestEncode_NonPtr(t *testing.T) {
 	s := GetTestScheme()
 	tt := TestType1{A: "I'm not a pointer object"}
 	obj := interface{}(tt)
-	data, err := s.Encode(obj)
+	data, err := s.EncodeToVersion(obj, "v1")
 	obj2, err2 := s.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
@@ -238,7 +237,7 @@ func TestEncode_Ptr(t *testing.T) {
 	s := GetTestScheme()
 	tt := &TestType1{A: "I am a pointer object"}
 	obj := interface{}(tt)
-	data, err := s.Encode(obj)
+	data, err := s.EncodeToVersion(obj, "v1")
 	obj2, err2 := s.Decode(data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'", err, err2)
@@ -255,9 +254,25 @@ func TestBadJSONRejection(t *testing.T) {
 	s := GetTestScheme()
 	badJSONs := [][]byte{
 		[]byte(`{"myVersionKey":"v1"}`),                          // Missing kind
-		[]byte(`{"myKindKey":"TestType1"}`),                      // Missing version
 		[]byte(`{"myVersionKey":"v1","myKindKey":"bar"}`),        // Unknown kind
 		[]byte(`{"myVersionKey":"bar","myKindKey":"TestType1"}`), // Unknown version
+	}
+	for _, b := range badJSONs {
+		if _, err := s.Decode(b); err == nil {
+			t.Errorf("Did not reject bad json: %s", string(b))
+		}
+	}
+	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
+	if err := s.DecodeInto(badJSONKindMismatch, &TestType1{}); err == nil {
+		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
+	}
+}
+
+func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
+	s := GetTestScheme()
+	s.InternalVersion = "v1"
+	badJSONs := [][]byte{
+		[]byte(`{"myKindKey":"TestType1"}`), // Missing version
 	}
 	for _, b := range badJSONs {
 		if _, err := s.Decode(b); err == nil {
@@ -283,7 +298,6 @@ func TestMetaValues(t *testing.T) {
 	}
 	s := NewScheme()
 	s.InternalVersion = ""
-	s.ExternalVersion = "externalVersion"
 	s.AddKnownTypeWithName("", "Simple", &InternalSimple{})
 	s.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
 
@@ -373,7 +387,6 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	}
 	s := NewScheme()
 	s.InternalVersion = ""
-	s.ExternalVersion = "externalVersion"
 	// We deliberately don't register the types.
 
 	internalToExternalCalls := 0

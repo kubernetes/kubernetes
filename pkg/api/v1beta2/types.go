@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta3
+package v1beta2
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -122,13 +122,22 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
 	// Required.
+	// Exactly one of the following must be set.  If both are set, prefer MountPath.
+	// DEPRECATED: Path will be removed in a future version of the API.
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
+	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
+	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
+	// DEPRECATED: MountType will be removed in a future version of the API.
+	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
+	// Exactly one of the following must be set.  If both are set, prefer Name.
+	// DEPRECATED: EnvVar.Key will be removed in a future version of the API.
 	Name string `yaml:"name" json:"name"`
+	Key  string `yaml:"key,omitempty" json:"key,omitempty"`
 	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
@@ -437,7 +446,10 @@ func (*Minion) IsAnAPIObject() {}
 // MinionList is a list of minions.
 type MinionList struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Minion `json:"items,omitempty" yaml:"items,omitempty"`
+	// DEPRECATED: the below Minions is due to a naming mistake and
+	// will be replaced with Items in the future.
+	Minions []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
+	Items   []Minion `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 func (*MinionList) IsAnAPIObject() {}

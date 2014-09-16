@@ -14,30 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
-
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-)
-
-var Scheme = runtime.NewScheme()
-
-func init() {
-	Scheme.AddKnownTypes("",
-		&PodList{},
-		&Pod{},
-		&ReplicationControllerList{},
-		&ReplicationController{},
-		&ServiceList{},
-		&Service{},
-		&MinionList{},
-		&Minion{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
-		&ContainerManifestList{},
-		&Endpoints{},
-		&EndpointsList{},
-		&Binding{},
-	)
-}
+// Package v1beta2 is the v1beta2 version of the API.
+package v1beta2

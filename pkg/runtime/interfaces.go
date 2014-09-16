@@ -16,11 +16,21 @@ limitations under the License.
 
 package runtime
 
-// Codec defines methods for serializing and deserializing API objects.
-type Codec interface {
-	Encode(obj Object) (data []byte, err error)
+// Decoder defines methods for deserializing API objects into a given type
+type Decoder interface {
 	Decode(data []byte) (Object, error)
 	DecodeInto(data []byte, obj Object) error
+}
+
+// Encoder defines methods for serializing API objects into bytes
+type Encoder interface {
+	Encode(obj Object) (data []byte, err error)
+}
+
+// Codec defines methods for serializing and deserializing API objects.
+type Codec interface {
+	Decoder
+	Encoder
 }
 
 // ResourceVersioner provides methods for setting and retrieving

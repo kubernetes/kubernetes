@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
@@ -206,7 +207,7 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: "v1beta1"},
+			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: latest.Version},
 			Port:     12345,
 			Labels: map[string]string{
 				"name": "atomicService",

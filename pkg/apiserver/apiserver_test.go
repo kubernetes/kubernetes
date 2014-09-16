@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -43,11 +44,11 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-var codec = runtime.DefaultCodec
+var codec = latest.Codec
 
 func init() {
-	runtime.DefaultScheme.AddKnownTypes("", &Simple{}, &SimpleList{})
-	runtime.DefaultScheme.AddKnownTypes("v1beta1", &Simple{}, &SimpleList{})
+	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{})
+	api.Scheme.AddKnownTypes(latest.Version, &Simple{}, &SimpleList{})
 }
 
 type Simple struct {
@@ -95,7 +96,7 @@ func (storage *SimpleRESTStorage) List(labels.Selector) (runtime.Object, error) 
 }
 
 func (storage *SimpleRESTStorage) Get(id string) (runtime.Object, error) {
-	return runtime.DefaultScheme.CopyOrDie(&storage.item), storage.errors["get"]
+	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) Delete(id string) (<-chan runtime.Object, error) {
@@ -676,7 +677,7 @@ func (*UnregisteredAPIObject) IsAnAPIObject() {}
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(http.StatusOK, runtime.DefaultCodec, &UnregisteredAPIObject{"Undecodable"}, w)
+		writeJSON(http.StatusOK, latest.Codec, &UnregisteredAPIObject{"Undecodable"}, w)
 	}))
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != api.StatusReasonUnknown {
