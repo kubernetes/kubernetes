@@ -180,7 +180,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumes := util.StringSet{}
-	capabilities.SetCapabilitiesForTests(capabilities.Capabilities{
+	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
 
@@ -203,7 +203,7 @@ func TestValidateContainers(t *testing.T) {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	capabilities.SetCapabilitiesForTests(capabilities.Capabilities{
+	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
 	errorCases := map[string][]api.Container{

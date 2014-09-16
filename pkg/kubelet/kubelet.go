@@ -337,7 +337,7 @@ func (kl *Kubelet) runContainer(pod *Pod, container *api.Container, podVolumes v
 		return "", err
 	}
 	privileged := false
-	if capabilities.GetCapabilities().AllowPrivileged {
+	if capabilities.Get().AllowPrivileged {
 		privileged = container.Privileged
 	} else if container.Privileged {
 		return "", fmt.Errorf("Container requested privileged mode, but it is disallowed globally.")

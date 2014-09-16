@@ -30,7 +30,7 @@ var once sync.Once
 var capabilities *Capabilities
 
 // Initialize the capability set.  This can only be done once per binary, subsequent calls are ignored.
-func InitializeCapabilities(c Capabilities) {
+func Initialize(c Capabilities) {
 	// Only do this once
 	once.Do(func() {
 		capabilities = &c
@@ -38,14 +38,14 @@ func InitializeCapabilities(c Capabilities) {
 }
 
 // SetCapabilitiesForTests.  Convenience method for testing.  This should only be called from tests.
-func SetCapabilitiesForTests(c Capabilities) {
+func SetForTests(c Capabilities) {
 	capabilities = &c
 }
 
 // Returns a read-only copy of the system capabilities.
-func GetCapabilities() Capabilities {
+func Get() Capabilities {
 	if capabilities == nil {
-		InitializeCapabilities(Capabilities{
+		Initialize(Capabilities{
 			AllowPrivileged: false,
 		})
 	}

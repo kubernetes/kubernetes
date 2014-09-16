@@ -105,7 +105,7 @@ func main() {
 
 	etcd.SetLogger(util.NewLogger("etcd "))
 
-	capabilities.InitializeCapabilities(capabilities.Capabilities{
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: *allowPrivileged,
 	})
 
