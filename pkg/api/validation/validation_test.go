@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -179,6 +180,9 @@ func TestValidateVolumeMounts(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumes := util.StringSet{}
+	capabilities.SetCapabilitiesForTests(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
 
 	successCase := []api.Container{
 		{Name: "abc", Image: "image"},
@@ -193,11 +197,15 @@ func TestValidateContainers(t *testing.T) {
 				},
 			},
 		},
+		{Name: "abc-1234", Image: "image", Privileged: true},
 	}
 	if errs := validateContainers(successCase, volumes); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
+	capabilities.SetCapabilitiesForTests(capabilities.Capabilities{
+		AllowPrivileged: false,
+	})
 	errorCases := map[string][]api.Container{
 		"zero-length name":     {{Name: "", Image: "image"}},
 		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image"}},
@@ -247,6 +255,9 @@ func TestValidateContainers(t *testing.T) {
 					PreStop: &api.Handler{},
 				},
 			},
+		},
+		"privilege disabled": {
+			{Name: "abc", Image: "image", Privileged: true},
 		},
 	}
 	for k, v := range errorCases {

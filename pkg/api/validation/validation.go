@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -226,12 +227,15 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	for i := range containers {
 		cErrs := errs.ErrorList{}
 		ctr := &containers[i] // so we can set default values
+		capabilities := capabilities.GetCapabilities()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name", ctr.Name))
 		} else if !util.IsDNSLabel(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name))
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
+		} else if ctr.Privileged && !capabilities.AllowPrivileged {
+			cErrs = append(cErrs, errs.NewFieldInvalid("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
 		}

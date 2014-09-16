@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -49,6 +50,7 @@ var (
 	etcdServerList        util.StringList
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
+	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
 )
 
 func init() {
@@ -111,6 +113,10 @@ func main() {
 	if len(etcdServerList) == 0 {
 		glog.Fatalf("-etcd_servers flag is required.")
 	}
+
+	capabilities.InitializeCapabilities(capabilities.Capabilities{
+		AllowPrivileged: *allowPrivileged,
+	})
 
 	cloud := initCloudProvider(*cloudProvider, *cloudConfigFile)
 
