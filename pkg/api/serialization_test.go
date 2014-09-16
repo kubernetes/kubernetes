@@ -31,7 +31,7 @@ import (
 	"github.com/google/gofuzz"
 )
 
-var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
+var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
@@ -166,6 +166,7 @@ func TestTypes(t *testing.T) {
 		for i := 0; i < *fuzzIters; i++ {
 			runTest(t, v1beta1.Codec, item)
 			runTest(t, v1beta2.Codec, item)
+			runTest(t, api.Codec, item)
 		}
 	}
 }
