@@ -33,6 +33,11 @@ type Store interface {
 	List() []interface{}
 	Contains() util.StringSet
 	Get(id string) (item interface{}, exists bool)
+
+	// Replace will delete the contents of the store, using instead the
+	// given map. Store takes ownership of the map, you should not reference
+	// it after calling this function.
+	Replace(idToObj map[string]interface{})
 }
 
 type cache struct {
@@ -93,6 +98,15 @@ func (c *cache) Get(id string) (item interface{}, exists bool) {
 	defer c.lock.RUnlock()
 	item, exists = c.items[id]
 	return item, exists
+}
+
+// Replace will delete the contents of 'c', using instead the given map.
+// 'c' takes ownership of the map, you should not reference the map again
+// after calling this function.
+func (c *cache) Replace(idToObj map[string]interface{}) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.items = idToObj
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.

@@ -81,3 +81,29 @@ func TestFIFO_addUpdate(t *testing.T) {
 		t.Errorf("item did not get removed")
 	}
 }
+
+func TestFIFO_addReplace(t *testing.T) {
+	f := NewFIFO()
+	f.Add("foo", 10)
+	f.Replace(map[string]interface{}{"foo": 15})
+	got := make(chan int, 2)
+	go func() {
+		for {
+			got <- f.Pop().(int)
+		}
+	}()
+
+	first := <-got
+	if e, a := 15, first; e != a {
+		t.Errorf("Didn't get updated value (%v), got %v", e, a)
+	}
+	select {
+	case unexpected := <-got:
+		t.Errorf("Got second value %v", unexpected)
+	case <-time.After(50 * time.Millisecond):
+	}
+	_, exists := f.Get("foo")
+	if exists {
+		t.Errorf("item did not get removed")
+	}
+}
