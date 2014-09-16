@@ -30,8 +30,7 @@ type RESTStorage interface {
 	New() runtime.Object
 
 	// List selects resources in the storage which match to the selector.
-	// TODO: add field selector in addition to label selector.
-	List(labels.Selector) (runtime.Object, error)
+	List(label, field labels.Selector) (runtime.Object, error)
 
 	// Get finds a resource in the storage by id and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the

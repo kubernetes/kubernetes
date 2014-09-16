@@ -65,7 +65,7 @@ func TestRESTUnsupported(t *testing.T) {
 	if _, err := b.Get("binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector()); err == nil {
+	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector(), labels.Everything()); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	// Try sending wrong object just to get 100% coverage

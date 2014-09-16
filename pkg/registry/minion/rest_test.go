@@ -67,7 +67,7 @@ func TestMinionREST(t *testing.T) {
 		t.Errorf("delete returned wrong error")
 	}
 
-	list, err := ms.List(labels.Everything())
+	list, err := ms.List(labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("got error calling List")
 	}

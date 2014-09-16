@@ -113,14 +113,15 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	return s, err
 }
 
-func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
+// TODO: implement field selector?
+func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
 	list, err := rs.registry.ListServices()
 	if err != nil {
 		return nil, err
 	}
 	var filtered []api.Service
 	for _, service := range list.Items {
-		if selector.Matches(labels.Set(service.Labels)) {
+		if label.Matches(labels.Set(service.Labels)) {
 			filtered = append(filtered, service)
 		}
 	}

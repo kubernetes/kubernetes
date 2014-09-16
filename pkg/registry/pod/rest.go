@@ -107,8 +107,25 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	return pod, err
 }
 
-func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
-	pods, err := rs.registry.ListPods(selector)
+func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
+	return labels.Set{
+		"ID": pod.ID,
+		"DesiredState.Status": string(pod.DesiredState.Status),
+		"DesiredState.Host":   pod.DesiredState.Host,
+	}
+}
+
+// filterFunc returns a predicate based on label & field selectors that can be passed to registry's
+// ListPods & WatchPods.
+func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
+	return func(pod *api.Pod) bool {
+		fields := rs.podToSelectableFields(pod)
+		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+	}
+}
+
+func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+	pods, err := rs.registry.ListPodsPredicate(rs.filterFunc(label, field))
 	if err == nil {
 		for i := range pods.Items {
 			pod := &pods.Items[i]
@@ -122,14 +139,7 @@ func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 
 // Watch begins watching for new, changed, or deleted pods.
 func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return rs.registry.WatchPods(resourceVersion, func(pod *api.Pod) bool {
-		fields := labels.Set{
-			"ID": pod.ID,
-			"DesiredState.Status": string(pod.DesiredState.Status),
-			"DesiredState.Host":   pod.DesiredState.Host,
-		}
-		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
-	})
+	return rs.registry.WatchPods(resourceVersion, rs.filterFunc(label, field))
 }
 
 func (*REST) New() runtime.Object {

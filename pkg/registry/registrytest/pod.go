@@ -40,7 +40,7 @@ func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	}
 }
 
-func (r *PodRegistry) ListPods(selector labels.Selector) (*api.PodList, error) {
+func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {
@@ -48,13 +48,19 @@ func (r *PodRegistry) ListPods(selector labels.Selector) (*api.PodList, error) {
 	}
 	var filtered []api.Pod
 	for _, pod := range r.Pods.Items {
-		if selector.Matches(labels.Set(pod.Labels)) {
+		if filter(&pod) {
 			filtered = append(filtered, pod)
 		}
 	}
 	pods := *r.Pods
 	pods.Items = filtered
 	return &pods, nil
+}
+
+func (r *PodRegistry) ListPods(selector labels.Selector) (*api.PodList, error) {
+	return r.ListPodsPredicate(func(pod *api.Pod) bool {
+		return selector.Matches(labels.Set(pod.Labels))
+	})
 }
 
 func (r *PodRegistry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {

@@ -60,8 +60,15 @@ func makePodKey(podID string) string {
 	return "/registry/pods/" + podID
 }
 
-// ListPods obtains a list of pods that match selector.
+// ListPods obtains a list of pods with labels that match selector.
 func (r *Registry) ListPods(selector labels.Selector) (*api.PodList, error) {
+	return r.ListPodsPredicate(func(pod *api.Pod) bool {
+		return selector.Matches(labels.Set(pod.Labels))
+	})
+}
+
+// ListPodsPredicate obtains a list of pods that match filter.
+func (r *Registry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, error) {
 	allPods := api.PodList{}
 	err := r.ExtractList("/registry/pods", &allPods.Items, &allPods.ResourceVersion)
 	if err != nil {
@@ -69,7 +76,7 @@ func (r *Registry) ListPods(selector labels.Selector) (*api.PodList, error) {
 	}
 	filtered := []api.Pod{}
 	for _, pod := range allPods.Items {
-		if selector.Matches(labels.Set(pod.Labels)) {
+		if filter(&pod) {
 			// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 			// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
 			// matches our desires.

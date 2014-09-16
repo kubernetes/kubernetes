@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -129,7 +130,7 @@ func TestListPodsError(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	pods, err := storage.List(labels.Everything())
+	pods, err := storage.List(labels.Everything(), labels.Everything())
 	if err != podRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", podRegistry.Err, err)
 	}
@@ -143,7 +144,7 @@ func TestListEmptyPodList(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	pods, err := storage.List(labels.Everything())
+	pods, err := storage.List(labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -175,7 +176,7 @@ func TestListPodList(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	podsObj, err := storage.List(labels.Everything())
+	podsObj, err := storage.List(labels.Everything(), labels.Everything())
 	pods := podsObj.(*api.PodList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -189,6 +190,86 @@ func TestListPodList(t *testing.T) {
 	}
 	if pods.Items[1].ID != "bar" {
 		t.Errorf("Unexpected pod: %#v", pods.Items[1])
+	}
+}
+
+func TestListPodListSelection(t *testing.T) {
+	podRegistry := registrytest.NewPodRegistry(nil)
+	podRegistry.Pods = &api.PodList{
+		Items: []api.Pod{
+			{
+				JSONBase: api.JSONBase{ID: "foo"},
+			}, {
+				JSONBase:     api.JSONBase{ID: "bar"},
+				DesiredState: api.PodState{Host: "barhost"},
+			}, {
+				JSONBase:     api.JSONBase{ID: "baz"},
+				DesiredState: api.PodState{Status: "bazstatus"},
+			}, {
+				JSONBase: api.JSONBase{ID: "qux"},
+				Labels:   map[string]string{"label": "qux"},
+			}, {
+				JSONBase: api.JSONBase{ID: "zot"},
+			},
+		},
+	}
+	storage := REST{
+		registry: podRegistry,
+	}
+
+	table := []struct {
+		label, field string
+		expectedIDs  util.StringSet
+	}{
+		{
+			expectedIDs: util.NewStringSet("foo", "bar", "baz", "qux", "zot"),
+		}, {
+			field:       "ID=zot",
+			expectedIDs: util.NewStringSet("zot"),
+		}, {
+			label:       "label=qux",
+			expectedIDs: util.NewStringSet("qux"),
+		}, {
+			field:       "DesiredState.Status=bazstatus",
+			expectedIDs: util.NewStringSet("baz"),
+		}, {
+			field:       "DesiredState.Host=barhost",
+			expectedIDs: util.NewStringSet("bar"),
+		}, {
+			field:       "DesiredState.Host=",
+			expectedIDs: util.NewStringSet("foo", "baz", "qux", "zot"),
+		}, {
+			field:       "DesiredState.Host!=",
+			expectedIDs: util.NewStringSet("bar"),
+		},
+	}
+
+	for index, item := range table {
+		label, err := labels.ParseSelector(item.label)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		field, err := labels.ParseSelector(item.field)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		podsObj, err := storage.List(label, field)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		pods := podsObj.(*api.PodList)
+
+		if e, a := len(item.expectedIDs), len(pods.Items); e != a {
+			t.Errorf("%v: Expected %v, got %v", index, e, a)
+		}
+		for _, pod := range pods.Items {
+			if !item.expectedIDs.Has(pod.ID) {
+				t.Errorf("%v: Unexpected pod %v", index, pod.ID)
+			}
+			t.Logf("%v: Got pod ID: %v", index, pod.ID)
+		}
 	}
 }
 

@@ -43,9 +43,9 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 }
 
 // List satisfies the RESTStorage interface.
-func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
-	if !selector.Empty() {
-		return nil, errors.New("label selectors are not supported on endpoints")
+func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+	if !label.Empty() || !field.Empty() {
+		return nil, errors.New("label/field selectors are not supported on endpoints")
 	}
 	return rs.registry.ListEndpoints()
 }

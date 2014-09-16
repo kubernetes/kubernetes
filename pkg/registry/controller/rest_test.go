@@ -39,7 +39,7 @@ func TestListControllersError(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(nil)
+	controllers, err := storage.List(labels.Everything(), labels.Everything())
 	if err != mockRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
 	}
@@ -53,7 +53,7 @@ func TestListEmptyControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(labels.Everything())
+	controllers, err := storage.List(labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestListControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllersObj, err := storage.List(labels.Everything())
+	controllersObj, err := storage.List(labels.Everything(), labels.Everything())
 	controllers := controllersObj.(*api.ReplicationControllerList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
