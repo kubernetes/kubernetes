@@ -160,6 +160,7 @@ https://github.com/GoogleCloudPlatform/kubernetes/issues/97
 The following are examples of possible future work, outlined here only to provide context for the volume types described
 above.
 
+### Resource Allocation
 We will want to account for resources required and used by Pods and Volumes (see #168, #442, #617, #502).  This may
 include:
   - A CachedVolume and a Pod, and maybe an EmptyDirectory,  can specify the amount of resources each requires.
@@ -169,6 +170,7 @@ include:
   - CachedVolume and EmptyVolume can be backed by different media types, such as a single disk, an ssd with a filesystem, or memory (tmpfs).  Maybe even multiple disks
     combined into a single logical volume, or a hybrid of disk and flash (e.g.[DM-cache](http://en.wikipedia.org/wiki/Dm-cache)).
 
+### Readonly data packages
 We may want to introduce one or more kinds of volume that act like a read-only data package.  They might do some of the following:
   - Hold readonly content, such as static webserver content.
   - Be automatically installed and uninstalled by K8s as pods depend on it.
@@ -179,12 +181,14 @@ We may want to introduce one or more kinds of volume that act like a read-only d
   - Provide functionality similar to Docker `volumes_from`
 Need to determine how this concept relates to Docker images.
 
+### Saving debugging data
 We may want to introduce a kind of volume that holds debugging data.  It might do the following:
   - Start empty, but be kept around after pod termination on a configurable or best-effort basis.
   - Hold things like core files and large debugging log files, for debugging a failed container.
 Need to determine whether keeping files like this node-locally is necessary, or copying them to a central repository is
 better.
 
+### Remote filesystems
 We may want to introduce one or more kinds of volume that represent remote data.  They might do some of the following:
   - Provide POSIX-type access to remotely-stored data.
   - Provide access to NFS, GCE Persistent Disks, GCEPersistentDisk (see #861), etc.
