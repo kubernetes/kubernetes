@@ -227,7 +227,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	for i := range containers {
 		cErrs := errs.ErrorList{}
 		ctr := &containers[i] // so we can set default values
-		capabilities := capabilities.GetCapabilities()
+		capabilities := capabilities.Get()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name", ctr.Name))
 		} else if !util.IsDNSLabel(ctr.Name) {

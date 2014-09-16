@@ -114,7 +114,7 @@ func main() {
 		glog.Fatalf("-etcd_servers flag is required.")
 	}
 
-	capabilities.InitializeCapabilities(capabilities.Capabilities{
+	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: *allowPrivileged,
 	})
 
