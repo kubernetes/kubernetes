@@ -18,7 +18,7 @@
 # we're being called by hack/e2e-test.sh (we use some env vars it sets up).
 
 # Exit on error
-set -e
+set -x
 
 source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
 source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
@@ -49,6 +49,8 @@ while [ $ALL_RUNNING -ne 1 ]; do
   sleep 5
   ALL_RUNNING=1
   for id in $POD_ID_LIST; do
+echo "=========================================="
+echo $KUBECFG
     CURRENT_STATUS=$($KUBECFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
     if [ "$CURRENT_STATUS" != "true" ]; then
       ALL_RUNNING=0

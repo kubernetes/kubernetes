@@ -146,7 +146,11 @@ func TestContainers(t *testing.T) {
 
 func TestPodInfo(t *testing.T) {
 	fw := newServerTest()
-	expected := api.PodInfo{"goodpod": docker.Container{ID: "myContainerID"}}
+	expected := api.PodInfo{
+		"goodpod": api.ContainerStatus{
+			DetailInfo: docker.Container{ID: "myContainerID"},
+		},
+	}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
 		if name == "goodpod.etcd" {
 			return expected, nil
