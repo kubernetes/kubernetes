@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func TestCreate(t *testing.T) {
@@ -45,42 +44,26 @@ func TestCreate(t *testing.T) {
 	factory.Create()
 }
 
-func TestCreateWatches(t *testing.T) {
+func TestCreateLists(t *testing.T) {
 	factory := ConfigFactory{nil}
 	table := []struct {
-		rv           uint64
-		location     string
-		watchFactory func(rv uint64) (watch.Interface, error)
+		location string
+		factory  func() *listWatch
 	}{
-		// Minion watch
+		// Minion
 		{
-			rv:           0,
-			location:     "/api/v1beta1/watch/minions?resourceVersion=0",
-			watchFactory: factory.createMinionWatch,
-		}, {
-			rv:           42,
-			location:     "/api/v1beta1/watch/minions?resourceVersion=42",
-			watchFactory: factory.createMinionWatch,
+			location: "/api/v1beta1/minions?fields=",
+			factory:  factory.createMinionLW,
 		},
-		// Assigned pod watches
+		// Assigned pod
 		{
-			rv:           0,
-			location:     "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=0",
-			watchFactory: factory.createAssignedPodWatch,
-		}, {
-			rv:           42,
-			location:     "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
-			watchFactory: factory.createAssignedPodWatch,
+			location: "/api/v1beta1/pods?fields=DesiredState.Host!%3D",
+			factory:  factory.createAssignedPodLW,
 		},
-		// Unassigned pod watches
+		// Unassigned pod
 		{
-			rv:           0,
-			location:     "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=0",
-			watchFactory: factory.createUnassignedPodWatch,
-		}, {
-			rv:           42,
-			location:     "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
-			watchFactory: factory.createUnassignedPodWatch,
+			location: "/api/v1beta1/pods?fields=DesiredState.Host%3D",
+			factory:  factory.createUnassignedPodLW,
 		},
 	}
 
@@ -93,7 +76,60 @@ func TestCreateWatches(t *testing.T) {
 		server := httptest.NewServer(&handler)
 		factory.Client = client.NewOrDie(server.URL, nil)
 		// This test merely tests that the correct request is made.
-		item.watchFactory(item.rv)
+		item.factory().List()
+		handler.ValidateRequest(t, item.location, "GET", nil)
+	}
+}
+
+func TestCreateWatches(t *testing.T) {
+	factory := ConfigFactory{nil}
+	table := []struct {
+		rv       uint64
+		location string
+		factory  func() *listWatch
+	}{
+		// Minion watch
+		{
+			rv:       0,
+			location: "/api/v1beta1/watch/minions?fields=&resourceVersion=0",
+			factory:  factory.createMinionLW,
+		}, {
+			rv:       42,
+			location: "/api/v1beta1/watch/minions?fields=&resourceVersion=42",
+			factory:  factory.createMinionLW,
+		},
+		// Assigned pod watches
+		{
+			rv:       0,
+			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=0",
+			factory:  factory.createAssignedPodLW,
+		}, {
+			rv:       42,
+			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
+			factory:  factory.createAssignedPodLW,
+		},
+		// Unassigned pod watches
+		{
+			rv:       0,
+			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=0",
+			factory:  factory.createUnassignedPodLW,
+		}, {
+			rv:       42,
+			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
+			factory:  factory.createUnassignedPodLW,
+		},
+	}
+
+	for _, item := range table {
+		handler := util.FakeHandler{
+			StatusCode:   500,
+			ResponseBody: "",
+			T:            t,
+		}
+		server := httptest.NewServer(&handler)
+		factory.Client = client.NewOrDie(server.URL, nil)
+		// This test merely tests that the correct request is made.
+		item.factory().Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
 	}
 }

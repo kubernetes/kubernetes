@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -43,19 +44,19 @@ type ConfigFactory struct {
 func (factory *ConfigFactory) Create() *scheduler.Config {
 	// Watch and queue pods that need scheduling.
 	podQueue := cache.NewFIFO()
-	cache.NewReflector(factory.createUnassignedPodWatch, &api.Pod{}, podQueue).Run()
+	cache.NewReflector(factory.createUnassignedPodLW(), &api.Pod{}, podQueue).Run()
 
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
 	podCache := cache.NewStore()
-	cache.NewReflector(factory.createAssignedPodWatch, &api.Pod{}, podCache).Run()
+	cache.NewReflector(factory.createAssignedPodLW(), &api.Pod{}, podCache).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
 	minionCache := cache.NewStore()
 	if false {
 		// Disable this code until minions support watches.
-		cache.NewReflector(factory.createMinionWatch, &api.Minion{}, minionCache).Run()
+		cache.NewReflector(factory.createMinionLW(), &api.Minion{}, minionCache).Run()
 	} else {
 		cache.NewPoller(factory.pollMinions, 10*time.Second, minionCache).Run()
 	}
@@ -82,38 +83,66 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 	}
 }
 
-// createUnassignedPodWatch starts a watch that finds all pods that need to be
+type listWatch struct {
+	client        *client.Client
+	fieldSelector labels.Selector
+	resource      string
+}
+
+func (lw *listWatch) List() (runtime.Object, error) {
+	return lw.client.
+		Get().
+		Path(lw.resource).
+		SelectorParam("fields", lw.fieldSelector).
+		Do().
+		Get()
+}
+
+func (lw *listWatch) Watch(resourceVersion uint64) (watch.Interface, error) {
+	return lw.client.
+		Get().
+		Path("watch").
+		Path(lw.resource).
+		SelectorParam("fields", lw.fieldSelector).
+		UintParam("resourceVersion", resourceVersion).
+		Watch()
+}
+
+// createUnassignedPodLW returns a listWatch that finds all pods that need to be
 // scheduled.
-func (factory *ConfigFactory) createUnassignedPodWatch(resourceVersion uint64) (watch.Interface, error) {
-	return factory.Client.
-		Get().
-		Path("watch").
-		Path("pods").
-		SelectorParam("fields", labels.Set{"DesiredState.Host": ""}.AsSelector()).
-		UintParam("resourceVersion", resourceVersion).
-		Watch()
+func (factory *ConfigFactory) createUnassignedPodLW() *listWatch {
+	return &listWatch{
+		client:        factory.Client,
+		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+		resource:      "pods",
+	}
 }
 
-// createUnassignedPodWatch starts a watch that finds all pods that are
+func parseSelectorOrDie(s string) labels.Selector {
+	selector, err := labels.ParseSelector(s)
+	if err != nil {
+		panic(err)
+	}
+	return selector
+}
+
+// createUnassignedPodLW returns a listWatch that finds all pods that are
 // already scheduled.
-func (factory *ConfigFactory) createAssignedPodWatch(resourceVersion uint64) (watch.Interface, error) {
-	return factory.Client.
-		Get().
-		Path("watch").
-		Path("pods").
-		ParseSelectorParam("fields", "DesiredState.Host!=").
-		UintParam("resourceVersion", resourceVersion).
-		Watch()
+func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
+	return &listWatch{
+		client:        factory.Client,
+		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
+		resource:      "pods",
+	}
 }
 
-// createMinionWatch starts a watch that gets all changes to minions.
-func (factory *ConfigFactory) createMinionWatch(resourceVersion uint64) (watch.Interface, error) {
-	return factory.Client.
-		Get().
-		Path("watch").
-		Path("minions").
-		UintParam("resourceVersion", resourceVersion).
-		Watch()
+// createMinionLW returns a listWatch that gets all changes to minions.
+func (factory *ConfigFactory) createMinionLW() *listWatch {
+	return &listWatch{
+		client:        factory.Client,
+		fieldSelector: parseSelectorOrDie(""),
+		resource:      "minions",
+	}
 }
 
 // pollMinions lists all minions and returns an enumerator for cache.Poller.
