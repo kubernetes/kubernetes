@@ -109,16 +109,21 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 			continue
 		}
 		// Spin up an async copy loop.
-		proxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
+		go proxyTCP(inConn.(*net.TCPConn), outConn.(*net.TCPConn))
 	}
 }
 
 // proxyTCP proxies data bi-directionally between in and out.
 func proxyTCP(in, out *net.TCPConn) {
+	var wg sync.WaitGroup
+	wg.Add(2)
 	glog.Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	go copyBytes(in, out)
-	go copyBytes(out, in)
+	go copyBytes(in, out, &wg)
+	go copyBytes(out, in, &wg)
+	wg.Wait()
+	in.Close()
+	out.Close()
 }
 
 // udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
@@ -302,7 +307,8 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 	}
 }
 
-func copyBytes(in, out *net.TCPConn) {
+func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
+	defer wg.Done()
 	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	if _, err := io.Copy(in, out); err != nil {

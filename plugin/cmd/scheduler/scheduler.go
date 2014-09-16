@@ -18,8 +18,13 @@ package main
 
 import (
 	"flag"
+	"net"
+	"net/http"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
+	masterPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -28,7 +33,9 @@ import (
 )
 
 var (
-	master = flag.String("master", "", "The address of the Kubernetes API server")
+	master  = flag.String("master", "", "The address of the Kubernetes API server")
+	port    = flag.Int("port", masterPkg.SchedulerPort, "The port that the scheduler's http service runs on")
+	address = flag.String("address", "127.0.0.1", "The address to serve from")
 )
 
 func main() {
@@ -43,6 +50,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Invalid -master: %v", err)
 	}
+
+	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)
 
 	configFactory := &factory.ConfigFactory{Client: kubeClient}
 	config := configFactory.Create()

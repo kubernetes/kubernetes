@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 )
 
 type myType struct {
@@ -90,4 +91,28 @@ func TestMuxWatcherClose(t *testing.T) {
 	// Extra stops don't hurt things
 	w.Stop()
 	w2.Stop()
+}
+
+func TestMuxWatcherStopDeadlock(t *testing.T) {
+	done := make(chan bool)
+	m := NewMux(0)
+	go func(w0, w1 Interface) {
+		// We know Mux is in the distribute loop once one watcher receives
+		// an event. Stop the other watcher while distribute is trying to
+		// send to it.
+		select {
+		case <-w0.ResultChan():
+			w1.Stop()
+		case <-w1.ResultChan():
+			w0.Stop()
+		}
+		close(done)
+	}(m.Watch(), m.Watch())
+	m.Action(Added, &myType{})
+	select {
+	case <-time.After(5 * time.Second):
+		t.Error("timeout: deadlocked")
+	case <-done:
+	}
+	m.Shutdown()
 }

@@ -49,6 +49,7 @@ grains:
   etcd_servers: $MASTER_IP
   roles:
     - kubernetes-pool
+    - kubernetes-pool-vagrant
   cbr-cidr: $MINION_IP_RANGE
   minion_ip: $MINION_IP
 EOF

@@ -22,17 +22,24 @@ package main
 
 import (
 	"flag"
+	"net"
+	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
+	masterPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
 )
 
 var (
-	master = flag.String("master", "", "The address of the Kubernetes API server")
+	master  = flag.String("master", "", "The address of the Kubernetes API server")
+	port    = flag.Int("port", masterPkg.ControllerManagerPort, "The port that the controller-manager's http service runs on")
+	address = flag.String("address", "127.0.0.1", "The address to serve from")
 )
 
 func main() {
@@ -50,6 +57,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Invalid -master: %v", err)
 	}
+
+	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)
 
 	controllerManager := controller.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
