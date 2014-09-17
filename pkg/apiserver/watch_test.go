@@ -200,3 +200,51 @@ func TestWatchParamParsing(t *testing.T) {
 		}
 	}
 }
+
+func TestWatchProtocolSelection(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := Handle(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, codec, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/prefix/version/watch/foo"
+	dest.RawQuery = ""
+
+	table := []struct {
+		isWebsocket bool
+		connHeader  string
+	}{
+		{true, "Upgrade"},
+		{true, "keep-alive, Upgrade"},
+		{true, "upgrade"},
+		{false, "keep-alive"},
+	}
+
+	for _, item := range table {
+		request, err := http.NewRequest("GET", dest.String(), nil)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		request.Header.Set("Connection", item.connHeader)
+		request.Header.Set("Upgrade", "websocket")
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		// The requests recognized as websocket requests based on connection
+		// and upgrade headers will not also have the necessary Sec-Websocket-*
+		// headers so it is expected to throw a 400
+		if item.isWebsocket && response.StatusCode != http.StatusBadRequest {
+			t.Errorf("Unexpected response %#v", response)
+		}
+
+		if !item.isWebsocket && response.StatusCode != http.StatusOK {
+			t.Errorf("Unexpected response %#v", response)
+		}
+	}
+}
