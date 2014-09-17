@@ -8,7 +8,7 @@ Not running Linux? Consider running Linux in a local virtual machine with [Vagra
 
 #### Docker
 
-At least Docker 1.0.0+. Ensure the Docker daemon is running and can be contacted by the user you plan to run as (try `docker ps`).
+At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. Ensure the Docker daemon is running and can be contacted by the user you plan to run as (try `docker ps`).
 
 #### etcd
 
