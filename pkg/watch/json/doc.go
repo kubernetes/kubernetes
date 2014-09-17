@@ -14,30 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
-
-import (
-	"encoding/json"
-	"reflect"
-	"testing"
-)
-
-func TestEmbeddedDefaultSerialization(t *testing.T) {
-	expected := WatchEvent{
-		Type:   "foo",
-		Object: EmbeddedObject{&Pod{}},
-	}
-	data, err := json.Marshal(expected)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	actual := WatchEvent{}
-	if err := json.Unmarshal(data, &actual); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !reflect.DeepEqual(actual, expected) {
-		t.Errorf("Expected %#v, Got %#v", expected, actual)
-	}
-}
+// Package json implements a simple encoder and decoder for streams
+// of watch events over io.Writer/Readers
+package json

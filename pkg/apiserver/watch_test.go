@@ -25,10 +25,15 @@ import (
 	"testing"
 
 	"code.google.com/p/go.net/websocket"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
+
+// watchJSON defines the expected JSON wire equivalent of watch.Event
+type watchJSON struct {
+	Type   watch.EventType `json:"type,omitempty" yaml:"type,omitempty"`
+	Object json.RawMessage `json:"object,omitempty" yaml:"object,omitempty"`
+}
 
 var watchTestTable = []struct {
 	t   watch.EventType
@@ -61,7 +66,7 @@ func TestWatchWebsocket(t *testing.T) {
 		// Send
 		simpleStorage.fakeWatch.Action(action, object)
 		// Test receive
-		var got api.WatchEvent
+		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
@@ -69,8 +74,8 @@ func TestWatchWebsocket(t *testing.T) {
 		if got.Type != action {
 			t.Errorf("Unexpected type: %v", got.Type)
 		}
-		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
+		if e, a := runtime.EncodeOrDie(codec, object), string(got.Object); !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 	}
 
@@ -79,7 +84,7 @@ func TestWatchWebsocket(t *testing.T) {
 	}
 	simpleStorage.fakeWatch.Stop()
 
-	var got api.WatchEvent
+	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
 	if err == nil {
 		t.Errorf("Unexpected non-error")
@@ -118,7 +123,7 @@ func TestWatchHTTP(t *testing.T) {
 		// Send
 		simpleStorage.fakeWatch.Action(item.t, item.obj)
 		// Test receive
-		var got api.WatchEvent
+		var got watchJSON
 		err := decoder.Decode(&got)
 		if err != nil {
 			t.Fatalf("%d: Unexpected error: %v", i, err)
@@ -126,13 +131,13 @@ func TestWatchHTTP(t *testing.T) {
 		if got.Type != item.t {
 			t.Errorf("%d: Unexpected type: %v", i, got.Type)
 		}
-		if e, a := item.obj, got.Object.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("%d: Expected %v, got %v", i, e, a)
+		if e, a := runtime.EncodeOrDie(codec, item.obj), string(got.Object); !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 	}
 	simpleStorage.fakeWatch.Stop()
 
-	var got api.WatchEvent
+	var got watchJSON
 	err = decoder.Decode(&got)
 	if err == nil {
 		t.Errorf("Unexpected non-error")

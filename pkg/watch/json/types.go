@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package json
 
 import (
 	"encoding/json"
@@ -25,26 +25,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// WatchEvent objects are streamed from the api server in response to a watch request.
+// watchEvent objects are streamed from the api server in response to a watch request.
 // These are not API objects and are unversioned today.
-type WatchEvent struct {
+type watchEvent struct {
 	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType
+	Type watch.EventType `json:"type,omitempty" yaml:"type,omitempty"`
 
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
-	Object EmbeddedObject
+	Object runtime.RawExtension `json:"object,omitempty" yaml:"object,omitempty"`
 }
 
-// watchSerialization defines the JSON wire equivalent of watch.Event
-type watchSerialization struct {
-	Type   watch.EventType
-	Object json.RawMessage
-}
-
-// NewJSONWatcHEvent returns an object that will serialize to JSON and back
-// to a WatchEvent.
-func NewJSONWatchEvent(codec runtime.Codec, event watch.Event) (interface{}, error) {
+// Object converts a watch.Event into an appropriately serializable JSON object
+func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
 	obj, ok := event.Object.(runtime.Object)
 	if !ok {
 		return nil, fmt.Errorf("The event object cannot be safely converted to JSON: %v", reflect.TypeOf(event.Object).Name())
@@ -53,5 +46,5 @@ func NewJSONWatchEvent(codec runtime.Codec, event watch.Event) (interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	return &watchSerialization{event.Type, json.RawMessage(data)}, nil
+	return &watchEvent{event.Type, runtime.RawExtension{json.RawMessage(data)}}, nil
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -25,11 +24,11 @@ import (
 	"strings"
 
 	"code.google.com/p/go.net/websocket"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
 
 type WatchHandler struct {
@@ -120,7 +119,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			obj, err := api.NewJSONWatchEvent(w.codec, event)
+			obj, err := watchjson.Object(w.codec, &event)
 			if err != nil {
 				// Client disconnect.
 				w.watching.Stop()
@@ -158,7 +157,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	encoder := json.NewEncoder(w)
+	encoder := watchjson.NewEncoder(w, self.codec)
 	for {
 		select {
 		case <-cn.CloseNotify():
@@ -169,13 +168,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			obj, err := api.NewJSONWatchEvent(self.codec, event)
-			if err != nil {
-				// Client disconnect.
-				self.watching.Stop()
-				return
-			}
-			if err := encoder.Encode(obj); err != nil {
+			if err := encoder.Encode(&event); err != nil {
 				// Client disconnect.
 				self.watching.Stop()
 				return
