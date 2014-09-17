@@ -2,3 +2,4 @@ base:
   '*':
     - mine
     - common
+    - privilege
