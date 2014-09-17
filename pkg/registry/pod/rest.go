@@ -44,6 +44,7 @@ type REST struct {
 	podInfoGetter client.PodInfoGetter
 	podPollPeriod time.Duration
 	registry      Registry
+	minions       client.MinionInterface
 }
 
 type RESTConfig struct {
@@ -51,6 +52,7 @@ type RESTConfig struct {
 	PodCache      client.PodInfoGetter
 	PodInfoGetter client.PodInfoGetter
 	Registry      Registry
+	Minions       client.MinionInterface
 }
 
 // NewREST returns a new REST.
@@ -61,6 +63,7 @@ func NewREST(config *RESTConfig) *REST {
 		podInfoGetter: config.PodInfoGetter,
 		podPollPeriod: time.Second * 10,
 		registry:      config.Registry,
+		minions:       config.Minions,
 	}
 }
 
@@ -101,7 +104,11 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	}
 	if rs.podCache != nil || rs.podInfoGetter != nil {
 		rs.fillPodInfo(pod)
-		pod.CurrentState.Status = getPodStatus(pod)
+		status, err := getPodStatus(pod, rs.minions)
+		if err != nil {
+			return pod, err
+		}
+		pod.CurrentState.Status = status
 	}
 	pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
 	return pod, err
@@ -113,7 +120,11 @@ func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 		for i := range pods.Items {
 			pod := &pods.Items[i]
 			rs.fillPodInfo(pod)
-			pod.CurrentState.Status = getPodStatus(pod)
+			status, err := getPodStatus(pod, rs.minions)
+			if err != nil {
+				return pod, err
+			}
+			pod.CurrentState.Status = status
 			pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
 		}
 	}
@@ -202,9 +213,24 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 	return addr.String()
 }
 
-func getPodStatus(pod *api.Pod) api.PodStatus {
+func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, error) {
 	if pod.CurrentState.Info == nil || pod.CurrentState.Host == "" {
-		return api.PodWaiting
+		return api.PodWaiting, nil
+	}
+	res, err := minions.ListMinions()
+	if err != nil {
+		glog.Errorf("Error listing minions: %v", err)
+		return "", err
+	}
+	found := false
+	for _, minion := range res.Items {
+		if minion.ID == pod.CurrentState.Host {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return api.PodTerminated, nil
 	}
 	running := 0
 	stopped := 0
@@ -222,13 +248,13 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 	}
 	switch {
 	case running > 0 && stopped == 0 && unknown == 0:
-		return api.PodRunning
+		return api.PodRunning, nil
 	case running == 0 && stopped > 0 && unknown == 0:
-		return api.PodTerminated
+		return api.PodTerminated, nil
 	case running == 0 && stopped == 0 && unknown > 0:
-		return api.PodWaiting
+		return api.PodWaiting, nil
 	default:
-		return api.PodWaiting
+		return api.PodWaiting, nil
 	}
 }
 

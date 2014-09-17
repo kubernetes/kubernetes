@@ -119,6 +119,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 			PodCache:      podCache,
 			PodInfoGetter: podInfoGetter,
 			Registry:      m.podRegistry,
+			Minions:       m.client,
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, cloud, m.minionRegistry),
