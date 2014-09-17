@@ -40,7 +40,7 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := SourceURL{"http://localhost:49575/_not_found_", ch}
+	c := SourceURL{"http://localhost:49575/_not_found_", ch, nil}
 	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
@@ -75,6 +75,24 @@ func TestExtractInvalidManifest(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "Unspecified container name",
+			manifests: []api.ContainerManifest{
+				{
+					Version: "v1beta1",
+					Containers: []api.Container{{Name: ""}},
+				},
+			},
+		},
+		{
+			desc: "Invalid container name",
+			manifests: []api.ContainerManifest{
+				{
+					Version: "v1beta1",
+					Containers: []api.Container{{Name: "_INVALID_"}},
+				},
+			},
+		},
 	}
 	for _, testCase := range testCases {
 		data, err := json.Marshal(testCase.manifests)
@@ -87,7 +105,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 		}
 		testServer := httptest.NewServer(&fakeHandler)
 		ch := make(chan interface{}, 1)
-		c := SourceURL{testServer.URL, ch}
+		c := SourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
@@ -146,7 +164,7 @@ func TestExtractFromHTTP(t *testing.T) {
 		}
 		testServer := httptest.NewServer(&fakeHandler)
 		ch := make(chan interface{}, 1)
-		c := SourceURL{testServer.URL, ch}
+		c := SourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 		}

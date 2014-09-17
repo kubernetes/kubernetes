@@ -18,6 +18,7 @@ limitations under the License.
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -34,12 +35,14 @@ import (
 type SourceURL struct {
 	url     string
 	updates chan<- interface{}
+	data    []byte
 }
 
 func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) *SourceURL {
 	config := &SourceURL{
 		url:     url,
 		updates: updates,
+		data:    nil,
 	}
 	glog.Infof("Watching URL %s", url)
 	go util.Forever(config.run, period)
@@ -68,6 +71,11 @@ func (s *SourceURL) extractFromURL() error {
 	if len(data) == 0 {
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
+	// Short circuit if the manifest has not changed since the last time it was read.
+	if bytes.Compare(data, s.data) == 0 {
+		return nil
+	}
+	s.data = data
 
 	// First try as if it's a single manifest
 	var manifest api.ContainerManifest
@@ -101,6 +109,13 @@ func (s *SourceURL) extractFromURL() error {
 		}
 	}
 	if multiErr == nil {
+		// A single manifest that did not pass semantic validation will yield an empty
+		// array of manifests (and no error) when unmarshaled as such.  In that case,
+		// if the single manifest at least had a Version, we return the single-manifest
+		// error (if any).
+		if len(manifests) == 0 && manifest.Version != "" {
+			return singleErr
+		}
 		pods := []kubelet.Pod{}
 		for i, manifest := range manifests {
 			pod := kubelet.Pod{Name: manifest.ID, Manifest: manifest}
