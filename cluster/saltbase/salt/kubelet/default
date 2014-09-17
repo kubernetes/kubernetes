@@ -16,4 +16,5 @@
   {% set hostname_override = " -hostname_override=" + grains.minion_ip %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}} {{address}} {{config}}"
+
+DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}} {{address}} {{config}} --allow_privileged {{pillars['allow_privileged']}}"
