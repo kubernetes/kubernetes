@@ -153,15 +153,12 @@ godep go tool cover -html=target/c.out
 
 ### Integration tests
 
-You need an etcd somewhere in your path. To get from head:
-
-*Important Note* etcd is currently broken at head.  You need to build using the ```hack/install-etcd.sh``` script.
+You need an etcd somewhere in your PATH. To install etcd, run:
 
 ```
-./hack/install-etcd.sh
-sudo ln -s "third_party/bin/etcd" /usr/bin/etcd
-# Or just use the packaged one:
-sudo ln -s "$REPO_ROOT/target/bin/etcd" /usr/bin/etcd
+cd kubernetes
+hack/install-etcd.sh
+sudo ln -s $(pwd)/third_party/etcd/bin/etcd /usr/bin/etcd
 ```
 
 ```
