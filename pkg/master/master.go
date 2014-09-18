@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"net"
 	"net/http"
 	"time"
 
@@ -54,6 +55,7 @@ type Config struct {
 	MinionRegexp       string
 	PodInfoGetter      client.PodInfoGetter
 	NodeResources      api.NodeResources
+	PortalNet          *net.IPNet
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -67,6 +69,7 @@ type Master struct {
 	eventRegistry      generic.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
+	portalNet          *net.IPNet
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -98,6 +101,7 @@ func New(c *Config) *Master {
 		eventRegistry:      event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
+		portalNet:          c.PortalNet,
 	}
 	m.init(c)
 	return m
@@ -137,7 +141,7 @@ func (m *Master) init(c *Config) {
 			Minions:       m.client,
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry),
+		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                minion.NewREST(m.minionRegistry),
 		"events":                 event.NewREST(m.eventRegistry),

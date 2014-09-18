@@ -17,6 +17,8 @@ limitations under the License.
 package registrytest
 
 import (
+	"sync"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -27,6 +29,7 @@ func NewServiceRegistry() *ServiceRegistry {
 }
 
 type ServiceRegistry struct {
+	mu            sync.Mutex
 	List          api.ServiceList
 	Service       *api.Service
 	Err           error
@@ -39,48 +42,84 @@ type ServiceRegistry struct {
 }
 
 func (r *ServiceRegistry) ListServices(ctx api.Context) (*api.ServiceList, error) {
-	return &r.List, r.Err
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Return by copy to avoid data races
+	res := new(api.ServiceList)
+	*res = r.List
+	res.Items = append([]api.Service{}, r.List.Items...)
+	return res, r.Err
 }
 
 func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.Service = svc
 	r.List.Items = append(r.List.Items, *svc)
 	return r.Err
 }
 
 func (r *ServiceRegistry) GetService(ctx api.Context, id string) (*api.Service, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.GottenID = id
 	return r.Service, r.Err
 }
 
 func (r *ServiceRegistry) DeleteService(ctx api.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.DeletedID = id
+	r.Service = nil
 	return r.Err
 }
 
 func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.UpdatedID = svc.ID
+	r.Service = svc
 	return r.Err
 }
 
 func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return nil, r.Err
 }
 
 func (r *ServiceRegistry) ListEndpoints(ctx api.Context) (*api.EndpointsList, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return &r.EndpointsList, r.Err
 }
 
 func (r *ServiceRegistry) GetEndpoints(ctx api.Context, id string) (*api.Endpoints, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.GottenID = id
 	return &r.Endpoints, r.Err
 }
 
 func (r *ServiceRegistry) UpdateEndpoints(ctx api.Context, e *api.Endpoints) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	r.Endpoints = *e
 	return r.Err
 }
 
 func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return nil, r.Err
 }

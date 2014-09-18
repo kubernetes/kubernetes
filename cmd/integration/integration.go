@@ -123,11 +123,16 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	}
 
 	// Master
+	_, portalNet, err := net.ParseCIDR("10.0.0.0/24")
+	if err != nil {
+		glog.Fatalf("Unable to parse CIDR: %v", err)
+	}
 	m := master.New(&master.Config{
 		Client:        cl,
 		EtcdHelper:    helper,
 		Minions:       machineList,
 		PodInfoGetter: fakePodInfoGetter{},
+		PortalNet:     portalNet,
 	})
 	mux := http.NewServeMux()
 	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, "/api/v1beta1")
@@ -349,18 +354,33 @@ func runServiceTest(client *client.Client) {
 	if err := wait.Poll(time.Second, time.Second*20, podExists(client, ctx, pod.ID)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
-	svc := api.Service{
+	svc1 := api.Service{
 		TypeMeta: api.TypeMeta{ID: "service1"},
 		Selector: map[string]string{
 			"name": "thisisalonglabel",
 		},
 		Port: 8080,
 	}
-	_, err = client.CreateService(ctx, &svc)
+	_, err = client.CreateService(ctx, &svc1)
 	if err != nil {
-		glog.Fatalf("Failed to create service: %v, %v", svc, err)
+		glog.Fatalf("Failed to create service: %v, %v", svc1, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*10, endpointsSet(client, ctx, svc.ID, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc1.ID, 1)); err != nil {
+		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
+	}
+	// A second service with the same port.
+	svc2 := api.Service{
+		TypeMeta: api.TypeMeta{ID: "service2"},
+		Selector: map[string]string{
+			"name": "thisisalonglabel",
+		},
+		Port: 8080,
+	}
+	_, err = client.CreateService(ctx, &svc2)
+	if err != nil {
+		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc2.ID, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	glog.Info("Service test passed.")

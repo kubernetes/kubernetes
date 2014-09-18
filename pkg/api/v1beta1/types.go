@@ -451,6 +451,12 @@ type Service struct {
 	// ContainerPort is the name of the port on the container to direct traffic to.
 	// Optional, if unspecified use the first port on the container.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
+
+	// PortalIP is assigned by the master.  If specified by the user it will be ignored.
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
+
+	// ProxyPort is assigned by the master.  If specified by the user it will be ignored.
+	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

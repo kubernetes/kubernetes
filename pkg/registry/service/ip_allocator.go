@@ -32,7 +32,6 @@ type ipAllocator struct {
 }
 
 // newIPAllocator creates and intializes a new ipAllocator object.
-// FIXME: resync from storage at startup.
 func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 	if subnet == nil || subnet.IP == nil || subnet.Mask == nil {
 		return nil
