@@ -52,4 +52,4 @@
 {% endif %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{ minion_regexp }} {{ cloud_provider }} --allow_privileged {{pillars['allow_privileged']}}"
+DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{ minion_regexp }} {{ cloud_provider }} --allow_privileged {{pillar['allow_privileged']}}"
