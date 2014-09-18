@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -52,6 +54,12 @@ func getWatchParams(query url.Values) (label, field labels.Selector, resourceVer
 	return label, field, resourceVersion
 }
 
+var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
+
+func isWebsocketRequest(req *http.Request) bool {
+	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
+}
+
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	parts := splitPath(req.URL.Path)
@@ -75,7 +83,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// TODO: This is one watch per connection. We want to multiplex, so that
 		// multiple watches of the same thing don't create two watches downstream.
 		watchServer := &WatchServer{watching, h.codec}
-		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
+		if isWebsocketRequest(req) {
 			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
 		} else {
 			watchServer.ServeHTTP(w, req)
