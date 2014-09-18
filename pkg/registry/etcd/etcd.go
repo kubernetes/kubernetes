@@ -218,7 +218,7 @@ func (r *Registry) DeletePod(podID string) error {
 			// This really shouldn't happen, it indicates something is broken, and likely
 			// there is a lost pod somewhere.
 			// However it is "deleted" so log it and move on
-			glog.Infof("Couldn't find: %s in %#v", podID, manifests)
+			glog.Warningf("Couldn't find: %s in %#v", podID, manifests)
 		}
 		manifests.Items = newManifests
 		return manifests, nil

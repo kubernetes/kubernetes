@@ -72,7 +72,7 @@ func NewConfigSourceFile(filename string, serviceChannel chan ServiceUpdate, end
 
 // Run begins watching the config file.
 func (s ConfigSourceFile) Run() {
-	glog.Infof("Watching file %s", s.filename)
+	glog.V(1).Infof("Watching file %s", s.filename)
 	var lastData []byte
 	var lastServices []api.Service
 	var lastEndpoints []api.Endpoints

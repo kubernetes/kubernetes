@@ -101,7 +101,7 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 		existingEndpoints, exists := lb.endpointsMap[endpoint.ID]
 		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
 		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
-			glog.Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.ID, endpoint.Endpoints)
+			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.ID, endpoint.Endpoints)
 			lb.endpointsMap[endpoint.ID] = validEndpoints
 			// Reset the round-robin index.
 			lb.rrIndex[endpoint.ID] = 0
@@ -111,7 +111,7 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	// Remove endpoints missing from the update.
 	for k, v := range lb.endpointsMap {
 		if _, exists := registeredEndpoints[k]; !exists {
-			glog.Infof("LoadBalancerRR: Removing endpoints for %s -> %+v", k, v)
+			glog.V(3).Infof("LoadBalancerRR: Removing endpoints for %s -> %+v", k, v)
 			delete(lb.endpointsMap, k)
 		}
 	}

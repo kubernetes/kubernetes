@@ -115,7 +115,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
 				// that called us call us again.
 				return
 			}
-			glog.Infof("Got watch: %#v", event)
+			glog.V(4).Infof("Got watch: %#v", event)
 			rc, ok := event.Object.(*api.ReplicationController)
 			if !ok {
 				glog.Errorf("unexpected object: %#v", event.Object)
@@ -125,7 +125,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
 			*resourceVersion = rc.ResourceVersion + 1
 			// Sync even if this is a deletion event, to ensure that we leave
 			// it in the desired state.
-			glog.Infof("About to sync from watch: %v", rc.ID)
+			glog.V(4).Infof("About to sync from watch: %v", rc.ID)
 			rm.syncHandler(*rc)
 		}
 	}
@@ -153,7 +153,7 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 		diff *= -1
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
-		glog.Infof("Too few replicas, creating %d\n", diff)
+		glog.V(2).Infof("Too few replicas, creating %d\n", diff)
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
@@ -162,7 +162,7 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 		}
 		wait.Wait()
 	} else if diff > 0 {
-		glog.Infof("Too many replicas, deleting %d\n", diff)
+		glog.V(2).Infof("Too many replicas, deleting %d\n", diff)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
 		for i := 0; i < diff; i++ {
@@ -191,7 +191,7 @@ func (rm *ReplicationManager) synchronize() {
 	for ix := range controllerSpecs {
 		go func(ix int) {
 			defer wg.Done()
-			glog.Infof("periodic sync of %v", controllerSpecs[ix].ID)
+			glog.V(4).Infof("periodic sync of %v", controllerSpecs[ix].ID)
 			err := rm.syncHandler(controllerSpecs[ix])
 			if err != nil {
 				glog.Errorf("Error synchronizing: %#v", err)
