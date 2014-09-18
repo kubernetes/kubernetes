@@ -96,29 +96,22 @@ The format and semantics of the User and Groups strings depends on the authentic
 
 A verb is a string which describes the action being taken.  Kubernetes core code defines the following mappings from (HTTP method, object Kind) to verb.
 
-HTTP Method | Resource prefix         | Verb
------------ | ----------------------- | ----
-GET         | /pods                   | core.read
-POST        | /pods                   | core.write
-DELETE      | /pods                   | core.write
-GET         | /services               | core.read
-POST        | /services               | core.write
-DELETE      | /services               | core.write
-GET         | /endpoints              | core.read
-POST        | /endpoints              | core.write
-DELETE      | /endpoints              | core.write
-GET         | /replicationControllers | core.read
-POST        | /replicationControllers | core.write
-DELETE      | /replicationControllers | core.write
-GET         | /minions                | cluster.read
-POST        | /minions                | cluster.write
-DELETE      | /minions                | cluster.write
-GET         | /bindings               | cluster.read
-POST        | /bindings               | cluster.write
-DELETE      | /bindings               | cluster.write
-GET         | /namespaces             | namespaces.read
-POST        | /namespaces             | namespaces.write
-DELETE      | /namespaces             | namespaces.write
+HTTP Method        | Resource prefix         | Verb
+------------------ | ----------------------- | ----
+GET                | /pods                   | core.read
+POST,DELETE        | /pods                   | core.write
+GET                | /services               | core.read
+POST,DELETE        | /services               | core.write
+GET                | /endpoints              | core.read
+POST,DELETE        | /endpoints              | core.write
+GET                | /replicationControllers | core.read
+POST,DELETE        | /replicationControllers | core.write
+GET                | /minions                | cluster.read
+POST,DELETE        | /minions                | cluster.write
+GET                | /bindings               | cluster.read
+POST,DELETE        | /bindings               | cluster.write
+GET                | /namespaces             | namespaces.read
+POST,DELETE        | /namespaces             | namespaces.write
 
 Plug-ins are required to define their own mappings.  Policies can use prefix matching on verbs, so that `core.*` includes `core.read` and `core.write`.
 Several related Kinds of objects are often combined under a single Verb prefix to allow for expressing a policy with fewer policy objects (a user can be granted read access to pods, services, endpoints, and replicationControllers with a single verb, rather than four.)  When finer granularity is needed, the Kind object attribute can be used.  The reason for not doing away with prefixes like `core.` entirely is twofold:
