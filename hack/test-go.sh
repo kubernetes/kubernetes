@@ -46,7 +46,7 @@ find_test_pkgs() {
 
 # -covermode=atomic becomes default with -race in Go >=1.3
 KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 30s}
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 60s}
 
 cd "${KUBE_TARGET}"
 
