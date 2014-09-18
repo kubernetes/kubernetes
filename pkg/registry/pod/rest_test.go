@@ -381,6 +381,16 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
+					Host: "machine-2",
+				},
+			},
+			api.PodTerminated,
+			"no info, but bad machine",
+		},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
 					Info: map[string]docker.Container{
 						"containerA": runningState,
 						"containerB": runningState,
