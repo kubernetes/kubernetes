@@ -95,6 +95,7 @@ The format and semantics of the User and Groups strings depends on the authentic
 #### Verbs
 
 A verb is a string which describes the action being taken.  Kubernetes core code defines the following mappings from (HTTP method, object Kind) to verb.
+
 HTTP Method | Resource prefix         | Verb
 ----------- | ----------------------- | ----
 GET         | /pods                   | core.read
@@ -122,8 +123,17 @@ DELETE      | /namespaces             | namespaces.write
 Plug-ins are required to define their own mappings.  Policies can use prefix matching on verbs, so that `core.*` includes `core.read` and `core.write`.
 Several related Kinds of objects are often combined under a single Verb prefix to allow for expressing a policy with fewer policy objects (a user can be granted read access to pods, services, endpoints, and replicationControllers with a single verb, rather than four.)  When finer granularity is needed, the Kind object attribute can be used.  The reason for not doing away with prefixes like `core.` entirely is twofold:
    1. when a new plugin is introduced, users should not automatically get access to those new kinds of objects.
-   1. read and write may not be the right verbs for some kinds of objects.
+   1. read and write may not be the right verbs for some kinds of API actions.
 
+*TBD: There are some actions which we plan to implement for kubernetes which do not neatly fit the GET/POST resource model, such as restarting a container, or creating a pod from a template.  These may be implemented with different URL paths, or with query parameters, or with flags in the payload.  However, it is done, there will need to be some mapping from the request to a verb.*
+
+Some made-up but illustrative examples:
+
+HTTP Method | request                 | Verb
+----------- | ----------------------- | ----
+POST        | /restartPod             | pods.restart
+POST        | /pods/myPod?restart=1   | pods.restart
+POST        | /pods/otherPod?fromtpl=myPodTpl | pods.write.fromtemplate
 
 #### Object attributes
 The object of an API action is the kind and name of the object being accessed.
@@ -287,17 +297,17 @@ Policy{Effect{"ALLOW"}, Subject{Group{"some-ns-managers"}}, Verb{"policies.*"} (
 Policy{Effect{"ALLOW"}, Subject{Group{"some-ns-auditors"}}, Verb{"policy.read"}} (Namespace of Policy = "someNs")
 ```
 
-#### Allow Bob (a developer who writes crappy code) to create pods in a project with a "stage=dev" label but not a "stage=prod" label.
+#### Allow Bob, who writes buggy code, to create pods with a "stage=dev" label but not a "stage=prod" label.
 
 ```
 Policy{Effect{"ALLOW"}, Subject{User{"bob"}}, Verb{"core.write"}, Object{Kind{"pods"}, Where{"stage=dev"} (Namespace of Policy = "someNs")
 ```
 
 #### Allow some users to restart containers of a pod but not delete or modify it.
-*TODO: need a finer grained verb for restarting a pod.*
+*TODO: need a verb for this.*
 
-#### Allow a cron controller to create a pod based on a certain podTemplate, but not create any other pod
-*TODO: need finer grained verb for this.*
+#### Allow a cron controller to create a pod based only on a certain podTemplate
+*TODO: need to define a verb for this.*
 
 ## Policy Languages
 
