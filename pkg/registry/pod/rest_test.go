@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -257,6 +258,15 @@ func TestGetPodCloud(t *testing.T) {
 }
 
 func TestMakePodStatus(t *testing.T) {
+	fakeClient := client.Fake{
+		Minions: api.MinionList{
+			Items: []api.Minion{
+				{
+					JSONBase: api.JSONBase{ID: "machine"},
+				},
+			},
+		},
+	}
 	desiredState := api.PodState{
 		Manifest: api.ContainerManifest{
 			Version: "v1beta1",
@@ -269,12 +279,6 @@ func TestMakePodStatus(t *testing.T) {
 	currentState := api.PodState{
 		Host: "machine",
 	}
-	pod := &api.Pod{DesiredState: desiredState, CurrentState: currentState}
-	status := getPodStatus(pod)
-	if status != api.PodWaiting {
-		t.Errorf("Expected 'Waiting', got '%s'", status)
-	}
-
 	runningState := docker.Container{
 		State: docker.State{
 			Running: true,
@@ -286,67 +290,103 @@ func TestMakePodStatus(t *testing.T) {
 		},
 	}
 
-	// All running.
-	pod = &api.Pod{
-		DesiredState: desiredState,
-		CurrentState: api.PodState{
-			Info: map[string]docker.Container{
-				"containerA": runningState,
-				"containerB": runningState,
+	tests := []struct {
+		pod    *api.Pod
+		status api.PodStatus
+		test   string
+	}{
+		{&api.Pod{DesiredState: desiredState, CurrentState: currentState}, api.PodWaiting, "waiting"},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
+					Info: map[string]docker.Container{
+						"containerA": runningState,
+						"containerB": runningState,
+					},
+					Host: "machine",
+				},
 			},
-			Host: "machine",
+			api.PodRunning,
+			"all running",
+		},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
+					Info: map[string]docker.Container{
+						"containerA": runningState,
+						"containerB": runningState,
+					},
+					Host: "machine-two",
+				},
+			},
+			api.PodTerminated,
+			"all running but minion is missing",
+		},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
+					Info: map[string]docker.Container{
+						"containerA": stoppedState,
+						"containerB": stoppedState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodTerminated,
+			"all stopped",
+		},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
+					Info: map[string]docker.Container{
+						"containerA": stoppedState,
+						"containerB": stoppedState,
+					},
+					Host: "machine-two",
+				},
+			},
+			api.PodTerminated,
+			"all stopped but minion missing",
+		},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
+					Info: map[string]docker.Container{
+						"containerA": runningState,
+						"containerB": stoppedState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodWaiting,
+			"mixed state #1",
+		},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: api.PodState{
+					Info: map[string]docker.Container{
+						"containerA": runningState,
+					},
+					Host: "machine",
+				},
+			},
+			api.PodWaiting,
+			"mixed state #2",
 		},
 	}
-	status = getPodStatus(pod)
-	if status != api.PodRunning {
-		t.Errorf("Expected 'Running', got '%s'", status)
-	}
-
-	// All stopped.
-	pod = &api.Pod{
-		DesiredState: desiredState,
-		CurrentState: api.PodState{
-			Info: map[string]docker.Container{
-				"containerA": stoppedState,
-				"containerB": stoppedState,
-			},
-			Host: "machine",
-		},
-	}
-	status = getPodStatus(pod)
-	if status != api.PodTerminated {
-		t.Errorf("Expected 'Terminated', got '%s'", status)
-	}
-
-	// Mixed state.
-	pod = &api.Pod{
-		DesiredState: desiredState,
-		CurrentState: api.PodState{
-			Info: map[string]docker.Container{
-				"containerA": runningState,
-				"containerB": stoppedState,
-			},
-			Host: "machine",
-		},
-	}
-	status = getPodStatus(pod)
-	if status != api.PodWaiting {
-		t.Errorf("Expected 'Waiting', got '%s'", status)
-	}
-
-	// Mixed state.
-	pod = &api.Pod{
-		DesiredState: desiredState,
-		CurrentState: api.PodState{
-			Info: map[string]docker.Container{
-				"containerA": runningState,
-			},
-			Host: "machine",
-		},
-	}
-	status = getPodStatus(pod)
-	if status != api.PodWaiting {
-		t.Errorf("Expected 'Waiting', got '%s'", status)
+	for _, test := range tests {
+		if status, err := getPodStatus(test.pod, &fakeClient); status != test.status {
+			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
+			if err != nil {
+				t.Errorf("In test %s, unexpected error: %v", test.test, err)
+			}
+		}
 	}
 }
 
