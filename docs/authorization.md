@@ -128,6 +128,8 @@ POST        | /restartPod             | pods.restart
 POST        | /pods/myPod?restart=1   | pods.restart
 POST        | /pods/otherPod?fromtpl=myPodTpl | pods.write.fromtemplate
 
+*Alternative: instead of using prefix matching, we could instead predefine a forest of verb precedences.  In role-based access control schemes like GCE, this is referred to as _concentric_ permissions: write includes read and so on.  The prefix matching format has the advantage that users don't have to memorize the precedence of verbs; this is not a problem in RBAC where there are only 3 or 4 verb, but in this scheme there may be many more and new ones may be introduced by plugins.*
+
 #### Object attributes
 The object of an API action is the kind and name of the object being accessed.
 
