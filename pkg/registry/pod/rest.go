@@ -214,7 +214,7 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 }
 
 func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, error) {
-	if pod.CurrentState.Info == nil || pod.CurrentState.Host == "" {
+	if pod.CurrentState.Host == "" {
 		return api.PodWaiting, nil
 	}
 	res, err := minions.ListMinions()
@@ -231,6 +231,9 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 	}
 	if !found {
 		return api.PodTerminated, nil
+	}
+	if pod.CurrentState.Info == nil {
+		return api.PodWaiting, nil
 	}
 	running := 0
 	stopped := 0
