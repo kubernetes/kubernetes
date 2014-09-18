@@ -20,11 +20,10 @@ Next build Kubernetes, package the release, and upload to Azure Storage:
     cd kubernetes
     release/azure/release.sh
 
-Next, specify an existing US West virtual network in /cluster/azure/config.sh:
+Next, specify an existing virtual network in `cluster/azure/config-defualt.sh`:
 
     AZ_VNET=<vnet name>
-    AZ_SUBNET=<subnet name>
-    
+
 Now you're ready.
 
 You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, start with:
