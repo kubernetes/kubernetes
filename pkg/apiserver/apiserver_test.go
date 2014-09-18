@@ -88,7 +88,7 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(labels.Selector) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(label, field labels.Selector) (runtime.Object, error) {
 	result := &SimpleList{
 		Items: storage.list,
 	}

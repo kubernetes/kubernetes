@@ -97,14 +97,17 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+	if !field.Empty() {
+		return nil, fmt.Errorf("field selector not supported yet")
+	}
 	controllers, err := rs.registry.ListControllers()
 	if err != nil {
 		return nil, err
 	}
 	filtered := []api.ReplicationController{}
 	for _, controller := range controllers.Items {
-		if selector.Matches(labels.Set(controller.Labels)) {
+		if label.Matches(labels.Set(controller.Labels)) {
 			rs.fillCurrentState(&controller)
 			filtered = append(filtered, controller)
 		}

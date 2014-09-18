@@ -86,7 +86,7 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	return rs.toApiMinion(id), err
 }
 
-func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
 	nameList, err := rs.registry.List()
 	if err != nil {
 		return nil, err

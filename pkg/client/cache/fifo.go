@@ -116,6 +116,23 @@ func (f *FIFO) Pop() interface{} {
 	}
 }
 
+// Replace will delete the contents of 'f', using instead the given map.
+// 'f' takes ownersip of the map, you should not reference the map again
+// after calling this function. f's queue is reset, too; upon return, it
+// will contain the items in the map, in no particular order.
+func (f *FIFO) Replace(idToObj map[string]interface{}) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.items = idToObj
+	f.queue = f.queue[:0]
+	for id := range idToObj {
+		f.queue = append(f.queue, id)
+	}
+	if len(f.queue) > 0 {
+		f.cond.Broadcast()
+	}
+}
+
 // NewFIFO returns a Store which can be used to queue up items to
 // process.
 func NewFIFO() *FIFO {
