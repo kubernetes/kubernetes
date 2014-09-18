@@ -66,7 +66,7 @@ Docker allocates IP addresses from a bridge we create on each node, using its â€
 ### Other networking implementation examples
 With the primary aim of providing IP-per-pod-model, other implementations exist to serve the purpose outside of GCE.
   - [OpenVSwitch with GRE/VxLAN](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/ovs-networking.md)
-  - [Rudder](https://github.com/coreos/rudder#rudder)
+  - [Flannel](https://github.com/coreos/flannel#flannel)
 
 ## Challenges and future work
 
