@@ -23,8 +23,9 @@
 6. Get the Kubernetes source:
 
    ```sh
-   go get github.com/GoogleCloudPlatform/kubernetes
-   cd $GOPATH/src/github.com/GoogleCloudPlatform/kubernetes
+   mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform
+   git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+   cd kubernetes
    ```
 
 ### Setup
