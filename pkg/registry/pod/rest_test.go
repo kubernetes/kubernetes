@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -554,6 +555,10 @@ type FakePodInfoGetter struct {
 
 func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	return f.info, f.err
+}
+
+func (f *FakePodInfoGetter) WatchPodInfo(host, id string) (watch.Interface, error) {
+	return nil, fmt.Errorf("unsupported")
 }
 
 func TestFillPodInfo(t *testing.T) {

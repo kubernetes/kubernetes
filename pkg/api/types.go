@@ -333,6 +333,8 @@ type PodList struct {
 
 func (*PodList) IsAnAPIObject() {}
 
+func (PodInfo) IsAnAPIObject() {}
+
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	JSONBase     `json:",inline" yaml:",inline"`

@@ -17,11 +17,13 @@ limitations under the License.
 package master
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 )
 
@@ -38,12 +40,17 @@ func (f *FakePodInfoGetter) GetPodInfo(host, id string) (api.PodInfo, error) {
 	return f.data, f.err
 }
 
+func (f *FakePodInfoGetter) WatchPodInfo(host, id string) (watch.Interface, error) {
+	return nil, fmt.Errorf("unsupported")
+}
+
 func TestPodCacheGet(t *testing.T) {
 	cache := NewPodCache(nil, nil)
 
 	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
-	cache.podInfo["foo"] = expected
-
+	cache.podInfo["foo"] = &cacheEntry{
+		info: expected,
+	}
 	info, err := cache.GetPodInfo("host", "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
