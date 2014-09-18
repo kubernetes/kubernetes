@@ -26,10 +26,10 @@ Currently, the user cannot control what kind of media is used for an EmptyDirect
 A Volume with a HostDirectory property allows access to files on the current node.
 
 Some uses for a HostDirectory are:
-  - running a container that need access to Docker internals; use a HostDirectory of /var/lib/docker.
+  - running a container that needs access to Docker internals; use a HostDirectory of /var/lib/docker.
   - running cAdvisor in a container; use a HostDirectory of /dev/cgroups.
 
 Watch out when using this type of volume, because:
-  - pods with identical configuration (such as created from a PodTemplate) may behave differently on different nodes, if they see node-specific files.
+  - pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
   - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDirectory.
 
