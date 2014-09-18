@@ -121,7 +121,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 }
 
 // rawExtensionToEmbeddedObject does the conversion you would expect from the name, using the information
-// given in conversion.Scope. It's placed in the DefaultScheme as a ConversionFunc to enable plugins;
+// given in conversion.Scope. It's placed in all schemes as a ConversionFunc to enable plugins;
 // see the comment for RawExtension.
 func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conversion.Scope) error {
 	if len(in.RawJSON) == 4 && string(in.RawJSON) == "null" {

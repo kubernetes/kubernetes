@@ -27,52 +27,29 @@ import (
 var scheme = runtime.NewScheme()
 var Codec = runtime.CodecFor(scheme, "v1test")
 
-// EmbeddedObject implements a Codec specific version of an
-// embedded object.
-type EmbeddedObject struct {
-	runtime.Object
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface.
-func (a *EmbeddedObject) UnmarshalJSON(b []byte) error {
-	obj, err := runtime.CodecUnmarshalJSON(Codec, b)
-	a.Object = obj
-	return err
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (a EmbeddedObject) MarshalJSON() ([]byte, error) {
-	return runtime.CodecMarshalJSON(Codec, a.Object)
-}
-
-// SetYAML implements the yaml.Setter interface.
-func (a *EmbeddedObject) SetYAML(tag string, value interface{}) bool {
-	obj, ok := runtime.CodecSetYAML(Codec, tag, value)
-	a.Object = obj
-	return ok
-}
-
-// GetYAML implements the yaml.Getter interface.
-func (a EmbeddedObject) GetYAML() (tag string, value interface{}) {
-	return runtime.CodecGetYAML(Codec, a.Object)
-}
-
 type EmbeddedTest struct {
 	runtime.JSONBase `yaml:",inline" json:",inline"`
-	Object           EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	Object           runtime.EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
+	EmptyObject      runtime.EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 }
 
-func (*EmbeddedTest) IsAnAPIObject() {}
+type EmbeddedTestExternal struct {
+	runtime.JSONBase `yaml:",inline" json:",inline"`
+	Object           runtime.RawExtension `yaml:"object,omitempty" json:"object,omitempty"`
+	EmptyObject      runtime.RawExtension `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+}
+
+func (*EmbeddedTest) IsAnAPIObject()         {}
+func (*EmbeddedTestExternal) IsAnAPIObject() {}
 
 func TestEmbeddedObject(t *testing.T) {
 	s := scheme
 	s.AddKnownTypes("", &EmbeddedTest{})
-	s.AddKnownTypes("v1test", &EmbeddedTest{})
+	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
 
 	outer := &EmbeddedTest{
 		JSONBase: runtime.JSONBase{ID: "outer"},
-		Object: EmbeddedObject{
+		Object: runtime.EmbeddedObject{
 			&EmbeddedTest{
 				JSONBase: runtime.JSONBase{ID: "inner"},
 			},
@@ -95,18 +72,30 @@ func TestEmbeddedObject(t *testing.T) {
 		t.Errorf("Expected: %#v but got %#v", e, a)
 	}
 
+	// test JSON decoding of the external object, which should preserve
+	// raw bytes
+	var externalViaJSON EmbeddedTestExternal
+	err = json.Unmarshal(wire, &externalViaJSON)
+	if err != nil {
+		t.Fatalf("Unexpected decode error %v", err)
+	}
+	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
+		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
+	}
+	if !reflect.DeepEqual(externalViaJSON.EmptyObject.RawJSON, []byte("null")) || len(externalViaJSON.Object.RawJSON) == 0 {
+		t.Errorf("Expected deserialization of nested objects into bytes, got %#v", externalViaJSON)
+	}
+
 	// test JSON decoding, too, since Decode uses yaml unmarshalling.
+	// Generic Unmarshalling of JSON cannot load the nested objects because there is
+	// no default schema set.  Consumers wishing to get direct JSON decoding must use
+	// the external representation
 	var decodedViaJSON EmbeddedTest
 	err = json.Unmarshal(wire, &decodedViaJSON)
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
-
-	// Things that Decode would have done for us:
-	decodedViaJSON.Kind = ""
-	decodedViaJSON.APIVersion = ""
-
-	if e, a := outer, &decodedViaJSON; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected: %#v but got %#v", e, a)
+	if a := decodedViaJSON; a.Object.Object != nil || a.EmptyObject.Object != nil {
+		t.Errorf("Expected embedded objects to be nil: %#v", a)
 	}
 }
