@@ -23,10 +23,10 @@ These basic use cases should be possible:
  1. Restrict which users can add and remove machines to a cluster.
  1. Restrict which users can create or remove namespaces.
  1. Allow some users (e.g. cluster administrators) to create or remove any object in the cluster.
- 1. Allow some users (e.g. project admins) to create or remove any object in the project
- 1. Allow some users (e.g. project admins) to add or edit any policies scoped to that project
- 1. Allow some users to create and delete pods and replicationControllers and services in a project, but not affect minions or modify or remove existing policies.
- 1. Allow some users (e.g. developers) to create pods in a project with a "dev" label but not a "prod" label.
+ 1. Allow some users (e.g. project admins) to create or remove any object in the namespace
+ 1. Allow some users (e.g. project admins) to add or edit any policies scoped to the namespace
+ 1. Allow some users to create and delete pods and replicationControllers and services in a namespace, but not affect minions or modify or remove existing policies.
+ 1. Allow some users (e.g. developers) to create pods in namespace with a "dev" label but not a "prod" label.
  1. Allow some users to restart containers of a pod but not delete or modify it.
 
 These additional use cases should be possible, but may require clients to write additional code or use a client binary:
@@ -40,14 +40,14 @@ These additional use cases should be possible, but may require clients to write 
 ### Prerequisites
 This document assumes that [Namespaces](https://github.com/GoogleCloudPlatform/kubernetes/pull/1114) are implemented.  Access policies are often, but not always, attached to a namespace.  Namespaces have policies which control the ability of a user to access the namespace.
 
-This document assumes that Kubernetes has support for _plugins_, which are processes separate from the apiserver, which can register new object types (e.g. a Build Controller), and which the APIserver can delegate handling of those objects URLs (e.g. `/api/v1beta3/buildController`).  It is further assumed that there will be support libraries which can be used by plugins to efficiently watch and index objects and evaluate selectors.
+This document assumes that Kubernetes has support for _plugins_, which are processes separate from the apiserver, which can register new object types (e.g. a Build Controller), and to which the APIserver can delegate handling of those objects URLs (e.g. `/api/v1beta3/buildController`).  It is further assumed that there will be support libraries which can be used by plugins to efficiently watch and index objects and evaluate selectors.
 
 This document assumes that Kubernetes has support for authenticating users via an identity provider.  That identity provider might be external to kubernetes.  The main mechanism for communicating an identity to the k8s apiserver from an identity provider is expected to be Oauth tokens used in an OpenID-like manner.  The authorization tokens may have scopes which restrict what k8s can learn about the party presenting the token, but, for the purposes of this document, they do not include scopes which refer to kubernetes objects or actions.  Whether and how to handle Oauth tokens which are scoped in terms of Kubernetes objects/action is future work.
 
-This document assumes that Name is a user-provided typically-human-readable string, per #1124.
+This document assumes that Name is a user-provided typically-human-readable string which all Kubernetes API objects have, per #1124.
 
 ## Design Overview
-Authorization occurs when a set of relevant _attributes_ are extracted from the current HTTP request, and passed to an `Authorize` function, which allows or denies the action.
+Authorization occurs when a set of relevant _attributes_ are extracted from the current HTTP request, and passed to an `Authorize` function which allows or denies the action.
 
 ### Pluggability
 Kubernetes will allow for multiple implementations of authorization.  The pattern for implementing authorization is:
@@ -278,20 +278,20 @@ Policy{Effect{"ALLOW"}, Subject{Group{"ns-admins"}}, Verb{"namespaces.*"}} (Name
 Policy{Effect{"ALLOW"}, Subject{Group{"cluster-admins"}}, Verb{"*"}}  (Namespace of Policy = "")
 ```
 
-#### Allow some users to create or remove any object in the project
+#### Allow some users to create or remove any object in the namespace
 ```
 Policy{Effect{"ALLOW"}, Subject{Group{"some-ns-admins"}}, Verb{"*"},  (Namespace of Policy = "someNs")
 ```
 
 Note: cluster resources are not in a namespace so only empty-namespace policies can ALLOW access to them.
 
-#### Allow some users to add or edit any policies scoped to that project
+#### Allow some users to add or edit any policies scoped to that namespace
 
 ```
 Policy{Effect{"ALLOW"}, Subject{Group{"some-ns-managers"}}, Verb{"policies.*"} (Namespace of Policy = "someNs")}
 ```
 
-#### Allow some users to view any policies scoped to that project
+#### Allow some users to view any policies scoped to that namespace
 
 ```
 Policy{Effect{"ALLOW"}, Subject{Group{"some-ns-auditors"}}, Verb{"policy.read"}} (Namespace of Policy = "someNs")
