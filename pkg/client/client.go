@@ -18,6 +18,7 @@ package client
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -141,6 +142,9 @@ func (s *StatusErr) Error() string {
 type AuthInfo struct {
 	User     string
 	Password string
+	CAFile   string
+	CertFile string
+	KeyFile  string
 }
 
 // RESTClient holds common code used to work with API resources that follow the
@@ -169,6 +173,33 @@ func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec) (*
 	base.Path = ""
 	base.RawQuery = ""
 	base.Fragment = ""
+
+	var config *tls.Config
+	if auth != nil && len(auth.CertFile) != 0 {
+		cert, err := tls.LoadX509KeyPair(auth.CertFile, auth.KeyFile)
+		if err != nil {
+			return nil, err
+		}
+		data, err := ioutil.ReadFile(auth.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(data)
+		config = &tls.Config{
+			Certificates: []tls.Certificate{
+				cert,
+			},
+			RootCAs:    certPool,
+			ClientCAs:  certPool,
+			ClientAuth: tls.RequireAndVerifyClientCert,
+		}
+	} else {
+		config = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
+
 	return &RESTClient{
 		host:   base.String(),
 		prefix: prefix.Path,
@@ -176,9 +207,7 @@ func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec) (*
 		auth:   auth,
 		httpClient: &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
+				TLSClientConfig: config,
 			},
 		},
 		Sync:       false,
