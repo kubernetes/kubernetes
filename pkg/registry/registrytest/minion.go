@@ -41,6 +41,7 @@ func (r *MinionRegistry) Insert(minion string) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Minion = minion
+	r.Minions = append(r.Minions, minion)
 	return r.Err
 }
 
