@@ -8,13 +8,7 @@
 
 ### Setup
 
-By default, the Vagrant setup will create a single kubernetes-master and 3 kubernetes-minions.  You can control the number of minions that are instantiated via an environment variable on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion.
-
-```
-export KUBERNETES_NUM_MINIONS=3
-```
-
-To start your local cluster, open a terminal window and run:
+By default, the Vagrant setup will create a single kubernetes-master and 3 kubernetes-minions. Each VM will take 512 MB, so make sure you have at least 2 GB of free memory. To start your local cluster, open a shell and run:
 
 ```
 cd kubernetes
@@ -56,12 +50,16 @@ vagrant ssh minion-1
 [vagrant@kubernetes-minion-1] $ sudo journalctl -r -u kubelet
 ```
 
+### Interacting with your Kubernetes cluster with Vagrant.
+
+With your Kubernetes cluster up, you can manage the nodes in your cluster with the regular Vagrant commands.
+
 To push updates to new Kubernetes code after making source changes:
 ```
 vagrant provision
 ```
 
-To shutdown and then restart the cluster:
+To stop and then restart the cluster:
 ```
 vagrant halt
 vagrant up
@@ -69,72 +67,174 @@ vagrant up
 
 To destroy the cluster:
 ```
-vagrant destroy -f
+vagrant destroy
 ```
 
-You can also use the cluster/kube-*.sh scripts to interact with vagrant based providers just like any other hosting platform for kubernetes.
+Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubecfg.sh` script.
+Set the `KUBERNETS_PROVIDER` environment variable and try to list the minions:
 
 ```
-cd kubernetes
-modify cluster/kube-env.sh:
-  KUBERNETES_PROVIDER="vagrant"
+$ export KUBERNETES_PROVIDER=vagrant
+$ ./cluster/kubecfg.sh list /minions
+Minion identifier
+----------
+10.245.2.4
+10.245.2.3
+10.245.2.2
+```
 
-## build the binary required by kubecfg.sh
+### Interacting with your Kubernetes cluster with the `kube-*` scripts.
+
+Alternatively to using the vagrant commands, you can also use the `cluster/kube-*.sh` scripts to interact with the vagrant based provider just like any other hosting platform for kubernetes.
+
+You need to build the binary required by `kube*` scripts:
+
+```
 hack/build-go.sh
+```
 
-cluster/kube-up.sh => brings up a vagrant cluster
-cluster/kube-down.sh => destroys a vagrant cluster
-cluster/kube-push.sh => updates a vagrant cluster
-cluster/kubecfg.sh => interact with the cluster
+Then bring up a vagrant cluster
+
+```
+cluster/kube-up.sh
+```
+
+Destroy the vagrant cluster
+ 
+```
+cluster/kube-down.sh
+```
+
+Update the vagrant cluster
+
+```
+cluster/kube-push.sh
+```
+
+Interact with the cluster
+
+```
+cluster/kubecfg.sh
 ```
 
 ### Authenticating with your master
 
-To interact with the cluster, you must authenticate with the master when running cluster/kubecfg.sh commands.
-
-If it's your first time using the cluster, your first invocation of cluster/kubecfg.sh will prompt you for credentials:
+When using the vagrant provider in Kubernetes, the `cluster/kubecfg.sh` script will cache your credentials in a `~/.kubernetes_auth_vagrant` file so you will not be prompted for them in the future.
 
 ```
-cd kubernetes
+cat ~/.kubernetes_auth_vagrant
+{ "User": "vagrant",
+  "Password": "vagrant"}
+```
+
+You should now be set to use the `cluster/kubecfg.sh` script. For example try to list the minions that you have started with:
+
+```
 cluster/kubecfg.sh list minions
-Please enter Username: vagrant
-Please enter Password: vagrant
+```
+
+### Running containers
+
+Your cluster is running, you can list the minions in your cluster:
+
+```
+$ cluster/kubecfg.sh list /minions
 Minion identifier
 ----------
+10.245.2.4
+10.245.2.3
+10.245.2.2
 ```
 
-The kubecfg.sh command will cache your credentials in a .kubernetes_auth file so you will not be prompted in the future.
-```
-cat ~/.kubernetes_auth
-{"User":"vagrant","Password":"vagrant"}
-```
-
-If you try Kubernetes against multiple cloud providers, make sure this file is correct for your target environment.
-
-### Running a container
-
-Your cluster is running, and you want to start running containers!
+Now start running some containers!
 
 You can now use any of the cluster/kube-*.sh commands to interact with your VM machines.
+Before starting a container there will be no pods, services and replication controllers.
+
 ```
-cluster/kubecfg.sh list /pods
-cluster/kubecfg.sh list /services
-cluster/kubecfg.sh list /replicationControllers
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
+$ cluster/kubecfg.sh list /pods
+ID                  Image(s)            Host                Labels              Status
+----------          ----------          ----------          ----------          ----------
 
-## begin wait for provision to complete, you can monitor the minions by doing
-  vagrant ssh minion-1
-  sudo docker images
-  ## you should see it pulling the dockerfile/nginx image, once the above command returns it
-  sudo docker ps
-  ## you should see your container running!
-  exit
-## end wait
+$ cluster/kubecfg.sh list /services
+ID                  Labels              Selector            Port
+----------          ----------          ----------          ----------
 
-## back on the host, introspect kubernetes!
-cluster/kubecfg.sh list /pods
-cluster/kubecfg.sh list /services
-cluster/kubecfg.sh list /replicationControllers
+$ cluster/kubecfg.sh list /replicationControllers
+ID                  Image(s)            Selector            Replicas
+----------          ----------          ----------          ----------
+```
+
+Start a container running nginx with a replication controller and three replicas:
+
+```
+$cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
+```
+
+When listing the pods, you will see that three containers have been started and are in Waiting state:
+
+```
+$ cluster/kubecfg.sh list /pods
+ID                                     Image(s)            Host                    Labels                          Status
+----------                             ----------          ----------              ----------                      ----------
+781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   replicationController=myNginx   Waiting
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Waiting
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Waiting
+```
+
+You need to wait for the provisioning to complete, you can monitor the minions by doing
+
+```
+$ vagrant ssh minion-1
+$ sudo docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+<none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
+google/cadvisor     latest              e0575e677c50        13 days ago         12.64 MB
+kubernetes/pause    latest              6c4579af347b        8 weeks ago         239.8 kB
+```
+
+Once the docker image for nginx has been downloaded, the container will start and you can list it:
+
+```
+$ sudo docker ps
+CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
+dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f   
+fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b       
+aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2                                                                            
+65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561                                                               
+```
+
+Going back to listing the pods, services and replicationControllers, you now have:
+
+```
+$ cluster/kubecfg.sh list /pods
+ID                                     Image(s)            Host                    Labels                          Status
+----------                             ----------          ----------              ----------                      ----------
+781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   replicationController=myNginx   Running
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Running
+
+$ cluster/kubecfg.sh list /services
+ID                  Labels              Selector            Port
+----------          ----------          ----------          ----------
+
+$ cluster/kubecfg.sh list r/eplicationControllers
+ID                  Image(s)            Selector                        Replicas
+----------          ----------          ----------                      ----------
+myNginx             dockerfile/nginx    replicationController=myNginx   3
+```
+
+We did not start any services, hence there is none listed. But we see three replicas displayed properly.
+Check the [guestbook](examples/guestbook/README.md) application to learn how to create a service.
+You can already play with resizing the replicas with:
+
+```
+$ cluster/kubecfg.sh resize myNginx 2
+$ cluster/kubecfg.sh list /pods
+ID                                     Image(s)            Host                    Labels                          Status
+----------                             ----------          ----------              ----------                      ----------
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Running
 ```
 
 Congratulations!
@@ -147,29 +247,39 @@ The following will run all of the end-to-end testing scenarios assuming you set 
 hack/e2e-test.sh
 ```
 
-
 ### Troubleshooting
 
 #### I just created the cluster, but I am getting authorization errors!
 
-You probably have an incorrect ~/.kubernetes_auth file for the cluster you are attempting to contact.
+You probably have an incorrect ~/.kubernetes_auth_vagrant file for the cluster you are attempting to contact.
 
 ```
-rm ~/.kubernetes_auth
+rm ~/.kubernetes_auth_vagrant
 ```
 
-And when using kubecfg.sh, provide the correct credentials:
+After using kubecfg.sh make sure that the correct credentials are set:
 
 ```
-Please enter Username: vagrant
-Please enter Password: vagrant
+cat ~/.kubernetes_vagrant_auth 
+{
+  "User": "vagrant",
+  "Password": "vagrant"
+}
 ```
 
-#### I just created the cluster, but I do not see my container running!
+#### I just created the cluster, but I do not see my container running !
 
 If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
-#### I changed Kubernetes code, but it's not running!
+#### I changed Kubernetes code, but it's not running !
 
-Are you sure there was no build error?  After running $ vagrant provision, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
+Are you sure there was no build error?  After running `$ vagrant provision`, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
 It's very likely you see a build error due to an error in your source files!
+
+#### I want to change the number of minions !
+
+You can control the number of minions that are instantiated via the environment variable `KUBERNETES_NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `KUBERNETES_NUM_MINIONS` to 1 like so:
+
+```
+export KUBERNETES_NUM_MINIONS=1
+```
