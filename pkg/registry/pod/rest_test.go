@@ -376,7 +376,14 @@ func TestMakePodStatus(t *testing.T) {
 		status api.PodStatus
 		test   string
 	}{
-		{&api.Pod{DesiredState: desiredState, CurrentState: currentState}, api.PodWaiting, "waiting"},
+		{
+			&api.Pod{
+				DesiredState: desiredState,
+				CurrentState: currentState,
+			},
+			api.PodWaiting,
+			"waiting",
+		},
 		{
 			&api.Pod{
 				DesiredState: desiredState,
