@@ -298,7 +298,7 @@ type ContainerStatus struct {
 
 // PodInfo contains one entry for every container with available info.
 // TODO(dchen1107): Replace docker.Container below with ContainerStatus defined above.
-type PodInfo map[string]docker.Container
+type PodInfo map[string]ContainerStatus
 
 type RestartPolicyAlways struct{}
 
