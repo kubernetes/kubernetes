@@ -58,6 +58,7 @@ var (
 	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
+	apiVersion    = flag.String("api_version", latest.Version, "The version of the API to use against this server.")
 )
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
@@ -125,12 +126,12 @@ func readConfigData() []byte {
 
 // readConfig reads and parses pod, replicationController, and service
 // configuration files. If any errors log and exit non-zero.
-func readConfig(storage string) []byte {
+func readConfig(storage string, serverCodec runtime.Codec) []byte {
 	if len(*config) == 0 {
 		glog.Fatal("Need config file (-c)")
 	}
 
-	data, err := parser.ToWireFormat(readConfigData(), storage, latest.Codec)
+	data, err := parser.ToWireFormat(readConfigData(), storage, latest.Codec, serverCodec)
 
 	if err != nil {
 		glog.Fatalf("Error parsing %v as an object for %v: %v\n", *config, storage, err)
@@ -160,9 +161,9 @@ func main() {
 	} else {
 		masterServer = "http://localhost:8080"
 	}
-	kubeClient, err := client.New(masterServer, nil)
+	kubeClient, err := client.New(masterServer, *apiVersion, nil)
 	if err != nil {
-		glog.Fatalf("Unable to parse %s as a URL: %v", masterServer, err)
+		glog.Fatalf("Can't configure client: %v", err)
 	}
 
 	// TODO: this won't work if TLS is enabled with client cert auth, but no
@@ -172,9 +173,9 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
 		}
-		kubeClient, err = client.New(masterServer, auth)
+		kubeClient, err = client.New(masterServer, *apiVersion, auth)
 		if err != nil {
-			glog.Fatalf("Unable to parse %s as a URL: %v", masterServer, err)
+			glog.Fatalf("Can't configure client: %v", err)
 		}
 	}
 
@@ -296,7 +297,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		ParseSelectorParam("labels", *selector)
 	if setBody {
 		if version != 0 {
-			data := readConfig(storage)
+			data := readConfig(storage, c.RESTClient.Codec)
 			obj, err := latest.Codec.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
@@ -306,13 +307,13 @@ func executeAPIRequest(method string, c *client.Client) bool {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
 			jsonBase.SetResourceVersion(version)
-			data, err = latest.Codec.Encode(obj)
+			data, err = c.RESTClient.Codec.Encode(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
 			r.Body(data)
 		} else {
-			r.Body(readConfig(storage))
+			r.Body(readConfig(storage, c.RESTClient.Codec))
 		}
 	}
 	result := r.Do()

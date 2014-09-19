@@ -21,7 +21,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -42,13 +41,9 @@ type Registry struct {
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(client tools.EtcdClient) *Registry {
+func NewRegistry(helper tools.EtcdHelper) *Registry {
 	registry := &Registry{
-		EtcdHelper: tools.EtcdHelper{
-			client,
-			latest.Codec,
-			latest.ResourceVersioner,
-		},
+		EtcdHelper: helper,
 	}
 	registry.manifestFactory = &BasicManifestFactory{
 		serviceRegistry: registry,

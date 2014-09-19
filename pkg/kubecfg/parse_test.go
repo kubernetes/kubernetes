@@ -22,28 +22,28 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"gopkg.in/v1/yaml"
 )
 
 func TestParseBadStorage(t *testing.T) {
 	p := NewParser(map[string]runtime.Object{})
-	_, err := p.ToWireFormat([]byte("{}"), "badstorage", latest.Codec)
+	_, err := p.ToWireFormat([]byte("{}"), "badstorage", latest.Codec, latest.Codec)
 	if err == nil {
 		t.Errorf("Expected error, received none")
 	}
 }
 
-func DoParseTest(t *testing.T, storage string, obj runtime.Object, p *Parser) {
-	jsonData, _ := latest.Codec.Encode(obj)
+func DoParseTest(t *testing.T, storage string, obj runtime.Object, codec runtime.Codec, p *Parser) {
+	jsonData, _ := codec.Encode(obj)
 	var tmp map[string]interface{}
 	json.Unmarshal(jsonData, &tmp)
 	yamlData, _ := yaml.Marshal(tmp)
 	t.Logf("Intermediate yaml:\n%v\n", string(yamlData))
 	t.Logf("Intermediate json:\n%v\n", string(jsonData))
-	jsonGot, jsonErr := p.ToWireFormat(jsonData, storage, latest.Codec)
-	yamlGot, yamlErr := p.ToWireFormat(yamlData, storage, latest.Codec)
+	jsonGot, jsonErr := p.ToWireFormat(jsonData, storage, latest.Codec, codec)
+	yamlGot, yamlErr := p.ToWireFormat(yamlData, storage, latest.Codec, codec)
 
 	if jsonErr != nil {
 		t.Errorf("json err: %#v", jsonErr)
@@ -81,7 +81,7 @@ func TestParsePod(t *testing.T) {
 				},
 			},
 		},
-	}, testParser)
+	}, v1beta1.Codec, testParser)
 }
 
 func TestParseService(t *testing.T) {
@@ -94,7 +94,7 @@ func TestParseService(t *testing.T) {
 		Selector: map[string]string{
 			"area": "staging",
 		},
-	}, testParser)
+	}, v1beta1.Codec, testParser)
 }
 
 func TestParseController(t *testing.T) {
@@ -116,7 +116,7 @@ func TestParseController(t *testing.T) {
 				},
 			},
 		},
-	}, testParser)
+	}, v1beta1.Codec, testParser)
 }
 
 type TestParseType struct {
@@ -136,5 +136,5 @@ func TestParseCustomType(t *testing.T) {
 	DoParseTest(t, "custom", &TestParseType{
 		JSONBase: api.JSONBase{APIVersion: "", ID: "my custom object", Kind: "TestParseType"},
 		Data:     "test data",
-	}, parser)
+	}, v1beta1.Codec, parser)
 }

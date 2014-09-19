@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	masterPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -46,7 +47,7 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	// TODO: security story for plugins!
-	kubeClient, err := client.New(*master, nil)
+	kubeClient, err := client.New(*master, latest.OldestVersion, nil)
 	if err != nil {
 		glog.Fatalf("Invalid -master: %v", err)
 	}

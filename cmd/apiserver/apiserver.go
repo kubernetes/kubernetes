@@ -38,15 +38,16 @@ import (
 )
 
 var (
-	port                  = flag.Uint("port", 8080, "The port to listen on.  Default 8080.")
+	port                  = flag.Uint("port", 8080, "The port to listen on. Default 8080")
 	address               = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
-	apiPrefix             = flag.String("api_prefix", "/api/v1beta1", "The prefix for API requests on the server. Default '/api/v1beta1'")
+	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'")
+	storageVersion        = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
 	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	cloudConfigFile       = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	minionRegexp          = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
 	minionPort            = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
-	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. [default true]")
-	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. [default 30 seconds]")
+	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true")
+	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. Default 30 seconds")
 	etcdServerList        util.StringList
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
@@ -125,15 +126,20 @@ func main() {
 		Port:   *minionPort,
 	}
 
-	client, err := client.New(net.JoinHostPort(*address, strconv.Itoa(int(*port))), nil)
+	client, err := client.New(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *storageVersion, nil)
 	if err != nil {
 		glog.Fatalf("Invalid server address: %v", err)
+	}
+
+	helper, err := master.NewEtcdHelper(etcdServerList, *storageVersion)
+	if err != nil {
+		glog.Fatalf("Invalid storage version: %v", err)
 	}
 
 	m := master.New(&master.Config{
 		Client:             client,
 		Cloud:              cloud,
-		EtcdServers:        etcdServerList,
+		EtcdHelper:         helper,
 		HealthCheckMinions: *healthCheckMinions,
 		Minions:            machineList,
 		MinionCacheTTL:     *minionCacheTTL,
@@ -141,9 +147,12 @@ func main() {
 		PodInfoGetter:      podInfoGetter,
 	})
 
-	storage, codec := m.API_v1beta1()
+	mux := http.NewServeMux()
+	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, *apiPrefix+"/v1beta1")
+	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(mux, *apiPrefix+"/v1beta2")
+	apiserver.InstallSupport(mux)
 
-	handler := apiserver.Handle(storage, codec, *apiPrefix)
+	handler := http.Handler(mux)
 	if len(corsAllowedOriginList) > 0 {
 		allowedOriginRegexps, err := util.CompileRegexps(corsAllowedOriginList)
 		if err != nil {
@@ -151,10 +160,11 @@ func main() {
 		}
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
+	handler = apiserver.RecoverPanics(handler)
 
 	s := &http.Server{
 		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
-		Handler:        apiserver.RecoverPanics(handler),
+		Handler:        handler,
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,

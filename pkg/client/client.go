@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -96,19 +97,30 @@ type Client struct {
 // New creates a Kubernetes client. This client works with pods, replication controllers
 // and services. It allows operations such as list, get, update and delete on these objects.
 // host must be a host string, a host:port combo, or an http or https URL.  Passing a prefix
-// to a URL will prepend the server path. Returns an error if host cannot be converted to a
-// valid URL.
-func New(host string, auth *AuthInfo) (*Client, error) {
-	restClient, err := NewRESTClient(host, auth, "/api/v1beta1/", latest.Codec)
+// to a URL will prepend the server path. The API version to use may be specified or left
+// empty to use the client preferred version. Returns an error if host cannot be converted to
+// a valid URL.
+func New(host, version string, auth *AuthInfo) (*Client, error) {
+	if version == "" {
+		// Clients default to the preferred code API version
+		// TODO: implement version negotation (highest version supported by server)
+		version = latest.Version
+	}
+	serverCodec, _, err := latest.InterfacesFor(version)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
+	}
+	prefix := fmt.Sprintf("/api/%s/", version)
+	restClient, err := NewRESTClient(host, auth, prefix, serverCodec)
+	if err != nil {
+		return nil, fmt.Errorf("API URL '%s' is not valid: %v", host, err)
 	}
 	return &Client{restClient}, nil
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided host is invalid.
-func NewOrDie(host string, auth *AuthInfo) *Client {
-	client, err := New(host, auth)
+func NewOrDie(host, version string, auth *AuthInfo) *Client {
+	client, err := New(host, version, auth)
 	if err != nil {
 		panic(err)
 	}

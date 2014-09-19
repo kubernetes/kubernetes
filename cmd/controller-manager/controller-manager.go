@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -53,7 +54,7 @@ func main() {
 		glog.Fatal("usage: controller-manager -master <master>")
 	}
 
-	kubeClient, err := client.New(*master, nil)
+	kubeClient, err := client.New(*master, latest.OldestVersion, nil)
 	if err != nil {
 		glog.Fatalf("Invalid -master: %v", err)
 	}

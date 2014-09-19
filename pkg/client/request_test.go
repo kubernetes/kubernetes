@@ -29,7 +29,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -39,7 +40,7 @@ import (
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := latest.Codec.Encode(expectedObj)
+	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -47,7 +48,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, &auth)
+	c := NewOrDie(testServer.URL, "v1beta2", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -64,7 +65,7 @@ func TestDoRequestNewWay(t *testing.T) {
 	} else if !reflect.DeepEqual(obj, expectedObj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &reqBody)
+	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo", "POST", &reqBody)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -72,9 +73,9 @@ func TestDoRequestNewWay(t *testing.T) {
 
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := latest.Codec.Encode(reqObj)
+	reqBodyExpected, _ := v1beta1.Codec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := latest.Codec.Encode(expectedObj)
+	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -82,7 +83,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, &auth)
+	c := NewOrDie(testServer.URL, "v1beta1", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -109,9 +110,9 @@ func TestDoRequestNewWayReader(t *testing.T) {
 
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, _ := latest.Codec.Encode(reqObj)
+	reqBodyExpected, _ := v1beta2.Codec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := latest.Codec.Encode(expectedObj)
+	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -119,7 +120,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, &auth)
+	c := NewOrDie(testServer.URL, "v1beta2", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -137,7 +138,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
 	tmpStr := string(reqBodyExpected)
-	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
+	fakeHandler.ValidateRequest(t, "/api/v1beta2/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}
@@ -145,7 +146,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 
 func TestDoRequestNewWayFile(t *testing.T) {
 	reqObj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	reqBodyExpected, err := latest.Codec.Encode(reqObj)
+	reqBodyExpected, err := v1beta1.Codec.Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -161,7 +162,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 
 	expectedObj := &api.Service{Port: 12345}
-	expectedBody, _ := latest.Codec.Encode(expectedObj)
+	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(expectedBody),
@@ -169,7 +170,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, &auth)
+	c := NewOrDie(testServer.URL, "v1beta1", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -194,7 +195,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestVerbs(t *testing.T) {
-	c := NewOrDie("localhost", nil)
+	c := NewOrDie("localhost", "", nil)
 	if r := c.Post(); r.verb != "POST" {
 		t.Errorf("Post verb is wrong")
 	}
@@ -211,7 +212,7 @@ func TestVerbs(t *testing.T) {
 
 func TestAbsPath(t *testing.T) {
 	expectedPath := "/bar/foo"
-	c := NewOrDie("localhost", nil)
+	c := NewOrDie("localhost", "", nil)
 	r := c.Post().Path("/foo").AbsPath(expectedPath)
 	if r.path != expectedPath {
 		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
@@ -219,7 +220,7 @@ func TestAbsPath(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	c := NewOrDie("localhost", nil)
+	c := NewOrDie("localhost", "", nil)
 	r := c.Get()
 	if r.sync {
 		t.Errorf("sync has wrong default")
@@ -246,7 +247,7 @@ func TestUintParam(t *testing.T) {
 	}
 
 	for _, item := range table {
-		c := NewOrDie("localhost", nil)
+		c := NewOrDie("localhost", "", nil)
 		r := c.Get().AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.finalURL(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
@@ -265,7 +266,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 	}
 
 	for _, item := range table {
-		c := NewOrDie("localhost", nil)
+		c := NewOrDie("localhost", "", nil)
 		r := c.Get().setParam(item.name, item.testVal)
 		if e, a := item.expectSuccess, r.err == nil; e != a {
 			t.Errorf("expected %v, got %v (%v)", e, a, r.err)
@@ -274,7 +275,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 }
 
 func TestSetPollPeriod(t *testing.T) {
-	c := NewOrDie("localhost", nil)
+	c := NewOrDie("localhost", "", nil)
 	r := c.Get()
 	if r.pollPeriod == 0 {
 		t.Errorf("polling should be on by default")
@@ -296,7 +297,7 @@ func TestPolling(t *testing.T) {
 
 	callNumber := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data, err := latest.Codec.Encode(objects[callNumber])
+		data, err := v1beta1.Codec.Encode(objects[callNumber])
 		if err != nil {
 			t.Errorf("Unexpected encode error")
 		}
@@ -305,7 +306,7 @@ func TestPolling(t *testing.T) {
 	}))
 
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, &auth)
+	c := NewOrDie(testServer.URL, "v1beta1", &auth)
 
 	trials := []func(){
 		func() {
@@ -402,7 +403,7 @@ func TestWatch(t *testing.T) {
 
 		encoder := json.NewEncoder(w)
 		for _, item := range table {
-			data, err := api.NewJSONWatchEvent(latest.Codec, watch.Event{item.t, item.obj})
+			data, err := api.NewJSONWatchEvent(v1beta1.Codec, watch.Event{item.t, item.obj})
 			if err != nil {
 				panic(err)
 			}
@@ -413,7 +414,7 @@ func TestWatch(t *testing.T) {
 		}
 	}))
 
-	s, err := New(testServer.URL, &auth)
+	s, err := New(testServer.URL, "v1beta1", &auth)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

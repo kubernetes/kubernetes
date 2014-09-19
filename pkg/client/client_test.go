@@ -27,6 +27,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -35,6 +37,38 @@ import (
 
 // TODO: Move this to a common place, it's needed in multiple tests.
 const apiPath = "/api/v1beta1"
+
+func TestChecksCodec(t *testing.T) {
+	testCases := map[string]struct {
+		Err    bool
+		Prefix string
+		Codec  runtime.Codec
+	}{
+		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
+		"":        {false, "/api/v1beta1/", v1beta1.Codec},
+		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
+		"v1beta3": {true, "", nil},
+	}
+	for version, expected := range testCases {
+		client, err := New("127.0.0.1", version, nil)
+		switch {
+		case err == nil && expected.Err:
+			t.Errorf("expected error but was nil")
+			continue
+		case err != nil && !expected.Err:
+			t.Errorf("unexpected error %v", err)
+			continue
+		case err != nil:
+			continue
+		}
+		if e, a := expected.Prefix, client.prefix; e != a {
+			t.Errorf("expected %#v, got %#v", e, a)
+		}
+		if e, a := expected.Codec, client.Codec; e != a {
+			t.Errorf("expected %#v, got %#v", e, a)
+		}
+	}
+}
 
 func TestValidatesHostParameter(t *testing.T) {
 	testCases := map[string]struct {
@@ -49,7 +83,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		"host/server":        {"", "", true},
 	}
 	for k, expected := range testCases {
-		c, err := NewRESTClient(k, nil, "/api/v1beta1/", latest.Codec)
+		c, err := NewRESTClient(k, nil, "/api/v1beta1/", v1beta1.Codec)
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -355,7 +389,7 @@ func (c *testClient) Setup() *testClient {
 	}
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
-		c.Client = NewOrDie("localhost", nil)
+		c.Client = NewOrDie("localhost", "v1beta1", nil)
 	}
 	c.Client.host = c.server.URL
 	c.Client.prefix = "/api/v1beta1/"
@@ -512,7 +546,7 @@ func TestDoRequest(t *testing.T) {
 	testClients := []testClient{
 		{Request: testRequest{Method: "GET", Path: "good"}, Response: Response{StatusCode: 200}},
 		{Request: testRequest{Method: "GET", Path: "bad%ZZ"}, Error: true},
-		{Client: NewOrDie("localhost", &AuthInfo{"foo", "bar"}), Request: testRequest{Method: "GET", Path: "auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
+		{Client: NewOrDie("localhost", "v1beta1", &AuthInfo{"foo", "bar"}), Request: testRequest{Method: "GET", Path: "auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
 		{Client: &Client{&RESTClient{httpClient: http.DefaultClient}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "error"}, Response: Response{StatusCode: 500}, Error: true},
 		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
@@ -543,7 +577,7 @@ func TestDoRequestAccepted(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c, err := New(testServer.URL, &auth)
+	c, err := New(testServer.URL, "", &auth)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -580,7 +614,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c, err := New(testServer.URL, &auth)
+	c, err := New(testServer.URL, "", &auth)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -617,7 +651,7 @@ func TestGetServerVersion(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	client := NewOrDie(server.URL, nil)
+	client := NewOrDie(server.URL, "", nil)
 
 	got, err := client.ServerVersion()
 	if err != nil {

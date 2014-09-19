@@ -20,7 +20,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -33,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	goetcd "github.com/coreos/go-etcd/etcd"
@@ -43,7 +46,7 @@ import (
 type Config struct {
 	Client             *client.Client
 	Cloud              cloudprovider.Interface
-	EtcdServers        []string
+	EtcdHelper         tools.EtcdHelper
 	HealthCheckMinions bool
 	Minions            []string
 	MinionCacheTTL     time.Duration
@@ -63,16 +66,29 @@ type Master struct {
 	client             *client.Client
 }
 
-// New returns a new instance of Master connected to the given etcdServer.
+// NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
+// is incorrect.
+func NewEtcdHelper(etcdServers []string, version string) (helper tools.EtcdHelper, err error) {
+	client := goetcd.NewClient(etcdServers)
+	if version == "" {
+		version = latest.Version
+	}
+	codec, versioner, err := latest.InterfacesFor(version)
+	if err != nil {
+		return helper, err
+	}
+	return tools.EtcdHelper{client, codec, versioner}, nil
+}
+
+// New returns a new instance of Master connected to the given etcd server.
 func New(c *Config) *Master {
-	etcdClient := goetcd.NewClient(c.EtcdServers)
 	minionRegistry := makeMinionRegistry(c)
 	m := &Master{
-		podRegistry:        etcd.NewRegistry(etcdClient),
-		controllerRegistry: etcd.NewRegistry(etcdClient),
-		serviceRegistry:    etcd.NewRegistry(etcdClient),
-		endpointRegistry:   etcd.NewRegistry(etcdClient),
-		bindingRegistry:    etcd.NewRegistry(etcdClient),
+		podRegistry:        etcd.NewRegistry(c.EtcdHelper),
+		controllerRegistry: etcd.NewRegistry(c.EtcdHelper),
+		serviceRegistry:    etcd.NewRegistry(c.EtcdHelper),
+		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper),
+		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 	}
@@ -138,4 +154,13 @@ func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec)
 		storage[k] = v
 	}
 	return storage, v1beta1.Codec
+}
+
+// API_v1beta2 returns the resources and codec for API version v1beta2.
+func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec) {
+	storage := make(map[string]apiserver.RESTStorage)
+	for k, v := range m.storage {
+		storage[k] = v
+	}
+	return storage, v1beta2.Codec
 }
