@@ -17,7 +17,9 @@ limitations under the License.
 package api_test
 
 import (
+	"encoding/json"
 	"flag"
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -202,4 +204,58 @@ func TestBadJSONRejection(t *testing.T) {
 	if err2 := DecodeInto(badJSONKindMismatch, &Minion{}); err2 == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}*/
+}
+
+const benchmarkSeed = 100
+
+func BenchmarkEncode(b *testing.B) {
+	pod := api.Pod{}
+	apiObjectFuzzer.RandSource(rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer.Fuzz(&pod)
+	for i := 0; i < b.N; i++ {
+		latest.Codec.Encode(&pod)
+	}
+}
+
+// BenchmarkEncodeJSON provides a baseline for regular JSON encode performance
+func BenchmarkEncodeJSON(b *testing.B) {
+	pod := api.Pod{}
+	apiObjectFuzzer.RandSource(rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer.Fuzz(&pod)
+	for i := 0; i < b.N; i++ {
+		json.Marshal(&pod)
+	}
+}
+
+func BenchmarkDecode(b *testing.B) {
+	pod := api.Pod{}
+	apiObjectFuzzer.RandSource(rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer.Fuzz(&pod)
+	data, _ := latest.Codec.Encode(&pod)
+	for i := 0; i < b.N; i++ {
+		latest.Codec.Decode(data)
+	}
+}
+
+func BenchmarkDecodeInto(b *testing.B) {
+	pod := api.Pod{}
+	apiObjectFuzzer.RandSource(rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer.Fuzz(&pod)
+	data, _ := latest.Codec.Encode(&pod)
+	for i := 0; i < b.N; i++ {
+		obj := api.Pod{}
+		latest.Codec.DecodeInto(data, &obj)
+	}
+}
+
+// BenchmarkDecodeJSON provides a baseline for regular JSON decode performance
+func BenchmarkDecodeJSON(b *testing.B) {
+	pod := api.Pod{}
+	apiObjectFuzzer.RandSource(rand.NewSource(benchmarkSeed))
+	apiObjectFuzzer.Fuzz(&pod)
+	data, _ := latest.Codec.Encode(&pod)
+	for i := 0; i < b.N; i++ {
+		obj := api.Pod{}
+		json.Unmarshal(data, &obj)
+	}
 }
