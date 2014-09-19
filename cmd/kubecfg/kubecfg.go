@@ -59,6 +59,9 @@ var (
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 	apiVersion    = flag.String("api_version", latest.Version, "The version of the API to use against this server.")
+	caFile        = flag.String("certificate_authority", "", "Path to a cert. file for the certificate authority")
+	certFile      = flag.String("client_certificate", "", "Path to a client certificate for TLS.")
+	keyFile       = flag.String("client_key", "", "Path to a client key file for TLS.")
 )
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
@@ -172,6 +175,15 @@ func main() {
 		auth, err := kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
+		}
+		if *caFile != "" {
+			auth.CAFile = *caFile
+		}
+		if *certFile != "" {
+			auth.CertFile = *certFile
+		}
+		if *keyFile != "" {
+			auth.KeyFile = *keyFile
 		}
 		kubeClient, err = client.New(masterServer, *apiVersion, auth)
 		if err != nil {
