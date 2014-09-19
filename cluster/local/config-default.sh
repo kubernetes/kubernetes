@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-## Contains configuration values for interacting with the Vagrant cluster
+## Contains configuration values for interacting with a Local cluster
 
 # NUMBER OF MINIONS IN THE CLUSTER
 NUM_MINIONS=1
