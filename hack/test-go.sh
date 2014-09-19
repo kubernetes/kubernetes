@@ -47,6 +47,7 @@ find_test_pkgs() {
 # -covermode=atomic becomes default with -race in Go >=1.3
 KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 60s}
+KUBE_RACE=${KUBE_RACE:--race}
 
 cd "${KUBE_TARGET}"
 
@@ -121,7 +122,7 @@ if [[ "${iterations}" -gt 1 ]]; then
     count=0
     for i in $(seq 1 ${iterations}); do
       if go test "${goflags[@]:+${goflags[@]}}" \
-          -race ${KUBE_TIMEOUT} "${pkg}"; then
+          ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}"; then
         pass=$((pass + 1))
       else
         fails=$((fails + 1))
@@ -145,7 +146,7 @@ if [[ -n "$1" ]]; then
     mkdir -p "${covdir}/${arg}"
     pkg=${KUBE_GO_PACKAGE}/${arg}
     go test "${goflags[@]:+${goflags[@]}}" \
-        -race \
+        ${KUBE_RACE} \
         ${KUBE_TIMEOUT} \
         ${KUBE_COVER} -coverprofile="${covdir}/${arg}/coverage.out" \
         "${pkg}"
@@ -154,6 +155,6 @@ if [[ -n "$1" ]]; then
 fi
 
 find_test_pkgs | xargs go test "${goflags[@]:+${goflags[@]}}" \
-    -race \
+    ${KUBE_RACE} \
     ${KUBE_TIMEOUT} \
     ${KUBE_COVER}
