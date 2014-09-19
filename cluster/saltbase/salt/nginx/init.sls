@@ -10,14 +10,33 @@ nginx:
       - file: /usr/share/nginx/htpasswd
       - cmd: /usr/share/nginx/server.cert
 
+{% if grains.cloud == 'gce' %}
+  {% set cert_ip='_use_gce_external_ip_' %}
+{% endif %}
+{% if grains.cloud == 'vagrant' %}
+  {% set cert_ip=grains.fqdn_ip4 %}
+{% endif %}
+# If there is a pillar defined, override any defaults.
+{% if pillar['cert_ip'] is defined %}
+  {% set cert_ip=pillar['cert_ip'] %}
+{% endif %}
+
+{% set certgen="make-cert.sh" %}
+{% if cert_ip is defined %}
+  {% set certgen="make-ca-cert.sh" %}
+{% endif %}
+
 /usr/share/nginx/server.cert:
   cmd.script:
-    - source: salt://nginx/make-cert.sh
+    - unless: test -f /usr/share/nginx/server.cert
+    - source: salt://nginx/{{certgen}} 
+{% if cert_ip is defined %}
+    - args: {{cert_ip}}
+{% endif %}
     - cwd: /
     - user: root
     - group: root
     - shell: /bin/bash
-    - stateful: True
 
 /etc/nginx/nginx.conf:
   file:
@@ -45,10 +64,3 @@ nginx:
     - group: root
     - mode: 644
 
-/usr/share/nginx/make-cert.sh:
-  file:
-    - managed
-    - source: salt://nginx/make-cert.sh
-    - user: root
-    - group: root
-    - mode: 755
