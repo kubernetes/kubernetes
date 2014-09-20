@@ -35,6 +35,20 @@ func (t *testLW) Watch(resourceVersion uint64) (watch.Interface, error) {
 	return t.WatchFunc(resourceVersion)
 }
 
+func TestReflector_watchHandlerError(t *testing.T) {
+	s := NewStore()
+	g := NewReflector(&testLW{}, &api.Pod{}, s)
+	fw := watch.NewFake()
+	go func() {
+		fw.Stop()
+	}()
+	var resumeRV uint64
+	err := g.watchHandler(fw, &resumeRV)
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
 func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore()
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
@@ -49,7 +63,10 @@ func TestReflector_watchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV uint64
-	g.watchHandler(fw, &resumeRV)
+	err := g.watchHandler(fw, &resumeRV)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
 
 	table := []struct {
 		ID     string
