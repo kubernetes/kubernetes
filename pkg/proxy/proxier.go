@@ -347,15 +347,10 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 	proxier.serviceMap[service] = info
 }
 
-// used to globally lock around unused ports. Only used in testing.
-var unusedPortLock sync.Mutex
-
 // addServiceOnUnusedPort starts listening for a new service, returning the
 // port it's using.  For testing on a system with unknown ports used.  The timeout only applies to UDP
 // connections, for now.
 func (proxier *Proxier) addServiceOnUnusedPort(service, protocol string, timeout time.Duration) (string, error) {
-	unusedPortLock.Lock()
-	defer unusedPortLock.Unlock()
 	sock, err := newProxySocket(protocol, proxier.address, 0)
 	if err != nil {
 		return "", err
