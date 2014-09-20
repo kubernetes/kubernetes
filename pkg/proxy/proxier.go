@@ -125,6 +125,17 @@ func proxyTCP(in, out *net.TCPConn) {
 	out.Close()
 }
 
+func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
+	defer wg.Done()
+	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
+		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
+	if _, err := io.Copy(in, out); err != nil {
+		glog.Errorf("I/O error: %v", err)
+	}
+	in.CloseRead()
+	out.CloseWrite()
+}
+
 // udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
 // no new connections are allowed and existing connections are broken.
 // TODO: We could lame-duck this ourselves, if it becomes important.
@@ -304,17 +315,6 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 		serviceMap:   make(map[string]*serviceInfo),
 		address:      address,
 	}
-}
-
-func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
-	defer wg.Done()
-	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
-		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	if _, err := io.Copy(in, out); err != nil {
-		glog.Errorf("I/O error: %v", err)
-	}
-	in.CloseRead()
-	out.CloseWrite()
 }
 
 // StopProxy stops the proxy for the named service.
