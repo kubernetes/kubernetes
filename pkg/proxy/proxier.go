@@ -319,19 +319,27 @@ func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
 
 // StopProxy stops the proxy for the named service.
 func (proxier *Proxier) StopProxy(service string) error {
-	// TODO: delete from map here?
 	info, found := proxier.getServiceInfo(service)
 	if !found {
 		return fmt.Errorf("unknown service: %s", service)
 	}
+	return proxier.stopProxy(service, info)
+}
+
+// This assumes proxier.mu is not locked.
+func (proxier *Proxier) stopProxy(service string, info *serviceInfo) error {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
+// This assumes proxier.mu is locked.
 func (proxier *Proxier) stopProxyInternal(service string, info *serviceInfo) error {
 	if !info.setActive(false) {
 		return nil
 	}
 	glog.Infof("Removing service: %s", service)
+	delete(proxier.serviceMap, service)
 	return info.socket.Close()
 }
 
@@ -405,7 +413,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			continue
 		}
 		if exists && info.port != service.Port {
-			err := proxier.stopProxyInternal(service.ID, info)
+			err := proxier.stopProxy(service.ID, info)
 			if err != nil {
 				glog.Errorf("error stopping %s: %v", service.ID, err)
 			}
