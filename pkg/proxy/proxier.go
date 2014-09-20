@@ -317,15 +317,6 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 	}
 }
 
-// StopProxy stops the proxy for the named service.
-func (proxier *Proxier) StopProxy(service string) error {
-	info, found := proxier.getServiceInfo(service)
-	if !found {
-		return fmt.Errorf("unknown service: %s", service)
-	}
-	return proxier.stopProxy(service, info)
-}
-
 // This assumes proxier.mu is not locked.
 func (proxier *Proxier) stopProxy(service string, info *serviceInfo) error {
 	proxier.mu.Lock()
