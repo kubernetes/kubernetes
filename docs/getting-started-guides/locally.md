@@ -12,15 +12,8 @@ At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. En
 
 #### etcd
 
-You need an etcd somewhere in your path. To get from head:
+You need an [etcd](https://github.com/coreos/etcd) somewhere in your path. Get the [latest release](https://github.com/coreos/etcd/releases/) and place it in `/usr/bin`.
 
-```
-go get github.com/coreos/etcd
-go install github.com/coreos/etcd
-sudo ln -s "$GOPATH/bin/etcd" /usr/bin/etcd
-# Or just use the packaged one:
-sudo ln -s "$REPO_ROOT/target/bin/etcd" /usr/bin/etcd
-```
 
 ### Starting the cluster
 
