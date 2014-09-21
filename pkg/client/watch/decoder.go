@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package watch
 
 import (
 	"encoding/json"
@@ -28,6 +28,8 @@ import (
 
 // APIEventDecoder implements the watch.Decoder interface for io.ReadClosers that
 // have contents which consist of a series of api.WatchEvent objects encoded via JSON.
+// It will decode any object which is registered to convert to api.WatchEvent via
+// api.Scheme
 type APIEventDecoder struct {
 	stream  io.ReadCloser
 	decoder *json.Decoder

@@ -26,10 +26,10 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestListControllersError(t *testing.T) {
@@ -39,7 +39,7 @@ func TestListControllersError(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(nil)
+	controllers, err := storage.List(labels.Everything(), labels.Everything())
 	if err != mockRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
 	}
@@ -53,7 +53,7 @@ func TestListEmptyControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(labels.Everything())
+	controllers, err := storage.List(labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestListControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllersObj, err := storage.List(labels.Everything())
+	controllersObj, err := storage.List(labels.Everything(), labels.Everything())
 	controllers := controllersObj.(*api.ReplicationControllerList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -113,13 +113,13 @@ func TestControllerDecode(t *testing.T) {
 			ID: "foo",
 		},
 	}
-	body, err := runtime.DefaultCodec.Encode(controller)
+	body, err := latest.Codec.Encode(controller)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	controllerOut := storage.New()
-	if err := runtime.DefaultCodec.DecodeInto(body, controllerOut); err != nil {
+	if err := latest.Codec.DecodeInto(body, controllerOut); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

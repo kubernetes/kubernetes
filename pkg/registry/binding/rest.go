@@ -41,7 +41,7 @@ func NewREST(bindingRegistry Registry) *REST {
 }
 
 // List returns an error because bindings are write-only objects.
-func (*REST) List(selector labels.Selector) (runtime.Object, error) {
+func (*REST) List(label, field labels.Selector) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", "list")
 }
 

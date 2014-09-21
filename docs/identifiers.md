@@ -1,14 +1,15 @@
 # Identifiers and Names in Kubernetes
 
-A summarization of the goals and recommendations for identifiers and names in Kubernetes.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/kubernetes/issues/199).
+A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/kubernetes/issues/199).
+
 
 ## Definitions
 
-identifier
-: An opaque machine generated value guaranteed to be unique in a certain space
+UID
+: A non-empty, opaque, system-generated value guaranteed to be unique in time and space; intended to distinguish between historical occurrences of similar entities.
 
-name
-: A human readable string intended to help an end user distinguish between similar but distinct entities
+Name
+: A non-empty string guaranteed to be unique within a given scope at a particular time; used in resource URLs; provided by clients at creation time and encouraged to be human friendly; intended to facilitate creation idempotence and space-uniqueness of singleton objects, distinguish distinct entities, and reference particular entities across operations.
 
 [rfc1035](http://www.ietf.org/rfc/rfc1035.txt)/[rfc1123](http://www.ietf.org/rfc/rfc1123.txt) label (DNS_LABEL)
 : An alphanumeric (a-z, A-Z, and 0-9) string, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character, suitable for use as a hostname or segment in a domain name
@@ -19,68 +20,71 @@ name
 [rfc4122](http://www.ietf.org/rfc/rfc4122.txt) universally unique identifier (UUID)
 : A 128 bit generated value that is extremely unlikely to collide across time and space and requires no central coordination
 
-## Objectives for names and identifiers
 
-1) Uniquely identify an instance of a pod on the apiserver and on the kubelet
+## Objectives for names and UIDs
 
-2) Uniquely identify an instance of a container within a pod on the apiserver and on the kubelet
+1. Uniquely identify (via a UID) an object across space and time
 
-3) Uniquely identify a single execution of a container in time for logging or reporting
+2. Uniquely name (via a name) an object across space
 
-4) The structure of a pod specification should stay largely the same throughout the entire system
+3. Provide human-friendly names in API operations and/or configuration files
 
-5) Provide human-friendly, memorable, semantically meaningful, short-ish references in container and pod operations
+4. Allow idempotent creation of API resources (#148) and enforcement of space-uniqueness of singleton objects
 
-6) Provide predictable container and pod references in operations and/or configuration files
-
-7) Allow idempotent creation of API resources (#148)
-
-8) Allow DNS names to be automatically generated for individual containers or pods (#146)
+5. Allow DNS names to be automatically generated for some objects
 
 
-## Design
+## General design
 
-1) Each apiserver has a Namespace string (a DNS_SUBDOMAIN) that is unique across all apiservers that share its configured minions.
-   Example: "k8s.example.com"
+1. When an object is created via an API, a Name string (a DNS_SUBDOMAIN) must be specified.  Name must be non-empty and unique within the apiserver.  This enables idempotent and space-unique creation operations.  Parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffix) to create a unique Name.  For situations where generating a name is impractical, some or all objects may support a param to auto-generate a name.  Generating random names will defeat idempotency.
+   * Examples: "guestbook.user", "backend-x4eb1"
 
-2) Each pod instance on an apiserver has a PodName string (a DNS_SUBDOMAIN) which is and unique within the Namespace.
-   1) If not specified by the client, the apiserver will assign this identifier
-   Example: "guestbook.user"
+2. When an object is created via an api, a Namespace string (a DNS_SUBDOMAIN? format TBD via #1114) may be specified.  Depending on the API receiver, namespaces might be validated (e.g. apiserver might ensure that the namespace actually exists).  If a namespace is not specified, one will be assigned by the API receiver.  This assignment policy might vary across API receivers (e.g. apiserver might have a default, kubelet might generate something semi-random).
+   * Example: "api.k8s.example.com"
 
-3) Each pod instance on an apiserver has a PodFullName (a DNS_SUBDOMAIN) string which is derived from a combination of the Namespace and Name strings.
-   1) If the joined Namespace and PodName is too long for a DNS_SUBDOMAIN, the apiserver must transform it to fit, while still being unique
-   Example: "guestbook.user.k8s.example.com"
+3. Upon acceptance of an object via an API, the object is assigned a UID (a UUID).  UID must be non-empty and unique across space and time.
+   * Example: "01234567-89ab-cdef-0123-456789abcdef"
 
-4) Each pod instance on an apiserver has a PodID (a UUID) that is unique across space and time
-   1) If not specified by the client, the apiserver will assign this identifier
-   2) This identifier will persist for the lifetime of the pod, even if the pod is stopped and started or moved across hosts
-   Example: "01234567-89ab-cdef-0123-456789abcdef"
 
-5) Each container within a pod has a ContainerName string (a DNS_LABEL) that is unique within that pod
-   1) This name must be specified by the client or the apiserver will reject the pod
-   Example: "frontend"
+## Case study: Scheduling a pod
 
-6) Each pod instance on a kubelet has a PodNamespace string (a DNS_SUBDOMAIN)
-   1) This corresponds to the apiserver's Namespace string
-   2) If not specified, the kubelet will assign this name to a deterministic value which is likely to be unique across all sources on the host
-   Example: "k8s.example.com"
-   Example: "file-f4231812554558a718a01ca942782d81"
+Pods can be placed onto a particular node in a number of ways.  This case
+study demonstrates how the above design can be applied to satisfy the
+objectives.
 
-7) Each pod instance on a kubelet has a PodName string (a DNS_SUBDOMAIN) which is unique within the source Namespace
-   1) This corresponds to the apiserver's PodName string
-   2) If not specified, the kubelet will assign this name to a deterministic value
-   Example: "frontend"
+### A pod scheduled by a user through the apiserver
 
-8) When starting an instance of a pod on a kubelet, a PodInstanceID (a UUID) will be assigned to that pod instance
-   1) If not specified, the kubelet will assign this identifier
-   2) If the pod is restarted, it must retain the PodInstanceID it previously had
-   3) If the pod is stopped and a new instance with the same PodNamespace and PodName is started, it must be assigned a new PodInstanceID
-   4) If the pod is moved across hosts, it must be assigned a new PodInstanceID
-   Example: "01234567-89ab-cdef-0123-456789abcdef"
+1. A user submits a pod with Namespace="" and Name="guestbook" to the apiserver.
 
-9) The kubelet may use the PodNamespace, PodName, PodID, and PodInstanceID to produce a docker container name (--name)
-   Example: "01234567-89ab-cdef-0123-456789abcdef_frontend_k8s.example.com"
+2. The apiserver validates the input.
+   1. A default Namespace is assigned.
+   2. The pod name must be space-unique within the Namespace.
+   3. Each container within the pod has a name which must be space-unique within the pod.
 
-10) Each run of a container within a pod will be assigned a ContainerAttemptID (string) that is unique across time.
-   1) This corresponds to Docker container IDs
-   Example: "77af4d6b9913e693e8d0b4b294fa62ade6054e6b2f1ffb617ac955dd63fb0182"
+3. The pod is accepted.
+   1. A new UID is assigned.
+
+4. The pod is bound to a node.
+   1. The kubelet on the node is passed the pod's UID, Namespace, and Name.
+
+5. Kubelet validates the input.
+
+6. Kubelet runs the pod.
+   1. Each container is started up with enough metadata to distinguish the pod from whence it came.
+   2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
+      * This may correspond to Docker's container ID.
+
+### A pod placed by a config file on the node
+
+1. A config file is stored on the node, containing a pod with UID="", Namespace="", and Name="cadvisor".
+
+2. Kubelet validates the input.
+   1. Since UID is not provided, kubelet generates one.
+   2. Since Namespace is not provided, kubelet generates one.
+      1. The generated namespace should be deterministic and cluster-unique for the source, such as a hash of the hostname and file path.
+         * E.g. Namespace="file-f4231812554558a718a01ca942782d81"
+
+3. Kubelet runs the pod.
+   1. Each container is started up with enough metadata to distinguish the pod from whence it came.
+   2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
+      1. This may correspond to Docker's container ID.

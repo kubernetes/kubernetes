@@ -45,28 +45,58 @@ func doTestStore(t *testing.T, store Store) {
 		t.Errorf("found deleted item??")
 	}
 
-	// Test List
+	// Test List.
 	store.Add("a", "b")
 	store.Add("c", "d")
 	store.Add("e", "e")
-	found := util.StringSet{}
-	for _, item := range store.List() {
-		found.Insert(item.(string))
-	}
-	if !found.HasAll("b", "d", "e") {
-		t.Errorf("missing items")
-	}
-	if len(found) != 3 {
-		t.Errorf("extra items")
+	{
+		found := util.StringSet{}
+		for _, item := range store.List() {
+			found.Insert(item.(string))
+		}
+		if !found.HasAll("b", "d", "e") {
+			t.Errorf("missing items")
+		}
+		if len(found) != 3 {
+			t.Errorf("extra items")
+		}
+
+		// Check that ID list is correct.
+		ids := store.Contains()
+		if !ids.HasAll("a", "c", "e") {
+			t.Errorf("missing items")
+		}
+		if len(ids) != 3 {
+			t.Errorf("extra items")
+		}
 	}
 
-	// Check that ID list is correct.
-	ids := store.Contains()
-	if !ids.HasAll("a", "c", "e") {
-		t.Errorf("missing items")
-	}
-	if len(ids) != 3 {
-		t.Errorf("extra items")
+	// Test Replace.
+	store.Replace(map[string]interface{}{
+		"foo": "foo",
+		"bar": "bar",
+	})
+
+	{
+		found := util.StringSet{}
+		for _, item := range store.List() {
+			found.Insert(item.(string))
+		}
+		if !found.HasAll("foo", "bar") {
+			t.Errorf("missing items")
+		}
+		if len(found) != 2 {
+			t.Errorf("extra items")
+		}
+
+		// Check that ID list is correct.
+		ids := store.Contains()
+		if !ids.HasAll("foo", "bar") {
+			t.Errorf("missing items")
+		}
+		if len(ids) != 2 {
+			t.Errorf("extra items")
+		}
 	}
 }
 

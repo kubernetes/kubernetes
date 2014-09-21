@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -149,7 +150,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 	testServer := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, api.ServiceList{}})
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -161,7 +162,7 @@ func TestSyncEndpointsError(t *testing.T) {
 	testServer := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusInternalServerError, api.ServiceList{}})
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 	serviceRegistry := registrytest.ServiceRegistry{
 		Err: fmt.Errorf("test error"),
 	}
@@ -184,7 +185,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	testServer := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, serviceList})
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -209,7 +210,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 	testServer := makeTestServer(t,
 		serverResponse{http.StatusInternalServerError, api.PodList{}},
 		serverResponse{http.StatusOK, serviceList})
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 	serviceRegistry := registrytest.ServiceRegistry{
 		List: api.ServiceList{
 			Items: []api.Service{

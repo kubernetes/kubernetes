@@ -114,25 +114,21 @@ func TestWatchHTTP(t *testing.T) {
 
 	decoder := json.NewDecoder(response.Body)
 
-	try := func(action watch.EventType, object runtime.Object) {
+	for i, item := range watchTestTable {
 		// Send
-		simpleStorage.fakeWatch.Action(action, object)
+		simpleStorage.fakeWatch.Action(item.t, item.obj)
 		// Test receive
 		var got api.WatchEvent
 		err := decoder.Decode(&got)
 		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
+			t.Fatalf("%d: Unexpected error: %v", i, err)
 		}
-		if got.Type != action {
-			t.Errorf("Unexpected type: %v", got.Type)
+		if got.Type != item.t {
+			t.Errorf("%d: Unexpected type: %v", i, got.Type)
 		}
-		if e, a := object, got.Object.Object; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
+		if e, a := item.obj, got.Object.Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("%d: Expected %v, got %v", i, e, a)
 		}
-	}
-
-	for _, item := range watchTestTable {
-		try(item.t, item.obj)
 	}
 	simpleStorage.fakeWatch.Stop()
 
@@ -201,6 +197,54 @@ func TestWatchParamParsing(t *testing.T) {
 		}
 		if e, a := item.fieldSelector, simpleStorage.requestedFieldSelector.String(); e != a {
 			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+		}
+	}
+}
+
+func TestWatchProtocolSelection(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	handler := Handle(map[string]RESTStorage{
+		"foo": simpleStorage,
+	}, codec, "/prefix/version")
+	server := httptest.NewServer(handler)
+	client := http.Client{}
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/prefix/version/watch/foo"
+	dest.RawQuery = ""
+
+	table := []struct {
+		isWebsocket bool
+		connHeader  string
+	}{
+		{true, "Upgrade"},
+		{true, "keep-alive, Upgrade"},
+		{true, "upgrade"},
+		{false, "keep-alive"},
+	}
+
+	for _, item := range table {
+		request, err := http.NewRequest("GET", dest.String(), nil)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		request.Header.Set("Connection", item.connHeader)
+		request.Header.Set("Upgrade", "websocket")
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		// The requests recognized as websocket requests based on connection
+		// and upgrade headers will not also have the necessary Sec-Websocket-*
+		// headers so it is expected to throw a 400
+		if item.isWebsocket && response.StatusCode != http.StatusBadRequest {
+			t.Errorf("Unexpected response %#v", response)
+		}
+
+		if !item.isWebsocket && response.StatusCode != http.StatusOK {
+			t.Errorf("Unexpected response %#v", response)
 		}
 	}
 }

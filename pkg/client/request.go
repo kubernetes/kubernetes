@@ -28,9 +28,9 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	cwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/client/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
@@ -269,7 +269,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Got status: %v", response.StatusCode)
 	}
-	return watch.NewStreamWatcher(tools.NewAPIEventDecoder(response.Body)), nil
+	return watch.NewStreamWatcher(cwatch.NewAPIEventDecoder(response.Body)), nil
 }
 
 // Do formats and executes the request. Returns the API object received, or an error.

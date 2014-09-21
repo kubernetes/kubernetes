@@ -94,3 +94,12 @@ func findPortByName(container api.Container, portName string) int {
 	}
 	return -1
 }
+
+func (s Status) String() string {
+	if s == Healthy {
+		return "healthy"
+	} else if s == Unhealthy {
+		return "unhealthy"
+	}
+	return "unknown"
+}

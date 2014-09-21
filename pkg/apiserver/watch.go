@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -52,6 +54,12 @@ func getWatchParams(query url.Values) (label, field labels.Selector, resourceVer
 	return label, field, resourceVersion
 }
 
+var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
+
+func isWebsocketRequest(req *http.Request) bool {
+	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
+}
+
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	parts := splitPath(req.URL.Path)
@@ -74,8 +82,8 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		// TODO: This is one watch per connection. We want to multiplex, so that
 		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching}
-		if req.Header.Get("Connection") == "Upgrade" && req.Header.Get("Upgrade") == "websocket" {
+		watchServer := &WatchServer{watching, h.codec}
+		if isWebsocketRequest(req) {
 			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
 		} else {
 			watchServer.ServeHTTP(w, req)
@@ -89,6 +97,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
 	watching watch.Interface
+	codec    runtime.Codec
 }
 
 // HandleWS implements a websocket handler.
@@ -111,11 +120,13 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			err := websocket.JSON.Send(ws, &api.WatchEvent{
-				Type:   event.Type,
-				Object: runtime.EmbeddedObject{event.Object},
-			})
+			obj, err := api.NewJSONWatchEvent(w.codec, event)
 			if err != nil {
+				// Client disconnect.
+				w.watching.Stop()
+				return
+			}
+			if err := websocket.JSON.Send(ws, obj); err != nil {
 				// Client disconnect.
 				w.watching.Stop()
 				return
@@ -158,11 +169,13 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			err := encoder.Encode(&api.WatchEvent{
-				Type:   event.Type,
-				Object: runtime.EmbeddedObject{event.Object},
-			})
+			obj, err := api.NewJSONWatchEvent(self.codec, event)
 			if err != nil {
+				// Client disconnect.
+				self.watching.Stop()
+				return
+			}
+			if err := encoder.Encode(obj); err != nil {
 				// Client disconnect.
 				self.watching.Stop()
 				return

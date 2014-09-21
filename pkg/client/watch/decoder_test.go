@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tools
+package watch
 
 import (
 	"encoding/json"
@@ -24,29 +24,37 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+type watchSerialization struct {
+	Type   watch.EventType
+	Object json.RawMessage
+}
+
 func TestDecoder(t *testing.T) {
 	out, in := io.Pipe()
-	encoder := json.NewEncoder(in)
 	decoder := NewAPIEventDecoder(out)
 
 	expect := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	encoder := json.NewEncoder(in)
 	go func() {
-		err := encoder.Encode(api.WatchEvent{watch.Added, runtime.EmbeddedObject{expect}})
+		data, err := v1beta1.Codec.Encode(expect)
 		if err != nil {
+			t.Fatalf("Unexpected error %v", err)
+		}
+		if err := encoder.Encode(&watchSerialization{watch.Added, json.RawMessage(data)}); err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
+		in.Close()
 	}()
 
 	done := make(chan struct{})
 	go func() {
 		action, got, err := decoder.Decode()
 		if err != nil {
-			t.Errorf("Unexpected error %v", err)
+			t.Fatalf("Unexpected error %v", err)
 		}
 		if e, a := watch.Added, action; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
@@ -54,17 +62,12 @@ func TestDecoder(t *testing.T) {
 		if e, a := expect, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+		t.Logf("Exited read")
 		close(done)
 	}()
-	select {
-	case <-done:
-		break
-	case <-time.After(10 * time.Second):
-		t.Error("Timeout")
-	}
+	<-done
 
 	done = make(chan struct{})
-
 	go func() {
 		_, _, err := decoder.Decode()
 		if err == nil {
@@ -72,15 +75,9 @@ func TestDecoder(t *testing.T) {
 		}
 		close(done)
 	}()
+	<-done
 
 	decoder.Close()
-
-	select {
-	case <-done:
-		break
-	case <-time.After(10 * time.Second):
-		t.Error("Timeout")
-	}
 }
 
 func TestDecoder_SourceClose(t *testing.T) {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -226,12 +227,15 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	for i := range containers {
 		cErrs := errs.ErrorList{}
 		ctr := &containers[i] // so we can set default values
+		capabilities := capabilities.Get()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name", ctr.Name))
 		} else if !util.IsDNSLabel(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name))
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
+		} else if ctr.Privileged && !capabilities.AllowPrivileged {
+			cErrs = append(cErrs, errs.NewFieldInvalid("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
@@ -341,17 +345,24 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.E
 	if len(controller.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
 	}
-	if labels.Set(controller.DesiredState.ReplicaSelector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("desiredState.replicaSelector", controller.DesiredState.ReplicaSelector))
+	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
+	return allErrs
+}
+
+// ValidateReplicationControllerState tests if required fields in the replication controller state are set.
+func ValidateReplicationControllerState(state *api.ReplicationControllerState) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	if labels.Set(state.ReplicaSelector).AsSelector().Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("replicaSelector", state.ReplicaSelector))
 	}
-	selector := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
-	labels := labels.Set(controller.DesiredState.PodTemplate.Labels)
+	selector := labels.Set(state.ReplicaSelector).AsSelector()
+	labels := labels.Set(state.PodTemplate.Labels)
 	if !selector.Matches(labels) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("desiredState.podTemplate.labels", controller.DesiredState.PodTemplate))
+		allErrs = append(allErrs, errs.NewFieldInvalid("podTemplate.labels", state.PodTemplate))
 	}
-	if controller.DesiredState.Replicas < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("desiredState.replicas", controller.DesiredState.Replicas))
+	if state.Replicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
-	allErrs = append(allErrs, ValidateManifest(&controller.DesiredState.PodTemplate.DesiredState.Manifest).Prefix("desiredState.podTemplate.desiredState.manifest")...)
+	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
 	return allErrs
 }

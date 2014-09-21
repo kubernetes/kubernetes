@@ -44,6 +44,7 @@ type REST struct {
 	podInfoGetter client.PodInfoGetter
 	podPollPeriod time.Duration
 	registry      Registry
+	minions       client.MinionInterface
 }
 
 type RESTConfig struct {
@@ -51,6 +52,7 @@ type RESTConfig struct {
 	PodCache      client.PodInfoGetter
 	PodInfoGetter client.PodInfoGetter
 	Registry      Registry
+	Minions       client.MinionInterface
 }
 
 // NewREST returns a new REST.
@@ -61,6 +63,7 @@ func NewREST(config *RESTConfig) *REST {
 		podInfoGetter: config.PodInfoGetter,
 		podPollPeriod: time.Second * 10,
 		registry:      config.Registry,
+		minions:       config.Minions,
 	}
 }
 
@@ -101,19 +104,44 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	}
 	if rs.podCache != nil || rs.podInfoGetter != nil {
 		rs.fillPodInfo(pod)
-		pod.CurrentState.Status = getPodStatus(pod)
+		status, err := getPodStatus(pod, rs.minions)
+		if err != nil {
+			return pod, err
+		}
+		pod.CurrentState.Status = status
 	}
 	pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
 	return pod, err
 }
 
-func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
-	pods, err := rs.registry.ListPods(selector)
+func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
+	return labels.Set{
+		"ID": pod.ID,
+		"DesiredState.Status": string(pod.DesiredState.Status),
+		"DesiredState.Host":   pod.DesiredState.Host,
+	}
+}
+
+// filterFunc returns a predicate based on label & field selectors that can be passed to registry's
+// ListPods & WatchPods.
+func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
+	return func(pod *api.Pod) bool {
+		fields := rs.podToSelectableFields(pod)
+		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+	}
+}
+
+func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+	pods, err := rs.registry.ListPodsPredicate(rs.filterFunc(label, field))
 	if err == nil {
 		for i := range pods.Items {
 			pod := &pods.Items[i]
 			rs.fillPodInfo(pod)
-			pod.CurrentState.Status = getPodStatus(pod)
+			status, err := getPodStatus(pod, rs.minions)
+			if err != nil {
+				return pod, err
+			}
+			pod.CurrentState.Status = status
 			pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
 		}
 	}
@@ -122,14 +150,7 @@ func (rs *REST) List(selector labels.Selector) (runtime.Object, error) {
 
 // Watch begins watching for new, changed, or deleted pods.
 func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return rs.registry.WatchPods(resourceVersion, func(pod *api.Pod) bool {
-		fields := labels.Set{
-			"ID": pod.ID,
-			"DesiredState.Status": string(pod.DesiredState.Status),
-			"DesiredState.Host":   pod.DesiredState.Host,
-		}
-		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
-	})
+	return rs.registry.WatchPods(resourceVersion, rs.filterFunc(label, field))
 }
 
 func (*REST) New() runtime.Object {
@@ -202,9 +223,31 @@ func getInstanceIP(cloud cloudprovider.Interface, host string) string {
 	return addr.String()
 }
 
-func getPodStatus(pod *api.Pod) api.PodStatus {
-	if pod.CurrentState.Info == nil || pod.CurrentState.Host == "" {
-		return api.PodWaiting
+func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, error) {
+	if pod.CurrentState.Host == "" {
+		return api.PodWaiting, nil
+	}
+	if minions != nil {
+		res, err := minions.ListMinions()
+		if err != nil {
+			glog.Errorf("Error listing minions: %v", err)
+			return "", err
+		}
+		found := false
+		for _, minion := range res.Items {
+			if minion.ID == pod.CurrentState.Host {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return api.PodTerminated, nil
+		}
+	} else {
+		glog.Errorf("Unexpected missing minion interface, status may be in-accurate")
+	}
+	if pod.CurrentState.Info == nil {
+		return api.PodWaiting, nil
 	}
 	running := 0
 	stopped := 0
@@ -222,13 +265,13 @@ func getPodStatus(pod *api.Pod) api.PodStatus {
 	}
 	switch {
 	case running > 0 && stopped == 0 && unknown == 0:
-		return api.PodRunning
+		return api.PodRunning, nil
 	case running == 0 && stopped > 0 && unknown == 0:
-		return api.PodTerminated
+		return api.PodTerminated, nil
 	case running == 0 && stopped == 0 && unknown > 0:
-		return api.PodWaiting
+		return api.PodWaiting, nil
 	default:
-		return api.PodWaiting
+		return api.PodWaiting, nil
 	}
 }
 

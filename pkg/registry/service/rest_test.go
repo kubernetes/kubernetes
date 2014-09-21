@@ -319,7 +319,7 @@ func TestServiceRegistryList(t *testing.T) {
 		Selector: map[string]string{"bar2": "baz2"},
 	})
 	registry.List.ResourceVersion = 1
-	s, _ := storage.List(labels.Everything())
+	s, _ := storage.List(labels.Everything(), labels.Everything())
 	sl := s.(*api.ServiceList)
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)

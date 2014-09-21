@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -109,13 +111,13 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 }
 
 func TestSyncReplicationControllerDoesNothing(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(newPodList(2))
+	body, _ := latest.Codec.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 
 	fakePodControl := FakePodControl{}
 
@@ -129,13 +131,13 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 }
 
 func TestSyncReplicationControllerDeletes(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(newPodList(2))
+	body, _ := latest.Codec.Encode(newPodList(2))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 
 	fakePodControl := FakePodControl{}
 
@@ -149,13 +151,13 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(newPodList(0))
+	body, _ := latest.Codec.Encode(newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 
 	fakePodControl := FakePodControl{}
 
@@ -169,13 +171,13 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	body, _ := runtime.DefaultCodec.Encode(&api.Pod{})
+	body, _ := v1beta1.Codec.Encode(&api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 
 	podControl := RealPodControl{
 		kubeClient: client,
@@ -209,7 +211,7 @@ func TestCreateReplica(t *testing.T) {
 	expectedPod := api.Pod{
 		JSONBase: api.JSONBase{
 			Kind:       "Pod",
-			APIVersion: "v1beta1",
+			APIVersion: latest.Version,
 		},
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
@@ -225,7 +227,7 @@ func TestCreateReplica(t *testing.T) {
 	}
 }
 
-func TestSyncronize(t *testing.T) {
+func TestSynchonize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1"},
 		DesiredState: api.ReplicationControllerState{
@@ -287,12 +289,12 @@ func TestSyncronize(t *testing.T) {
 
 	fakePodHandler := util.FakeHandler{
 		StatusCode:   200,
-		ResponseBody: "{\"apiVersion\": \"v1beta1\", \"kind\": \"PodList\"}",
+		ResponseBody: "{\"apiVersion\": \"" + latest.Version + "\", \"kind\": \"PodList\"}",
 		T:            t,
 	}
 	fakeControllerHandler := util.FakeHandler{
 		StatusCode: 200,
-		ResponseBody: runtime.DefaultScheme.EncodeOrDie(&api.ReplicationControllerList{
+		ResponseBody: runtime.EncodeOrDie(latest.Codec, &api.ReplicationControllerList{
 			Items: []api.ReplicationController{
 				controllerSpec1,
 				controllerSpec2,
@@ -308,7 +310,7 @@ func TestSyncronize(t *testing.T) {
 		t.Errorf("Unexpected request for %v", req.RequestURI)
 	})
 	testServer := httptest.NewServer(mux)
-	client := client.NewOrDie(testServer.URL, nil)
+	client := client.NewOrDie(testServer.URL, "v1beta1", nil)
 	manager := NewReplicationManager(client)
 	fakePodControl := FakePodControl{}
 	manager.podControl = &fakePodControl

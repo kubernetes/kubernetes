@@ -79,7 +79,7 @@ func TestEndpointsRegistryList(t *testing.T) {
 			{JSONBase: api.JSONBase{ID: "bar"}},
 		},
 	}
-	s, _ := storage.List(labels.Everything())
+	s, _ := storage.List(labels.Everything(), labels.Everything())
 	sl := s.(*api.EndpointsList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))

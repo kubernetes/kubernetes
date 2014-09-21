@@ -23,9 +23,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestNewREST(t *testing.T) {
@@ -38,12 +37,12 @@ func TestNewREST(t *testing.T) {
 		PodID: "foo",
 		Host:  "bar",
 	}
-	body, err := runtime.DefaultCodec.Encode(binding)
+	body, err := latest.Codec.Encode(binding)
 	if err != nil {
 		t.Fatalf("Unexpected encode error %v", err)
 	}
 	obj := b.New()
-	err = runtime.DefaultCodec.DecodeInto(body, obj)
+	err = latest.Codec.DecodeInto(body, obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -66,7 +65,7 @@ func TestRESTUnsupported(t *testing.T) {
 	if _, err := b.Get("binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector()); err == nil {
+	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector(), labels.Everything()); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	// Try sending wrong object just to get 100% coverage

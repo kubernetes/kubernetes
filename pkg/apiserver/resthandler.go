@@ -70,12 +70,17 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 	case "GET":
 		switch len(parts) {
 		case 1:
-			selector, err := labels.ParseSelector(req.URL.Query().Get("labels"))
+			label, err := labels.ParseSelector(req.URL.Query().Get("labels"))
 			if err != nil {
 				errorJSON(err, h.codec, w)
 				return
 			}
-			list, err := storage.List(selector)
+			field, err := labels.ParseSelector(req.URL.Query().Get("fields"))
+			if err != nil {
+				errorJSON(err, h.codec, w)
+				return
+			}
+			list, err := storage.List(label, field)
 			if err != nil {
 				errorJSON(err, h.codec, w)
 				return

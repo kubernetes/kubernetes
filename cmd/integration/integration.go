@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
@@ -105,19 +106,27 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		}
 	}
 
-	cl := client.NewOrDie(apiServer.URL, nil)
+	cl := client.NewOrDie(apiServer.URL, "", nil)
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
+
+	helper, err := master.NewEtcdHelper(servers, "")
+	if err != nil {
+		glog.Fatalf("Unable to get etcd helper: %v", err)
+	}
 
 	// Master
 	m := master.New(&master.Config{
 		Client:        cl,
-		EtcdServers:   servers,
+		EtcdHelper:    helper,
 		Minions:       machineList,
 		PodInfoGetter: fakePodInfoGetter{},
 	})
-	storage, codec := m.API_v1beta1()
-	handler.delegate = apiserver.Handle(storage, codec, "/api/v1beta1")
+	mux := http.NewServeMux()
+	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, "/api/v1beta1")
+	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(mux, "/api/v1beta2")
+	apiserver.InstallSupport(mux)
+	handler.delegate = mux
 
 	// Scheduler
 	scheduler.New((&factory.ConfigFactory{cl}).Create()).Run()
@@ -206,7 +215,7 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: "v1beta1"},
+			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: latest.Version},
 			Port:     12345,
 			Labels: map[string]string{
 				"name": "atomicService",
@@ -302,7 +311,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(apiServerURL, nil)
+	kubeClient := client.NewOrDie(apiServerURL, "", nil)
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

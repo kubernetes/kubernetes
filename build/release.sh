@@ -30,5 +30,5 @@ kube::build::run_build_command build/build-image/run-tests.sh
 kube::build::run_build_command build/build-image/run-integration.sh
 kube::build::copy_output
 kube::build::run_image
-kube::build::package_tarballs
+kube::release::package_tarballs
 kube::release::gcs::release
