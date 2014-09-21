@@ -98,7 +98,7 @@ func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Contain
 	return err
 }
 
-// FlusherWriter provides wrapper for responseWriter with HTTP streaming capabilities
+// FlushWriter provides wrapper for responseWriter with HTTP streaming capabilities
 type FlushWriter struct {
 	flusher http.Flusher
 	writer io.Writer
