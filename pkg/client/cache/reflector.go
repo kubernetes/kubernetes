@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -99,7 +100,10 @@ func (r *Reflector) listAndWatch() {
 			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
 			return
 		}
-		r.watchHandler(w, &resourceVersion)
+		if err := r.watchHandler(w, &resourceVersion); err != nil {
+			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
+			return
+		}
 	}
 }
 
@@ -119,12 +123,13 @@ func (r *Reflector) syncWith(items []runtime.Object) error {
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) error {
+	start := time.Now()
+	eventCount := 0
 	for {
 		event, ok := <-w.ResultChan()
 		if !ok {
-			glog.Errorf("unexpected watch close")
-			return
+			break
 		}
 		if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
@@ -149,5 +154,14 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
 		*resourceVersion = jsonBase.ResourceVersion() + 1
+		eventCount++
 	}
+
+	watchDuration := time.Now().Sub(start)
+	if watchDuration < 1*time.Second && eventCount == 0 {
+		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
+		return errors.New("very short watch")
+	}
+	glog.Infof("unexpected watch close - %v total items received", eventCount)
+	return nil
 }

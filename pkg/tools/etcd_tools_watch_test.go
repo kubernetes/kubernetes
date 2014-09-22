@@ -198,6 +198,19 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	}
 }
 
+func TestWatchEtcdError(t *testing.T) {
+	codec := latest.Codec
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
+	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
+	h := EtcdHelper{fakeClient, codec, versioner}
+
+	_, err := h.Watch("/some/key", 0)
+	if err == nil {
+		t.Fatalf("Unexpected non-error")
+	}
+}
+
 func TestWatch(t *testing.T) {
 	codec := latest.Codec
 	fakeClient := NewFakeEtcdClient(t)

@@ -57,6 +57,8 @@ type FakeEtcdClient struct {
 	// Write to this to prematurely stop a Watch that is running in a goroutine.
 	WatchInjectError chan<- error
 	WatchStop        chan<- bool
+	// If non-nil, will be returned immediately when Watch is called.
+	WatchImmediateError error
 }
 
 func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
@@ -250,6 +252,9 @@ func (f *FakeEtcdClient) WaitForWatchCompletion() {
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
+	if f.WatchImmediateError != nil {
+		return nil, f.WatchImmediateError
+	}
 	f.WatchResponse = receiver
 	f.WatchStop = stop
 	f.WatchIndex = waitIndex
