@@ -42,7 +42,7 @@ type fakeKubelet struct {
 	machineInfoFunc    func() (*info.MachineInfo, error)
 	logFunc            func(w http.ResponseWriter, req *http.Request)
 	runFunc            func(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
-	containerLogsFunc  func(podFullName, containerName, tail string, follow bool, writer io.Writer)  error
+	containerLogsFunc  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer)  error
 }
 
 func (fk *fakeKubelet) GetPodInfo(name, uuid string) (api.PodInfo, error) {
@@ -65,8 +65,8 @@ func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
 }
 
-func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
-	return fk.containerLogsFunc(podFullName, containerName, tail, follow, writer)
+func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+	return fk.containerLogsFunc(podFullName, containerName, tail, follow, stdout, stderr)
 }
 
 func (fk *fakeKubelet) RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {
@@ -363,7 +363,7 @@ func TestContainerLogs(t *testing.T) {
     expectedTail := ""
     expectedFollow := false
     // expected := api.Container{"goodpod": docker.Container{ID: "myContainerID"}}
-    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
             if podFullName != expectedPodName {
                     t.Errorf("expected %s, got %s", expectedPodName, podFullName)
             }
@@ -402,7 +402,7 @@ func TestContainerLogsWithTail(t *testing.T) {
     expectedContainerName := "baz"
     expectedTail := "5"
     expectedFollow := false
-    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
             if podFullName != expectedPodName {
                     t.Errorf("expected %s, got %s", expectedPodName, podFullName)
             }
@@ -441,7 +441,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
     expectedContainerName := "baz"
     expectedTail := ""
     expectedFollow := true
-    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
             if podFullName != expectedPodName {
                     t.Errorf("expected %s, got %s", expectedPodName, podFullName)
             }
