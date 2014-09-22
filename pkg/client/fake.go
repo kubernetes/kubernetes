@@ -132,6 +132,11 @@ func (c *Fake) ListEndpoints(selector labels.Selector) (*api.EndpointsList, erro
 	return api.Scheme.CopyOrDie(&c.EndpointsList).(*api.EndpointsList), c.Err
 }
 
+func (c *Fake) GetEndpoints(name string) (*api.Endpoints, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-endpoints"})
+	return &api.Endpoints{}, nil
+}
+
 func (c *Fake) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
 	return c.Watch, c.Err
