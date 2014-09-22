@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -35,12 +36,13 @@ import (
 )
 
 type fakeKubelet struct {
-	infoFunc          func(name string) (api.PodInfo, error)
-	containerInfoFunc func(podFullName, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	rootInfoFunc      func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	machineInfoFunc   func() (*info.MachineInfo, error)
-	logFunc           func(w http.ResponseWriter, req *http.Request)
-	runFunc           func(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
+	infoFunc           func(name string) (api.PodInfo, error)
+	containerInfoFunc  func(podFullName, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	rootInfoFunc       func(query *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	machineInfoFunc    func() (*info.MachineInfo, error)
+	logFunc            func(w http.ResponseWriter, req *http.Request)
+	runFunc            func(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
+	containerLogsFunc  func(podFullName, containerName, tail string, follow bool, writer io.Writer)  error
 }
 
 func (fk *fakeKubelet) GetPodInfo(name, uuid string) (api.PodInfo, error) {
@@ -61,6 +63,10 @@ func (fk *fakeKubelet) GetMachineInfo() (*info.MachineInfo, error) {
 
 func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
+}
+
+func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+	return fk.containerLogsFunc(podFullName, containerName, tail, follow, writer)
 }
 
 func (fk *fakeKubelet) RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {
@@ -346,4 +352,122 @@ func TestServeRunInContainerWithUUID(t *testing.T) {
 	if result != output {
 		t.Errorf("expected %s, got %s", output, result)
 	}
+}
+
+func TestContainerLogs(t *testing.T) {
+    fw := newServerTest()
+    output := "foo bar"
+    podName := "foo"
+    expectedPodName := podName + ".etcd"
+    expectedContainerName := "baz"
+    expectedTail := ""
+    expectedFollow := false
+    // expected := api.Container{"goodpod": docker.Container{ID: "myContainerID"}}
+    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+            if podFullName != expectedPodName {
+                    t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+            }
+			if containerName != expectedContainerName {
+				t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+			}
+            if tail != expectedTail {
+                    t.Errorf("expected %s, got %s", expectedTail, tail)
+            }
+            if follow != expectedFollow {
+                    t.Errorf("expected %t, got %t", expectedFollow, follow)
+            }
+            return nil
+    }
+    resp, err := http.Get(fw.testHTTPServer.URL+"/containerLogs/" + podName + "/" + expectedContainerName)
+    if err != nil {
+            t.Errorf("Got error GETing: %v", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+            t.Errorf("Error reading container logs: %v", err)
+    }
+    result := string(body)
+    if result != string(body) {
+            t.Errorf("Expected: '%v', got: '%v'", output, result)
+    }
+}
+
+func TestContainerLogsWithTail(t *testing.T) {
+    fw := newServerTest()
+    output := "foo bar"
+    podName := "foo"
+    expectedPodName := podName + ".etcd"
+    expectedContainerName := "baz"
+    expectedTail := "5"
+    expectedFollow := false
+    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+            if podFullName != expectedPodName {
+                    t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+            }
+			if containerName != expectedContainerName {
+				t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+			}
+            if tail != expectedTail {
+                    t.Errorf("expected %s, got %s", expectedTail, tail)
+            }
+            if follow != expectedFollow {
+                    t.Errorf("expected %t, got %t", expectedFollow, follow)
+            }
+            return nil
+    }
+    resp, err := http.Get(fw.testHTTPServer.URL+"/containerLogs/" + podName + "/" + expectedContainerName + "?tail=5")
+    if err != nil {
+            t.Errorf("Got error GETing: %v", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+            t.Errorf("Error reading container logs: %v", err)
+    }
+    result := string(body)
+    if result != string(body) {
+            t.Errorf("Expected: '%v', got: '%v'", output, result)
+    }
+}
+
+func TestContainerLogsWithFollow(t *testing.T) {
+    fw := newServerTest()
+    output := "foo bar"
+    podName := "foo"
+    expectedPodName := podName + ".etcd"
+    expectedContainerName := "baz"
+    expectedTail := ""
+    expectedFollow := true
+    fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+            if podFullName != expectedPodName {
+                    t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+            }
+			if containerName != expectedContainerName {
+				t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+			}
+            if tail != expectedTail {
+                    t.Errorf("expected %s, got %s", expectedTail, tail)
+            }
+            if follow != expectedFollow {
+                    t.Errorf("expected %t, got %t", expectedFollow, follow)
+            }
+            return nil
+    }
+    resp, err := http.Get(fw.testHTTPServer.URL+"/containerLogs/" + podName + "/" + expectedContainerName + "?follow=1")
+    if err != nil {
+            t.Errorf("Got error GETing: %v", err)
+    }
+    defer resp.Body.Close()
+
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+            t.Errorf("Error reading container logs: %v", err)
+    }
+    result := string(body)
+    if result != string(body) {
+            t.Errorf("Expected: '%v', got: '%v'", output, result)
+    }
 }

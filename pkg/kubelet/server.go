@@ -68,6 +68,7 @@ type HostInterface interface {
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name, uuid string) (api.PodInfo, error)
 	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
+	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, writer io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
@@ -92,6 +93,7 @@ func (s *Server) InstallDefaultHandlers() {
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
 	s.mux.HandleFunc("/run/", s.handleRun)
+	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
 }
 
 // error serializes an error object into an HTTP response.
@@ -143,7 +145,54 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handlePodInfo handles podInfo requests against the Kubelet.
+// handleContainerLogs handles containerLogs request against the Kubelet
+func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+	u, err := url.ParseRequestURI(req.RequestURI)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	parts := strings.Split(u.Path, "/")
+
+	var podID, containerName string
+	if len(parts) == 4 {
+		podID = parts[2]
+		containerName = parts[3]
+	} else {
+		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
+		return
+	}
+
+	if len(podID) == 0 {
+		http.Error(w, `{"message": "Missing podID."}`, http.StatusBadRequest)
+		return
+	}
+	if len(containerName) == 0 {
+		http.Error(w, `{"message": "Missing container name."}`, http.StatusBadRequest)
+		return
+	}
+	
+	uriValues := u.Query()
+	follow, _ := strconv.ParseBool(uriValues.Get("follow"))
+	tail := uriValues.Get("tail")
+
+	podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
+
+	fw := FlushWriter{writer: w}
+	if flusher, ok := w.(http.Flusher); ok {
+		fw.flusher = flusher
+	}
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
+	err = s.host.GetKubeletContainerLogs(podFullName, containerName, tail, follow, &fw)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+}
+
+// handlePodInfo handles podInfo requests against the Kubelet
 func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
