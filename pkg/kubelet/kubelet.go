@@ -753,7 +753,7 @@ func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.Contai
 }
 
 // GetKubeletContainerLogs returns logs from the container
-func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, writer io.Writer) error {
+func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient)
 	if err != nil {
 		return err
@@ -763,7 +763,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	if !found {
 		return fmt.Errorf("container not found (%s)\n", containerName)
 	}
-	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail , follow, writer)
+	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail , follow, stdout, stderr)
 }
 
 // GetPodInfo returns information from Docker about the containers in a pod

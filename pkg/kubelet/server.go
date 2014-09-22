@@ -68,7 +68,7 @@ type HostInterface interface {
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name, uuid string) (api.PodInfo, error)
 	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
-	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, writer io.Writer) error
+	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
@@ -185,7 +185,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	err = s.host.GetKubeletContainerLogs(podFullName, containerName, tail, follow, &fw)
+	err = s.host.GetKubeletContainerLogs(podFullName, containerName, tail, follow, &fw, &fw)
 	if err != nil {
 		s.error(w, err)
 		return
