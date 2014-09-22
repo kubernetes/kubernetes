@@ -109,10 +109,7 @@ func testHTTPContainerInfoGetter(
 
 func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:               10,
-		NumSamples:             10,
-		CpuUsagePercentiles:    []int{20, 30},
-		MemoryUsagePercentiles: []int{40, 50},
+		NumStats: 10,
 	}
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
@@ -125,10 +122,7 @@ func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 
 func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:               10,
-		NumSamples:             10,
-		CpuUsagePercentiles:    []int{20, 30},
-		MemoryUsagePercentiles: []int{40, 50},
+		NumStats: 10,
 	}
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
@@ -141,10 +135,7 @@ func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
 
 func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:               10,
-		NumSamples:             10,
-		CpuUsagePercentiles:    []int{20, 30},
-		MemoryUsagePercentiles: []int{40, 50},
+		NumStats: 10,
 	}
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
@@ -157,10 +148,7 @@ func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 
 func TestHTTPContainerInfoGetterGetRootInfoWithError(t *testing.T) {
 	req := &info.ContainerInfoRequest{
-		NumStats:               10,
-		NumSamples:             10,
-		CpuUsagePercentiles:    []int{20, 30},
-		MemoryUsagePercentiles: []int{40, 50},
+		NumStats: 10,
 	}
 	cinfo := itest.GenerateRandomContainerInfo(
 		"dockerIDWhichWillNotBeChecked", // docker ID
