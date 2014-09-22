@@ -35,7 +35,7 @@ function find-release() {
 
   # Do one final check that we have a good release
   if ! gsutil -q stat $RELEASE_NORMALIZED/master-release.tgz; then
-    echo "Could not find release tar.  If developing, make sure you have run src/release/release.sh to create a release."
+    echo "Could not find release tar.  If developing, make sure you have run src/release/release.sh to create a release." 1>&2
     exit 1
   fi
   echo "Release: ${RELEASE_NORMALIZED}"
@@ -49,7 +49,7 @@ function detect-project () {
   fi
 
   if [ -z "$PROJECT" ]; then
-    echo "Could not detect Google Cloud Platform project.  Set the default project using 'gcloud config set project <PROJECT>'"
+    echo "Could not detect Google Cloud Platform project.  Set the default project using 'gcloud config set project <PROJECT>'" 1>&2
     exit 1
   fi
   echo "Project: $PROJECT (autodetected from gcloud config)"
@@ -58,14 +58,19 @@ function detect-project () {
 function detect-minions () {
   KUBE_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    # gcutil will print the "external-ip" column header even if no instances are found
     local minion_ip=$(gcutil listinstances --format=csv --sort=external-ip \
       --columns=external-ip --zone ${ZONE} --filter="name eq ${MINION_NAMES[$i]}" \
-      | tail -n 1)
-    echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+      | tail --lines=+2 | tail -n 1)
+    if [ -z "$minion_ip" ] ; then
+      echo "Did not find ${MINION_NAMES[$i]}" 1>&2
+    else
+      echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
+      KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    fi
   done
   if [ -z "$KUBE_MINION_IP_ADDRESSES" ]; then
-    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
+    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
     exit 1
   fi
 }
@@ -73,12 +78,13 @@ function detect-minions () {
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
   if [ -z "$KUBE_MASTER_IP" ]; then
+    # gcutil will print the "external-ip" column header even if no instances are found
     KUBE_MASTER_IP=$(gcutil listinstances --format=csv --sort=external-ip \
       --columns=external-ip --zone ${ZONE} --filter="name eq ${MASTER_NAME}" \
-      | tail -n 1)
+      | tail --lines=+2 | tail -n 1)
   fi
   if [ -z "$KUBE_MASTER_IP" ]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
     exit 1
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
@@ -108,7 +114,7 @@ EOF
 function verify-prereqs {
   for x in gcloud gcutil gsutil; do
     if [ "$(which $x)" == "" ]; then
-      echo "Can't find $x in PATH, please fix and retry."
+      echo "Can't find $x in PATH, please fix and retry." 1>&2
       exit 1
     fi
   done
@@ -237,8 +243,8 @@ function kube-up {
       # Make sure docker is installed
       gcutil ssh ${MINION_NAMES[$i]} which docker > /dev/null
       if [ "$?" != "0" ]; then
-          echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
-          echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
+          echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly." 1>&2
+          echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)" 1>&2
           exit 1
       fi
   done
