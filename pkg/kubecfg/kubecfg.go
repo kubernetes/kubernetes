@@ -201,7 +201,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
 			ReplicaSelector: map[string]string{
-				"replicationController": name,
+				"simpleService": name,
 			},
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
@@ -217,7 +217,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 					},
 				},
 				Labels: map[string]string{
-					"replicationController": name,
+					"simpleService": name,
 				},
 			},
 		},
@@ -252,10 +252,10 @@ func createService(name string, port int, client client.Interface) (*api.Service
 		JSONBase: api.JSONBase{ID: name},
 		Port:     port,
 		Labels: map[string]string{
-			"name": name,
+			"simpleService": name,
 		},
 		Selector: map[string]string{
-			"replicationController": name,
+			"simpleService": name,
 		},
 	}
 	svc, err := client.CreateService(svc)
