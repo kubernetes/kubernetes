@@ -125,6 +125,17 @@ func proxyTCP(in, out *net.TCPConn) {
 	out.Close()
 }
 
+func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
+	defer wg.Done()
+	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
+		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
+	if _, err := io.Copy(in, out); err != nil {
+		glog.Errorf("I/O error: %v", err)
+	}
+	in.CloseRead()
+	out.CloseWrite()
+}
+
 // udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
 // no new connections are allowed and existing connections are broken.
 // TODO: We could lame-duck this ourselves, if it becomes important.
@@ -306,32 +317,20 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 	}
 }
 
-func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
-	defer wg.Done()
-	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
-		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	if _, err := io.Copy(in, out); err != nil {
-		glog.Errorf("I/O error: %v", err)
-	}
-	in.CloseRead()
-	out.CloseWrite()
-}
-
-// StopProxy stops the proxy for the named service.
-func (proxier *Proxier) StopProxy(service string) error {
-	// TODO: delete from map here?
-	info, found := proxier.getServiceInfo(service)
-	if !found {
-		return fmt.Errorf("unknown service: %s", service)
-	}
+// This assumes proxier.mu is not locked.
+func (proxier *Proxier) stopProxy(service string, info *serviceInfo) error {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
+// This assumes proxier.mu is locked.
 func (proxier *Proxier) stopProxyInternal(service string, info *serviceInfo) error {
 	if !info.setActive(false) {
 		return nil
 	}
 	glog.Infof("Removing service: %s", service)
+	delete(proxier.serviceMap, service)
 	return info.socket.Close()
 }
 
@@ -348,15 +347,10 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 	proxier.serviceMap[service] = info
 }
 
-// used to globally lock around unused ports. Only used in testing.
-var unusedPortLock sync.Mutex
-
 // addServiceOnUnusedPort starts listening for a new service, returning the
 // port it's using.  For testing on a system with unknown ports used.  The timeout only applies to UDP
 // connections, for now.
 func (proxier *Proxier) addServiceOnUnusedPort(service, protocol string, timeout time.Duration) (string, error) {
-	unusedPortLock.Lock()
-	defer unusedPortLock.Unlock()
 	sock, err := newProxySocket(protocol, proxier.address, 0)
 	if err != nil {
 		return "", err
@@ -405,7 +399,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			continue
 		}
 		if exists && info.port != service.Port {
-			err := proxier.stopProxyInternal(service.ID, info)
+			err := proxier.stopProxy(service.ID, info)
 			if err != nil {
 				glog.Errorf("error stopping %s: %v", service.ID, err)
 			}

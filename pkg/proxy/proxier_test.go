@@ -171,6 +171,15 @@ func TestUDPProxy(t *testing.T) {
 	testEchoUDP(t, "127.0.0.1", proxyPort)
 }
 
+// Helper: Stops the proxy for the named service.
+func stopProxyByName(proxier *Proxier, service string) error {
+	info, found := proxier.getServiceInfo(service)
+	if !found {
+		return fmt.Errorf("unknown service: %s", service)
+	}
+	return proxier.stopProxy(service, info)
+}
+
 func TestTCPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
@@ -192,7 +201,7 @@ func TestTCPProxyStop(t *testing.T) {
 	}
 	conn.Close()
 
-	p.StopProxy("echo")
+	stopProxyByName(p, "echo")
 	// Wait for the port to really close.
 	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
@@ -220,7 +229,7 @@ func TestUDPProxyStop(t *testing.T) {
 	}
 	conn.Close()
 
-	p.StopProxy("echo")
+	stopProxyByName(p, "echo")
 	// Wait for the port to really close.
 	if err := waitForClosedPortUDP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
