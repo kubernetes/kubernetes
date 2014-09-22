@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package watch
+package json
 
 import (
 	"encoding/json"
@@ -25,17 +25,13 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-type watchSerialization struct {
-	Type   watch.EventType
-	Object json.RawMessage
-}
-
 func TestDecoder(t *testing.T) {
 	out, in := io.Pipe()
-	decoder := NewAPIEventDecoder(out)
+	decoder := NewDecoder(out, v1beta1.Codec)
 
 	expect := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	encoder := json.NewEncoder(in)
@@ -44,7 +40,7 @@ func TestDecoder(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error %v", err)
 		}
-		if err := encoder.Encode(&watchSerialization{watch.Added, json.RawMessage(data)}); err != nil {
+		if err := encoder.Encode(&watchEvent{watch.Added, runtime.RawExtension{json.RawMessage(data)}}); err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
 		in.Close()
@@ -82,7 +78,7 @@ func TestDecoder(t *testing.T) {
 
 func TestDecoder_SourceClose(t *testing.T) {
 	out, in := io.Pipe()
-	decoder := NewAPIEventDecoder(out)
+	decoder := NewDecoder(out, v1beta1.Codec)
 
 	done := make(chan struct{})
 

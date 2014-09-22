@@ -19,7 +19,6 @@ package client
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -29,12 +28,14 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
 
 func TestDoRequestNewWay(t *testing.T) {
@@ -386,7 +387,7 @@ func TestWatch(t *testing.T) {
 	}{
 		{watch.Added, &api.Pod{JSONBase: api.JSONBase{ID: "first"}}},
 		{watch.Modified, &api.Pod{JSONBase: api.JSONBase{ID: "second"}}},
-		{watch.Deleted, &api.Pod{JSONBase: api.JSONBase{ID: "third"}}},
+		{watch.Deleted, &api.Pod{JSONBase: api.JSONBase{ID: "last"}}},
 	}
 
 	auth := AuthInfo{User: "user", Password: "pass"}
@@ -401,13 +402,9 @@ func TestWatch(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher.Flush()
 
-		encoder := json.NewEncoder(w)
+		encoder := watchjson.NewEncoder(w, latest.Codec)
 		for _, item := range table {
-			data, err := api.NewJSONWatchEvent(v1beta1.Codec, watch.Event{item.t, item.obj})
-			if err != nil {
-				panic(err)
-			}
-			if err := encoder.Encode(data); err != nil {
+			if err := encoder.Encode(&watch.Event{item.t, item.obj}); err != nil {
 				panic(err)
 			}
 			flusher.Flush()

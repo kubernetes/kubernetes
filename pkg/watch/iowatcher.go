@@ -17,10 +17,12 @@ limitations under the License.
 package watch
 
 import (
+	"io"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -82,6 +84,9 @@ func (sw *StreamWatcher) receive() {
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {
+			if err != io.EOF {
+				glog.Errorf("Unable to decode an event from the watch stream: %v", err)
+			}
 			return
 		}
 		sw.result <- Event{
