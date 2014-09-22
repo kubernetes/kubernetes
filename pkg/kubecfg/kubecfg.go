@@ -255,7 +255,7 @@ func createService(name string, port int, client client.Interface) (*api.Service
 			"name": name,
 		},
 		Selector: map[string]string{
-			"name": name,
+			"replicationController": name,
 		},
 	}
 	svc, err := client.CreateService(svc)
