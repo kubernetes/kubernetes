@@ -154,20 +154,36 @@ func portsFromString(spec string) []api.Port {
 	var result []api.Port
 	for _, part := range parts {
 		pieces := strings.Split(part, ":")
-		if len(pieces) != 2 {
+		if len(pieces) < 1 || len(pieces) > 2 {
 			glog.Infof("Bad port spec: %s", part)
 			continue
 		}
-		host, err := strconv.Atoi(pieces[0])
-		if err != nil {
-			glog.Errorf("Host part is not integer: %s %v", pieces[0], err)
+		host := 0
+		container := 0
+		var err error
+		if len(pieces) == 1 {
+			container, err = strconv.Atoi(pieces[0])
+			if err != nil {
+				glog.Errorf("Container port is not integer: %s %v", pieces[0], err)
+				continue
+			}
+		} else {
+			host, err = strconv.Atoi(pieces[0])
+			if err != nil {
+				glog.Errorf("Host port is not integer: %s %v", pieces[0], err)
+				continue
+			}
+			container, err = strconv.Atoi(pieces[1])
+			if err != nil {
+				glog.Errorf("Container port is not integer: %s %v", pieces[1], err)
+				continue
+			}
+		}
+		if container < 1 {
+			glog.Errorf("Container port is not valid: %d", container)
 			continue
 		}
-		container, err := strconv.Atoi(pieces[1])
-		if err != nil {
-			glog.Errorf("Container part is not integer: %s %v", pieces[1], err)
-			continue
-		}
+
 		result = append(result, api.Port{ContainerPort: container, HostPort: host})
 	}
 	return result
