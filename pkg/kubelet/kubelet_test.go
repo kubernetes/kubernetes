@@ -803,53 +803,12 @@ func (c *mockCadvisorClient) MachineInfo() (*info.MachineInfo, error) {
 	return args.Get(0).(*info.MachineInfo), args.Error(1)
 }
 
-func areSamePercentiles(
-	cadvisorPercentiles []info.Percentile,
-	kubePercentiles []info.Percentile,
-	t *testing.T,
-) {
-	if len(cadvisorPercentiles) != len(kubePercentiles) {
-		t.Errorf("cadvisor gives %v percentiles; kubelet got %v", len(cadvisorPercentiles), len(kubePercentiles))
-		return
-	}
-	for _, ap := range cadvisorPercentiles {
-		found := false
-		for _, kp := range kubePercentiles {
-			if ap.Percentage == kp.Percentage {
-				found = true
-				if ap.Value != kp.Value {
-					t.Errorf("%v percentile from cadvisor is %v; kubelet got %v",
-						ap.Percentage,
-						ap.Value,
-						kp.Value)
-				}
-			}
-		}
-		if !found {
-			t.Errorf("Unable to find %v percentile in kubelet's data", ap.Percentage)
-		}
-	}
-}
-
 func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
 	containerInfo := &info.ContainerInfo{
 		ContainerReference: info.ContainerReference{
 			Name: containerPath,
-		},
-		StatsPercentiles: &info.ContainerStatsPercentiles{
-			MaxMemoryUsage: 1024000,
-			MemoryUsagePercentiles: []info.Percentile{
-				{50, 100},
-				{80, 180},
-				{90, 190},
-			},
-			CpuUsagePercentiles: []info.Percentile{
-				{51, 101},
-				{81, 181},
-				{91, 191},
-			},
 		},
 	}
 
@@ -876,11 +835,6 @@ func TestGetContainerInfo(t *testing.T) {
 	if stats == nil {
 		t.Fatalf("stats should not be nil")
 	}
-	if stats.StatsPercentiles.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
-		t.Errorf("wrong max memory usage")
-	}
-	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.StatsPercentiles.CpuUsagePercentiles, t)
-	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.StatsPercentiles.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
 
@@ -889,14 +843,6 @@ func TestGetRootInfo(t *testing.T) {
 	containerInfo := &info.ContainerInfo{
 		ContainerReference: info.ContainerReference{
 			Name: containerPath,
-		}, StatsPercentiles: &info.ContainerStatsPercentiles{MaxMemoryUsage: 1024000, MemoryUsagePercentiles: []info.Percentile{{50, 100}, {80, 180},
-			{90, 190},
-		},
-			CpuUsagePercentiles: []info.Percentile{
-				{51, 101},
-				{81, 181},
-				{91, 191},
-			},
 		},
 	}
 	fakeDocker := dockertools.FakeDockerClient{}
@@ -914,15 +860,10 @@ func TestGetRootInfo(t *testing.T) {
 	}
 
 	// If the container name is an empty string, then it means the root container.
-	stats, err := kubelet.GetRootInfo(req)
+	_, err := kubelet.GetRootInfo(req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if stats.StatsPercentiles.MaxMemoryUsage != containerInfo.StatsPercentiles.MaxMemoryUsage {
-		t.Errorf("wrong max memory usage")
-	}
-	areSamePercentiles(containerInfo.StatsPercentiles.CpuUsagePercentiles, stats.StatsPercentiles.CpuUsagePercentiles, t)
-	areSamePercentiles(containerInfo.StatsPercentiles.MemoryUsagePercentiles, stats.StatsPercentiles.MemoryUsagePercentiles, t)
 	mockCadvisor.AssertExpectations(t)
 }
 
@@ -941,15 +882,6 @@ func TestGetContainerInfoWithoutCadvisor(t *testing.T) {
 	// When there's no cAdvisor, the stats should be either nil or empty
 	if stats == nil {
 		return
-	}
-	if stats.StatsPercentiles.MaxMemoryUsage != 0 {
-		t.Errorf("MaxMemoryUsage is %v even if there's no cadvisor", stats.StatsPercentiles.MaxMemoryUsage)
-	}
-	if len(stats.StatsPercentiles.CpuUsagePercentiles) > 0 {
-		t.Errorf("CPU usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.CpuUsagePercentiles)
-	}
-	if len(stats.StatsPercentiles.MemoryUsagePercentiles) > 0 {
-		t.Errorf("Memory usage percentiles is not empty (%+v) even if there's no cadvisor", stats.StatsPercentiles.MemoryUsagePercentiles)
 	}
 }
 

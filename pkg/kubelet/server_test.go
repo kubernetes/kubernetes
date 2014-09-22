@@ -166,21 +166,7 @@ func TestPodInfo(t *testing.T) {
 
 func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &info.ContainerInfo{
-		StatsPercentiles: &info.ContainerStatsPercentiles{
-			MaxMemoryUsage: 1024001,
-			CpuUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-			MemoryUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-		},
-	}
+	expectedInfo := &info.ContainerInfo{}
 	expectedPodID := "somepod"
 	expectedContainerName := "goodcontainer"
 	fw.fakeKubelet.containerInfoFunc = func(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
@@ -207,21 +193,7 @@ func TestContainerInfo(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &info.ContainerInfo{
-		StatsPercentiles: &info.ContainerStatsPercentiles{
-			MaxMemoryUsage: 1024001,
-			CpuUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-			MemoryUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-		},
-	}
+	expectedInfo := &info.ContainerInfo{}
 	fw.fakeKubelet.rootInfoFunc = func(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		return expectedInfo, nil
 	}

@@ -729,9 +729,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 
 func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.ContainerInfoRequest {
 	ret := &info.ContainerInfoRequest{
-		NumStats:               req.NumStats,
-		CpuUsagePercentiles:    req.CpuUsagePercentiles,
-		MemoryUsagePercentiles: req.MemoryUsagePercentiles,
+		NumStats: req.NumStats,
 	}
 	return ret
 }

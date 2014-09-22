@@ -15,9 +15,7 @@
 package info
 
 import (
-	"fmt"
 	"reflect"
-	"sort"
 	"time"
 )
 
@@ -59,13 +57,6 @@ type ContainerReference struct {
 type ContainerInfoRequest struct {
 	// Max number of stats to return.
 	NumStats int `json:"num_stats,omitempty"`
-	// Max number of samples to return.
-	NumSamples int `json:"num_samples,omitempty"`
-
-	// Different percentiles of CPU usage within a period. The values must be within [0, 100]
-	CpuUsagePercentiles []int `json:"cpu_usage_percentiles,omitempty"`
-	// Different percentiles of memory usage within a period. The values must be within [0, 100]
-	MemoryUsagePercentiles []int `json:"memory_usage_percentiles,omitempty"`
 }
 
 type ContainerInfo struct {
@@ -79,11 +70,6 @@ type ContainerInfo struct {
 
 	// Historical statistics gathered from the container.
 	Stats []*ContainerStats `json:"stats,omitempty"`
-
-	// Randomly sampled container states.
-	Samples []*ContainerStatsSample `json:"samples,omitempty"`
-
-	StatsPercentiles *ContainerStatsPercentiles `json:"stats_summary,omitempty"`
 }
 
 // ContainerInfo may be (un)marshaled by json or other en/decoder. In that
@@ -112,9 +98,6 @@ func (self *ContainerInfo) Eq(b *ContainerInfo) bool {
 	if !reflect.DeepEqual(self.Spec, b.Spec) {
 		return false
 	}
-	if !reflect.DeepEqual(self.StatsPercentiles, b.StatsPercentiles) {
-		return false
-	}
 
 	for i, expectedStats := range b.Stats {
 		selfStats := self.Stats[i]
@@ -123,12 +106,6 @@ func (self *ContainerInfo) Eq(b *ContainerInfo) bool {
 		}
 	}
 
-	for i, expectedSample := range b.Samples {
-		selfSample := self.Samples[i]
-		if !expectedSample.Eq(selfSample) {
-			return false
-		}
-	}
 	return true
 }
 
@@ -278,24 +255,6 @@ func (self *ContainerStats) Copy(dst *ContainerStats) *ContainerStats {
 	return dst
 }
 
-type ContainerStatsSample struct {
-	// Timetamp of the end of the sample period
-	Timestamp time.Time `json:"timestamp"`
-	// Duration of the sample period
-	Duration time.Duration `json:"duration"`
-	Cpu      struct {
-		// number of nanoseconds of CPU time used by the container
-		Usage uint64 `json:"usage"`
-
-		// Per-core usage of the container. (unit: nanoseconds)
-		PerCpuUsage []uint64 `json:"per_cpu_usage,omitempty"`
-	} `json:"cpu"`
-	Memory struct {
-		// Units: Bytes.
-		Usage uint64 `json:"usage"`
-	} `json:"memory"`
-}
-
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {
 	// t1 should not be later than t2
 	if t1.After(t2) {
@@ -330,6 +289,11 @@ func (a *ContainerStats) Eq(b *ContainerStats) bool {
 	if !timeEq(a.Timestamp, b.Timestamp, timePrecision) {
 		return false
 	}
+	return a.StatsEq(b)
+}
+
+// Checks equality of the stats values.
+func (a *ContainerStats) StatsEq(b *ContainerStats) bool {
 	if !reflect.DeepEqual(a.Cpu, b.Cpu) {
 		return false
 	}
@@ -339,138 +303,10 @@ func (a *ContainerStats) Eq(b *ContainerStats) bool {
 	return true
 }
 
-// This function is useful because we do not require precise time
-// representation.
-func (a *ContainerStatsSample) Eq(b *ContainerStatsSample) bool {
-	if !timeEq(a.Timestamp, b.Timestamp, timePrecision) {
-		return false
+// Saturate CPU usage to 0.
+func calculateCpuUsage(prev, cur uint64) uint64 {
+	if prev > cur {
+		return 0
 	}
-	if !durationEq(a.Duration, b.Duration, timePrecision) {
-		return false
-	}
-	if !reflect.DeepEqual(a.Cpu, b.Cpu) {
-		return false
-	}
-	if !reflect.DeepEqual(a.Memory, b.Memory) {
-		return false
-	}
-	return true
-}
-
-type Percentile struct {
-	Percentage int    `json:"percentage"`
-	Value      uint64 `json:"value"`
-}
-
-type ContainerStatsPercentiles struct {
-	MaxMemoryUsage         uint64       `json:"max_memory_usage,omitempty"`
-	MemoryUsagePercentiles []Percentile `json:"memory_usage_percentiles,omitempty"`
-	CpuUsagePercentiles    []Percentile `json:"cpu_usage_percentiles,omitempty"`
-}
-
-// Each sample needs two stats because the cpu usage in ContainerStats is
-// cumulative.
-// prev should be an earlier observation than current.
-// This method is not thread/goroutine safe.
-func NewSample(prev, current *ContainerStats) (*ContainerStatsSample, error) {
-	if prev == nil || current == nil {
-		return nil, fmt.Errorf("empty stats")
-	}
-	// Ignore this sample if it is incomplete
-	if prev.Cpu == nil || prev.Memory == nil || current.Cpu == nil || current.Memory == nil {
-		return nil, fmt.Errorf("incomplete stats")
-	}
-	// prev must be an early observation
-	if !current.Timestamp.After(prev.Timestamp) {
-		return nil, fmt.Errorf("wrong stats order")
-	}
-	// This data is invalid.
-	if current.Cpu.Usage.Total < prev.Cpu.Usage.Total {
-		return nil, fmt.Errorf("current CPU usage is less than prev CPU usage (cumulative).")
-	}
-
-	var percpu []uint64
-
-	if len(current.Cpu.Usage.PerCpu) > 0 {
-		curNumCpus := len(current.Cpu.Usage.PerCpu)
-		percpu = make([]uint64, curNumCpus)
-
-		for i, currUsage := range current.Cpu.Usage.PerCpu {
-			var prevUsage uint64 = 0
-			if i < len(prev.Cpu.Usage.PerCpu) {
-				prevUsage = prev.Cpu.Usage.PerCpu[i]
-			}
-			if currUsage < prevUsage {
-				return nil, fmt.Errorf("current per-core CPU usage is less than prev per-core CPU usage (cumulative).")
-			}
-			percpu[i] = currUsage - prevUsage
-		}
-	}
-	sample := new(ContainerStatsSample)
-	// Calculate the diff to get the CPU usage within the time interval.
-	sample.Cpu.Usage = current.Cpu.Usage.Total - prev.Cpu.Usage.Total
-	sample.Cpu.PerCpuUsage = percpu
-	// Memory usage is current memory usage
-	sample.Memory.Usage = current.Memory.Usage
-	sample.Timestamp = current.Timestamp
-	sample.Duration = current.Timestamp.Sub(prev.Timestamp)
-
-	return sample, nil
-}
-
-type uint64Slice []uint64
-
-func (self uint64Slice) Len() int {
-	return len(self)
-}
-
-func (self uint64Slice) Less(i, j int) bool {
-	return self[i] < self[j]
-}
-
-func (self uint64Slice) Swap(i, j int) {
-	self[i], self[j] = self[j], self[i]
-}
-
-func (self uint64Slice) Percentiles(requestedPercentiles ...int) []Percentile {
-	if len(self) == 0 {
-		return nil
-	}
-	ret := make([]Percentile, 0, len(requestedPercentiles))
-	sort.Sort(self)
-	for _, p := range requestedPercentiles {
-		idx := (len(self) * p / 100) - 1
-		if idx < 0 {
-			idx = 0
-		}
-		ret = append(
-			ret,
-			Percentile{
-				Percentage: p,
-				Value:      self[idx],
-			},
-		)
-	}
-	return ret
-}
-
-func NewPercentiles(samples []*ContainerStatsSample, cpuPercentages, memoryPercentages []int) *ContainerStatsPercentiles {
-	if len(samples) == 0 {
-		return nil
-	}
-	cpuUsages := make([]uint64, 0, len(samples))
-	memUsages := make([]uint64, 0, len(samples))
-
-	for _, sample := range samples {
-		if sample == nil {
-			continue
-		}
-		cpuUsages = append(cpuUsages, sample.Cpu.Usage)
-		memUsages = append(memUsages, sample.Memory.Usage)
-	}
-
-	ret := new(ContainerStatsPercentiles)
-	ret.CpuUsagePercentiles = uint64Slice(cpuUsages).Percentiles(cpuPercentages...)
-	ret.MemoryUsagePercentiles = uint64Slice(memUsages).Percentiles(memoryPercentages...)
-	return ret
+	return cur - prev
 }

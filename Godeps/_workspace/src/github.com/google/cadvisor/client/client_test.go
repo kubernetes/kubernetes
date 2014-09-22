@@ -49,10 +49,10 @@ func cadvisorTestClient(path string, expectedPostObj, expectedPostObjEmpty, repl
 				decoder := json.NewDecoder(r.Body)
 				err := decoder.Decode(expectedPostObjEmpty)
 				if err != nil {
-					t.Errorf("Recieved invalid object: %v", err)
+					t.Errorf("Received invalid object: %v", err)
 				}
 				if !reflect.DeepEqual(expectedPostObj, expectedPostObjEmpty) {
-					t.Errorf("Recieved unexpected object: %+v", expectedPostObjEmpty)
+					t.Errorf("Received unexpected object: %+v", expectedPostObjEmpty)
 				}
 			}
 			encoder := json.NewEncoder(w)
@@ -93,10 +93,7 @@ func TestGetMachineinfo(t *testing.T) {
 
 func TestGetContainerInfo(t *testing.T) {
 	query := &info.ContainerInfoRequest{
-		NumStats:               3,
-		NumSamples:             2,
-		CpuUsagePercentiles:    []int{10, 50, 90},
-		MemoryUsagePercentiles: []int{10, 80, 90},
+		NumStats: 3,
 	}
 	containerName := "/some/container"
 	cinfo := itest.GenerateRandomContainerInfo(containerName, 4, query, 1*time.Second)
