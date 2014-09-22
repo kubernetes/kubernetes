@@ -12,7 +12,7 @@
 7. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
 8. Install godep (optional, only required when modifying package dependencies). [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
 9. Get the Kubernetes source:
-      * Kubernetes 0.2 \[[.tar.gz](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.2.tar.gz)\] \[[.zip](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.2.zip)\]
+      * Kubernetes 0.3 \[[.tar.gz](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.tar.gz)\] \[[.zip](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.zip)\]
 
 ### Setup
 
