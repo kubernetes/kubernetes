@@ -41,14 +41,18 @@ const (
 	Added    EventType = "ADDED"
 	Modified EventType = "MODIFIED"
 	Deleted  EventType = "DELETED"
+	Error    EventType = "ERROR"
 )
 
 // Event represents a single event to a watched resource.
 type Event struct {
 	Type EventType
 
-	// If Type == Deleted, then this is the state of the object
-	// immediately before deletion.
+	// Object is:
+	//  * If Type is Added or Modified: the new state of the object.
+	//  * If Type is Deleted: the state of the object immediately before deletion.
+	//  * If Type is Error: *api.Status is recommended; other types may make sense
+	//    depending on context.
 	Object runtime.Object
 }
 
@@ -92,6 +96,11 @@ func (f *FakeWatcher) Modify(obj runtime.Object) {
 // Delete sends a delete event.
 func (f *FakeWatcher) Delete(lastValue runtime.Object) {
 	f.result <- Event{Deleted, lastValue}
+}
+
+// Error sends an Error event.
+func (f *FakeWatcher) Error(errValue runtime.Object) {
+	f.result <- Event{Error, errValue}
 }
 
 // Action sends an event of the requested type, for table-based testing.
