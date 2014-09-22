@@ -304,9 +304,10 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		return false
 	}
 
-	r := c.Verb(verb).
-		Path(path).
-		ParseSelectorParam("labels", *selector)
+	r := c.Verb(verb).Path(path)
+	if len(*selector) > 0 {
+		r.ParseSelectorParam("labels", *selector)
+	}
 	if setBody {
 		if version != 0 {
 			data := readConfig(storage, c.RESTClient.Codec)
