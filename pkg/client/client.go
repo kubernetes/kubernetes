@@ -78,6 +78,7 @@ type ServiceInterface interface {
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
 	ListEndpoints(selector labels.Selector) (*api.EndpointsList, error)
+	GetEndpoints(id string) (*api.Endpoints, error)
 	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
@@ -426,6 +427,13 @@ func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uin
 func (c *Client) ListEndpoints(selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.Get().Path("endpoints").SelectorParam("labels", selector).Do().Into(result)
+	return
+}
+
+// GetEndpoints returns information about the endpoints for a particular service.
+func (c *Client) GetEndpoints(id string) (result *api.Endpoints, err error) {
+	result = &api.Endpoints{}
+	err = c.Get().Path("endpoints").Path(id).Do().Into(result)
 	return
 }
 

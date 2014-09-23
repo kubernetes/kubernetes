@@ -541,6 +541,33 @@ func TestDeleteService(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestListEndpooints(t *testing.T) {
+	c := &testClient{
+		Request: testRequest{Method: "GET", Path: "/endpoints"},
+		Response: Response{StatusCode: 200,
+			Body: &api.EndpointsList{
+				Items: []api.Endpoints{
+					{
+						JSONBase:  api.JSONBase{ID: "endpoint-1"},
+						Endpoints: []string{"10.245.1.2:8080", "10.245.1.3:8080"},
+					},
+				},
+			},
+		},
+	}
+	receivedEndpointsList, err := c.Setup().ListEndpoints(labels.Everything())
+	c.Validate(t, receivedEndpointsList, err)
+}
+
+func TestGetEndpoints(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "GET", Path: "/endpoints/endpoint-1"},
+		Response: Response{StatusCode: 200, Body: &api.Endpoints{JSONBase: api.JSONBase{ID: "endpoint-1"}}},
+	}
+	response, err := c.Setup().GetEndpoints("endpoint-1")
+	c.Validate(t, response, err)
+}
+
 func TestDoRequest(t *testing.T) {
 	invalid := "aaaaa"
 	testClients := []testClient{
