@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func TestErrorNew(t *testing.T) {
@@ -129,5 +130,25 @@ func TestNewInvalid(t *testing.T) {
 func Test_reasonForError(t *testing.T) {
 	if e, a := api.StatusReasonUnknown, reasonForError(nil); e != a {
 		t.Errorf("unexpected reason type: %#v", a)
+	}
+}
+
+type TestType struct{}
+
+func (*TestType) IsAnAPIObject() {}
+
+func TestFromObject(t *testing.T) {
+	table := []struct {
+		obj     runtime.Object
+		message string
+	}{
+		{&api.Status{Message: "foobar"}, "foobar"},
+		{&TestType{}, "unexpected object: &{}"},
+	}
+
+	for _, item := range table {
+		if e, a := item.message, FromObject(item.obj).Error(); e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
 	}
 }

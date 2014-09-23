@@ -101,10 +101,7 @@ func TestWatch(t *testing.T) {
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := helper.Watch(key, 0)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		w := helper.Watch(key, 0)
 		event := <-w.ResultChan()
 		if event.Type != watch.Added || event.Object == nil {
 			t.Fatalf("expected first value to be set to ADDED, got %#v", event)
