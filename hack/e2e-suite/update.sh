@@ -30,7 +30,7 @@ CONTROLLER_NAME=update-demo
 function validate() {
   NUM_REPLICAS=$1
   CONTAINER_IMAGE_VERSION=$2
-  POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=${CONTROLLER_NAME} list pods)
+  POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l simpleService=${CONTROLLER_NAME} list pods)
   # Container turn up on a clean cluster can take a while for the docker image pull.
   ALL_RUNNING=0
   while [ $ALL_RUNNING -ne 1 ]; do
