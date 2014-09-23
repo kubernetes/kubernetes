@@ -6,7 +6,7 @@ Releasing the image requires that you have access to the docker registry user ac
 
 To build and release the guestbook image:
 
-    cd examples/guestbook-go/src
+    cd examples/guestbook-go/_src
     ./script/release.sh
 
 If you're using boot2docker, specify the `DOCKER_BIN` environment variable
