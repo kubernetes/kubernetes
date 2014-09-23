@@ -20,13 +20,16 @@
 # the release tar to download and unpack.  It is meant to be pushed to the
 # master and run.
 
-echo "Downloading release ($MASTER_RELEASE_TAR)"
-gsutil cp $MASTER_RELEASE_TAR master-release.tgz
 
+echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
+gsutil cp "$SERVER_BINARY_TAR_URL" .
 
-echo "Unpacking release"
-rm -rf master-release || false
-tar xzf master-release.tgz
+echo "Downloading binary release tar ($SALT_TAR_URL)"
+gsutil cp "$SALT_TAR_URL" .
+
+echo "Unpacking Salt tree"
+rm -rf kubernetes
+tar xzf "${SALT_TAR_URL##*/}"
 
 echo "Running release install script"
-sudo master-release/src/scripts/master-release-install.sh
+sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"

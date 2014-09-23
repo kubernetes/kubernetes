@@ -49,7 +49,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     fi
 
     # Make sure the kubelet is healthy
-    if [ "$(curl --insecure --user ${user}:${passwd} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
+    if [ "$(curl -s --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
         echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1

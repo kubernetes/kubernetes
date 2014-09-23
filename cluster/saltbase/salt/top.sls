@@ -4,12 +4,12 @@ base:
 
   'roles:kubernetes-pool':
     - match: grain
-    - golang
     - docker
     - kubelet
     - kube-proxy
     - cadvisor
-    - nsinit
+    # We need a binary release of nsinit
+    # - nsinit
     - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn-client
@@ -19,9 +19,7 @@ base:
 
   'roles:kubernetes-master':
     - match: grain
-    - golang
     - etcd
-    - etcdctl
     - apiserver
     - controller-manager
     - scheduler

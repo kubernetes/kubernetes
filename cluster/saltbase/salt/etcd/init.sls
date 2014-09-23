@@ -1,21 +1,43 @@
-etcd-install:
-  git.latest:
-    - target: /var/src/etcd
-    - name: git://github.com/coreos/etcd
-  cmd.wait:
-    - cwd: /var/src/etcd
-    - name: |
-        git checkout ab4bcc18694644d12f0c038339d8d039072502b1  
-        ./build
-    - env:
-      - PATH: {{ grains['path'] }}:/usr/local/bin
+{% set etcd_version="v0.4.6" %}
+{% set etcd_tar_url="https://github.com/coreos/etcd/releases/download/%s/etcd-%s-linux-amd64.tar.gz"
+  | format(etcd_version, etcd_version)  %}
+{% set etcd_tar_hash="md5=2949e9163e59dc4f8db9ad92f3245b20" %}
+
+etcd-tar:
+  archive:
+    - extracted
+    - user: root
+    - name: /usr/local/src
+    - source: {{ etcd_tar_url }}
+    - source_hash: {{ etcd_tar_hash }}
+    - archive_format: tar
+    - if_missing: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
+    - tar_options: z
+  file.directory:
+    - name: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64
+    - user: root
+    - group: root
     - watch:
-      - git: etcd-install
+      - archive: etcd-tar
+    - recurse:
+      - user
+      - group
+
+etcd-symlink:
   file.symlink:
     - name: /usr/local/bin/etcd
-    - target: /var/src/etcd/bin/etcd
+    - target: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64/etcd
+    - force: true
     - watch:
-      - cmd: etcd-install
+      - archive: etcd-tar
+
+etcdctl-symlink:
+  file.symlink:
+    - name: /usr/local/bin/etcdctl
+    - target: /usr/local/src/etcd-{{ etcd_version }}-linux-amd64/etcdctl
+    - force: true
+    - watch:
+      - archive: etcd-tar
 
 etcd:
   group.present:
@@ -25,8 +47,6 @@ etcd:
     - gid_from_name: True
     - shell: /sbin/nologin
     - home: /var/etcd
-    - require:
-      - group: etcd
 
 /etc/etcd:
   file.directory:
@@ -84,5 +104,6 @@ etcd-service:
       - file: /usr/lib/systemd/system/etcd.service
       - file: /etc/default/etcd
       {% endif %}
-      - cmd: etcd-install
+      - file: etcd-tar
+      - file: etcd-symlink
 

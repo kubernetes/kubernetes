@@ -245,11 +245,16 @@ function kube::build::clean_images() {
 function kube::build::run_build_command() {
   [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
 
-  local -r docker="docker run --rm --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+  local -r docker="docker run --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
+  # Remove the container if it is left over from some previous aborted run
   docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
-
   ${docker} "$@"
+
+  # Remove the container after we run.  '--rm' might be appropriate but it
+  # appears that sometimes it fails. See
+  # https://github.com/docker/docker/issues/3968
+  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 }
 
 # If the Docker server is remote, copy the results back out.
@@ -264,7 +269,7 @@ function kube::build::copy_output() {
     # The easiest thing I (jbeda) could figure out was to launch another
     # container pointed at the same volume, tar the output directory and ship
     # that tar over stdou.
-    local -r docker="docker run -a stdout --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+    local -r docker="docker run -a stdout --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
     # Kill any leftover container
     docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
@@ -274,6 +279,11 @@ function kube::build::copy_output() {
     mkdir -p "${LOCAL_OUTPUT_BUILD}"
     ${docker} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} . ; sleep 1"  \
       | tar xv -C "${LOCAL_OUTPUT_BUILD}"
+
+    # Remove the container after we run.  '--rm' might be appropriate but it
+    # appears that sometimes it fails. See
+    # https://github.com/docker/docker/issues/3968
+    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
 
     # I (jbeda) also tried getting rsync working using 'docker run' as the
     # 'remote shell'.  This mostly worked but there was a hang when
@@ -292,27 +302,10 @@ function kube::release::package_tarballs() {
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
 
-  kube::release::package_full_tarball
   kube::release::package_client_tarballs
-  kube::release::package_server_tarball
-}
-
-# This is all the stuff you need to run/install kubernetes.  This includes:
-#   - precompiled binaries for client and server
-#   - Cluster spin up/down scripts and configs for various cloud providers
-function kube::release::package_full_tarball() {
-  local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/full/kubernetes"
-  rm -rf "${release_stage}"
-  mkdir -p "${release_stage}"
-
-  cp -R "${LOCAL_OUTPUT_ROOT}/build" "${release_stage}/platforms"
-  cp -R "${KUBE_REPO_ROOT}/cluster" "${release_stage}/"
-  cp -R "${KUBE_REPO_ROOT}/examples" "${release_stage}/"
-  cp "${KUBE_REPO_ROOT}/README.md" "${release_stage}/"
-  cp "${KUBE_REPO_ROOT}/LICENSE" "${release_stage}/"
-
-  local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
-  tar czf "${package_name}" -C "${release_stage}/.." .
+  kube::release::package_server_tarballs
+  kube::release::package_salt_tarball
+  kube::release::package_full_tarball
 }
 
 # Package up all of the cross compiled clients.  Over time this should grow into
@@ -323,42 +316,91 @@ function kube::release::package_client_tarballs() {
   platforms=($(cd "${LOCAL_OUTPUT_ROOT}/build" ; echo */*))
   for platform in "${platforms[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    echo "+++ Building client tarball for $platform_tag"
+    echo "+++ Building tarball: client $platform_tag"
 
-    local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/client/${platform_tag}/kubernetes/client"
+    local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/client/${platform_tag}/kubernetes"
     rm -rf "${release_stage}"
-    mkdir -p "${release_stage}/bin"
+    mkdir -p "${release_stage}/client/bin"
 
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_ROOT}/build/${platform}/) to every item in the
     # KUBE_CLIENT_BINARIES array.
-    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_ROOT}/build/${platform}/}" "${release_stage}/bin/"
+    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_ROOT}/build/${platform}/}" \
+      "${release_stage}/client/bin/"
 
     local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
-    tar czf "${package_name}" -C "${release_stage}/../.." .
+    tar czf "${package_name}" -C "${release_stage}/.." .
   done
 }
 
 # Package up all of the server binaries
-function kube::release::package_server_tarball() {
+function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    echo "+++ Building server tarball for $platform_tag"
+    echo "+++ Building tarball: server $platform_tag"
 
-    local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/server/${platform_tag}/kubernetes/server"
+    local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/server/${platform_tag}/kubernetes"
     rm -rf "${release_stage}"
-    mkdir -p "${release_stage}/bin"
+    mkdir -p "${release_stage}/server/bin"
 
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_ROOT}/build/${platform}/) to every item in the
     # KUBE_SERVER_BINARIES array.
-    cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_ROOT}/build/${platform}/}" "${release_stage}/bin/"
+    cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_ROOT}/build/${platform}/}" \
+      "${release_stage}/server/bin/"
 
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
-    tar czf "${package_name}" -C "${release_stage}/../.." .
+    tar czf "${package_name}" -C "${release_stage}/.." .
   done
 }
+
+# Package up the salt configuration tree.  This is an optional helper to getting
+# a cluster up and running.
+function kube::release::package_salt_tarball() {
+  echo "+++ Building tarball: salt"
+
+  local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/salt/kubernetes"
+  rm -rf "${release_stage}"
+  mkdir -p "${release_stage}"
+
+  cp -R "${KUBE_REPO_ROOT}/cluster/saltbase" "${release_stage}/"
+
+  local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
+  tar czf "${package_name}" -C "${release_stage}/.." .
+}
+
+# This is all the stuff you need to run/install kubernetes.  This includes:
+#   - precompiled binaries for client
+#   - Cluster spin up/down scripts and configs for various cloud providers
+#   - tarballs for server binary and salt configs that are ready to be uploaded
+#     to master by whatever means appropriate.
+function kube::release::package_full_tarball() {
+  echo "+++ Building tarball: full"
+
+  local release_stage="${LOCAL_OUTPUT_ROOT}/release-stage/full/kubernetes"
+  rm -rf "${release_stage}"
+  mkdir -p "${release_stage}"
+
+  cp -R "${LOCAL_OUTPUT_ROOT}/build" "${release_stage}/platforms"
+
+  # We want everything in /cluster except saltbase.  That is only needed on the
+  # server.
+  cp -R "${KUBE_REPO_ROOT}/cluster" "${release_stage}/"
+  rm -rf "${release_stage}/cluster/saltbase"
+
+  mkdir -p "${release_stage}/server"
+  cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
+  cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
+
+  cp -R "${KUBE_REPO_ROOT}/examples" "${release_stage}/"
+  cp "${KUBE_REPO_ROOT}/README.md" "${release_stage}/"
+  cp "${KUBE_REPO_ROOT}/LICENSE" "${release_stage}/"
+
+  local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
+  tar czf "${package_name}" -C "${release_stage}/.." .
+}
+
 
 # ---------------------------------------------------------------------------
 # GCS Release
