@@ -123,6 +123,7 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 }
 
 // ExtractList extracts a go object per etcd node into a slice with the resource version.
+// DEPRECATED: Use ExtractToList instead, it's more convenient.
 func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersion *uint64) error {
 	nodes, index, err := h.listEtcdNode(key)
 	if resourceVersion != nil {
@@ -148,6 +149,27 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 			return err
 		}
 		v.Set(reflect.Append(v, obj.Elem()))
+	}
+	return nil
+}
+
+// ExtractToList is just like ExtractList, but it works on a ThingyList api object.
+// extracts a go object per etcd node into a slice with the resource version.
+func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
+	var resourceVersion uint64
+	listPtr, err := runtime.GetItemsPtr(listObj)
+	if err != nil {
+		return err
+	}
+	err = h.ExtractList(key, listPtr, &resourceVersion)
+	if err != nil {
+		return err
+	}
+	if h.ResourceVersioner != nil {
+		err = h.ResourceVersioner.SetResourceVersion(listObj, resourceVersion)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
