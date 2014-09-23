@@ -61,7 +61,7 @@ function detect-minions () {
     # gcutil will print the "external-ip" column header even if no instances are found
     local minion_ip=$(gcutil listinstances --format=csv --sort=external-ip \
       --columns=external-ip --zone ${ZONE} --filter="name eq ${MINION_NAMES[$i]}" \
-      | tail --lines=+2 | tail -n 1)
+      | tail -n '+2' | tail -n 1)
     if [ -z "$minion_ip" ] ; then
       echo "Did not find ${MINION_NAMES[$i]}" 1>&2
     else
@@ -81,7 +81,7 @@ function detect-master () {
     # gcutil will print the "external-ip" column header even if no instances are found
     KUBE_MASTER_IP=$(gcutil listinstances --format=csv --sort=external-ip \
       --columns=external-ip --zone ${ZONE} --filter="name eq ${MASTER_NAME}" \
-      | tail --lines=+2 | tail -n 1)
+      | tail -n '+2' | tail -n 1)
   fi
   if [ -z "$KUBE_MASTER_IP" ]; then
     echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
