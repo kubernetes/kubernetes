@@ -14,41 +14,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source $(dirname $0)/util.sh
-source $(dirname $0)/config-go.sh
+set -o errexit
+set -o nounset
+set -o pipefail
 
-function cleanup()
-{
-    set +e
-    kill ${ETCD_PID} 1>&2 2>/dev/null
-    rm -rf ${ETCD_DIR} 1>&2 2>/dev/null
-    echo
-    echo "Complete"
+basedir=$(dirname "$0")
+source "${basedir}/config-go.sh"
+
+source "${KUBE_REPO_ROOT}/hack/util.sh"
+
+cleanup() {
+  kill "${ETCD_PID-}" >/dev/null 2>&1 || :
+  rm -rf "${ETCD_DIR-}"
+  echo ""
+  echo "Complete"
 }
 
-# Stop right away if the build fails
-set -e
-
-if [[ -z $KUBE_NO_BUILD_INTEGRATION ]]; then
-    $(dirname $0)/build-go.sh cmd/integration
+if [[ "${KUBE_NO_BUILD_INTEGRATION+set}" != "set" ]]; then
+    "${KUBE_REPO_ROOT}/hack/build-go.sh" cmd/integration
 fi
+
+# Run cleanup to stop etcd on interrupt or other kill signal.
+trap cleanup HUP INT QUIT TERM
 
 start_etcd
 
-trap cleanup EXIT SIGINT
-
-echo
-echo Integration test cases ...
-echo
+echo ""
+echo "Integration test cases..."
+echo ""
 GOFLAGS="-tags 'integration no-docker'" \
-    ${KUBE_REPO_ROOT}/hack/test-go.sh test/integration
-# leave etcd running if integration tests fail
-trap "echo etcd still running" EXIT
+  "${KUBE_REPO_ROOT}/hack/test-go.sh" test/integration
 
-echo
-echo Integration scenario ...
-echo
-${KUBE_TARGET}/bin/integration
+echo ""
+echo "Integration scenario ..."
+echo ""
+"${KUBE_TARGET}/bin/integration"
 
-# nuke etcd
-trap cleanup EXIT SIGINT
+cleanup
