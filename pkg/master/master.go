@@ -83,12 +83,16 @@ func NewEtcdHelper(etcdServers []string, version string) (helper tools.EtcdHelpe
 // New returns a new instance of Master connected to the given etcd server.
 func New(c *Config) *Master {
 	minionRegistry := makeMinionRegistry(c)
+	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
+	manifestFactory := &pod.BasicManifestFactory{
+		ServiceRegistry: serviceRegistry,
+	}
 	m := &Master{
-		podRegistry:        etcd.NewRegistry(c.EtcdHelper),
-		controllerRegistry: etcd.NewRegistry(c.EtcdHelper),
-		serviceRegistry:    etcd.NewRegistry(c.EtcdHelper),
-		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper),
-		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper),
+		podRegistry:        etcd.NewRegistry(c.EtcdHelper, manifestFactory),
+		controllerRegistry: etcd.NewRegistry(c.EtcdHelper, nil),
+		serviceRegistry:    serviceRegistry,
+		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper, nil),
+		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper, manifestFactory),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package pod
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -27,11 +27,12 @@ type ManifestFactory interface {
 }
 
 type BasicManifestFactory struct {
-	serviceRegistry service.Registry
+	// TODO: this should really point at the API rather than a registry
+	ServiceRegistry service.Registry
 }
 
 func (b *BasicManifestFactory) MakeManifest(machine string, pod api.Pod) (api.ContainerManifest, error) {
-	envVars, err := service.GetServiceEnvironmentVariables(b.serviceRegistry, machine)
+	envVars, err := service.GetServiceEnvironmentVariables(b.ServiceRegistry, machine)
 	if err != nil {
 		return api.ContainerManifest{}, err
 	}

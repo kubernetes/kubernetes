@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -32,10 +33,10 @@ import (
 )
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
-	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, latest.ResourceVersioner})
-	registry.manifestFactory = &BasicManifestFactory{
-		serviceRegistry: &registrytest.ServiceRegistry{},
-	}
+	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, latest.ResourceVersioner},
+		&pod.BasicManifestFactory{
+			ServiceRegistry: &registrytest.ServiceRegistry{},
+		})
 	return registry
 }
 
