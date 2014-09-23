@@ -15,6 +15,7 @@
 # limitations under the License.
 
 source $(dirname $0)/util.sh
+source $(dirname $0)/config-go.sh
 
 function cleanup()
 {
@@ -37,14 +38,14 @@ echo
 echo Integration test cases ...
 echo
 GOFLAGS="-tags 'integration no-docker'" \
-    $(dirname $0)/../hack/test-go.sh test/integration
+    ${KUBE_REPO_ROOT}/hack/test-go.sh test/integration
 # leave etcd running if integration tests fail
 trap "echo etcd still running" EXIT
 
 echo
 echo Integration scenario ...
 echo
-$(dirname $0)/../_output/go/bin/integration
+${KUBE_TARGET}/bin/integration
 
 # nuke etcd
 trap cleanup EXIT SIGINT
