@@ -28,7 +28,10 @@ function cleanup()
 
 # Stop right away if the build fails
 set -e
-$(dirname $0)/build-go.sh cmd/integration
+
+if [[ -z $KUBE_NO_BUILD_INTEGRATION ]]; then
+    $(dirname $0)/build-go.sh cmd/integration
+fi
 
 start_etcd
 
