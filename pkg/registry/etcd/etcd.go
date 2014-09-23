@@ -23,6 +23,7 @@ import (
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -37,17 +38,15 @@ import (
 // with backed by etcd.
 type Registry struct {
 	tools.EtcdHelper
-	manifestFactory ManifestFactory
+	manifestFactory pod.ManifestFactory
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(helper tools.EtcdHelper) *Registry {
+func NewRegistry(helper tools.EtcdHelper, manifestFactory pod.ManifestFactory) *Registry {
 	registry := &Registry{
 		EtcdHelper: helper,
 	}
-	registry.manifestFactory = &BasicManifestFactory{
-		serviceRegistry: registry,
-	}
+	registry.manifestFactory = manifestFactory
 	return registry
 }
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package pod
 
 import (
 	"reflect"
@@ -28,7 +28,7 @@ import (
 func TestMakeManifestNoServices(t *testing.T) {
 	registry := registrytest.ServiceRegistry{}
 	factory := &BasicManifestFactory{
-		serviceRegistry: &registry,
+		ServiceRegistry: &registry,
 	}
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
@@ -74,7 +74,7 @@ func TestMakeManifestServices(t *testing.T) {
 		},
 	}
 	factory := &BasicManifestFactory{
-		serviceRegistry: &registry,
+		ServiceRegistry: &registry,
 	}
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
@@ -150,7 +150,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		},
 	}
 	factory := &BasicManifestFactory{
-		serviceRegistry: &registry,
+		ServiceRegistry: &registry,
 	}
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
