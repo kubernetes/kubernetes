@@ -25,21 +25,49 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
+// FitPredicate is a function that indicates if a pod fits into an existing node.
+type FitPredicate func(pod api.Pod, existingPods []api.Pod, node string) (bool, error)
+
 // RandomFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
 type RandomFitScheduler struct {
 	podLister  PodLister
+	predicates []FitPredicate
 	random     *rand.Rand
 	randomLock sync.Mutex
 }
 
+// NewRandomFitScheduler creates a random fit scheduler with the default set of fit predicates
 func NewRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
+	return NewRandomFitSchedulerWithPredicates(podLister, random, []FitPredicate{podFitsPorts})
+}
+
+// NewRandomFitScheduler creates a random fit scheduler with the specified set of fit predicates.
+// All predicates must be true for the pod to be considered a fit.
+func NewRandomFitSchedulerWithPredicates(podLister PodLister, random *rand.Rand, predicates []FitPredicate) Scheduler {
 	return &RandomFitScheduler{
-		podLister: podLister,
-		random:    random,
+		podLister:  podLister,
+		random:     random,
+		predicates: predicates,
 	}
 }
 
-func (s *RandomFitScheduler) containsPort(pod api.Pod, port api.Port) bool {
+func podFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	for _, scheduledPod := range existingPods {
+		for _, container := range pod.DesiredState.Manifest.Containers {
+			for _, port := range container.Ports {
+				if port.HostPort == 0 {
+					continue
+				}
+				if containsPort(scheduledPod, port) {
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
+func containsPort(pod api.Pod, port api.Port) bool {
 	for _, container := range pod.DesiredState.Manifest.Containers {
 		for _, podPort := range container.Ports {
 			if podPort.HostPort == port.HostPort {
@@ -69,16 +97,14 @@ func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (s
 	var machineOptions []string
 	for _, machine := range machines {
 		podFits := true
-		for _, scheduledPod := range machineToPods[machine] {
-			for _, container := range pod.DesiredState.Manifest.Containers {
-				for _, port := range container.Ports {
-					if port.HostPort == 0 {
-						continue
-					}
-					if s.containsPort(scheduledPod, port) {
-						podFits = false
-					}
-				}
+		for _, predicate := range s.predicates {
+			fits, err := predicate(pod, machineToPods[machine], machine)
+			if err != nil {
+				return "", err
+			}
+			if !fits {
+				podFits = false
+				break
 			}
 		}
 		if podFits {

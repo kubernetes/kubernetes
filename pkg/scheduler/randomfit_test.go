@@ -76,3 +76,41 @@ func TestRandomFitSchedulerFirstScheduledImpossible(t *testing.T) {
 	}
 	st.expectFailure(newPod("", 8080, 8081))
 }
+
+func falsePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	return false, nil
+}
+
+func truePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	return true, nil
+}
+
+func TestRandomFitSchedulerFirstScheduledComplicatedWithMultiplePredicates(t *testing.T) {
+	fakeRegistry := FakePodLister{
+		newPod("m1", 80, 8080),
+		newPod("m2", 8081, 8082, 8083),
+		newPod("m3", 80, 443, 8085),
+	}
+	r := rand.New(rand.NewSource(0))
+	st := schedulerTester{
+		t:            t,
+		scheduler:    NewRandomFitSchedulerWithPredicates(fakeRegistry, r, []FitPredicate{podFitsPorts, truePredicate}),
+		minionLister: FakeMinionLister{"m1", "m2", "m3"},
+	}
+	st.expectSchedule(newPod("", 8080, 8081), "m3")
+}
+
+func TestRandomFitSchedulerFailureManyPredicates(t *testing.T) {
+	fakeRegistry := FakePodLister{
+		newPod("m1", 8080),
+		newPod("m2", 8081),
+		newPod("m3", 8080),
+	}
+	r := rand.New(rand.NewSource(0))
+	st := schedulerTester{
+		t:            t,
+		scheduler:    NewRandomFitSchedulerWithPredicates(fakeRegistry, r, []FitPredicate{truePredicate, falsePredicate}),
+		minionLister: FakeMinionLister{"m1", "m2", "m3"},
+	}
+	st.expectFailure(newPod("", 8080, 8081))
+}
