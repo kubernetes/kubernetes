@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"time"
 
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -101,7 +102,7 @@ func (r *Reflector) listAndWatch() {
 			return
 		}
 		if err := r.watchHandler(w, &resourceVersion); err != nil {
-			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
+			glog.Errorf("watch of %v ended with error: %v", r.expectedType, err)
 			return
 		}
 	}
@@ -130,6 +131,9 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) err
 		event, ok := <-w.ResultChan()
 		if !ok {
 			break
+		}
+		if event.Type == watch.Error {
+			return apierrs.FromObject(event.Object)
 		}
 		if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
@@ -162,6 +166,6 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) err
 		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
 		return errors.New("very short watch")
 	}
-	glog.Infof("unexpected watch close - %v total items received", eventCount)
+	glog.Infof("watch close - %v total items received", eventCount)
 	return nil
 }

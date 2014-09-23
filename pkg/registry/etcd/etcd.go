@@ -343,7 +343,7 @@ func (r *Registry) WatchServices(label, field labels.Selector, resourceVersion u
 		return nil, fmt.Errorf("label selectors are not supported on services")
 	}
 	if value, found := field.RequiresExactMatch("ID"); found {
-		return r.Watch(makeServiceKey(value), resourceVersion)
+		return r.Watch(makeServiceKey(value), resourceVersion), nil
 	}
 	if field.Empty() {
 		return r.WatchList("/registry/services/specs", resourceVersion, tools.Everything)
@@ -375,7 +375,7 @@ func (r *Registry) WatchEndpoints(label, field labels.Selector, resourceVersion 
 		return nil, fmt.Errorf("label selectors are not supported on endpoints")
 	}
 	if value, found := field.RequiresExactMatch("ID"); found {
-		return r.Watch(makeServiceEndpointsKey(value), resourceVersion)
+		return r.Watch(makeServiceEndpointsKey(value), resourceVersion), nil
 	}
 	if field.Empty() {
 		return r.WatchList("/registry/services/endpoints", resourceVersion, tools.Everything)

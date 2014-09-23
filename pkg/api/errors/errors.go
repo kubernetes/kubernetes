@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // statusError is an error intended for consumption by a REST API server.
@@ -36,6 +37,16 @@ func (e *statusError) Error() string {
 // Status converts this error into an api.Status object.
 func (e *statusError) Status() api.Status {
 	return e.status
+}
+
+// FromObject generates an statusError from an api.Status, if that is the type of obj; otherwise,
+// returns an error created by fmt.Errorf.
+func FromObject(obj runtime.Object) error {
+	switch t := obj.(type) {
+	case *api.Status:
+		return &statusError{*t}
+	}
+	return fmt.Errorf("unexpected object: %v", obj)
 }
 
 // NewNotFound returns a new error which indicates that the resource of the kind and the name was not found.

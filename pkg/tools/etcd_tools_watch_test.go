@@ -205,9 +205,19 @@ func TestWatchEtcdError(t *testing.T) {
 	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	_, err := h.Watch("/some/key", 0)
-	if err == nil {
+	got := <-h.Watch("/some/key", 4).ResultChan()
+	if got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
+	}
+	status, ok := got.Object.(*api.Status)
+	if !ok {
+		t.Fatalf("Unexpected non-error object type")
+	}
+	if status.Message != "immediate error" {
+		t.Errorf("Unexpected wrong error")
+	}
+	if status.Status != api.StatusFailure {
+		t.Errorf("Unexpected wrong error status")
 	}
 }
 
@@ -217,10 +227,7 @@ func TestWatch(t *testing.T) {
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	watching := h.Watch("/some/key", 0)
 
 	fakeClient.WaitForWatchCompletion()
 	// when server returns not found, the watch index starts at the next value (1)
@@ -248,6 +255,17 @@ func TestWatch(t *testing.T) {
 
 	// Test error case
 	fakeClient.WatchInjectError <- fmt.Errorf("Injected error")
+
+	if errEvent, ok := <-watching.ResultChan(); !ok {
+		t.Errorf("no error result?")
+	} else {
+		if e, a := watch.Error, errEvent.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := "Injected error", errEvent.Object.(*api.Status).Message; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
 
 	// Did everything shut down?
 	if _, open := <-fakeClient.WatchResponse; open {
@@ -349,11 +367,7 @@ func TestWatchEtcdState(t *testing.T) {
 			fakeClient.Data[key] = value
 		}
 		h := EtcdHelper{fakeClient, codec, versioner}
-		watching, err := h.Watch("/somekey/foo", testCase.From)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
+		watching := h.Watch("/somekey/foo", testCase.From)
 		fakeClient.WaitForWatchCompletion()
 
 		t.Logf("Testing %v", k)
@@ -421,10 +435,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		fakeClient.Data["/some/key"] = testCase.Response
 		h := EtcdHelper{fakeClient, codec, versioner}
 
-		watching, err := h.Watch("/some/key", 0)
-		if err != nil {
-			t.Fatalf("%s: unexpected error: %v", k, err)
-		}
+		watching := h.Watch("/some/key", 0)
 
 		fakeClient.WaitForWatchCompletion()
 		if e, a := testCase.Response.R.EtcdIndex+1, fakeClient.WatchIndex; e != a {
@@ -525,10 +536,7 @@ func TestWatchFromNotFound(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	watching := h.Watch("/some/key", 0)
 
 	fakeClient.WaitForWatchCompletion()
 	if fakeClient.WatchIndex != 3 {
@@ -551,9 +559,14 @@ func TestWatchFromOtherError(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	watching := h.Watch("/some/key", 0)
+
+	errEvent := <-watching.ResultChan()
+	if e, a := watch.Error, errEvent.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := "101:  () [2]", errEvent.Object.(*api.Status).Message; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
 	}
 
 	select {
@@ -576,10 +589,7 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 
 	// Test purposeful shutdown
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	watching := h.Watch("/some/key", 0)
 	fakeClient.WaitForWatchCompletion()
 	watching.Stop()
 

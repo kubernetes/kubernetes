@@ -33,6 +33,7 @@ type watchEvent struct {
 
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
+	// For errors, it's an api.Status.
 	Object runtime.RawExtension `json:"object,omitempty" yaml:"object,omitempty"`
 }
 
