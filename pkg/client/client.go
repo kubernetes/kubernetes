@@ -102,7 +102,7 @@ type Client struct {
 // to a URL will prepend the server path. The API version to use may be specified or left
 // empty to use the client preferred version. Returns an error if host cannot be converted to
 // a valid URL.
-func New(host, version string, auth *AuthInfo) (*Client, error) {
+func New(host, version string, auth *AuthInfo, nsInfo *NamespaceInfo) (*Client, error) {
 	if version == "" {
 		// Clients default to the preferred code API version
 		// TODO: implement version negotation (highest version supported by server)
@@ -113,7 +113,7 @@ func New(host, version string, auth *AuthInfo) (*Client, error) {
 		return nil, fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
 	}
 	prefix := fmt.Sprintf("/api/%s/", version)
-	restClient, err := NewRESTClient(host, auth, prefix, serverCodec)
+	restClient, err := NewRESTClient(host, auth, prefix, serverCodec, nsInfo)
 	if err != nil {
 		return nil, fmt.Errorf("API URL '%s' is not valid: %v", host, err)
 	}
@@ -121,8 +121,8 @@ func New(host, version string, auth *AuthInfo) (*Client, error) {
 }
 
 // NewOrDie creates a Kubernetes client and panics if the provided host is invalid.
-func NewOrDie(host, version string, auth *AuthInfo) *Client {
-	client, err := New(host, version, auth)
+func NewOrDie(host, version string, auth *AuthInfo, nsInfo *NamespaceInfo) *Client {
+	client, err := New(host, version, auth, nsInfo)
 	if err != nil {
 		panic(err)
 	}
@@ -148,6 +148,11 @@ type AuthInfo struct {
 	KeyFile  string
 }
 
+// NamespaceInfo is used to store namespace information
+type NamespaceInfo struct {
+	Namespace string
+}
+
 // RESTClient holds common code used to work with API resources that follow the
 // Kubernetes API pattern.
 // Host is the http://... base for the URL
@@ -161,11 +166,12 @@ type RESTClient struct {
 	PollPeriod time.Duration
 	Timeout    time.Duration
 	Codec      runtime.Codec
+	nsInfo     *NamespaceInfo
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec) (*RESTClient, error) {
+func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec, nsInfo *NamespaceInfo) (*RESTClient, error) {
 	prefix, err := normalizePrefix(host, path)
 	if err != nil {
 		return nil, err
@@ -215,6 +221,7 @@ func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec) (*
 		PollPeriod: time.Second * 2,
 		Timeout:    time.Second * 20,
 		Codec:      c,
+		nsInfo:     nsInfo,
 	}, nil
 }
 

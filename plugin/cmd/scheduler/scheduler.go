@@ -47,7 +47,7 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 
 	// TODO: security story for plugins!
-	kubeClient, err := client.New(*master, latest.OldestVersion, nil)
+	kubeClient, err := client.New(*master, latest.OldestVersion, nil, nil)
 	if err != nil {
 		glog.Fatalf("Invalid -master: %v", err)
 	}

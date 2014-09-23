@@ -62,6 +62,8 @@ var (
 	caFile        = flag.String("certificate_authority", "", "Path to a cert. file for the certificate authority")
 	certFile      = flag.String("client_certificate", "", "Path to a client certificate for TLS.")
 	keyFile       = flag.String("client_key", "", "Path to a client key file for TLS.")
+	ns            = flag.String("ns", "", "If present, the namespace scope for this request.")
+	nsFile        = flag.String("ns_file", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace file.")
 )
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
@@ -88,6 +90,9 @@ Launch a simple ReplicationController with a single container based
 on the given image:
 
   kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
+
+Manage namespace:
+	kubecfg [OPTIONS] ns [<namespace>]
 
 Options:
 `, prettyWireStorage())
@@ -173,7 +178,13 @@ func main() {
 	} else {
 		masterServer = "http://localhost:8080"
 	}
-	kubeClient, err := client.New(masterServer, *apiVersion, nil)
+	// Load namespace information for requests
+	nsInfo, err := kubecfg.LoadNamespaceInfo(*nsFile, os.Stdin)
+	if err != nil {
+		glog.Fatalf("Error loading current namespace: %v", err)
+	}
+
+	kubeClient, err := client.New(masterServer, *apiVersion, nil, nsInfo)
 	if err != nil {
 		glog.Fatalf("Can't configure client: %v", err)
 	}
@@ -194,7 +205,7 @@ func main() {
 		if *keyFile != "" {
 			auth.KeyFile = *keyFile
 		}
-		kubeClient, err = client.New(masterServer, *apiVersion, auth)
+		kubeClient, err = client.New(masterServer, *apiVersion, auth, nsInfo)
 		if err != nil {
 			glog.Fatalf("Can't configure client: %v", err)
 		}
@@ -239,7 +250,7 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(method, kubeClient) || executeControllerRequest(method, kubeClient)
+	matchFound := executeAPIRequest(method, kubeClient) || executeControllerRequest(method, kubeClient) || executeNamespaceRequest(method, kubeClient)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
@@ -428,6 +439,33 @@ func executeControllerRequest(method string, c *client.Client) bool {
 	if err != nil {
 		glog.Fatalf("Error: %v", err)
 	}
+	return true
+}
+
+// executeNamespaceRequest handles client operations for namespaces
+func executeNamespaceRequest(method string, c *client.Client) bool {
+	var err error
+	var ns *client.NamespaceInfo
+	switch method {
+	case "ns":
+		args := flag.Args()
+		switch len(args) {
+		case 1:
+			ns, err = kubecfg.LoadNamespaceInfo(*nsFile, os.Stdin)
+		case 2:
+			ns = &client.NamespaceInfo{Namespace: args[1]}
+			err = kubecfg.SaveNamespaceInfo(*nsFile, ns)
+		default:
+			glog.Fatalf("usage: kubecfg ns [<namespace>]")
+		}
+	default:
+		return false
+	}
+	if err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
+	fmt.Print("Using namespace ", ns.Namespace)
+	fmt.Print("\n")
 	return true
 }
 

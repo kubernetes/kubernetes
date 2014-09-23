@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -66,7 +67,8 @@ func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
-	namespace := api.NamespaceDefault
+	namespace := req.URL.Query().Get("namespace")
+	fmt.Printf("Using namespace: %s", namespace)
 	switch req.Method {
 	case "GET":
 		switch len(parts) {

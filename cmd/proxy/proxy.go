@@ -54,8 +54,8 @@ func main() {
 	// define api config source
 	if *master != "" {
 		glog.Infof("Using api calls to get config %v", *master)
-		//TODO: add auth info
-		client, err := client.New(*master, latest.OldestVersion, nil)
+		//TODO: add auth info, namespaceInfo
+		client, err := client.New(*master, latest.OldestVersion, nil, nil)
 		if err != nil {
 			glog.Fatalf("Invalid -master: %v", err)
 		}

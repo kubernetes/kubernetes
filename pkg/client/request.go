@@ -54,7 +54,7 @@ var specialParams = util.NewStringSet("sync", "timeout")
 // list, ok := resp.(*api.PodList)
 //
 func (c *RESTClient) Verb(verb string) *Request {
-	return &Request{
+	request := &Request{
 		verb:       verb,
 		c:          c,
 		path:       c.prefix,
@@ -63,6 +63,10 @@ func (c *RESTClient) Verb(verb string) *Request {
 		params:     map[string]string{},
 		pollPeriod: c.PollPeriod,
 	}
+	if c.nsInfo != nil && len(c.nsInfo.Namespace) > 0 {
+		request.namespace = c.nsInfo.Namespace
+	}
+	return request
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -104,6 +108,7 @@ type Request struct {
 	timeout    time.Duration
 	sync       bool
 	pollPeriod time.Duration
+	namespace  string
 }
 
 // Path appends an item to the request path. You must call Path at least once.
@@ -237,6 +242,11 @@ func (r *Request) finalURL() string {
 	for key, value := range r.params {
 		query.Add(key, value)
 	}
+	// for now, we add a ns to the request as a query param until we rewrite url paths
+	if len(r.namespace) > 0 {
+		query.Add("namespace", r.namespace)
+	}
+
 	// sync and timeout are handled specially here, to allow setting them
 	// in any order.
 	if r.sync {

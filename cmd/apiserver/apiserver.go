@@ -126,7 +126,7 @@ func main() {
 		Port:   *minionPort,
 	}
 
-	client, err := client.New(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *storageVersion, nil)
+	client, err := client.New(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *storageVersion, nil, nil)
 	if err != nil {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
