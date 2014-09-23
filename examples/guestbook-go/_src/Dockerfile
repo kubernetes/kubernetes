@@ -2,7 +2,7 @@ FROM google/golang:latest
 
 RUN mkdir -p /gopath/src/github.com/GoogleCloudPlatform/ && cd /gopath/src/github.com/GoogleCloudPlatform/ && \
     git clone http://github.com/GoogleCloudPlatform/kubernetes && \
-    cd /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/src/ && \
+    cd /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src/ && \
     go get && go build -o ../bin/guestbook && \
     cp ./guestbook/Dockerfile /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/
 
