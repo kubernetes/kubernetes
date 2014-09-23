@@ -12,7 +12,7 @@ if (isset($_GET['cmd']) === true) {
   if ($_GET['cmd'] == 'set') {
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => getenv('SERVICE_HOST'),
+      'host'   => getenv('REDISMASTER_SERVICE_HOST') ?: getenv('SERVICE_HOST'),
       'port'   => getenv('REDISMASTER_SERVICE_PORT'),
     ]);
     $client->set($_GET['key'], $_GET['value']);
@@ -25,7 +25,7 @@ if (isset($_GET['cmd']) === true) {
     }
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => getenv('SERVICE_HOST'),
+      'host'   => getenv('REDISMASTER_SERVICE_HOST') ?: getenv('SERVICE_HOST'),
       'port'   => $read_port,
     ]);
 

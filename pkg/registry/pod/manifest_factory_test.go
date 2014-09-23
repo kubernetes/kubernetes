@@ -95,6 +95,10 @@ func TestMakeManifestServices(t *testing.T) {
 	container := manifest.Containers[0]
 	envs := []api.EnvVar{
 		{
+			Name:  "TEST_SERVICE_HOST",
+			Value: "machine",
+		},
+		{
 			Name:  "TEST_SERVICE_PORT",
 			Value: "8080",
 		},
@@ -123,8 +127,8 @@ func TestMakeManifestServices(t *testing.T) {
 			Value: "machine",
 		},
 	}
-	if len(container.Env) != 7 {
-		t.Errorf("Expected 7 env vars, got %d: %#v", len(container.Env), manifest)
+	if len(container.Env) != len(envs) {
+		t.Errorf("Expected %d env vars, got %d: %#v", len(envs), len(container.Env), manifest)
 		return
 	}
 	for ix := range container.Env {
@@ -181,6 +185,10 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 			Value: "bar",
 		},
 		{
+			Name:  "TEST_SERVICE_HOST",
+			Value: "machine",
+		},
+		{
 			Name:  "TEST_SERVICE_PORT",
 			Value: "8080",
 		},
@@ -209,8 +217,8 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 			Value: "machine",
 		},
 	}
-	if len(container.Env) != 8 {
-		t.Errorf("Expected 8 env vars, got: %#v", manifest)
+	if len(container.Env) != len(envs) {
+		t.Errorf("Expected %d env vars, got: %#v", len(envs), manifest)
 		return
 	}
 	for ix := range container.Env {
