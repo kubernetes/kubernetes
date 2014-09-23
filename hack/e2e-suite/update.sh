@@ -19,7 +19,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x
+set -e
 
 source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
 source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"

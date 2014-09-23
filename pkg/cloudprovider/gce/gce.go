@@ -30,6 +30,7 @@ import (
 	"code.google.com/p/goauth2/compute/serviceaccount"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/golang/glog"
 )
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
@@ -191,8 +192,16 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 
 // IPAddress is an implementation of Instances.IPAddress.
 func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
-	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, instance).Do()
+	suffix, err := fqdnSuffix()
 	if err != nil {
+		return nil, err
+	}
+	if len(suffix) > 0 {
+		suffix = "." + suffix
+	}
+	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, strings.Replace(instance, suffix, "", 1)).Do()
+	if err != nil {
+		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", instance)
 		return nil, err
 	}
 	ip := net.ParseIP(res.NetworkInterfaces[0].AccessConfigs[0].NatIP)
