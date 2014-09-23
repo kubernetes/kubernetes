@@ -23,9 +23,13 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // ErrPodInfoNotAvailable may be returned when the requested pod info is not available.
@@ -37,12 +41,18 @@ type PodInfoGetter interface {
 	// GetPodInfo returns information about all containers which are part
 	// Returns an api.PodInfo, or an error if one occurs.
 	GetPodInfo(host, podID string) (api.PodInfo, error)
+	// WatchPodInfo watches for changes in pod information.
+	WatchPodInfo(host, podID string) (watch.Interface, error)
 }
 
 // HTTPPodInfoGetter is the default implementation of PodInfoGetter, accesses the kubelet over HTTP.
 type HTTPPodInfoGetter struct {
 	Client *http.Client
 	Port   uint
+}
+
+func (c *HTTPPodInfoGetter) WatchPodInfo(host, podID string) (watch.Interface, error) {
+	return newHTTPPodInfoWatch(c, host, podID)
 }
 
 // GetPodInfo gets information about the specified pod.
@@ -87,4 +97,58 @@ type FakePodInfoGetter struct {
 // GetPodInfo is a fake implementation of PodInfoGetter.GetPodInfo.
 func (c *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	return c.data, c.err
+}
+
+type empty struct{}
+
+type httpPodInfoWatch struct {
+	getter PodInfoGetter
+	obj    api.PodInfo
+	host   string
+	podID  string
+	events chan watch.Event
+	stop   bool
+}
+
+func newHTTPPodInfoWatch(getter PodInfoGetter, host, podID string) (watch.Interface, error) {
+	obj, err := getter.GetPodInfo(host, podID)
+	if err != nil {
+		return nil, err
+	}
+	res := &httpPodInfoWatch{
+		getter: getter,
+		obj:    obj,
+		host:   host,
+		podID:  podID,
+		events: make(chan watch.Event),
+		stop:   false,
+	}
+	go func() {
+		wait.Poll(time.Second*10, time.Second*10, res.pollFunc)
+	}()
+	return res, nil
+}
+
+func (h *httpPodInfoWatch) pollFunc() (bool, error) {
+	if h.stop {
+		return true, nil
+	}
+	newObj, err := h.getter.GetPodInfo(h.host, h.podID)
+	if err == nil && !reflect.DeepEqual(h.obj, newObj) {
+		h.events <- watch.Event{
+			Type:   watch.Modified,
+			Object: newObj,
+		}
+		h.obj = newObj
+	}
+	return false, nil
+}
+
+func (h *httpPodInfoWatch) ResultChan() <-chan watch.Event {
+	return h.events
+}
+
+func (h *httpPodInfoWatch) Stop() {
+	close(h.events)
+	h.stop = true
 }

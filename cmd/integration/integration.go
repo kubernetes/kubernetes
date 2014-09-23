@@ -20,6 +20,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 
@@ -72,6 +74,10 @@ func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 		glog.Fatalf("Can't get info for: '%v', '%v'", host, podID)
 	}
 	return c.GetPodInfo("localhost", podID)
+}
+
+func (fakePodInfoGetter) WatchPodInfo(host, podID string) (watch.Interface, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 type delegateHandler struct {

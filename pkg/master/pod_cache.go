@@ -17,15 +17,22 @@ limitations under the License.
 package master
 
 import (
+	"reflect"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
+
+type cacheEntry struct {
+	info api.PodInfo
+	mux  *watch.Mux
+}
 
 // PodCache contains both a cache of container information, as well as the mechanism for keeping
 // that cache up to date.
@@ -33,7 +40,7 @@ type PodCache struct {
 	containerInfo client.PodInfoGetter
 	pods          pod.Registry
 	// This is a map of pod id to a map of container name to the
-	podInfo map[string]api.PodInfo
+	podInfo map[string]*cacheEntry
 	podLock sync.Mutex
 }
 
@@ -42,7 +49,7 @@ func NewPodCache(info client.PodInfoGetter, pods pod.Registry) *PodCache {
 	return &PodCache{
 		containerInfo: info,
 		pods:          pods,
-		podInfo:       map[string]api.PodInfo{},
+		podInfo:       map[string]*cacheEntry{},
 	}
 }
 
@@ -56,7 +63,19 @@ func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
 	if !ok {
 		return nil, client.ErrPodInfoNotAvailable
 	}
-	return value, nil
+	return value.info, nil
+}
+
+func (p *PodCache) WatchPodInfo(host, podID string) (watch.Interface, error) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	entry, ok := p.podInfo[podID]
+	if !ok {
+		// TODO: Should we just watch anyway?
+		return nil, client.ErrPodInfoNotAvailable
+	}
+	entry.mux = watch.NewMux(1)
+	return entry.mux.Watch(), nil
 }
 
 func (p *PodCache) updatePodInfo(host, id string) error {
@@ -66,7 +85,16 @@ func (p *PodCache) updatePodInfo(host, id string) error {
 	}
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	p.podInfo[id] = info
+	entry, ok := p.podInfo[id]
+	if !ok {
+		entry = &cacheEntry{}
+		p.podInfo[id] = entry
+	}
+	if entry.mux != nil && !reflect.DeepEqual(info, entry.info) {
+		entry.mux.Action(watch.Modified, info)
+	}
+	entry.info = info
+
 	return nil
 }
 
