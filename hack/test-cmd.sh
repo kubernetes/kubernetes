@@ -18,6 +18,7 @@
 # simple scenarios.  It does not require Docker so it can run in travis.
 
 source $(dirname $0)/util.sh
+source $(dirname $0)/config-go.sh
 
 function cleanup()
 {
@@ -44,7 +45,7 @@ ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
-GO_OUT=$(dirname $0)/../_output/go/bin
+GO_OUT=${KUBE_TARGET}/bin
 
 # Check kubecfg
 out=$(${GO_OUT}/kubecfg -version)
