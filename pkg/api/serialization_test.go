@@ -147,25 +147,14 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 }
 
 func TestTypes(t *testing.T) {
-	table := []runtime.Object{
-		&api.PodList{},
-		&api.Pod{},
-		&api.ServiceList{},
-		&api.Service{},
-		&api.ReplicationControllerList{},
-		&api.ReplicationController{},
-		&api.MinionList{},
-		&api.Minion{},
-		&api.Status{},
-		&api.ServerOpList{},
-		&api.ServerOp{},
-		&api.ContainerManifestList{},
-		&api.Endpoints{},
-		&api.Binding{},
-	}
-	for _, item := range table {
+	for kind := range api.Scheme.KnownTypes("") {
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
+			item, err := api.Scheme.New("", kind)
+			if err != nil {
+				t.Errorf("Couldn't make a %v? %v", kind, err)
+				continue
+			}
 			runTest(t, v1beta1.Codec, item)
 			runTest(t, v1beta2.Codec, item)
 			runTest(t, api.Codec, item)

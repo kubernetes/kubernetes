@@ -230,14 +230,6 @@ type Lifecycle struct {
 	PreStop *Handler `yaml:"preStop,omitempty" json:"preStop,omitempty"`
 }
 
-// Event is the representation of an event logged to etcd backends.
-type Event struct {
-	Event     string             `json:"event,omitempty"`
-	Manifest  *ContainerManifest `json:"manifest,omitempty"`
-	Container *Container         `json:"container,omitempty"`
-	Timestamp int64              `json:"timestamp"`
-}
-
 // The below types are used by kube_client and api_server.
 
 // JSONBase is shared by all objects sent to, or returned from the client.
@@ -623,3 +615,63 @@ type ServerOpList struct {
 }
 
 func (*ServerOpList) IsAnAPIObject() {}
+
+// ObjectReference contains enough information to let you inspect or modify the referred object.
+type ObjectReference struct {
+	Kind            string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
+	UID             string `json:"uid,omitempty" yaml:"uid,omitempty"`
+	APIVersion      string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	ResourceVersion uint64 `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+
+	// Optional. If referring to a piece of an object instead of an entire object, this string
+	// should contain a valid field access statement. For example,
+	// if the object reference is to a container within a pod, this would take on a value like:
+	// "desiredState.manifest.containers[2]". Such statements are valid language constructs in
+	// both go and JavaScript. This is syntax is chosen only to have some well-defined way of
+	// referencing a part of an object.
+	// TODO: this design is not final and this field is subject to change in the future.
+	FieldPath string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
+}
+
+// Event is a report of an event somewhere in the cluster.
+// TODO: Decide whether to store these separately or with the object they apply to.
+type Event struct {
+	JSONBase `yaml:",inline" json:",inline"`
+
+	// Required. The object that this event is about.
+	InvolvedObject ObjectReference `json:"involvedObject,omitempty" yaml:"involvedObject,omitempty"`
+
+	// Should be a short, machine understandable string that describes the current status
+	// of the referred object. This should not give the reason for being in this state.
+	// Examples: "running", "cantStart", "cantSchedule", "deleted".
+	// It's OK for components to make up statuses to report here, but the same string should
+	// always be used for the same status.
+	// TODO: define a way of making sure these are consistent and don't collide.
+	// TODO: provide exact specification for format.
+	Status string `json:"status,omitempty" yaml:"status,omitempty"`
+
+	// Optional; this should be a short, machine understandable string that gives the reason
+	// for the transition into the object's current status. For example, if ObjectStatus is
+	// "cantStart", StatusReason might be "imageNotFound".
+	// TODO: provide exact specification for format.
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
+
+	// Optional. A human-readable description of the status of this operation.
+	// TODO: decide on maximum length.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+
+	// Optional. The component reporting this event. Should be a short machine understandable string.
+	// TODO: provide exact specification for format.
+	Source string `json:"source,omitempty" yaml:"source,omitempty"`
+}
+
+func (*Event) IsAnAPIObject() {}
+
+// EventList is a list of events.
+type EventList struct {
+	JSONBase `yaml:",inline" json:",inline"`
+	Items    []Event `yaml:"items,omitempty" json:"items,omitempty"`
+}
+
+func (*EventList) IsAnAPIObject() {}
