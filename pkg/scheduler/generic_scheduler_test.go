@@ -25,14 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-func falsePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	return false, nil
-}
-
-func truePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	return true, nil
-}
-
 func matchesPredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	return pod.ID == node, nil
 }
@@ -80,72 +72,56 @@ func TestGenericScheduler(t *testing.T) {
 		predicates   []FitPredicate
 		prioritizer  PriorityFunction
 		nodes        []string
-		existingPods []api.Pod
 		pod          api.Pod
 		expectedHost string
 		expectsErr   bool
 	}{
 		{
-			[]FitPredicate{falsePredicate},
-			evenPriority,
-			[]string{"machine1", "machine2"},
-			[]api.Pod{},
-			api.Pod{},
-			"",
-			true,
+			predicates:  []FitPredicate{falsePredicate},
+			prioritizer: evenPriority,
+			nodes:       []string{"machine1", "machine2"},
+			expectsErr:  true,
 		},
 		{
-			[]FitPredicate{truePredicate},
-			evenPriority,
-			[]string{"machine1", "machine2"},
-			[]api.Pod{},
-			api.Pod{},
+			predicates:  []FitPredicate{truePredicate},
+			prioritizer: evenPriority,
+			nodes:       []string{"machine1", "machine2"},
 			// Random choice between both, the rand seeded above with zero, chooses "machine2"
-			"machine2",
-			false,
+			expectedHost: "machine2",
 		},
 		{
-			[]FitPredicate{matchesPredicate},
-			evenPriority,
-			[]string{"machine1", "machine2"},
-			[]api.Pod{},
-			api.Pod{JSONBase: api.JSONBase{ID: "machine2"}},
-			"machine2",
-			false,
+			// Fits on a machine where the pod ID matches the machine name
+			predicates:   []FitPredicate{matchesPredicate},
+			prioritizer:  evenPriority,
+			nodes:        []string{"machine1", "machine2"},
+			pod:          api.Pod{JSONBase: api.JSONBase{ID: "machine2"}},
+			expectedHost: "machine2",
 		},
 		{
-			[]FitPredicate{truePredicate},
-			numericPriority,
-			[]string{"3", "2", "1"},
-			[]api.Pod{},
-			api.Pod{},
-			"1",
-			false,
+			predicates:   []FitPredicate{truePredicate},
+			prioritizer:  numericPriority,
+			nodes:        []string{"3", "2", "1"},
+			expectedHost: "1",
 		},
 		{
-			[]FitPredicate{matchesPredicate},
-			numericPriority,
-			[]string{"3", "2", "1"},
-			[]api.Pod{},
-			api.Pod{JSONBase: api.JSONBase{ID: "2"}},
-			"2",
-			false,
+			predicates:   []FitPredicate{matchesPredicate},
+			prioritizer:  numericPriority,
+			nodes:        []string{"3", "2", "1"},
+			pod:          api.Pod{JSONBase: api.JSONBase{ID: "2"}},
+			expectedHost: "2",
 		},
 		{
-			[]FitPredicate{truePredicate, falsePredicate},
-			numericPriority,
-			[]string{"3", "2", "1"},
-			[]api.Pod{},
-			api.Pod{},
-			"",
-			true,
+			predicates:  []FitPredicate{truePredicate, falsePredicate},
+			prioritizer: numericPriority,
+			nodes:       []string{"3", "2", "1"},
+			expectsErr:  true,
 		},
 	}
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizer, FakePodLister(test.existingPods), random)
-		machine, err := scheduler.Schedule(test.pod, &listMinionLister{nodes: test.nodes})
+		scheduler := NewGenericScheduler(test.predicates, test.prioritizer, FakePodLister([]api.Pod{}), random)
+		machine, err := scheduler.Schedule(test.pod, FakeMinionLister(test.nodes))
 		if test.expectsErr {
 			if err == nil {
 				t.Error("Unexpected non-error")

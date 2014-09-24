@@ -42,28 +42,70 @@ func TestSpreadPriority(t *testing.T) {
 		pod          api.Pod
 		pods         []api.Pod
 		nodes        []string
-		expectErr    bool
 		expectedList HostPriorityList
 		test         string
 	}{
-		{api.Pod{}, []api.Pod{}, []string{"machine1", "machine2"}, false, []HostPriority{{"machine1", 0}, {"machine2", 0}}, "nothing scheduled"},
-		{api.Pod{Labels: labels1}, []api.Pod{{CurrentState: machine1State}}, []string{"machine1", "machine2"}, false, []HostPriority{{"machine1", 0}, {"machine2", 0}}, "no labels"},
-		{api.Pod{Labels: labels1}, []api.Pod{{CurrentState: machine1State, Labels: labels2}}, []string{"machine1", "machine2"}, false, []HostPriority{{"machine1", 0}, {"machine2", 0}}, "different labels"},
-		{api.Pod{Labels: labels1}, []api.Pod{{CurrentState: machine1State, Labels: labels2}, {CurrentState: machine2State, Labels: labels1}}, []string{"machine1", "machine2"}, false, []HostPriority{{"machine1", 0}, {"machine2", 1}}, "one label match"},
-		{api.Pod{Labels: labels1}, []api.Pod{{CurrentState: machine1State, Labels: labels2}, {CurrentState: machine1State, Labels: labels1}, {CurrentState: machine2State, Labels: labels1}}, []string{"machine1", "machine2"}, false, []HostPriority{{"machine1", 1}, {"machine2", 1}}, "two label matches on different machines"},
-		{api.Pod{Labels: labels1}, []api.Pod{{CurrentState: machine1State, Labels: labels2}, {CurrentState: machine1State, Labels: labels1}, {CurrentState: machine2State, Labels: labels1}, {CurrentState: machine2State, Labels: labels1}}, []string{"machine1", "machine2"}, false, []HostPriority{{"machine1", 1}, {"machine2", 2}}, "three label matches"},
+		{
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:         "nothing scheduled",
+		},
+		{
+			pod:          api.Pod{Labels: labels1},
+			pods:         []api.Pod{{CurrentState: machine1State}},
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:         "no labels",
+		},
+		{
+			pod:          api.Pod{Labels: labels1},
+			pods:         []api.Pod{{CurrentState: machine1State, Labels: labels2}},
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:         "different labels",
+		},
+		{
+			pod: api.Pod{Labels: labels1},
+			pods: []api.Pod{
+				{CurrentState: machine1State, Labels: labels2},
+				{CurrentState: machine2State, Labels: labels1},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 1}},
+			test:         "one label match",
+		},
+		{
+			pod: api.Pod{Labels: labels1},
+			pods: []api.Pod{
+				{CurrentState: machine1State, Labels: labels2},
+				{CurrentState: machine1State, Labels: labels1},
+				{CurrentState: machine2State, Labels: labels1},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 1}},
+			test:         "two label matches on different machines",
+		},
+		{
+			pod: api.Pod{Labels: labels1},
+			pods: []api.Pod{
+				{CurrentState: machine1State, Labels: labels2},
+				{CurrentState: machine1State, Labels: labels1},
+				{CurrentState: machine2State, Labels: labels1},
+				{CurrentState: machine2State, Labels: labels1},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
+			test:         "three label matches",
+		},
 	}
 
 	for _, test := range tests {
-		list, err := CalculateSpreadPriority(test.pod, FakePodLister(test.pods), &listMinionLister{test.nodes})
-		if test.expectErr {
-			if err == nil {
-				t.Errorf("%s: unexpected non-error", test.test)
-			}
-		} else {
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
-			}
+		list, err := CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(test.nodes))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expectedList, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
 		}
 	}
 }

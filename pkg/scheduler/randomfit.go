@@ -25,9 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// FitPredicate is a function that indicates if a pod fits into an existing node.
-type FitPredicate func(pod api.Pod, existingPods []api.Pod, node string) (bool, error)
-
 // RandomFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
 type RandomFitScheduler struct {
 	podLister  PodLister
@@ -78,6 +75,8 @@ func containsPort(pod api.Pod, port api.Port) bool {
 	return false
 }
 
+// MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
+// and the values are the list of pods running on that host.
 func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
 	machineToPods := map[string][]api.Pod{}
 	// TODO: perform more targeted query...

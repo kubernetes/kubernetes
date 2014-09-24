@@ -33,47 +33,26 @@ type genericScheduler struct {
 	randomLock  sync.Mutex
 }
 
-type listMinionLister struct {
-	nodes []string
-}
-
-func (l *listMinionLister) List() ([]string, error) {
-	return l.nodes, nil
-}
-
 func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
 	minions, err := minionLister.List()
 	if err != nil {
 		return "", err
 	}
-	filtered := []string{}
-	machineToPods, err := MapPodsToMachines(g.pods)
+	filteredNodes, err := findNodesThatFit(pod, g.pods, g.predicates, minions)
 	if err != nil {
 		return "", err
 	}
-	for _, minion := range minions {
-		fits := true
-		for _, predicate := range g.predicates {
-			fit, err := predicate(pod, machineToPods[minion], minion)
-			if err != nil {
-				return "", err
-			}
-			if !fit {
-				fits = false
-				break
-			}
-		}
-		if fits {
-			filtered = append(filtered, minion)
-		}
-	}
-	priorityList, err := g.prioritizer(pod, g.pods, &listMinionLister{filtered})
+	priorityList, err := g.prioritizer(pod, g.pods, FakeMinionLister(filteredNodes))
 	if err != nil {
 		return "", err
 	}
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("failed to find a fit for pod: %v", pod)
 	}
+	return g.selectHost(priorityList)
+}
+
+func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, error) {
 	sort.Sort(priorityList)
 
 	hosts := getMinHosts(priorityList)
@@ -84,11 +63,38 @@ func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (str
 	return hosts[ix], nil
 }
 
+func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes []string) ([]string, error) {
+	filtered := []string{}
+	machineToPods, err := MapPodsToMachines(podLister)
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range nodes {
+		fits := true
+		for _, predicate := range predicates {
+			fit, err := predicate(pod, machineToPods[node], node)
+			if err != nil {
+				return nil, err
+			}
+			if !fit {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			filtered = append(filtered, node)
+		}
+	}
+	return filtered, nil
+}
+
 func getMinHosts(list HostPriorityList) []string {
 	result := []string{}
 	for _, hostEntry := range list {
 		if hostEntry.score == list[0].score {
 			result = append(result, hostEntry.host)
+		} else {
+			break
 		}
 	}
 	return result
