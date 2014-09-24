@@ -22,6 +22,6 @@ package main
 import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
 )

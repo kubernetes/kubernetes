@@ -18,10 +18,10 @@ package kubelet
 
 import (
 	"fmt"
-	"net"
-	"strconv"
-	"net/http"
 	"io"
+	"net"
+	"net/http"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -101,7 +101,7 @@ func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Contain
 // FlushWriter provides wrapper for responseWriter with HTTP streaming capabilities
 type FlushWriter struct {
 	flusher http.Flusher
-	writer io.Writer
+	writer  io.Writer
 }
 
 // Write is a FlushWriter implementation of the io.Writer that sends any buffered data to the client.

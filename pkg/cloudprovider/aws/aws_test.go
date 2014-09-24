@@ -89,20 +89,20 @@ func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 			func(instanceIds []string, filter *ec2.Filter) (resp *ec2.InstancesResp, err error) {
 				return &ec2.InstancesResp{"",
 					[]ec2.Reservation{
-						ec2.Reservation{"", "", "", nil, instances}}}, nil
+						{"", "", "", nil, instances}}}, nil
 			}},
 		nil}
 }
 
 func TestList(t *testing.T) {
 	instances := make([]ec2.Instance, 4)
-	instances[0].Tags = []ec2.Tag{ec2.Tag{"Name", "foo"}}
+	instances[0].Tags = []ec2.Tag{{"Name", "foo"}}
 	instances[0].PrivateDNSName = "instance1"
-	instances[1].Tags = []ec2.Tag{ec2.Tag{"Name", "bar"}}
+	instances[1].Tags = []ec2.Tag{{"Name", "bar"}}
 	instances[1].PrivateDNSName = "instance2"
-	instances[2].Tags = []ec2.Tag{ec2.Tag{"Name", "baz"}}
+	instances[2].Tags = []ec2.Tag{{"Name", "baz"}}
 	instances[2].PrivateDNSName = "instance3"
-	instances[3].Tags = []ec2.Tag{ec2.Tag{"Name", "quux"}}
+	instances[3].Tags = []ec2.Tag{{"Name", "quux"}}
 	instances[3].PrivateDNSName = "instance4"
 
 	aws := mockInstancesResp(instances)

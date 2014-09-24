@@ -28,12 +28,12 @@ func TestDockerConfigJSONDecode(t *testing.T) {
 	input := []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`)
 
 	expect := dockerConfig(map[string]dockerConfigEntry{
-		"http://foo.example.com": dockerConfigEntry{
+		"http://foo.example.com": {
 			Username: "foo",
 			Password: "bar",
 			Email:    "foo@example.com",
 		},
-		"http://bar.example.com": dockerConfigEntry{
+		"http://bar.example.com": {
 			Username: "bar",
 			Password: "baz",
 			Email:    "bar@example.com",
@@ -171,12 +171,12 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 
 func TestDockerKeyringFromConfig(t *testing.T) {
 	cfg := dockerConfig(map[string]dockerConfigEntry{
-		"http://foo.example.com": dockerConfigEntry{
+		"http://foo.example.com": {
 			Username: "foo",
 			Password: "bar",
 			Email:    "foo@example.com",
 		},
-		"https://bar.example.com": dockerConfigEntry{
+		"https://bar.example.com": {
 			Username: "bar",
 			Password: "baz",
 			Email:    "bar@example.com",
