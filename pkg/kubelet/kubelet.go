@@ -748,15 +748,19 @@ func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.Contai
 }
 
 // GetKubeletContainerLogs returns logs from the container
+// The second parameter of GetPodInfo and FindPodContainer methods represents pod UUID, which is allowed to be blank
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+	_, err := kl.GetPodInfo(podFullName, "")
+	if err == dockertools.ErrNoContainersInPod {
+		return fmt.Errorf("Pod not found (%s)\n", podFullName)
+	}
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient)
 	if err != nil {
 		return err
 	}
-	var uuid string
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, containerName)
+	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, "", containerName)
 	if !found {
-		return fmt.Errorf("container not found (%s)\n", containerName)
+		return fmt.Errorf("Container not found (%s)\n", containerName)
 	}
 	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail, follow, stdout, stderr)
 }

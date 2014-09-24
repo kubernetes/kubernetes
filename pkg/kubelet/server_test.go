@@ -362,7 +362,6 @@ func TestContainerLogs(t *testing.T) {
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := false
-	// expected := api.Container{"goodpod": docker.Container{ID: "myContainerID"}}
 	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
