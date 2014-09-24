@@ -70,7 +70,7 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 		if ext != "" {
 			name = name[:len(name)-len(ext)]
 		}
-		if ext != ".json" {
+		if !(ext == ".json" || ext == ".yaml") {
 			return nil
 		}
 		glog.Infof("Testing %s", path)
@@ -84,102 +84,106 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 	return err
 }
 
-func TestApiExamples(t *testing.T) {
-	expected := map[string]runtime.Object{
-		"controller":       &api.ReplicationController{},
-		"controller-list":  &api.ReplicationControllerList{},
-		"pod":              &api.Pod{},
-		"pod-list":         &api.PodList{},
-		"service":          &api.Service{},
-		"external-service": &api.Service{},
-		"service-list":     &api.ServiceList{},
+func TestExampleObjectSchemas(t *testing.T) {
+	cases := map[string]map[string]runtime.Object{
+		"../api/examples": {
+			"controller":       &api.ReplicationController{},
+			"controller-list":  &api.ReplicationControllerList{},
+			"pod":              &api.Pod{},
+			"pod-list":         &api.PodList{},
+			"service":          &api.Service{},
+			"external-service": &api.Service{},
+			"service-list":     &api.ServiceList{},
+		},
+		"../examples/guestbook": {
+			"frontend-controller":    &api.ReplicationController{},
+			"redis-slave-controller": &api.ReplicationController{},
+			"redis-master":           &api.Pod{},
+			"frontend-service":       &api.Service{},
+			"redis-master-service":   &api.Service{},
+			"redis-slave-service":    &api.Service{},
+		},
+		"../examples/walkthrough": {
+			"pod1": &api.Pod{},
+			"pod2": &api.Pod{},
+		},
 	}
 
-	tested := 0
-	err := walkJSONFiles("../api/examples", func(name, path string, data []byte) {
-		expectedType, found := expected[name]
-		if !found {
-			t.Errorf("%s does not have a test case defined", path)
-			return
+	for path, expected := range cases {
+		tested := 0
+		err := walkJSONFiles(path, func(name, path string, data []byte) {
+			expectedType, found := expected[name]
+			if !found {
+				t.Errorf("%s does not have a test case defined", path)
+				return
+			}
+			tested += 1
+			if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
+				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
+				return
+			}
+			if errors := validateObject(expectedType); len(errors) > 0 {
+				t.Errorf("%s did not validate correctly: %v", path, errors)
+			}
+		})
+		if err != nil {
+			t.Errorf("Expected no error, Got %v", err)
 		}
-		tested += 1
-		if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
-			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
-			return
+		if tested != len(expected) {
+			t.Errorf("Expected %d examples, Got %d", len(expected), tested)
 		}
-		if errors := validateObject(expectedType); len(errors) > 0 {
-			t.Errorf("%s did not validate correctly: %v", path, errors)
-		}
-	})
-	if err != nil {
-		t.Errorf("Expected no error, Got %v", err)
-	}
-	if tested != len(expected) {
-		t.Errorf("Expected %d examples, Got %d", len(expected), tested)
 	}
 }
 
-func TestExamples(t *testing.T) {
-	expected := map[string]runtime.Object{
-		"frontend-controller":    &api.ReplicationController{},
-		"redis-slave-controller": &api.ReplicationController{},
-		"redis-master":           &api.Pod{},
-		"frontend-service":       &api.Service{},
-		"redis-master-service":   &api.Service{},
-		"redis-slave-service":    &api.Service{},
-	}
-
-	tested := 0
-	err := walkJSONFiles("../examples/guestbook", func(name, path string, data []byte) {
-		expectedType, found := expected[name]
-		if !found {
-			t.Errorf("%s does not have a test case defined", path)
-			return
-		}
-		tested += 1
-		if err := latest.Codec.DecodeInto(data, expectedType); err != nil {
-			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
-			return
-		}
-		if errors := validateObject(expectedType); len(errors) > 0 {
-			t.Errorf("%s did not validate correctly: %v", path, errors)
-		}
-	})
-	if err != nil {
-		t.Errorf("Expected no error, Got %v", err)
-	}
-	if tested != len(expected) {
-		t.Errorf("Expected %d examples, Got %d", len(expected), tested)
-	}
-}
-
-var jsonRegexp = regexp.MustCompile("(?ms)^```\\w*\\n(\\{.+?\\})\\w*\\n^```")
+var sampleRegexp = regexp.MustCompile("(?ms)^```(?:(?P<type>yaml)\\w*\\n(?P<content>.+?)|\\w*\\n(?P<content>\\{.+?\\}))\\w*\\n^```")
+var subsetRegexp = regexp.MustCompile("(?ms)\\.{3}")
 
 func TestReadme(t *testing.T) {
-	path := "../README.md"
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		t.Fatalf("Unable to read file: %v", err)
+	paths := []string{
+		"../README.md",
+		"../examples/walkthrough/README.md",
 	}
 
-	match := jsonRegexp.FindStringSubmatch(string(data))
-	if match == nil {
-		return
-	}
-	for _, json := range match[1:] {
-		expectedType := &api.Pod{}
-		if err := latest.Codec.DecodeInto([]byte(json), expectedType); err != nil {
-			t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(data))
-			return
-		}
-		if errors := validateObject(expectedType); len(errors) > 0 {
-			t.Errorf("%s did not validate correctly: %v", path, errors)
-		}
-		encoded, err := latest.Codec.Encode(expectedType)
+	for _, path := range paths {
+		data, err := ioutil.ReadFile(path)
 		if err != nil {
-			t.Errorf("Could not encode object: %v", err)
+			t.Errorf("Unable to read file %s: %v", path, err)
 			continue
 		}
-		t.Logf("Found pod %s\n%s", json, encoded)
+
+		matches := sampleRegexp.FindAllStringSubmatch(string(data), -1)
+		if matches == nil {
+			continue
+		}
+		for _, match := range matches {
+			var content, subtype string
+			for i, name := range sampleRegexp.SubexpNames() {
+				if name == "type" {
+					subtype = match[i]
+				}
+				if name == "content" && match[i] != "" {
+					content = match[i]
+				}
+			}
+			if subtype == "yaml" && subsetRegexp.FindString(content) != "" {
+				t.Logf("skipping (%s): \n%s", subtype, content)
+				continue
+			}
+
+			//t.Logf("testing (%s): \n%s", subtype, content)
+			expectedType := &api.Pod{}
+			if err := latest.Codec.DecodeInto([]byte(content), expectedType); err != nil {
+				t.Errorf("%s did not decode correctly: %v\n%s", path, err, string(content))
+				continue
+			}
+			if errors := validateObject(expectedType); len(errors) > 0 {
+				t.Errorf("%s did not validate correctly: %v", path, errors)
+			}
+			_, err := latest.Codec.Encode(expectedType)
+			if err != nil {
+				t.Errorf("Could not encode object: %v", err)
+				continue
+			}
+		}
 	}
 }

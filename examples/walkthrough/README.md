@@ -98,7 +98,7 @@ desiredState:
         volumeMounts:
           - name: www-data
             mountPath: /srv/www
-            readOnly
+            readOnly: true
     containers:
       - name: git-monitor
         image: kubernetes/git-monitor
