@@ -262,8 +262,8 @@ function kube-up {
   (umask 077 && gcutil pull "${MASTER_NAME}" /usr/share/nginx/kubecfg.crt "${HOME}/${kube_cert}" && chmod 0600 "${HOME}/${kube_cert}")
   (umask 077 && gcutil pull "${MASTER_NAME}" /usr/share/nginx/kubecfg.key "${HOME}/${kube_key}" && chmod 0600 "${HOME}/${kube_key}")
   (umask 077 && gcutil pull "${MASTER_NAME}" /usr/share/nginx/ca.crt "${HOME}/${ca_cert}" && chmod 0600 "${HOME}/${ca_cert}")
-  (umask 077 && \
-cat << EOF > ~/.kubernetes_auth
+  (umask 077 
+   cat << EOF > ~/.kubernetes_auth
 {
   "User": "$user",
   "Password": "$passwd",
@@ -271,7 +271,7 @@ cat << EOF > ~/.kubernetes_auth
   "CertFile": "$HOME/$kube_crt",
   "KeyFile": "$HOME/$kube_key",
 }
-EOF && \
+EOF
   chmod 0600 ~/.kubernetes_auth)
 }
 
