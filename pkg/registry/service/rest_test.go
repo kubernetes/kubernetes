@@ -18,6 +18,7 @@ package service
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -27,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestServiceRegistryCreate(t *testing.T) {
@@ -237,23 +237,65 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 }
 
 func TestServiceRegistryMakeLinkVariables(t *testing.T) {
-	service := api.Service{
-		JSONBase:      api.JSONBase{ID: "foo-bar"},
-		Selector:      map[string]string{"bar": "baz"},
-		ContainerPort: util.IntOrString{Kind: util.IntstrString, StrVal: "a-b-c"},
-	}
 	registry := registrytest.NewServiceRegistry()
 	registry.List = api.ServiceList{
-		Items: []api.Service{service},
+		Items: []api.Service{
+			{
+				JSONBase: api.JSONBase{ID: "foo-bar"},
+				Selector: map[string]string{"bar": "baz"},
+				Port:     8080,
+				Protocol: "TCP",
+			},
+			{
+				JSONBase: api.JSONBase{ID: "abc-123"},
+				Selector: map[string]string{"bar": "baz"},
+				Port:     8081,
+				Protocol: "UDP",
+			},
+			{
+				JSONBase: api.JSONBase{ID: "q-u-u-x"},
+				Selector: map[string]string{"bar": "baz"},
+				Port:     8082,
+				Protocol: "",
+			},
+		},
 	}
 	machine := "machine"
 	vars, err := GetServiceEnvironmentVariables(registry, machine)
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
 	}
-	for _, v := range vars {
-		if !util.IsCIdentifier(v.Name) {
-			t.Errorf("Environment variable name is not valid: %v", v.Name)
+	expected := []api.EnvVar{
+		{Name: "FOO_BAR_SERVICE_HOST", Value: "machine"},
+		{Name: "FOO_BAR_SERVICE_PORT", Value: "8080"},
+		{Name: "FOO_BAR_PORT", Value: "tcp://machine:8080"},
+		{Name: "FOO_BAR_PORT_8080_TCP", Value: "tcp://machine:8080"},
+		{Name: "FOO_BAR_PORT_8080_TCP_PROTO", Value: "tcp"},
+		{Name: "FOO_BAR_PORT_8080_TCP_PORT", Value: "8080"},
+		{Name: "FOO_BAR_PORT_8080_TCP_ADDR", Value: "machine"},
+		{Name: "ABC_123_SERVICE_HOST", Value: "machine"},
+		{Name: "ABC_123_SERVICE_PORT", Value: "8081"},
+		{Name: "ABC_123_PORT", Value: "udp://machine:8081"},
+		{Name: "ABC_123_PORT_8081_UDP", Value: "udp://machine:8081"},
+		{Name: "ABC_123_PORT_8081_UDP_PROTO", Value: "udp"},
+		{Name: "ABC_123_PORT_8081_UDP_PORT", Value: "8081"},
+		{Name: "ABC_123_PORT_8081_UDP_ADDR", Value: "machine"},
+		{Name: "Q_U_U_X_SERVICE_HOST", Value: "machine"},
+		{Name: "Q_U_U_X_SERVICE_PORT", Value: "8082"},
+		{Name: "Q_U_U_X_PORT", Value: "tcp://machine:8082"},
+		{Name: "Q_U_U_X_PORT_8082_TCP", Value: "tcp://machine:8082"},
+		{Name: "Q_U_U_X_PORT_8082_TCP_PROTO", Value: "tcp"},
+		{Name: "Q_U_U_X_PORT_8082_TCP_PORT", Value: "8082"},
+		{Name: "Q_U_U_X_PORT_8082_TCP_ADDR", Value: "machine"},
+		{Name: "SERVICE_HOST", Value: "machine"},
+	}
+	if len(vars) != len(expected) {
+		t.Errorf("Expected %d env vars, got: %+v", len(expected), vars)
+		return
+	}
+	for i := range expected {
+		if !reflect.DeepEqual(vars[i], expected[i]) {
+			t.Errorf("expected %#v, got %#v", vars[i], expected[i])
 		}
 	}
 }
