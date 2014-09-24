@@ -5,7 +5,7 @@ go:
   - 1.3
   - 1.2
 
-install: 
+install:
   - go get code.google.com/p/go.tools/cmd/cover
   - ./hack/install-etcd.sh
   - ./hack/verify-gofmt.sh
