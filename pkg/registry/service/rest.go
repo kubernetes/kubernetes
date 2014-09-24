@@ -222,25 +222,23 @@ func makeEnvVariableName(str string) string {
 
 func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
 	prefix := makeEnvVariableName(service.ID)
-	var port string
-	if service.ContainerPort.Kind == util.IntstrString {
-		port = service.ContainerPort.StrVal
-	} else {
-		port = strconv.Itoa(service.ContainerPort.IntVal)
+	protocol := "TCP"
+	if service.Protocol != "" {
+		protocol = service.Protocol
 	}
-	portPrefix := prefix + "_PORT_" + makeEnvVariableName(port) + "_TCP"
+	portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, service.Port, strings.ToUpper(protocol))
 	return []api.EnvVar{
 		{
 			Name:  prefix + "_PORT",
-			Value: fmt.Sprintf("tcp://%s:%d", machine, service.Port),
+			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), machine, service.Port),
 		},
 		{
 			Name:  portPrefix,
-			Value: fmt.Sprintf("tcp://%s:%d", machine, service.Port),
+			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), machine, service.Port),
 		},
 		{
 			Name:  portPrefix + "_PROTO",
-			Value: "tcp",
+			Value: strings.ToLower(protocol),
 		},
 		{
 			Name:  portPrefix + "_PORT",

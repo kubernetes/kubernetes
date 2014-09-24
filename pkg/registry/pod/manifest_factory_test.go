@@ -107,19 +107,19 @@ func TestMakeManifestServices(t *testing.T) {
 			Value: "tcp://machine:8080",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP",
+			Name:  "TEST_PORT_8080_TCP",
 			Value: "tcp://machine:8080",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP_PROTO",
+			Name:  "TEST_PORT_8080_TCP_PROTO",
 			Value: "tcp",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP_PORT",
+			Name:  "TEST_PORT_8080_TCP_PORT",
 			Value: "8080",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP_ADDR",
+			Name:  "TEST_PORT_8080_TCP_ADDR",
 			Value: "machine",
 		},
 		{
@@ -197,19 +197,19 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 			Value: "tcp://machine:8080",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP",
+			Name:  "TEST_PORT_8080_TCP",
 			Value: "tcp://machine:8080",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP_PROTO",
+			Name:  "TEST_PORT_8080_TCP_PROTO",
 			Value: "tcp",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP_PORT",
+			Name:  "TEST_PORT_8080_TCP_PORT",
 			Value: "8080",
 		},
 		{
-			Name:  "TEST_PORT_900_TCP_ADDR",
+			Name:  "TEST_PORT_8080_TCP_ADDR",
 			Value: "machine",
 		},
 		{
