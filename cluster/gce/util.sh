@@ -259,20 +259,25 @@ function kube-up {
   kube_key=".kubecfg.key"
   ca_cert=".kubernetes.ca.crt"
 
-  (umask 077 && gcutil pull "${MASTER_NAME}" /usr/share/nginx/kubecfg.crt "${HOME}/${kube_cert}" && chmod 0600 "${HOME}/${kube_cert}")
-  (umask 077 && gcutil pull "${MASTER_NAME}" /usr/share/nginx/kubecfg.key "${HOME}/${kube_key}" && chmod 0600 "${HOME}/${kube_key}")
-  (umask 077 && gcutil pull "${MASTER_NAME}" /usr/share/nginx/ca.crt "${HOME}/${ca_cert}" && chmod 0600 "${HOME}/${ca_cert}")
-  (umask 077 
+  (umask 077
+   gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.crt > "${HOME}/${kube_cert}"
+   gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.key > "${HOME}/${kube_key}"
+   gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/ca.crt > "${HOME}/${ca_cert}"
+
    cat << EOF > ~/.kubernetes_auth
 {
   "User": "$user",
   "Password": "$passwd",
-  "CAFile": "$HOME/$ca_crt",
-  "CertFile": "$HOME/$kube_crt",
-  "KeyFile": "$HOME/$kube_key",
+  "CAFile": "$HOME/$ca_cert",
+  "CertFile": "$HOME/$kube_cert",
+  "KeyFile": "$HOME/$kube_key"
 }
 EOF
-  chmod 0600 ~/.kubernetes_auth)
+
+   chmod 0600 ~/.kubernetes_auth
+   chmod 0600 "${HOME}/${kube_cert}"
+   chmod 0600 "${HOME}/${kube_key}"
+   chmod 0600 "${HOME}/${ca_cert}")
 }
 
 # Delete a kubernetes cluster
