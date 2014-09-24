@@ -148,11 +148,17 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 		return result, err
 	}
 	for _, service := range services.Items {
-		name := makeEnvVariableName(service.ID) + "_SERVICE_PORT"
-		value := strconv.Itoa(service.Port)
-		result = append(result, api.EnvVar{Name: name, Value: value})
+		// Host
+		name := makeEnvVariableName(service.ID) + "_SERVICE_HOST"
+		result = append(result, api.EnvVar{Name: name, Value: machine})
+		// Port
+		name = makeEnvVariableName(service.ID) + "_SERVICE_PORT"
+		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Port)})
+		// Docker-compatible vars.
 		result = append(result, makeLinkVariables(service, machine)...)
 	}
+	// The 'SERVICE_HOST' variable is deprecated.
+	// TODO(thockin): get rid of it once ip-per-service is in and "deployed".
 	result = append(result, api.EnvVar{Name: "SERVICE_HOST", Value: machine})
 	return result, nil
 }
