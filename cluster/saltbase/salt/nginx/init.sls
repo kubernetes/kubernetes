@@ -17,10 +17,11 @@ nginx:
 {% if grains.cloud == 'vagrant' %}
   {% set cert_ip=grains.fqdn_ip4 %}
 {% endif %}
+{% endif %}
+
 # If there is a pillar defined, override any defaults.
 {% if pillar['cert_ip'] is defined %}
   {% set cert_ip=pillar['cert_ip'] %}
-{% endif %}
 {% endif %}
 
 {% set certgen="make-cert.sh" %}
