@@ -44,6 +44,11 @@ grains:
     - kubernetes-master
 EOF
 
+# Specify the minion prefix
+cat <<EOF >>/srv/pillar/common.sls
+instance_prefix: $MINION_PREFIX
+EOF
+
 # Configure the salt-master
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
