@@ -119,7 +119,7 @@ func (r *Registry) CreatePod(pod *api.Pod) error {
 	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
 	pod.DesiredState.Status = api.PodRunning
 	pod.DesiredState.Host = ""
-	err := r.CreateObj(makePodKey(pod.ID), pod)
+	err := r.CreateObj(makePodKey(pod.ID), pod, 0)
 	return etcderr.InterpretCreateError(err, "pod", pod.ID)
 }
 
@@ -253,7 +253,7 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 
 // CreateController creates a new ReplicationController.
 func (r *Registry) CreateController(controller *api.ReplicationController) error {
-	err := r.CreateObj(makeControllerKey(controller.ID), controller)
+	err := r.CreateObj(makeControllerKey(controller.ID), controller, 0)
 	return etcderr.InterpretCreateError(err, "replicationController", controller.ID)
 }
 
@@ -283,7 +283,7 @@ func (r *Registry) ListServices() (*api.ServiceList, error) {
 
 // CreateService creates a new Service.
 func (r *Registry) CreateService(svc *api.Service) error {
-	err := r.CreateObj(makeServiceKey(svc.ID), svc)
+	err := r.CreateObj(makeServiceKey(svc.ID), svc, 0)
 	return etcderr.InterpretCreateError(err, "service", svc.ID)
 }
 

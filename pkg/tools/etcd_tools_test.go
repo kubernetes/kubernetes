@@ -163,6 +163,27 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	try("/some/key3")
 }
 
+func TestCreateObj(t *testing.T) {
+	obj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	err := helper.CreateObj("/some/key", obj, 5)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err := latest.Codec.Encode(obj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	node := fakeClient.Data["/some/key"].R.Node
+	if e, a := string(data), node.Value; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
+	if e, a := uint64(5), fakeClient.LastSetTTL; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
+}
+
 func TestSetObj(t *testing.T) {
 	obj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)

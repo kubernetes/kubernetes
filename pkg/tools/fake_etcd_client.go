@@ -49,6 +49,7 @@ type FakeEtcdClient struct {
 	Ix          int
 	TestIndex   bool
 	ChangeIndex uint64
+	LastSetTTL  uint64
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -135,6 +136,7 @@ func (f *FakeEtcdClient) nodeExists(key string) bool {
 }
 
 func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Response, error) {
+	f.LastSetTTL = ttl
 	if f.Err != nil {
 		return nil, f.Err
 	}

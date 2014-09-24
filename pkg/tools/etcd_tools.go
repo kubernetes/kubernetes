@@ -207,8 +207,9 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignore
 	return body, response.Node.ModifiedIndex, err
 }
 
-// CreateObj adds a new object at a key unless it already exists.
-func (h *EtcdHelper) CreateObj(key string, obj runtime.Object) error {
+// CreateObj adds a new object at a key unless it already exists. 'ttl' is time-to-live in seconds,
+// and 0 means forever.
+func (h *EtcdHelper) CreateObj(key string, obj runtime.Object, ttl uint64) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
@@ -219,7 +220,7 @@ func (h *EtcdHelper) CreateObj(key string, obj runtime.Object) error {
 		}
 	}
 
-	_, err = h.Client.Create(key, string(data), 0)
+	_, err = h.Client.Create(key, string(data), ttl)
 	return err
 }
 
