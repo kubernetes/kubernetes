@@ -10,6 +10,7 @@ nginx:
       - file: /usr/share/nginx/htpasswd
       - cmd: /usr/share/nginx/server.cert
 
+{% if grains.cloud is defined %}
 {% if grains.cloud == 'gce' %}
   {% set cert_ip='_use_gce_external_ip_' %}
 {% endif %}
@@ -19,6 +20,7 @@ nginx:
 # If there is a pillar defined, override any defaults.
 {% if pillar['cert_ip'] is defined %}
   {% set cert_ip=pillar['cert_ip'] %}
+{% endif %}
 {% endif %}
 
 {% set certgen="make-cert.sh" %}
