@@ -108,6 +108,7 @@ function kube-up {
         echo "MASTER_NAME=${MASTER_NAME}"
         echo "MASTER_RELEASE_TAR=${FULL_URL}"
         echo "MASTER_HTPASSWD='${HTPASSWD}'"
+        echo "MINION_PREFIX=${INSTANCE_PREFIX}-minion"
         echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
         echo "SERVER_CRT=\"$(cat ${KUBE_TEMP}/server.crt)\""
         echo "SERVER_KEY=\"$(cat ${KUBE_TEMP}/server.key)\""
