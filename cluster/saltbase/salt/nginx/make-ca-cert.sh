@@ -39,9 +39,9 @@ cd easy-rsa-master/easyrsa3
 ./easyrsa --batch build-ca nopass > /dev/null 2>&1
 ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
 ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1
-cp pki/issued/kubernetes-master.crt /usr/share/nginx/server.cert > /dev/null 2>&1
-cp pki/private/kubernetes-master.key /usr/share/nginx/server.key > /dev/null 2>&1
-cp pki/ca.crt /usr/share/nginx/ca.crt
-cp pki/issued/kubecfg.crt /usr/share/nginx/kubecfg.crt
-cp pki/private/kubecfg.key /usr/share/nginx/kubecfg.key
+cp -p pki/issued/kubernetes-master.crt /usr/share/nginx/server.cert > /dev/null 2>&1
+cp -p pki/private/kubernetes-master.key /usr/share/nginx/server.key > /dev/null 2>&1
+cp -p pki/ca.crt /usr/share/nginx/ca.crt
+cp -p pki/issued/kubecfg.crt /usr/share/nginx/kubecfg.crt
+cp -p pki/private/kubecfg.key /usr/share/nginx/kubecfg.key
 
