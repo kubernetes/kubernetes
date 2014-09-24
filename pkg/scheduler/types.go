@@ -16,6 +16,13 @@ limitations under the License.
 
 package scheduler
 
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
+
+// FitPredicate is a function that indicates if a pod fits into an existing node.
+type FitPredicate func(pod api.Pod, existingPods []api.Pod, node string) (bool, error)
+
 // HostPriority represents the priority of scheduling to a particular host, lower priority is better.
 type HostPriority struct {
 	host  string
@@ -38,3 +45,5 @@ func (h HostPriorityList) Less(i, j int) bool {
 func (h HostPriorityList) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
 }
+
+type PriorityFunction func(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error)

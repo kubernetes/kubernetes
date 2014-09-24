@@ -17,27 +17,18 @@ limitations under the License.
 package scheduler
 
 import (
-	"fmt"
 	"math/rand"
-	"sort"
-	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-type SpreadingScheduler struct {
-	pods       PodLister
-	random     *rand.Rand
-	randomLock sync.Mutex
-}
-
 // CalculateSpreadPriority spreads pods by minimizing the number of pods on the same machine with the same labels.
 // Importantly, if there are services in the system that span multiple heterogenous sets of pods, this spreading priority
 // may not provide optimal spreading for the members of that Service.
 // TODO: consider if we want to include Service label sets in the scheduling priority.
-func CalculateSpreadPriority(selector labels.Selector, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	pods, err := podLister.ListPods(selector)
+func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	pods, err := podLister.ListPods(labels.SelectorFromSet(pod.Labels))
 	if err != nil {
 		return nil, err
 	}
@@ -58,17 +49,6 @@ func CalculateSpreadPriority(selector labels.Selector, podLister PodLister, mini
 	return result, nil
 }
 
-// Schedule schedules pods to maximize spreading of identical pods across multiple hosts.
-// Does not currently take hostPort scheduling into account.
-// TODO: combine priority based and fit based schedulers into a single scheduler.
-func (s *SpreadingScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
-	priorities, err := CalculateSpreadPriority(labels.SelectorFromSet(pod.Labels), s.pods, minionLister)
-	if err != nil {
-		return "", err
-	}
-	sort.Sort(priorities)
-	if len(priorities) == 0 {
-		return "", fmt.Errorf("failed to find a fit: %v", pod)
-	}
-	return priorities[0].host, nil
+func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
+	return NewGenericScheduler(predicates, CalculateSpreadPriority, podLister, random)
 }
