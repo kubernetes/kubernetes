@@ -20,12 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"hash/adler32"
+	"io"
 	"math/rand"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
-	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/fsouza/go-dockerclient"

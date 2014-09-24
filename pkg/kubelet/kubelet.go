@@ -20,13 +20,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
@@ -758,7 +758,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	if !found {
 		return fmt.Errorf("container not found (%s)\n", containerName)
 	}
-	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail , follow, stdout, stderr)
+	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail, follow, stdout, stderr)
 }
 
 // GetPodInfo returns information from Docker about the containers in a pod

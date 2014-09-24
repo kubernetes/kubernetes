@@ -18,9 +18,9 @@ package ovirt_cloud
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -32,8 +32,8 @@ import (
 )
 
 type OVirtCloud struct {
-	VmsRequest         *url.URL
-	HostsRequest       *url.URL
+	VmsRequest   *url.URL
+	HostsRequest *url.URL
 }
 
 type OVirtApiConfig struct {
@@ -43,18 +43,18 @@ type OVirtApiConfig struct {
 		Password string `gcfg:"password"`
 	}
 	Filters struct {
-		VmsQuery   string `gcfg:"vms"`
+		VmsQuery string `gcfg:"vms"`
 	}
 }
 
 type XmlVmInfo struct {
-	Hostname        string `xml:"guest_info>fqdn"`
-	State		string `xml:"status>state"`
+	Hostname string `xml:"guest_info>fqdn"`
+	State    string `xml:"status>state"`
 }
 
 type XmlVmsList struct {
-	XMLName         xml.Name     `xml:"vms"`
-	Vm		[]XmlVmInfo  `xml:"vm"`
+	XMLName xml.Name    `xml:"vms"`
+	Vm      []XmlVmInfo `xml:"vm"`
 }
 
 func init() {
@@ -74,7 +74,7 @@ func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 	/* defaults */
 	oVirtConfig.Connection.Username = "admin@internal"
 
-	if  err := gcfg.ReadInto(&oVirtConfig, config); err != nil {
+	if err := gcfg.ReadInto(&oVirtConfig, config); err != nil {
 		return nil, err
 	}
 
@@ -83,7 +83,7 @@ func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 	}
 
 	request, err := url.Parse(oVirtConfig.Connection.ApiEntry)
-	if  err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -121,7 +121,7 @@ func getInstancesFromXml(body io.Reader) ([]string, error) {
 	}
 
 	content, err := ioutil.ReadAll(body)
-	if  err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func getInstancesFromXml(body io.Reader) ([]string, error) {
 // List enumerates the set of minions instances known by the cloud provider
 func (v *OVirtCloud) List(filter string) ([]string, error) {
 	response, err := http.Get(v.VmsRequest.String())
-	if  err != nil {
+	if err != nil {
 		return nil, err
 	}
 
