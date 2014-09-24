@@ -13,7 +13,7 @@ nginx:
 {% if grains.cloud == 'gce' %}
   {% set cert_ip='_use_gce_external_ip_' %}
 {% endif %}
-{% if grains.cloud == 'vagrant' %}
+{% if grains.cloud is defined and grains.cloud == 'vagrant' %}
   {% set cert_ip=grains.fqdn_ip4 %}
 {% endif %}
 # If there is a pillar defined, override any defaults.
