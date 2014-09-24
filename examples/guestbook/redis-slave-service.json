@@ -1,5 +1,6 @@
 {
   "id": "redisslave",
+  "namespace": "default",
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 10001,

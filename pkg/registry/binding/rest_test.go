@@ -56,20 +56,20 @@ func TestRESTUnsupported(t *testing.T) {
 		OnApplyBinding: func(b *api.Binding) error { return nil },
 	}
 	b := NewREST(mockRegistry)
-	if _, err := b.Delete("binding id"); err == nil {
+	if _, err := b.Delete(api.NamespaceDefault, "binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.Update(&api.Binding{PodID: "foo", Host: "new machine"}); err == nil {
+	if _, err := b.Update(api.NamespaceDefault, &api.Binding{PodID: "foo", Host: "new machine"}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.Get("binding id"); err == nil {
+	if _, err := b.Get(api.NamespaceDefault, "binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector(), labels.Everything()); err == nil {
+	if _, err := b.List(api.NamespaceDefault, labels.Set{"name": "foo"}.AsSelector(), labels.Everything()); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	// Try sending wrong object just to get 100% coverage
-	if _, err := b.Create(&api.Pod{}); err == nil {
+	if _, err := b.Create(api.NamespaceDefault, &api.Pod{}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -94,7 +94,7 @@ func TestRESTPost(t *testing.T) {
 			},
 		}
 		b := NewREST(mockRegistry)
-		resultChan, err := b.Create(item.b)
+		resultChan, err := b.Create(api.NamespaceDefault, item.b)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 			continue

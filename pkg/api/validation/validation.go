@@ -311,8 +311,9 @@ func ValidatePodState(podState *api.PodState) errs.ErrorList {
 func ValidatePod(pod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(pod.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
+		allErrs = append(allErrs, errs.NewFieldRequired("Pod.ID", pod.ID))
 	}
+	allErrs = validateNotEmptyDNS952Label(pod.Namespace, "Pod.Namespace", allErrs)
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
 	return allErrs
 }
@@ -320,11 +321,8 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(service.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", service.ID))
-	} else if !util.IsDNS952Label(service.ID) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
-	}
+	allErrs = validateNotEmptyDNS952Label(service.ID, "Service.ID", allErrs)
+	allErrs = validateNotEmptyDNS952Label(service.Namespace, "Service.Namespace", allErrs)
 	if !util.IsValidPortNum(service.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
 	}
@@ -343,8 +341,9 @@ func ValidateService(service *api.Service) errs.ErrorList {
 func ValidateReplicationController(controller *api.ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(controller.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
+		allErrs = append(allErrs, errs.NewFieldRequired("ReplicationController.ID", controller.ID))
 	}
+	allErrs = validateNotEmptyDNS952Label(controller.Namespace, "ReplicationController.Namespace", allErrs)
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
 	return allErrs
 }
@@ -364,5 +363,15 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
 	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
+	return allErrs
+}
+
+// validateNotEmptyDNS952Label validates the provided value is not empty and is a dns label.
+func validateNotEmptyDNS952Label(value string, label string, allErrs errs.ErrorList) errs.ErrorList {
+	if value == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid(label, value))
+	} else if !util.IsDNS952Label(value) {
+		allErrs = append(allErrs, errs.NewFieldInvalid(label, value))
+	}
 	return allErrs
 }

@@ -4,6 +4,7 @@
     "items": [
         {
             "id": "example1",
+            "namespace": "default",
             "port": 8000,
             "labels": {
                 "name": "nginx"
@@ -14,6 +15,7 @@
         },
         {
             "id": "example2",
+            "namespace": "default",            
             "port": 8080,
             "labels": {
                 "env": "prod",

@@ -41,17 +41,17 @@ func NewREST(bindingRegistry Registry) *REST {
 }
 
 // List returns an error because bindings are write-only objects.
-func (*REST) List(label, field labels.Selector) (runtime.Object, error) {
+func (*REST) List(namespace string, label, field labels.Selector) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", "list")
 }
 
 // Get returns an error because bindings are write-only objects.
-func (*REST) Get(id string) (runtime.Object, error) {
+func (*REST) Get(namespace string, id string) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
 // Delete returns an error because bindings are write-only objects.
-func (*REST) Delete(id string) (<-chan runtime.Object, error) {
+func (*REST) Delete(namespace string, id string) (<-chan runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
@@ -61,10 +61,15 @@ func (*REST) New() runtime.Object {
 }
 
 // Create attempts to make the assignment indicated by the binding it recieves.
-func (b *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Create(namespace string, obj runtime.Object) (<-chan runtime.Object, error) {
 	binding, ok := obj.(*api.Binding)
+	// TODO find out if we have a nemspace
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
+	}
+	// ensure the namespace is equal to the object
+	if len(namespace) > 0 {
+		binding.Namespace = namespace
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := b.registry.ApplyBinding(binding); err != nil {
@@ -75,6 +80,6 @@ func (b *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 }
 
 // Update returns an error-- this object may not be updated.
-func (b *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Update(namespace string, obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Bindings may not be changed.")
 }

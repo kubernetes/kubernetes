@@ -42,28 +42,32 @@ func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 
 func TestEtcdGetPod(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/pods/foo", runtime.EncodeOrDie(latest.Codec, &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	ns := api.NamespaceDefault
+	id := "foo"
+	fakeClient.Set(makePodKey(ns, id), runtime.EncodeOrDie(latest.Codec, &api.Pod{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	pod, err := registry.GetPod("foo")
+	pod, err := registry.GetPod(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.ID != id {
 		t.Errorf("Unexpected pod: %#v", pod)
 	}
 }
 
 func TestEtcdGetPodNotFound(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
+	ns := api.NamespaceDefault
+	id := "foo"
+	fakeClient.Data[makePodKey(ns, id)] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	_, err := registry.GetPod("foo")
+	_, err := registry.GetPod(ns, id)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error returned: %#v", err)
 	}
@@ -72,7 +76,9 @@ func TestEtcdGetPodNotFound(t *testing.T) {
 func TestEtcdCreatePod(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
+	ns := api.NamespaceDefault
+	id := "foo"
+	fakeClient.Data[makePodKey(ns, id)] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -82,7 +88,8 @@ func TestEtcdCreatePod(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(&api.Pod{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
@@ -99,12 +106,12 @@ func TestEtcdCreatePod(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
+	err = registry.ApplyBinding(&api.Binding{JSONBase: api.JSONBase{Namespace: ns}, PodID: id, Host: "machine"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get("/registry/pods/foo", false, false)
+	resp, err := fakeClient.Get(makePodKey(ns, id), false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -114,7 +121,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.ID != id {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
@@ -131,10 +138,12 @@ func TestEtcdCreatePod(t *testing.T) {
 
 func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
+	ns := api.NamespaceDefault
+	id := "foo"
+	fakeClient.Data[makePodKey(ns, id)] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}),
+				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{JSONBase: api.JSONBase{ID: id, Namespace: ns}}),
 			},
 		},
 		E: nil,
@@ -142,7 +151,8 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(&api.Pod{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 	})
 	if !errors.IsAlreadyExists(err) {
@@ -153,7 +163,9 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
+	ns := api.NamespaceDefault
+	id := "foo"
+	fakeClient.Data[makePodKey(ns, id)] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -168,7 +180,8 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(&api.Pod{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 	})
 	if err != nil {
@@ -176,12 +189,12 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
+	err = registry.ApplyBinding(&api.Binding{JSONBase: api.JSONBase{Namespace: ns}, PodID: id, Host: "machine"})
 	if !errors.IsAlreadyExists(err) {
 		t.Fatalf("Unexpected error returned: %#v", err)
 	}
 
-	existingPod, err := registry.GetPod("foo")
+	existingPod, err := registry.GetPod(api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -191,9 +204,12 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 }
 
 func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
+	id := "foo"
+	ns := api.NamespaceDefault
+	key := makePodKey(ns, id)
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -208,11 +224,12 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(&api.Pod{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
-				ID: "foo",
+				ID: id,
 				Containers: []api.Container{
 					{
 						Name: "foo",
@@ -226,12 +243,12 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
+	err = registry.ApplyBinding(&api.Binding{JSONBase: api.JSONBase{Namespace: ns}, PodID: id, Host: "machine"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get("/registry/pods/foo", false, false)
+	resp, err := fakeClient.Get(key, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -241,7 +258,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.ID != id {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
@@ -257,9 +274,12 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 }
 
 func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
+	id := "foo"
+	ns := api.NamespaceDefault
+	key := makePodKey(ns, id)
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -273,7 +293,8 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(&api.Pod{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
@@ -291,12 +312,12 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	err = registry.ApplyBinding(&api.Binding{PodID: "foo", Host: "machine"})
+	err = registry.ApplyBinding(&api.Binding{JSONBase: api.JSONBase{Namespace: ns}, PodID: "foo", Host: "machine"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get("/registry/pods/foo", false, false)
+	resp, err := fakeClient.Get(key, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -306,7 +327,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.ID != id {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
@@ -325,9 +346,12 @@ func TestEtcdDeletePod(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 
-	key := "/registry/pods/foo"
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makePodKey(ns, id)
+
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		JSONBase:     api.JSONBase{ID: "foo"},
+		JSONBase:     api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
@@ -336,7 +360,7 @@ func TestEtcdDeletePod(t *testing.T) {
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.DeletePod("foo")
+	err := registry.DeletePod(api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -361,9 +385,12 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 
-	key := "/registry/pods/foo"
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makePodKey(ns, id)
+
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		JSONBase:     api.JSONBase{ID: "foo"},
+		JSONBase:     api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
@@ -373,7 +400,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.DeletePod("foo")
+	err := registry.DeletePod(api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -400,7 +427,8 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 
 func TestEtcdEmptyListPods(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/pods"
+	ns := api.NamespaceDefault
+	key := makePodKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -410,7 +438,7 @@ func TestEtcdEmptyListPods(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	pods, err := registry.ListPods(labels.Everything())
+	pods, err := registry.ListPods(ns, labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -422,13 +450,14 @@ func TestEtcdEmptyListPods(t *testing.T) {
 
 func TestEtcdListPodsNotFound(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/pods"
+	ns := api.NamespaceDefault
+	key := makePodKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	pods, err := registry.ListPods(labels.Everything())
+	pods, err := registry.ListPods(ns, labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -440,20 +469,21 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 
 func TestEtcdListPods(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/pods"
+	ns := api.NamespaceDefault
+	key := makePodKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-							JSONBase:     api.JSONBase{ID: "foo"},
+							JSONBase:     api.JSONBase{ID: "foo", Namespace: ns},
 							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-							JSONBase:     api.JSONBase{ID: "bar"},
+							JSONBase:     api.JSONBase{ID: "bar", Namespace: ns},
 							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
@@ -463,7 +493,7 @@ func TestEtcdListPods(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	pods, err := registry.ListPods(labels.Everything())
+	pods, err := registry.ListPods(ns, labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -479,13 +509,13 @@ func TestEtcdListPods(t *testing.T) {
 
 func TestEtcdListControllersNotFound(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/controllers"
+	key := makeControllerKey(api.NamespaceDefault, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	controllers, err := registry.ListControllers()
+	controllers, err := registry.ListControllers(api.NamespaceDefault)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -497,13 +527,14 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 
 func TestEtcdListServicesNotFound(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/services/specs"
+	ns := api.NamespaceDefault
+	key := makeServiceKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	services, err := registry.ListServices()
+	services, err := registry.ListServices(ns)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -515,24 +546,25 @@ func TestEtcdListServicesNotFound(t *testing.T) {
 
 func TestEtcdListControllers(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/controllers"
+	registry := NewTestEtcdRegistry(fakeClient)
+	ns := api.NamespaceDefault
+	key := makeControllerKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo", Namespace: ns}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "bar", Namespace: ns}}),
 					},
 				},
 			},
 		},
 		E: nil,
 	}
-	registry := NewTestEtcdRegistry(fakeClient)
-	controllers, err := registry.ListControllers()
+	controllers, err := registry.ListControllers(ns)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -543,29 +575,33 @@ func TestEtcdListControllers(t *testing.T) {
 }
 
 func TestEtcdGetController(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeControllerKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	ctrl, err := registry.GetController("foo")
+	ctrl, err := registry.GetController(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if ctrl.ID != "foo" {
+	if ctrl.ID != id {
 		t.Errorf("Unexpected controller: %#v", ctrl)
 	}
 }
 
 func TestEtcdGetControllerNotFound(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Data["/registry/controllers/foo"] = tools.EtcdResponseWithError{
+	fakeClient.Data["/registry/controllers/"+api.NamespaceDefault+"/foo"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	ctrl, err := registry.GetController("foo")
+	ctrl, err := registry.GetController(api.NamespaceDefault, "foo")
 	if ctrl != nil {
 		t.Errorf("Unexpected non-nil controller: %#v", ctrl)
 	}
@@ -575,35 +611,41 @@ func TestEtcdGetControllerNotFound(t *testing.T) {
 }
 
 func TestEtcdDeleteController(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeControllerKey(ns, id)
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.DeleteController("foo")
+	err := registry.DeleteController(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
 	if len(fakeClient.DeletedKeys) != 1 {
 		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
 	}
-	key := "/registry/controllers/foo"
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
 }
 
 func TestEtcdCreateController(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeControllerKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateController(&api.ReplicationController{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get("/registry/controllers/foo", false, false)
+	resp, err := fakeClient.Get(key, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -619,13 +661,18 @@ func TestEtcdCreateController(t *testing.T) {
 }
 
 func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeControllerKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateController(&api.ReplicationController{
 		JSONBase: api.JSONBase{
-			ID: "foo",
+			ID:        id,
+			Namespace: ns,
 		},
 	})
 	if !errors.IsAlreadyExists(err) {
@@ -634,13 +681,17 @@ func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
 }
 
 func TestEtcdUpdateController(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeControllerKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 
-	resp, _ := fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.UpdateController(&api.ReplicationController{
-		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+		JSONBase: api.JSONBase{ID: id, Namespace: ns, ResourceVersion: resp.Node.ModifiedIndex},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
@@ -649,7 +700,7 @@ func TestEtcdUpdateController(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	ctrl, err := registry.GetController("foo")
+	ctrl, err := registry.GetController(ns, id)
 	if ctrl.DesiredState.Replicas != 2 {
 		t.Errorf("Unexpected controller: %#v", ctrl)
 	}
@@ -657,16 +708,17 @@ func TestEtcdUpdateController(t *testing.T) {
 
 func TestEtcdListServices(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/services/specs"
+	ns := api.NamespaceDefault
+	key := makeServiceKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo", Namespace: ns}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "bar", Namespace: ns}}),
 					},
 				},
 			},
@@ -674,7 +726,7 @@ func TestEtcdListServices(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	services, err := registry.ListServices()
+	services, err := registry.ListServices(ns)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -685,16 +737,20 @@ func TestEtcdListServices(t *testing.T) {
 }
 
 func TestEtcdCreateService(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeServiceKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: id, Namespace: ns},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	resp, err := fakeClient.Get("/registry/services/specs/foo", false, false)
+	resp, err := fakeClient.Get(key, false, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -705,17 +761,21 @@ func TestEtcdCreateService(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if service.ID != "foo" {
+	if service.ID != id {
 		t.Errorf("Unexpected service: %#v %s", service, resp.Node.Value)
 	}
 }
 
 func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeServiceKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: id, Namespace: ns},
 	})
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %#v", err)
@@ -723,38 +783,50 @@ func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 }
 
 func TestEtcdGetService(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeServiceKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	service, err := registry.GetService("foo")
+	service, err := registry.GetService(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if service.ID != "foo" {
+	if service.ID != id {
 		t.Errorf("Unexpected service: %#v", service)
 	}
 }
 
 func TestEtcdGetServiceNotFound(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeServiceKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Data["/registry/services/specs/foo"] = tools.EtcdResponseWithError{
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	_, err := registry.GetService("foo")
+	_, err := registry.GetService(ns, id)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 
 func TestEtcdDeleteService(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeServiceKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.DeleteService("foo")
+	err := registry.DeleteService(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -762,24 +834,29 @@ func TestEtcdDeleteService(t *testing.T) {
 	if len(fakeClient.DeletedKeys) != 2 {
 		t.Errorf("Expected 2 delete, found %#v", fakeClient.DeletedKeys)
 	}
-	key := "/registry/services/specs/foo"
+
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
-	key = "/registry/services/endpoints/foo"
-	if fakeClient.DeletedKeys[1] != key {
+
+	endpointsKey := makeServiceEndpointsKey(ns, id)
+	if fakeClient.DeletedKeys[1] != endpointsKey {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[1], key)
 	}
 }
 
 func TestEtcdUpdateService(t *testing.T) {
+	ns := api.NamespaceDefault
+	id := "foo"
+	key := makeServiceKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 
-	resp, _ := fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: id, Namespace: ns}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	testService := api.Service{
-		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+		JSONBase: api.JSONBase{ID: id, Namespace: ns, ResourceVersion: resp.Node.ModifiedIndex},
 		Labels: map[string]string{
 			"baz": "bar",
 		},
@@ -792,7 +869,7 @@ func TestEtcdUpdateService(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	svc, err := registry.GetService("foo")
+	svc, err := registry.GetService(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -807,16 +884,17 @@ func TestEtcdUpdateService(t *testing.T) {
 
 func TestEtcdListEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
-	key := "/registry/services/endpoints"
+	ns := api.NamespaceDefault
+	key := makeServiceEndpointsKey(ns, "")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:8345"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo", Namespace: ns}, Endpoints: []string{"127.0.0.1:8345"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "bar", Namespace: ns}}),
 					},
 				},
 			},
@@ -824,7 +902,7 @@ func TestEtcdListEndpoints(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	services, err := registry.ListEndpoints()
+	services, err := registry.ListEndpoints(ns)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -835,16 +913,20 @@ func TestEtcdListEndpoints(t *testing.T) {
 }
 
 func TestEtcdGetEndpoints(t *testing.T) {
+	id := "foo"
+	ns := api.NamespaceDefault
+	key := makeServiceEndpointsKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := &api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		JSONBase:  api.JSONBase{ID: id, Namespace: ns},
 		Endpoints: []string{"127.0.0.1:34855"},
 	}
 
-	fakeClient.Set("/registry/services/endpoints/foo", runtime.EncodeOrDie(latest.Codec, endpoints), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, endpoints), 0)
 
-	got, err := registry.GetEndpoints("foo")
+	got, err := registry.GetEndpoints(ns, id)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -855,22 +937,26 @@ func TestEtcdGetEndpoints(t *testing.T) {
 }
 
 func TestEtcdUpdateEndpoints(t *testing.T) {
+	id := "foo"
+	ns := api.NamespaceDefault
+	key := makeServiceEndpointsKey(ns, id)
+
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		JSONBase:  api.JSONBase{ID: id, Namespace: ns},
 		Endpoints: []string{"baz", "bar"},
 	}
 
-	fakeClient.Set("/registry/services/endpoints/foo", runtime.EncodeOrDie(latest.Codec, &api.Endpoints{}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Endpoints{}), 0)
 
 	err := registry.UpdateEndpoints(&endpoints)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	response, err := fakeClient.Get("/registry/services/endpoints/foo", false, false)
+	response, err := fakeClient.Get(key, false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

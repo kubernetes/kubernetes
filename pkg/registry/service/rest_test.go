@@ -40,7 +40,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
-	c, _ := storage.Create(svc)
+	c, _ := storage.Create(api.NamespaceDefault, svc)
 	created_svc := <-c
 	created_service := created_svc.(*api.Service)
 	if created_service.ID != "foo" {
@@ -52,7 +52,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(svc.ID)
+	srv, err := registry.GetService(svc.Namespace, svc.ID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -76,14 +76,13 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(&failureCase)
+		c, err := storage.Create(api.NamespaceDefault, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
 		if !errors.IsInvalid(err) {
 			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
-
 	}
 }
 
@@ -91,13 +90,13 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(&api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz1"},
 	})
 	storage := NewREST(registry, nil, nil)
-	c, err := storage.Update(&api.Service{
+	c, err := storage.Update(api.NamespaceDefault, &api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz2"},
 	})
 	if c == nil {
@@ -120,24 +119,24 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(&api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	storage := NewREST(registry, nil, nil)
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			Port:     6502,
-			JSONBase: api.JSONBase{ID: ""},
+			JSONBase: api.JSONBase{ID: "", Namespace: api.NamespaceDefault},
 			Selector: map[string]string{"bar": "baz"},
 		},
 		"empty selector": {
 			Port:     6502,
-			JSONBase: api.JSONBase{ID: "foo"},
+			JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 			Selector: map[string]string{},
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(&failureCase)
+		c, err := storage.Update(api.NamespaceDefault, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -154,16 +153,16 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := &api.Service{
 		Port:                       6502,
-		JSONBase:                   api.JSONBase{ID: "foo"},
+		JSONBase:                   api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
-	c, _ := storage.Create(svc)
+	c, _ := storage.Create(api.NamespaceDefault, svc)
 	<-c
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(svc.ID)
+	srv, err := registry.GetService(svc.Namespace, svc.ID)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -185,7 +184,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
-	c, _ := storage.Create(svc)
+	c, _ := storage.Create(api.NamespaceDefault, svc)
 	<-c
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "get-zone" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -196,16 +195,17 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 }
 
 func TestServiceRegistryDelete(t *testing.T) {
+	namespace := "default"
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	registry.CreateService(svc)
-	c, _ := storage.Delete(svc.ID)
+	c, _ := storage.Delete(namespace, svc.ID)
 	<-c
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -221,12 +221,12 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
 	svc := &api.Service{
-		JSONBase:                   api.JSONBase{ID: "foo"},
+		JSONBase:                   api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
 	registry.CreateService(svc)
-	c, _ := storage.Delete(svc.ID)
+	c, _ := storage.Delete(api.NamespaceDefault, svc.ID)
 	<-c
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -238,7 +238,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 	service := api.Service{
-		JSONBase:      api.JSONBase{ID: "foo-bar"},
+		JSONBase:      api.JSONBase{ID: "foo-bar", Namespace: api.NamespaceDefault},
 		Selector:      map[string]string{"bar": "baz"},
 		ContainerPort: util.IntOrString{Kind: util.IntstrString, StrVal: "a-b-c"},
 	}
@@ -264,10 +264,10 @@ func TestServiceRegistryGet(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
 	registry.CreateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz"},
 	})
-	storage.Get("foo")
+	storage.Get(api.NamespaceDefault, "foo")
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
@@ -283,11 +283,11 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
 	registry.CreateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	redirector := apiserver.Redirector(storage)
-	location, err := redirector.ResourceLocation("foo")
+	location, err := redirector.ResourceLocation(api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -300,7 +300,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 
 	// Test error path
 	registry.Err = fmt.Errorf("fake error")
-	if _, err = redirector.ResourceLocation("foo"); err == nil {
+	if _, err = redirector.ResourceLocation(api.NamespaceDefault, "foo"); err == nil {
 		t.Errorf("unexpected nil error")
 	}
 }
@@ -311,15 +311,15 @@ func TestServiceRegistryList(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
 	registry.CreateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	registry.CreateService(&api.Service{
-		JSONBase: api.JSONBase{ID: "foo2"},
+		JSONBase: api.JSONBase{ID: "foo2", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"bar2": "baz2"},
 	})
 	registry.List.ResourceVersion = 1
-	s, _ := storage.List(labels.Everything(), labels.Everything())
+	s, _ := storage.List(api.NamespaceDefault, labels.Everything(), labels.Everything())
 	sl := s.(*api.ServiceList)
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)

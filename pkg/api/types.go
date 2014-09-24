@@ -233,11 +233,18 @@ type Event struct {
 type JSONBase struct {
 	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
 	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+	Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
+
+// This is the default namespace when not provided by clients
+const NamespaceDefault string = "default"
+
+// This is the default argument to pass when you want resources across all namespaces
+const NamespaceAll string = ""
 
 // PodStatus represents a status of a pod.
 type PodStatus string

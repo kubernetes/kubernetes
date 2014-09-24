@@ -1,5 +1,6 @@
 {
   "id": "example",
+  "namespace": "default",
   "kind": "Service",
   "apiVersion": "v1beta1",
   "port": 8000,

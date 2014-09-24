@@ -40,7 +40,7 @@ func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	}
 }
 
-func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, error) {
+func (r *PodRegistry) ListPodsPredicate(namespace string, filter func(*api.Pod) bool) (*api.PodList, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {
@@ -57,8 +57,8 @@ func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodLis
 	return &pods, nil
 }
 
-func (r *PodRegistry) ListPods(selector labels.Selector) (*api.PodList, error) {
-	return r.ListPodsPredicate(func(pod *api.Pod) bool {
+func (r *PodRegistry) ListPods(namespace string, selector labels.Selector) (*api.PodList, error) {
+	return r.ListPodsPredicate(namespace, func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})
 }
@@ -68,7 +68,7 @@ func (r *PodRegistry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bo
 	return r.mux.Watch(), nil
 }
 
-func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {
+func (r *PodRegistry) GetPod(namespace string, podId string) (*api.Pod, error) {
 	r.Lock()
 	defer r.Unlock()
 	return r.Pod, r.Err
@@ -90,7 +90,7 @@ func (r *PodRegistry) UpdatePod(pod *api.Pod) error {
 	return r.Err
 }
 
-func (r *PodRegistry) DeletePod(podId string) error {
+func (r *PodRegistry) DeletePod(namespace string, podId string) error {
 	r.Lock()
 	defer r.Unlock()
 	r.mux.Action(watch.Deleted, r.Pod)

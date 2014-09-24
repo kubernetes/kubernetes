@@ -231,6 +231,6 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	// TODO: Remove or reduce verbosity by sep 6th, 2014. Leave until then to
 	// make it easy to find scheduling problems.
-	glog.Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
+	glog.Infof("Attempting to bind %v / %v to %v", binding.Namespace, binding.PodID, binding.Host)
 	return b.Post().Path("bindings").Body(binding).Do().Error()
 }
