@@ -106,10 +106,7 @@ func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
 }
 
 func makeHostLink(projectID, zone, host string) string {
-	ix := strings.Index(host, ".")
-	if ix != -1 {
-		host = host[:ix]
-	}
+	host = canonicalizeInstanceName(host)
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
 		projectID, zone, host)
 }
@@ -190,16 +187,21 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	return err
 }
 
+// Take a GCE instance 'hostname' and break it down to something that can be fed
+// to the GCE API client library.  Basically this means reducing 'kubernetes-
+// minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
+func canonicalizeInstanceName(name string) string {
+	ix := strings.Index(name, ".")
+	if ix != -1 {
+		name = name[:ix]
+	}
+	return name
+}
+
 // IPAddress is an implementation of Instances.IPAddress.
 func (gce *GCECloud) IPAddress(instance string) (net.IP, error) {
-	suffix, err := fqdnSuffix()
-	if err != nil {
-		return nil, err
-	}
-	if len(suffix) > 0 {
-		suffix = "." + suffix
-	}
-	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, strings.Replace(instance, suffix, "", 1)).Do()
+	instance = canonicalizeInstanceName(instance)
+	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, instance).Do()
 	if err != nil {
 		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", instance)
 		return nil, err
