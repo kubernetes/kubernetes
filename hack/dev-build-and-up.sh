@@ -17,6 +17,8 @@
 # This script will build a dev release and bring up a new cluster with that
 # release.
 
+set -e
+
 # First build the binaries
 $(dirname $0)/build-go.sh
 if [ "$?" != "0" ]; then

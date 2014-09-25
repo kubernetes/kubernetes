@@ -23,6 +23,16 @@
 # exit on any error
 set -e
 
+gsutil_version=$(gsutil version | awk '{split($0,a," "); print a[3]}')
+
+# Warning! uses lexical comparison.  This really only works for major versions, or minor versions up to x.9
+min_gsutil_version="4.0"
+
+if [[ "$gsutil_version" < "$min_gsutil_version" ]]; then
+  echo "gsutil version $min_gsutil_version or greater is required, please run 'gcloud components upgrade'"
+  exit 1
+fi
+
 SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
 source $SCRIPT_DIR/config.sh
