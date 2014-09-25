@@ -423,12 +423,26 @@ type EndpointsList struct {
 
 func (*EndpointsList) IsAnAPIObject() {}
 
+// NodeResources represents resources on a Kubernetes system node
+// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+type NodeResources struct {
+	// Capacity represents the available resources.
+	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+}
+
+type ResourceName string
+
+// TODO Replace this with a more complete "Quantity" struct
+type ResourceList map[ResourceName]util.IntOrString
+
 // Minion is a worker node in Kubernetenes.
 // The name of the minion according to etcd is in JSONBase.ID.
 type Minion struct {
 	JSONBase `json:",inline" yaml:",inline"`
 	// Queried from cloud provider, if available.
 	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
+	// Resources available on the node
+	NodeResources NodeResources `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
 func (*Minion) IsAnAPIObject() {}
