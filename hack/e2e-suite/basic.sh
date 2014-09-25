@@ -50,7 +50,7 @@ while [ $ALL_RUNNING -ne 1 ]; do
   ALL_RUNNING=1
   for id in $POD_ID_LIST; do
     CURRENT_STATUS=$($KUBECFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
-    if [ "$CURRENT_STATUS" != "true" ]; then
+    if [ "$CURRENT_STATUS" != "{}" ]; then
       ALL_RUNNING=0
     fi
   done

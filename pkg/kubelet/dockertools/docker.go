@@ -228,6 +228,25 @@ func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail str
 	return
 }
 
+func generateContainerStatus(inspectResult *docker.Container) api.ContainerStatus {
+	if inspectResult == nil {
+		// Why did we not get an error?
+		return api.ContainerStatus{}
+	}
+
+	var containerStatus api.ContainerStatus
+
+	if inspectResult.State.Running {
+		containerStatus.State.Running = &api.ContainerStateRunning{}
+	} else {
+		containerStatus.State.Termination = &api.ContainerStateTerminated{
+			ExitCode: inspectResult.State.ExitCode,
+		}
+	}
+	containerStatus.DetailInfo = *inspectResult
+	return containerStatus
+}
+
 // ErrNoContainersInPod is returned when there are no containers for a given pod
 var ErrNoContainersInPod = errors.New("no containers exist for this pod")
 
@@ -249,7 +268,9 @@ func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.Pod
 			continue
 		}
 		// We assume docker return us a list of containers in time order
-		if _, ok := info[dockerContainerName]; ok {
+		if containerStatus, found := info[dockerContainerName]; found {
+			containerStatus.RestartCount += 1
+			info[dockerContainerName] = containerStatus
 			continue
 		}
 
@@ -257,12 +278,7 @@ func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.Pod
 		if err != nil {
 			return nil, err
 		}
-		if inspectResult == nil {
-			// Why did we not get an error?
-			info[dockerContainerName] = docker.Container{}
-		} else {
-			info[dockerContainerName] = *inspectResult
-		}
+		info[dockerContainerName] = generateContainerStatus(inspectResult)
 	}
 	if len(info) == 0 {
 		return nil, ErrNoContainersInPod

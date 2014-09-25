@@ -41,7 +41,11 @@ func (f *FakePodInfoGetter) GetPodInfo(host, id string) (api.PodInfo, error) {
 func TestPodCacheGet(t *testing.T) {
 	cache := NewPodCache(nil, nil)
 
-	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
+	expected := api.PodInfo{
+		"foo": api.ContainerStatus{
+			DetailInfo: docker.Container{ID: "foo"},
+		},
+	}
 	cache.podInfo["foo"] = expected
 
 	info, err := cache.GetPodInfo("host", "foo")
@@ -66,7 +70,11 @@ func TestPodCacheGetMissing(t *testing.T) {
 }
 
 func TestPodGetPodInfoGetter(t *testing.T) {
-	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
+	expected := api.PodInfo{
+		"foo": api.ContainerStatus{
+			DetailInfo: docker.Container{ID: "foo"},
+		},
+	}
 	fake := FakePodInfoGetter{
 		data: expected,
 	}
@@ -98,7 +106,11 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	pods := []api.Pod{pod}
 	mockRegistry := registrytest.NewPodRegistry(&api.PodList{Items: pods})
 
-	expected := api.PodInfo{"foo": docker.Container{ID: "foo"}}
+	expected := api.PodInfo{
+		"foo": api.ContainerStatus{
+			DetailInfo: docker.Container{ID: "foo"},
+		},
+	}
 	fake := FakePodInfoGetter{
 		data: expected,
 	}

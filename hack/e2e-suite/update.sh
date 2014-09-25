@@ -40,10 +40,10 @@ function validate() {
     for id in $POD_ID_LIST; do
       TEMPLATE_STRING="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
       CURRENT_STATUS=$($KUBECFG -template "${TEMPLATE_STRING}" get pods/$id)
-      if [ "$CURRENT_STATUS" != "true" ]; then
+      if [ "$CURRENT_STATUS" != "{}" ]; then
         ALL_RUNNING=0
       else
-        CURRENT_IMAGE=$($KUBECFG -template "{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Config.Image}}" get pods/$id)
+        CURRENT_IMAGE=$($KUBECFG -template "{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").DetailInfo.Config.Image}}" get pods/$id)
         if [ "$CURRENT_IMAGE" != "${DOCKER_HUB_USER}/update-demo:${CONTAINER_IMAGE_VERSION}" ]; then
           ALL_RUNNING=0
         fi

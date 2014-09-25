@@ -196,8 +196,8 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 		pod.CurrentState.Info = info
 		netContainerInfo, ok := info["net"]
 		if ok {
-			if netContainerInfo.NetworkSettings != nil {
-				pod.CurrentState.PodIP = netContainerInfo.NetworkSettings.IPAddress
+			if netContainerInfo.DetailInfo.NetworkSettings != nil {
+				pod.CurrentState.PodIP = netContainerInfo.DetailInfo.NetworkSettings.IPAddress
 			} else {
 				glog.Warningf("No network settings: %#v", netContainerInfo)
 			}
@@ -253,11 +253,13 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 	stopped := 0
 	unknown := 0
 	for _, container := range pod.DesiredState.Manifest.Containers {
-		if info, ok := pod.CurrentState.Info[container.Name]; ok {
-			if info.State.Running {
+		if containerStatus, ok := pod.CurrentState.Info[container.Name]; ok {
+			if containerStatus.State.Running != nil {
 				running++
-			} else {
+			} else if containerStatus.State.Termination != nil {
 				stopped++
+			} else {
+				unknown++
 			}
 		} else {
 			unknown++

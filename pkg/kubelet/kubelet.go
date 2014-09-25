@@ -488,8 +488,8 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 			podFullName, uuid)
 	}
 	netInfo, found := info[networkContainerName]
-	if found && netInfo.NetworkSettings != nil {
-		podState.PodIP = netInfo.NetworkSettings.IPAddress
+	if found && netInfo.DetailInfo.NetworkSettings != nil {
+		podState.PodIP = netInfo.DetailInfo.NetworkSettings.IPAddress
 	}
 
 	for _, container := range pod.Manifest.Containers {

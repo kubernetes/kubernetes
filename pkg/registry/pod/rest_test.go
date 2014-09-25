@@ -360,14 +360,14 @@ func TestMakePodStatus(t *testing.T) {
 	currentState := api.PodState{
 		Host: "machine",
 	}
-	runningState := docker.Container{
-		State: docker.State{
-			Running: true,
+	runningState := api.ContainerStatus{
+		State: api.ContainerState{
+			Running: &api.ContainerStateRunning{},
 		},
 	}
-	stoppedState := docker.Container{
-		State: docker.State{
-			Running: false,
+	stoppedState := api.ContainerStatus{
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{},
 		},
 	}
 
@@ -376,14 +376,7 @@ func TestMakePodStatus(t *testing.T) {
 		status api.PodStatus
 		test   string
 	}{
-		{
-			&api.Pod{
-				DesiredState: desiredState,
-				CurrentState: currentState,
-			},
-			api.PodWaiting,
-			"waiting",
-		},
+		{&api.Pod{DesiredState: desiredState, CurrentState: currentState}, api.PodWaiting, "waiting"},
 		{
 			&api.Pod{
 				DesiredState: desiredState,
@@ -398,7 +391,7 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
-					Info: map[string]docker.Container{
+					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
 						"containerB": runningState,
 					},
@@ -412,7 +405,7 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
-					Info: map[string]docker.Container{
+					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
 						"containerB": runningState,
 					},
@@ -426,7 +419,7 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
-					Info: map[string]docker.Container{
+					Info: map[string]api.ContainerStatus{
 						"containerA": stoppedState,
 						"containerB": stoppedState,
 					},
@@ -440,7 +433,7 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
-					Info: map[string]docker.Container{
+					Info: map[string]api.ContainerStatus{
 						"containerA": stoppedState,
 						"containerB": stoppedState,
 					},
@@ -454,7 +447,7 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
-					Info: map[string]docker.Container{
+					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
 						"containerB": stoppedState,
 					},
@@ -468,7 +461,7 @@ func TestMakePodStatus(t *testing.T) {
 			&api.Pod{
 				DesiredState: desiredState,
 				CurrentState: api.PodState{
-					Info: map[string]docker.Container{
+					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
 					},
 					Host: "machine",
@@ -566,12 +559,14 @@ func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) 
 func TestFillPodInfo(t *testing.T) {
 	expectedIP := "1.2.3.4"
 	fakeGetter := FakePodInfoGetter{
-		info: map[string]docker.Container{
+		info: map[string]api.ContainerStatus{
 			"net": {
-				ID:   "foobar",
-				Path: "bin/run.sh",
-				NetworkSettings: &docker.NetworkSettings{
-					IPAddress: expectedIP,
+				DetailInfo: docker.Container{
+					ID:   "foobar",
+					Path: "bin/run.sh",
+					NetworkSettings: &docker.NetworkSettings{
+						IPAddress: expectedIP,
+					},
 				},
 			},
 		},
@@ -592,10 +587,12 @@ func TestFillPodInfo(t *testing.T) {
 func TestFillPodInfoNoData(t *testing.T) {
 	expectedIP := ""
 	fakeGetter := FakePodInfoGetter{
-		info: map[string]docker.Container{
+		info: map[string]api.ContainerStatus{
 			"net": {
-				ID:   "foobar",
-				Path: "bin/run.sh",
+				DetailInfo: docker.Container{
+					ID:   "foobar",
+					Path: "bin/run.sh",
+				},
 			},
 		},
 	}

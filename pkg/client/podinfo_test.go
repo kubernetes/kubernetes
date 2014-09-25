@@ -32,7 +32,9 @@ import (
 
 func TestHTTPPodInfoGetter(t *testing.T) {
 	expectObj := api.PodInfo{
-		"myID": docker.Container{ID: "myID"},
+		"myID": api.ContainerStatus{
+			DetailInfo: docker.Container{ID: "myID"},
+		},
 	}
 	body, err := json.Marshal(expectObj)
 	if err != nil {
@@ -67,14 +69,17 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 	}
 
 	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
-	if len(gotObj) != len(expectObj) || expectObj["myID"].ID != gotObj["myID"].ID {
+	if len(gotObj) != len(expectObj) ||
+		expectObj["myID"].DetailInfo.ID != gotObj["myID"].DetailInfo.ID {
 		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }
 
 func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 	expectObj := api.PodInfo{
-		"myID": docker.Container{ID: "myID"},
+		"myID": api.ContainerStatus{
+			DetailInfo: docker.Container{ID: "myID"},
+		},
 	}
 	_, err := json.Marshal(expectObj)
 	if err != nil {
