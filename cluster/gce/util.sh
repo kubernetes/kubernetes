@@ -149,6 +149,23 @@ function kube-up {
     grep -v "^#" $(dirname $0)/templates/salt-master.sh
   ) > ${KUBE_TEMP}/master-start.sh
 
+  if ! gcutil getnetwork "${NETWORK}"; then
+    echo "Creating new network for: ${NETWORK}"
+    gcutil addnetwork "${NETWORK}" --range "10.240.0.0/16"
+    gcutil addfirewall "${NETWORK}-default-internal" \
+      --norespect_terminal_width \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --allowed_ip_sources "10.0.0.0/8" \
+      --allowed "tcp:1-65535,udp:1-65535,icmp" &
+    gcutil addfirewall "${NETWORK}-default-ssh" \
+      --norespect_terminal_width \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --allowed_ip_sources "0.0.0.0/0" \
+      --allowed "tcp:22" &
+  fi
+
   echo "Starting VMs and configuring firewalls"
   gcutil addfirewall ${MASTER_NAME}-https \
     --norespect_terminal_width \

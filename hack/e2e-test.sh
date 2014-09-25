@@ -17,6 +17,11 @@
 # Starts a Kubernetes cluster, runs the e2e test suite, and shuts it
 # down.
 
+# Use testing config
+export KUBE_CONFIG_FILE="config-test.sh"
+export KUBE_REPO_ROOT="$(dirname $0)/.."
+export KUBECFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
+
 source $(dirname $0)/../cluster/kube-env.sh
 source $(dirname $0)/../cluster/$KUBERNETES_PROVIDER/util.sh
 
@@ -28,11 +33,6 @@ TEAR_DOWN=${3:-0}
 
 # Exit on error
 set -e
-
-# Use testing config
-export KUBE_CONFIG_FILE="config-test.sh"
-export KUBE_REPO_ROOT="$(dirname $0)/.."
-export KUBECFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
 
 if [[ $TEAR_DOWN -ne 0 ]]; then
   detect-project
