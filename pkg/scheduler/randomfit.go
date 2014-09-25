@@ -17,21 +17,11 @@ limitations under the License.
 package scheduler
 
 import (
-	"fmt"
 	"math/rand"
-	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
-
-// RandomFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
-type RandomFitScheduler struct {
-	podLister  PodLister
-	predicates []FitPredicate
-	random     *rand.Rand
-	randomLock sync.Mutex
-}
 
 // NewRandomFitScheduler creates a random fit scheduler with the default set of fit predicates
 func NewRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
@@ -41,11 +31,7 @@ func NewRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
 // NewRandomFitScheduler creates a random fit scheduler with the specified set of fit predicates.
 // All predicates must be true for the pod to be considered a fit.
 func NewRandomFitSchedulerWithPredicates(podLister PodLister, random *rand.Rand, predicates []FitPredicate) Scheduler {
-	return &RandomFitScheduler{
-		podLister:  podLister,
-		random:     random,
-		predicates: predicates,
-	}
+	return NewGenericScheduler(predicates, evenPriority, podLister, random)
 }
 
 func podFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
@@ -89,39 +75,4 @@ func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	return machineToPods, nil
-}
-
-// Schedule schedules a pod on a random machine which matches its requirement.
-func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
-	machines, err := minionLister.List()
-	if err != nil {
-		return "", err
-	}
-	machineToPods, err := MapPodsToMachines(s.podLister)
-	if err != nil {
-		return "", err
-	}
-	var machineOptions []string
-	for _, machine := range machines {
-		podFits := true
-		for _, predicate := range s.predicates {
-			fits, err := predicate(pod, machineToPods[machine], machine)
-			if err != nil {
-				return "", err
-			}
-			if !fits {
-				podFits = false
-				break
-			}
-		}
-		if podFits {
-			machineOptions = append(machineOptions, machine)
-		}
-	}
-	if len(machineOptions) == 0 {
-		return "", fmt.Errorf("failed to find fit for %#v", pod)
-	}
-	s.randomLock.Lock()
-	defer s.randomLock.Unlock()
-	return machineOptions[s.random.Int()%len(machineOptions)], nil
 }

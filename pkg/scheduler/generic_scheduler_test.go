@@ -29,23 +29,6 @@ func matchesPredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, e
 	return pod.ID == node, nil
 }
 
-func evenPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	nodes, err := minionLister.List()
-	result := []HostPriority{}
-
-	if err != nil {
-		fmt.Errorf("failed to list nodes: %v", err)
-		return []HostPriority{}, err
-	}
-	for _, minion := range nodes {
-		result = append(result, HostPriority{
-			host:  minion,
-			score: 1,
-		})
-	}
-	return result, nil
-}
-
 func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	result := []HostPriority{}

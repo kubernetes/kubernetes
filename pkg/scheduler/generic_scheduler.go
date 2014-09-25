@@ -100,6 +100,23 @@ func getMinHosts(list HostPriorityList) []string {
 	return result
 }
 
+func evenPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	nodes, err := minionLister.List()
+	result := []HostPriority{}
+
+	if err != nil {
+		fmt.Errorf("failed to list nodes: %v", err)
+		return []HostPriority{}, err
+	}
+	for _, minion := range nodes {
+		result = append(result, HostPriority{
+			host:  minion,
+			score: 1,
+		})
+	}
+	return result, nil
+}
+
 func NewGenericScheduler(predicates []FitPredicate, prioritizer PriorityFunction, pods PodLister, random *rand.Rand) Scheduler {
 	return &genericScheduler{
 		predicates:  predicates,
