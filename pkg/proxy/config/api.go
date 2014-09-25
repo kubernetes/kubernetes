@@ -101,7 +101,7 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 		select {
 		case event, ok := <-ch:
 			if !ok {
-				glog.V(2).Infof("WatchServices channel closed")
+				glog.V(4).Infof("WatchServices channel closed")
 				return
 			}
 
@@ -150,7 +150,7 @@ func handleEndpointsWatch(resourceVersion *uint64, ch <-chan watch.Event, update
 		select {
 		case event, ok := <-ch:
 			if !ok {
-				glog.V(2).Infof("WatchEndpoints channel closed")
+				glog.V(4).Infof("WatchEndpoints channel closed")
 				return
 			}
 

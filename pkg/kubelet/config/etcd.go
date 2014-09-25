@@ -54,7 +54,7 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 		helper:  helper,
 		updates: updates,
 	}
-	glog.Infof("Watching etcd for %s", key)
+	glog.V(1).Infof("Watching etcd for %s", key)
 	go util.Forever(source.run, time.Second)
 	return source
 }
@@ -78,7 +78,7 @@ func (s *SourceEtcd) run() {
 				continue
 			}
 
-			glog.Infof("Received state from etcd watch: %+v", pods)
+			glog.V(4).Infof("Received state from etcd watch: %+v", pods)
 			s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
 		}
 	}

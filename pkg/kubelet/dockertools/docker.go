@@ -75,11 +75,11 @@ func NewDockerPuller(client DockerInterface) DockerPuller {
 	if err == nil {
 		cfg.addToKeyring(dp.keyring)
 	} else {
-		glog.Errorf("Unable to parse docker config file: %v", err)
+		glog.Errorf("Unable to parse Docker config file: %v", err)
 	}
 
 	if dp.keyring.count() == 0 {
-		glog.Infof("Continuing with empty docker keyring")
+		glog.V(1).Infof("Continuing with empty Docker keyring")
 	}
 
 	return dp
@@ -348,7 +348,7 @@ func ParseDockerName(name string) (podFullName, uuid, containerName string, hash
 			var err error
 			hash, err = strconv.ParseUint(pieces[1], 16, 32)
 			if err != nil {
-				glog.Infof("invalid container hash: %s", pieces[1])
+				glog.Warningf("invalid container hash: %s", pieces[1])
 			}
 		}
 	}

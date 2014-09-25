@@ -220,7 +220,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		case "TCP":
 			protocol = "/tcp"
 		default:
-			glog.Infof("Unknown protocol '%s': defaulting to TCP", port.Protocol)
+			glog.Warningf("Unknown protocol '%s': defaulting to TCP", port.Protocol)
 			protocol = "/tcp"
 		}
 		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
@@ -345,7 +345,7 @@ func (kl *Kubelet) killContainer(dockerContainer *docker.APIContainers) error {
 }
 
 func (kl *Kubelet) killContainerByID(ID, name string) error {
-	glog.Infof("Killing: %s", ID)
+	glog.V(2).Infof("Killing: %s", ID)
 	err := kl.dockerClient.StopContainer(ID, 10)
 	if len(name) == 0 {
 		return err
@@ -425,7 +425,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 	if networkDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
 		netID = dockertools.DockerID(networkDockerContainer.ID)
 	} else {
-		glog.Infof("Network container doesn't exist, creating")
+		glog.V(3).Infof("Network container doesn't exist, creating")
 		count, err := kl.deleteAllContainers(pod, podFullName, dockerContainers)
 		if err != nil {
 			return err
@@ -468,7 +468,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 		expectedHash := dockertools.HashContainer(&container)
 		if dockerContainer, found, hash := dockerContainers.FindPodContainer(podFullName, uuid, container.Name); found {
 			containerID := dockertools.DockerID(dockerContainer.ID)
-			glog.V(1).Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
+			glog.V(3).Infof("pod %s container %s exists as %v", podFullName, container.Name, containerID)
 
 			// look for changes in the container.
 			if hash == 0 || hash == expectedHash {
@@ -485,7 +485,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 				}
 				glog.V(1).Infof("pod %s container %s is unhealthy.", podFullName, container.Name, healthy)
 			} else {
-				glog.V(1).Infof("container hash changed %d vs %d.", hash, expectedHash)
+				glog.V(3).Infof("container hash changed %d vs %d.", hash, expectedHash)
 			}
 			if err := kl.killContainer(dockerContainer); err != nil {
 				glog.V(1).Infof("Failed to kill container %s: %v", dockerContainer.ID, err)
@@ -503,21 +503,21 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 
 		if len(recentContainers) > 0 && pod.Manifest.RestartPolicy.Always == nil {
 			if pod.Manifest.RestartPolicy.Never != nil {
-				glog.Infof("Already ran container with name %s--%s--%s, do nothing",
+				glog.V(3).Infof("Already ran container with name %s--%s--%s, do nothing",
 					podFullName, uuid, container.Name)
 				continue
 			}
 			if pod.Manifest.RestartPolicy.OnFailure != nil {
 				// Check the exit code of last run
 				if recentContainers[0].State.ExitCode == 0 {
-					glog.Infof("Already successfully ran container with name %s--%s--%s, do nothing",
+					glog.V(3).Infof("Already successfully ran container with name %s--%s--%s, do nothing",
 						podFullName, uuid, container.Name)
 					continue
 				}
 			}
 		}
 
-		glog.Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uuid, container.Name, container)
+		glog.V(3).Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uuid, container.Name, container)
 		if err := kl.dockerPuller.Pull(container.Image); err != nil {
 			glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
 			continue
@@ -579,11 +579,11 @@ func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
 		if _, ok := desiredVolumes[name]; !ok {
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
 			//to be deleted and volumes that are leftover after a crash.
-			glog.Infof("Orphaned volume %s found, tearing down volume", name)
+			glog.Warningf("Orphaned volume %s found, tearing down volume", name)
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
 			err := vol.TearDown()
 			if err != nil {
-				glog.Infof("Could not tear down volume %s (%s)", name, err)
+				glog.Errorf("Could not tear down volume %s (%s)", name, err)
 			}
 		}
 	}
@@ -592,7 +592,7 @@ func (kl *Kubelet) reconcileVolumes(pods []Pod) error {
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(pods []Pod) error {
-	glog.Infof("Desired [%s]: %+v", kl.hostname, pods)
+	glog.V(4).Infof("Desired [%s]: %+v", kl.hostname, pods)
 	var err error
 	desiredContainers := make(map[podContainer]empty)
 
@@ -675,13 +675,13 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		case u := <-updates:
 			switch u.Op {
 			case SET:
-				glog.Infof("Containers changed [%s]", kl.hostname)
+				glog.V(3).Infof("Containers changed [%s]", kl.hostname)
 				pods = u.Pods
 				pods = filterHostPortConflicts(pods)
 
 			case UPDATE:
 				//TODO: implement updates of containers
-				glog.Infof("Containers updated, not implemented [%s]", kl.hostname)
+				glog.Warningf("Containers updated, not implemented [%s]", kl.hostname)
 				continue
 
 			default:

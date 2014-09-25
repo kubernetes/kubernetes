@@ -44,7 +44,7 @@ func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) 
 		updates: updates,
 		data:    nil,
 	}
-	glog.Infof("Watching URL %s", url)
+	glog.V(1).Infof("Watching URL %s", url)
 	go util.Forever(config.run, period)
 	return config
 }

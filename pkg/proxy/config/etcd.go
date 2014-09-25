@@ -121,7 +121,7 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 	response, err := s.client.Get(registryRoot+"/specs", true, false)
 	if err != nil {
 		if tools.IsEtcdNotFound(err) {
-			glog.V(1).Infof("Failed to get the key %s: %v", registryRoot, err)
+			glog.V(4).Infof("Failed to get the key %s: %v", registryRoot, err)
 		} else {
 			glog.Errorf("Failed to contact etcd for key %s: %v", registryRoot, err)
 		}
@@ -144,12 +144,12 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 			endpoints, err := s.GetEndpoints(svc.ID)
 			if err != nil {
 				if tools.IsEtcdNotFound(err) {
-					glog.V(1).Infof("Unable to get endpoints for %s : %v", svc.ID, err)
+					glog.V(4).Infof("Unable to get endpoints for %s : %v", svc.ID, err)
 				}
 				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.ID, err)
 				endpoints = api.Endpoints{}
 			} else {
-				glog.Infof("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
+				glog.V(3).Infof("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
 			}
 			retEndpoints[i] = endpoints
 		}
@@ -186,7 +186,7 @@ func etcdResponseToService(response *etcd.Response) (*api.Service, error) {
 }
 
 func (s ConfigSourceEtcd) WatchForChanges() {
-	glog.Info("Setting up a watch for new services")
+	glog.V(4).Info("Setting up a watch for new services")
 	watchChannel := make(chan *etcd.Response)
 	go s.client.Watch("/registry/services/", 0, true, watchChannel, nil)
 	for {
@@ -199,7 +199,7 @@ func (s ConfigSourceEtcd) WatchForChanges() {
 }
 
 func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
-	glog.Infof("Processing a change in service configuration... %s", *response)
+	glog.V(4).Infof("Processing a change in service configuration... %s", *response)
 
 	// If it's a new service being added (signified by a localport being added)
 	// then process it as such
@@ -212,7 +212,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 			return
 		}
 
-		glog.Infof("New service added/updated: %#v", service)
+		glog.V(4).Infof("New service added/updated: %#v", service)
 		serviceUpdate := ServiceUpdate{Op: ADD, Services: []api.Service{*service}}
 		s.serviceChannel <- serviceUpdate
 		return
@@ -220,17 +220,17 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 	if response.Action == "delete" {
 		parts := strings.Split(response.Node.Key[1:], "/")
 		if len(parts) == 4 {
-			glog.Infof("Deleting service: %s", parts[3])
+			glog.V(4).Infof("Deleting service: %s", parts[3])
 			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{JSONBase: api.JSONBase{ID: parts[3]}}}}
 			s.serviceChannel <- serviceUpdate
 			return
 		}
-		glog.Infof("Unknown service delete: %#v", parts)
+		glog.Warningf("Unknown service delete: %#v", parts)
 	}
 }
 
 func (s ConfigSourceEtcd) ProcessEndpointResponse(response *etcd.Response) {
-	glog.Infof("Processing a change in endpoint configuration... %s", *response)
+	glog.V(4).Infof("Processing a change in endpoint configuration... %s", *response)
 	var endpoints api.Endpoints
 	err := latest.Codec.DecodeInto([]byte(response.Node.Value), &endpoints)
 	if err != nil {

@@ -168,9 +168,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	switch update.Op {
 	case kubelet.ADD, kubelet.UPDATE:
 		if update.Op == kubelet.ADD {
-			glog.Infof("Adding new pods from source %s : %v", source, update.Pods)
+			glog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
 		} else {
-			glog.Infof("Updating pods from source %s : %v", source, update.Pods)
+			glog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
 		}
 
 		filtered := filterInvalidPods(update.Pods, source)
@@ -193,7 +193,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	case kubelet.REMOVE:
-		glog.Infof("Removing a pod %v", update)
+		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
 			name := value.Name
 			if existing, found := pods[name]; found {
@@ -206,7 +206,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	case kubelet.SET:
-		glog.Infof("Setting pods for source %s : %v", source, update)
+		glog.V(4).Infof("Setting pods for source %s : %v", source, update)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
 		pods = make(map[string]*kubelet.Pod)
@@ -238,7 +238,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	default:
-		glog.Infof("Received invalid update type: %v", update)
+		glog.Warningf("Received invalid update type: %v", update)
 
 	}
 
@@ -259,7 +259,7 @@ func filterInvalidPods(pods []kubelet.Pod, source string) (filtered []*kubelet.P
 			errors = append(errors, errs...)
 		}
 		if len(errors) > 0 {
-			glog.Warningf("Pod %d from %s failed validation, ignoring: %v", i+1, source, errors)
+			glog.Warningf("Pod %d (%s) from %s failed validation, ignoring: %v", i+1, pods[i].Name, source, errors)
 			continue
 		}
 		filtered = append(filtered, &pods[i])
