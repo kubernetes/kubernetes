@@ -25,6 +25,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
+func falsePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	return false, nil
+}
+
+func truePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	return true, nil
+}
+
 func matchesPredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	return pod.ID == node, nil
 }
@@ -61,13 +69,13 @@ func TestGenericScheduler(t *testing.T) {
 	}{
 		{
 			predicates:  []FitPredicate{falsePredicate},
-			prioritizer: evenPriority,
+			prioritizer: EqualPriority,
 			nodes:       []string{"machine1", "machine2"},
 			expectsErr:  true,
 		},
 		{
 			predicates:  []FitPredicate{truePredicate},
-			prioritizer: evenPriority,
+			prioritizer: EqualPriority,
 			nodes:       []string{"machine1", "machine2"},
 			// Random choice between both, the rand seeded above with zero, chooses "machine2"
 			expectedHost: "machine2",
@@ -75,7 +83,7 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			// Fits on a machine where the pod ID matches the machine name
 			predicates:   []FitPredicate{matchesPredicate},
-			prioritizer:  evenPriority,
+			prioritizer:  EqualPriority,
 			nodes:        []string{"machine1", "machine2"},
 			pod:          api.Pod{JSONBase: api.JSONBase{ID: "machine2"}},
 			expectedHost: "machine2",

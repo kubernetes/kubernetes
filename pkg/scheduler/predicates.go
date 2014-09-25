@@ -17,24 +17,11 @@ limitations under the License.
 package scheduler
 
 import (
-	"math/rand"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// NewRandomFitScheduler creates a random fit scheduler with the default set of fit predicates
-func NewRandomFitScheduler(podLister PodLister, random *rand.Rand) Scheduler {
-	return NewRandomFitSchedulerWithPredicates(podLister, random, []FitPredicate{podFitsPorts})
-}
-
-// NewRandomFitScheduler creates a random fit scheduler with the specified set of fit predicates.
-// All predicates must be true for the pod to be considered a fit.
-func NewRandomFitSchedulerWithPredicates(podLister PodLister, random *rand.Rand, predicates []FitPredicate) Scheduler {
-	return NewGenericScheduler(predicates, evenPriority, podLister, random)
-}
-
-func podFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	for _, scheduledPod := range existingPods {
 		for _, container := range pod.DesiredState.Manifest.Containers {
 			for _, port := range container.Ports {

@@ -100,7 +100,8 @@ func getMinHosts(list HostPriorityList) []string {
 	return result
 }
 
-func evenPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
+func EqualPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	result := []HostPriority{}
 
