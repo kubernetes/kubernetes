@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -544,53 +543,6 @@ func TestSyncPodUnhealthy(t *testing.T) {
 	if len(fakeDocker.Stopped) != 1 ||
 		!expectedToStop[fakeDocker.Stopped[0]] {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
-	}
-}
-
-func TestEventWriting(t *testing.T) {
-	kubelet, fakeEtcd, _ := newTestKubelet(t)
-	expectedEvent := api.Event{
-		Event: "test",
-		Container: &api.Container{
-			Name: "foo",
-		},
-	}
-	err := kubelet.LogEvent(&expectedEvent)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if fakeEtcd.Ix != 1 {
-		t.Errorf("Unexpected number of children added: %d, expected 1", fakeEtcd.Ix)
-	}
-	response, err := fakeEtcd.Get("/events/foo/1", false, false)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	var event api.Event
-	err = json.Unmarshal([]byte(response.Node.Value), &event)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if event.Event != expectedEvent.Event ||
-		event.Container.Name != expectedEvent.Container.Name {
-		t.Errorf("Event's don't match.  Expected: %#v Saw: %#v", expectedEvent, event)
-	}
-}
-
-func TestEventWritingError(t *testing.T) {
-	kubelet, fakeEtcd, _ := newTestKubelet(t)
-	fakeEtcd.Err = fmt.Errorf("test error")
-	err := kubelet.LogEvent(&api.Event{
-		Event: "test",
-		Container: &api.Container{
-			Name: "foo",
-		},
-	})
-	if err == nil {
-		t.Errorf("Unexpected non-error")
 	}
 }
 

@@ -41,5 +41,7 @@ func init() {
 		&Endpoints{},
 		&EndpointsList{},
 		&Binding{},
+		&Event{},
+		&EventList{},
 	)
 }

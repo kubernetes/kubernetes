@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,7 +35,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/info"
@@ -174,27 +172,9 @@ func (self *podWorkers) Run(podFullName string, action func()) {
 	}()
 }
 
-// LogEvent logs an event to the etcd backend.
+// LogEvent reports an event.
 func (kl *Kubelet) LogEvent(event *api.Event) error {
-	if kl.etcdClient == nil {
-		return fmt.Errorf("no etcd client connection")
-	}
-	event.Timestamp = time.Now().Unix()
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-
-	var response *etcd.Response
-	response, err = kl.etcdClient.AddChild(fmt.Sprintf("/events/%s", event.Container.Name), string(data), 60*60*48 /* 2 days */)
-	// TODO(bburns) : examine response here.
-	if err != nil {
-		glog.Errorf("Error writing event: %s\n", err)
-		if response != nil {
-			glog.Infof("Response was: %v\n", *response)
-		}
-	}
-	return err
+	return nil
 }
 
 func makeEnvironmentVariables(container *api.Container) []string {
@@ -370,18 +350,10 @@ func (kl *Kubelet) killContainerByID(ID, name string) error {
 	if len(name) == 0 {
 		return err
 	}
-	podFullName, uuid, containerName, _ := dockertools.ParseDockerName(name)
-	kl.LogEvent(&api.Event{
-		Event: "STOP",
-		Manifest: &api.ContainerManifest{
-			//TODO: This should be reported using either the apiserver schema or the kubelet schema
-			ID:   podFullName,
-			UUID: uuid,
-		},
-		Container: &api.Container{
-			Name: containerName,
-		},
-	})
+
+	// TODO(lavalamp): restore event logging:
+	// podFullName, uuid, containerName, _ := dockertools.ParseDockerName(name)
+	// kl.LogEvent(&api.Event{})
 
 	return err
 }
