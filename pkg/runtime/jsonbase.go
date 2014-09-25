@@ -21,15 +21,16 @@ import (
 	"reflect"
 )
 
-// NewJSONBaseResourceVersioner returns a resourceVersioner that can set or
+// NewJSONBaseResourceVersioner returns a ResourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from JSONBase.
 func NewJSONBaseResourceVersioner() ResourceVersioner {
-	return &jsonBaseResourceVersioner{}
+	return jsonBaseModifier{}
 }
 
-type jsonBaseResourceVersioner struct{}
+// jsonBaseModifier implements ResourceVersioner and SelfLinker.
+type jsonBaseModifier struct{}
 
-func (v jsonBaseResourceVersioner) ResourceVersion(obj Object) (uint64, error) {
+func (v jsonBaseModifier) ResourceVersion(obj Object) (uint64, error) {
 	json, err := FindJSONBase(obj)
 	if err != nil {
 		return 0, err
@@ -37,13 +38,43 @@ func (v jsonBaseResourceVersioner) ResourceVersion(obj Object) (uint64, error) {
 	return json.ResourceVersion(), nil
 }
 
-func (v jsonBaseResourceVersioner) SetResourceVersion(obj Object, version uint64) error {
+func (v jsonBaseModifier) SetResourceVersion(obj Object, version uint64) error {
 	json, err := FindJSONBase(obj)
 	if err != nil {
 		return err
 	}
 	json.SetResourceVersion(version)
 	return nil
+}
+
+func (v jsonBaseModifier) ID(obj Object) (string, error) {
+	json, err := FindJSONBase(obj)
+	if err != nil {
+		return "", err
+	}
+	return json.ID(), nil
+}
+
+func (v jsonBaseModifier) SelfLink(obj Object) (string, error) {
+	json, err := FindJSONBase(obj)
+	if err != nil {
+		return "", err
+	}
+	return json.SelfLink(), nil
+}
+
+func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
+	json, err := FindJSONBase(obj)
+	if err != nil {
+		return err
+	}
+	json.SetSelfLink(selfLink)
+	return nil
+}
+
+// NewJSONBaseSelfLinker returns a SelfLinker that works on all JSONBase SelfLink fields.
+func NewJSONBaseSelfLinker() SelfLinker {
+	return jsonBaseModifier{}
 }
 
 // JSONBaseInterface lets you work with a JSONBase from any of the versioned or
@@ -57,6 +88,8 @@ type JSONBaseInterface interface {
 	SetKind(kind string)
 	ResourceVersion() uint64
 	SetResourceVersion(version uint64)
+	SelfLink() string
+	SetSelfLink(selfLink string)
 }
 
 type genericJSONBase struct {
@@ -64,6 +97,7 @@ type genericJSONBase struct {
 	apiVersion      *string
 	kind            *string
 	resourceVersion *uint64
+	selfLink        *string
 }
 
 func (g genericJSONBase) ID() string {
@@ -96,6 +130,14 @@ func (g genericJSONBase) ResourceVersion() uint64 {
 
 func (g genericJSONBase) SetResourceVersion(version uint64) {
 	*g.resourceVersion = version
+}
+
+func (g genericJSONBase) SelfLink() string {
+	return *g.selfLink
+}
+
+func (g genericJSONBase) SetSelfLink(selfLink string) {
+	*g.selfLink = selfLink
 }
 
 // fieldPtr puts the address of fieldName, which must be a member of v,
@@ -138,6 +180,9 @@ func newGenericJSONBase(v reflect.Value) (genericJSONBase, error) {
 		return g, err
 	}
 	if err := fieldPtr(v, "ResourceVersion", &g.resourceVersion); err != nil {
+		return g, err
+	}
+	if err := fieldPtr(v, "SelfLink", &g.selfLink); err != nil {
 		return g, err
 	}
 	return g, nil

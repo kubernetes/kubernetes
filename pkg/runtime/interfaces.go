@@ -40,6 +40,15 @@ type ResourceVersioner interface {
 	ResourceVersion(obj Object) (uint64, error)
 }
 
+// SelfLinker provides methods for setting and retrieving the SelfLink field of an API object.
+type SelfLinker interface {
+	SetSelfLink(obj Object, selfLink string) error
+	SelfLink(obj Object) (string, error)
+
+	// Knowing ID is sometimes necssary to use a SelfLinker.
+	ID(obj Object) (string, error)
+}
+
 // All api types must support the Object interface. It's deliberately tiny so that this is not an onerous
 // burden. Implement it with a pointer reciever; this will allow us to use the go compiler to check the
 // one thing about our objects that it's capable of checking for us.
