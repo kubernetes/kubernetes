@@ -20,16 +20,5 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ "${DOCKER_BIN+set}" == "set" ]]; then
-  echo "Using DOCKER_BIN=\"${DOCKER_BIN}\" from the environment."
-elif DOCKER_BIN=$(which docker); then
-  echo "Setting DOCKER_BIN=\"${DOCKER_BIN}\" from host machine."
-else
-  echo "Could not find a working docker binary and none passed in DOCKER_BIN." >&2
-  exit 1
-fi
-
 docker build --rm --force-rm -t kubernetes/guestbook-build .
-docker run --rm -v "${DOCKER_BIN}:/usr/local/bin/docker" \
-                -v "/var/run/docker.sock:/var/run/docker.sock" \
-                -ti --name guestbook-build kubernetes/guestbook-build
+docker run --rm kubernetes/guestbook-build | docker build -t kubernetes/guestbook -
