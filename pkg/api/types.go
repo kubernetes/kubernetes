@@ -620,3 +620,29 @@ type ServerOpList struct {
 }
 
 func (*ServerOpList) IsAnAPIObject() {}
+
+// ComponentPlugin describes a plugin, that is, a component that adds functionality to the core kubernetes
+// system. See docs/plugin-component.md.
+type ComponentPlugin struct {
+	JSONBase `yaml:",inline" json:",inline"`
+
+	// Required. The endpoint this plugin would like to own. Must be unique cluster-wide.
+	// Example: "shardController"
+	ResourceEndpoint string
+
+	// Required. The api versions which this plugin understands.
+	// Example: {"v1beta1", "v1beta2"}
+	APIVersionsUnderstood []string
+
+	// Required. The base URL path to which requests should be forwarded.
+	// Kubernetes api server will expect to append to this the version and the
+	// ResourceEndpoint.
+	// Example: If Destination is "/api", then a constructed path might be
+	// "/api/v1beta1/shardController"
+	Path string
+
+	// Service is the kubernetes service that is serving this plugin.
+	Service string
+}
+
+func (*ComponentPlugin) IsAnAPIObject() {}
