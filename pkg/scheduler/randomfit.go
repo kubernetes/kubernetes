@@ -25,9 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// FitPredicate is a function that indicates if a pod fits into an existing node.
-type FitPredicate func(pod api.Pod, existingPods []api.Pod, node string) (bool, error)
-
 // RandomFitScheduler is a Scheduler which schedules a Pod on a random machine which matches its requirement.
 type RandomFitScheduler struct {
 	podLister  PodLister
@@ -78,21 +75,31 @@ func containsPort(pod api.Pod, port api.Port) bool {
 	return false
 }
 
+// MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
+// and the values are the list of pods running on that host.
+func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
+	machineToPods := map[string][]api.Pod{}
+	// TODO: perform more targeted query...
+	pods, err := lister.ListPods(labels.Everything())
+	if err != nil {
+		return map[string][]api.Pod{}, err
+	}
+	for _, scheduledPod := range pods {
+		host := scheduledPod.CurrentState.Host
+		machineToPods[host] = append(machineToPods[host], scheduledPod)
+	}
+	return machineToPods, nil
+}
+
 // Schedule schedules a pod on a random machine which matches its requirement.
 func (s *RandomFitScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
 	machines, err := minionLister.List()
 	if err != nil {
 		return "", err
 	}
-	machineToPods := map[string][]api.Pod{}
-	// TODO: perform more targeted query...
-	pods, err := s.podLister.ListPods(labels.Everything())
+	machineToPods, err := MapPodsToMachines(s.podLister)
 	if err != nil {
 		return "", err
-	}
-	for _, scheduledPod := range pods {
-		host := scheduledPod.CurrentState.Host
-		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	var machineOptions []string
 	for _, machine := range machines {
