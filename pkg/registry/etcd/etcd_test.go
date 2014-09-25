@@ -410,7 +410,8 @@ func TestEtcdEmptyListPods(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	pods, err := registry.ListPods(labels.Everything())
+	ctx := api.NewContext()
+	pods, err := registry.ListPods(ctx, labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -428,7 +429,8 @@ func TestEtcdListPodsNotFound(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	pods, err := registry.ListPods(labels.Everything())
+	ctx := api.NewContext()
+	pods, err := registry.ListPods(ctx, labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -463,7 +465,8 @@ func TestEtcdListPods(t *testing.T) {
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	pods, err := registry.ListPods(labels.Everything())
+	ctx := api.NewContext()
+	pods, err := registry.ListPods(ctx, labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

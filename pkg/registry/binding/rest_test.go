@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	"code.google.com/p/go.net/context"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -52,24 +54,25 @@ func TestNewREST(t *testing.T) {
 }
 
 func TestRESTUnsupported(t *testing.T) {
+	var ctx context.Context
 	mockRegistry := MockRegistry{
 		OnApplyBinding: func(b *api.Binding) error { return nil },
 	}
 	b := NewREST(mockRegistry)
-	if _, err := b.Delete("binding id"); err == nil {
+	if _, err := b.Delete(ctx, "binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.Update(&api.Binding{PodID: "foo", Host: "new machine"}); err == nil {
+	if _, err := b.Update(ctx, &api.Binding{PodID: "foo", Host: "new machine"}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.Get("binding id"); err == nil {
+	if _, err := b.Get(ctx, "binding id"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := b.List(labels.Set{"name": "foo"}.AsSelector(), labels.Everything()); err == nil {
+	if _, err := b.List(ctx, labels.Set{"name": "foo"}.AsSelector(), labels.Everything()); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	// Try sending wrong object just to get 100% coverage
-	if _, err := b.Create(&api.Pod{}); err == nil {
+	if _, err := b.Create(ctx, &api.Pod{}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -93,8 +96,9 @@ func TestRESTPost(t *testing.T) {
 				return item.err
 			},
 		}
+		ctx := api.NewContext()
 		b := NewREST(mockRegistry)
-		resultChan, err := b.Create(item.b)
+		resultChan, err := b.Create(ctx, item.b)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 			continue

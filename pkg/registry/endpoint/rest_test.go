@@ -34,7 +34,8 @@ func TestGetEndpoints(t *testing.T) {
 		},
 	}
 	storage := NewREST(registry)
-	obj, err := storage.Get("foo")
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -48,9 +49,9 @@ func TestGetEndpointsMissingService(t *testing.T) {
 		Err: errors.NewNotFound("service", "foo"),
 	}
 	storage := NewREST(registry)
-
+	ctx := api.NewContext()
 	// returns service not found
-	_, err := storage.Get("foo")
+	_, err := storage.Get(ctx, "foo")
 	if !errors.IsNotFound(err) || !reflect.DeepEqual(err, errors.NewNotFound("service", "foo")) {
 		t.Errorf("expected NotFound error, got %#v", err)
 	}
@@ -60,7 +61,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	registry.Service = &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 	}
-	obj, err := storage.Get("foo")
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +80,8 @@ func TestEndpointsRegistryList(t *testing.T) {
 			{JSONBase: api.JSONBase{ID: "bar"}},
 		},
 	}
-	s, _ := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	s, _ := storage.List(ctx, labels.Everything(), labels.Everything())
 	sl := s.(*api.EndpointsList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))

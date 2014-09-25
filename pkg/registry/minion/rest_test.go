@@ -27,18 +27,18 @@ import (
 func TestMinionREST(t *testing.T) {
 	m := NewRegistry([]string{"foo", "bar"})
 	ms := NewREST(m)
-
-	if obj, err := ms.Get("foo"); err != nil || obj.(*api.Minion).ID != "foo" {
+	ctx := api.NewContext()
+	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Minion).ID != "foo" {
 		t.Errorf("missing expected object")
 	}
-	if obj, err := ms.Get("bar"); err != nil || obj.(*api.Minion).ID != "bar" {
+	if obj, err := ms.Get(ctx, "bar"); err != nil || obj.(*api.Minion).ID != "bar" {
 		t.Errorf("missing expected object")
 	}
-	if _, err := ms.Get("baz"); err != ErrDoesNotExist {
+	if _, err := ms.Get(ctx, "baz"); err != ErrDoesNotExist {
 		t.Errorf("has unexpected object")
 	}
 
-	c, err := ms.Create(&api.Minion{JSONBase: api.JSONBase{ID: "baz"}})
+	c, err := ms.Create(ctx, &api.Minion{JSONBase: api.JSONBase{ID: "baz"}})
 	if err != nil {
 		t.Errorf("insert failed")
 	}
@@ -46,11 +46,11 @@ func TestMinionREST(t *testing.T) {
 	if m, ok := obj.(*api.Minion); !ok || m.ID != "baz" {
 		t.Errorf("insert return value was weird: %#v", obj)
 	}
-	if obj, err := ms.Get("baz"); err != nil || obj.(*api.Minion).ID != "baz" {
+	if obj, err := ms.Get(ctx, "baz"); err != nil || obj.(*api.Minion).ID != "baz" {
 		t.Errorf("insert didn't actually insert")
 	}
 
-	c, err = ms.Delete("bar")
+	c, err = ms.Delete(ctx, "bar")
 	if err != nil {
 		t.Errorf("delete failed")
 	}
@@ -58,16 +58,16 @@ func TestMinionREST(t *testing.T) {
 	if s, ok := obj.(*api.Status); !ok || s.Status != api.StatusSuccess {
 		t.Errorf("delete return value was weird: %#v", obj)
 	}
-	if _, err := ms.Get("bar"); err != ErrDoesNotExist {
+	if _, err := ms.Get(ctx, "bar"); err != ErrDoesNotExist {
 		t.Errorf("delete didn't actually delete")
 	}
 
-	_, err = ms.Delete("bar")
+	_, err = ms.Delete(ctx, "bar")
 	if err != ErrDoesNotExist {
 		t.Errorf("delete returned wrong error")
 	}
 
-	list, err := ms.List(labels.Everything(), labels.Everything())
+	list, err := ms.List(ctx, labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("got error calling List")
 	}
