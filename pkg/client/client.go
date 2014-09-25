@@ -108,12 +108,12 @@ func New(host, version string, auth *AuthInfo) (*Client, error) {
 		// TODO: implement version negotation (highest version supported by server)
 		version = latest.Version
 	}
-	serverCodec, _, err := latest.InterfacesFor(version)
+	versionInterfaces, err := latest.InterfacesFor(version)
 	if err != nil {
 		return nil, fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
 	}
 	prefix := fmt.Sprintf("/api/%s/", version)
-	restClient, err := NewRESTClient(host, auth, prefix, serverCodec)
+	restClient, err := NewRESTClient(host, auth, prefix, versionInterfaces.Codec)
 	if err != nil {
 		return nil, fmt.Errorf("API URL '%s' is not valid: %v", host, err)
 	}
