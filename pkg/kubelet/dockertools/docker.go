@@ -169,7 +169,10 @@ func GetKubeletDockerContainers(client DockerInterface) (DockerContainers, error
 		container := &containers[i]
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
-		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
+		// TODO(dchen1107): Remove the old separator "--" by end of Oct
+		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") &&
+			!strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
+			glog.Infof("Docker Container:%s is not managed by kubelet.", container.Names[0])
 			continue
 		}
 		result[DockerID(container.ID)] = container
@@ -287,20 +290,6 @@ func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.Pod
 	return info, nil
 }
 
-// Converts "-" to "_-_" and "_" to "___" so that we can use "--" to meaningfully separate parts of a docker name.
-func escapeDash(in string) (out string) {
-	out = strings.Replace(in, "_", "___", -1)
-	out = strings.Replace(out, "-", "_-_", -1)
-	return
-}
-
-// Reverses the transformation of escapeDash.
-func unescapeDash(in string) (out string) {
-	out = strings.Replace(in, "_-_", "-", -1)
-	out = strings.Replace(out, "___", "_", -1)
-	return
-}
-
 const containerNamePrefix = "k8s"
 
 func HashContainer(container *api.Container) uint64 {
@@ -311,20 +300,20 @@ func HashContainer(container *api.Container) uint64 {
 
 // Creates a name which can be reversed to identify both full pod name and container name.
 func BuildDockerName(manifestUUID, podFullName string, container *api.Container) string {
-	containerName := escapeDash(container.Name) + "." + strconv.FormatUint(HashContainer(container), 16)
+	containerName := container.Name + "." + strconv.FormatUint(HashContainer(container), 16)
 	// Note, manifest.ID could be blank.
 	if len(manifestUUID) == 0 {
-		return fmt.Sprintf("%s--%s--%s--%08x",
+		return fmt.Sprintf("%s_%s_%s_%08x",
 			containerNamePrefix,
 			containerName,
-			escapeDash(podFullName),
+			podFullName,
 			rand.Uint32())
 	} else {
-		return fmt.Sprintf("%s--%s--%s--%s--%08x",
+		return fmt.Sprintf("%s_%s_%s_%s_%08x",
 			containerNamePrefix,
 			containerName,
-			escapeDash(podFullName),
-			escapeDash(manifestUUID),
+			podFullName,
+			manifestUUID,
 			rand.Uint32())
 	}
 }
@@ -337,13 +326,13 @@ func ParseDockerName(name string) (podFullName, uuid, containerName string, hash
 	if name[0] == '/' {
 		name = name[1:]
 	}
-	parts := strings.Split(name, "--")
+	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
 		return
 	}
 	if len(parts) > 1 {
 		pieces := strings.Split(parts[1], ".")
-		containerName = unescapeDash(pieces[0])
+		containerName = pieces[0]
 		if len(pieces) > 1 {
 			var err error
 			hash, err = strconv.ParseUint(pieces[1], 16, 32)
@@ -353,10 +342,10 @@ func ParseDockerName(name string) (podFullName, uuid, containerName string, hash
 		}
 	}
 	if len(parts) > 2 {
-		podFullName = unescapeDash(parts[2])
+		podFullName = parts[2]
 	}
 	if len(parts) > 4 {
-		uuid = unescapeDash(parts[3])
+		uuid = parts[3]
 	}
 	return
 }
