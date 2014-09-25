@@ -29,6 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+
+	"code.google.com/p/go.net/context"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
@@ -55,7 +57,7 @@ func makePodKey(podID string) string {
 }
 
 // ListPods obtains a list of pods with labels that match selector.
-func (r *Registry) ListPods(selector labels.Selector) (*api.PodList, error) {
+func (r *Registry) ListPods(ctx context.Context, selector labels.Selector) (*api.PodList, error) {
 	return r.ListPodsPredicate(func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})

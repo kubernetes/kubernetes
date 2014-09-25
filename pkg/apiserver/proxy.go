@@ -26,6 +26,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -76,6 +77,7 @@ type ProxyHandler struct {
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := api.NewContext()
 	parts := strings.SplitN(req.URL.Path, "/", 3)
 	if len(parts) < 2 {
 		notFound(w, req)
@@ -101,7 +103,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, err := redirector.ResourceLocation(id)
+	location, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)

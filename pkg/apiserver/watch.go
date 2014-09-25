@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"code.google.com/p/go.net/websocket"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -61,6 +62,7 @@ func isWebsocketRequest(req *http.Request) bool {
 
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := api.NewContext()
 	parts := splitPath(req.URL.Path)
 	if len(parts) < 1 || req.Method != "GET" {
 		notFound(w, req)
@@ -73,7 +75,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
 		label, field, resourceVersion := getWatchParams(req.URL.Query())
-		watching, err := watcher.Watch(label, field, resourceVersion)
+		watching, err := watcher.Watch(ctx, label, field, resourceVersion)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return

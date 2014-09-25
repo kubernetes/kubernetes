@@ -30,11 +30,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"code.google.com/p/go-uuid/uuid"
+	"code.google.com/p/go.net/context"
 )
 
 // PodLister is anything that knows how to list pods.
 type PodLister interface {
-	ListPods(labels.Selector) (*api.PodList, error)
+	ListPods(ctx context.Context, labels labels.Selector) (*api.PodList, error)
 }
 
 // REST implements apiserver.RESTStorage for the replication controller service.
@@ -54,7 +55,7 @@ func NewREST(registry Registry, podLister PodLister) *REST {
 }
 
 // Create registers the given ReplicationController.
-func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -80,24 +81,24 @@ func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
-func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx context.Context, id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(id)
 	}), nil
 }
 
 // Get obtains the ReplicationController specified by its id.
-func (rs *REST) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(ctx context.Context, id string) (runtime.Object, error) {
 	controller, err := rs.registry.GetController(id)
 	if err != nil {
 		return nil, err
 	}
-	rs.fillCurrentState(controller)
+	rs.fillCurrentState(ctx, controller)
 	return controller, err
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx context.Context, label, field labels.Selector) (runtime.Object, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -108,7 +109,7 @@ func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
 	filtered := []api.ReplicationController{}
 	for _, controller := range controllers.Items {
 		if label.Matches(labels.Set(controller.Labels)) {
-			rs.fillCurrentState(&controller)
+			rs.fillCurrentState(ctx, &controller)
 			filtered = append(filtered, controller)
 		}
 	}
@@ -123,7 +124,7 @@ func (*REST) New() runtime.Object {
 
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
-func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -142,7 +143,7 @@ func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 
 // Watch returns ReplicationController events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx context.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}
@@ -160,15 +161,15 @@ func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (wat
 		}
 		match := label.Matches(labels.Set(repController.Labels))
 		if match {
-			rs.fillCurrentState(repController)
+			rs.fillCurrentState(ctx, repController)
 		}
 		return e, match
 	}), nil
 }
 
-func (rs *REST) waitForController(ctrl *api.ReplicationController) (runtime.Object, error) {
+func (rs *REST) waitForController(ctx context.Context, ctrl *api.ReplicationController) (runtime.Object, error) {
 	for {
-		pods, err := rs.podLister.ListPods(labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
 		if err != nil {
 			return ctrl, err
 		}
@@ -180,11 +181,11 @@ func (rs *REST) waitForController(ctrl *api.ReplicationController) (runtime.Obje
 	return ctrl, nil
 }
 
-func (rs *REST) fillCurrentState(ctrl *api.ReplicationController) error {
+func (rs *REST) fillCurrentState(ctx context.Context, ctrl *api.ReplicationController) error {
 	if rs.podLister == nil {
 		return nil
 	}
-	list, err := rs.podLister.ListPods(labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+	list, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
 	if err != nil {
 		return err
 	}
