@@ -150,8 +150,14 @@ func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (wat
 	if err != nil {
 		return nil, err
 	}
+	// TODO(lavalamp): remove watch.Filter, which is broken. Implement consistent way of filtering.
+	// TODO(lavalamp): this watch method needs a test.
 	return watch.Filter(incoming, func(e watch.Event) (watch.Event, bool) {
-		repController := e.Object.(*api.ReplicationController)
+		repController, ok := e.Object.(*api.ReplicationController)
+		if !ok {
+			// must be an error event-- pass it on
+			return e, true
+		}
 		match := label.Matches(labels.Set(repController.Labels))
 		if match {
 			rs.fillCurrentState(repController)

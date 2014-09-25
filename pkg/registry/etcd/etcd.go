@@ -85,12 +85,13 @@ func (r *Registry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, 
 // WatchPods begins watching for new, changed, or deleted pods.
 func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
 	return r.WatchList("/registry/pods", resourceVersion, func(obj runtime.Object) bool {
-		pod, ok := obj.(*api.Pod)
-		if !ok {
-			glog.Errorf("Unexpected object during pod watch: %#v", obj)
-			return false
+		switch t := obj.(type) {
+		case *api.Pod:
+			return filter(t)
+		default:
+			// Must be an error
+			return true
 		}
-		return filter(pod)
 	})
 }
 
