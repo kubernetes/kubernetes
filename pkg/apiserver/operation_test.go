@@ -35,7 +35,8 @@ func TestOperation(t *testing.T) {
 	ops := NewOperations()
 
 	c := make(chan runtime.Object)
-	op := ops.NewOperation(c)
+	called := make(chan struct{})
+	op := ops.NewOperation(c, func(runtime.Object) { go close(called) })
 	// Allow context switch, so that op's ID can get added to the map and Get will work.
 	// This is just so we can test Get. Ordinary users have no need to call Get immediately
 	// after calling NewOperation, because it returns the operation directly.
@@ -70,6 +71,11 @@ func TestOperation(t *testing.T) {
 	op.WaitFor(time.Minute)
 	if _, completed := op.StatusOrResult(); !completed {
 		t.Errorf("Unexpectedly slow completion")
+	}
+
+	_, open := <-called
+	if open {
+		t.Errorf("expected hook to be called!")
 	}
 
 	time.Sleep(100 * time.Millisecond)
@@ -107,7 +113,7 @@ func TestOperationsList(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version")
+	}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}
@@ -163,7 +169,7 @@ func TestOpGet(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version")
+	}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	client := http.Client{}

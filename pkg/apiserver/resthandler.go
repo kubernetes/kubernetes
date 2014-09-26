@@ -18,19 +18,24 @@ package apiserver
 
 import (
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+
+	"github.com/golang/glog"
 )
 
 type RESTHandler struct {
-	storage     map[string]RESTStorage
-	codec       runtime.Codec
-	ops         *Operations
-	asyncOpWait time.Duration
+	storage         map[string]RESTStorage
+	codec           runtime.Codec
+	canonicalPrefix string
+	selfLinker      runtime.SelfLinker
+	ops             *Operations
+	asyncOpWait     time.Duration
 }
 
 // ServeHTTP handles requests to all RESTStorage objects.
@@ -48,6 +53,37 @@ func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	h.handleRESTStorage(parts, req, w, storage)
+}
+
+// Sets the SelfLink field of the object.
+func (h *RESTHandler) setSelfLink(obj runtime.Object, req *http.Request) error {
+	newURL := *req.URL
+	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path)
+	newURL.RawQuery = ""
+	newURL.Fragment = ""
+	return h.selfLinker.SetSelfLink(obj, newURL.String())
+}
+
+// Like setSelfLink, but appends the object's id.
+func (h *RESTHandler) setSelfLinkAddID(obj runtime.Object, req *http.Request) error {
+	id, err := h.selfLinker.ID(obj)
+	if err != nil {
+		return err
+	}
+	newURL := *req.URL
+	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, id)
+	newURL.RawQuery = ""
+	newURL.Fragment = ""
+	return h.selfLinker.SetSelfLink(obj, newURL.String())
+}
+
+// curry adapts either of the self link setting functions into a function appropriate for operation's hook.
+func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(runtime.Object) {
+	return func(obj runtime.Object) {
+		if err := f(obj, req); err != nil {
+			glog.Errorf("unable to set self link for %#v: %v", obj, err)
+		}
+	}
 }
 
 // handleRESTStorage is the main dispatcher for a storage object.  It switches on the HTTP method, and then
@@ -86,10 +122,18 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 				errorJSON(err, h.codec, w)
 				return
 			}
+			if err := h.setSelfLink(list, req); err != nil {
+				errorJSON(err, h.codec, w)
+				return
+			}
 			writeJSON(http.StatusOK, h.codec, list, w)
 		case 2:
 			item, err := storage.Get(ctx, parts[1])
 			if err != nil {
+				errorJSON(err, h.codec, w)
+				return
+			}
+			if err := h.setSelfLink(item, req); err != nil {
 				errorJSON(err, h.codec, w)
 				return
 			}
@@ -119,7 +163,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout)
+		op := h.createOperation(out, sync, timeout, curry(h.setSelfLinkAddID, req))
 		h.finishReq(op, req, w)
 
 	case "DELETE":
@@ -132,7 +176,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout)
+		op := h.createOperation(out, sync, timeout, nil)
 		h.finishReq(op, req, w)
 
 	case "PUT":
@@ -156,7 +200,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout)
+		op := h.createOperation(out, sync, timeout, curry(h.setSelfLink, req))
 		h.finishReq(op, req, w)
 
 	default:
@@ -165,8 +209,8 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 }
 
 // createOperation creates an operation to process a channel response.
-func (h *RESTHandler) createOperation(out <-chan runtime.Object, sync bool, timeout time.Duration) *Operation {
-	op := h.ops.NewOperation(out)
+func (h *RESTHandler) createOperation(out <-chan runtime.Object, sync bool, timeout time.Duration, onReceive func(runtime.Object)) *Operation {
+	op := h.ops.NewOperation(out, onReceive)
 	if sync {
 		op.WaitFor(timeout)
 	} else if h.asyncOpWait != 0 {

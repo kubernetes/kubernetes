@@ -45,11 +45,11 @@ const (
 	StatusUnprocessableEntity = 422
 )
 
-// Handle returns a Handler function that expose the provided storage interfaces
+// Handle returns a Handler function that exposes the provided storage interfaces
 // as RESTful resources at prefix, serialized by codec, and also includes the support
 // http resources.
-func Handle(storage map[string]RESTStorage, codec runtime.Codec, prefix string) http.Handler {
-	group := NewAPIGroup(storage, codec)
+func Handle(storage map[string]RESTStorage, codec runtime.Codec, prefix string, selfLinker runtime.SelfLinker) http.Handler {
+	group := NewAPIGroup(storage, codec, prefix, selfLinker)
 
 	mux := http.NewServeMux()
 	group.InstallREST(mux, prefix)
@@ -72,11 +72,13 @@ type APIGroup struct {
 // This is a helper method for registering multiple sets of REST handlers under different
 // prefixes onto a server.
 // TODO: add multitype codec serialization
-func NewAPIGroup(storage map[string]RESTStorage, codec runtime.Codec) *APIGroup {
+func NewAPIGroup(storage map[string]RESTStorage, codec runtime.Codec, canonicalPrefix string, selfLinker runtime.SelfLinker) *APIGroup {
 	return &APIGroup{RESTHandler{
-		storage: storage,
-		codec:   codec,
-		ops:     NewOperations(),
+		storage:         storage,
+		codec:           codec,
+		canonicalPrefix: canonicalPrefix,
+		selfLinker:      selfLinker,
+		ops:             NewOperations(),
 		// Delay just long enough to handle most simple write operations
 		asyncOpWait: time.Millisecond * 25,
 	}}
