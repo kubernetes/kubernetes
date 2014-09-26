@@ -81,21 +81,21 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	pod.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.CreatePod(pod); err != nil {
+		if err := rs.registry.CreatePod(ctx, pod); err != nil {
 			return nil, err
 		}
-		return rs.registry.GetPod(pod.ID)
+		return rs.registry.GetPod(ctx, pod.ID)
 	}), nil
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(ctx, id)
 	}), nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	pod, err := rs.registry.GetPod(id)
+	pod, err := rs.registry.GetPod(ctx, id)
 	if err != nil {
 		return pod, err
 	}
@@ -132,7 +132,7 @@ func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
 }
 
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	pods, err := rs.registry.ListPodsPredicate(rs.filterFunc(label, field))
+	pods, err := rs.registry.ListPodsPredicate(ctx, rs.filterFunc(label, field))
 	if err == nil {
 		for i := range pods.Items {
 			pod := &pods.Items[i]
@@ -150,7 +150,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 
 // Watch begins watching for new, changed, or deleted pods.
 func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return rs.registry.WatchPods(resourceVersion, rs.filterFunc(label, field))
+	return rs.registry.WatchPods(ctx, resourceVersion, rs.filterFunc(label, field))
 }
 
 func (*REST) New() runtime.Object {
@@ -163,10 +163,10 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.UpdatePod(pod); err != nil {
+		if err := rs.registry.UpdatePod(ctx, pod); err != nil {
 			return nil, err
 		}
-		return rs.registry.GetPod(pod.ID)
+		return rs.registry.GetPod(ctx, pod.ID)
 	}), nil
 }
 

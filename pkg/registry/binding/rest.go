@@ -67,7 +67,7 @@ func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Objec
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := b.registry.ApplyBinding(binding); err != nil {
+		if err := b.registry.ApplyBinding(ctx, binding); err != nil {
 			return nil, err
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil

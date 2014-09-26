@@ -56,13 +56,13 @@ func makePodKey(podID string) string {
 
 // ListPods obtains a list of pods with labels that match selector.
 func (r *Registry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
-	return r.ListPodsPredicate(func(pod *api.Pod) bool {
+	return r.ListPodsPredicate(ctx, func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})
 }
 
 // ListPodsPredicate obtains a list of pods that match filter.
-func (r *Registry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, error) {
+func (r *Registry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool) (*api.PodList, error) {
 	allPods := api.PodList{}
 	err := r.ExtractList("/registry/pods", &allPods.Items, &allPods.ResourceVersion)
 	if err != nil {
@@ -83,7 +83,7 @@ func (r *Registry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, 
 }
 
 // WatchPods begins watching for new, changed, or deleted pods.
-func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
+func (r *Registry) WatchPods(ctx api.Context, resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
 	return r.WatchList("/registry/pods", resourceVersion, func(obj runtime.Object) bool {
 		switch t := obj.(type) {
 		case *api.Pod:
@@ -96,7 +96,7 @@ func (r *Registry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool)
 }
 
 // GetPod gets a specific pod specified by its ID.
-func (r *Registry) GetPod(podID string) (*api.Pod, error) {
+func (r *Registry) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
 	var pod api.Pod
 	if err := r.ExtractObj(makePodKey(podID), &pod, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, "pod", podID)
@@ -113,7 +113,7 @@ func makeContainerKey(machine string) string {
 }
 
 // CreatePod creates a pod based on a specification.
-func (r *Registry) CreatePod(pod *api.Pod) error {
+func (r *Registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	// Set current status to "Waiting".
 	pod.CurrentState.Status = api.PodWaiting
 	pod.CurrentState.Host = ""
@@ -125,7 +125,7 @@ func (r *Registry) CreatePod(pod *api.Pod) error {
 }
 
 // ApplyBinding implements binding's registry
-func (r *Registry) ApplyBinding(binding *api.Binding) error {
+func (r *Registry) ApplyBinding(ctx api.Context, binding *api.Binding) error {
 	return etcderr.InterpretCreateError(r.assignPod(binding.PodID, binding.Host), "binding", "")
 }
 
@@ -178,12 +178,12 @@ func (r *Registry) assignPod(podID string, machine string) error {
 	return err
 }
 
-func (r *Registry) UpdatePod(pod *api.Pod) error {
+func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	return fmt.Errorf("unimplemented!")
 }
 
 // DeletePod deletes an existing pod specified by its ID.
-func (r *Registry) DeletePod(podID string) error {
+func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 	var pod api.Pod
 	podKey := makePodKey(podID)
 	err := r.ExtractObj(podKey, &pod, false)
@@ -226,14 +226,14 @@ func (r *Registry) DeletePod(podID string) error {
 }
 
 // ListControllers obtains a list of ReplicationControllers.
-func (r *Registry) ListControllers() (*api.ReplicationControllerList, error) {
+func (r *Registry) ListControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
 	controllers := &api.ReplicationControllerList{}
 	err := r.ExtractList("/registry/controllers", &controllers.Items, &controllers.ResourceVersion)
 	return controllers, err
 }
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
-func (r *Registry) WatchControllers(resourceVersion uint64) (watch.Interface, error) {
+func (r *Registry) WatchControllers(ctx api.Context, resourceVersion uint64) (watch.Interface, error) {
 	return r.WatchList("/registry/controllers", resourceVersion, tools.Everything)
 }
 
@@ -242,7 +242,7 @@ func makeControllerKey(id string) string {
 }
 
 // GetController gets a specific ReplicationController specified by its ID.
-func (r *Registry) GetController(controllerID string) (*api.ReplicationController, error) {
+func (r *Registry) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
 	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
 	err := r.ExtractObj(key, &controller, false)
@@ -253,19 +253,19 @@ func (r *Registry) GetController(controllerID string) (*api.ReplicationControlle
 }
 
 // CreateController creates a new ReplicationController.
-func (r *Registry) CreateController(controller *api.ReplicationController) error {
+func (r *Registry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
 	err := r.CreateObj(makeControllerKey(controller.ID), controller, 0)
 	return etcderr.InterpretCreateError(err, "replicationController", controller.ID)
 }
 
 // UpdateController replaces an existing ReplicationController.
-func (r *Registry) UpdateController(controller *api.ReplicationController) error {
+func (r *Registry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
 	err := r.SetObj(makeControllerKey(controller.ID), controller)
 	return etcderr.InterpretUpdateError(err, "replicationController", controller.ID)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
-func (r *Registry) DeleteController(controllerID string) error {
+func (r *Registry) DeleteController(ctx api.Context, controllerID string) error {
 	key := makeControllerKey(controllerID)
 	err := r.Delete(key, false)
 	return etcderr.InterpretDeleteError(err, "replicationController", controllerID)
@@ -276,20 +276,20 @@ func makeServiceKey(name string) string {
 }
 
 // ListServices obtains a list of Services.
-func (r *Registry) ListServices() (*api.ServiceList, error) {
+func (r *Registry) ListServices(ctx api.Context) (*api.ServiceList, error) {
 	list := &api.ServiceList{}
 	err := r.ExtractList("/registry/services/specs", &list.Items, &list.ResourceVersion)
 	return list, err
 }
 
 // CreateService creates a new Service.
-func (r *Registry) CreateService(svc *api.Service) error {
+func (r *Registry) CreateService(ctx api.Context, svc *api.Service) error {
 	err := r.CreateObj(makeServiceKey(svc.ID), svc, 0)
 	return etcderr.InterpretCreateError(err, "service", svc.ID)
 }
 
 // GetService obtains a Service specified by its name.
-func (r *Registry) GetService(name string) (*api.Service, error) {
+func (r *Registry) GetService(ctx api.Context, name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	var svc api.Service
 	err := r.ExtractObj(key, &svc, false)
@@ -300,7 +300,7 @@ func (r *Registry) GetService(name string) (*api.Service, error) {
 }
 
 // GetEndpoints obtains the endpoints for the service identified by 'name'.
-func (r *Registry) GetEndpoints(name string) (*api.Endpoints, error) {
+func (r *Registry) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error) {
 	key := makeServiceEndpointsKey(name)
 	var endpoints api.Endpoints
 	err := r.ExtractObj(key, &endpoints, false)
@@ -315,7 +315,7 @@ func makeServiceEndpointsKey(name string) string {
 }
 
 // DeleteService deletes a Service specified by its name.
-func (r *Registry) DeleteService(name string) error {
+func (r *Registry) DeleteService(ctx api.Context, name string) error {
 	key := makeServiceKey(name)
 	err := r.Delete(key, true)
 	if err != nil {
@@ -332,13 +332,13 @@ func (r *Registry) DeleteService(name string) error {
 }
 
 // UpdateService replaces an existing Service.
-func (r *Registry) UpdateService(svc *api.Service) error {
+func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) error {
 	err := r.SetObj(makeServiceKey(svc.ID), svc)
 	return etcderr.InterpretUpdateError(err, "service", svc.ID)
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
-func (r *Registry) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (r *Registry) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	if !label.Empty() {
 		return nil, fmt.Errorf("label selectors are not supported on services")
 	}
@@ -352,14 +352,14 @@ func (r *Registry) WatchServices(label, field labels.Selector, resourceVersion u
 }
 
 // ListEndpoints obtains a list of Services.
-func (r *Registry) ListEndpoints() (*api.EndpointsList, error) {
+func (r *Registry) ListEndpoints(ctx api.Context) (*api.EndpointsList, error) {
 	list := &api.EndpointsList{}
 	err := r.ExtractList("/registry/services/endpoints", &list.Items, &list.ResourceVersion)
 	return list, err
 }
 
 // UpdateEndpoints update Endpoints of a Service.
-func (r *Registry) UpdateEndpoints(e *api.Endpoints) error {
+func (r *Registry) UpdateEndpoints(ctx api.Context, e *api.Endpoints) error {
 	// TODO: this is a really bad misuse of AtomicUpdate, need to compute a diff inside the loop.
 	err := r.AtomicUpdate(makeServiceEndpointsKey(e.ID), &api.Endpoints{},
 		func(input runtime.Object) (runtime.Object, error) {
@@ -370,7 +370,7 @@ func (r *Registry) UpdateEndpoints(e *api.Endpoints) error {
 }
 
 // WatchEndpoints begins watching for new, changed, or deleted endpoint configurations.
-func (r *Registry) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	if !label.Empty() {
 		return nil, fmt.Errorf("label selectors are not supported on endpoints")
 	}

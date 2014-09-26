@@ -53,7 +53,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(svc.ID)
+	srv, err := registry.GetService(ctx, svc.ID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -90,14 +90,14 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 }
 
 func TestServiceRegistryUpdate(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
-	registry.CreateService(&api.Service{
+	registry.CreateService(ctx, &api.Service{
 		Port:     6502,
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz1"},
 	})
 	storage := NewREST(registry, nil, nil)
-	ctx := api.NewContext()
 	c, err := storage.Update(ctx, &api.Service{
 		Port:     6502,
 		JSONBase: api.JSONBase{ID: "foo"},
@@ -120,8 +120,9 @@ func TestServiceRegistryUpdate(t *testing.T) {
 }
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
-	registry.CreateService(&api.Service{
+	registry.CreateService(ctx, &api.Service{
 		Port:     6502,
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -139,7 +140,6 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 			Selector: map[string]string{},
 		},
 	}
-	ctx := api.NewContext()
 	for _, failureCase := range failureCases {
 		c, err := storage.Update(ctx, &failureCase)
 		if c != nil {
@@ -152,6 +152,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryExternalService(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
@@ -162,13 +163,12 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
-	ctx := api.NewContext()
 	c, _ := storage.Create(ctx, svc)
 	<-c
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(svc.ID)
+	srv, err := registry.GetService(ctx, svc.ID)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -202,6 +202,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 }
 
 func TestServiceRegistryDelete(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
@@ -210,8 +211,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
-	ctx := api.NewContext()
-	registry.CreateService(svc)
+	registry.CreateService(ctx, svc)
 	c, _ := storage.Delete(ctx, svc.ID)
 	<-c
 	if len(fakeCloud.Calls) != 0 {
@@ -223,6 +223,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 }
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
@@ -232,8 +233,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
-	ctx := api.NewContext()
-	registry.CreateService(svc)
+	registry.CreateService(ctx, svc)
 	c, _ := storage.Delete(ctx, svc.ID)
 	<-c
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
@@ -245,6 +245,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 }
 
 func TestServiceRegistryMakeLinkVariables(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	registry.List = api.ServiceList{
 		Items: []api.Service{
@@ -269,7 +270,7 @@ func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 		},
 	}
 	machine := "machine"
-	vars, err := GetServiceEnvironmentVariables(registry, machine)
+	vars, err := GetServiceEnvironmentVariables(ctx, registry, machine)
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
 	}
@@ -309,15 +310,15 @@ func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 }
 
 func TestServiceRegistryGet(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
-	registry.CreateService(&api.Service{
+	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
-	ctx := api.NewContext()
 	storage.Get(ctx, "foo")
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -328,13 +329,13 @@ func TestServiceRegistryGet(t *testing.T) {
 }
 
 func TestServiceRegistryResourceLocation(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	registry.Endpoints = api.Endpoints{Endpoints: []string{"foo:80"}}
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
-	ctx := api.NewContext()
-	registry.CreateService(&api.Service{
+	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
@@ -358,20 +359,20 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 }
 
 func TestServiceRegistryList(t *testing.T) {
+	ctx := api.NewContext()
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
-	registry.CreateService(&api.Service{
+	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
-	registry.CreateService(&api.Service{
+	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo2"},
 		Selector: map[string]string{"bar2": "baz2"},
 	})
 	registry.List.ResourceVersion = 1
-	ctx := api.NewContext()
 	s, _ := storage.List(ctx, labels.Everything(), labels.Everything())
 	sl := s.(*api.ServiceList)
 	if len(fakeCloud.Calls) != 0 {

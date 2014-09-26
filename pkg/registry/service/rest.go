@@ -86,27 +86,27 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 				return nil, err
 			}
 		}
-		err := rs.registry.CreateService(srv)
+		err := rs.registry.CreateService(ctx, srv)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetService(srv.ID)
+		return rs.registry.GetService(ctx, srv.ID)
 	}), nil
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
-	service, err := rs.registry.GetService(id)
+	service, err := rs.registry.GetService(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		rs.deleteExternalLoadBalancer(service)
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
 	}), nil
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	s, err := rs.registry.GetService(id)
+	s, err := rs.registry.GetService(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 
 // TODO: implement field selector?
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	list, err := rs.registry.ListServices()
+	list, err := rs.registry.ListServices(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 // Watch returns Services events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
 func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return rs.registry.WatchServices(label, field, resourceVersion)
+	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
 }
 
 func (*REST) New() runtime.Object {
@@ -141,9 +141,9 @@ func (*REST) New() runtime.Object {
 
 // GetServiceEnvironmentVariables populates a list of environment variables that are use
 // in the container environment to get access to services.
-func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.EnvVar, error) {
+func GetServiceEnvironmentVariables(ctx api.Context, registry Registry, machine string) ([]api.EnvVar, error) {
 	var result []api.EnvVar
-	services, err := registry.ListServices()
+	services, err := registry.ListServices(ctx)
 	if err != nil {
 		return result, err
 	}
@@ -170,17 +170,17 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		// TODO: check to see if external load balancer status changed
-		err := rs.registry.UpdateService(srv)
+		err := rs.registry.UpdateService(ctx, srv)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetService(srv.ID)
+		return rs.registry.GetService(ctx, srv.ID)
 	}), nil
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
-	e, err := rs.registry.GetEndpoints(id)
+	e, err := rs.registry.GetEndpoints(ctx, id)
 	if err != nil {
 		return "", err
 	}

@@ -32,7 +32,7 @@ type BasicManifestFactory struct {
 }
 
 func (b *BasicManifestFactory) MakeManifest(machine string, pod api.Pod) (api.ContainerManifest, error) {
-	envVars, err := service.GetServiceEnvironmentVariables(b.ServiceRegistry, machine)
+	envVars, err := service.GetServiceEnvironmentVariables(api.NewContext(), b.ServiceRegistry, machine)
 	if err != nil {
 		return api.ContainerManifest{}, err
 	}
