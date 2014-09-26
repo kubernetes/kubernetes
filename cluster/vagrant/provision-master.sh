@@ -45,6 +45,7 @@ grains:
 EOF
 
 # Specify the minion prefix
+mkdir -p /srv/pillar/
 cat <<EOF >>/srv/pillar/common.sls
 instance_prefix: $MINION_PREFIX
 EOF
