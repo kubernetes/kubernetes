@@ -10,7 +10,7 @@ The **salt-master** service runs on the kubernetes-master node.
 
 The **salt-minion** service runs on the kubernetes-master node and each kubernetes-minion node in the cluster.
 
-Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file.  
+Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file.
 
 ```
 [root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
@@ -18,11 +18,11 @@ master: kubernetes-master
 ```
 The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-minion with all the required capabilities needed to run Kubernetes.
 
-If you are running the Vagrant based environment, the **salt-api** service is running on the kubernetes-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.  
+If you are running the Vagrant based environment, the **salt-api** service is running on the kubernetes-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.
 
 ## Salt security
 
-Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments.
+Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
 ```
 [root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
@@ -51,16 +51,16 @@ The following enumerates the set of defined key/value pairs that are supported t
 
 Key | Value
 ------------- | -------------
-cbr-cidr | (Optional) The minion IP address range used for the docker container bridge.
-cloud | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*
-cloud_provider | (Optional) The cloud_provider used by apiserver: *gce*, *azure*, *vagrant*
-etcd_servers | (Required) Comma-delimited list of IP addresses the apiserver and kubelet use to reach etcd
-hostnamef | (Optional) The full host name of the machine, i.e. hostname -f
-master_ip | (Optional) The IP address that the apiserver will bind against
-node_ip | (Optional) The IP address to use to address this node
-minion_ip | (Optional) Mapped to the kubelet hostname_override, K8S TODO - change this name
-network_mode | (Optional) Networking model to use among nodes: *openvswitch*
-roles | (Required) 1. **kubernetes-master** means this machine is the master in the kubernetes cluster.  2. **kubernetes-pool** means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
+`cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
+`cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*
+`cloud_provider` | (Optional) The cloud_provider used by apiserver: *gce*, *azure*, *vagrant*
+`etcd_servers` | (Optional) Comma-delimited list of IP addresses the apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role.
+`hostnamef` | (Optional) The full host name of the machine, i.e. hostname -f
+`master_ip` | (Optional) The IP address that the apiserver will bind against
+`node_ip` | (Optional) The IP address to use to address this node
+`minion_ip` | (Optional) Mapped to the kubelet hostname_override, K8S TODO - change this name
+`network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
+`roles` | (Required) 1. `kubernetes-master` means this machine is the master in the kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
 
 These keys may be leveraged by the Salt sls files to branch behavior.
 
