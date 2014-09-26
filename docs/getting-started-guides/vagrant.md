@@ -71,7 +71,9 @@ vagrant destroy
 ```
 
 Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubecfg.sh` script.
-Set the `KUBERNETS_PROVIDER` environment variable and try to list the minions:
+Set the `KUBERNETES_PROVIDER` environment variable and try to list the minions:
+
+You may need to build the binaries first, you can do this with ```make```
 
 ```
 $ export KUBERNETES_PROVIDER=vagrant
