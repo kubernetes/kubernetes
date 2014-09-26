@@ -50,7 +50,7 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 	}
 }
 
-func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -94,7 +94,7 @@ func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	service, err := rs.registry.GetService(id)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *REST) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	s, err := rs.registry.GetService(id)
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 }
 
 // TODO: implement field selector?
-func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	list, err := rs.registry.ListServices()
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
 
 // Watch returns Services events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return rs.registry.WatchServices(label, field, resourceVersion)
 }
 
@@ -163,7 +163,7 @@ func GetServiceEnvironmentVariables(registry Registry, machine string) ([]api.En
 	return result, nil
 }
 
-func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -179,7 +179,7 @@ func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(id string) (string, error) {
+func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 	e, err := rs.registry.GetEndpoints(id)
 	if err != nil {
 		return "", err

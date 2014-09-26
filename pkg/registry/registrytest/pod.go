@@ -57,7 +57,7 @@ func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodLis
 	return &pods, nil
 }
 
-func (r *PodRegistry) ListPods(selector labels.Selector) (*api.PodList, error) {
+func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
 	return r.ListPodsPredicate(func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})

@@ -38,7 +38,7 @@ func NewREST(m Registry) *REST {
 	}
 }
 
-func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	minion, ok := obj.(*api.Minion)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
@@ -65,7 +65,7 @@ func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	exists, err := rs.registry.Contains(id)
 	if !exists {
 		return nil, ErrDoesNotExist
@@ -78,7 +78,7 @@ func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *REST) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	exists, err := rs.registry.Contains(id)
 	if !exists {
 		return nil, ErrDoesNotExist
@@ -86,7 +86,7 @@ func (rs *REST) Get(id string) (runtime.Object, error) {
 	return rs.toApiMinion(id), err
 }
 
-func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	nameList, err := rs.registry.List()
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (*REST) New() runtime.Object {
 	return &api.Minion{}
 }
 
-func (rs *REST) Update(minion runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
 }
 

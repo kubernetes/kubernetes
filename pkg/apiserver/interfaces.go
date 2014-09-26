@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -30,20 +31,20 @@ type RESTStorage interface {
 	New() runtime.Object
 
 	// List selects resources in the storage which match to the selector.
-	List(label, field labels.Selector) (runtime.Object, error)
+	List(ctx api.Context, label, field labels.Selector) (runtime.Object, error)
 
 	// Get finds a resource in the storage by id and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Get(id string) (runtime.Object, error)
+	Get(ctx api.Context, id string) (runtime.Object, error)
 
 	// Delete finds a resource in the storage and deletes it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Delete(id string) (<-chan runtime.Object, error)
+	Delete(ctx api.Context, id string) (<-chan runtime.Object, error)
 
-	Create(runtime.Object) (<-chan runtime.Object, error)
-	Update(runtime.Object) (<-chan runtime.Object, error)
+	Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error)
+	Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error)
 }
 
 // ResourceWatcher should be implemented by all RESTStorage objects that
@@ -53,11 +54,11 @@ type ResourceWatcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // Redirector know how to return a remote resource's location.
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, or an error.
-	ResourceLocation(id string) (remoteLocation string, err error)
+	ResourceLocation(ctx api.Context, id string) (remoteLocation string, err error)
 }

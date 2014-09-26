@@ -55,7 +55,7 @@ func makePodKey(podID string) string {
 }
 
 // ListPods obtains a list of pods with labels that match selector.
-func (r *Registry) ListPods(selector labels.Selector) (*api.PodList, error) {
+func (r *Registry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
 	return r.ListPodsPredicate(func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})

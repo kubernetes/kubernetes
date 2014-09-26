@@ -69,7 +69,8 @@ func TestCreatePodRegistryError(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{DesiredState: desiredState}
-	ch, err := storage.Create(pod)
+	ctx := api.NewContext()
+	ch, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
 	}
@@ -88,7 +89,8 @@ func TestCreatePodSetsIds(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{DesiredState: desiredState}
-	ch, err := storage.Create(pod)
+	ctx := api.NewContext()
+	ch, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
 	}
@@ -114,7 +116,8 @@ func TestCreatePodSetsUUIDs(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{DesiredState: desiredState}
-	ch, err := storage.Create(pod)
+	ctx := api.NewContext()
+	ch, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
 	}
@@ -131,7 +134,8 @@ func TestListPodsError(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	pods, err := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	pods, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	if err != podRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", podRegistry.Err, err)
 	}
@@ -145,7 +149,8 @@ func TestListEmptyPodList(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	pods, err := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	pods, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -177,7 +182,8 @@ func TestListPodList(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	podsObj, err := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	podsObj, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	pods := podsObj.(*api.PodList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -217,6 +223,7 @@ func TestListPodListSelection(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
+	ctx := api.NewContext()
 
 	table := []struct {
 		label, field string
@@ -256,7 +263,7 @@ func TestListPodListSelection(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
-		podsObj, err := storage.List(label, field)
+		podsObj, err := storage.List(ctx, label, field)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -305,7 +312,8 @@ func TestGetPod(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	obj, err := storage.Get("foo")
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
 	pod := obj.(*api.Pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -324,7 +332,8 @@ func TestGetPodCloud(t *testing.T) {
 		registry:      podRegistry,
 		cloudProvider: fakeCloud,
 	}
-	obj, err := storage.Get("foo")
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
 	pod := obj.(*api.Pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -487,8 +496,9 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
+	ctx := api.NewContext()
 	pod := &api.Pod{}
-	c, err := storage.Create(pod)
+	c, err := storage.Create(ctx, pod)
 	if c != nil {
 		t.Errorf("Expected nil channel")
 	}
@@ -503,8 +513,9 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
+	ctx := api.NewContext()
 	pod := &api.Pod{}
-	c, err := storage.Update(pod)
+	c, err := storage.Update(ctx, pod)
 	if c != nil {
 		t.Errorf("Expected nil channel")
 	}
@@ -534,7 +545,8 @@ func TestCreatePod(t *testing.T) {
 		JSONBase:     api.JSONBase{ID: "foo"},
 		DesiredState: desiredState,
 	}
-	channel, err := storage.Create(pod)
+	ctx := api.NewContext()
+	channel, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

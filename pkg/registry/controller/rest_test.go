@@ -39,7 +39,8 @@ func TestListControllersError(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	controllers, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	if err != mockRegistry.Err {
 		t.Errorf("Expected %#v, Got %#v", mockRegistry.Err, err)
 	}
@@ -53,7 +54,8 @@ func TestListEmptyControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllers, err := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	controllers, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -86,7 +88,8 @@ func TestListControllerList(t *testing.T) {
 	storage := REST{
 		registry: &mockRegistry,
 	}
-	controllersObj, err := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	controllersObj, err := storage.List(ctx, labels.Everything(), labels.Everything())
 	controllers := controllersObj.(*api.ReplicationControllerList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -240,7 +243,8 @@ func TestCreateController(t *testing.T) {
 			PodTemplate:     validPodTemplate,
 		},
 	}
-	channel, err := storage.Create(controller)
+	ctx := api.NewContext()
+	channel, err := storage.Create(ctx, controller)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -263,7 +267,6 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 		podLister:  nil,
 		pollPeriod: time.Millisecond * 1,
 	}
-
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
@@ -277,7 +280,8 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Create(&failureCase)
+		ctx := api.NewContext()
+		c, err := storage.Create(ctx, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -307,7 +311,8 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, err := storage.Update(&failureCase)
+		ctx := api.NewContext()
+		c, err := storage.Update(ctx, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
 		}
@@ -323,7 +328,7 @@ type fakePodLister struct {
 	s labels.Selector
 }
 
-func (f *fakePodLister) ListPods(s labels.Selector) (*api.PodList, error) {
+func (f *fakePodLister) ListPods(ctx api.Context, s labels.Selector) (*api.PodList, error) {
 	f.s = s
 	return &f.l, f.e
 }
@@ -349,7 +354,8 @@ func TestFillCurrentState(t *testing.T) {
 			},
 		},
 	}
-	storage.fillCurrentState(&controller)
+	ctx := api.NewContext()
+	storage.fillCurrentState(ctx, &controller)
 	if controller.CurrentState.Replicas != 2 {
 		t.Errorf("expected 2, got: %d", controller.CurrentState.Replicas)
 	}

@@ -88,18 +88,18 @@ type SimpleRESTStorage struct {
 	injectedFunction func(obj runtime.Object) (returnObj runtime.Object, err error)
 }
 
-func (storage *SimpleRESTStorage) List(label, field labels.Selector) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	result := &SimpleList{
 		Items: storage.list,
 	}
 	return result, storage.errors["list"]
 }
 
-func (storage *SimpleRESTStorage) Get(id string) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) Delete(id string) (<-chan runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	storage.deleted = id
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (storage *SimpleRESTStorage) New() runtime.Object {
 	return &Simple{}
 }
 
-func (storage *SimpleRESTStorage) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	storage.created = obj.(*Simple)
 	if err := storage.errors["create"]; err != nil {
 		return nil, err
@@ -129,7 +129,7 @@ func (storage *SimpleRESTStorage) Create(obj runtime.Object) (<-chan runtime.Obj
 	}), nil
 }
 
-func (storage *SimpleRESTStorage) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	storage.updated = obj.(*Simple)
 	if err := storage.errors["update"]; err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (storage *SimpleRESTStorage) Update(obj runtime.Object) (<-chan runtime.Obj
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	storage.requestedLabelSelector = label
 	storage.requestedFieldSelector = field
 	storage.requestedResourceVersion = resourceVersion
@@ -155,7 +155,7 @@ func (storage *SimpleRESTStorage) Watch(label, field labels.Selector, resourceVe
 }
 
 // Implement Redirector.
-func (storage *SimpleRESTStorage) ResourceLocation(id string) (string, error) {
+func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (string, error) {
 	storage.requestedResourceLocationID = id
 	if err := storage.errors["resourceLocation"]; err != nil {
 		return "", err

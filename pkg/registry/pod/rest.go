@@ -67,7 +67,7 @@ func NewREST(config *RESTConfig) *REST {
 	}
 }
 
-func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
 	if len(pod.ID) == 0 {
@@ -88,13 +88,13 @@ func (rs *REST) Create(obj runtime.Object) (<-chan runtime.Object, error) {
 	}), nil
 }
 
-func (rs *REST) Delete(id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(id)
 	}), nil
 }
 
-func (rs *REST) Get(id string) (runtime.Object, error) {
+func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	pod, err := rs.registry.GetPod(id)
 	if err != nil {
 		return pod, err
@@ -131,7 +131,7 @@ func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
 	}
 }
 
-func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	pods, err := rs.registry.ListPodsPredicate(rs.filterFunc(label, field))
 	if err == nil {
 		for i := range pods.Items {
@@ -149,7 +149,7 @@ func (rs *REST) List(label, field labels.Selector) (runtime.Object, error) {
 }
 
 // Watch begins watching for new, changed, or deleted pods.
-func (rs *REST) Watch(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return rs.registry.WatchPods(resourceVersion, rs.filterFunc(label, field))
 }
 
@@ -157,7 +157,7 @@ func (*REST) New() runtime.Object {
 	return &api.Pod{}
 }
 
-func (rs *REST) Update(obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
@@ -277,9 +277,9 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 	}
 }
 
-func (rs *REST) waitForPodRunning(pod *api.Pod) (runtime.Object, error) {
+func (rs *REST) waitForPodRunning(ctx api.Context, pod *api.Pod) (runtime.Object, error) {
 	for {
-		podObj, err := rs.Get(pod.ID)
+		podObj, err := rs.Get(ctx, pod.ID)
 		if err != nil || podObj == nil {
 			return nil, err
 		}

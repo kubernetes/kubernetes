@@ -64,6 +64,7 @@ func (h *RESTHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
 func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
+	ctx := api.NewContext()
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {
@@ -80,14 +81,14 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 				errorJSON(err, h.codec, w)
 				return
 			}
-			list, err := storage.List(label, field)
+			list, err := storage.List(ctx, label, field)
 			if err != nil {
 				errorJSON(err, h.codec, w)
 				return
 			}
 			writeJSON(http.StatusOK, h.codec, list, w)
 		case 2:
-			item, err := storage.Get(parts[1])
+			item, err := storage.Get(ctx, parts[1])
 			if err != nil {
 				errorJSON(err, h.codec, w)
 				return
@@ -113,7 +114,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		out, err := storage.Create(obj)
+		out, err := storage.Create(ctx, obj)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -126,7 +127,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			notFound(w, req)
 			return
 		}
-		out, err := storage.Delete(parts[1])
+		out, err := storage.Delete(ctx, parts[1])
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -150,7 +151,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		out, err := storage.Update(obj)
+		out, err := storage.Update(ctx, obj)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
