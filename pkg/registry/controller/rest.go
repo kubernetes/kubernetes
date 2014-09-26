@@ -71,24 +71,24 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	controller.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.CreateController(controller)
+		err := rs.registry.CreateController(ctx, controller)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(controller.ID)
+		return rs.registry.GetController(ctx, controller.ID)
 	}), nil
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(id)
+		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(ctx, id)
 	}), nil
 }
 
 // Get obtains the ReplicationController specified by its id.
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	controller, err := rs.registry.GetController(id)
+	controller, err := rs.registry.GetController(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
-	controllers, err := rs.registry.ListControllers()
+	controllers, err := rs.registry.ListControllers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +132,11 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateController(controller)
+		err := rs.registry.UpdateController(ctx, controller)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(controller.ID)
+		return rs.registry.GetController(ctx, controller.ID)
 	}), nil
 }
 
@@ -146,7 +146,7 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}
-	incoming, err := rs.registry.WatchControllers(resourceVersion)
+	incoming, err := rs.registry.WatchControllers(ctx, resourceVersion)
 	if err != nil {
 		return nil, err
 	}

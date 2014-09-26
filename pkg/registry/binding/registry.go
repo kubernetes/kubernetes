@@ -24,5 +24,5 @@ import (
 type Registry interface {
 	// ApplyBinding should apply the binding. That is, it should actually
 	// assign or place pod binding.PodID on machine binding.Host.
-	ApplyBinding(binding *api.Binding) error
+	ApplyBinding(ctx api.Context, binding *api.Binding) error
 }

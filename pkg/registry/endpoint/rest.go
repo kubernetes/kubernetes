@@ -39,7 +39,7 @@ func NewREST(registry Registry) *REST {
 
 // Get satisfies the RESTStorage interface.
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	return rs.registry.GetEndpoints(id)
+	return rs.registry.GetEndpoints(ctx, id)
 }
 
 // List satisfies the RESTStorage interface.
@@ -47,13 +47,13 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	if !label.Empty() || !field.Empty() {
 		return nil, errors.New("label/field selectors are not supported on endpoints")
 	}
-	return rs.registry.ListEndpoints()
+	return rs.registry.ListEndpoints(ctx)
 }
 
 // Watch returns Endpoint events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
 func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
-	return rs.registry.WatchEndpoints(label, field, resourceVersion)
+	return rs.registry.WatchEndpoints(ctx, label, field, resourceVersion)
 }
 
 // Create satisfies the RESTStorage interface but is unimplemented.
