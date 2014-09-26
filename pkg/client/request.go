@@ -269,6 +269,26 @@ func (r *Request) Watch() (watch.Interface, error) {
 	return watch.NewStreamWatcher(tools.NewAPIEventDecoder(response.Body)), nil
 }
 
+// Stream formats and executes the request.
+// Returns io.ReadCloser which could be used for streaming of the response, or an error
+func (r *Request) Stream() (io.ReadCloser, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if r.c.auth != nil {
+		req.SetBasicAuth(r.c.auth.User, r.c.auth.Password)
+	}
+	response, err := r.c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
 // Do formats and executes the request. Returns the API object received, or an error.
 func (r *Request) Do() Result {
 	for {
