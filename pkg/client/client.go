@@ -448,6 +448,26 @@ func (c *Client) WatchEndpoints(label, field labels.Selector, resourceVersion ui
 		Watch()
 }
 
+func (c *Client) CreateEndpoints(endpoints *api.Endpoints) (*api.Endpoints, error) {
+	result := &api.Endpoints{}
+	err := c.Post().Path("endpoints").Body(endpoints).Do().Into(result)
+	return result, err
+}
+
+func (c *Client) UpdateEndpoints(endpoints *api.Endpoints) (*api.Endpoints, error) {
+	result := &api.Endpoints{}
+	if endpoints.ResourceVersion == 0 {
+		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
+	}
+	err := c.Put().
+		Path("endpoints").
+		Path(endpoints.ID).
+		Body(endpoints).
+		Do().
+		Into(result)
+	return result, err
+}
+
 // ServerVersion retrieves and parses the server's version.
 func (c *Client) ServerVersion() (*version.Info, error) {
 	body, err := c.Get().AbsPath("/version").Do().Raw()

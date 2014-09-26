@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -72,17 +73,65 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			}
 			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
 		}
-		// TODO: this is totally broken, we need to compute this and store inside an AtomicUpdate loop.
-		err = e.serviceRegistry.UpdateEndpoints(api.NewContext(), &api.Endpoints{
-			JSONBase:  api.JSONBase{ID: service.ID},
-			Endpoints: endpoints,
-		})
+		currentEndpoints, err := e.client.GetEndpoints(service.ID)
+		if err != nil {
+			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
+			if strings.Contains(err.Error(), "(404)") {
+				currentEndpoints = &api.Endpoints{
+					JSONBase: api.JSONBase{
+						ID: service.ID,
+					},
+				}
+			} else {
+				glog.Errorf("Error getting endpoints: %#v", err)
+				continue
+			}
+		}
+		newEndpoints := &api.Endpoints{}
+		*newEndpoints = *currentEndpoints
+		newEndpoints.Endpoints = endpoints
+
+		if currentEndpoints.ResourceVersion == 0 {
+			// No previous endpoints, create them
+			_, err = e.client.CreateEndpoints(newEndpoints)
+		} else {
+			// Pre-existing
+			if endpointsEqual(currentEndpoints, endpoints) {
+				glog.V(2).Infof("endpoints are equal for %s, skipping update", service.ID)
+				continue
+			}
+			_, err = e.client.UpdateEndpoints(newEndpoints)
+		}
 		if err != nil {
 			glog.Errorf("Error updating endpoints: %#v", err)
 			continue
 		}
 	}
 	return resultErr
+}
+
+func containsEndpoint(endpoints *api.Endpoints, endpoint string) bool {
+	if endpoints == nil {
+		return false
+	}
+	for ix := range endpoints.Endpoints {
+		if endpoints.Endpoints[ix] == endpoint {
+			return true
+		}
+	}
+	return false
+}
+
+func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
+	if len(e.Endpoints) != len(endpoints) {
+		return false
+	}
+	for _, endpoint := range endpoints {
+		if !containsEndpoint(e, endpoint) {
+			return false
+		}
+	}
+	return true
 }
 
 // findPort locates the container port for the given manifest and portName.
