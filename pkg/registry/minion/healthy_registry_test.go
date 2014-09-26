@@ -49,7 +49,7 @@ func TestBasicDelegation(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, mockMinionRegistry.Minions) {
+	if !reflect.DeepEqual(list, &mockMinionRegistry.Minions) {
 		t.Errorf("Expected %v, Got %v", mockMinionRegistry.Minions, list)
 	}
 	err = healthy.Insert("foo")
@@ -96,7 +96,7 @@ func TestFiltering(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, expected) {
+	if !reflect.DeepEqual(list, registrytest.MakeMinionList(expected)) {
 		t.Errorf("Expected %v, Got %v", expected, list)
 	}
 	ok, err := healthy.Contains("m1")

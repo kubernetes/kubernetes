@@ -27,6 +27,7 @@ import (
 	neturl "net/url"
 	"sort"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
@@ -208,4 +209,8 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 	}
 
 	return instances, nil
+}
+
+func (v *VagrantCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	return nil, nil
 }

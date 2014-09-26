@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
@@ -52,6 +53,7 @@ type Config struct {
 	MinionCacheTTL     time.Duration
 	MinionRegexp       string
 	PodInfoGetter      client.PodInfoGetter
+	NodeResources      api.NodeResources
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -104,13 +106,13 @@ func makeMinionRegistry(c *Config) minion.Registry {
 	var minionRegistry minion.Registry
 	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
 		var err error
-		minionRegistry, err = minion.NewCloudRegistry(c.Cloud, c.MinionRegexp)
+		minionRegistry, err = minion.NewCloudRegistry(c.Cloud, c.MinionRegexp, &c.NodeResources)
 		if err != nil {
 			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
 		}
 	}
 	if minionRegistry == nil {
-		minionRegistry = minion.NewRegistry(c.Minions)
+		minionRegistry = minion.NewRegistry(c.Minions, c.NodeResources)
 	}
 	if c.HealthCheckMinions {
 		minionRegistry = minion.NewHealthyRegistry(minionRegistry, &http.Client{})

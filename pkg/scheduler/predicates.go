@@ -17,6 +17,8 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
@@ -24,7 +26,20 @@ import (
 )
 
 type NodeInfo interface {
-	GetNodeInfo(nodeName string) (api.Minion, error)
+	GetNodeInfo(nodeID string) (*api.Minion, error)
+}
+
+type StaticNodeInfo struct {
+	*api.MinionList
+}
+
+func (nodes StaticNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
+	for ix := range nodes.Items {
+		if nodes.Items[ix].ID == nodeID {
+			return &nodes.Items[ix], nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find node: %s", nodeID)
 }
 
 type ResourceFit struct {
@@ -73,6 +88,13 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	glog.V(3).Infof("Calculated fit: cpu: %s, memory %s", fitsCPU, fitsMemory)
 
 	return fitsCPU && fitsMemory, nil
+}
+
+func NewResourceFitPredicate(info NodeInfo) FitPredicate {
+	fit := &ResourceFit{
+		info: info,
+	}
+	return fit.PodFitsResources
 }
 
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {

@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"code.google.com/p/gcfg"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
@@ -153,4 +154,8 @@ func (v *OVirtCloud) List(filter string) ([]string, error) {
 	defer response.Body.Close()
 
 	return getInstancesFromXml(response.Body)
+}
+
+func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	return nil, nil
 }

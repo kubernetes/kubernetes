@@ -17,7 +17,6 @@ limitations under the License.
 package minion
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -25,7 +24,7 @@ import (
 )
 
 func TestMinionREST(t *testing.T) {
-	m := NewRegistry([]string{"foo", "bar"})
+	m := NewRegistry([]string{"foo", "bar"}, api.NodeResources{})
 	ms := NewREST(m)
 	ctx := api.NewContext()
 	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Minion).ID != "foo" {
@@ -78,7 +77,8 @@ func TestMinionREST(t *testing.T) {
 			JSONBase: api.JSONBase{ID: "foo"},
 		},
 	}
-	if !reflect.DeepEqual(list.(*api.MinionList).Items, expect) {
+	nodeList := list.(*api.MinionList)
+	if len(expect) != len(nodeList.Items) || !contains(nodeList, "foo") || !contains(nodeList, "baz") {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
 }

@@ -16,40 +16,54 @@ limitations under the License.
 
 package registrytest
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
 
 type MinionRegistry struct {
 	Err     error
 	Minion  string
-	Minions []string
+	Minions api.MinionList
 	sync.Mutex
+}
+
+func MakeMinionList(minions []string) *api.MinionList {
+	list := api.MinionList{
+		Items: make([]api.Minion, len(minions)),
+	}
+	for i := range minions {
+		list.Items[i].ID = minions[i]
+	}
+	return &list
 }
 
 func NewMinionRegistry(minions []string) *MinionRegistry {
 	return &MinionRegistry{
-		Minions: minions,
+		Minions: *MakeMinionList(minions),
 	}
 }
 
-func (r *MinionRegistry) List() ([]string, error) {
+func (r *MinionRegistry) List() (*api.MinionList, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Minions, r.Err
+	return &r.Minions, r.Err
 }
 
 func (r *MinionRegistry) Insert(minion string) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Minion = minion
-	r.Minions = append(r.Minions, minion)
+	r.Minions.Items = append(r.Minions.Items, api.Minion{JSONBase: api.JSONBase{ID: minion}})
 	return r.Err
 }
 
-func (r *MinionRegistry) Contains(minion string) (bool, error) {
+func (r *MinionRegistry) Contains(nodeID string) (bool, error) {
 	r.Lock()
 	defer r.Unlock()
-	for _, name := range r.Minions {
-		if name == minion {
+	for _, node := range r.Minions.Items {
+		if node.ID == nodeID {
 			return true, r.Err
 		}
 	}
@@ -59,12 +73,12 @@ func (r *MinionRegistry) Contains(minion string) (bool, error) {
 func (r *MinionRegistry) Delete(minion string) error {
 	r.Lock()
 	defer r.Unlock()
-	var newList []string
-	for _, name := range r.Minions {
-		if name != minion {
-			newList = append(newList, name)
+	var newList []api.Minion
+	for _, node := range r.Minions.Items {
+		if node.ID != minion {
+			newList = append(newList, api.Minion{JSONBase: api.JSONBase{ID: minion}})
 		}
 	}
-	r.Minions = newList
+	r.Minions.Items = newList
 	return r.Err
 }

@@ -18,9 +18,9 @@ package minion
 
 import (
 	"fmt"
-	"sort"
 	"sync"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -28,16 +28,17 @@ var ErrDoesNotExist = fmt.Errorf("The requested resource does not exist.")
 
 // Registry keeps track of a set of minions. Safe for concurrent reading/writing.
 type Registry interface {
-	List() (currentMinions []string, err error)
+	List() (currentMinions *api.MinionList, err error)
 	Insert(minion string) error
 	Delete(minion string) error
 	Contains(minion string) (bool, error)
 }
 
 // NewRegistry initializes a minion registry with a list of minions.
-func NewRegistry(minions []string) Registry {
+func NewRegistry(minions []string, nodeResources api.NodeResources) Registry {
 	m := &minionList{
-		minions: util.StringSet{},
+		minions:       util.StringSet{},
+		nodeResources: nodeResources,
 	}
 	for _, minion := range minions {
 		m.minions.Insert(minion)
@@ -46,8 +47,9 @@ func NewRegistry(minions []string) Registry {
 }
 
 type minionList struct {
-	minions util.StringSet
-	lock    sync.Mutex
+	minions       util.StringSet
+	lock          sync.Mutex
+	nodeResources api.NodeResources
 }
 
 func (m *minionList) Contains(minion string) (bool, error) {
@@ -70,12 +72,17 @@ func (m *minionList) Insert(newMinion string) error {
 	return nil
 }
 
-func (m *minionList) List() (currentMinions []string, err error) {
+func (m *minionList) List() (currentMinions *api.MinionList, err error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	minions := []api.Minion{}
 	for minion := range m.minions {
-		currentMinions = append(currentMinions, minion)
+		minions = append(minions, api.Minion{
+			JSONBase:      api.JSONBase{ID: minion},
+			NodeResources: m.nodeResources,
+		})
 	}
-	sort.StringSlice(currentMinions).Sort()
-	return
+	return &api.MinionList{
+		Items: minions,
+	}, nil
 }

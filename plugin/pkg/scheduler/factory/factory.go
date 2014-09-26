@@ -62,9 +62,19 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	nodes, err := factory.Client.ListMinions()
+	if err != nil {
+		glog.Errorf("failed to obtain minion information, aborting")
+		return nil
+	}
 	algo := algorithm.NewGenericScheduler(
-		// Fit is defined based on the absence of port conflicts.
-		[]algorithm.FitPredicate{algorithm.PodFitsPorts},
+		[]algorithm.FitPredicate{
+			// Fit is defined based on the absence of port conflicts.
+			algorithm.PodFitsPorts,
+			// Fit is determined by resource availability
+			algorithm.NewResourceFitPredicate(algorithm.StaticNodeInfo{nodes}),
+		},
 		// All nodes where things fit are equally likely (Random)
 		algorithm.EqualPriority,
 		&storeToPodLister{podCache}, r)
