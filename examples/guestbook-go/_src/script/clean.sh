@@ -20,6 +20,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-docker rm -f guestbook-build 2> /dev/null || true
+docker rm -f guestbook-builder 2> /dev/null || true
 docker rmi -f kubernetes/guestbook-builder || true
 docker rmi -f kubernetes/guestbook || true
