@@ -6,13 +6,13 @@
 # which runs fluentd with the default flag -v (which can be over-ridden).
 # Note that fluentd is run with root permssion to allow access to
 # log files with root only access under /var/lib/docker/containers/*
+# Please see http://docs.fluentd.org/articles/install-by-deb for more
+# information about installing fluentd using deb package.
 
 FROM ubuntu:14.04
 MAINTAINER Satnam Singh "satnam@google.com"
 RUN ulimit -n 65536
-RUN apt-get update
-
-RUN apt-get install -y curl
+RUN apt-get update && apt-get install -y curl
 RUN apt-get install -y -q libcurl4-openssl-dev make
 RUN /usr/bin/curl -L http://toolbelt.treasuredata.com/sh/install-ubuntu-trusty-td-agent2.sh | sh
 RUN sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent
