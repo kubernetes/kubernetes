@@ -21,5 +21,5 @@ set -o nounset
 set -o pipefail
 
 docker rm -f guestbook-build 2> /dev/null || true
-docker rmi -f kubernetes/guestbook-build || true
+docker rmi -f kubernetes/guestbook-builder || true
 docker rmi -f kubernetes/guestbook || true
