@@ -40,7 +40,7 @@ func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	}
 }
 
-func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, error) {
+func (r *PodRegistry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool) (*api.PodList, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {
@@ -58,23 +58,23 @@ func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodLis
 }
 
 func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
-	return r.ListPodsPredicate(func(pod *api.Pod) bool {
+	return r.ListPodsPredicate(ctx, func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})
 }
 
-func (r *PodRegistry) WatchPods(resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
+func (r *PodRegistry) WatchPods(ctx api.Context, resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
 	// TODO: wire filter down into the mux; it needs access to current and previous state :(
 	return r.mux.Watch(), nil
 }
 
-func (r *PodRegistry) GetPod(podId string) (*api.Pod, error) {
+func (r *PodRegistry) GetPod(ctx api.Context, podId string) (*api.Pod, error) {
 	r.Lock()
 	defer r.Unlock()
 	return r.Pod, r.Err
 }
 
-func (r *PodRegistry) CreatePod(pod *api.Pod) error {
+func (r *PodRegistry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Pod = pod
@@ -82,7 +82,7 @@ func (r *PodRegistry) CreatePod(pod *api.Pod) error {
 	return r.Err
 }
 
-func (r *PodRegistry) UpdatePod(pod *api.Pod) error {
+func (r *PodRegistry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Pod = pod
@@ -90,7 +90,7 @@ func (r *PodRegistry) UpdatePod(pod *api.Pod) error {
 	return r.Err
 }
 
-func (r *PodRegistry) DeletePod(podId string) error {
+func (r *PodRegistry) DeletePod(ctx api.Context, podId string) error {
 	r.Lock()
 	defer r.Unlock()
 	r.mux.Action(watch.Deleted, r.Pod)

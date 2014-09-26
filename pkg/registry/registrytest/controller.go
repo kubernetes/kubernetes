@@ -27,26 +27,26 @@ type ControllerRegistry struct {
 	Controllers *api.ReplicationControllerList
 }
 
-func (r *ControllerRegistry) ListControllers() (*api.ReplicationControllerList, error) {
+func (r *ControllerRegistry) ListControllers(ctx api.Context) (*api.ReplicationControllerList, error) {
 	return r.Controllers, r.Err
 }
 
-func (r *ControllerRegistry) GetController(ID string) (*api.ReplicationController, error) {
+func (r *ControllerRegistry) GetController(ctx api.Context, ID string) (*api.ReplicationController, error) {
 	return &api.ReplicationController{}, r.Err
 }
 
-func (r *ControllerRegistry) CreateController(controller *api.ReplicationController) error {
+func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
 	return r.Err
 }
 
-func (r *ControllerRegistry) UpdateController(controller *api.ReplicationController) error {
+func (r *ControllerRegistry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
 	return r.Err
 }
 
-func (r *ControllerRegistry) DeleteController(ID string) error {
+func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error {
 	return r.Err
 }
 
-func (r *ControllerRegistry) WatchControllers(resourceVersion uint64) (watch.Interface, error) {
+func (r *ControllerRegistry) WatchControllers(ctx api.Context, resourceVersion uint64) (watch.Interface, error) {
 	return nil, r.Err
 }
