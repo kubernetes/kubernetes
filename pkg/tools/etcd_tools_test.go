@@ -65,7 +65,7 @@ func TestIsEtcdNotFound(t *testing.T) {
 	try(fmt.Errorf("some other kind of error"), false)
 }
 
-func TestExtractList(t *testing.T) {
+func TestExtractToList(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
@@ -88,27 +88,23 @@ func TestExtractList(t *testing.T) {
 			},
 		},
 	}
-	expect := []api.Pod{
-		{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}},
-		{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 2}},
-		{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 3}},
+	expect := api.PodList{
+		JSONBase: api.JSONBase{ResourceVersion: 10},
+		Items: []api.Pod{
+			{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}},
+			{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 2}},
+			{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 3}},
+		},
 	}
 
-	var got []api.Pod
+	var got api.PodList
 	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
-	resourceVersion := uint64(0)
-	err := helper.ExtractList("/some/key", &got, &resourceVersion)
+	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
+		t.Errorf("Unexpected error %v", err)
 	}
-	if resourceVersion != 10 {
-		t.Errorf("Unexpected resource version %d", resourceVersion)
-	}
-
-	for i := 0; i < len(expect); i++ {
-		if !reflect.DeepEqual(got[i], expect[i]) {
-			t.Errorf("\nWanted:\n%#v\nGot:\n%#v\n", expect[i], got[i])
-		}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }
 
@@ -165,6 +161,27 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 	try("/some/key")
 	try("/some/key2")
 	try("/some/key3")
+}
+
+func TestCreateObj(t *testing.T) {
+	obj := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	fakeClient := NewFakeEtcdClient(t)
+	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	err := helper.CreateObj("/some/key", obj, 5)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	data, err := latest.Codec.Encode(obj)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	node := fakeClient.Data["/some/key"].R.Node
+	if e, a := string(data), node.Value; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
+	if e, a := uint64(5), fakeClient.LastSetTTL; e != a {
+		t.Errorf("Wanted %v, got %v", e, a)
+	}
 }
 
 func TestSetObj(t *testing.T) {
