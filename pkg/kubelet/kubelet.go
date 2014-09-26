@@ -528,9 +528,18 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 		}
 
 		glog.V(3).Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uuid, container.Name, container)
-		if err := kl.dockerPuller.Pull(container.Image); err != nil {
-			glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
-			continue
+		if !api.IsPullNever(container.ImagePullPolicy) {
+			present, err := kl.dockerPuller.IsImagePresent(container.Image)
+			if err != nil {
+				glog.Errorf("Failed to inspect image: %s: %#v skipping pod %s container %s", container.Image, err, podFullName, container.Name)
+				continue
+			}
+			if api.IsPullAlways(container.ImagePullPolicy) || !present {
+				if err := kl.dockerPuller.Pull(container.Image); err != nil {
+					glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
+					continue
+				}
+			}
 		}
 		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 		containerID, err := kl.runContainer(pod, &container, podVolumes, "container:"+string(netID))
