@@ -20,6 +20,9 @@
 # Use testing config
 export KUBE_CONFIG_FILE="config-test.sh"
 export KUBE_REPO_ROOT="$(dirname $0)/.."
+
+# TODO(jbeda): This will break on usage if there is a space in
+# ${KUBE_REPO_ROOT}.  Covert to an array?  Or an exported function?
 export KUBECFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
 
 source $(dirname $0)/../cluster/kube-env.sh

@@ -131,26 +131,23 @@ function kube-up {
   # Detect the project into $PROJECT if it isn't set
   detect-project
 
+  # This will take us up to the git repo root
+  local base_dir=$(dirname "${BASH_SOURCE}")/../..
+
   # Build up start up script for master
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-  trap "rm -rf ${KUBE_TEMP}" EXIT
+  trap 'rm -rf "${KUBE_TEMP}"' EXIT
 
   get-password
   echo "Using password: $user:$passwd"
-  python $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $user $passwd
-  HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
-
-  (
-    echo "#! /bin/bash"
-    echo "MASTER_NAME=${MASTER_NAME}"
-    echo "MASTER_RELEASE_TAR=${RELEASE_NORMALIZED}/master-release.tgz"
-    echo "MASTER_HTPASSWD='${HTPASSWD}'"
-    grep -v "^#" $(dirname $0)/templates/download-release.sh
-    grep -v "^#" $(dirname $0)/templates/salt-master.sh
-  ) > ${KUBE_TEMP}/master-start.sh
+  python "${base_dir}/third_party/htpasswd/htpasswd.py" -b \
+    -c "${KUBE_TEMP}/htpasswd" $user $passwd
+  HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
 
   if ! gcutil getnetwork "${NETWORK}"; then
     echo "Creating new network for: ${NETWORK}"
+    # The network needs to be created synchronously or we have a race. The
+    # firewalls can be added concurrent with instance creation.
     gcutil addnetwork "${NETWORK}" --range "10.240.0.0/16"
     gcutil addfirewall "${NETWORK}-default-internal" \
       --norespect_terminal_width \
@@ -174,6 +171,15 @@ function kube-up {
     --target_tags ${MASTER_TAG} \
     --allowed tcp:443 &
 
+  (
+    echo "#! /bin/bash"
+    echo "MASTER_NAME='${MASTER_NAME}'"
+    echo "MASTER_RELEASE_TAR=${RELEASE_NORMALIZED}/master-release.tgz"
+    echo "MASTER_HTPASSWD='${HTPASSWD}'"
+    grep -v "^#" "${base_dir}/cluster/templates/download-release.sh"
+    grep -v "^#" "${base_dir}/cluster/templates/salt-master.sh"
+  ) > "${KUBE_TEMP}/master-start.sh"
+
   gcutil addinstance ${MASTER_NAME}\
     --norespect_terminal_width \
     --project ${PROJECT} \
@@ -184,14 +190,14 @@ function kube-up {
     --network ${NETWORK} \
     --service_account_scopes="storage-ro,compute-rw" \
     --automatic_restart \
-    --metadata_from_file startup-script:${KUBE_TEMP}/master-start.sh &
+    --metadata_from_file "startup-script:${KUBE_TEMP}/master-start.sh" &
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
-      echo "MASTER_NAME=${MASTER_NAME}"
+      echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
-      grep -v "^#" $(dirname $0)/templates/salt-minion.sh
+      grep -v "^#" "${base_dir}/cluster/templates/salt-minion.sh"
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
     gcutil addfirewall ${MINION_NAMES[$i]}-all \
@@ -212,7 +218,7 @@ function kube-up {
       --service_account_scopes=${MINION_SCOPES} \
       --automatic_restart \
       --can_ip_forward \
-      --metadata_from_file startup-script:${KUBE_TEMP}/minion-start-${i}.sh &
+      --metadata_from_file "startup-script:${KUBE_TEMP}/minion-start-${i}.sh" &
 
     gcutil addroute ${MINION_NAMES[$i]} ${MINION_IP_RANGES[$i]} \
     --norespect_terminal_width \
