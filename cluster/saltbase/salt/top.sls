@@ -9,7 +9,8 @@ base:
     - kubelet
     - kube-proxy
     - cadvisor
-    - nsinit
+# disable, it's broken and deprecated
+#   - nsinit
     - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn-client
