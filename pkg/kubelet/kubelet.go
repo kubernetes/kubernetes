@@ -67,7 +67,9 @@ func NewMainKubelet(
 	cc CadvisorInterface,
 	ec tools.EtcdClient,
 	rd string,
-	ri time.Duration) *Kubelet {
+	ri time.Duration,
+	pullQPS float32,
+	pullBurst int) *Kubelet {
 	return &Kubelet{
 		hostname:       hn,
 		dockerClient:   dc,
@@ -78,6 +80,8 @@ func NewMainKubelet(
 		podWorkers:     newPodWorkers(),
 		runner:         dockertools.NewDockerContainerCommandRunner(),
 		httpClient:     &http.Client{},
+		pullQPS:        pullQPS,
+		pullBurst:      pullBurst,
 	}
 }
 
@@ -119,6 +123,10 @@ type Kubelet struct {
 	runner dockertools.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
 	httpClient httpGetInterface
+	// Optional, maximum pull QPS from the docker registry, 0.0 means unlimited.
+	pullQPS float32
+	// Optional, maximum burst QPS from the docker registry, must be positive if QPS is > 0.0
+	pullBurst int
 }
 
 // Run starts the kubelet reacting to config updates
@@ -127,7 +135,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
 	}
 	if kl.dockerPuller == nil {
-		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient)
+		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
 	}
 	if kl.healthChecker == nil {
 		kl.healthChecker = health.NewHealthChecker()
@@ -376,7 +384,9 @@ func (kl *Kubelet) createNetworkContainer(pod *Pod) (dockertools.DockerID, error
 		Image: networkContainerImage,
 		Ports: ports,
 	}
-	kl.dockerPuller.Pull(networkContainerImage)
+	if err := kl.dockerPuller.Pull(networkContainerImage); err != nil {
+		return "", err
+	}
 	return kl.runContainer(pod, container, nil, "")
 }
 

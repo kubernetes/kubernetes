@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -64,8 +65,13 @@ type dockerPuller struct {
 	keyring *dockerKeyring
 }
 
+type throttledDockerPuller struct {
+	puller  dockerPuller
+	limiter util.RateLimiter
+}
+
 // NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client DockerInterface) DockerPuller {
+func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
 		keyring: newDockerKeyring(),
@@ -81,8 +87,13 @@ func NewDockerPuller(client DockerInterface) DockerPuller {
 	if dp.keyring.count() == 0 {
 		glog.V(1).Infof("Continuing with empty Docker keyring")
 	}
-
-	return dp
+	if qps == 0.0 {
+		return dp
+	}
+	return &throttledDockerPuller{
+		puller:  dp,
+		limiter: util.NewTokenBucketRateLimiter(qps, burst),
+	}
 }
 
 type dockerContainerCommandRunner struct{}
@@ -128,6 +139,13 @@ func (p dockerPuller) Pull(image string) error {
 	}
 
 	return p.client.PullImage(opts, creds)
+}
+
+func (p throttledDockerPuller) Pull(image string) error {
+	if p.limiter.CanAccept() {
+		return p.puller.Pull(image)
+	}
+	return fmt.Errorf("pull QPS exceeded.")
 }
 
 // DockerContainers is a map of containers

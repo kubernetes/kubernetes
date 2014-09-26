@@ -61,6 +61,8 @@ var (
 	etcdServerList     util.StringList
 	rootDirectory      = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
 	allowPrivileged    = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
+	registryPullQPS    = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
+	registryBurst      = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
 )
 
 func init() {
@@ -157,7 +159,9 @@ func main() {
 		cadvisorClient,
 		etcdClient,
 		*rootDirectory,
-		*syncFrequency)
+		*syncFrequency,
+		float32(*registryPullQPS),
+		*registryBurst)
 
 	health.AddHealthChecker("exec", health.NewExecHealthChecker(k))
 	health.AddHealthChecker("http", health.NewHTTPHealthChecker(&http.Client{}))
