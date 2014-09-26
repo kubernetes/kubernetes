@@ -33,6 +33,7 @@ func TestValidatePodNoName(t *testing.T) {
 		"zero-length name":         {Name: "", Manifest: api.ContainerManifest{Version: "v1beta1"}},
 		"name > 255 characters":    {Name: strings.Repeat("a", 256), Manifest: api.ContainerManifest{Version: "v1beta1"}},
 		"name not a DNS subdomain": {Name: "a.b.c.", Manifest: api.ContainerManifest{Version: "v1beta1"}},
+		"name with underscore":     {Name: "a_b_c", Manifest: api.ContainerManifest{Version: "v1beta1"}},
 	}
 	for k, v := range errorCases {
 		if errs := ValidatePod(&v); len(errs) == 0 {
