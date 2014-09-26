@@ -62,7 +62,11 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	algo := algorithm.NewRandomFitScheduler(
+	algo := algorithm.NewGenericScheduler(
+		// Fit is defined based on the absence of port conflicts.
+		[]algorithm.FitPredicate{algorithm.PodFitsPorts},
+		// All nodes where things fit are equally likely (Random)
+		algorithm.EqualPriority,
 		&storeToPodLister{podCache}, r)
 
 	return &scheduler.Config{
