@@ -117,7 +117,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 
-	helper, err := master.NewEtcdHelper(servers, "")
+	helper, err := master.NewEtcdHelper(etcdClient, "")
 	if err != nil {
 		glog.Fatalf("Unable to get etcd helper: %v", err)
 	}
