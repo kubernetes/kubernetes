@@ -30,12 +30,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"code.google.com/p/go-uuid/uuid"
-	"code.google.com/p/go.net/context"
 )
 
 // PodLister is anything that knows how to list pods.
 type PodLister interface {
-	ListPods(ctx context.Context, labels labels.Selector) (*api.PodList, error)
+	ListPods(ctx api.Context, labels labels.Selector) (*api.PodList, error)
 }
 
 // REST implements apiserver.RESTStorage for the replication controller service.
@@ -55,7 +54,7 @@ func NewREST(registry Registry, podLister PodLister) *REST {
 }
 
 // Create registers the given ReplicationController.
-func (rs *REST) Create(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -81,14 +80,14 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object) (<-chan runtime.
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
-func (rs *REST) Delete(ctx context.Context, id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(id)
 	}), nil
 }
 
 // Get obtains the ReplicationController specified by its id.
-func (rs *REST) Get(ctx context.Context, id string) (runtime.Object, error) {
+func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	controller, err := rs.registry.GetController(id)
 	if err != nil {
 		return nil, err
@@ -98,7 +97,7 @@ func (rs *REST) Get(ctx context.Context, id string) (runtime.Object, error) {
 }
 
 // List obtains a list of ReplicationControllers that match selector.
-func (rs *REST) List(ctx context.Context, label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
@@ -124,7 +123,7 @@ func (*REST) New() runtime.Object {
 
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
-func (rs *REST) Update(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -143,7 +142,7 @@ func (rs *REST) Update(ctx context.Context, obj runtime.Object) (<-chan runtime.
 
 // Watch returns ReplicationController events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx context.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}
@@ -167,7 +166,7 @@ func (rs *REST) Watch(ctx context.Context, label, field labels.Selector, resourc
 	}), nil
 }
 
-func (rs *REST) waitForController(ctx context.Context, ctrl *api.ReplicationController) (runtime.Object, error) {
+func (rs *REST) waitForController(ctx api.Context, ctrl *api.ReplicationController) (runtime.Object, error) {
 	for {
 		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
 		if err != nil {
@@ -181,7 +180,7 @@ func (rs *REST) waitForController(ctx context.Context, ctrl *api.ReplicationCont
 	return ctrl, nil
 }
 
-func (rs *REST) fillCurrentState(ctx context.Context, ctrl *api.ReplicationController) error {
+func (rs *REST) fillCurrentState(ctx api.Context, ctrl *api.ReplicationController) error {
 	if rs.podLister == nil {
 		return nil
 	}

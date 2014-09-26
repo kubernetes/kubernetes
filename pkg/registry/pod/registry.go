@@ -17,8 +17,6 @@ limitations under the License.
 package pod
 
 import (
-	"code.google.com/p/go.net/context"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -27,7 +25,7 @@ import (
 // Registry is an interface implemented by things that know how to store Pod objects.
 type Registry interface {
 	// ListPods obtains a list of pods having labels which match selector.
-	ListPods(ctx context.Context, selector labels.Selector) (*api.PodList, error)
+	ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error)
 	// ListPodsPredicate obtains a list of pods for which filter returns true.
 	ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodList, error)
 	// Watch for new/changed/deleted pods

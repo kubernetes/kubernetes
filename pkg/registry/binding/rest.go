@@ -19,8 +19,6 @@ package binding
 import (
 	"fmt"
 
-	"code.google.com/p/go.net/context"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -43,17 +41,17 @@ func NewREST(bindingRegistry Registry) *REST {
 }
 
 // List returns an error because bindings are write-only objects.
-func (*REST) List(ctx context.Context, label, field labels.Selector) (runtime.Object, error) {
+func (*REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", "list")
 }
 
 // Get returns an error because bindings are write-only objects.
-func (*REST) Get(ctx context.Context, id string) (runtime.Object, error) {
+func (*REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
 // Delete returns an error because bindings are write-only objects.
-func (*REST) Delete(ctx context.Context, id string) (<-chan runtime.Object, error) {
+func (*REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
@@ -63,7 +61,7 @@ func (*REST) New() runtime.Object {
 }
 
 // Create attempts to make the assignment indicated by the binding it recieves.
-func (b *REST) Create(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	binding, ok := obj.(*api.Binding)
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
@@ -77,6 +75,6 @@ func (b *REST) Create(ctx context.Context, obj runtime.Object) (<-chan runtime.O
 }
 
 // Update returns an error-- this object may not be updated.
-func (b *REST) Update(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Bindings may not be changed.")
 }

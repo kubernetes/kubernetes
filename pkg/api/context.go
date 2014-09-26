@@ -20,7 +20,12 @@ import (
 	"code.google.com/p/go.net/context"
 )
 
+// Context carries values across API boundaries.
+type Context interface {
+	Value(key interface{}) interface{}
+}
+
 // NewContext instantiates a base context object for request flows
-func NewContext() context.Context {
-	return context.Background()
+func NewContext() Context {
+	return context.TODO()
 }

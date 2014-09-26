@@ -22,8 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-
-	"code.google.com/p/go.net/context"
 )
 
 type PodRegistry struct {
@@ -59,7 +57,7 @@ func (r *PodRegistry) ListPodsPredicate(filter func(*api.Pod) bool) (*api.PodLis
 	return &pods, nil
 }
 
-func (r *PodRegistry) ListPods(ctx context.Context, selector labels.Selector) (*api.PodList, error) {
+func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
 	return r.ListPodsPredicate(func(pod *api.Pod) bool {
 		return selector.Matches(labels.Set(pod.Labels))
 	})

@@ -19,8 +19,6 @@ package endpoint
 import (
 	"errors"
 
-	"code.google.com/p/go.net/context"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -40,12 +38,12 @@ func NewREST(registry Registry) *REST {
 }
 
 // Get satisfies the RESTStorage interface.
-func (rs *REST) Get(ctx context.Context, id string) (runtime.Object, error) {
+func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 	return rs.registry.GetEndpoints(id)
 }
 
 // List satisfies the RESTStorage interface.
-func (rs *REST) List(ctx context.Context, label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
 	if !label.Empty() || !field.Empty() {
 		return nil, errors.New("label/field selectors are not supported on endpoints")
 	}
@@ -54,22 +52,22 @@ func (rs *REST) List(ctx context.Context, label, field labels.Selector) (runtime
 
 // Watch returns Endpoint events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx context.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return rs.registry.WatchEndpoints(label, field, resourceVersion)
 }
 
 // Create satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Create(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Update satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Update(ctx context.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 
 // Delete satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Delete(ctx context.Context, id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
 	return nil, errors.New("unimplemented")
 }
 

@@ -19,8 +19,6 @@ package master
 import (
 	"sync"
 
-	"code.google.com/p/go.net/context"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -74,7 +72,7 @@ func (p *PodCache) updatePodInfo(host, id string) error {
 
 // UpdateAllContainers updates information about all containers.  Either called by Loop() below, or one-off.
 func (p *PodCache) UpdateAllContainers() {
-	var ctx context.Context
+	var ctx api.Context
 	pods, err := p.pods.ListPods(ctx, labels.Everything())
 	if err != nil {
 		glog.Errorf("Error synchronizing container list: %v", err)

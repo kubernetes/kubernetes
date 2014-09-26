@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"code.google.com/p/go.net/context"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -330,7 +328,7 @@ type fakePodLister struct {
 	s labels.Selector
 }
 
-func (f *fakePodLister) ListPods(ctx context.Context, s labels.Selector) (*api.PodList, error) {
+func (f *fakePodLister) ListPods(ctx api.Context, s labels.Selector) (*api.PodList, error) {
 	f.s = s
 	return &f.l, f.e
 }

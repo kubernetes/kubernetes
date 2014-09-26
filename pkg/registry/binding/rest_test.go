@@ -22,8 +22,6 @@ import (
 	"reflect"
 	"testing"
 
-	"code.google.com/p/go.net/context"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -54,7 +52,7 @@ func TestNewREST(t *testing.T) {
 }
 
 func TestRESTUnsupported(t *testing.T) {
-	var ctx context.Context
+	var ctx api.Context
 	mockRegistry := MockRegistry{
 		OnApplyBinding: func(b *api.Binding) error { return nil },
 	}
