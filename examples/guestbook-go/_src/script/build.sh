@@ -20,5 +20,5 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-docker build --rm --force-rm -t kubernetes/guestbook-build .
-docker run --rm kubernetes/guestbook-build | docker build -t kubernetes/guestbook -
+docker build --rm --force-rm -t kubernetes/guestbook-builder .
+docker run --rm kubernetes/guestbook-builder | docker build -t kubernetes/guestbook -
