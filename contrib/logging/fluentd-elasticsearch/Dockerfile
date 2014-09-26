@@ -18,6 +18,6 @@ RUN /usr/bin/curl -L http://toolbelt.treasuredata.com/sh/install-ubuntu-trusty-t
 RUN sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent
 RUN /usr/sbin/td-agent-gem install fluent-plugin-elasticsearch
 COPY td-agent.conf /etc/td-agent/td-agent.conf
+ADD run.sh /run.sh
 
-ENTRYPOINT ["/usr/sbin/td-agent"]
-CMD ["-v"]
+ENTRYPOINT ["/run.sh"]
