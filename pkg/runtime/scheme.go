@@ -198,8 +198,15 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj Object) {
 	s.raw.AddKnownTypeWithName(version, kind, obj)
 }
 
+// KnownTypes returns the types known for the given version.
+// Return value must be treated as read-only.
 func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
 	return s.raw.KnownTypes(version)
+}
+
+// ObjectVersionAndKind returns the version and kind of the given Object.
+func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
+	return s.raw.ObjectVersionAndKind(obj)
 }
 
 // New returns a new API object of the given version ("" for internal
