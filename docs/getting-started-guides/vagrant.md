@@ -220,7 +220,7 @@ $ cluster/kubecfg.sh list /services
 ID                  Labels              Selector            Port
 ----------          ----------          ----------          ----------
 
-$ cluster/kubecfg.sh list r/eplicationControllers
+$ cluster/kubecfg.sh list /replicationControllers
 ID                  Image(s)            Selector                        Replicas
 ----------          ----------          ----------                      ----------
 myNginx             dockerfile/nginx    replicationController=myNginx   3
