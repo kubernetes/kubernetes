@@ -266,12 +266,48 @@ func checkStorage(storage string) bool {
 	return false
 }
 
+func getPrinter() kubecfg.ResourcePrinter {
+	var printer kubecfg.ResourcePrinter
+	switch {
+	case *json:
+		printer = &kubecfg.IdentityPrinter{}
+	case *yaml:
+		printer = &kubecfg.YAMLPrinter{}
+	case len(*templateFile) > 0 || len(*templateStr) > 0:
+		var data []byte
+		if len(*templateFile) > 0 {
+			var err error
+			data, err = ioutil.ReadFile(*templateFile)
+			if err != nil {
+				glog.Fatalf("Error reading template %s, %v\n", *templateFile, err)
+				return nil
+			}
+		} else {
+			data = []byte(*templateStr)
+		}
+		tmpl, err := template.New("output").Parse(string(data))
+		if err != nil {
+			glog.Fatalf("Error parsing template %s, %v\n", string(data), err)
+			return nil
+		}
+		printer = &kubecfg.TemplatePrinter{
+			Template: tmpl,
+		}
+	default:
+		printer = humanReadablePrinter()
+	}
+	return printer
+}
+
 func executeAPIRequest(method string, c *client.Client) bool {
 	storage, path, hasSuffix := storagePathFromArg(flag.Arg(1))
 	validStorage := checkStorage(storage)
 	verb := ""
 	setBody := false
 	var version uint64
+
+	printer := getPrinter()
+
 	switch method {
 	case "get":
 		verb = "GET"
@@ -309,6 +345,14 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		if !validStorage || !hasSuffix {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>/<id>", method, prettyWireStorage())
 		}
+	case "print":
+		data := readConfig(storage, c.RESTClient.Codec)
+		obj, err := latest.Codec.Decode(data)
+		if err != nil {
+			glog.Fatalf("error setting resource version: %v", err)
+		}
+		printer.PrintObj(obj, os.Stdout)
+		return true
 	default:
 		return false
 	}
@@ -343,36 +387,6 @@ func executeAPIRequest(method string, c *client.Client) bool {
 	if err != nil {
 		glog.Fatalf("Got request error: %v\n", err)
 		return false
-	}
-
-	var printer kubecfg.ResourcePrinter
-	switch {
-	case *json:
-		printer = &kubecfg.IdentityPrinter{}
-	case *yaml:
-		printer = &kubecfg.YAMLPrinter{}
-	case len(*templateFile) > 0 || len(*templateStr) > 0:
-		var data []byte
-		if len(*templateFile) > 0 {
-			var err error
-			data, err = ioutil.ReadFile(*templateFile)
-			if err != nil {
-				glog.Fatalf("Error reading template %s, %v\n", *templateFile, err)
-				return false
-			}
-		} else {
-			data = []byte(*templateStr)
-		}
-		tmpl, err := template.New("output").Parse(string(data))
-		if err != nil {
-			glog.Fatalf("Error parsing template %s, %v\n", string(data), err)
-			return false
-		}
-		printer = &kubecfg.TemplatePrinter{
-			Template: tmpl,
-		}
-	default:
-		printer = humanReadablePrinter()
 	}
 
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
