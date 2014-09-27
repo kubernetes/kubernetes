@@ -37,6 +37,7 @@ func TestGenericJSONBase(t *testing.T) {
 		APIVersion:      "a",
 		Kind:            "b",
 		ResourceVersion: 1,
+		SelfLink:        "some/place/only/we/know",
 	}
 	g, err := newGenericJSONBase(reflect.ValueOf(&j).Elem())
 	if err != nil {
@@ -56,11 +57,15 @@ func TestGenericJSONBase(t *testing.T) {
 	if e, a := uint64(1), jbi.ResourceVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := "some/place/only/we/know", jbi.SelfLink(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 
 	jbi.SetID("bar")
 	jbi.SetAPIVersion("c")
 	jbi.SetKind("d")
 	jbi.SetResourceVersion(2)
+	jbi.SetSelfLink("google.com")
 
 	// Prove that jbi changes the original object.
 	if e, a := "bar", j.ID; e != a {
@@ -73,6 +78,9 @@ func TestGenericJSONBase(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := uint64(2), j.ResourceVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "google.com", j.SelfLink; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -138,6 +146,51 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		}
 		if actual != 5 {
 			t.Errorf("%s: expected %d, got %d", key, 5, actual)
+		}
+	}
+}
+
+func TestJSONBaseSelfLinker(t *testing.T) {
+	table := map[string]struct {
+		obj     Object
+		expect  string
+		try     string
+		succeed bool
+	}{
+		"normal": {
+			obj:     &MyAPIObject{JSONBase: JSONBase{SelfLink: "foobar"}},
+			expect:  "foobar",
+			try:     "newbar",
+			succeed: true,
+		},
+		"fail": {
+			obj:     &MyIncorrectlyMarkedAsAPIObject{},
+			succeed: false,
+		},
+	}
+
+	linker := NewJSONBaseSelfLinker()
+	for name, item := range table {
+		got, err := linker.SelfLink(item.obj)
+		if e, a := item.succeed, err == nil; e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+		if e, a := item.expect, got; item.succeed && e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+
+		err = linker.SetSelfLink(item.obj, item.try)
+		if e, a := item.succeed, err == nil; e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+		if item.succeed {
+			got, err := linker.SelfLink(item.obj)
+			if err != nil {
+				t.Errorf("%v: expected no err, got %v", name, err)
+			}
+			if e, a := item.try, got; e != a {
+				t.Errorf("%v: expected %v, got %v", name, e, a)
+			}
 		}
 	}
 }

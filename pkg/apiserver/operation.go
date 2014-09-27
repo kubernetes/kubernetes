@@ -63,12 +63,13 @@ func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // Operation represents an ongoing action which the server is performing.
 type Operation struct {
-	ID       string
-	result   runtime.Object
-	awaiting <-chan runtime.Object
-	finished *time.Time
-	lock     sync.Mutex
-	notify   chan struct{}
+	ID        string
+	result    runtime.Object
+	onReceive func(runtime.Object)
+	awaiting  <-chan runtime.Object
+	finished  *time.Time
+	lock      sync.Mutex
+	notify    chan struct{}
 }
 
 // Operations tracks all the ongoing operations.
@@ -90,13 +91,15 @@ func NewOperations() *Operations {
 	return ops
 }
 
-// NewOperation adds a new operation. It is lock-free.
-func (ops *Operations) NewOperation(from <-chan runtime.Object) *Operation {
+// NewOperation adds a new operation. It is lock-free. 'onReceive' will be called
+// with the value read from 'from', when it is read.
+func (ops *Operations) NewOperation(from <-chan runtime.Object, onReceive func(runtime.Object)) *Operation {
 	id := atomic.AddInt64(&ops.lastID, 1)
 	op := &Operation{
-		ID:       strconv.FormatInt(id, 10),
-		awaiting: from,
-		notify:   make(chan struct{}),
+		ID:        strconv.FormatInt(id, 10),
+		awaiting:  from,
+		onReceive: onReceive,
+		notify:    make(chan struct{}),
 	}
 	go op.wait()
 	go ops.insert(op)
@@ -159,6 +162,9 @@ func (op *Operation) wait() {
 
 	op.lock.Lock()
 	defer op.lock.Unlock()
+	if op.onReceive != nil {
+		op.onReceive(result)
+	}
 	op.result = result
 	finished := time.Now()
 	op.finished = &finished

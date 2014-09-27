@@ -45,20 +45,22 @@ func TestClient(t *testing.T) {
 	m := master.New(&master.Config{
 		EtcdHelper: helper,
 	})
-	s1, c1 := m.API_v1beta1()
-	s2, c2 := m.API_v1beta2()
+	s1, c1, loc1, sl1 := m.API_v1beta1()
+	s2, c2, loc2, sl2 := m.API_v1beta2()
 
 	testCases := map[string]struct {
-		Storage map[string]apiserver.RESTStorage
-		Codec   runtime.Codec
+		Storage    map[string]apiserver.RESTStorage
+		Codec      runtime.Codec
+		location   string
+		selfLinker runtime.SelfLinker
 	}{
-		"v1beta1": {s1, c1},
-		"v1beta2": {s2, c2},
+		"v1beta1": {s1, c1, loc1, sl1},
+		"v1beta2": {s2, c2, loc2, sl2},
 	}
 
 	for apiVersion, values := range testCases {
 		deleteAllEtcdKeys()
-		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion)))
+		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion), values.selfLinker))
 		client := client.NewOrDie(s.URL, apiVersion, nil)
 
 		info, err := client.ServerVersion()

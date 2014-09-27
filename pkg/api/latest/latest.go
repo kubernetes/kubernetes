@@ -49,16 +49,36 @@ var Codec = v1beta1.Codec
 // TODO: when versioning changes, make this part of each API definition.
 var ResourceVersioner = runtime.NewJSONBaseResourceVersioner()
 
+// SelfLinker can set or get the SelfLink field of all API types.
+// TODO: when versioning changes, make this part of each API definition.
+// TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
+// to go through the InterfacesFor method below.
+var SelfLinker = runtime.NewJSONBaseSelfLinker()
+
+// VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
+type VersionInterfaces struct {
+	runtime.Codec
+	runtime.ResourceVersioner
+	runtime.SelfLinker
+}
+
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
-func InterfacesFor(version string) (codec runtime.Codec, versioner runtime.ResourceVersioner, err error) {
+func InterfacesFor(version string) (*VersionInterfaces, error) {
 	switch version {
 	case "v1beta1":
-		codec, versioner = v1beta1.Codec, ResourceVersioner
+		return &VersionInterfaces{
+			Codec:             v1beta1.Codec,
+			ResourceVersioner: ResourceVersioner,
+			SelfLinker:        SelfLinker,
+		}, nil
 	case "v1beta2":
-		codec, versioner = v1beta2.Codec, ResourceVersioner
+		return &VersionInterfaces{
+			Codec:             v1beta2.Codec,
+			ResourceVersioner: ResourceVersioner,
+			SelfLinker:        SelfLinker,
+		}, nil
 	default:
-		err = fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
 	}
-	return
 }
