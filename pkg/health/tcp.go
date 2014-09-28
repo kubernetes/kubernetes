@@ -81,3 +81,7 @@ func (t *TCPHealthChecker) HealthCheck(podFullName string, currentState api.PodS
 	}
 	return DoTCPCheck(net.JoinHostPort(host, strconv.Itoa(port)))
 }
+
+func (t *TCPHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return probe.TCPSocket != nil
+}

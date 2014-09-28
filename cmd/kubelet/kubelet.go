@@ -163,9 +163,11 @@ func main() {
 		float32(*registryPullQPS),
 		*registryBurst)
 
-	health.AddHealthChecker("exec", health.NewExecHealthChecker(k))
-	health.AddHealthChecker("http", health.NewHTTPHealthChecker(&http.Client{}))
-	health.AddHealthChecker("tcp", &health.TCPHealthChecker{})
+	// TODO: These should probably become more plugin-ish: register a factory func
+	// in each checker's init(), iterate those here.
+	health.AddHealthChecker(health.NewExecHealthChecker(k))
+	health.AddHealthChecker(health.NewHTTPHealthChecker(&http.Client{}))
+	health.AddHealthChecker(&health.TCPHealthChecker{})
 
 	// start the kubelet
 	go util.Forever(func() { k.Run(cfg.Updates()) }, 0)

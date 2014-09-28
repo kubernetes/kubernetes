@@ -57,3 +57,7 @@ func (e *ExecHealthChecker) HealthCheck(podFullName string, currentState api.Pod
 	}
 	return Healthy, nil
 }
+
+func (e *ExecHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return probe.Exec != nil
+}

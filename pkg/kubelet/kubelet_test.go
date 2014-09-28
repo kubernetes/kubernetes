@@ -457,6 +457,10 @@ func (f *FalseHealthChecker) HealthCheck(podFullName string, state api.PodState,
 	return health.Unhealthy, nil
 }
 
+func (f *FalseHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return true
+}
+
 func TestSyncPodBadHash(t *testing.T) {
 	kubelet, _, fakeDocker := newTestKubelet(t)
 	kubelet.healthChecker = &FalseHealthChecker{}
@@ -522,8 +526,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 			Containers: []api.Container{
 				{Name: "bar",
 					LivenessProbe: &api.LivenessProbe{
-						// Always returns healthy == false
-						Type: "false",
+					// Always returns healthy == false
 					},
 				},
 			},
