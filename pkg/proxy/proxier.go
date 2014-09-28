@@ -32,7 +32,7 @@ import (
 
 type serviceInfo struct {
 	port     int
-	protocol string
+	protocol api.Protocol
 	socket   proxySocket
 	timeout  time.Duration
 	mu       sync.Mutex // protects active
@@ -276,8 +276,8 @@ func logTimeout(err error) bool {
 	return false
 }
 
-func newProxySocket(protocol string, host string, port int) (proxySocket, error) {
-	switch strings.ToUpper(protocol) {
+func newProxySocket(protocol api.Protocol, host string, port int) (proxySocket, error) {
+	switch strings.ToUpper(string(protocol)) {
 	case "TCP":
 		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 		if err != nil {
@@ -350,7 +350,7 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 // addServiceOnUnusedPort starts listening for a new service, returning the
 // port it's using.  For testing on a system with unknown ports used.  The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnUnusedPort(service, protocol string, timeout time.Duration) (string, error) {
+func (proxier *Proxier) addServiceOnUnusedPort(service string, protocol api.Protocol, timeout time.Duration) (string, error) {
 	sock, err := newProxySocket(protocol, proxier.address, 0)
 	if err != nil {
 		return "", err

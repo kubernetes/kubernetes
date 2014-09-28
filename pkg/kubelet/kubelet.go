@@ -222,7 +222,7 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		// Some of this port stuff is under-documented voodoo.
 		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
 		var protocol string
-		switch strings.ToUpper(port.Protocol) {
+		switch strings.ToUpper(string(port.Protocol)) {
 		case "UDP":
 			protocol = "/udp"
 		case "TCP":

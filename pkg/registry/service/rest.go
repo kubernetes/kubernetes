@@ -222,9 +222,9 @@ func makeEnvVariableName(str string) string {
 
 func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
 	prefix := makeEnvVariableName(service.ID)
-	protocol := "TCP"
+	protocol := string(api.ProtocolTCP)
 	if service.Protocol != "" {
-		protocol = service.Protocol
+		protocol = string(service.Protocol)
 	}
 	portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, service.Port, strings.ToUpper(protocol))
 	return []api.EnvVar{

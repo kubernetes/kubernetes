@@ -706,7 +706,7 @@ func TestAsyncCreateError(t *testing.T) {
 	expectedStatus := &api.Status{
 		Status:  api.StatusFailure,
 		Code:    http.StatusConflict,
-		Reason:  "already_exists",
+		Reason:  "AlreadyExists",
 		Message: expectedErr.Error(),
 		Details: &api.StatusDetails{
 			Kind: "foo",

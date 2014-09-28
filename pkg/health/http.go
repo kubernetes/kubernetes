@@ -105,3 +105,7 @@ func (h *HTTPHealthChecker) HealthCheck(podFullName string, currentState api.Pod
 	}
 	return DoHTTPCheck(formatURL(host, port, path), h.client)
 }
+
+func (h *HTTPHealthChecker) CanCheck(probe *api.LivenessProbe) bool {
+	return probe.HTTPGet != nil
+}

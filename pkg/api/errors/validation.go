@@ -28,22 +28,23 @@ import (
 // CauseType in api/types.go.
 type ValidationErrorType string
 
+// TODO: These values are duplicated in api/types.go, but there's a circular dep.  Fix it.
 const (
 	// ValidationErrorTypeNotFound is used to report failure to find a requested value
 	// (e.g. looking up an ID).
-	ValidationErrorTypeNotFound ValidationErrorType = "fieldValueNotFound"
+	ValidationErrorTypeNotFound ValidationErrorType = "FieldValueNotFound"
 	// ValidationErrorTypeRequired is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).
-	ValidationErrorTypeRequired ValidationErrorType = "fieldValueRequired"
+	ValidationErrorTypeRequired ValidationErrorType = "FieldValueRequired"
 	// ValidationErrorTypeDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).
-	ValidationErrorTypeDuplicate ValidationErrorType = "fieldValueDuplicate"
+	ValidationErrorTypeDuplicate ValidationErrorType = "FieldValueDuplicate"
 	// ValidationErrorTypeInvalid is used to report malformed values (e.g. failed regex
 	// match).
-	ValidationErrorTypeInvalid ValidationErrorType = "fieldValueInvalid"
+	ValidationErrorTypeInvalid ValidationErrorType = "FieldValueInvalid"
 	// ValidationErrorTypeNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
-	ValidationErrorTypeNotSupported ValidationErrorType = "fieldValueNotSupported"
+	ValidationErrorTypeNotSupported ValidationErrorType = "FieldValueNotSupported"
 )
 
 func ValueOf(t ValidationErrorType) string {

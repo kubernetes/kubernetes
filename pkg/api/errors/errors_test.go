@@ -29,26 +29,26 @@ import (
 func TestErrorNew(t *testing.T) {
 	err := NewAlreadyExists("test", "1")
 	if !IsAlreadyExists(err) {
-		t.Errorf("expected to be already_exists")
+		t.Errorf("expected to be %s", api.StatusReasonAlreadyExists)
 	}
 	if IsConflict(err) {
-		t.Errorf("expected to not be confict")
+		t.Errorf("expected to not be %s", api.StatusReasonConflict)
 	}
 	if IsNotFound(err) {
 		t.Errorf(fmt.Sprintf("expected to not be %s", api.StatusReasonNotFound))
 	}
 	if IsInvalid(err) {
-		t.Errorf("expected to not be invalid")
+		t.Errorf("expected to not be %s", api.StatusReasonInvalid)
 	}
 
 	if !IsConflict(NewConflict("test", "2", errors.New("message"))) {
 		t.Errorf("expected to be conflict")
 	}
 	if !IsNotFound(NewNotFound("test", "3")) {
-		t.Errorf("expected to be not found")
+		t.Errorf("expected to be %s", api.StatusReasonNotFound)
 	}
 	if !IsInvalid(NewInvalid("test", "2", nil)) {
-		t.Errorf("expected to be invalid")
+		t.Errorf("expected to be %s", api.StatusReasonInvalid)
 	}
 }
 
@@ -122,7 +122,7 @@ func TestNewInvalid(t *testing.T) {
 			t.Errorf("%d: unexpected status: %#v", i, status)
 		}
 		if !reflect.DeepEqual(expected, status.Details) {
-			t.Errorf("%d: expected %#v, got %#v", expected, status.Details)
+			t.Errorf("%d: expected %#v, got %#v", i, expected, status.Details)
 		}
 	}
 }

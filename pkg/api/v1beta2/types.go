@@ -100,6 +100,16 @@ type HostDirectory struct {
 
 type EmptyDirectory struct{}
 
+// Protocol defines network protocols supported for things like conatiner ports.
+type Protocol string
+
+const (
+	// ProtocolTCP is the TCP protocol.
+	ProtocolTCP Protocol = "TCP"
+	// ProtocolUDP is the UDP protocol.
+	ProtocolUDP Protocol = "UDP"
+)
+
 // Port represents a network port in a single container.
 type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
@@ -109,8 +119,8 @@ type Port struct {
 	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
-	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Optional: Defaults to "TCP".
+	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
 	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
 }
@@ -170,8 +180,6 @@ type ExecAction struct {
 // LivenessProbe describes a liveness probe to be examined to the container.
 // TODO: pass structured data to the actions, and document that data here.
 type LivenessProbe struct {
-	// Type of liveness probe.  Current legal values "http", "tcp"
-	Type string `yaml:"type,omitempty" json:"type,omitempty"`
 	// HTTPGetProbe parameters, required if Type == 'http'
 	HTTPGet *HTTPGetAction `yaml:"httpGet,omitempty" json:"httpGet,omitempty"`
 	// TCPSocketProbe parameter, required if Type == 'tcp'
@@ -391,8 +399,8 @@ type Service struct {
 
 	// Required.
 	Port int `json:"port" yaml:"port"`
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
-	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Optional: Defaults to "TCP".
+	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 
 	// This service's labels.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -460,12 +468,12 @@ func (*Binding) IsAnAPIObject() {}
 // import both.
 type Status struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	// One of: "success", "failure", "working" (for operations not yet completed)
+	// One of: "Success", "Failure", "Working" (for operations not yet completed)
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
 	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 	// A machine-readable description of why this operation is in the
-	// "failure" or "working" status. If this value is empty there
+	// "Failure" or "Working" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
 	Reason StatusReason `json:"reason,omitempty" yaml:"reason,omitempty"`
@@ -500,9 +508,9 @@ type StatusDetails struct {
 
 // Values of Status.Status
 const (
-	StatusSuccess = "success"
-	StatusFailure = "failure"
-	StatusWorking = "working"
+	StatusSuccess = "Success"
+	StatusFailure = "Failure"
+	StatusWorking = "Working"
 )
 
 // StatusReason is an enumeration of possible failure causes.  Each StatusReason
@@ -527,7 +535,7 @@ const (
 	//   "Location" - HTTP header populated with a URL that can retrieved the final
 	//                status of this operation.
 	// Status code 202
-	StatusReasonWorking StatusReason = "working"
+	StatusReasonWorking StatusReason = "Working"
 
 	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
@@ -537,21 +545,21 @@ const (
 	//                   resource.
 	//   "id"   string - the identifier of the missing resource
 	// Status code 404
-	StatusReasonNotFound StatusReason = "not_found"
+	StatusReasonNotFound StatusReason = "NotFound"
 
 	// StatusReasonAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the conflicting resource
 	//   "id"   string - the identifier of the conflicting resource
 	// Status code 409
-	StatusReasonAlreadyExists StatusReason = "already_exists"
+	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
 
 	// StatusReasonConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
 	// Each resource may define custom details that indicate the nature of the
 	// conflict.
 	// Status code 409
-	StatusReasonConflict StatusReason = "conflict"
+	StatusReasonConflict StatusReason = "Conflict"
 
 	// StatusReasonInvalid means the requested create or update operation cannot be
 	// completed due to invalid data provided as part of the request. The client may
@@ -564,7 +572,7 @@ const (
 	//                   provided resource that was invalid.  The code, message, and
 	//                   field attributes will be set.
 	// Status code 422
-	StatusReasonInvalid StatusReason = "invalid"
+	StatusReasonInvalid StatusReason = "Invalid"
 )
 
 // StatusCause provides more information about an api.Status failure, including
@@ -590,25 +598,25 @@ type StatusCause struct {
 
 // CauseType is a machine readable value providing more detail about what
 // occured in a status response. An operation may have multiple causes for a
-// status (whether failure, success, or working).
+// status (whether Failure, Success, or Working).
 type CauseType string
 
 const (
 	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
 	// (e.g. looking up an ID).
-	CauseTypeFieldValueNotFound CauseType = "fieldValueNotFound"
+	CauseTypeFieldValueNotFound CauseType = "FieldValueNotFound"
 	// CauseTypeFieldValueInvalid is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).
-	CauseTypeFieldValueRequired CauseType = "fieldValueRequired"
+	CauseTypeFieldValueRequired CauseType = "FieldValueRequired"
 	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).
-	CauseTypeFieldValueDuplicate CauseType = "fieldValueDuplicate"
+	CauseTypeFieldValueDuplicate CauseType = "FieldValueDuplicate"
 	// CauseTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
 	// match).
-	CauseTypeFieldValueInvalid CauseType = "fieldValueInvalid"
+	CauseTypeFieldValueInvalid CauseType = "FieldValueInvalid"
 	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
-	CauseTypeFieldValueNotSupported CauseType = "fieldValueNotSupported"
+	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
 )
 
 // ServerOp is an operation delivered to API clients.
