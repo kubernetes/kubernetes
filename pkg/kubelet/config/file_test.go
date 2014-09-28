@@ -27,7 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {

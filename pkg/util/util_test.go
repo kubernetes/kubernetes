@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 type FakeJSONBase struct {
@@ -89,6 +89,13 @@ func TestNewIntOrStringFromString(t *testing.T) {
 type IntOrStringHolder struct {
 	IOrS IntOrString `json:"val" yaml:"val"`
 }
+
+// Ensure *IntOrString implements the right interfaces.
+var intstr = &IntOrString{}
+var _ yaml.Marshaler = intstr
+var _ yaml.Unmarshaler = intstr
+var _ json.Marshaler = intstr
+var _ json.Unmarshaler = intstr
 
 func TestIntOrStringUnmarshalYAML(t *testing.T) {
 	cases := []struct {

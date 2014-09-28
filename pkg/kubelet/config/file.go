@@ -32,7 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 type SourceFile struct {

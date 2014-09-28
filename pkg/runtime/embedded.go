@@ -17,7 +17,7 @@ limitations under the License.
 package runtime
 
 import (
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // Encode()/Decode() are the canonical way of converting an API object to/from
