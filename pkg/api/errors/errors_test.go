@@ -122,7 +122,7 @@ func TestNewInvalid(t *testing.T) {
 			t.Errorf("%d: unexpected status: %#v", i, status)
 		}
 		if !reflect.DeepEqual(expected, status.Details) {
-			t.Errorf("%d: expected %#v, got %#v", expected, status.Details)
+			t.Errorf("%d: expected %#v, got %#v", i, expected, status.Details)
 		}
 	}
 }

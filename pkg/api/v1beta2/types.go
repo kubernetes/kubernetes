@@ -604,19 +604,19 @@ type CauseType string
 const (
 	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
 	// (e.g. looking up an ID).
-	CauseTypeFieldValueNotFound CauseType = "fieldValueNotFound"
+	CauseTypeFieldValueNotFound CauseType = "FieldValueNotFound"
 	// CauseTypeFieldValueInvalid is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).
-	CauseTypeFieldValueRequired CauseType = "fieldValueRequired"
+	CauseTypeFieldValueRequired CauseType = "FieldValueRequired"
 	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).
-	CauseTypeFieldValueDuplicate CauseType = "fieldValueDuplicate"
+	CauseTypeFieldValueDuplicate CauseType = "FieldValueDuplicate"
 	// CauseTypeFieldValueInvalid is used to report malformed values (e.g. failed regex
 	// match).
-	CauseTypeFieldValueInvalid CauseType = "fieldValueInvalid"
+	CauseTypeFieldValueInvalid CauseType = "FieldValueInvalid"
 	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
-	CauseTypeFieldValueNotSupported CauseType = "fieldValueNotSupported"
+	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
 )
 
 // ServerOp is an operation delivered to API clients.
