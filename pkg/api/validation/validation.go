@@ -78,7 +78,7 @@ func validateHostDir(hostDir *api.HostDirectory) errs.ErrorList {
 	return allErrs
 }
 
-var supportedPortProtocols = util.NewStringSet("TCP", "UDP")
+var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
 func validatePorts(ports []api.Port) errs.ErrorList {
 	allErrs := errs.ErrorList{}
@@ -106,7 +106,7 @@ func validatePorts(ports []api.Port) errs.ErrorList {
 		}
 		if len(port.Protocol) == 0 {
 			port.Protocol = "TCP"
-		} else if !supportedPortProtocols.Has(strings.ToUpper(port.Protocol)) {
+		} else if !supportedPortProtocols.Has(strings.ToUpper(string(port.Protocol))) {
 			pErrs = append(pErrs, errs.NewFieldNotSupported("protocol", port.Protocol))
 		}
 		allErrs = append(allErrs, pErrs.PrefixIndex(i)...)
@@ -330,7 +330,7 @@ func ValidateService(service *api.Service) errs.ErrorList {
 	}
 	if len(service.Protocol) == 0 {
 		service.Protocol = "TCP"
-	} else if !supportedPortProtocols.Has(strings.ToUpper(service.Protocol)) {
+	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Protocol))) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", service.Protocol))
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {

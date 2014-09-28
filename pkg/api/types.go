@@ -100,6 +100,16 @@ type HostDirectory struct {
 
 type EmptyDirectory struct{}
 
+// Protocol defines network protocols supported for things like conatiner ports.
+type Protocol string
+
+const (
+	// ProtocolTCP is the TCP protocol.
+	ProtocolTCP Protocol = "TCP"
+	// ProtocolUDP is the UDP protocol.
+	ProtocolUDP Protocol = "UDP"
+)
+
 // Port represents a network port in a single container.
 type Port struct {
 	// Optional: If specified, this must be a DNS_LABEL.  Each named port
@@ -109,8 +119,8 @@ type Port struct {
 	HostPort int `yaml:"hostPort,omitempty" json:"hostPort,omitempty"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `yaml:"containerPort" json:"containerPort"`
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
-	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Optional: Defaults to "TCP".
+	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 	// Optional: What host IP to bind the external port to.
 	HostIP string `yaml:"hostIP,omitempty" json:"hostIP,omitempty"`
 }
@@ -381,8 +391,8 @@ type Service struct {
 
 	// Required.
 	Port int `json:"port" yaml:"port"`
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
-	Protocol string `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Optional: Defaults to "TCP".
+	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 
 	// This service's labels.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
