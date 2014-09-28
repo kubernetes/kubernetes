@@ -468,12 +468,12 @@ func (*Binding) IsAnAPIObject() {}
 // import both.
 type Status struct {
 	JSONBase `json:",inline" yaml:",inline"`
-	// One of: "success", "failure", "working" (for operations not yet completed)
+	// One of: "Success", "Failure", "Working" (for operations not yet completed)
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
 	// A human-readable description of the status of this operation.
 	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 	// A machine-readable description of why this operation is in the
-	// "failure" or "working" status. If this value is empty there
+	// "Failure" or "Working" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
 	Reason StatusReason `json:"reason,omitempty" yaml:"reason,omitempty"`
@@ -508,9 +508,9 @@ type StatusDetails struct {
 
 // Values of Status.Status
 const (
-	StatusSuccess = "success"
-	StatusFailure = "failure"
-	StatusWorking = "working"
+	StatusSuccess = "Success"
+	StatusFailure = "Failure"
+	StatusWorking = "Working"
 )
 
 // StatusReason is an enumeration of possible failure causes.  Each StatusReason
@@ -598,7 +598,7 @@ type StatusCause struct {
 
 // CauseType is a machine readable value providing more detail about what
 // occured in a status response. An operation may have multiple causes for a
-// status (whether failure, success, or working).
+// status (whether Failure, Success, or Working).
 type CauseType string
 
 const (
