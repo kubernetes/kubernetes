@@ -535,7 +535,7 @@ const (
 	//   "Location" - HTTP header populated with a URL that can retrieved the final
 	//                status of this operation.
 	// Status code 202
-	StatusReasonWorking StatusReason = "working"
+	StatusReasonWorking StatusReason = "Working"
 
 	// StatusReasonNotFound means one or more resources required for this operation
 	// could not be found.
@@ -545,21 +545,21 @@ const (
 	//                   resource.
 	//   "id"   string - the identifier of the missing resource
 	// Status code 404
-	StatusReasonNotFound StatusReason = "not_found"
+	StatusReasonNotFound StatusReason = "NotFound"
 
 	// StatusReasonAlreadyExists means the resource you are creating already exists.
 	// Details (optional):
 	//   "kind" string - the kind attribute of the conflicting resource
 	//   "id"   string - the identifier of the conflicting resource
 	// Status code 409
-	StatusReasonAlreadyExists StatusReason = "already_exists"
+	StatusReasonAlreadyExists StatusReason = "AlreadyExists"
 
 	// StatusReasonConflict means the requested update operation cannot be completed
 	// due to a conflict in the operation. The client may need to alter the request.
 	// Each resource may define custom details that indicate the nature of the
 	// conflict.
 	// Status code 409
-	StatusReasonConflict StatusReason = "conflict"
+	StatusReasonConflict StatusReason = "Conflict"
 
 	// StatusReasonInvalid means the requested create or update operation cannot be
 	// completed due to invalid data provided as part of the request. The client may
@@ -572,7 +572,7 @@ const (
 	//                   provided resource that was invalid.  The code, message, and
 	//                   field attributes will be set.
 	// Status code 422
-	StatusReasonInvalid StatusReason = "invalid"
+	StatusReasonInvalid StatusReason = "Invalid"
 )
 
 // StatusCause provides more information about an api.Status failure, including
