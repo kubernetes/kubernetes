@@ -122,7 +122,7 @@ func (intstr IntOrString) MarshalYAML() (interface{}, error) {
 	case IntstrString:
 		return intstr.StrVal, nil
 	}
-	panic("impossible IntOrString.Kind")
+	return nil, fmt.Errorf("invalid IntOrString.Kind: %v", intstr.Kind)
 }
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
