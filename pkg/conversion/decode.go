@@ -19,7 +19,7 @@ package conversion
 import (
 	"fmt"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // Decode converts a YAML or JSON string back into a pointer to an api object.

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // MetaInsertionFactory is used to create an object to store and retrieve

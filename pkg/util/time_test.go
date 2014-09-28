@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 type TimeHolder struct {

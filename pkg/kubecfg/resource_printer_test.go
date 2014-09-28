@@ -26,7 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 func TestYAMLPrinterPrint(t *testing.T) {

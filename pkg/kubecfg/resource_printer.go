@@ -30,7 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
-	"gopkg.in/v1/yaml"
+	"gopkg.in/v2/yaml"
 )
 
 // ResourcePrinter is an interface that knows how to print API resources.
