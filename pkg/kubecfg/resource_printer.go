@@ -182,10 +182,17 @@ func makeImageList(manifest api.ContainerManifest) string {
 	return strings.Join(images, ",")
 }
 
+func podHostString(host, ip string) string {
+	if host == "" && ip == "" {
+		return "<unassigned>"
+	}
+	return host + "/" + ip
+}
+
 func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.ID, makeImageList(pod.DesiredState.Manifest),
-		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP,
+		podHostString(pod.CurrentState.Host, pod.CurrentState.HostIP),
 		labels.Set(pod.Labels), pod.CurrentState.Status)
 	return err
 }

@@ -133,7 +133,9 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 		}
 		pod.CurrentState.Status = status
 	}
-	pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
+	if pod.CurrentState.Host != "" {
+		pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
+	}
 	return pod, err
 }
 
@@ -165,7 +167,9 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 				return pod, err
 			}
 			pod.CurrentState.Status = status
-			pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
+			if pod.CurrentState.Host != "" {
+				pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
+			}
 		}
 	}
 	return pods, err
@@ -258,7 +262,7 @@ func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 	}
 	addr, err := instances.IPAddress(host)
 	if err != nil {
-		glog.Errorf("Error getting instance IP: %#v", err)
+		glog.Errorf("Error getting instance IP for %q: %#v", host, err)
 		return ""
 	}
 	return addr.String()

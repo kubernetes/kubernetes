@@ -341,7 +341,7 @@ func TestGetPod(t *testing.T) {
 func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}, CurrentState: api.PodState{Host: "machine"}}
 
 	clock := &fakeClock{t: time.Now()}
 
