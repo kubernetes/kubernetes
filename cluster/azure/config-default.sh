@@ -19,7 +19,7 @@ source $SCRIPT_DIR/../release/azure/config.sh
 
 AZ_SSH_KEY=$HOME/.ssh/azure_rsa
 AZ_SSH_CERT=$HOME/.ssh/azure.pem
-AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04-LTS-amd64-server-20140618.1-en-us-30GB
+AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04_1-LTS-amd64-server-20140926-en-us-30GB
 AZ_SUBNET=Subnet-1
 AZ_VNET=kube-$AZ_HSH
 AZ_CS=kube-$AZ_HSH
