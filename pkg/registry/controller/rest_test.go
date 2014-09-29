@@ -243,7 +243,7 @@ func TestCreateController(t *testing.T) {
 			PodTemplate:     validPodTemplate,
 		},
 	}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	channel, err := storage.Create(ctx, controller)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -279,8 +279,8 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
+	ctx := api.NewDefaultContext()
 	for _, failureCase := range failureCases {
-		ctx := api.NewContext()
 		c, err := storage.Create(ctx, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")
@@ -310,8 +310,8 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
+	ctx := api.NewDefaultContext()
 	for _, failureCase := range failureCases {
-		ctx := api.NewContext()
 		c, err := storage.Update(ctx, &failureCase)
 		if c != nil {
 			t.Errorf("Expected nil channel")

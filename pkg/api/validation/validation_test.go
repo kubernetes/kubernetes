@@ -366,7 +366,7 @@ func TestValidateManifest(t *testing.T) {
 
 func TestValidatePod(t *testing.T) {
 	errs := ValidatePod(&api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Labels: map[string]string{
 			"foo": "bar",
 		},
@@ -384,7 +384,7 @@ func TestValidatePod(t *testing.T) {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
 	errs = ValidatePod(&api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Labels: map[string]string{
 			"foo": "bar",
 		},
@@ -397,7 +397,7 @@ func TestValidatePod(t *testing.T) {
 	}
 
 	errs = ValidatePod(&api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Labels: map[string]string{
 			"foo": "bar",
 		},
@@ -424,6 +424,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "missing id",
 			svc: api.Service{
+				JSONBase: api.JSONBase{Namespace: api.NamespaceDefault},
 				Port:     8675,
 				Selector: map[string]string{"foo": "bar"},
 			},
@@ -431,9 +432,19 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "missing namespace",
+			svc: api.Service{
+				JSONBase: api.JSONBase{ID: "foo"},
+				Port:     8675,
+				Selector: map[string]string{"foo": "bar"},
+			},
+			// Should fail because the Namespace is missing.
+			numErrs: 1,
+		},
+		{
 			name: "invalid id",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "123abc"},
+				JSONBase: api.JSONBase{ID: "123abc", Namespace: api.NamespaceDefault},
 				Port:     8675,
 				Selector: map[string]string{"foo": "bar"},
 			},
@@ -443,7 +454,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "missing port",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "abc123"},
+				JSONBase: api.JSONBase{ID: "abc123", Namespace: api.NamespaceDefault},
 				Selector: map[string]string{"foo": "bar"},
 			},
 			// Should fail because the port number is missing/invalid.
@@ -452,7 +463,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid port",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "abc123"},
+				JSONBase: api.JSONBase{ID: "abc123", Namespace: api.NamespaceDefault},
 				Port:     65536,
 				Selector: map[string]string{"foo": "bar"},
 			},
@@ -462,7 +473,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid protocol",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "abc123"},
+				JSONBase: api.JSONBase{ID: "abc123", Namespace: api.NamespaceDefault},
 				Port:     8675,
 				Protocol: "INVALID",
 				Selector: map[string]string{"foo": "bar"},
@@ -473,7 +484,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "missing selector",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "foo"},
+				JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 				Port:     8675,
 			},
 			// Should fail because the selector is missing.
@@ -482,7 +493,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "valid 1",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "abc123"},
+				JSONBase: api.JSONBase{ID: "abc123", Namespace: api.NamespaceDefault},
 				Port:     1,
 				Protocol: "TCP",
 				Selector: map[string]string{"foo": "bar"},
@@ -492,7 +503,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "valid 2",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "abc123"},
+				JSONBase: api.JSONBase{ID: "abc123", Namespace: api.NamespaceDefault},
 				Port:     65535,
 				Protocol: "UDP",
 				Selector: map[string]string{"foo": "bar"},
@@ -502,7 +513,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "valid 3",
 			svc: api.Service{
-				JSONBase: api.JSONBase{ID: "abc123"},
+				JSONBase: api.JSONBase{ID: "abc123", Namespace: api.NamespaceDefault},
 				Port:     80,
 				Selector: map[string]string{"foo": "bar"},
 			},
@@ -519,7 +530,7 @@ func TestValidateService(t *testing.T) {
 
 	svc := api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		JSONBase: api.JSONBase{ID: "foo", Namespace: api.NamespaceDefault},
 		Selector: map[string]string{"foo": "bar"},
 	}
 	errs := ValidateService(&svc)
@@ -544,14 +555,14 @@ func TestValidateReplicationController(t *testing.T) {
 
 	successCases := []api.ReplicationController{
 		{
-			JSONBase: api.JSONBase{ID: "abc"},
+			JSONBase: api.JSONBase{ID: "abc", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		{
-			JSONBase: api.JSONBase{ID: "abc-123"},
+			JSONBase: api.JSONBase{ID: "abc-123", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
@@ -566,33 +577,40 @@ func TestValidateReplicationController(t *testing.T) {
 
 	errorCases := map[string]api.ReplicationController{
 		"zero-length ID": {
-			JSONBase: api.JSONBase{ID: ""},
+			JSONBase: api.JSONBase{ID: "", Namespace: api.NamespaceDefault},
+			DesiredState: api.ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     validPodTemplate,
+			},
+		},
+		"missing-namespace": {
+			JSONBase: api.JSONBase{ID: "abc-123"},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"empty selector": {
-			JSONBase: api.JSONBase{ID: "abc"},
+			JSONBase: api.JSONBase{ID: "abc", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
 				PodTemplate: validPodTemplate,
 			},
 		},
 		"selector_doesnt_match": {
-			JSONBase: api.JSONBase{ID: "abc"},
+			JSONBase: api.JSONBase{ID: "abc", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"foo": "bar"},
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"invalid manifest": {
-			JSONBase: api.JSONBase{ID: "abc"},
+			JSONBase: api.JSONBase{ID: "abc", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 			},
 		},
 		"negative_replicas": {
-			JSONBase: api.JSONBase{ID: "abc"},
+			JSONBase: api.JSONBase{ID: "abc", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
 				Replicas:        -1,
 				ReplicaSelector: validSelector,
@@ -608,6 +626,7 @@ func TestValidateReplicationController(t *testing.T) {
 			field := errs[i].(errors.ValidationError).Field
 			if !strings.HasPrefix(field, "desiredState.podTemplate.") &&
 				field != "id" &&
+				field != "controller.Namespace" &&
 				field != "desiredState.replicaSelector" &&
 				field != "desiredState.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])

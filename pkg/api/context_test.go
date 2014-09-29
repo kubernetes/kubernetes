@@ -46,6 +46,10 @@ func TestValidNamespaceOnCreateOrUpdate(t *testing.T) {
 	}
 	resource = api.ReplicationController{JSONBase: api.JSONBase{Namespace: "other"}}
 	if api.ValidNamespaceOnCreateOrUpdate(ctx, &resource.JSONBase) {
-		t.Errorf("Expected error that resource and context errors do not match")
+		t.Errorf("Expected error that resource and context errors do not match because resource has different namespace")
+	}
+	ctx = api.NewContext()
+	if api.ValidNamespaceOnCreateOrUpdate(ctx, &resource.JSONBase) {
+		t.Errorf("Expected error that resource and context errors do not match since context has no namespace")
 	}
 }
