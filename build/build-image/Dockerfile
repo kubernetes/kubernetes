@@ -14,38 +14,14 @@
 
 # This file creates a standard build environment for building Kubernetes
 
-FROM  google/debian:wheezy
+FROM  golang:cross
 MAINTAINER  Joe Beda <jbeda@google.com>
 
-RUN apt-get update -y && apt-get install --no-install-recommends -y -q \
-  curl \
-  build-essential \
-  ca-certificates \
-  git \
-  mercurial \
-  rsync
-
-# Install Go
-# Save the SHA1 checksum from http://golang.org/dl
-RUN echo '9f9dfcbcb4fa126b2b66c0830dc733215f2f056e  go1.3.src.tar.gz' > go1.3.src.tar.gz.sha1
-RUN curl -O -s https://storage.googleapis.com/golang/go1.3.src.tar.gz
-RUN sha1sum --check go1.3.src.tar.gz.sha1
-RUN tar -xzf go1.3.src.tar.gz -C /usr/local
-ENV PATH  /usr/local/go/bin:$PATH
-RUN cd /usr/local/go/src && ./make.bash --no-clean 2>&1
-
-# Compile Go for cross compilation
 ENV KUBE_CROSSPLATFORMS \
   linux/386 linux/arm \
   darwin/amd64 darwin/386
 # (set an explicit GOARM of 5 for maximum compatibility)
 ENV GOARM 5
-RUN cd /usr/local/go/src && \
-  bash -xc 'for platform in $KUBE_CROSSPLATFORMS; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean 2>&1; done'
-
-# Set up Go Environment
-ENV PATH    /go/bin:$PATH
-ENV GOPATH  /go
 ENV GOOS    linux
 ENV GOARCH  amd64
 
