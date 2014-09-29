@@ -65,7 +65,6 @@ function kube-up {
     trap "rm -rf ${KUBE_TEMP}" EXIT
 
     get-password
-    echo "Using password: $user:$passwd"
     python $SCRIPT_DIR/../third_party/htpasswd/htpasswd.py -b -c \
         ${KUBE_TEMP}/htpasswd $user $passwd
     HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
@@ -202,12 +201,15 @@ function kube-up {
     done
 
     echo
-    echo "Kubernetes cluster is running.  Access the master at:"
+    echo "Kubernetes cluster is running.  The master is running at:"
     echo
-    echo "  https://${user}:${passwd}@$AZ_CS.cloudapp.net"
+    echo "  https://$AZ_CS.cloudapp.net"
+    echo
+    echo "The user name and password to use is located in ~/.kubernetes_auth."
     echo
     echo "Security note: The server above uses a self signed certificate.  This is"
     echo "    subject to \"Man in the middle\" type attacks."
+    echo
 }
 
 # Delete a kubernetes cluster
@@ -241,11 +243,15 @@ function kube-down {
 
 #   get-password
 
-#   echo "Kubernetes cluster is updated.  Access the master at:"
+#   echo "Kubernetes cluster is updated.  The master is running at:"
 #   echo
-#   echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+#   echo "  https://${KUBE_MASTER_IP}"
 #   echo
-
+#   echo "The user name and password to use is located in ~/.kubernetes_auth."
+#   echo
+#   echo "Security note: The server above uses a self signed certificate.  This is"
+#   echo "    subject to \"Man in the middle\" type attacks."
+#   echo
 # }
 
 # # Execute prior to running tests to build a release if required for env

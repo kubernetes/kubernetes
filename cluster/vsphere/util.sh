@@ -101,8 +101,6 @@ function kube-up {
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
   get-password
-  echo "Using password: $user:$passwd"
-  echo
   python $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $user $passwd
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
@@ -220,9 +218,11 @@ function kube-up {
   done
 
   echo
-  echo "Kubernetes cluster is running. Access the master at:"
+  echo "Kubernetes cluster is running. The master is running at:"
   echo
-  echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+  echo "  https://${KUBE_MASTER_IP}"
+  echo
+  echo "The user name and password to use is located in ~/.kubernetes_auth."
   echo
   echo "Security note: The server above uses a self signed certificate."
   echo "This is subject to \"Man in the middle\" type attacks."
@@ -260,9 +260,12 @@ function kube-push {
 
   get-password
 
-  echo "Kubernetes cluster is updated.  Access the master at:"
   echo
-  echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+  echo "Kubernetes cluster is updated.  The master is running at:"
+  echo
+  echo "  https://${KUBE_MASTER_IP}"
+  echo
+  echo "The user name and password to use is located in ~/.kubernetes_auth."
   echo
 }
 

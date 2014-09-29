@@ -86,7 +86,7 @@ rax-boot-master() {
 --file /root/masterStart.sh=${KUBE_TEMP}/masterStart.sh \
 --nic net-id=${NETWORK_UUID} \
 ${MASTER_NAME}"
-  
+
   echo "cluster/rackspace/util.sh: Booting ${MASTER_NAME} with following command:"
   echo -e "\t$MASTER_BOOT_CMD"
   $MASTER_BOOT_CMD
@@ -96,7 +96,7 @@ rax-boot-minions() {
 
   cp $(dirname $0)/cloud-config/minion-cloud-config.yaml \
   ${KUBE_TEMP}/minion-cloud-config.yaml
-  
+
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 
     (
@@ -106,7 +106,7 @@ rax-boot-minions() {
       echo "NUM_MINIONS=${RAX_NUM_MINIONS}"
       grep -v "^#" $(dirname $0)/templates/salt-minion.sh
     ) > ${KUBE_TEMP}/minionStart${i}.sh
-  
+
     MINION_BOOT_CMD="nova boot \
 --key-name ${SSH_KEY_NAME} \
 --flavor ${KUBE_MINION_FLAVOR} \
@@ -117,7 +117,7 @@ rax-boot-minions() {
 --nic net-id=${NETWORK_UUID} \
 --file=/root/minionStart.sh=${KUBE_TEMP}/minionStart${i}.sh \
 ${MINION_NAMES[$i]}"
-  
+
     echo "cluster/rackspace/util.sh: Booting ${MINION_NAMES[$i]} with following command:"
     echo -e "\t$MINION_BOOT_CMD"
     $MINION_BOOT_CMD
@@ -128,10 +128,10 @@ rax-nova-network() {
   if ! $(nova network-list | grep $NOVA_NETWORK_LABEL > /dev/null 2>&1); then
     SAFE_CIDR=$(echo $NOVA_NETWORK_CIDR | tr -d '\\')
     NETWORK_CREATE_CMD="nova network-create $NOVA_NETWORK_LABEL $SAFE_CIDR"
-  
+
     echo "cluster/rackspace/util.sh: Creating cloud network with following command:"
     echo -e "\t${NETWORK_CREATE_CMD}"
-  
+
     $NETWORK_CREATE_CMD
   else
     echo "cluster/rackspace/util.sh: Using existing cloud network $NOVA_NETWORK_LABEL"
@@ -167,42 +167,41 @@ detect-master-nova-net() {
 }
 
 kube-up() {
-  
+
   SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
   source $(dirname $0)/../gce/util.sh
   source $(dirname $0)/util.sh
   source $(dirname $0)/../../release/rackspace/config.sh
-  
+
   # Find the release to use.  Generally it will be passed when doing a 'prod'
   # install and will default to the release/config.sh version when doing a
   # developer up.
   find-object-url $CONTAINER output/release/$TAR_FILE
-  
+
   # Create a temp directory to hold scripts that will be uploaded to master/minions
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
   trap "rm -rf ${KUBE_TEMP}" EXIT
-  
+
   get-password
-  echo "cluster/rackspace/util.sh: Using password: $user:$passwd"
   python $(dirname $0)/../../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $user $passwd
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
-  
+
   rax-nova-network
   NETWORK_UUID=$(nova network-list | grep -i ${NOVA_NETWORK_LABEL} | awk '{print $2}')
-  
+
   # create and upload ssh key if necessary
   rax-ssh-key
-  
+
   echo "cluster/rackspace/util.sh: Starting Cloud Servers"
   rax-boot-master
-  
+
   # a bit of a hack to wait until master is has an IP from the extra network
   echo "cluster/rackspace/util.sh: sleeping 35 seconds"
   sleep 35
-  
+
   detect-master-nova-net $NOVA_NETWORK_LABEL
   rax-boot-minions
-  
+
   FAIL=0
   for job in `jobs -p`
   do
@@ -221,19 +220,19 @@ kube-up() {
   echo "  This might loop forever if there was some uncaught error during start"
   echo "  up."
   echo
-  
+
   #This will fail until apiserver salt is updated
   until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
           --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
       printf "."
       sleep 2
   done
-  
+
   echo "Kubernetes cluster created."
   echo "Sanity checking cluster..."
-  
+
   sleep 5
-  
+
   # Don't bail on errors, we want to be able to print some info.
   set +e
   sleep 45
@@ -242,10 +241,13 @@ kube-up() {
 
   echo "All minions may not be online yet, this is okay."
   echo
-  echo "Kubernetes cluster is running.  Access the master at:"
+  echo "Kubernetes cluster is running.  The master is running at:"
   echo
-  echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+  echo "  https://${KUBE_MASTER_IP}"
+  echo
+  echo "The user name and password to use is located in ~/.kubernetes_auth."
   echo
   echo "Security note: The server above uses a self signed certificate.  This is"
   echo "    subject to \"Man in the middle\" type attacks."
+  echo
 }

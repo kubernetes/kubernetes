@@ -22,11 +22,11 @@ source $(dirname $0)/provision-config.sh
 minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   minion=${MINION_NAMES[$i]}
-  ip=${minion_ip_array[$i]}  
+  ip=${minion_ip_array[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
-  fi  
+  fi
 done
 
 # Update salt configuration
@@ -68,7 +68,6 @@ EOF
 # Configure nginx authorization
 mkdir -p $KUBE_TEMP
 mkdir -p /srv/salt/nginx
-echo "Using password: $MASTER_USER:$MASTER_PASSWD"
 python $(dirname $0)/../../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $MASTER_USER $MASTER_PASSWD
 MASTER_HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
