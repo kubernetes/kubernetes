@@ -39,7 +39,7 @@ function verify-prereqs {
 }
 
 # Instantiate a kubernetes cluster
-function kube-up {		
+function kube-up {
 
   get-password
   vagrant up
@@ -74,7 +74,7 @@ function kube-up {
       done
     done
   done
-  
+
   echo
   echo "Waiting for each minion to be registered with cloud provider"
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -85,13 +85,16 @@ function kube-up {
       COUNT=$(grep -c ${MINION_NAMES[i]} /tmp/minions) || { printf "."; sleep 2; COUNT="0"; }
     done
   done
-	
+
   echo
   echo "Kubernetes cluster created."
   echo
-  echo "Kubernetes cluster is running.  Access the master at:"
+  echo "Kubernetes cluster is running.  The master is running at:"
   echo
-  echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+  echo "  https://${KUBE_MASTER_IP}"
+  echo
+  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo
 }
 
 # Delete a kubernetes cluster
