@@ -18,6 +18,57 @@
 set -e
 source $(dirname $0)/provision-config.sh
 
+# # Install Docker on master to run the build.  This is a necessary chunk of
+# # bootstrapping.
+# yum install -y docker-io
+# SYSTEMD_LOG_LEVEL=notice systemctl enable docker
+# systemctl start docker
+
+# # Build release
+# echo "Building release"
+# pushd /vagrant
+#   bash -x ./build/release.sh
+# popd
+
+function release_not_found() {
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  exit 1
+}
+
+# Look for our precompiled binary releases.  When running from a source repo,
+# these are generated under _output.  When running from an release tarball these
+# are under ./server.
+server_binary_tar="/vagrant/server/kubernetes-server-linux-amd64.tar.gz"
+if [[ ! -f "$server_binary_tar" ]]; then
+  server_binary_tar="/vagrant/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+fi
+if [[ ! -f "$server_binary_tar" ]]; then
+  release_not_found
+fi
+
+salt_tar="/vagrant/server/kubernetes-salt.tar.gz"
+if [[ ! -f "$salt_tar" ]]; then
+  salt_tar="/vagrant/_output/release-tars/kubernetes-salt.tar.gz"
+fi
+if [[ ! -f "$salt_tar" ]]; then
+  release_not_found
+fi
+
+
+echo "Running release install script"
+rm -rf /kube-install
+mkdir -p /kube-install
+pushd /kube-install
+  tar xzf "$salt_tar"
+  cp "$server_binary_tar" .
+  ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
+popd
+
+
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
 minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -103,19 +154,10 @@ EOF
   SYSTEMD_LOG_LEVEL=notice systemctl enable salt-api
   systemctl start salt-api
 
+else
+  # Only run highstate when updating the config.  In the first-run case, Salt is
+  # set up to run highstate as new minions join for the first time.
+  echo "Executing configuration"
+  salt '*' mine.update
+  salt --force-color '*' state.highstate
 fi
-
-# Build release
-echo "Building release"
-pushd /vagrant
-  ./release/build-release.sh kubernetes
-popd
-
-echo "Running release install script"
-pushd /vagrant/_output/release/master-release/src/scripts
-  ./master-release-install.sh
-popd
-
-echo "Executing configuration"
-salt '*' mine.update
-salt --force-color '*' state.highstate

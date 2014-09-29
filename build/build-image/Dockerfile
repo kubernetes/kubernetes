@@ -28,10 +28,12 @@ ENV GOARCH  amd64
 # Get the code coverage tool and godep
 RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
 
-RUN mkdir -p /go/src/github.com/coreos/etcd && \
-    cd /go/src/github.com/coreos/etcd && \
-    git clone https://github.com/coreos/etcd.git . -b v0.4.6 --depth=1 && \
-    go install github.com/coreos/etcd
+# Download and symlink etcd.  We need this for our integration tests.
+RUN mkdir -p /usr/local/src/etcd &&\
+    cd /usr/local/src/etcd &&\
+    curl -L -O -s https://github.com/coreos/etcd/releases/download/v0.4.6/etcd-v0.4.6-linux-amd64.tar.gz &&\
+    tar xzf etcd-v0.4.6-linux-amd64.tar.gz &&\
+    ln -s ../src/etcd/etcd-v0.4.6-linux-amd64/etcd /usr/local/bin/
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image

@@ -152,7 +152,8 @@ function kube::build::build_image() {
     build
     cmd
     examples
-    Godeps
+    Godeps/Godeps.json
+    Godeps/_workspace/src
     hack
     LICENSE
     pkg
@@ -203,8 +204,9 @@ function kube::build::docker_build() {
 
   echo "+++ Building Docker image ${image}. This can take a while."
   set +e # We are handling the error here manually
-  local -r docker_output="$(${build_cmd} 2>&1)"
-  if [ $? -ne 0 ]; then
+  local -r docker_output
+  docker_output=$(${build_cmd} 2>&1)
+  if [[ $? -ne 0 ]]; then
     set -e
     echo "+++ Docker build command failed for ${image}" >&2
     echo >&2
@@ -245,7 +247,7 @@ function kube::build::clean_images() {
 function kube::build::run_build_command() {
   [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
 
-  local -r docker="docker run --name=${DOCKER_CONTAINER_NAME} -it ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+  local -r docker="docker run --name=${DOCKER_CONTAINER_NAME} --attach=stdout --attach=stderr --attach=stdin --tty ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
 
   # Remove the container if it is left over from some previous aborted run
   docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
@@ -393,9 +395,13 @@ function kube::release::package_full_tarball() {
   cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
   cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
 
+  mkdir -p "${release_stage}/third_party"
+  cp -R "${KUBE_REPO_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
+
   cp -R "${KUBE_REPO_ROOT}/examples" "${release_stage}/"
   cp "${KUBE_REPO_ROOT}/README.md" "${release_stage}/"
   cp "${KUBE_REPO_ROOT}/LICENSE" "${release_stage}/"
+  cp "${KUBE_REPO_ROOT}/Vagrantfile" "${release_stage}/"
 
   local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
   tar czf "${package_name}" -C "${release_stage}/.." .
