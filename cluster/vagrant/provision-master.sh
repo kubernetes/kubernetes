@@ -115,7 +115,7 @@ fi
 # Build release
 echo "Building release"
 pushd /vagrant
-  ./release/build-release.sh kubernetes
+  ./release/build-release.sh
 popd
 
 echo "Running release install script"

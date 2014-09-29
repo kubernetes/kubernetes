@@ -27,7 +27,7 @@ function json_val () {
 
 source $SCRIPT_DIR/config.sh
 
-$SCRIPT_DIR/../build-release.sh $INSTANCE_PREFIX
+$SCRIPT_DIR/../build-release.sh
 
 if [ -z "$(azure storage account show $AZ_STG 2>/dev/null | \
     grep data)" ]; then

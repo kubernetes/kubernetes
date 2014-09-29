@@ -22,8 +22,6 @@ set -o pipefail
 
 SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
-INSTANCE_PREFIX=$1
-
 KUBE_DIR=$SCRIPT_DIR/..
 
 . "${KUBE_DIR}/hack/config-go.sh"

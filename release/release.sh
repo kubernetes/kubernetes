@@ -43,7 +43,7 @@ source $(dirname ${BASH_SOURCE})/../cluster/${KUBERNETES_PROVIDER}/${KUBE_CONFIG
 
 cd $SCRIPT_DIR/..
 
-$SCRIPT_DIR/build-release.sh $INSTANCE_PREFIX
+$SCRIPT_DIR/build-release.sh
 
 echo "Building launch script"
 # Create the local install script.  These are the tools to install the local
