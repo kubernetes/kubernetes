@@ -20,7 +20,7 @@ MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
 NUM_MINIONS=2
 # gcloud/gcutil will expand this to the latest supported image.
-IMAGE=backports-debian-7-wheezy
+IMAGE=projects/debian-cloud/global/images/backports-debian-7-wheezy-v20140924
 NETWORK=e2e
 INSTANCE_PREFIX="e2e-test-${USER}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
