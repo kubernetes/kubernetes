@@ -6,6 +6,8 @@ Therefore, loosely coupled cooperating pods are organized using  organized using
 
 The use of labels in the presence of namespaces is [TBD](https://github.com/GoogleCloudPlatform/kubernetes/issues/1491).
 
+Label Keys should follow [DNS_SUBDOMAIN](./identifiers.md) format.
+
 Individual labels are used to specify identifying metadata, and to convey the semantic purposes/roles of pods of containers. Examples of typical pod label keys include `service`, `environment` (e.g., with values `dev`, `qa`, or `production`), `tier` (e.g., with values `frontend` or `backend`), and `track` (e.g., with values `daily` or `weekly`), but you are free to develop your own conventions.
 
 Each pod can have a set of key/value labels set on it, with at most one label with a particular key. 
