@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	stderrs "errors"
 	"fmt"
 	"sync"
 	"time"
@@ -69,6 +70,9 @@ func NewREST(config *RESTConfig) *REST {
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
+	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &pod.JSONBase) {
+		return nil, errors.NewConflict("pod", pod.Namespace, stderrs.New("Pod.Namespace does not match the provided context"))
+	}
 	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
 	if len(pod.ID) == 0 {
 		pod.ID = pod.DesiredState.Manifest.UUID
@@ -77,7 +81,6 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
 	}
-
 	pod.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
@@ -159,6 +162,9 @@ func (*REST) New() runtime.Object {
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
+	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &pod.JSONBase) {
+		return nil, errors.NewConflict("pod", pod.Namespace, stderrs.New("Pod.Namespace does not match the provided context"))
+	}
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
 	}
