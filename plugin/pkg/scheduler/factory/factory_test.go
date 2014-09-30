@@ -39,7 +39,7 @@ func TestCreate(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	client := client.NewOrDie(server.URL, "", nil)
+	client := client.NewOrDie(api.NewContext(), server.URL, "", nil)
 	factory := ConfigFactory{client}
 	factory.Create()
 }
@@ -74,7 +74,7 @@ func TestCreateLists(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.NewOrDie(server.URL, latest.OldestVersion, nil)
+		factory.Client = client.NewOrDie(api.NewContext(), server.URL, latest.OldestVersion, nil)
 		// This test merely tests that the correct request is made.
 		item.factory().List()
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -127,7 +127,7 @@ func TestCreateWatches(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.NewOrDie(server.URL, "v1beta1", nil)
+		factory.Client = client.NewOrDie(api.NewContext(), server.URL, "v1beta1", nil)
 		// This test merely tests that the correct request is made.
 		item.factory().Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -157,7 +157,7 @@ func TestPollMinions(t *testing.T) {
 		// FakeHandler musn't be sent requests other than the one you want to test.
 		mux.Handle("/api/v1beta1/minions", &handler)
 		server := httptest.NewServer(mux)
-		client := client.NewOrDie(server.URL, "v1beta1", nil)
+		client := client.NewOrDie(api.NewContext(), server.URL, "v1beta1", nil)
 		cf := ConfigFactory{client}
 
 		ce, err := cf.pollMinions()
@@ -184,7 +184,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	// FakeHandler musn't be sent requests other than the one you want to test.
 	mux.Handle("/api/v1beta1/pods/foo", &handler)
 	server := httptest.NewServer(mux)
-	factory := ConfigFactory{client.NewOrDie(server.URL, "", nil)}
+	factory := ConfigFactory{client.NewOrDie(api.NewContext(), server.URL, "", nil)}
 	queue := cache.NewFIFO()
 	errFunc := factory.makeDefaultErrorFunc(queue)
 
@@ -289,7 +289,7 @@ func TestBind(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		client := client.NewOrDie(server.URL, "", nil)
+		client := client.NewOrDie(api.NewContext(), server.URL, "", nil)
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {

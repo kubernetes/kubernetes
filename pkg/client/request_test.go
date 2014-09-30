@@ -49,7 +49,8 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, "v1beta2", &auth)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, testServer.URL, "v1beta2", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -84,7 +85,8 @@ func TestDoRequestNewWayReader(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, "v1beta1", &auth)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, testServer.URL, "v1beta1", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -121,7 +123,8 @@ func TestDoRequestNewWayObj(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, "v1beta2", &auth)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, testServer.URL, "v1beta2", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -171,7 +174,8 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, "v1beta1", &auth)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, testServer.URL, "v1beta1", &auth)
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
@@ -196,7 +200,8 @@ func TestDoRequestNewWayFile(t *testing.T) {
 }
 
 func TestVerbs(t *testing.T) {
-	c := NewOrDie("localhost", "", nil)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, "localhost", "", nil)
 	if r := c.Post(); r.verb != "POST" {
 		t.Errorf("Post verb is wrong")
 	}
@@ -212,8 +217,9 @@ func TestVerbs(t *testing.T) {
 }
 
 func TestAbsPath(t *testing.T) {
+	ctx := api.NewContext()
 	expectedPath := "/bar/foo"
-	c := NewOrDie("localhost", "", nil)
+	c := NewOrDie(ctx, "localhost", "", nil)
 	r := c.Post().Path("/foo").AbsPath(expectedPath)
 	if r.path != expectedPath {
 		t.Errorf("unexpected path: %s, expected %s", r.path, expectedPath)
@@ -221,7 +227,8 @@ func TestAbsPath(t *testing.T) {
 }
 
 func TestSync(t *testing.T) {
-	c := NewOrDie("localhost", "", nil)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, "localhost", "", nil)
 	r := c.Get()
 	if r.sync {
 		t.Errorf("sync has wrong default")
@@ -247,8 +254,9 @@ func TestUintParam(t *testing.T) {
 		{"baz", 0, "http://localhost?baz=0"},
 	}
 
+	ctx := api.NewContext()
 	for _, item := range table {
-		c := NewOrDie("localhost", "", nil)
+		c := NewOrDie(ctx, "localhost", "", nil)
 		r := c.Get().AbsPath("").UintParam(item.name, item.testVal)
 		if e, a := item.expectStr, r.finalURL(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
@@ -265,9 +273,9 @@ func TestUnacceptableParamNames(t *testing.T) {
 		{"sync", "foo", false},
 		{"timeout", "42", false},
 	}
-
+	ctx := api.NewContext()
 	for _, item := range table {
-		c := NewOrDie("localhost", "", nil)
+		c := NewOrDie(ctx, "localhost", "", nil)
 		r := c.Get().setParam(item.name, item.testVal)
 		if e, a := item.expectSuccess, r.err == nil; e != a {
 			t.Errorf("expected %v, got %v (%v)", e, a, r.err)
@@ -276,7 +284,8 @@ func TestUnacceptableParamNames(t *testing.T) {
 }
 
 func TestSetPollPeriod(t *testing.T) {
-	c := NewOrDie("localhost", "", nil)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, "localhost", "", nil)
 	r := c.Get()
 	if r.pollPeriod == 0 {
 		t.Errorf("polling should be on by default")
@@ -307,7 +316,8 @@ func TestPolling(t *testing.T) {
 	}))
 
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c := NewOrDie(testServer.URL, "v1beta1", &auth)
+	ctx := api.NewContext()
+	c := NewOrDie(ctx, testServer.URL, "v1beta1", &auth)
 
 	trials := []func(){
 		func() {
@@ -411,7 +421,8 @@ func TestWatch(t *testing.T) {
 		}
 	}))
 
-	s, err := New(testServer.URL, "v1beta1", &auth)
+	ctx := api.NewContext()
+	s, err := New(ctx, testServer.URL, "v1beta1", &auth)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
