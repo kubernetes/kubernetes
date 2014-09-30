@@ -106,7 +106,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		}
 	}
 
-	cl := client.NewOrDie(apiServer.URL, "", nil)
+	cl := client.NewOrDie(api.NewContext(), apiServer.URL, "", nil)
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 
@@ -311,7 +311,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(apiServerURL, "", nil)
+	kubeClient := client.NewOrDie(api.NewContext(), apiServerURL, "", nil)
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
