@@ -61,7 +61,9 @@ func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
 }
 
 func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	result := s.Client.Verb(r.Method).AbsPath(r.URL.Path).Body(r.Body).Do()
+	url := r.URL
+	selector := url.Query().Get("labels")
+	result := s.Client.Verb(r.Method).AbsPath(r.URL.Path).ParseSelectorParam("labels", selector).Body(r.Body).Do()
 	if result.Error() != nil {
 		s.doError(w, result.Error())
 		return
