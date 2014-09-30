@@ -40,56 +40,6 @@ import (
 // are therefore not allowed to set manually.
 var specialParams = util.NewStringSet("sync", "timeout")
 
-// Verb begins a request with a verb (GET, POST, PUT, DELETE).
-//
-// Example usage of Client's request building interface:
-// auth, err := LoadAuth(filename)
-// c := New(url, auth)
-// resp, err := c.Verb("GET").
-//	Path("pods").
-//	SelectorParam("labels", "area=staging").
-//	Timeout(10*time.Second).
-//	Do()
-// if err != nil { ... }
-// list, ok := resp.(*api.PodList)
-//
-func (c *RESTClient) Verb(verb string) *Request {
-	return &Request{
-		verb:       verb,
-		c:          c,
-		path:       c.prefix,
-		sync:       c.Sync,
-		timeout:    c.Timeout,
-		params:     map[string]string{},
-		pollPeriod: c.PollPeriod,
-	}
-}
-
-// Post begins a POST request. Short for c.Verb("POST").
-func (c *RESTClient) Post() *Request {
-	return c.Verb("POST")
-}
-
-// Put begins a PUT request. Short for c.Verb("PUT").
-func (c *RESTClient) Put() *Request {
-	return c.Verb("PUT")
-}
-
-// Get begins a GET request. Short for c.Verb("GET").
-func (c *RESTClient) Get() *Request {
-	return c.Verb("GET")
-}
-
-// Delete begins a DELETE request. Short for c.Verb("DELETE").
-func (c *RESTClient) Delete() *Request {
-	return c.Verb("DELETE")
-}
-
-// PollFor makes a request to do a single poll of the completion of the given operation.
-func (c *RESTClient) PollFor(operationID string) *Request {
-	return c.Get().Path("operations").Path(operationID).Sync(false).PollPeriod(0)
-}
-
 // Request allows for building up a request to a server in a chained fashion.
 // Any errors are stored until the end of your call, so you only have to
 // check once.
@@ -232,7 +182,8 @@ func (r *Request) PollPeriod(d time.Duration) *Request {
 }
 
 func (r *Request) finalURL() string {
-	finalURL := r.c.host + r.path
+	finalURL := *r.c.baseURL
+	finalURL.Path = r.path
 	query := url.Values{}
 	for key, value := range r.params {
 		query.Add(key, value)
@@ -245,8 +196,8 @@ func (r *Request) finalURL() string {
 			query.Add("timeout", r.timeout.String())
 		}
 	}
-	finalURL += "?" + query.Encode()
-	return finalURL
+	finalURL.RawQuery = query.Encode()
+	return finalURL.String()
 }
 
 // Watch attempts to begin watching the requested location.
@@ -259,10 +210,11 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	if r.c.auth != nil {
-		req.SetBasicAuth(r.c.auth.User, r.c.auth.Password)
+	client := r.c.Client
+	if client == nil {
+		client = http.DefaultClient
 	}
-	response, err := r.c.httpClient.Do(req)
+	response, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -284,10 +236,11 @@ func (r *Request) Do() Result {
 		}
 		respBody, err := r.c.doRequest(req)
 		if err != nil {
-			if statusErr, ok := err.(*StatusErr); ok {
-				if statusErr.Status.Status == api.StatusWorking && r.pollPeriod != 0 {
-					if statusErr.Status.Details != nil {
-						id := statusErr.Status.Details.ID
+			if s, ok := err.(APIStatus); ok {
+				status := s.Status()
+				if status.Status == api.StatusWorking && r.pollPeriod != 0 {
+					if status.Details != nil {
+						id := status.Details.ID
 						if len(id) > 0 {
 							glog.Infof("Waiting for completion of /operations/%s", id)
 							time.Sleep(r.pollPeriod)

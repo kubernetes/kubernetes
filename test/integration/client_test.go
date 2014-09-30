@@ -61,7 +61,7 @@ func TestClient(t *testing.T) {
 	for apiVersion, values := range testCases {
 		deleteAllEtcdKeys()
 		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion), values.selfLinker))
-		client := client.NewOrDie(api.NewContext(), s.URL, apiVersion, nil)
+		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
 
 		info, err := client.ServerVersion()
 		if err != nil {

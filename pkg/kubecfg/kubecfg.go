@@ -51,9 +51,14 @@ func promptForString(field string, r io.Reader) string {
 	return result
 }
 
+type AuthInfo struct {
+	User     string
+	Password string
+}
+
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
-func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
-	var auth client.AuthInfo
+func LoadAuthInfo(path string, r io.Reader) (*AuthInfo, error) {
+	var auth AuthInfo
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		auth.User = promptForString("Username", r)
 		auth.Password = promptForString("Password", r)

@@ -20,8 +20,6 @@ import (
 	"flag"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
@@ -33,12 +31,13 @@ import (
 
 var (
 	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
-	master         = flag.String("master", "", "The address of the Kubernetes API server (optional)")
 	etcdServerList util.StringList
 	bindAddress    = flag.String("bindaddress", "0.0.0.0", "The address for the proxy server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
+	clientConfig   = &client.Config{}
 )
 
 func init() {
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional)")
 }
 
@@ -53,13 +52,11 @@ func main() {
 	endpointsConfig := config.NewEndpointsConfig()
 
 	// define api config source
-	if *master != "" {
-		glog.Infof("Using api calls to get config %v", *master)
-		ctx := api.NewContext()
-		//TODO: add auth info
-		client, err := client.New(ctx, *master, latest.OldestVersion, nil)
+	if clientConfig.Host != "" {
+		glog.Infof("Using api calls to get config %v", clientConfig.Host)
+		client, err := client.New(clientConfig)
 		if err != nil {
-			glog.Fatalf("Invalid -master: %v", err)
+			glog.Fatalf("Invalid API configuration: %v", err)
 		}
 		config.NewSourceAPI(
 			client,
@@ -70,7 +67,7 @@ func main() {
 	}
 
 	// Create a configuration source that handles configuration from etcd.
-	if len(etcdServerList) > 0 && *master == "" {
+	if len(etcdServerList) > 0 && clientConfig.Host == "" {
 		glog.Infof("Using etcd servers %v", etcdServerList)
 
 		// Set up logger for etcd client

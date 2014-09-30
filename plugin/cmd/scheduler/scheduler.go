@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	masterPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -35,10 +33,14 @@ import (
 )
 
 var (
-	master  = flag.String("master", "", "The address of the Kubernetes API server")
-	port    = flag.Int("port", masterPkg.SchedulerPort, "The port that the scheduler's http service runs on")
-	address = flag.String("address", "127.0.0.1", "The address to serve from")
+	port         = flag.Int("port", masterPkg.SchedulerPort, "The port that the scheduler's http service runs on")
+	address      = flag.String("address", "127.0.0.1", "The address to serve from")
+	clientConfig = &client.Config{}
 )
+
+func init() {
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+}
 
 func main() {
 	flag.Parse()
@@ -47,11 +49,9 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	// TODO: security story for plugins!
-	ctx := api.NewContext()
-	kubeClient, err := client.New(ctx, *master, latest.OldestVersion, nil)
+	kubeClient, err := client.New(clientConfig)
 	if err != nil {
-		glog.Fatalf("Invalid -master: %v", err)
+		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
 	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)

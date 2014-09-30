@@ -24,7 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -37,7 +37,7 @@ func newPodList(count int) api.PodList {
 		pods = append(pods, api.Pod{
 			JSONBase: api.JSONBase{
 				ID:         fmt.Sprintf("pod%d", i),
-				APIVersion: "v1beta1",
+				APIVersion: testapi.Version(),
 			},
 			DesiredState: api.PodState{
 				Manifest: api.ContainerManifest{
@@ -58,7 +58,7 @@ func newPodList(count int) api.PodList {
 		})
 	}
 	return api.PodList{
-		JSONBase: api.JSONBase{APIVersion: "v1beta1", Kind: "PodList"},
+		JSONBase: api.JSONBase{APIVersion: testapi.Version(), Kind: "PodList"},
 		Items:    pods,
 	}
 }
@@ -143,10 +143,10 @@ func makeTestServer(t *testing.T, podResponse serverResponse, serviceResponse se
 		ResponseBody: util.EncodeJSON(endpointsResponse.obj),
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/api/v1beta1/pods", &fakePodHandler)
-	mux.Handle("/api/v1beta1/services", &fakeServiceHandler)
-	mux.Handle("/api/v1beta1/endpoints", &fakeEndpointsHandler)
-	mux.Handle("/api/v1beta1/endpoints/", &fakeEndpointsHandler)
+	mux.Handle("/api/"+testapi.Version()+"/pods", &fakePodHandler)
+	mux.Handle("/api/"+testapi.Version()+"/services", &fakeServiceHandler)
+	mux.Handle("/api/"+testapi.Version()+"/endpoints", &fakeEndpointsHandler)
+	mux.Handle("/api/"+testapi.Version()+"/endpoints/", &fakeEndpointsHandler)
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		res.WriteHeader(http.StatusNotFound)
@@ -159,7 +159,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, api.ServiceList{}},
 		serverResponse{http.StatusOK, api.Endpoints{}})
-	client := client.NewOrDie(api.NewContext(), testServer.URL, "v1beta1", nil)
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -172,7 +172,7 @@ func TestSyncEndpointsError(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusInternalServerError, api.ServiceList{}},
 		serverResponse{http.StatusOK, api.Endpoints{}})
-	client := client.NewOrDie(api.NewContext(), testServer.URL, "v1beta1", nil)
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	serviceRegistry := registrytest.ServiceRegistry{
 		Err: fmt.Errorf("test error"),
 	}
@@ -203,20 +203,20 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			},
 			Endpoints: []string{"6.7.8.9:1000"},
 		}})
-	client := client.NewOrDie(api.NewContext(), testServer.URL, "v1beta1", nil)
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	data := runtime.EncodeOrDie(v1beta1.Codec, &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Endpoints{
 		JSONBase: api.JSONBase{
 			ID:              "foo",
 			ResourceVersion: 1,
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1beta1/endpoints/foo", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
@@ -239,13 +239,13 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			},
 			Endpoints: []string{"1.2.3.4:8080"},
 		}})
-	client := client.NewOrDie(api.NewContext(), testServer.URL, "v1beta1", nil)
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	endpointsHandler.ValidateRequest(t, "/api/v1beta1/endpoints/foo", "GET", nil)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo", "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
@@ -263,19 +263,19 @@ func TestSyncEndpointsItems(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{}})
-	client := client.NewOrDie(api.NewContext(), testServer.URL, "v1beta1", nil)
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	serviceRegistry := registrytest.ServiceRegistry{}
 	endpoints := NewEndpointController(&serviceRegistry, client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	data := runtime.EncodeOrDie(v1beta1.Codec, &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Endpoints{
 		JSONBase: api.JSONBase{
 			ResourceVersion: 0,
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/v1beta1/endpoints", "POST", &data)
+	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints", "POST", &data)
 }
 
 func TestSyncEndpointsPodError(t *testing.T) {
@@ -292,7 +292,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		serverResponse{http.StatusInternalServerError, api.PodList{}},
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{}})
-	client := client.NewOrDie(api.NewContext(), testServer.URL, "v1beta1", nil)
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	serviceRegistry := registrytest.ServiceRegistry{
 		List: api.ServiceList{
 			Items: []api.Service{
