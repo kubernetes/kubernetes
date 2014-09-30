@@ -49,8 +49,9 @@ func TestChecksCodec(t *testing.T) {
 		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
 		"v1beta3": {true, "", nil},
 	}
+	ctx := api.NewContext()
 	for version, expected := range testCases {
-		client, err := New("127.0.0.1", version, nil)
+		client, err := New(ctx, "127.0.0.1", version, nil)
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -82,8 +83,9 @@ func TestValidatesHostParameter(t *testing.T) {
 		"http://host/server": {"http://host", "/server/api/v1beta1/", false},
 		"host/server":        {"", "", true},
 	}
+	ctx := api.NewContext()
 	for k, expected := range testCases {
-		c, err := NewRESTClient(k, nil, "/api/v1beta1/", v1beta1.Codec)
+		c, err := NewRESTClient(ctx, k, nil, "/api/v1beta1/", v1beta1.Codec)
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -381,6 +383,7 @@ type testClient struct {
 }
 
 func (c *testClient) Setup() *testClient {
+	ctx := api.NewContext()
 	c.handler = &util.FakeHandler{
 		StatusCode: c.Response.StatusCode,
 	}
@@ -389,7 +392,7 @@ func (c *testClient) Setup() *testClient {
 	}
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
-		c.Client = NewOrDie("localhost", "v1beta1", nil)
+		c.Client = NewOrDie(ctx, "localhost", "v1beta1", nil)
 	}
 	c.Client.host = c.server.URL
 	c.Client.prefix = "/api/v1beta1/"
@@ -573,7 +576,7 @@ func TestDoRequest(t *testing.T) {
 	testClients := []testClient{
 		{Request: testRequest{Method: "GET", Path: "good"}, Response: Response{StatusCode: 200}},
 		{Request: testRequest{Method: "GET", Path: "bad%ZZ"}, Error: true},
-		{Client: NewOrDie("localhost", "v1beta1", &AuthInfo{"foo", "bar", "", "", ""}), Request: testRequest{Method: "GET", Path: "auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
+		{Client: NewOrDie(api.NewContext(), "localhost", "v1beta1", &AuthInfo{"foo", "bar", "", "", ""}), Request: testRequest{Method: "GET", Path: "auth", Header: "Authorization"}, Response: Response{StatusCode: 200}},
 		{Client: &Client{&RESTClient{httpClient: http.DefaultClient}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "error"}, Response: Response{StatusCode: 500}, Error: true},
 		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
@@ -604,7 +607,8 @@ func TestDoRequestAccepted(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c, err := New(testServer.URL, "", &auth)
+	ctx := api.NewContext()
+	c, err := New(ctx, testServer.URL, "", &auth)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -641,7 +645,8 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
 	auth := AuthInfo{User: "user", Password: "pass"}
-	c, err := New(testServer.URL, "", &auth)
+	ctx := api.NewContext()
+	c, err := New(ctx, testServer.URL, "", &auth)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -678,7 +683,7 @@ func TestGetServerVersion(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	client := NewOrDie(server.URL, "", nil)
+	client := NewOrDie(api.NewContext(), server.URL, "", nil)
 
 	got, err := client.ServerVersion()
 	if err != nil {

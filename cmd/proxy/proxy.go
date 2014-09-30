@@ -20,6 +20,7 @@ import (
 	"flag"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
@@ -54,8 +55,9 @@ func main() {
 	// define api config source
 	if *master != "" {
 		glog.Infof("Using api calls to get config %v", *master)
+		ctx := api.NewContext()
 		//TODO: add auth info
-		client, err := client.New(*master, latest.OldestVersion, nil)
+		client, err := client.New(ctx, *master, latest.OldestVersion, nil)
 		if err != nil {
 			glog.Fatalf("Invalid -master: %v", err)
 		}
