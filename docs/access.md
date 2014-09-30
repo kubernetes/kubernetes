@@ -86,7 +86,7 @@ Related discussion:
 
 This doc describes two security profiles:
   - Simple profile:  like single-user mode.  Make it easy to evaluate K8s without lots of configuring accounts and policies.  Protects from unauthorized users, but does not partition authorized users.
-  - Enterprise profile: Provide mechanisms needed for large numbers of users.  Defence in depth.  Should integrate with existing enterprise security infrastructure.
+  - Enterprise profile: Provide mechanisms needed for large numbers of users.  Defense in depth.  Should integrate with existing enterprise security infrastructure.
  
 K8s distribution should include templates of config, and documentation, for simple and enterprise profiles.  System should be flexible enough for knowledgeable users to create intermediate profiles, but K8s developers should only reason about those two Profiles, not a matrix.
 
@@ -141,8 +141,7 @@ Improvements:
 ###Namespaces
 K8s will have a have a `namespace` API object.  It is similar to a Google Compute Engine `project`.  It provides a namespace for objects created by a group of people co-operating together, preventing name collisions with non-cooperating groups.  It also serves as a reference point for authorization policies.
 
-Namespaces are described in [namespace.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md),
-or will be once [#1114](https://github.com/GoogleCloudPlatform/kubernetes/pull/1114) is merged.
+Namespaces are described in [namespace.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md).
 
 In the Enterprise Profile:
    - a `userAccount` may have permission to access several `namespace`s. 
@@ -152,7 +151,7 @@ In the Simple Profile:
 
 Namespaces versus userAccount vs Labels:
 - `userAccount`s are intended for audit logging (both name and UID should be logged), and to define who has access to `namespace`s.
-- `labels` (see docs/labels.md) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.  
+- `labels` (see [docs/labels.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/labels.md)) should be used to distinguish pods, users, and other objects that cooperate towards a common goal but are different in some way, such as version, or responsibilities.  
 - `namespace`s prevent name collisions between uncoordinated groups of people, and provide a place to attach common policies for co-operating groups of people.
 
 
@@ -198,23 +197,22 @@ K8s authorization should:
 - Be separate as much as practical from Authentication, to allow Authentication methods to change over time and space, without impacting Authorization policies.
 
 K8s will implement a relatively simple 
-[Attribute-Based Access Control][http://en.wikipedia.org/wiki/Attribute_Based_Access_Control] model.
-The model will be described in more detail in a forthcoming document.  The model
+[Attribute-Based Access Control](http://en.wikipedia.org/wiki/Attribute_Based_Access_Control) model.
+The model will be described in more detail in a forthcoming document.  The model will
 - Be less complex than XACML
 - Be easily recognizable to those familiar with Amazon IAM Policies.
 - Have a subset/aliases/defaults which allow it to be used in a way comfortable to those users more familiar with Role-Based Access Control.
 
 Authorization policy is set by creating a set of Policy objects.
 
-The API Server will be the Enforcement Point for Policy. For each API call that it receives, it will construct the Attributes needed to evaluate the policy (what user is making the call, what resource they are accessing, what they are trying to do that resource, etc) and pass those attribytes to a Decision Point.  The Decision Point code evaluates the Attributes against all the Policies and allows or denys the API call.  The system will be modular enough that the Decision Point code can either be linked into the APIserver binary, or be another service that the apiserver calls for each Decision (with appropriate time-limited caching as needed for performance).
+The API Server will be the Enforcement Point for Policy. For each API call that it receives, it will construct the Attributes needed to evaluate the policy (what user is making the call, what resource they are accessing, what they are trying to do that resource, etc) and pass those attributes to a Decision Point.  The Decision Point code evaluates the Attributes against all the Policies and allows or denies the API call.  The system will be modular enough that the Decision Point code can either be linked into the APIserver binary, or be another service that the apiserver calls for each Decision (with appropriate time-limited caching as needed for performance).
 
 Policy objects may be applicable only to a single namespace or to all namespaces; K8s Project Admins would be able to create those as needed.  Other Policy objects may be applicable to all namespaces; a K8s Cluster Admin might create those in order to authorize a new type of controller to be used by all namespaces, or to make a K8s User into a K8s Project Admin.)
  
 
 ## Accounting
 
-The API should have a `quota` concept (see (https://github.com/GoogleCloudPlatform/kubernetes/issues/442
-).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see resources.md).
+The API should have a `quota` concept (see https://github.com/GoogleCloudPlatform/kubernetes/issues/442).  A quota object relates a namespace (and optionally a label selector) to a maximum quantity of resources that may be used (see [resources.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md)).
 
 Initially:
 - a `quota` object is immutable.
