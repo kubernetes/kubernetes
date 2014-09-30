@@ -176,10 +176,11 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 	return containers
 }
 
-// GetKubeletDockerContainers returns a map of docker containers that we manage. The map key is the docker container ID
-func GetKubeletDockerContainers(client DockerInterface) (DockerContainers, error) {
+// GetKubeletDockerContainers takes client and boolean whether to list all container or just the running ones.
+// Returns a map of docker containers that we manage. The map key is the docker container ID
+func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (DockerContainers, error) {
 	result := make(DockerContainers)
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
 	if err != nil {
 		return nil, err
 	}

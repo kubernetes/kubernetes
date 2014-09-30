@@ -62,7 +62,7 @@ func TestGetContainerID(t *testing.T) {
 		ID: "foobar",
 	}
 
-	dockerContainers, err := GetKubeletDockerContainers(fakeDocker)
+	dockerContainers, err := GetKubeletDockerContainers(fakeDocker, false)
 	if err != nil {
 		t.Errorf("Expected no error, Got %#v", err)
 	}
