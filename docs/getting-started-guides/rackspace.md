@@ -12,7 +12,7 @@ In general, the dev-build-and-up.sh workflow for Rackspace is the similar to GCE
 
 ## Release
 1. The kubernetes binaries will be built via the common build scripts in `release/`. There is a specific `release/rackspace` directory with scripts for the following steps:
-2. A cloud files contianer will be created via the `swiftly` CLI and a temp URL will be enabled on the object.
+2. A cloud files container will be created via the `swiftly` CLI and a temp URL will be enabled on the object.
 3. The built `master-release.tar.gz` will be uploaded to this container and the URL will be passed to master/minions nodes when booted.
 - NOTE: RELEASE tagging and launch scripts are not used currently.
 
