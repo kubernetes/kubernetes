@@ -173,7 +173,11 @@ func main() {
 	} else {
 		masterServer = "http://localhost:8080"
 	}
-	kubeClient, err := client.New(masterServer, *apiVersion, nil)
+
+	// TODO: get the namespace context when kubecfg ns is completed
+	ctx := api.NewContext()
+
+	kubeClient, err := client.New(ctx, masterServer, *apiVersion, nil)
 	if err != nil {
 		glog.Fatalf("Can't configure client: %v", err)
 	}
@@ -194,7 +198,7 @@ func main() {
 		if *keyFile != "" {
 			auth.KeyFile = *keyFile
 		}
-		kubeClient, err = client.New(masterServer, *apiVersion, auth)
+		kubeClient, err = client.New(ctx, masterServer, *apiVersion, auth)
 		if err != nil {
 			glog.Fatalf("Can't configure client: %v", err)
 		}

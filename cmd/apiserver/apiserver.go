@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -126,7 +127,8 @@ func main() {
 		Port:   *minionPort,
 	}
 
-	client, err := client.New(net.JoinHostPort(*address, strconv.Itoa(int(*port))), *storageVersion, nil)
+	ctx := api.NewContext()
+	client, err := client.New(ctx, net.JoinHostPort(*address, strconv.Itoa(int(*port))), *storageVersion, nil)
 	if err != nil {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
