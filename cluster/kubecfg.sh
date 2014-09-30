@@ -14,12 +14,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
+ROOT_DIR="$(dirname ${BASH_SOURCE})/.."
+source "${ROOT_DIR}/cluster/kube-env.sh"
+source "${ROOT_DIR}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-KUBECFG=$(dirname $0)/../_output/go/bin/kubecfg
-if [ ! -x $KUBECFG ]; then
-  echo "Could not find kubecfg binary. Run hack/build-go.sh to build it."
+# Detect the OS name/arch so that we can find our binary
+case "$(uname -s)" in
+  Darwin)
+    host_os=darwin
+  ;;
+  Linux)
+    host_os=linux
+  ;;
+  *)
+    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+    exit 1
+esac
+
+case "$(uname -m)" in
+  x86_64*)
+    host_arch=amd64
+  ;;
+  i?86_64*)
+    host_arch=amd64
+  ;;
+  amd64*)
+    host_arch=amd64
+  ;;
+  arm*)
+    host_arch=arm
+  ;;
+  i?86*)
+    host_arch=x86
+  ;;
+  *)
+  echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+  exit 1
+esac
+
+kubecfg="${ROOT_DIR}/_output/build/${host_os}/${host_arch}/kubecfg"
+if [[ ! -x "$kubecfg" ]]; then
+  kubecfg="${ROOT_DIR}/platforms/${host_os}/${host_arch}/kubecfg"
+fi
+if [[ ! -x "$kubecfg" ]]; then
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run ./build/make-cross.sh." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the "
+  echo "development team for help." >&2
   exit 1
 fi
 
@@ -32,13 +75,17 @@ if [ "$KUBERNETES_PROVIDER" == "vagrant" ]; then
   "Password": "vagrant"
 }
 EOF
-  AUTH_CONFIG="-auth $HOME/.kubernetes_vagrant_auth"
-  SKIP_VERIFY="-insecure_skip_tls_verify"
+  auth_config=(
+    "-auth" "$HOME/.kubernetes_vagrant_auth"
+    "-insecure_skip_tls_verify"
+  )
+else
+  auth_config=()
 fi
 
 detect-master > /dev/null
-if [ "$KUBE_MASTER_IP" != "" ] && [ "$KUBERNETES_MASTER" == "" ]; then
+if [[ "$KUBE_MASTER_IP" != "" ]] && [[ "$KUBERNETES_MASTER" == "" ]]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-$KUBECFG $SKIP_VERIFY $AUTH_CONFIG "$@"
+"$kubecfg" "${auth_config[@]}" "$@"
