@@ -41,7 +41,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			api.Volume{
 				Name: "host-dir",
 				Source: &api.VolumeSource{
-					HostDirectory: &api.HostDirectory{"/dir/path"},
+					HostDir: &api.HostDir{"/dir/path"},
 				},
 			},
 			"/dir/path",
@@ -52,7 +52,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			api.Volume{
 				Name: "empty-dir",
 				Source: &api.VolumeSource{
-					EmptyDirectory: &api.EmptyDirectory{},
+					EmptyDir: &api.EmptyDir{},
 				},
 			},
 			path.Join(tempDir, "/my-id/volumes/empty/empty-dir"),
@@ -79,7 +79,7 @@ func TestCreateVolumeBuilders(t *testing.T) {
 			}
 			continue
 		}
-		if tt.volume.Source.HostDirectory == nil && tt.volume.Source.EmptyDirectory == nil {
+		if tt.volume.Source.HostDir == nil && tt.volume.Source.EmptyDir == nil {
 			if err != ErrUnsupportedVolumeType {
 				t.Errorf("Unexpected error: %v", err)
 			}

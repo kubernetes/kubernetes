@@ -37,9 +37,9 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
 func TestValidateVolumes(t *testing.T) {
 	successCase := []api.Volume{
 		{Name: "abc"},
-		{Name: "123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path2"}}},
-		{Name: "abc-123", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/path3"}}},
-		{Name: "empty", Source: &api.VolumeSource{EmptyDirectory: &api.EmptyDirectory{}}},
+		{Name: "123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path2"}}},
+		{Name: "abc-123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path3"}}},
+		{Name: "empty", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
@@ -309,8 +309,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/vol1"}}},
-				{Name: "vol2", Source: &api.VolumeSource{HostDirectory: &api.HostDirectory{"/mnt/vol2"}}}},
+			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/vol1"}}},
+				{Name: "vol2", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/vol2"}}}},
 			Containers: []api.Container{
 				{
 					Name:       "abc",
