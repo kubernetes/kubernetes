@@ -98,7 +98,7 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 #### Using godep
-Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godep/_workspace.  You can use `godep` in three ways:
+Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace.  You can use `godep` in three ways:
 
 1. Use `godep` to call your `go` commands.  For example: `godep go test ./...`
 2. Use `godep` to modify your `$GOPATH` so that other tools know where to find the dependencies.  Specifically: `export GOPATH=$GOPATH:$(godep path)`
@@ -111,13 +111,10 @@ We recommend using options #1 or #2.
 Before committing any changes, please link/copy these hooks into your .git
 directory. This will keep you from accidentally committing non-gofmt'd go code.
 
-**NOTE:** The `../..` part seems odd but is correct, since the newly created
-links will be 2 levels down the tree.
-
 ```
 cd kubernetes
-ln -s ../../hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
-ln -s ../../hooks/commit-msg .git/hooks/commit-msg
+ln -s hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
+ln -s hooks/commit-msg .git/hooks/commit-msg
 ```
 
 ### Unit tests
