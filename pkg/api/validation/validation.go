@@ -313,7 +313,9 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 	if len(pod.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
 	}
-	allErrs = append(allErrs, validateNotEmptyDNSSubdomain(pod.Namespace, "pod.Namespace")...)
+	if !util.IsDNSSubdomain(pod.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("pod.Namespace", pod.Namespace))
+	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
 	return allErrs
 }
@@ -326,7 +328,9 @@ func ValidateService(service *api.Service) errs.ErrorList {
 	} else if !util.IsDNS952Label(service.ID) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
 	}
-	allErrs = append(allErrs, validateNotEmptyDNSSubdomain(service.Namespace, "service.Namespace")...)
+	if !util.IsDNSSubdomain(service.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("service.Namespace", service.Namespace))
+	}
 	if !util.IsValidPortNum(service.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
 	}
@@ -347,7 +351,9 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.E
 	if len(controller.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
 	}
-	allErrs = append(allErrs, validateNotEmptyDNSSubdomain(controller.Namespace, "controller.Namespace")...)
+	if !util.IsDNSSubdomain(controller.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("controller.Namespace", controller.Namespace))
+	}
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
 	return allErrs
 }
@@ -367,16 +373,5 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
 	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
-	return allErrs
-}
-
-// validateNotEmptyDNSSubdomain validates the provided value is not empty and is a dns subdomain.
-func validateNotEmptyDNSSubdomain(value string, label string) errs.ErrorList {
-	allErrs := errs.ErrorList{}
-	if value == "" {
-		allErrs = append(allErrs, errs.NewFieldInvalid(label, value))
-	} else if !util.IsDNSSubdomain(value) {
-		allErrs = append(allErrs, errs.NewFieldInvalid(label, value))
-	}
 	return allErrs
 }
