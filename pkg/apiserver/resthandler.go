@@ -100,7 +100,8 @@ func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
 func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	ctx := api.NewContext()
+	// TODO for now, we perform all operations in the default namespace
+	ctx := api.NewDefaultContext()
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
 	switch req.Method {

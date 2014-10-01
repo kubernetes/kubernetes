@@ -237,7 +237,15 @@ type JSONBase struct {
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	Namespace         string    `json:"namespace",omitempty" yaml:"namespace,omitempty"`
 }
+
+const (
+	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
+	NamespaceDefault string = "default"
+	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
+	NamespaceAll string = ""
+)
 
 // PodStatus represents a status of a pod.
 type PodStatus string

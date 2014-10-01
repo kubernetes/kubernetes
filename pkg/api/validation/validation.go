@@ -313,6 +313,9 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 	if len(pod.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
 	}
+	if !util.IsDNSSubdomain(pod.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("pod.Namespace", pod.Namespace))
+	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
 	return allErrs
 }
@@ -324,6 +327,9 @@ func ValidateService(service *api.Service) errs.ErrorList {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", service.ID))
 	} else if !util.IsDNS952Label(service.ID) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
+	}
+	if !util.IsDNSSubdomain(service.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("service.Namespace", service.Namespace))
 	}
 	if !util.IsValidPortNum(service.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
@@ -344,6 +350,9 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.E
 	allErrs := errs.ErrorList{}
 	if len(controller.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
+	}
+	if !util.IsDNSSubdomain(controller.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("controller.Namespace", controller.Namespace))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
 	return allErrs

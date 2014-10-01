@@ -69,7 +69,7 @@ func TestCreatePodRegistryError(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{DesiredState: desiredState}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
@@ -89,7 +89,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{DesiredState: desiredState}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
@@ -116,7 +116,7 @@ func TestCreatePodSetsUUIDs(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{DesiredState: desiredState}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("Expected %#v, Got %#v", nil, err)
@@ -496,7 +496,7 @@ func TestPodStorageValidatesCreate(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	pod := &api.Pod{}
 	c, err := storage.Create(ctx, pod)
 	if c != nil {
@@ -513,7 +513,7 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 	storage := REST{
 		registry: podRegistry,
 	}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	pod := &api.Pod{}
 	c, err := storage.Update(ctx, pod)
 	if c != nil {
@@ -545,7 +545,7 @@ func TestCreatePod(t *testing.T) {
 		JSONBase:     api.JSONBase{ID: "foo"},
 		DesiredState: desiredState,
 	}
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
 	channel, err := storage.Create(ctx, pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

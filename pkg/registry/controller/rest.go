@@ -59,6 +59,10 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
+	if !api.ValidNamespace(ctx, &controller.JSONBase) {
+		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
+	}
+
 	if len(controller.ID) == 0 {
 		controller.ID = uuid.NewUUID().String()
 	}
@@ -127,6 +131,9 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
+	}
+	if !api.ValidNamespace(ctx, &controller.JSONBase) {
+		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.ID, errs)

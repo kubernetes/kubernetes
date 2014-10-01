@@ -12,6 +12,10 @@
       "type": "string",
       "required": false
     },
+    "namespace": {
+      "type": "string",
+      "required": false
+    },
     "creationTimestamp": {
       "type": "string",
       "required": false
