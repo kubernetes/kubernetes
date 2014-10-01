@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	stderrs "errors"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -53,8 +52,8 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
-	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &srv.JSONBase) {
-		return nil, errors.NewConflict("service", srv.Namespace, stderrs.New("Service.Namespace does not match the provided context"))
+	if !api.ValidNamespace(ctx, &srv.JSONBase) {
+		return nil, errors.NewConflict("service", srv.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)
@@ -169,8 +168,8 @@ func GetServiceEnvironmentVariables(ctx api.Context, registry Registry, machine 
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
-	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &srv.JSONBase) {
-		return nil, errors.NewConflict("service", srv.Namespace, stderrs.New("Service.Namespace does not match the provided context"))
+	if !api.ValidNamespace(ctx, &srv.JSONBase) {
+		return nil, errors.NewConflict("service", srv.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", srv.ID, errs)

@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	stderrs "errors"
 	"fmt"
 	"time"
 
@@ -60,8 +59,8 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &controller.JSONBase) {
-		return nil, errors.NewConflict("controller", controller.Namespace, stderrs.New("Controller.Namespace does not match the provided context"))
+	if !api.ValidNamespace(ctx, &controller.JSONBase) {
+		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 
 	if len(controller.ID) == 0 {
@@ -133,8 +132,8 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &controller.JSONBase) {
-		return nil, errors.NewConflict("controller", controller.Namespace, stderrs.New("Controller.Namespace does not match the provided context"))
+	if !api.ValidNamespace(ctx, &controller.JSONBase) {
+		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.ID, errs)

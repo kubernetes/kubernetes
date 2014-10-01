@@ -32,24 +32,31 @@ func TestNamespaceContext(t *testing.T) {
 	if api.NamespaceDefault != result {
 		t.Errorf("Expected: %v, Actual: %v", api.NamespaceDefault, result)
 	}
+
+	ctx = api.NewContext()
+	result, ok = api.NamespaceFrom(ctx)
+	if ok {
+		t.Errorf("Should not be ok because there is no namespace on the context")
+	}
 }
 
-func TestValidNamespaceOnCreateOrUpdate(t *testing.T) {
+// TestValidNamespace validates that namespace rules are enforced on a resource prior to create or update
+func TestValidNamespace(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	namespace, _ := api.NamespaceFrom(ctx)
 	resource := api.ReplicationController{}
-	if !api.ValidNamespaceOnCreateOrUpdate(ctx, &resource.JSONBase) {
+	if !api.ValidNamespace(ctx, &resource.JSONBase) {
 		t.Errorf("expected success")
 	}
 	if namespace != resource.Namespace {
 		t.Errorf("expected resource to have the default namespace assigned during validation")
 	}
 	resource = api.ReplicationController{JSONBase: api.JSONBase{Namespace: "other"}}
-	if api.ValidNamespaceOnCreateOrUpdate(ctx, &resource.JSONBase) {
+	if api.ValidNamespace(ctx, &resource.JSONBase) {
 		t.Errorf("Expected error that resource and context errors do not match because resource has different namespace")
 	}
 	ctx = api.NewContext()
-	if api.ValidNamespaceOnCreateOrUpdate(ctx, &resource.JSONBase) {
+	if api.ValidNamespace(ctx, &resource.JSONBase) {
 		t.Errorf("Expected error that resource and context errors do not match since context has no namespace")
 	}
 }
