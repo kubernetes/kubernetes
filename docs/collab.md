@@ -22,6 +22,10 @@ Except for rare cases, such as trivial changes (e.g. typos, comments) or emergen
 
 Expect reviewers to request that you avoid [common go style mistakes](https://code.google.com/p/go-wiki/wiki/CodeReviewComments) in your PRs.
 
+## Assigned reviews
+
+Maintainers can assign reviews to other maintainers, when appropriate. The assignee becomes the shepherd for that PR and is responsible for merging the PR once they are satisfied with it or else closing it.  The assignee might request reviews from non-maintainers.
+
 ## Merge hours
 
 Maintainers will do merges between the hours of 7:00 am Monday and 7:00 pm (19:00h) Friday.  PRs that arrive over the weekend or on holidays will only be merged if there is a very good reason for it and if the code review requirements have been met.
