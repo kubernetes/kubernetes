@@ -20,7 +20,109 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+type FakeNodeInfo api.Minion
+
+func (n FakeNodeInfo) GetNodeInfo(nodeName string) (api.Minion, error) {
+	return api.Minion(n), nil
+}
+
+func makeResources(milliCPU int, memory int) api.NodeResources {
+	return api.NodeResources{
+		Capacity: api.ResourceList{
+			resources.CPU: util.IntOrString{
+				IntVal: milliCPU,
+				Kind:   util.IntstrInt,
+			},
+			resources.Memory: util.IntOrString{
+				IntVal: memory,
+				Kind:   util.IntstrInt,
+			},
+		},
+	}
+}
+
+func newResourcePod(usage ...resourceRequest) api.Pod {
+	containers := []api.Container{}
+	for _, req := range usage {
+		containers = append(containers, api.Container{
+			Memory: req.memory,
+			CPU:    req.milliCPU,
+		})
+	}
+	return api.Pod{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Containers: containers,
+			},
+		},
+	}
+}
+
+func TestPodFitsResources(t *testing.T) {
+	tests := []struct {
+		pod          api.Pod
+		existingPods []api.Pod
+		fits         bool
+		test         string
+	}{
+		{
+			pod: api.Pod{},
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
+			},
+			fits: true,
+			test: "no resources requested always fits",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
+			},
+			fits: false,
+			test: "too many resources fails",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
+			},
+			fits: true,
+			test: "both resources fit",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
+			},
+			fits: false,
+			test: "one resources fits",
+		},
+		{
+			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
+			existingPods: []api.Pod{
+				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
+			},
+			fits: true,
+			test: "equal edge case",
+		},
+	}
+	for _, test := range tests {
+		node := api.Minion{NodeResources: makeResources(10, 20)}
+
+		fit := ResourceFit{FakeNodeInfo(node)}
+		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}
 
 func TestPodFitsPorts(t *testing.T) {
 	tests := []struct {
