@@ -16,9 +16,7 @@
 
 # Run all of the golang unit tests.
 
-set -e
-
-source $(dirname $0)/common.sh
+source $(dirname "${BASH_SOURCE}")/common.sh
 
 kube::build::verify_prereqs
 kube::build::build_image

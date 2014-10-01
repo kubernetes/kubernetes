@@ -18,9 +18,7 @@
 # images and other build artifacts.  All intermediate artifacts will be hosted
 # publicly on Google Cloud Storage currently.
 
-set -e
-
-source $(dirname $0)/common.sh
+source $(dirname "${BASH_SOURCE}")/common.sh
 
 kube::build::verify_prereqs
 kube::build::build_image

@@ -19,9 +19,7 @@
 # This is a no-op on Linux when the Docker daemon is local.  This is only
 # necessary on Mac OS X with boot2docker.
 
-set -e
-
-source $(dirname $0)/common.sh
+source $(dirname "${BASH_SOURCE}")/common.sh
 
 kube::build::verify_prereqs
 kube::build::copy_output
