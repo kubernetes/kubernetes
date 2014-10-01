@@ -29,7 +29,9 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
@@ -106,7 +108,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		}
 	}
 
-	cl := client.NewOrDie(api.NewContext(), apiServer.URL, "", nil)
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 
@@ -262,12 +264,10 @@ func runAtomicPutTest(c *client.Client) {
 				glog.Infof("Posting update (%s, %s)", l, v)
 				err = c.Put().Path("services").Path(svc.ID).Body(&tmpSvc).Do().Error()
 				if err != nil {
-					if se, ok := err.(*client.StatusErr); ok {
-						if se.Status.Code == http.StatusConflict {
-							glog.Infof("Conflict: (%s, %s)", l, v)
-							// This is what we expect.
-							continue
-						}
+					if errors.IsConflict(err) {
+						glog.Infof("Conflict: (%s, %s)", l, v)
+						// This is what we expect.
+						continue
 					}
 					glog.Errorf("Unexpected error putting atomicService: %v", err)
 					continue
@@ -311,7 +311,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(api.NewContext(), apiServerURL, "", nil)
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{

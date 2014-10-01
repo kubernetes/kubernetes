@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -39,7 +40,7 @@ func TestCreate(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	client := client.NewOrDie(api.NewContext(), server.URL, "", nil)
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 	factory := ConfigFactory{client}
 	factory.Create()
 }
@@ -52,17 +53,17 @@ func TestCreateLists(t *testing.T) {
 	}{
 		// Minion
 		{
-			location: "/api/v1beta1/minions?fields=",
+			location: "/api/" + testapi.Version() + "/minions?fields=",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod
 		{
-			location: "/api/v1beta1/pods?fields=DesiredState.Host!%3D",
+			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host!%3D",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod
 		{
-			location: "/api/v1beta1/pods?fields=DesiredState.Host%3D",
+			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host%3D",
 			factory:  factory.createUnassignedPodLW,
 		},
 	}
@@ -74,7 +75,7 @@ func TestCreateLists(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.NewOrDie(api.NewContext(), server.URL, latest.OldestVersion, nil)
+		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		// This test merely tests that the correct request is made.
 		item.factory().List()
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -91,31 +92,31 @@ func TestCreateWatches(t *testing.T) {
 		// Minion watch
 		{
 			rv:       0,
-			location: "/api/v1beta1/watch/minions?fields=&resourceVersion=0",
+			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=0",
 			factory:  factory.createMinionLW,
 		}, {
 			rv:       42,
-			location: "/api/v1beta1/watch/minions?fields=&resourceVersion=42",
+			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=42",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod watches
 		{
 			rv:       0,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=0",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=0",
 			factory:  factory.createAssignedPodLW,
 		}, {
 			rv:       42,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod watches
 		{
 			rv:       0,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=0",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=0",
 			factory:  factory.createUnassignedPodLW,
 		}, {
 			rv:       42,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
 			factory:  factory.createUnassignedPodLW,
 		},
 	}
@@ -127,7 +128,7 @@ func TestCreateWatches(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.NewOrDie(api.NewContext(), server.URL, "v1beta1", nil)
+		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		// This test merely tests that the correct request is made.
 		item.factory().Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -155,9 +156,9 @@ func TestPollMinions(t *testing.T) {
 		}
 		mux := http.NewServeMux()
 		// FakeHandler musn't be sent requests other than the one you want to test.
-		mux.Handle("/api/v1beta1/minions", &handler)
+		mux.Handle("/api/"+testapi.Version()+"/minions", &handler)
 		server := httptest.NewServer(mux)
-		client := client.NewOrDie(api.NewContext(), server.URL, "v1beta1", nil)
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		cf := ConfigFactory{client}
 
 		ce, err := cf.pollMinions()
@@ -165,7 +166,7 @@ func TestPollMinions(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		handler.ValidateRequest(t, "/api/v1beta1/minions", "GET", nil)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/minions", "GET", nil)
 
 		if e, a := len(item.minions), ce.Len(); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
@@ -182,9 +183,9 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	mux := http.NewServeMux()
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle("/api/v1beta1/pods/foo", &handler)
+	mux.Handle("/api/"+testapi.Version()+"/pods/foo", &handler)
 	server := httptest.NewServer(mux)
-	factory := ConfigFactory{client.NewOrDie(api.NewContext(), server.URL, "", nil)}
+	factory := ConfigFactory{client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})}
 	queue := cache.NewFIFO()
 	errFunc := factory.makeDefaultErrorFunc(queue)
 
@@ -198,7 +199,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, "/api/v1beta1/pods/foo", "GET", nil)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/pods/foo", "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -289,14 +290,14 @@ func TestBind(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		client := client.NewOrDie(api.NewContext(), server.URL, "", nil)
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(latest.Codec, item.binding)
-		handler.ValidateRequest(t, "/api/v1beta1/bindings", "POST", &expectedBody)
+		expectedBody := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), item.binding)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
 	}
 }

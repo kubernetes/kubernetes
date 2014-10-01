@@ -27,8 +27,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -39,10 +37,14 @@ import (
 )
 
 var (
-	master  = flag.String("master", "", "The address of the Kubernetes API server")
-	port    = flag.Int("port", masterPkg.ControllerManagerPort, "The port that the controller-manager's http service runs on")
-	address = flag.String("address", "127.0.0.1", "The address to serve from")
+	port         = flag.Int("port", masterPkg.ControllerManagerPort, "The port that the controller-manager's http service runs on")
+	address      = flag.String("address", "127.0.0.1", "The address to serve from")
+	clientConfig = &client.Config{}
 )
+
+func init() {
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+}
 
 func main() {
 	flag.Parse()
@@ -51,13 +53,13 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if len(*master) == 0 {
+	if len(clientConfig.Host) == 0 {
 		glog.Fatal("usage: controller-manager -master <master>")
 	}
-	ctx := api.NewContext()
-	kubeClient, err := client.New(ctx, *master, latest.OldestVersion, nil)
+
+	kubeClient, err := client.New(clientConfig)
 	if err != nil {
-		glog.Fatalf("Invalid -master: %v", err)
+		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
 	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)

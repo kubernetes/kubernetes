@@ -43,7 +43,6 @@ import (
 var (
 	serverVersion = verflag.Version("server_version", verflag.VersionFalse, "Print the server's version information and quit")
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
-	httpServer    = flag.String("h", "", "The host to connect to.")
 	config        = flag.String("c", "", "Path or URL to the config file, or '-' to read from STDIN")
 	selector      = flag.String("l", "", "Selector (label query) to use for listing")
 	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
@@ -58,11 +57,16 @@ var (
 	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
-	apiVersion    = flag.String("api_version", latest.Version, "The version of the API to use against this server.")
-	caFile        = flag.String("certificate_authority", "", "Path to a cert. file for the certificate authority")
-	certFile      = flag.String("client_certificate", "", "Path to a client certificate for TLS.")
-	keyFile       = flag.String("client_key", "", "Path to a client key file for TLS.")
+	clientConfig  = &client.Config{}
 )
+
+func init() {
+	flag.StringVar(&clientConfig.Host, "h", "", "The host to connect to.")
+	flag.StringVar(&clientConfig.Version, "api_version", latest.Version, "The version of the API to use against this server.")
+	flag.StringVar(&clientConfig.CAFile, "certificate_authority", "", "Path to a cert. file for the certificate authority")
+	flag.StringVar(&clientConfig.CertFile, "client_certificate", "", "Path to a client certificate for TLS.")
+	flag.StringVar(&clientConfig.KeyFile, "client_key", "", "Path to a client key file for TLS.")
+}
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
 	"pods":                   &api.Pod{},
@@ -165,43 +169,29 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	var masterServer string
-	if len(*httpServer) > 0 {
-		masterServer = *httpServer
-	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
-		masterServer = os.Getenv("KUBERNETES_MASTER")
-	} else {
-		masterServer = "http://localhost:8080"
+	// Initialize the client
+	if clientConfig.Host == "" {
+		clientConfig.Host = os.Getenv("KUBERNETES_MASTER")
 	}
 
 	// TODO: get the namespace context when kubecfg ns is completed
-	ctx := api.NewContext()
+	clientConfig.Context = api.NewContext()
 
-	kubeClient, err := client.New(ctx, masterServer, *apiVersion, nil)
-	if err != nil {
-		glog.Fatalf("Can't configure client: %v", err)
+	if clientConfig.Host == "" {
+		// TODO: eventually apiserver should start on 443 and be secure by default
+		clientConfig.Host = "http://localhost:8080"
 	}
-
-	// TODO: this won't work if TLS is enabled with client cert auth, but no
-	// passwords are required. Refactor when we address client auth abstraction.
-	if kubeClient.Secure() {
+	if client.IsConfigTransportSecure(clientConfig) {
 		auth, err := kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
 		}
-		if *caFile != "" {
-			auth.CAFile = *caFile
-		}
-		if *certFile != "" {
-			auth.CertFile = *certFile
-		}
-		if *keyFile != "" {
-			auth.KeyFile = *keyFile
-		}
-		kubeClient, err = client.New(ctx, masterServer, *apiVersion, auth)
-		if err != nil {
-			glog.Fatalf("Can't configure client: %v", err)
-		}
+		clientConfig.Username = auth.User
+		clientConfig.Password = auth.Password
+	}
+	kubeClient, err := client.New(clientConfig)
+	if err != nil {
+		glog.Fatalf("Can't configure client: %v", err)
 	}
 
 	if *serverVersion != verflag.VersionFalse {

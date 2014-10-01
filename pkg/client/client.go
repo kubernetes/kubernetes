@@ -17,20 +17,11 @@ limitations under the License.
 package client
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -91,205 +82,15 @@ type MinionInterface interface {
 	ListMinions() (*api.MinionList, error)
 }
 
-// Client is the actual implementation of a Kubernetes client.
+// APIStatus is exposed by errors that can be converted to an api.Status object
+// for finer grained details.
+type APIStatus interface {
+	Status() api.Status
+}
+
+// Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
-}
-
-// New creates a Kubernetes client. This client works with pods, replication controllers
-// and services. It allows operations such as list, get, update and delete on these objects.
-// host must be a host string, a host:port combo, or an http or https URL.  Passing a prefix
-// to a URL will prepend the server path. The API version to use may be specified or left
-// empty to use the client preferred version. Returns an error if host cannot be converted to
-// a valid URL.
-func New(ctx api.Context, host, version string, auth *AuthInfo) (*Client, error) {
-	if version == "" {
-		// Clients default to the preferred code API version
-		// TODO: implement version negotation (highest version supported by server)
-		version = latest.Version
-	}
-	versionInterfaces, err := latest.InterfacesFor(version)
-	if err != nil {
-		return nil, fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
-	}
-	prefix := fmt.Sprintf("/api/%s/", version)
-	restClient, err := NewRESTClient(ctx, host, auth, prefix, versionInterfaces.Codec)
-	if err != nil {
-		return nil, fmt.Errorf("API URL '%s' is not valid: %v", host, err)
-	}
-	return &Client{restClient}, nil
-}
-
-// NewOrDie creates a Kubernetes client and panics if the provided host is invalid.
-func NewOrDie(ctx api.Context, host, version string, auth *AuthInfo) *Client {
-	client, err := New(ctx, host, version, auth)
-	if err != nil {
-		panic(err)
-	}
-	return client
-}
-
-// StatusErr might get returned from an api call if your request is still being processed
-// and hence the expected return data is not available yet.
-type StatusErr struct {
-	Status api.Status
-}
-
-func (s *StatusErr) Error() string {
-	return fmt.Sprintf("Status: %v (%#v)", s.Status.Status, s.Status)
-}
-
-// AuthInfo is used to store authorization information.
-type AuthInfo struct {
-	User     string
-	Password string
-	CAFile   string
-	CertFile string
-	KeyFile  string
-}
-
-// RESTClient holds common code used to work with API resources that follow the
-// Kubernetes API pattern.
-// Host is the http://... base for the URL
-type RESTClient struct {
-	ctx        api.Context
-	host       string
-	prefix     string
-	secure     bool
-	auth       *AuthInfo
-	httpClient *http.Client
-	Sync       bool
-	PollPeriod time.Duration
-	Timeout    time.Duration
-	Codec      runtime.Codec
-}
-
-// NewRESTClient creates a new RESTClient. This client performs generic REST functions
-// such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(ctx api.Context, host string, auth *AuthInfo, path string, c runtime.Codec) (*RESTClient, error) {
-	prefix, err := normalizePrefix(host, path)
-	if err != nil {
-		return nil, err
-	}
-	base := *prefix
-	base.Path = ""
-	base.RawQuery = ""
-	base.Fragment = ""
-
-	var config *tls.Config
-	if auth != nil && len(auth.CertFile) != 0 {
-		cert, err := tls.LoadX509KeyPair(auth.CertFile, auth.KeyFile)
-		if err != nil {
-			return nil, err
-		}
-		data, err := ioutil.ReadFile(auth.CAFile)
-		if err != nil {
-			return nil, err
-		}
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM(data)
-		config = &tls.Config{
-			Certificates: []tls.Certificate{
-				cert,
-			},
-			RootCAs:    certPool,
-			ClientCAs:  certPool,
-			ClientAuth: tls.RequireAndVerifyClientCert,
-		}
-	} else {
-		config = &tls.Config{
-			InsecureSkipVerify: true,
-		}
-	}
-
-	return &RESTClient{
-		ctx:    ctx,
-		host:   base.String(),
-		prefix: prefix.Path,
-		secure: prefix.Scheme == "https",
-		auth:   auth,
-		httpClient: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: config,
-			},
-		},
-		Sync:       false,
-		PollPeriod: time.Second * 2,
-		Timeout:    time.Second * 20,
-		Codec:      c,
-	}, nil
-}
-
-// normalizePrefix ensures the passed initial value is valid.
-func normalizePrefix(host, prefix string) (*url.URL, error) {
-	if host == "" {
-		return nil, fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	base := host
-	hostURL, err := url.Parse(base)
-	if err != nil {
-		return nil, err
-	}
-	if hostURL.Scheme == "" {
-		hostURL, err = url.Parse("http://" + base)
-		if err != nil {
-			return nil, err
-		}
-		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, fmt.Errorf("host must be a URL or a host:port pair: %s", base)
-		}
-	}
-	hostURL.Path += prefix
-
-	return hostURL, nil
-}
-
-// Secure returns true if the client is configured for secure connections.
-func (c *RESTClient) Secure() bool {
-	return c.secure
-}
-
-// doRequest executes a request, adds authentication (if auth != nil), and HTTPS
-// cert ignoring.
-func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
-	if c.auth != nil {
-		request.SetBasicAuth(c.auth.User, c.auth.Password)
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return body, err
-	}
-
-	// Did the server give us a status response?
-	isStatusResponse := false
-	var status api.Status
-	if err := latest.Codec.DecodeInto(body, &status); err == nil && status.Status != "" {
-		isStatusResponse = true
-	}
-
-	switch {
-	case response.StatusCode == http.StatusConflict:
-		// Return error given by server, if there was one.
-		if isStatusResponse {
-			return nil, &StatusErr{status}
-		}
-		fallthrough
-	case response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent:
-		return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
-	}
-
-	// If the server gave us a status back, look at what it was.
-	if isStatusResponse && status.Status != api.StatusSuccess {
-		// "Working" requests need to be handled specially.
-		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return nil, &StatusErr{status}
-	}
-	return body, err
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector.

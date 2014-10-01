@@ -222,12 +222,12 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 func TestLoadAuthInfo(t *testing.T) {
 	loadAuthInfoTests := []struct {
 		authData string
-		authInfo *client.AuthInfo
+		authInfo *AuthInfo
 		r        io.Reader
 	}{
 		{
 			`{"user": "user", "password": "pass"}`,
-			&client.AuthInfo{User: "user", Password: "pass"},
+			&AuthInfo{User: "user", Password: "pass"},
 			nil,
 		},
 		{
@@ -235,7 +235,7 @@ func TestLoadAuthInfo(t *testing.T) {
 		},
 		{
 			"missing",
-			&client.AuthInfo{User: "user", Password: "pass"},
+			&AuthInfo{User: "user", Password: "pass"},
 			bytes.NewBufferString("user\npass"),
 		},
 	}
