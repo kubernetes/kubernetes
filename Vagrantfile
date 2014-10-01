@@ -38,8 +38,8 @@ else # sorry Windows folks, I can't help you
   $vm_cpus = 2
 end
 
-# Give VM 1024 of RAM
-$vm_mem = 1024
+# Give VM 512MB of RAM
+$vm_mem = 512
 
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|

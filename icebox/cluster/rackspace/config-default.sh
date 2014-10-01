@@ -16,7 +16,7 @@
 
 # Sane defaults for dev environments. The following variables can be easily overriden
 # by setting each as a ENV variable ahead of time:
-# KUBE_IMAGE, KUBE_MASTER_FLAVOR, KUBE_MINION_FLAVOR, NUM_MINIONS, NOVA_NETWORK and SSH_KEY_NAME 
+# KUBE_IMAGE, KUBE_MASTER_FLAVOR, KUBE_MINION_FLAVOR, NUM_MINIONS, NOVA_NETWORK and SSH_KEY_NAME
 
 # Shared
 KUBE_IMAGE="${KUBE_IMAGE-255df5fb-e3d4-45a3-9a07-c976debf7c14}" # Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)

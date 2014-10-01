@@ -78,6 +78,9 @@ If the release script is set to upload to GCS, it'll do the following:
 
 ## TODOs
 
+These are in no particular order
+
+* [ ] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
 * [ ] Get a cluster up and running with the Docker images.  Perhaps start with a local cluster and move up to a GCE cluster.
 * [ ] Implement (#186)[https://github.com/GoogleCloudPlatform/kubernetes/issues/186].  This will make it easier to develop Kubernetes.
 * [ ] Deprecate/replace most of the stuff in the hack/
