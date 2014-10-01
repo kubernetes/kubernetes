@@ -24,10 +24,15 @@ cd $(dirname "${BASH_SOURCE}")/..
 source hack/config-go.sh
 
 # Incoming options
-readonly BUILD_RUN_IMAGES="${BUILD_RUN_IMAGES:-n}"
-readonly GCS_RELEASE="${GCS_RELEASE:-n}"
-readonly GCS_NO_CACHING="${GCS_NO_CACHING:-y}"
-readonly GCS_MAKE_PUBLIC="${GCS_MAKE_PUBLIC:-y}"
+#
+readonly KUBE_BUILD_RUN_IMAGES="${KUBE_BUILD_RUN_IMAGES:-n}"
+readonly KUBE_GCS_UPLOAD_RELEASE="${KUBE_GCS_UPLOAD_RELEASE:-n}"
+readonly KUBE_GCS_NO_CACHING="${KUBE_GCS_NO_CACHING:-y}"
+readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
+# KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
+# KUBE_GCS_RELEASE_PREFIX default: devel/
+# KUBE_GCS_DOCKER_REG_PREFIX default: docker-reg/
+
 
 
 # Constants
@@ -176,7 +181,7 @@ EOF
 # Builds the runtime image.  Assumes that the appropriate binaries are already
 # built and in _output/build/.
 function kube::build::run_image() {
-  [[ "${BUILD_RUN_IMAGES}" == "y" ]] || return 0
+  [[ "${KUBE_BUILD_RUN_IMAGES}" == "y" ]] || return 0
 
   local -r build_context_base="${LOCAL_OUTPUT_ROOT}/images/${KUBE_RUN_IMAGE_BASE}"
 
@@ -415,7 +420,7 @@ function kube::release::package_full_tarball() {
 # GCS Release
 
 function kube::release::gcs::release() {
-  [[ "${GCS_RELEASE}" == "y" ]] || return 0
+  [[ "${KUBE_GCS_UPLOAD_RELEASE}" == "y" ]] || return 0
 
   kube::release::gcs::verify_prereqs
   kube::release::gcs::ensure_release_bucket
@@ -463,13 +468,13 @@ function kube::release::gcs::ensure_release_bucket() {
     project_hash=$(echo -n "$GCLOUD_PROJECT" | md5sum)
   fi
   project_hash=${project_hash:0:5}
-  KUBE_RELEASE_BUCKET=${KUBE_RELEASE_BUCKET-kubernetes-releases-${project_hash}}
-  KUBE_RELEASE_PREFIX=${KUBE_RELEASE_PREFIX-devel/}
-  KUBE_DOCKER_REG_PREFIX=${KUBE_DOCKER_REG_PREFIX-docker-reg/}
+  KUBE_GCS_RELEASE_BUCKET=${KUBE_GCS_RELEASE_BUCKET-kubernetes-releases-${project_hash}}
+  KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel/}
+  KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg/}
 
-  if ! gsutil ls gs://${KUBE_RELEASE_BUCKET} >/dev/null 2>&1 ; then
+  if ! gsutil ls gs://${KUBE_GCS_RELEASE_BUCKET} >/dev/null 2>&1 ; then
     echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
-    gsutil mb gs://${KUBE_RELEASE_BUCKET}
+    gsutil mb gs://${KUBE_GCS_RELEASE_BUCKET}
   fi
 }
 
@@ -495,8 +500,8 @@ function kube::release::gcs::ensure_docker_registry() {
 
   echo "+++ Starting GCS backed Docker registry"
   local docker="docker run -d --name=${reg_container_name} "
-  docker+="-e GCS_BUCKET=${KUBE_RELEASE_BUCKET} "
-  docker+="-e STORAGE_PATH=${KUBE_DOCKER_REG_PREFIX} "
+  docker+="-e GCS_BUCKET=${KUBE_GCS_RELEASE_BUCKET} "
+  docker+="-e STORAGE_PATH=${KUBE_GCS_DOCKER_REG_PREFIX} "
   docker+="-e GCP_OAUTH2_REFRESH_TOKEN=${refresh_token} "
   docker+="-p 127.0.0.1:5000:5000 "
   docker+="google/docker-registry"
@@ -508,7 +513,7 @@ function kube::release::gcs::ensure_docker_registry() {
 }
 
 function kube::release::gcs::push_images() {
-  [[ "${BUILD_RUN_IMAGES}" == "y" ]] || return 0
+  [[ "${KUBE_BUILD_RUN_IMAGES}" == "y" ]] || return 0
 
   kube::release::gcs::ensure_docker_registry
 
@@ -516,7 +521,7 @@ function kube::release::gcs::push_images() {
   local b image_name
   for b in "${KUBE_RUN_IMAGES[@]}" ; do
     image_name="${KUBE_RUN_IMAGE_BASE}-${b}"
-    echo "+++ Tagging and pushing ${image_name} to GCS bucket ${KUBE_RELEASE_BUCKET}"
+    echo "+++ Tagging and pushing ${image_name} to GCS bucket ${KUBE_GCS_RELEASE_BUCKET}"
     docker tag "${KUBE_RUN_IMAGE_BASE}-$b" "localhost:5000/${image_name}"
     docker push "localhost:5000/${image_name}"
     docker rmi "localhost:5000/${image_name}"
@@ -528,10 +533,10 @@ function kube::release::gcs::copy_release_tarballs() {
   # no active release.  Also, if something fails, the release could be half-
   # copied.  The real way to do this would perhaps to have some sort of release
   # version so that we are never overwriting a destination.
-  local -r gcs_destination="gs://${KUBE_RELEASE_BUCKET}/${KUBE_RELEASE_PREFIX}"
+  local -r gcs_destination="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_RELEASE_PREFIX}"
   local gcs_options=()
 
-  if [[ ${GCS_NO_CACHING} == "y" ]]; then
+  if [[ ${KUBE_GCS_NO_CACHING} == "y" ]]; then
     gcs_options=("-h" "Cache-Control:private, max-age=0")
   fi
 
@@ -543,7 +548,7 @@ function kube::release::gcs::copy_release_tarballs() {
   # Now upload everything in release directory
   gsutil -m "${gcs_options[@]-}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}" >/dev/null 2>&1
 
-  if [[ ${GCS_MAKE_PUBLIC} == "y" ]]; then
+  if [[ ${KUBE_GCS_MAKE_PUBLIC} == "y" ]]; then
     gsutil acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
   fi
 

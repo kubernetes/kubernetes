@@ -8,37 +8,53 @@ To build Kubernetes you need to have access to a Docker installation through eit
   1. **Mac OS X** The best way to go is to use `boot2docker`.  See instructions [here](https://docs.docker.com/installation/mac/).
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
 2. Have python installed.  Pretty much it is installed everywhere at this point so you can probably ignore this.
-3. For releasing, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.  The default release mechanism will upload Docker images to a private registry backed by Google Cloud Storage.  Non-image release artifacts will be uploaded to Google Cloud Storage also.
+3. *Optional* For uploading your release to Google Cloud Storage, have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed and configured.
+
+## Overview
+
+While it is possible to build Kubernetes using a local golang installation, we have a build process that runs in a Docker container.  This simplifies initial set up and provides for a very consistent build and test environment.
+
+There is also early support for building Docker "run" containers
 
 ## Key scripts
 
-* `make-binaries.sh`: This will compile all of the Kubernetes binaries in a Docker container
-* `run-tests.sh`: This will run the Kubernetes unit tests in a Docker container
-* `run-integration.sh`: This will build and run the integration test in a Docker container
-* `make-cross.sh`: This will make all cross-compiled binaries (currently just kubecfg).
+* `make-binaries.sh`: This will compile all of the Kubernetes binaries
+* `run-tests.sh`: This will run the Kubernetes unit tests
+* `run-integration.sh`: This will build and run the integration test
+* `make-cross.sh`: This will make all cross-compiled binaries (currently just `kubecfg`)
 * `copy-output.sh`: This will copy the contents of `_output/build` from any remote Docker container to the local `_output/build`.  Right now this is only necessary on Mac OS X with `boot2docker`.
-* `make-clean.sh`: Clean out the contents of `_output/build`.
+* `make-clean.sh`: Clean out the contents of `_output/build` and remove any local built container images.
 * `shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
-* `release.sh`: Build everything, test it, upload the results to a GCS bucket.  Docker images are also sent to the same bucket using the [`google/docker-registry`](https://registry.hub.docker.com/u/google/docker-registry/) Docker image.
+* `release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
 
 ## Releasing
 
-The `release.sh` script will build a release.  It will build binaries, run tests, build runtime Docker images and then upload all build artifacts to a GCS bucket.
+The `release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
 
-The GCS bucket that is used is named `kubernetes-releases-NNNNN`.  The `NNNNN` is a random string derived from an md5 hash of the project name.
+The main output is a tar file: `kubernetes.tar.gz`.  This includes:
+* Cross compiled client utilities.
+* Script (`cluster/kubecfg.sh`) for picking and running the right client binary based on platform.
+* Examples
+* Cluster deployment scripts for various clouds
+* Tar file containing all server binaries
+* Tar file containing salt deployment tree shared across multiple cloud deployments.
 
-The release process can be customized with environment variables:
-* `KUBE_RELEASE_BUCKET`: Override the bucket to be used for uploading releases.
-* `KUBE_RELEASE_PREFIX`: The prefix for all non-docker image build artifacts.  This defaults to `devel/`
-* `KUBE_DOCKER_REG_PREFIX`: The prefix for storage of the docker registry.  This defaults to `docker-reg/`
+In addition, there are some other tar files that are created:
+* `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
+* `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
+* `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
 
-The release Docker images (all defined in `build/run-images/*/Dockerfile`):
-* `kubernetes-apiserver`: Runs the main API server. It is parameterized with environment variables for `ETCD_SERVERS` and `KUBE_MINIONS` with defaults for localhost.
-* `kubernetes-controller-manager`: Runs a set external controllers (see `DESIGN.md` for details).  It is parameterized with environment variables for `ETCD_SERVERS` and `API_SERVER`.
-* `kubernetes-proxy`: Runs the proxy server on each individual node.  This is parameterized for `ETCD_SERVERS` and is required to be launched with `--net=host` Docker option to function correctly.
+The release utilities grab a set of environment variables to modify behavior.  Arguably, these should be command line flags:
 
-Other build artifacts:
-* **TODO:** package up client utilties and cluster bring up scripts.
+Env Variable | Default | Description
+-------------|---------|------------
+`KUBE_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
+`KUBE_GCS_RELEASE_BUCKET` | `kubernetes-releases-${project_hash}` | The bucket to upload releases to
+`KUBE_GCS_RELEASE_PREFIX` | `devel/` | The path under the release bucket to put releases
+`KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
+`KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
+`KUBE_BUILD_RUN_IMAGES` | `n` | *Experimental* Build Docker images for running most server components.
+`KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg/` | *Experimental* When uploading docker images, the bucket that backs the registry.
 
 ## Basic Flow
 
@@ -48,17 +64,24 @@ The `kube-build` container image is built by first creating a "context" director
 
 Everything in `build/build-image/` is meant to be run inside of the container.  If it doesn't think it is running in the container it'll throw a warning.  While you can run some of that stuff outside of the container, it wasn't built to do so.
 
+When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
+
+## Runtime Docker Images
+
+This support is experimental and hasn't been used yet to deploy a cluster.
+
 The files necessarily for the release Docker images are in `build/run-images/*`.  All of this is staged into `_output/images` similar to build-image.  The `base` image is used as a base for each of the specialized containers and is generally never pushed to a shared repository.
+
+If the release script is set to upload to GCS, it'll do the following:
+* Start up a local `google/docker-registry` registry that is backed by GCS.
+* Rename/push the runtime images to that registry.
 
 ## TODOs
 
-@jbeda is going on vacation and can't complete this work for a while.  Here are the logical next steps:
-
 * [ ] Get a cluster up and running with the Docker images.  Perhaps start with a local cluster and move up to a GCE cluster.
-* [ ] Implement #186 and #187.  This will make it easier to develop Kubernetes.
+* [ ] Implement (#186)[https://github.com/GoogleCloudPlatform/kubernetes/issues/186].  This will make it easier to develop Kubernetes.
 * [ ] Deprecate/replace most of the stuff in the hack/
-* [ ] Put together a true client distribution.  You should be able to download the tarball for your platform and get a Kube cluster running in <5 minutes.  Not `git clone`.
-* [ ] Plumb in a version so we can do proper versioned releases.  Probably create a `./VERSION` and dope it with the git hash or something?
 * [ ] Create an install script that'll let us do a `curl https://[URL] | bash` to get that tarball down and ensure that other dependencies (cloud SDK?) are installed and configured correctly.
-* [ ] Support Windows as a client.
+* [ ] Support/test Windows as a client.
+* [ ] Finish support for the Dockerized runtime. Issue (#19)[https://github.com/GoogleCloudPlatform/kubernetes/issues/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
 * [ ] Support uploading to the Docker index instead of the GCS bucket.  This'll allow easier installs for those not running on GCE
