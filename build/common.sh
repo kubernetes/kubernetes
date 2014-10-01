@@ -25,7 +25,10 @@ source hack/config-go.sh
 
 # Incoming options
 readonly BUILD_RUN_IMAGES="${BUILD_RUN_IMAGES:-n}"
-readonly RELEASE_GCS="${RELEASE_GCS:-n}"
+readonly GCS_RELEASE="${GCS_RELEASE:-n}"
+readonly GCS_NO_CACHING="${GCS_NO_CACHING:-y}"
+readonly GCS_MAKE_PUBLIC="${GCS_MAKE_PUBLIC:-y}"
+
 
 # Constants
 readonly KUBE_REPO_ROOT="${PWD}"
@@ -204,7 +207,7 @@ function kube::build::docker_build() {
 
   echo "+++ Building Docker image ${image}. This can take a while."
   set +e # We are handling the error here manually
-  local -r docker_output
+  local docker_output
   docker_output=$(${build_cmd} 2>&1)
   if [[ $? -ne 0 ]]; then
     set -e
@@ -412,7 +415,7 @@ function kube::release::package_full_tarball() {
 # GCS Release
 
 function kube::release::gcs::release() {
-  [[ "${RELEASE_GCS}" == "y" ]] || return 0
+  [[ "${GCS_RELEASE}" == "y" ]] || return 0
 
   kube::release::gcs::verify_prereqs
   kube::release::gcs::ensure_release_bucket
@@ -526,6 +529,11 @@ function kube::release::gcs::copy_release_tarballs() {
   # copied.  The real way to do this would perhaps to have some sort of release
   # version so that we are never overwriting a destination.
   local -r gcs_destination="gs://${KUBE_RELEASE_BUCKET}/${KUBE_RELEASE_PREFIX}"
+  local gcs_options=()
+
+  if [[ ${GCS_NO_CACHING} == "y" ]]; then
+    gcs_options=("-h" "Cache-Control:private, max-age=0")
+  fi
 
   echo "+++ Copying client tarballs to ${gcs_destination}"
 
@@ -533,5 +541,11 @@ function kube::release::gcs::copy_release_tarballs() {
   gsutil -q rm -f -R "${gcs_destination}" >/dev/null 2>&1 || true
 
   # Now upload everything in release directory
-  gsutil -m cp -r "${RELEASE_DIR}"/* "${gcs_destination}" >/dev/null 2>&1
+  gsutil -m "${gcs_options[@]-}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}" >/dev/null 2>&1
+
+  if [[ ${GCS_MAKE_PUBLIC} == "y" ]]; then
+    gsutil acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
+  fi
+
+  gsutil ls -lh "${gcs_destination}"
 }
