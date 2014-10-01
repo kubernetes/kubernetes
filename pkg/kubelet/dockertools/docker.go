@@ -47,6 +47,7 @@ type DockerInterface interface {
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
+	InspectImage(image string) (*docker.Image, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	Logs(opts docker.LogsOptions) error
 }
@@ -57,6 +58,7 @@ type DockerID string
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string) error
+	IsImagePresent(image string) (bool, error)
 }
 
 // dockerPuller is the default implementation of DockerPuller.
@@ -146,6 +148,24 @@ func (p throttledDockerPuller) Pull(image string) error {
 		return p.puller.Pull(image)
 	}
 	return fmt.Errorf("pull QPS exceeded.")
+}
+
+func (p dockerPuller) IsImagePresent(name string) (bool, error) {
+	image, _ := parseImageName(name)
+	_, err := p.client.InspectImage(image)
+	if err == nil {
+		return true, nil
+	}
+	// This is super brittle, but its the best we got.
+	// TODO: Land code in the docker client to use docker.Error here instead.
+	if err.Error() == "no such image" {
+		return false, nil
+	}
+	return false, err
+}
+
+func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
+	return p.puller.IsImagePresent(name)
 }
 
 // DockerContainers is a map of containers

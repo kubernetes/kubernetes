@@ -190,6 +190,18 @@ type LivenessProbe struct {
 	InitialDelaySeconds int64 `yaml:"initialDelaySeconds,omitempty" json:"initialDelaySeconds,omitempty"`
 }
 
+// PullPolicy describes a policy for if/when to pull a container image
+type PullPolicy string
+
+const (
+	// Always attempt to pull the latest image.  Container will fail If the pull fails.
+	PullAlways PullPolicy = "PullAlways"
+	// Never pull an image, only use a local image.  Container will fail if the image isn't present
+	PullNever PullPolicy = "PullNever"
+	// Pull if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
+	PullIfNotPresent PullPolicy = "PullIfNotPresent"
+)
+
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
@@ -212,6 +224,8 @@ type Container struct {
 	Lifecycle     *Lifecycle     `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty"`
 	// Optional: Default to false.
 	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty"`
+	// Optional: Policy for pulling images for this container
+	ImagePullPolicy PullPolicy `json:"imagePullPolicy" yaml:"imagePullPolicy"`
 }
 
 // Handler defines a specific action that should be taken
