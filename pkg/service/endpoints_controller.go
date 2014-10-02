@@ -76,7 +76,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		currentEndpoints, err := e.client.GetEndpoints(service.ID)
 		if err != nil {
 			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
-			if strings.Contains(err.Error(), "(404)") {
+			if strings.Contains(err.Error(), "404") {
 				currentEndpoints = &api.Endpoints{
 					JSONBase: api.JSONBase{
 						ID: service.ID,
