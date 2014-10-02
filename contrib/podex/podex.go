@@ -90,7 +90,7 @@ func main() {
 			Always: &v1beta1.RestartPolicyAlways{},
 		},
 	}
-	for p, _ := range img.Config.ExposedPorts {
+	for p := range img.Config.ExposedPorts {
 		port, err := strconv.Atoi(p.Port())
 		if err != nil {
 			log.Fatalf("failed to parse port %q: %v", parts[0], err)
