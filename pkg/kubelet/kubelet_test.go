@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -206,6 +207,7 @@ func matchString(t *testing.T, pattern, str string) bool {
 
 func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet, _, fakeDocker := newTestKubelet(t)
+	kubelet.networkContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	err := kubelet.SyncPods([]Pod{
 		{
@@ -228,6 +230,57 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 		"list", "list", "create", "start", "list", "inspect", "list", "create", "start"})
 
 	fakeDocker.Lock()
+
+	found := false
+	for _, c := range fakeDocker.ContainerList {
+		if c.Image == "custom_image_name" && strings.HasPrefix(c.Names[0], "/k8s_net") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Custom net container not found: %v", fakeDocker.ContainerList)
+	}
+
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "k8s_net\\.[a-f0-9]+_foo.test_", fakeDocker.Created[0]) ||
+		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.test_", fakeDocker.Created[1]) {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+}
+
+func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
+	puller.HasImages = []string{}
+	kubelet.networkContainerImage = "custom_image_name"
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]Pod{
+		{
+			Name:      "foo",
+			Namespace: "test",
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list", "create", "start", "list", "inspect", "list", "create", "start"})
+
+	fakeDocker.Lock()
+
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", ""}) {
+		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
+	}
+
 	if len(fakeDocker.Created) != 2 ||
 		!matchString(t, "k8s_net\\.[a-f0-9]+_foo.test_", fakeDocker.Created[0]) ||
 		!matchString(t, "k8s_bar\\.[a-f0-9]+_foo.test_", fakeDocker.Created[1]) {

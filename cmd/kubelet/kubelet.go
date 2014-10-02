@@ -48,21 +48,22 @@ import (
 const defaultRootDir = "/var/lib/kubelet"
 
 var (
-	config             = flag.String("config", "", "Path to the config file or directory of files")
-	syncFrequency      = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
-	fileCheckFrequency = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking config files for new data")
-	httpCheckFrequency = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
-	manifestURL        = flag.String("manifest_url", "", "URL for accessing the container manifest")
-	enableServer       = flag.Bool("enable_server", true, "Enable the info server")
-	address            = flag.String("address", "127.0.0.1", "The address for the info server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
-	port               = flag.Uint("port", master.KubeletPort, "The port for the info server to serve on")
-	hostnameOverride   = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
-	dockerEndpoint     = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
-	etcdServerList     util.StringList
-	rootDirectory      = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
-	allowPrivileged    = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
-	registryPullQPS    = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
-	registryBurst      = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
+	config                = flag.String("config", "", "Path to the config file or directory of files")
+	syncFrequency         = flag.Duration("sync_frequency", 10*time.Second, "Max period between synchronizing running containers and config")
+	fileCheckFrequency    = flag.Duration("file_check_frequency", 20*time.Second, "Duration between checking config files for new data")
+	httpCheckFrequency    = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
+	manifestURL           = flag.String("manifest_url", "", "URL for accessing the container manifest")
+	enableServer          = flag.Bool("enable_server", true, "Enable the info server")
+	address               = flag.String("address", "127.0.0.1", "The address for the info server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
+	port                  = flag.Uint("port", master.KubeletPort, "The port for the info server to serve on")
+	hostnameOverride      = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
+	networkContainerImage = flag.String("network_container_image", kubelet.NetworkContainerImage, "The image that network containers in each pod will use.")
+	dockerEndpoint        = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
+	etcdServerList        util.StringList
+	rootDirectory         = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
+	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
+	registryPullQPS       = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
+	registryBurst         = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
 )
 
 func init() {
@@ -159,6 +160,7 @@ func main() {
 		cadvisorClient,
 		etcdClient,
 		*rootDirectory,
+		*networkContainerImage,
 		*syncFrequency,
 		float32(*registryPullQPS),
 		*registryBurst)
