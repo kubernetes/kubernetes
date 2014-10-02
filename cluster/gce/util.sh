@@ -149,14 +149,16 @@ function kube-up {
     # firewalls can be added concurrent with instance creation.
     gcutil addnetwork "${NETWORK}" --range "10.240.0.0/16"
     gcutil addfirewall "${NETWORK}-default-internal" \
-      --norespect_terminal_width \
       --project "${PROJECT}" \
+      --norespect_terminal_width \
+      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --network "${NETWORK}" \
       --allowed_ip_sources "10.0.0.0/8" \
       --allowed "tcp:1-65535,udp:1-65535,icmp" &
     gcutil addfirewall "${NETWORK}-default-ssh" \
-      --norespect_terminal_width \
       --project "${PROJECT}" \
+      --norespect_terminal_width \
+      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --network "${NETWORK}" \
       --allowed_ip_sources "0.0.0.0/0" \
       --allowed "tcp:22" &
@@ -164,8 +166,9 @@ function kube-up {
 
   echo "Starting VMs and configuring firewalls"
   gcutil addfirewall ${MASTER_NAME}-https \
-    --norespect_terminal_width \
     --project ${PROJECT} \
+    --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --network ${NETWORK} \
     --target_tags ${MASTER_TAG} \
     --allowed tcp:443 &
@@ -180,8 +183,9 @@ function kube-up {
   ) > "${KUBE_TEMP}/master-start.sh"
 
   gcutil addinstance ${MASTER_NAME}\
-    --norespect_terminal_width \
     --project ${PROJECT} \
+    --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --zone ${ZONE} \
     --machine_type ${MASTER_SIZE} \
     --image ${IMAGE} \
@@ -200,15 +204,17 @@ function kube-up {
     ) > ${KUBE_TEMP}/minion-start-${i}.sh
 
     gcutil addfirewall ${MINION_NAMES[$i]}-all \
-      --norespect_terminal_width \
       --project ${PROJECT} \
+      --norespect_terminal_width \
+      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --network ${NETWORK} \
       --allowed_ip_sources ${MINION_IP_RANGES[$i]} \
       --allowed "tcp,udp,icmp,esp,ah,sctp" &
 
     gcutil addinstance ${MINION_NAMES[$i]} \
-    --norespect_terminal_width \
       --project ${PROJECT} \
+      --norespect_terminal_width \
+      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --zone ${ZONE} \
       --machine_type ${MINION_SIZE} \
       --image ${IMAGE} \
@@ -220,8 +226,9 @@ function kube-up {
       --metadata_from_file "startup-script:${KUBE_TEMP}/minion-start-${i}.sh" &
 
     gcutil addroute ${MINION_NAMES[$i]} ${MINION_IP_RANGES[$i]} \
-    --norespect_terminal_width \
       --project ${PROJECT} \
+      --norespect_terminal_width \
+      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --network ${NETWORK} \
       --next_hop_instance ${ZONE}/instances/${MINION_NAMES[$i]} &
   done
@@ -313,12 +320,14 @@ function kube-down {
   gcutil deletefirewall  \
     --project ${PROJECT} \
     --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     ${MASTER_NAME}-https &
 
   gcutil deleteinstance \
     --project ${PROJECT} \
     --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     --delete_boot_pd \
     --zone ${ZONE} \
@@ -327,12 +336,14 @@ function kube-down {
   gcutil deletefirewall  \
     --project ${PROJECT} \
     --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     ${MINION_NAMES[*]/%/-all} &
 
   gcutil deleteinstance \
     --project ${PROJECT} \
     --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     --delete_boot_pd \
     --zone ${ZONE} \
@@ -340,6 +351,8 @@ function kube-down {
 
   gcutil deleteroute  \
     --project ${PROJECT} \
+    --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     ${MINION_NAMES[*]} &
 
@@ -396,8 +409,9 @@ function test-setup {
   if [[ ${ALREADY_UP} -ne 1 ]]; then
     # Open up port 80 & 8080 so common containers on minions can be reached
     gcutil addfirewall \
-      --norespect_terminal_width \
       --project ${PROJECT} \
+      --norespect_terminal_width \
+      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --target_tags ${MINION_TAG} \
       --allowed tcp:80,tcp:8080 \
       --network ${NETWORK} \
@@ -412,6 +426,7 @@ function test-teardown {
   gcutil deletefirewall  \
     --project ${PROJECT} \
     --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     ${MINION_TAG}-${INSTANCE_PREFIX}-http-alt || true > /dev/null
   $(dirname $0)/../cluster/kube-down.sh > /dev/null
