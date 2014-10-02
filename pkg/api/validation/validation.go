@@ -56,11 +56,11 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 func validateSource(source *api.VolumeSource) errs.ErrorList {
 	numVolumes := 0
 	allErrs := errs.ErrorList{}
-	if source.HostDirectory != nil {
+	if source.HostDir != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateHostDir(source.HostDirectory).Prefix("hostDirectory")...)
+		allErrs = append(allErrs, validateHostDir(source.HostDir).Prefix("hostDirectory")...)
 	}
-	if source.EmptyDirectory != nil {
+	if source.EmptyDir != nil {
 		numVolumes++
 		//EmptyDirs have nothing to validate
 	}
@@ -70,7 +70,7 @@ func validateSource(source *api.VolumeSource) errs.ErrorList {
 	return allErrs
 }
 
-func validateHostDir(hostDir *api.HostDirectory) errs.ErrorList {
+func validateHostDir(hostDir *api.HostDir) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if hostDir.Path == "" {
 		allErrs = append(allErrs, errs.NewNotFound("path", hostDir.Path))

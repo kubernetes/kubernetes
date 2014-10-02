@@ -83,22 +83,22 @@ type Volume struct {
 
 type VolumeSource struct {
 	// Only one of the following sources may be specified
-	// HostDirectory represents a pre-existing directory on the host machine that is directly
+	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
 	// things that are allowed to see the host machine. Most containers will NOT need this.
 	// TODO(jonesdl) We need to restrict who can use host directory mounts and
 	// who can/can not mount host directories as read/write.
-	HostDirectory *HostDirectory `yaml:"hostDir" json:"hostDir"`
-	// EmptyDirectory represents a temporary directory that shares a pod's lifetime.
-	EmptyDirectory *EmptyDirectory `yaml:"emptyDir" json:"emptyDir"`
+	HostDir *HostDir `yaml:"hostDir" json:"hostDir"`
+	// EmptyDir represents a temporary directory that shares a pod's lifetime.
+	EmptyDir *EmptyDir `yaml:"emptyDir" json:"emptyDir"`
 }
 
-// HostDirectory represents bare host directory volume.
-type HostDirectory struct {
+// HostDir represents bare host directory volume.
+type HostDir struct {
 	Path string `yaml:"path" json:"path"`
 }
 
-type EmptyDirectory struct{}
+type EmptyDir struct{}
 
 // Protocol defines network protocols supported for things like conatiner ports.
 type Protocol string

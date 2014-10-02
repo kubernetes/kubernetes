@@ -12,24 +12,24 @@ A process in a Container sees a filesystem view composed from two sources: a sin
 
 Kubernetes currently supports two types of Volumes, but more may be added in the future.
 
-### EmptyDirectory
+### EmptyDir
 
-An EmptyDirectory volume is created when a Pod is bound to a Node.  It is initially empty, when the first Container command starts.  Containers in the same pod can all read and write the same files in the EmptyDirectory.  When a Pod is unbound, the data in the EmptyDirectory is deleted forever.
+An EmptyDir volume is created when a Pod is bound to a Node.  It is initially empty, when the first Container command starts.  Containers in the same pod can all read and write the same files in the EmptyDir.  When a Pod is unbound, the data in the EmptyDir is deleted forever.
 
-Some uses for an EmptyDirectory are:
+Some uses for an EmptyDir are:
   - scratch space, such as for a disk-based mergesort or checkpointing a long computation.
   - a directory that a content-manager container fills with data while a webserver container serves the data.
 
-Currently, the user cannot control what kind of media is used for an EmptyDirectory.  If the Kubelet is configured to use a disk drive, then all EmptyDirectories will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDirectory is on a disk drive, SSD, or tmpfs.
+Currently, the user cannot control what kind of media is used for an EmptyDir.  If the Kubelet is configured to use a disk drive, then all EmptyDirectories will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
 
-### HostDirectory
-A Volume with a HostDirectory property allows access to files on the current node.
+### HostDir
+A Volume with a HostDir property allows access to files on the current node.
 
-Some uses for a HostDirectory are:
-  - running a container that needs access to Docker internals; use a HostDirectory of /var/lib/docker.
-  - running cAdvisor in a container; use a HostDirectory of /dev/cgroups.
+Some uses for a HostDir are:
+  - running a container that needs access to Docker internals; use a HostDir of /var/lib/docker.
+  - running cAdvisor in a container; use a HostDir of /dev/cgroups.
 
 Watch out when using this type of volume, because:
   - pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
-  - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDirectory.
+  - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDir.
 
