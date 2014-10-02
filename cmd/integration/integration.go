@@ -181,6 +181,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 }
 
 func runReplicationControllerTest(c *client.Client) {
+	ctx := api.NewDefaultContext()
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
@@ -191,7 +192,7 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := c.CreateReplicationController(&controllerRequest); err != nil {
+	if _, err := c.CreateReplicationController(ctx, &controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
@@ -202,7 +203,7 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.ListPods(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	pods, err := c.ListPods(ctx, labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}

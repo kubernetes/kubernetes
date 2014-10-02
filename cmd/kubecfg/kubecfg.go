@@ -66,6 +66,7 @@ func init() {
 	flag.StringVar(&clientConfig.CAFile, "certificate_authority", "", "Path to a cert. file for the certificate authority")
 	flag.StringVar(&clientConfig.CertFile, "client_certificate", "", "Path to a client certificate for TLS.")
 	flag.StringVar(&clientConfig.KeyFile, "client_key", "", "Path to a client key file for TLS.")
+	flag.BoolVar(&clientConfig.Insecure, "insecure_skip_tls_verify", clientConfig.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 }
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
@@ -175,7 +176,7 @@ func main() {
 	}
 
 	// TODO: get the namespace context when kubecfg ns is completed
-	clientConfig.Context = api.NewContext()
+	ctx := api.NewContext()
 
 	if clientConfig.Host == "" {
 		// TODO: eventually apiserver should start on 443 and be secure by default
@@ -196,6 +197,9 @@ func main() {
 		}
 		if auth.KeyFile != "" {
 			clientConfig.KeyFile = auth.KeyFile
+		}
+		if auth.Insecure != nil {
+			clientConfig.Insecure = *auth.Insecure
 		}
 	}
 	kubeClient, err := client.New(clientConfig)
@@ -242,7 +246,7 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(method, kubeClient) || executeControllerRequest(method, kubeClient)
+	matchFound := executeAPIRequest(ctx, method, kubeClient) || executeControllerRequest(ctx, method, kubeClient)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
@@ -302,7 +306,7 @@ func getPrinter() kubecfg.ResourcePrinter {
 	return printer
 }
 
-func executeAPIRequest(method string, c *client.Client) bool {
+func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 	storage, path, hasSuffix := storagePathFromArg(flag.Arg(1))
 	validStorage := checkStorage(storage)
 	verb := ""
@@ -401,7 +405,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 	return true
 }
 
-func executeControllerRequest(method string, c *client.Client) bool {
+func executeControllerRequest(ctx api.Context, method string, c *client.Client) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
 			glog.Fatal("usage: kubecfg [OPTIONS] stop|rm|rollingupdate <controller>")
@@ -412,11 +416,11 @@ func executeControllerRequest(method string, c *client.Client) bool {
 	var err error
 	switch method {
 	case "stop":
-		err = kubecfg.StopController(parseController(), c)
+		err = kubecfg.StopController(ctx, parseController(), c)
 	case "rm":
-		err = kubecfg.DeleteController(parseController(), c)
+		err = kubecfg.DeleteController(ctx, parseController(), c)
 	case "rollingupdate":
-		err = kubecfg.Update(parseController(), c, *updatePeriod, *imageName)
+		err = kubecfg.Update(ctx, parseController(), c, *updatePeriod, *imageName)
 	case "run":
 		if len(flag.Args()) != 4 {
 			glog.Fatal("usage: kubecfg [OPTIONS] run <image> <replicas> <controller>")
@@ -427,7 +431,7 @@ func executeControllerRequest(method string, c *client.Client) bool {
 			glog.Fatalf("Error parsing replicas: %v", err2)
 		}
 		name := flag.Arg(3)
-		err = kubecfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
+		err = kubecfg.RunController(ctx, image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
 		args := flag.Args()
 		if len(args) < 3 {
@@ -438,7 +442,7 @@ func executeControllerRequest(method string, c *client.Client) bool {
 		if err2 != nil {
 			glog.Fatalf("Error parsing replicas: %v", err2)
 		}
-		err = kubecfg.ResizeController(name, replicas, c)
+		err = kubecfg.ResizeController(ctx, name, replicas, c)
 	default:
 		return false
 	}

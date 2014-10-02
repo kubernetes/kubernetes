@@ -49,32 +49,32 @@ type Cleaner interface {
 	TearDown() error
 }
 
-// HostDirectory volumes represent a bare host directory mount.
+// HostDir volumes represent a bare host directory mount.
 // The directory in Path will be directly exposed to the container.
-type HostDirectory struct {
+type HostDir struct {
 	Path string
 }
 
 // SetUp implements interface definitions, even though host directory
 // mounts don't require any setup or cleanup.
-func (hostVol *HostDirectory) SetUp() error {
+func (hostVol *HostDir) SetUp() error {
 	return nil
 }
 
-func (hostVol *HostDirectory) GetPath() string {
+func (hostVol *HostDir) GetPath() string {
 	return hostVol.Path
 }
 
-// EmptyDirectory volumes are temporary directories exposed to the pod.
+// EmptyDir volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
-type EmptyDirectory struct {
+type EmptyDir struct {
 	Name    string
 	PodID   string
 	RootDir string
 }
 
 // SetUp creates new directory.
-func (emptyDir *EmptyDirectory) SetUp() error {
+func (emptyDir *EmptyDir) SetUp() error {
 	path := emptyDir.GetPath()
 	err := os.MkdirAll(path, 0750)
 	if err != nil {
@@ -83,11 +83,11 @@ func (emptyDir *EmptyDirectory) SetUp() error {
 	return nil
 }
 
-func (emptyDir *EmptyDirectory) GetPath() string {
+func (emptyDir *EmptyDir) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
-func (emptyDir *EmptyDirectory) renameDirectory() (string, error) {
+func (emptyDir *EmptyDir) renameDirectory() (string, error) {
 	oldPath := emptyDir.GetPath()
 	newPath, err := ioutil.TempDir(path.Dir(oldPath), emptyDir.Name+".deleting~")
 	if err != nil {
@@ -101,7 +101,7 @@ func (emptyDir *EmptyDirectory) renameDirectory() (string, error) {
 }
 
 // TearDown simply deletes everything in the directory.
-func (emptyDir *EmptyDirectory) TearDown() error {
+func (emptyDir *EmptyDir) TearDown() error {
 	tmpDir, err := emptyDir.renameDirectory()
 	if err != nil {
 		return err
@@ -113,14 +113,14 @@ func (emptyDir *EmptyDirectory) TearDown() error {
 	return nil
 }
 
-// createHostDirectory interprets API volume as a HostDirectory.
-func createHostDirectory(volume *api.Volume) *HostDirectory {
-	return &HostDirectory{volume.Source.HostDirectory.Path}
+// createHostDir interprets API volume as a HostDir.
+func createHostDir(volume *api.Volume) *HostDir {
+	return &HostDir{volume.Source.HostDir.Path}
 }
 
-// createEmptyDirectory interprets API volume as an EmptyDirectory.
-func createEmptyDirectory(volume *api.Volume, podID string, rootDir string) *EmptyDirectory {
-	return &EmptyDirectory{volume.Name, podID, rootDir}
+// createEmptyDir interprets API volume as an EmptyDir.
+func createEmptyDir(volume *api.Volume, podID string, rootDir string) *EmptyDir {
+	return &EmptyDir{volume.Name, podID, rootDir}
 }
 
 // CreateVolumeBuilder returns a Builder capable of mounting a volume described by an
@@ -135,10 +135,10 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 	var vol Builder
 	// TODO(jonesdl) We should probably not check every pointer and directly
 	// resolve these types instead.
-	if source.HostDirectory != nil {
-		vol = createHostDirectory(volume)
-	} else if source.EmptyDirectory != nil {
-		vol = createEmptyDirectory(volume, podID, rootDir)
+	if source.HostDir != nil {
+		vol = createHostDir(volume)
+	} else if source.EmptyDir != nil {
+		vol = createEmptyDir(volume, podID, rootDir)
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -149,7 +149,7 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 func CreateVolumeCleaner(kind string, name string, podID string, rootDir string) (Cleaner, error) {
 	switch kind {
 	case "empty":
-		return &EmptyDirectory{name, podID, rootDir}, nil
+		return &EmptyDir{name, podID, rootDir}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}
