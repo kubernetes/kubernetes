@@ -29,10 +29,10 @@ import (
 
 // Watcher is the interface needed to receive changes to services and endpoints.
 type Watcher interface {
-	ListServices(label labels.Selector) (*api.ServiceList, error)
-	ListEndpoints(label labels.Selector) (*api.EndpointsList, error)
-	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
-	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListServices(ctx api.Context, label labels.Selector) (*api.ServiceList, error)
+	ListEndpoints(ctx api.Context, label labels.Selector) (*api.EndpointsList, error)
+	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // SourceAPI implements a configuration source for services and endpoints that
@@ -72,8 +72,9 @@ func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceU
 
 // runServices loops forever looking for changes to services.
 func (s *SourceAPI) runServices(resourceVersion *uint64) {
+	ctx := api.NewContext()
 	if *resourceVersion == 0 {
-		services, err := s.client.ListServices(labels.Everything())
+		services, err := s.client.ListServices(ctx, labels.Everything())
 		if err != nil {
 			glog.Errorf("Unable to load services: %v", err)
 			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
@@ -83,7 +84,7 @@ func (s *SourceAPI) runServices(resourceVersion *uint64) {
 		s.services <- ServiceUpdate{Op: SET, Services: services.Items}
 	}
 
-	watcher, err := s.client.WatchServices(labels.Everything(), labels.Everything(), *resourceVersion)
+	watcher, err := s.client.WatchServices(ctx, labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for services changes: %v", err)
 		time.Sleep(wait.Jitter(s.waitDuration, 0.0))
@@ -121,8 +122,9 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 
 // runEndpoints loops forever looking for changes to endpoints.
 func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
+	ctx := api.NewContext()
 	if *resourceVersion == 0 {
-		endpoints, err := s.client.ListEndpoints(labels.Everything())
+		endpoints, err := s.client.ListEndpoints(ctx, labels.Everything())
 		if err != nil {
 			glog.Errorf("Unable to load endpoints: %v", err)
 			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
@@ -132,7 +134,7 @@ func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
 		s.endpoints <- EndpointsUpdate{Op: SET, Endpoints: endpoints.Items}
 	}
 
-	watcher, err := s.client.WatchEndpoints(labels.Everything(), labels.Everything(), *resourceVersion)
+	watcher, err := s.client.WatchEndpoints(ctx, labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for endpoints changes: %v", err)
 		time.Sleep(wait.Jitter(s.waitDuration, 0.0))

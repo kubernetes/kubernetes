@@ -23,7 +23,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 )
 
@@ -55,10 +54,6 @@ type Config struct {
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options.
 	Transport http.RoundTripper
-
-	// Context is the context that should be passed down to the server. If nil, the
-	// context will be set to the appropriate default.
-	Context api.Context
 }
 
 // New creates a Kubernetes client for the given config. This client works with pods,

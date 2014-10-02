@@ -39,38 +39,38 @@ type Interface interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	ListPods(selector labels.Selector) (*api.PodList, error)
-	GetPod(id string) (*api.Pod, error)
-	DeletePod(id string) error
-	CreatePod(*api.Pod) (*api.Pod, error)
-	UpdatePod(*api.Pod) (*api.Pod, error)
+	ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error)
+	GetPod(ctx api.Context, id string) (*api.Pod, error)
+	DeletePod(ctx api.Context, id string) error
+	CreatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error)
+	UpdatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error)
 }
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	ListReplicationControllers(selector labels.Selector) (*api.ReplicationControllerList, error)
-	GetReplicationController(id string) (*api.ReplicationController, error)
-	CreateReplicationController(*api.ReplicationController) (*api.ReplicationController, error)
-	UpdateReplicationController(*api.ReplicationController) (*api.ReplicationController, error)
-	DeleteReplicationController(string) error
-	WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListReplicationControllers(ctx api.Context, selector labels.Selector) (*api.ReplicationControllerList, error)
+	GetReplicationController(ctx api.Context, id string) (*api.ReplicationController, error)
+	CreateReplicationController(ctx api.Context, ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateReplicationController(ctx api.Context, ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	DeleteReplicationController(ctx api.Context, id string) error
+	WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	ListServices(selector labels.Selector) (*api.ServiceList, error)
-	GetService(id string) (*api.Service, error)
-	CreateService(*api.Service) (*api.Service, error)
-	UpdateService(*api.Service) (*api.Service, error)
-	DeleteService(string) error
-	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListServices(ctx api.Context, selector labels.Selector) (*api.ServiceList, error)
+	GetService(ctx api.Context, id string) (*api.Service, error)
+	CreateService(ctx api.Context, srv *api.Service) (*api.Service, error)
+	UpdateService(ctx api.Context, srv *api.Service) (*api.Service, error)
+	DeleteService(ctx api.Context, id string) error
+	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
-	ListEndpoints(selector labels.Selector) (*api.EndpointsList, error)
-	GetEndpoints(id string) (*api.Endpoints, error)
-	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListEndpoints(ctx api.Context, selector labels.Selector) (*api.EndpointsList, error)
+	GetEndpoints(ctx api.Context, id string) (*api.Endpoints, error)
+	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
 }
 
 // VersionInterface has a method to retrieve the server version.
@@ -94,33 +94,33 @@ type Client struct {
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector.
-func (c *Client) ListPods(selector labels.Selector) (result *api.PodList, err error) {
+func (c *Client) ListPods(ctx api.Context, selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
 	err = c.Get().Path("pods").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetPod takes the id of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (c *Client) GetPod(id string) (result *api.Pod, err error) {
+func (c *Client) GetPod(ctx api.Context, id string) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.Get().Path("pods").Path(id).Do().Into(result)
 	return
 }
 
 // DeletePod takes the id of the pod, and returns an error if one occurs
-func (c *Client) DeletePod(id string) error {
+func (c *Client) DeletePod(ctx api.Context, id string) error {
 	return c.Delete().Path("pods").Path(id).Do().Error()
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *Client) CreatePod(pod *api.Pod) (result *api.Pod, err error) {
+func (c *Client) CreatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.Post().Path("pods").Body(pod).Do().Into(result)
 	return
 }
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *Client) UpdatePod(pod *api.Pod) (result *api.Pod, err error) {
+func (c *Client) UpdatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	if pod.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
@@ -131,28 +131,28 @@ func (c *Client) UpdatePod(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector.
-func (c *Client) ListReplicationControllers(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
+func (c *Client) ListReplicationControllers(ctx api.Context, selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.Get().Path("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetReplicationController returns information about a particular replication controller.
-func (c *Client) GetReplicationController(id string) (result *api.ReplicationController, err error) {
+func (c *Client) GetReplicationController(ctx api.Context, id string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.Get().Path("replicationControllers").Path(id).Do().Into(result)
 	return
 }
 
 // CreateReplicationController creates a new replication controller.
-func (c *Client) CreateReplicationController(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+func (c *Client) CreateReplicationController(ctx api.Context, controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.Post().Path("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
 // UpdateReplicationController updates an existing replication controller.
-func (c *Client) UpdateReplicationController(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+func (c *Client) UpdateReplicationController(ctx api.Context, controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	if controller.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
@@ -163,12 +163,12 @@ func (c *Client) UpdateReplicationController(controller *api.ReplicationControll
 }
 
 // DeleteReplicationController deletes an existing replication controller.
-func (c *Client) DeleteReplicationController(id string) error {
+func (c *Client) DeleteReplicationController(ctx api.Context, id string) error {
 	return c.Delete().Path("replicationControllers").Path(id).Do().Error()
 }
 
 // WatchReplicationControllers returns a watch.Interface that watches the requested controllers.
-func (c *Client) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("replicationControllers").
@@ -179,28 +179,28 @@ func (c *Client) WatchReplicationControllers(label, field labels.Selector, resou
 }
 
 // ListServices takes a selector, and returns the list of services that match that selector
-func (c *Client) ListServices(selector labels.Selector) (result *api.ServiceList, err error) {
+func (c *Client) ListServices(ctx api.Context, selector labels.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetService returns information about a particular service.
-func (c *Client) GetService(id string) (result *api.Service, err error) {
+func (c *Client) GetService(ctx api.Context, id string) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.Get().Path("services").Path(id).Do().Into(result)
 	return
 }
 
 // CreateService creates a new service.
-func (c *Client) CreateService(svc *api.Service) (result *api.Service, err error) {
+func (c *Client) CreateService(ctx api.Context, svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.Post().Path("services").Body(svc).Do().Into(result)
 	return
 }
 
 // UpdateService updates an existing service.
-func (c *Client) UpdateService(svc *api.Service) (result *api.Service, err error) {
+func (c *Client) UpdateService(ctx api.Context, svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	if svc.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
@@ -211,12 +211,12 @@ func (c *Client) UpdateService(svc *api.Service) (result *api.Service, err error
 }
 
 // DeleteService deletes an existing service.
-func (c *Client) DeleteService(id string) error {
+func (c *Client) DeleteService(ctx api.Context, id string) error {
 	return c.Delete().Path("services").Path(id).Do().Error()
 }
 
 // WatchServices returns a watch.Interface that watches the requested services.
-func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("services").
@@ -227,21 +227,21 @@ func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uin
 }
 
 // ListEndpoints takes a selector, and returns the list of endpoints that match that selector
-func (c *Client) ListEndpoints(selector labels.Selector) (result *api.EndpointsList, err error) {
+func (c *Client) ListEndpoints(ctx api.Context, selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.Get().Path("endpoints").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetEndpoints returns information about the endpoints for a particular service.
-func (c *Client) GetEndpoints(id string) (result *api.Endpoints, err error) {
+func (c *Client) GetEndpoints(ctx api.Context, id string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
 	err = c.Get().Path("endpoints").Path(id).Do().Into(result)
 	return
 }
 
 // WatchEndpoints returns a watch.Interface that watches the requested endpoints for a service.
-func (c *Client) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("endpoints").
@@ -251,13 +251,13 @@ func (c *Client) WatchEndpoints(label, field labels.Selector, resourceVersion ui
 		Watch()
 }
 
-func (c *Client) CreateEndpoints(endpoints *api.Endpoints) (*api.Endpoints, error) {
+func (c *Client) CreateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
 	err := c.Post().Path("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
-func (c *Client) UpdateEndpoints(endpoints *api.Endpoints) (*api.Endpoints, error) {
+func (c *Client) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
 	if endpoints.ResourceVersion == 0 {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
