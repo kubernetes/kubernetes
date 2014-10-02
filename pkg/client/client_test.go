@@ -145,15 +145,17 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 }
 
 func TestListEmptyPods(t *testing.T) {
+	ctx := api.NewContext()
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup().ListPods(labels.Everything())
+	podList, err := c.Setup().ListPods(ctx, labels.Everything())
 	c.Validate(t, podList, err)
 }
 
 func TestListPods(t *testing.T) {
+	ctx := api.NewDefaultContext()
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200,
@@ -172,7 +174,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup().ListPods(labels.Everything())
+	receivedPodList, err := c.Setup().ListPods(ctx, labels.Everything())
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -183,6 +185,7 @@ func validateLabels(a, b string) bool {
 }
 
 func TestListPodsLabels(t *testing.T) {
+	ctx := api.NewDefaultContext()
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
 		Response: Response{
@@ -205,11 +208,12 @@ func TestListPodsLabels(t *testing.T) {
 	c.Setup()
 	c.QueryValidator["labels"] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedPodList, err := c.ListPods(selector)
+	receivedPodList, err := c.ListPods(ctx, selector)
 	c.Validate(t, receivedPodList, err)
 }
 
 func TestGetPod(t *testing.T) {
+	ctx := api.NewDefaultContext()
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods/foo"},
 		Response: Response{
@@ -225,7 +229,7 @@ func TestGetPod(t *testing.T) {
 			},
 		},
 	}
-	receivedPod, err := c.Setup().GetPod("foo")
+	receivedPod, err := c.Setup().GetPod(ctx, "foo")
 	c.Validate(t, receivedPod, err)
 }
 
@@ -234,7 +238,7 @@ func TestDeletePod(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/pods/foo"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeletePod("foo")
+	err := c.Setup().DeletePod(api.NewDefaultContext(), "foo")
 	c.Validate(t, nil, err)
 }
 
@@ -255,7 +259,7 @@ func TestCreatePod(t *testing.T) {
 			Body:       requestPod,
 		},
 	}
-	receivedPod, err := c.Setup().CreatePod(requestPod)
+	receivedPod, err := c.Setup().CreatePod(api.NewDefaultContext(), requestPod)
 	c.Validate(t, receivedPod, err)
 }
 
@@ -274,7 +278,7 @@ func TestUpdatePod(t *testing.T) {
 		Request:  testRequest{Method: "PUT", Path: "/pods/foo"},
 		Response: Response{StatusCode: 200, Body: requestPod},
 	}
-	receivedPod, err := c.Setup().UpdatePod(requestPod)
+	receivedPod, err := c.Setup().UpdatePod(api.NewDefaultContext(), requestPod)
 	c.Validate(t, receivedPod, err)
 }
 
@@ -298,7 +302,7 @@ func TestListControllers(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup().ListReplicationControllers(labels.Everything())
+	receivedControllerList, err := c.Setup().ListReplicationControllers(api.NewContext(), labels.Everything())
 	c.Validate(t, receivedControllerList, err)
 
 }
@@ -320,7 +324,7 @@ func TestGetController(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().GetReplicationController("foo")
+	receivedController, err := c.Setup().GetReplicationController(api.NewDefaultContext(), "foo")
 	c.Validate(t, receivedController, err)
 }
 
@@ -344,7 +348,7 @@ func TestUpdateController(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().UpdateReplicationController(requestController)
+	receivedController, err := c.Setup().UpdateReplicationController(api.NewDefaultContext(), requestController)
 	c.Validate(t, receivedController, err)
 }
 
@@ -353,7 +357,7 @@ func TestDeleteController(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/replicationControllers/foo"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeleteReplicationController("foo")
+	err := c.Setup().DeleteReplicationController(api.NewDefaultContext(), "foo")
 	c.Validate(t, nil, err)
 }
 
@@ -377,7 +381,7 @@ func TestCreateController(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().CreateReplicationController(requestController)
+	receivedController, err := c.Setup().CreateReplicationController(api.NewDefaultContext(), requestController)
 	c.Validate(t, receivedController, err)
 }
 
@@ -410,7 +414,7 @@ func TestListServices(t *testing.T) {
 			},
 		},
 	}
-	receivedServiceList, err := c.Setup().ListServices(labels.Everything())
+	receivedServiceList, err := c.Setup().ListServices(api.NewDefaultContext(), labels.Everything())
 	c.Validate(t, receivedServiceList, err)
 }
 
@@ -437,7 +441,7 @@ func TestListServicesLabels(t *testing.T) {
 	c.Setup()
 	c.QueryValidator["labels"] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedServiceList, err := c.ListServices(selector)
+	receivedServiceList, err := c.ListServices(api.NewDefaultContext(), selector)
 	c.Validate(t, receivedServiceList, err)
 }
 
@@ -446,7 +450,7 @@ func TestGetService(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/services/1"},
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}
-	response, err := c.Setup().GetService("1")
+	response, err := c.Setup().GetService(api.NewDefaultContext(), "1")
 	c.Validate(t, response, err)
 }
 
@@ -455,7 +459,7 @@ func TestCreateService(t *testing.T) {
 		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 		Response: Response{StatusCode: 200, Body: &api.Service{JSONBase: api.JSONBase{ID: "service-1"}}},
 	}
-	response, err := c.Setup().CreateService(&api.Service{JSONBase: api.JSONBase{ID: "service-1"}})
+	response, err := c.Setup().CreateService(api.NewDefaultContext(), &api.Service{JSONBase: api.JSONBase{ID: "service-1"}})
 	c.Validate(t, response, err)
 }
 
@@ -465,7 +469,7 @@ func TestUpdateService(t *testing.T) {
 		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: svc},
 		Response: Response{StatusCode: 200, Body: svc},
 	}
-	response, err := c.Setup().UpdateService(svc)
+	response, err := c.Setup().UpdateService(api.NewDefaultContext(), svc)
 	c.Validate(t, response, err)
 }
 
@@ -474,7 +478,7 @@ func TestDeleteService(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/services/1"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeleteService("1")
+	err := c.Setup().DeleteService(api.NewDefaultContext(), "1")
 	c.Validate(t, nil, err)
 }
 
@@ -492,7 +496,7 @@ func TestListEndpooints(t *testing.T) {
 			},
 		},
 	}
-	receivedEndpointsList, err := c.Setup().ListEndpoints(labels.Everything())
+	receivedEndpointsList, err := c.Setup().ListEndpoints(api.NewDefaultContext(), labels.Everything())
 	c.Validate(t, receivedEndpointsList, err)
 }
 
@@ -501,7 +505,7 @@ func TestGetEndpoints(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/endpoints/endpoint-1"},
 		Response: Response{StatusCode: 200, Body: &api.Endpoints{JSONBase: api.JSONBase{ID: "endpoint-1"}}},
 	}
-	response, err := c.Setup().GetEndpoints("endpoint-1")
+	response, err := c.Setup().GetEndpoints(api.NewDefaultContext(), "endpoint-1")
 	c.Validate(t, response, err)
 }
 

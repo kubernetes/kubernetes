@@ -43,7 +43,7 @@ func TestUpdateWithPods(t *testing.T) {
 			},
 		},
 	}
-	Update("foo", &fakeClient, 0, "")
+	Update(api.NewDefaultContext(), "foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 5 {
 		t.Fatalf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -57,7 +57,7 @@ func TestUpdateWithPods(t *testing.T) {
 
 func TestUpdateNoPods(t *testing.T) {
 	fakeClient := client.Fake{}
-	Update("foo", &fakeClient, 0, "")
+	Update(api.NewDefaultContext(), "foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -87,7 +87,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 			},
 		},
 	}
-	Update("foo", &fakeClient, 0, "fooImage:2")
+	Update(api.NewDefaultContext(), "foo", &fakeClient, 0, "fooImage:2")
 	if len(fakeClient.Actions) != 6 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -109,7 +109,7 @@ func TestRunController(t *testing.T) {
 	name := "name"
 	image := "foo/bar"
 	replicas := 3
-	RunController(image, name, replicas, &fakeClient, "8080:80", -1)
+	RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "8080:80", -1)
 	if len(fakeClient.Actions) != 1 || fakeClient.Actions[0].Action != "create-controller" {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -126,7 +126,7 @@ func TestRunControllerWithService(t *testing.T) {
 	name := "name"
 	image := "foo/bar"
 	replicas := 3
-	RunController(image, name, replicas, &fakeClient, "", 8000)
+	RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "", 8000)
 	if len(fakeClient.Actions) != 2 ||
 		fakeClient.Actions[0].Action != "create-controller" ||
 		fakeClient.Actions[1].Action != "create-service" {
@@ -143,7 +143,7 @@ func TestRunControllerWithService(t *testing.T) {
 func TestStopController(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
-	StopController(name, &fakeClient)
+	StopController(api.NewDefaultContext(), name, &fakeClient)
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -162,7 +162,7 @@ func TestResizeController(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
 	replicas := 17
-	ResizeController(name, replicas, &fakeClient)
+	ResizeController(api.NewDefaultContext(), name, replicas, &fakeClient)
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -180,7 +180,7 @@ func TestResizeController(t *testing.T) {
 func TestCloudCfgDeleteController(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
-	err := DeleteController(name, &fakeClient)
+	err := DeleteController(api.NewDefaultContext(), name, &fakeClient)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 		},
 	}
 	name := "name"
-	err := DeleteController(name, &fakeClient)
+	err := DeleteController(api.NewDefaultContext(), name, &fakeClient)
 	if len(fakeClient.Actions) != 1 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}

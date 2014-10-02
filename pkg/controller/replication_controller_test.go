@@ -49,13 +49,13 @@ type FakePodControl struct {
 	lock           sync.Mutex
 }
 
-func (f *FakePodControl) createReplica(spec api.ReplicationController) {
+func (f *FakePodControl) createReplica(ctx api.Context, spec api.ReplicationController) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
-func (f *FakePodControl) deletePod(podID string) error {
+func (f *FakePodControl) deletePod(ctx api.Context, podID string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.deletePodID = append(f.deletePodID, podID)
@@ -169,6 +169,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
+	ctx := api.NewDefaultContext()
 	body := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -204,7 +205,7 @@ func TestCreateReplica(t *testing.T) {
 		},
 	}
 
-	podControl.createReplica(controllerSpec)
+	podControl.createReplica(ctx, controllerSpec)
 
 	expectedPod := api.Pod{
 		JSONBase: api.JSONBase{
@@ -323,7 +324,7 @@ type FakeWatcher struct {
 	*client.Fake
 }
 
-func (fw FakeWatcher) WatchReplicationControllers(l, f labels.Selector, rv uint64) (watch.Interface, error) {
+func (fw FakeWatcher) WatchReplicationControllers(ctx api.Context, l, f labels.Selector, rv uint64) (watch.Interface, error) {
 	return fw.w, nil
 }
 
