@@ -9,6 +9,7 @@ base:
     - kubelet
     - kube-proxy
     - cadvisor
+    - fluentd
     - nsinit
     - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}

@@ -1,19 +1,16 @@
+version: v1beta2
 id: fluentd-to-elasticsearch
-kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: fluentd-to-es
-    containers:
+containers:
       - name: docker-fluentd
         image: satnam6502/lambda-fluentd
         volumeMounts:
           - name: containers
             mountPath: /var/lib/docker/containers
+            readOnly: true
           - name: hosts
             mountPath: /outerhost
-    volumes:
+            readOnly: true
+volumes:
       - name: containers
         source:
           hostDir:
@@ -22,6 +19,4 @@ desiredState:
         source:
           hostDir:
             path: /etc/hosts
-labels:
-  name: fluentd-logging
 
