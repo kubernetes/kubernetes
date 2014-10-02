@@ -439,3 +439,42 @@ func TestWatch(t *testing.T) {
 		t.Fatal("Unexpected non-close")
 	}
 }
+
+func TestStream(t *testing.T) {
+	auth := &Config{Username: "user", Password: "pass"}
+	expectedBody := "expected body"
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		checkAuth(t, auth, r)
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("need flusher!")
+		}
+		w.Header().Set("Transfer-Encoding", "chunked")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(expectedBody))
+		flusher.Flush()
+	}))
+
+	s, err := New(&Config{
+		Host:     testServer.URL,
+		Version:  "v1beta1",
+		Username: "user",
+		Password: "pass",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	readCloser, err := s.Get().Path("path/to/stream/thing").Stream()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer readCloser.Close()
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(readCloser)
+	resultBody := buf.String()
+
+	if expectedBody != resultBody {
+		t.Errorf("Expected %s, got %s", expectedBody, resultBody)
+	}
+}
