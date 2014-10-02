@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// podex is a command line tool to generate a kubernetes container
-// manifest placeholder from docker image metadata.
+// podex is a command line tool to bootstrap kubernetes container
+// manifests from docker image metadata.
 //
-// The manifest can then be edited by a human to match the deployment
-// needs.
+// Manifests can then be edited by a human to match deployment needs.
 //
 // Example usage:
 //

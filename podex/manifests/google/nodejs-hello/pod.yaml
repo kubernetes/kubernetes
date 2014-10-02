@@ -8,5 +8,3 @@ containers:
   - name: nodejs-hello-tcp-8080
     containerPort: 8080
     protocol: TCP
-restartPolicy:
-  always: {}
