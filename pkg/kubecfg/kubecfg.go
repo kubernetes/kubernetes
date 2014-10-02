@@ -54,6 +54,9 @@ func promptForString(field string, r io.Reader) string {
 type AuthInfo struct {
 	User     string
 	Password string
+	CAFile   string
+	CertFile string
+	KeyFile  string
 }
 
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
