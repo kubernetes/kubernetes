@@ -6,5 +6,6 @@ containers:
   image: google/nodejs-hello
   ports:
   - name: nodejs-hello-tcp-8080
+    hostPort: 80
     containerPort: 8080
     protocol: TCP
