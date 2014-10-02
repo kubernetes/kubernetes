@@ -224,6 +224,27 @@ func (r *Request) Watch() (watch.Interface, error) {
 	return watch.NewStreamWatcher(watchjson.NewDecoder(response.Body, r.c.Codec)), nil
 }
 
+// Stream formats and executes the request, and offers streaming of the response.
+// Returns io.ReadCloser which could be used for streaming of the response, or an error
+func (r *Request) Stream() (io.ReadCloser, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	if err != nil {
+		return nil, err
+	}
+	client := r.c.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return response.Body, nil
+}
+
 // Do formats and executes the request. Returns the API object received, or an error.
 func (r *Request) Do() Result {
 	for {
