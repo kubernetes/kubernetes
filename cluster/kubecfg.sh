@@ -33,6 +33,7 @@ if [ "$KUBERNETES_PROVIDER" == "vagrant" ]; then
 }
 EOF
   AUTH_CONFIG="-auth $HOME/.kubernetes_vagrant_auth"
+  SKIP_VERIFY="-insecure_skip_tls_verify"
 fi
 
 detect-master > /dev/null
@@ -40,4 +41,4 @@ if [ "$KUBE_MASTER_IP" != "" ] && [ "$KUBERNETES_MASTER" == "" ]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-$KUBECFG $AUTH_CONFIG "$@"
+$KUBECFG $SKIP_VERIFY $AUTH_CONFIG "$@"
