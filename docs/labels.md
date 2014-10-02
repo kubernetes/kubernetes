@@ -12,7 +12,7 @@ Via a "label selector" the user can identify a set of `pods`. The label selector
 
 Kubernetes currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
 - `service`: A service is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
-- `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
+- `replicationController`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
 
 The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. 
 
@@ -20,7 +20,7 @@ Pods may be removed from these sets by changing their labels. This flexibility m
 
 For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
 
-Sets identified by labels and label selectors could be overlapping (think Venn diagrams). For instance, a service might point to all pods with `tier in (frontend), environment in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `tier=frontend, environment=prod, track=stable` and another `replicationController` (with `replicas` set to 1) for the canary with labels `tier=frontend, environment=prod, track=canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc. 
+Sets identified by labels and label selectors could be overlapping (think Venn diagrams). For instance, a service might target all pods with `tier in (frontend), environment in (prod)`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `tier=frontend, environment=prod, track=stable` and another `replicationController` (with `replicas` set to 1) for the canary with labels `tier=frontend, environment=prod, track=canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc. 
 
 Note that the superset described in the previous example is also heterogeneous. In long-lived, highly available, horizontally scaled, distributed, continuously evolving service applications, heterogeneity is inevitable, due to canaries, incremental rollouts, live reconfiguration, simultaneous updates and auto-scaling, hardware upgrades, and so on.
 
