@@ -57,6 +57,7 @@ type AuthInfo struct {
 	CAFile   string
 	CertFile string
 	KeyFile  string
+	Insecure *bool
 }
 
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
