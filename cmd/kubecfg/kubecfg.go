@@ -188,6 +188,15 @@ func main() {
 		}
 		clientConfig.Username = auth.User
 		clientConfig.Password = auth.Password
+		if auth.CAFile != "" {
+			clientConfig.CAFile = auth.CAFile
+		}
+		if auth.CertFile != "" {
+			clientConfig.CertFile = auth.CertFile
+		}
+		if auth.KeyFile != "" {
+			clientConfig.KeyFile = auth.KeyFile
+		}
 	}
 	kubeClient, err := client.New(clientConfig)
 	if err != nil {
