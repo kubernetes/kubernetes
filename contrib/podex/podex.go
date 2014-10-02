@@ -70,10 +70,12 @@ func main() {
 		log.Fatalf("failed to connect to %q: %v", dockerHost, err)
 	}
 
+	// TODO(proppy): use the regitry API instead of the remote API to get image metadata.
 	img, err := docker.InspectImage(imageName)
 	if err != nil {
 		log.Fatalf("failed to inspect image %q: %v", imageName, err)
 	}
+	// TODO(proppy): add flag to handle multiple version
 	manifest := v1beta1.ContainerManifest{
 		Version: "v1beta1",
 		ID:      baseName + "-pod",
