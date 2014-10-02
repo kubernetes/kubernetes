@@ -61,6 +61,9 @@ func main() {
 		log.Fatal(usage)
 	}
 
+	// Parse docker image name
+	// IMAGE: [REGISTRYHOST/][USERNAME/]NAME[:TAG]
+	// NAME: [a-z0-9-_.]
 	parts := strings.Split(imageName, "/")
 	baseName := parts[len(parts)-1]
 
