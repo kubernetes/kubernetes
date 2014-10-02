@@ -35,9 +35,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	dockerclient "github.com/fsouza/go-dockerclient"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/v1/yaml"
 )
 
 const usage = "usage: podex [-json|-yaml] <repo/dockerimage>"
@@ -57,7 +57,7 @@ func main() {
 		log.Fatal(usage)
 	}
 
-	if !*generateJSON && !*generateYAML {
+	if (!*generateJSON && !*generateYAML) || (*generateJSON && *generateYAML) {
 		log.Fatal(usage)
 	}
 
@@ -74,15 +74,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to inspect image %q: %v", imageName, err)
 	}
-	manifest := api.ContainerManifest{
+	manifest := v1beta1.ContainerManifest{
 		Version: "v1beta1",
 		ID:      baseName + "-pod",
-		Containers: []api.Container{{
+		Containers: []v1beta1.Container{{
 			Name:  baseName,
 			Image: imageName,
 		}},
-		RestartPolicy: api.RestartPolicy{
-			Always: &api.RestartPolicyAlways{},
+		RestartPolicy: v1beta1.RestartPolicy{
+			Always: &v1beta1.RestartPolicyAlways{},
 		},
 	}
 	for p, _ := range img.Config.ExposedPorts {
@@ -90,10 +90,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to parse port %q: %v", parts[0], err)
 		}
-		manifest.Containers[0].Ports = append(manifest.Containers[0].Ports, api.Port{
+		manifest.Containers[0].Ports = append(manifest.Containers[0].Ports, v1beta1.Port{
 			Name:          strings.Join([]string{baseName, p.Proto(), p.Port()}, "-"),
 			ContainerPort: port,
-			Protocol:      api.Protocol(strings.ToUpper(p.Proto())),
+			Protocol:      strings.ToUpper(p.Proto()),
 		})
 	}
 	if *generateJSON {
