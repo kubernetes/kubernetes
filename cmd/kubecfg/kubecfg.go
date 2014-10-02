@@ -66,6 +66,7 @@ func init() {
 	flag.StringVar(&clientConfig.CAFile, "certificate_authority", "", "Path to a cert. file for the certificate authority")
 	flag.StringVar(&clientConfig.CertFile, "client_certificate", "", "Path to a client certificate for TLS.")
 	flag.StringVar(&clientConfig.KeyFile, "client_key", "", "Path to a client key file for TLS.")
+	flag.BoolVar(&clientConfig.Insecure, "insecure_skip_tls_verify", clientConfig.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 }
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
@@ -196,6 +197,9 @@ func main() {
 		}
 		if auth.KeyFile != "" {
 			clientConfig.KeyFile = auth.KeyFile
+		}
+		if auth.Insecure != nil {
+			clientConfig.Insecure = *auth.Insecure
 		}
 	}
 	kubeClient, err := client.New(clientConfig)
