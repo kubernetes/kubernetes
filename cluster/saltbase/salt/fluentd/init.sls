@@ -1,6 +1,6 @@
 /etc/kubernetes/manifests/fluentd.manifest:
   file.managed:
-    - source: salt://fluentd/cadvisor.manifest
+    - source: salt://fluentd/fluentd.manifest
     - user: root
     - group: root
     - mode: 644
