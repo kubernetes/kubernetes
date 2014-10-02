@@ -119,17 +119,14 @@ _kubecfg()
             -h
             -c
     )
-    local -A all_services=(
-        [CREATE]="pods replicationControllers services"
-        [UPDATE]="replicationControllers"
-        [ALL]="pods replicationControllers services minions"
-    )
-    local services=(${all_services[ALL]})
-    local -A all_commands=(
-        [WITH_JSON]="create update"
-        [ALL]="create update get list delete stop rm rollingupdate resize"
-    )
-    local commands=(${all_commands[ALL]})
+    local create_services=(pods replicationControllers services)
+    local update_services=(replicationControllers)
+    local all_services=(pods replicationControllers services minions)
+    local services=("${all_services[@]}")
+
+    local json_commands=(create update)
+    local all_commands=(create update get list delete stop rm rollingupdate resize)
+    local commands=("${all_commands[@]}")
 
     COMPREPLY=()
     local command
@@ -155,8 +152,8 @@ _kubecfg()
 
     # if you passed -c, you are limited to create or update
     if __contains_word "-c" "${words[@]}"; then
-        services=(${all_services[CREATE]} ${all_services[UPDATE]})
-        commands=(${all_commands[WITH_JSON]})
+        services=("${create_services[@]}" "${update_services[@]}")
+        commands=("${json_commands[@]}")
     fi
 
     # figure out which command they are running, remembering that arguments to
@@ -179,9 +176,9 @@ _kubecfg()
 
     # remove services which you can't update given your command
     if [[ ${command} == "create" ]]; then
-        services=(${all_services[CREATE]})
+        services=("${create_services[@]}")
     elif [[ ${command} == "update" ]]; then
-        services=(${all_services[UPDATE]})
+        services=("${update_services[@]}")
     fi
 
     case $command in
