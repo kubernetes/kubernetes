@@ -2,10 +2,9 @@
 
 There are multiple guides on running Kubernetes with [CoreOS](http://coreos.com):
 
-[Single Kubernetes example in any environment](https://github.com/kelseyhightower/kubernetes-coreos)
-
-
-[CoreOS + Fleet (work in progress)](https://github.com/kelseyhightower/kubernetes-fleet-tutorial)
+* [Single Node Kubernetes example in any environment](coreos/coreos_quick_start.md)
+* [Multi-node cluster using cloud-config](coreos/coreos_cloud_config.md)
+* [Elastic Kubernetes cluster with fleet and flannel](https://github.com/kelseyhightower/kubernetes-fleet-tutorial)
 
 Warning: the following instructions are slightly stale, after setting this up, you need to also start the scheduler binary.
 
