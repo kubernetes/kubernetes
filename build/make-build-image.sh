@@ -21,7 +21,8 @@
 # directory.  It will then copy over the Dockerfile and build the kube-build
 # image.
 
-source $(dirname "${BASH_SOURCE}")/common.sh
+KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
+source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::build_image

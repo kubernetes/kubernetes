@@ -17,8 +17,9 @@
 # This command checks that the built commands can function together for
 # simple scenarios.  It does not require Docker so it can run in travis.
 
-source $(dirname $0)/util.sh
-source $(dirname $0)/config-go.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/util.sh"
+source "${KUBE_ROOT}/hack/config-go.sh"
 
 function cleanup()
 {
@@ -48,7 +49,7 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 GO_OUT=${KUBE_TARGET}/bin
 
 # Check kubecfg
-out=$(${GO_OUT}/kubecfg -version)
+out=$("${GO_OUT}/kubecfg" -version)
 echo kubecfg: $out
 
 # Start kubelet

@@ -17,9 +17,10 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-cd $(dirname "${BASH_SOURCE}")/../.. >/dev/null
-readonly KUBE_REPO_ROOT="${PWD}"
-readonly KUBE_TARGET="${KUBE_REPO_ROOT}/_output/build"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+cd "${KUBE_ROOT}"
+
+readonly KUBE_TARGET="${KUBE_ROOT}/_output/build"
 readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 
 mkdir -p "${KUBE_TARGET}"
@@ -39,7 +40,7 @@ function kube::build::make_binary() {
   local -r bin=${gopkg##*/}
 
   echo "+++ Building ${bin} for ${GOOS}/${GOARCH}"
-  pushd "${KUBE_REPO_ROOT}" >/dev/null
+  pushd "${KUBE_ROOT}" >/dev/null
   godep go build -ldflags "${KUBE_LD_FLAGS-}" -o "${ARCH_TARGET}/${bin}" "${gopkg}"
   popd >/dev/null
 }

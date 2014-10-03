@@ -36,7 +36,7 @@
 #		      the final GOPATH.
 
 # --- Environment Variables set by sourcing config-go.sh ---
-# KUBE_REPO_ROOT  - Path to the top of the build tree.
+# KUBE_ROOT       - Path to the top of the build tree.
 # KUBE_TARGET     - Path where output Go files are saved.
 # KUBE_GO_PACKAGE - Full name of the Kubernetes Go package.
 
@@ -61,7 +61,7 @@ kube::version_ldflags() {
 
     unset CDPATH
 
-    cd "${KUBE_REPO_ROOT}"
+    cd "${KUBE_ROOT}"
 
     declare -a ldflags=()
     if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$(git rev-parse "HEAD^{commit}" 2>/dev/null); then
@@ -143,7 +143,7 @@ kube::setup_go_environment() {
   # Append the tree maintained by `godep` to the GOPATH unless KUBE_NO_GODEPS
   # is defined.
   if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_REPO_ROOT}/Godeps/_workspace"
+    GOPATH="${GOPATH}:${KUBE_ROOT}/Godeps/_workspace"
   fi
   export GOPATH
 
@@ -172,18 +172,19 @@ kube::binaries_from_targets() {
 }
 # --- Environment Variables ---
 
-# Make ${KUBE_REPO_ROOT} an absolute path.
-KUBE_REPO_ROOT=$(
-  set -eu
+# Make ${KUBE_ROOT} an absolute path.
+KUBE_ROOT=$(
+  set -o errexit
+  set -o nounset
+  set -o pipefail
   unset CDPATH
-  scripts_dir=$(dirname "${BASH_SOURCE[0]}")
-  cd "${scripts_dir}"
-  cd ..
+  kube_root=$(dirname "${BASH_SOURCE}")/..
+  cd "${kube_root}"
   pwd
 )
-export KUBE_REPO_ROOT
+export KUBE_ROOT
 
-KUBE_TARGET="${KUBE_REPO_ROOT}/_output/go"
+KUBE_TARGET="${KUBE_ROOT}/_output/go"
 mkdir -p "${KUBE_TARGET}"
 export KUBE_TARGET
 
@@ -195,12 +196,14 @@ export KUBE_GO_PACKAGE
   # So that Go knows how to import Kubernetes sources by full path.
   # Use a subshell to avoid leaking these variables.
 
-  set -eu
+  set -o errexit
+  set -o nounset
+  set -o pipefail
   go_pkg_dir="${KUBE_TARGET}/src/${KUBE_GO_PACKAGE}"
   go_pkg_basedir=$(dirname "${go_pkg_dir}")
   mkdir -p "${go_pkg_basedir}"
   rm -f "${go_pkg_dir}"
   # TODO: This symlink should be relative.
-  ln -s "${KUBE_REPO_ROOT}" "${go_pkg_dir}"
+  ln -s "${KUBE_ROOT}" "${go_pkg_dir}"
 )
 

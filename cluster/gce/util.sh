@@ -18,15 +18,11 @@
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
-source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 # Verify prereqs
-#
-# Vars set:
-#   KUBE_REPO_ROOT
 function verify-prereqs {
-  KUBE_REPO_ROOT="$(dirname ${BASH_SOURCE})/../.."
-
   for x in gcloud gcutil gsutil; do
     if [ "$(which $x)" == "" ]; then
       echo "Can't find $x in PATH, please fix and retry."
@@ -41,18 +37,18 @@ function verify-prereqs {
 #   SERVER_BINARY_TAR
 #   SALT_TAR
 function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_REPO_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_REPO_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
   fi
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
     echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
     exit 1
   fi
 
-  SALT_TAR="${KUBE_REPO_ROOT}/server/kubernetes-salt.tar.gz"
+  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
   if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_REPO_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
+    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
   fi
   if [[ ! -f "$SALT_TAR" ]]; then
     echo "!!! Cannot find kubernetes-salt.tar.gz"
@@ -195,7 +191,7 @@ EOF
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
-#   KUBE_REPO_ROOT
+#   KUBE_ROOT
 #   <Various vars set in config file>
 function kube-up {
   # Detect the project into $PROJECT if it isn't set
@@ -210,7 +206,7 @@ function kube-up {
   trap 'rm -rf "${kube_temp}"' EXIT
 
   get-password
-  python "${KUBE_REPO_ROOT}/third_party/htpasswd/htpasswd.py" \
+  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
     -b -c "${kube_temp}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
   local htpasswd=$(cat "${kube_temp}/htpasswd")
 
@@ -253,8 +249,8 @@ function kube-up {
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
-    grep -v "^#" "${KUBE_REPO_ROOT}/cluster/gce/templates/download-release.sh"
-    grep -v "^#" "${KUBE_REPO_ROOT}/cluster/gce/templates/salt-master.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
   ) > "${kube_temp}/master-start.sh"
 
   gcutil addinstance ${MASTER_NAME}\
@@ -275,7 +271,7 @@ function kube-up {
       echo "#! /bin/bash"
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
-      grep -v "^#" "${KUBE_REPO_ROOT}/cluster/gce/templates/salt-minion.sh"
+      grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-minion.sh"
     ) > "${kube_temp}/minion-start-${i}.sh"
 
     gcutil addfirewall ${MINION_NAMES[$i]}-all \
@@ -448,7 +444,7 @@ function kube-push {
     echo "cd /var/cache/kubernetes-install"
     echo "readonly SERVER_BINARY_TAR_URL=${SERVER_BINARY_TAR_URL}"
     echo "readonly SALT_TAR_URL=${SALT_TAR_URL}"
-    grep -v "^#" "${KUBE_REPO_ROOT}/cluster/gce/templates/download-release.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"
@@ -472,12 +468,12 @@ function kube-push {
 # Execute prior to running tests to build a release if required for env.
 #
 # Assumed Vars:
-#   KUBE_REPO_ROOT
+#   KUBE_ROOT
 function test-build-release {
   # Build source
-  "${KUBE_REPO_ROOT}/hack/build-go.sh"
+  "${KUBE_ROOT}/hack/build-go.sh"
   # Make a release
-  "${KUBE_REPO_ROOT}/release/release.sh"
+  "${KUBE_ROOT}/release/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -520,5 +516,5 @@ function test-teardown {
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     ${MINION_TAG}-${INSTANCE_PREFIX}-http-alt || true > /dev/null
-  $(dirname $0)/../cluster/kube-down.sh > /dev/null
+  "${KUBE_ROOT}/cluster/kube-down.sh" > /dev/null
 }

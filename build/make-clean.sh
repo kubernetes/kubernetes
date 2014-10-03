@@ -16,7 +16,8 @@
 
 # Clean out the output directory on the docker host.
 
-source $(dirname "${BASH_SOURCE}")/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::clean_output

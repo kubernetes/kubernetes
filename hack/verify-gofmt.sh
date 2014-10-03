@@ -23,9 +23,9 @@ if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3') ]]; then
   exit 0
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-files="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "third_party/\|release/\|_?output/\|target/\|Godeps/")"
+files="$(find "${KUBE_ROOT}" -type f | grep "[.]go$" | grep -v "third_party/\|release/\|_?output/\|target/\|Godeps/")"
 bad=$(gofmt -s -l ${files})
 if [[ -n "${bad}" ]]; then
   echo "$bad"

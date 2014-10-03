@@ -20,10 +20,10 @@
 
 set -e
 
-source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
-source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-GUESTBOOK="${KUBE_REPO_ROOT}/examples/guestbook"
+GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
 # Launch the guestbook example
 $KUBECFG -c "${GUESTBOOK}/redis-master.json" create /pods

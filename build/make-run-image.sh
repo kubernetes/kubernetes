@@ -19,7 +19,8 @@
 # This script will make the 'run image' after building all of the necessary
 # binaries.
 
-source $(dirname "${BASH_SOURCE}")/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::build_image

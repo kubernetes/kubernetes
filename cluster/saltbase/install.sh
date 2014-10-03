@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly SALTBASE="$(dirname $0)"
+readonly SALT_ROOT=$(dirname "${BASH_SOURCE}")
 
 readonly SERVER_BIN_TAR=${1-}
 if [[ -z "$SERVER_BIN_TAR" ]]; then
@@ -38,10 +38,10 @@ trap "rm -rf ${KUBE_TEMP}" EXIT
 
 echo "+++ Installing salt files"
 mkdir -p /srv
-# This bash voodoo will prepend $SALTBASE to the start of each item in the
+# This bash voodoo will prepend $SALT_ROOT to the start of each item in the
 # $SALTDIRS array
 readonly SALTDIRS=(salt pillar reactor)
-cp -R --preserve=mode "${SALTDIRS[@]/#/${SALTBASE}/}" /srv/
+cp -R --preserve=mode "${SALTDIRS[@]/#/${SALT_ROOT}/}" /srv/
 
 
 echo "+++ Install binaries from tar: $1"

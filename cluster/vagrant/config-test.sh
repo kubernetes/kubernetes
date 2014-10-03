@@ -15,4 +15,5 @@
 # limitations under the License.
 
 ## Contains configuration values for interacting with the Vagrant cluster in test mode
-source $(dirname ${BASH_SOURCE})/config-default.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/config-default.sh"

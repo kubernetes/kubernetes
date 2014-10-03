@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ROOT_DIR="$(dirname ${BASH_SOURCE})/.."
-source "${ROOT_DIR}/cluster/kube-env.sh"
-source "${ROOT_DIR}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -52,9 +52,9 @@ case "$(uname -m)" in
   exit 1
 esac
 
-kubecfg="${ROOT_DIR}/_output/build/${host_os}/${host_arch}/kubecfg"
+kubecfg="${KUBE_ROOT}/_output/build/${host_os}/${host_arch}/kubecfg"
 if [[ ! -x "$kubecfg" ]]; then
-  kubecfg="${ROOT_DIR}/platforms/${host_os}/${host_arch}/kubecfg"
+  kubecfg="${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubecfg"
 fi
 if [[ ! -x "$kubecfg" ]]; then
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2

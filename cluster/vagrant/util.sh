@@ -16,7 +16,8 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
-source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 function detect-master () {
   echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}"
@@ -91,7 +92,7 @@ function kube-up {
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
-      minions=$("$(dirname $0)/cluster/kubecfg.sh" -template '{{range.Items}}{{.ID}}:{{end}}' list minions)
+      minions=$("${KUBE_ROOT}/cluster/kubecfg.sh" -template '{{range.Items}}{{.ID}}:{{end}}' list minions)
       count=$(echo $minions | grep -c "${MINION_NAMES[i]}") || {
         printf "."
         sleep 2

@@ -16,19 +16,9 @@
 
 # exit on any error
 set -e
-source $(dirname $0)/provision-config.sh
 
-# # Install Docker on master to run the build.  This is a necessary chunk of
-# # bootstrapping.
-# yum install -y docker-io
-# SYSTEMD_LOG_LEVEL=notice systemctl enable docker
-# systemctl start docker
-
-# # Build release
-# echo "Building release"
-# pushd /vagrant
-#   bash -x ./build/release.sh
-# popd
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
 
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
@@ -117,10 +107,10 @@ state_output: mixed
 EOF
 
 # Configure nginx authorization
-mkdir -p $KUBE_TEMP
+mkdir -p "$KUBE_TEMP"
 mkdir -p /srv/salt/nginx
-python $(dirname $0)/../../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $MASTER_USER $MASTER_PASSWD
-MASTER_HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
+python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpasswd" "$MASTER_USER" "$MASTER_PASSWD"
+MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
 echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time

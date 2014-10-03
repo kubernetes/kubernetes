@@ -19,7 +19,8 @@
 # This makes the docker build image, builds the binaries and copies them out
 # of the docker container.
 
-source $(dirname "${BASH_SOURCE}")/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::build_image

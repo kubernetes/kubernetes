@@ -16,20 +16,21 @@
 
 set -e
 
-source $(dirname $0)/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/build/build-image/common.sh"
 
 kube::build::make_binaries "./cmd/integration"
 
-readonly ETCD_DIR="${KUBE_REPO_ROOT}/_output/etcd"
+readonly ETCD_DIR="${KUBE_ROOT}/_output/etcd"
 mkdir -p "${ETCD_DIR}"
 
 echo "+++ Running integration test"
 
-etcd -name test -data-dir ${ETCD_DIR} > "${KUBE_REPO_ROOT}/_output/etcd.log" &
+etcd -name test -data-dir ${ETCD_DIR} > "${KUBE_ROOT}/_output/etcd.log" &
 readonly ETCD_PID=$!
 
 sleep 5
 
-${KUBE_TARGET}/linux/amd64/integration
+"${KUBE_TARGET}/linux/amd64/integration"
 
 kill $ETCD_PID

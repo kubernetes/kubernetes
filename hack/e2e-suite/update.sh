@@ -20,8 +20,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
-source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 
 CONTROLLER_NAME=update-demo
@@ -79,26 +79,26 @@ function validate() {
 export DOCKER_HUB_USER=jbeda
 
 # Launch a container
-${KUBE_REPO_ROOT}/examples/update-demo/2-create-replication-controller.sh
+${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh
 
 function teardown() {
   echo "Cleaning up test artifacts"
-  ${KUBE_REPO_ROOT}/examples/update-demo/5-down.sh
+  ${KUBE_ROOT}/examples/update-demo/5-down.sh
 }
 
 trap "teardown" EXIT
 
 validate 2 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/3-scale.sh 1
+${KUBE_ROOT}/examples/update-demo/3-scale.sh 1
 sleep 2
 validate 1 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/3-scale.sh 2
+${KUBE_ROOT}/examples/update-demo/3-scale.sh 2
 sleep 2
 validate 2 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/4-rolling-update.sh kitten 1s
+${KUBE_ROOT}/examples/update-demo/4-rolling-update.sh kitten 1s
 sleep 2
 validate 2 kitten
 

@@ -23,15 +23,16 @@
 # exit on any error
 set -e
 
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 get-password
 detect-master > /dev/null
 detect-minions > /dev/null
 
 MINIONS_FILE=/tmp/minions
-$(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
+"${KUBE_ROOT}/cluster/kubecfg.sh" -template '{{range.Items}}{{.ID}}:{{end}}' list minions > ${MINIONS_FILE}
 
 # On vSphere, use minion IPs as their names
 if [ "$KUBERNETES_PROVIDER" == "vsphere" ]; then

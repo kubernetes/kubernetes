@@ -22,14 +22,15 @@
 # exit on any error
 set -e
 
-source $(dirname $0)/kube-env.sh
-source $(dirname $0)/$KUBERNETES_PROVIDER/util.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 echo "Updating cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
 kube-push
 
-source $(dirname $0)/validate-cluster.sh
+"${KUBE_ROOT}/cluster/validate-cluster.sh"
 
 echo "Done"

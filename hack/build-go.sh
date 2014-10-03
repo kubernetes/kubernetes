@@ -20,13 +20,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(CDPATH="" cd $(dirname $0); pwd)
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 # Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
+source "${KUBE_ROOT}/hack/config-go.sh"
 
 # Go to the top of the tree.
-cd "${KUBE_REPO_ROOT}"
+cd "${KUBE_ROOT}"
 
 # Check for `go` binary and set ${GOPATH}.
 kube::setup_go_environment

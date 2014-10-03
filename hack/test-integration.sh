@@ -18,10 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-basedir=$(dirname "$0")
-source "${basedir}/config-go.sh"
-
-source "${KUBE_REPO_ROOT}/hack/util.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/config-go.sh"
+source "${KUBE_ROOT}/hack/util.sh"
 
 cleanup() {
   kill "${ETCD_PID-}" >/dev/null 2>&1 || :
@@ -31,7 +30,7 @@ cleanup() {
 }
 
 if [[ "${KUBE_NO_BUILD_INTEGRATION+set}" != "set" ]]; then
-    "${KUBE_REPO_ROOT}/hack/build-go.sh" cmd/integration
+    "${KUBE_ROOT}/hack/build-go.sh" cmd/integration
 fi
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
@@ -43,7 +42,7 @@ echo ""
 echo "Integration test cases..."
 echo ""
 GOFLAGS="-tags 'integration no-docker'" \
-  "${KUBE_REPO_ROOT}/hack/test-go.sh" test/integration
+  "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
 echo ""
 echo "Integration scenario ..."

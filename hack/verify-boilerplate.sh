@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd -P)"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 result=0
 
-gofiles="$(find ${REPO_ROOT} -type f | grep "[.]go$" | grep -v "Godeps/\|third_party/\|release/\|_?output/|target/")" 
+gofiles="$(find "${KUBE_ROOT}" -type f | grep "[.]go$" | grep -v "Godeps/\|third_party/\|release/\|_?output/|target/")"
 for file in ${gofiles}; do
-  if [[ "$(${REPO_ROOT}/hooks/boilerplate.sh "${file}")" -eq "0" ]]; then
+  if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
     echo "Boilerplate header is wrong for: ${file}"
     result=1
   fi
@@ -29,8 +29,8 @@ done
 dirs=("cluster" "hack" "hooks")
 
 for dir in ${dirs[@]}; do
-  for file in $(grep -r -l "" "${REPO_ROOT}/${dir}/" | grep "[.]sh"); do
-    if [[ "$(${REPO_ROOT}/hooks/boilerplate.sh "${file}")" -eq "0" ]]; then
+  for file in $(grep -r -l "" "${KUBE_ROOT}/${dir}/" | grep "[.]sh"); do
+    if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
       echo "Boilerplate header is wrong for: ${file}"
       result=1
     fi

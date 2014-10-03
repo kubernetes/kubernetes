@@ -19,7 +19,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cd $(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+cd "${KUBE_ROOT}"
 
 source hack/config-go.sh
 
@@ -36,8 +37,6 @@ readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 
 
 # Constants
-readonly KUBE_REPO_ROOT="${PWD}"
-
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_TAG=build
 readonly KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
@@ -49,7 +48,7 @@ readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 #
 # Note that here "LOCAL" is local to the docker daemon.  In the boot2docker case
 # this is still inside the VM.  We use the same directory in both cases though.
-readonly LOCAL_OUTPUT_ROOT="${KUBE_REPO_ROOT}/_output"
+readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/_output"
 readonly LOCAL_OUTPUT_BUILD="${LOCAL_OUTPUT_ROOT}/build"
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_DIR="${REMOTE_OUTPUT_ROOT}/build"
@@ -374,7 +373,7 @@ function kube::release::package_salt_tarball() {
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
-  cp -R "${KUBE_REPO_ROOT}/cluster/saltbase" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/cluster/saltbase" "${release_stage}/"
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
   tar czf "${package_name}" -C "${release_stage}/.." .
@@ -396,7 +395,7 @@ function kube::release::package_full_tarball() {
 
   # We want everything in /cluster except saltbase.  That is only needed on the
   # server.
-  cp -R "${KUBE_REPO_ROOT}/cluster" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/cluster" "${release_stage}/"
   rm -rf "${release_stage}/cluster/saltbase"
 
   mkdir -p "${release_stage}/server"
@@ -404,12 +403,12 @@ function kube::release::package_full_tarball() {
   cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
 
   mkdir -p "${release_stage}/third_party"
-  cp -R "${KUBE_REPO_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
+  cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
 
-  cp -R "${KUBE_REPO_ROOT}/examples" "${release_stage}/"
-  cp "${KUBE_REPO_ROOT}/README.md" "${release_stage}/"
-  cp "${KUBE_REPO_ROOT}/LICENSE" "${release_stage}/"
-  cp "${KUBE_REPO_ROOT}/Vagrantfile" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
+  cp "${KUBE_ROOT}/README.md" "${release_stage}/"
+  cp "${KUBE_ROOT}/LICENSE" "${release_stage}/"
+  cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
 
   local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
   tar czf "${package_name}" -C "${release_stage}/.." .

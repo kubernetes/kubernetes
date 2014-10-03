@@ -16,6 +16,7 @@
 
 set -e
 
-source $(dirname $0)/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/build/build-image/common.sh"
 
 kube::build::make_binaries "$@"

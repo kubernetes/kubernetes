@@ -16,12 +16,14 @@
 
 # This script will build a dev release and push it to an existing cluster.
 
-# Then build a release
-$(dirname $0)/../build/release.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+# Build a release
+"${KUBE_ROOT}/build/release.sh"
 if [ "$?" != "0" ]; then
         echo "Building a release failed!"
         exit 1
 fi
 
 # Now push this out to the cluster
-$(dirname $0)/../cluster/kube-push.sh
+"${KUBE_ROOT}/cluster/kube-push.sh"
