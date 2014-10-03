@@ -11,6 +11,7 @@ install:
   - ./hack/verify-boilerplate.sh
   - ./hack/install-std-race.sh
   - ./hack/build-go.sh
+  - go get ./contrib/podex
 
 script:
   - KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh

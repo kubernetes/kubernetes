@@ -98,7 +98,7 @@ func main() {
 		manifest.Containers[0].Ports = append(manifest.Containers[0].Ports, v1beta1.Port{
 			Name:          strings.Join([]string{baseName, p.Proto(), p.Port()}, "-"),
 			ContainerPort: port,
-			Protocol:      strings.ToUpper(p.Proto()),
+			Protocol:      v1beta1.Protocol(strings.ToUpper(p.Proto())),
 		})
 	}
 	if *generateJSON {
