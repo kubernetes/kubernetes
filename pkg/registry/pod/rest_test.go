@@ -163,6 +163,14 @@ func TestListEmptyPodList(t *testing.T) {
 	}
 }
 
+type fakeClock struct {
+	t time.Time
+}
+
+func (f *fakeClock) Now() time.Time {
+	return f.t
+}
+
 func TestListPodList(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pods = &api.PodList{
@@ -181,6 +189,8 @@ func TestListPodList(t *testing.T) {
 	}
 	storage := REST{
 		registry: podRegistry,
+		ipCache:  ipCache{},
+		clock:    &fakeClock{},
 	}
 	ctx := api.NewContext()
 	podsObj, err := storage.List(ctx, labels.Everything(), labels.Everything())
@@ -222,6 +232,8 @@ func TestListPodListSelection(t *testing.T) {
 	}
 	storage := REST{
 		registry: podRegistry,
+		ipCache:  ipCache{},
+		clock:    &fakeClock{},
 	}
 	ctx := api.NewContext()
 
@@ -311,6 +323,8 @@ func TestGetPod(t *testing.T) {
 	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
 	storage := REST{
 		registry: podRegistry,
+		ipCache:  ipCache{},
+		clock:    &fakeClock{},
 	}
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
@@ -328,9 +342,14 @@ func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+
+	clock := &fakeClock{t: time.Now()}
+
 	storage := REST{
 		registry:      podRegistry,
 		cloudProvider: fakeCloud,
+		ipCache:       ipCache{},
+		clock:         clock,
 	}
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
@@ -342,7 +361,23 @@ func TestGetPodCloud(t *testing.T) {
 	if e, a := podRegistry.Pod, pod; !reflect.DeepEqual(e, a) {
 		t.Errorf("Unexpected pod. Expected %#v, Got %#v", e, a)
 	}
+
+	// This call should hit the cache, so we expect no additional calls to the cloud
+	obj, err = storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "ip-address" {
+		t.Errorf("Unexpected calls: %#v", fakeCloud.Calls)
+	}
+
+	// Advance the clock, this call should miss the cache, so expect one more call.
+	clock.t = clock.t.Add(60 * time.Second)
+	obj, err = storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[1] != "ip-address" {
 		t.Errorf("Unexpected calls: %#v", fakeCloud.Calls)
 	}
 }

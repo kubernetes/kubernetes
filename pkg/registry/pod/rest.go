@@ -36,6 +36,23 @@ import (
 	"github.com/golang/glog"
 )
 
+type ipCacheEntry struct {
+	ip         string
+	lastUpdate time.Time
+}
+
+type ipCache map[string]ipCacheEntry
+
+type clock interface {
+	Now() time.Time
+}
+
+type realClock struct{}
+
+func (r realClock) Now() time.Time {
+	return time.Now()
+}
+
 // REST implements the RESTStorage interface in terms of a PodRegistry.
 type REST struct {
 	cloudProvider cloudprovider.Interface
@@ -45,6 +62,8 @@ type REST struct {
 	podPollPeriod time.Duration
 	registry      Registry
 	minions       client.MinionInterface
+	ipCache       ipCache
+	clock         clock
 }
 
 type RESTConfig struct {
@@ -64,6 +83,8 @@ func NewREST(config *RESTConfig) *REST {
 		podPollPeriod: time.Second * 10,
 		registry:      config.Registry,
 		minions:       config.Minions,
+		ipCache:       ipCache{},
+		clock:         realClock{},
 	}
 }
 
@@ -112,7 +133,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 		}
 		pod.CurrentState.Status = status
 	}
-	pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
+	pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
 	return pod, err
 }
 
@@ -144,7 +165,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 				return pod, err
 			}
 			pod.CurrentState.Status = status
-			pod.CurrentState.HostIP = getInstanceIP(rs.cloudProvider, pod.CurrentState.Host)
+			pod.CurrentState.HostIP = rs.getInstanceIP(pod.CurrentState.Host)
 		}
 	}
 	return pods, err
@@ -212,7 +233,22 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 	}
 }
 
-func getInstanceIP(cloud cloudprovider.Interface, host string) string {
+func (rs *REST) getInstanceIP(host string) string {
+	data, ok := rs.ipCache[host]
+	now := rs.clock.Now()
+
+	if !ok || now.Sub(data.lastUpdate) > (30*time.Second) {
+		ip := getInstanceIPFromCloud(rs.cloudProvider, host)
+		data = ipCacheEntry{
+			ip:         ip,
+			lastUpdate: now,
+		}
+		rs.ipCache[host] = data
+	}
+	return data.ip
+}
+
+func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 	if cloud == nil {
 		return ""
 	}
