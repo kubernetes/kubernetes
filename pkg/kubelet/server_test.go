@@ -31,7 +31,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
 )
 
@@ -147,9 +146,7 @@ func TestContainers(t *testing.T) {
 func TestPodInfo(t *testing.T) {
 	fw := newServerTest()
 	expected := api.PodInfo{
-		"goodpod": api.ContainerStatus{
-			DetailInfo: docker.Container{ID: "myContainerID"},
-		},
+		"goodpod": api.ContainerStatus{},
 	}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
 		if name == "goodpod.etcd" {

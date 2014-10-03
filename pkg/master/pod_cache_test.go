@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/fsouza/go-dockerclient"
 )
 
 type FakePodInfoGetter struct {
@@ -42,9 +41,7 @@ func TestPodCacheGet(t *testing.T) {
 	cache := NewPodCache(nil, nil)
 
 	expected := api.PodInfo{
-		"foo": api.ContainerStatus{
-			DetailInfo: docker.Container{ID: "foo"},
-		},
+		"foo": api.ContainerStatus{},
 	}
 	cache.podInfo["foo"] = expected
 
@@ -71,9 +68,7 @@ func TestPodCacheGetMissing(t *testing.T) {
 
 func TestPodGetPodInfoGetter(t *testing.T) {
 	expected := api.PodInfo{
-		"foo": api.ContainerStatus{
-			DetailInfo: docker.Container{ID: "foo"},
-		},
+		"foo": api.ContainerStatus{},
 	}
 	fake := FakePodInfoGetter{
 		data: expected,
@@ -107,9 +102,7 @@ func TestPodUpdateAllContainers(t *testing.T) {
 	mockRegistry := registrytest.NewPodRegistry(&api.PodList{Items: pods})
 
 	expected := api.PodInfo{
-		"foo": api.ContainerStatus{
-			DetailInfo: docker.Container{ID: "foo"},
-		},
+		"foo": api.ContainerStatus{},
 	}
 	fake := FakePodInfoGetter{
 		data: expected,
