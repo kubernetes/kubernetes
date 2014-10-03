@@ -1,0 +1,11 @@
+[Unit]
+After=network.target
+Description=Docker Application Container Engine
+Documentation=http://docs.docker.io
+
+[Service]
+ExecStartPre=/bin/mount --make-rprivate /
+ExecStart=/usr/bin/docker -d -s=btrfs -H fd:// -b cbr0 --iptables=false
+
+[Install]
+WantedBy=multi-user.target
