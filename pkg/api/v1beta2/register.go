@@ -26,22 +26,45 @@ var Codec = runtime.CodecFor(api.Scheme, "v1beta2")
 
 func init() {
 	api.Scheme.AddKnownTypes("v1beta2",
-		&PodList{},
 		&Pod{},
-		&ReplicationControllerList{},
+		&PodList{},
 		&ReplicationController{},
-		&ServiceList{},
+		&ReplicationControllerList{},
 		&Service{},
-		&MinionList{},
-		&Minion{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
-		&ContainerManifestList{},
+		&ServiceList{},
 		&Endpoints{},
 		&EndpointsList{},
+		&Minion{},
+		&MinionList{},
 		&Binding{},
+		&Status{},
+		&ServerOp{},
+		&ServerOpList{},
 		&Event{},
 		&EventList{},
+		&ContainerManifestList{},
 	)
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Operation", &ServerOpList{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "OperationList", &ServerOpList{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
+	api.Scheme.AddKnownTypeWithName("v1beta2", "NodeList", &MinionList{})
 }
+
+func (*JSONBase) IsAnAPIObject()                  {}
+func (*Pod) IsAnAPIObject()                       {}
+func (*PodList) IsAnAPIObject()                   {}
+func (*ReplicationController) IsAnAPIObject()     {}
+func (*ReplicationControllerList) IsAnAPIObject() {}
+func (*Service) IsAnAPIObject()                   {}
+func (*ServiceList) IsAnAPIObject()               {}
+func (*Endpoints) IsAnAPIObject()                 {}
+func (*EndpointsList) IsAnAPIObject()             {}
+func (*Minion) IsAnAPIObject()                    {}
+func (*MinionList) IsAnAPIObject()                {}
+func (*Binding) IsAnAPIObject()                   {}
+func (*Status) IsAnAPIObject()                    {}
+func (*ServerOp) IsAnAPIObject()                  {}
+func (*ServerOpList) IsAnAPIObject()              {}
+func (*Event) IsAnAPIObject()                     {}
+func (*EventList) IsAnAPIObject()                 {}
+func (*ContainerManifestList) IsAnAPIObject()     {}

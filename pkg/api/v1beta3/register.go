@@ -14,57 +14,60 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta3
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// Codec encodes internal objects to the v1beta1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1beta1")
+// Codec encodes internal objects to the v1beta3 scheme
+var Codec = runtime.CodecFor(api.Scheme, "v1beta3")
 
 func init() {
-	api.Scheme.AddKnownTypes("v1beta1",
+	api.Scheme.AddKnownTypes("v1beta3",
 		&Pod{},
 		&PodList{},
+		&PodTemplate{},
+		&PodTemplateList{},
+		&BoundPod{},
+		&BoundPods{},
 		&ReplicationController{},
 		&ReplicationControllerList{},
 		&Service{},
 		&ServiceList{},
 		&Endpoints{},
 		&EndpointsList{},
-		&Minion{},
-		&MinionList{},
+		&Node{},
+		&NodeList{},
 		&Binding{},
 		&Status{},
-		&ServerOp{},
-		&ServerOpList{},
+		&Operation{},
+		&OperationList{},
 		&Event{},
 		&EventList{},
 		&ContainerManifestList{},
 	)
-	api.Scheme.AddKnownTypeWithName("v1beta1", "Operation", &ServerOpList{})
-	api.Scheme.AddKnownTypeWithName("v1beta1", "OperationList", &ServerOpList{})
-	api.Scheme.AddKnownTypeWithName("v1beta1", "Node", &Minion{})
-	api.Scheme.AddKnownTypeWithName("v1beta1", "NodeList", &MinionList{})
 }
 
-func (*JSONBase) IsAnAPIObject()                  {}
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
+func (*PodTemplate) IsAnAPIObject()               {}
+func (*PodTemplateList) IsAnAPIObject()           {}
+func (*BoundPod) IsAnAPIObject()                  {}
+func (*BoundPods) IsAnAPIObject()                 {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}
 func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}
 func (*EndpointsList) IsAnAPIObject()             {}
-func (*Minion) IsAnAPIObject()                    {}
-func (*MinionList) IsAnAPIObject()                {}
+func (*Node) IsAnAPIObject()                      {}
+func (*NodeList) IsAnAPIObject()                  {}
 func (*Binding) IsAnAPIObject()                   {}
 func (*Status) IsAnAPIObject()                    {}
-func (*ServerOp) IsAnAPIObject()                  {}
-func (*ServerOpList) IsAnAPIObject()              {}
+func (*Operation) IsAnAPIObject()                 {}
+func (*OperationList) IsAnAPIObject()             {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
 func (*ContainerManifestList) IsAnAPIObject()     {}
