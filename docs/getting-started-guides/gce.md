@@ -1,17 +1,23 @@
 ## Getting started on Google Compute Engine
 
-### Prerequisites
+The example below creates a Kubernetes cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
+
+### Getting VMs
 
 1. You need a Google Cloud Platform account with billing enabled. Visit
    [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
 2. Make sure you can start up a GCE VM.  At least make sure you can do the [Create an instance](https://developers.google.com/compute/docs/quickstart#addvm) part of the GCE Quickstart.
 3. Make sure you can ssh into the VM without interactive prompts. You'll need to set up a ssh key and expose port 22 in the firewall if you choose to use a network other than the default network (`gcutil addfirewall --description "SSH allowed from anywhere" --allowed=tcp:22 default-ssh`)
 4. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled.
-5. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
-6. You must have the [`gcloud` components](https://developers.google.com/cloud/sdk/) installed.
-7. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
-8. Install godep (optional, only required when modifying package dependencies). [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
-9. Get the Kubernetes source:
+
+
+### Prerequisites for your workstation
+
+1. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
+2. You must have the [`gcloud` components](https://developers.google.com/cloud/sdk/) installed.
+3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
+4. Install godep (optional, only required when modifying package dependencies). [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
+5. Get the Kubernetes source:
       * Kubernetes 0.3 \[[.tar.gz](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.tar.gz)\] \[[.zip](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.zip)\]
 
 ### Setup
