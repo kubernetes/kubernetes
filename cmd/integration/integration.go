@@ -180,6 +180,23 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	}
 }
 
+func endpointsSet(c *client.Client, ctx api.Context, serviceID string, endpointCount int) wait.ConditionFunc {
+	return func() (bool, error) {
+		endpoints, err := c.GetEndpoints(ctx, serviceID)
+		if err != nil {
+			return false, nil
+		}
+		return len(endpoints.Endpoints) == endpointCount, nil
+	}
+}
+
+func podExists(c *client.Client, ctx api.Context, podID string) wait.ConditionFunc {
+	return func() (bool, error) {
+		_, err := c.GetPod(ctx, podID)
+		return err == nil, nil
+	}
+}
+
 func runReplicationControllerTest(c *client.Client) {
 	ctx := api.NewDefaultContext()
 	data, err := ioutil.ReadFile("api/examples/controller.json")
@@ -289,6 +306,55 @@ func runAtomicPutTest(c *client.Client) {
 	glog.Info("Atomic PUTs work.")
 }
 
+func runServiceTest(client *client.Client) {
+	ctx := api.NewDefaultContext()
+	pod := api.Pod{
+		JSONBase: api.JSONBase{ID: "foo"},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "foo",
+						Ports: []api.Port{
+							{ContainerPort: 1234},
+						},
+					},
+				},
+			},
+		},
+		CurrentState: api.PodState{
+			PodIP: "1.2.3.4",
+		},
+		Labels: map[string]string{
+			"name": "thisisalonglabel",
+		},
+	}
+	_, err := client.CreatePod(ctx, &pod)
+	if err != nil {
+		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*20, podExists(client, ctx, pod.ID)); err != nil {
+		glog.Fatalf("FAILED: pod never started running %v", err)
+	}
+	svc := api.Service{
+		JSONBase: api.JSONBase{ID: "service1"},
+		Selector: map[string]string{
+			"name": "thisisalonglabel",
+		},
+		Port: 8080,
+	}
+	_, err = client.CreateService(ctx, &svc)
+	if err != nil {
+		glog.Fatalf("Failed to create service: %v, %v", svc, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*10, endpointsSet(client, ctx, svc.ID, 1)); err != nil {
+		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
+	}
+	glog.Info("Service test passed.")
+}
+
 type testFunc func(*client.Client)
 
 func main() {
@@ -318,6 +384,7 @@ func main() {
 	testFuncs := []testFunc{
 		runReplicationControllerTest,
 		runAtomicPutTest,
+		runServiceTest,
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
@@ -347,8 +414,9 @@ func main() {
 		}
 	}
 	// We expect 5: 2 net containers + 2 pods from the replication controller +
-	//              1 net container + 2 pods from the URL.
-	if len(createdPods) != 7 {
+	//              1 net container + 2 pods from the URL +
+	//              1 net container + 1 pod from the service test.
+	if len(createdPods) != 9 {
 		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created pods: %#v", createdPods.List())
