@@ -77,8 +77,8 @@ func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Contain
 			return err
 		}
 		netInfo, found := info[networkContainerName]
-		if found && netInfo.DetailInfo.NetworkSettings != nil {
-			host = netInfo.DetailInfo.NetworkSettings.IPAddress
+		if found {
+			host = netInfo.PodIP
 		} else {
 			return fmt.Errorf("failed to find networking container: %v", info)
 		}
