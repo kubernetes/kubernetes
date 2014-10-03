@@ -62,8 +62,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			resultErr = err
 			continue
 		}
-		endpoints := make([]string, len(pods.Items))
-		for ix, pod := range pods.Items {
+		endpoints := []string{}
+		for _, pod := range pods.Items {
 			port, err := findPort(&pod.DesiredState.Manifest, service.ContainerPort)
 			if err != nil {
 				glog.Errorf("Failed to find port for service: %v, %v", service, err)
@@ -73,7 +73,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				glog.Errorf("Failed to find an IP for pod: %v", pod)
 				continue
 			}
-			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
+			endpoints = append(endpoints, net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port)))
 		}
 		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.ID)
 		if err != nil {
