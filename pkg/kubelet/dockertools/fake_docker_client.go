@@ -81,7 +81,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
-	f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}})
+	f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}, Image: c.Config.Image})
 	return &docker.Container{ID: name}, nil
 }
 
@@ -138,6 +138,7 @@ func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
 type FakeDockerPuller struct {
 	sync.Mutex
 
+	HasImages    []string
 	ImagesPulled []string
 
 	// Every pull will return the first error here, and then reslice
@@ -159,5 +160,15 @@ func (f *FakeDockerPuller) Pull(image string) (err error) {
 }
 
 func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
-	return true, nil
+	f.Lock()
+	defer f.Unlock()
+	if f.HasImages == nil {
+		return true, nil
+	}
+	for _, s := range f.HasImages {
+		if s == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }

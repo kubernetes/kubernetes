@@ -67,21 +67,23 @@ func NewMainKubelet(
 	cc CadvisorInterface,
 	ec tools.EtcdClient,
 	rd string,
+	ni string,
 	ri time.Duration,
 	pullQPS float32,
 	pullBurst int) *Kubelet {
 	return &Kubelet{
-		hostname:       hn,
-		dockerClient:   dc,
-		cadvisorClient: cc,
-		etcdClient:     ec,
-		rootDirectory:  rd,
-		resyncInterval: ri,
-		podWorkers:     newPodWorkers(),
-		runner:         dockertools.NewDockerContainerCommandRunner(),
-		httpClient:     &http.Client{},
-		pullQPS:        pullQPS,
-		pullBurst:      pullBurst,
+		hostname:              hn,
+		dockerClient:          dc,
+		cadvisorClient:        cc,
+		etcdClient:            ec,
+		rootDirectory:         rd,
+		resyncInterval:        ri,
+		networkContainerImage: ni,
+		podWorkers:            newPodWorkers(),
+		runner:                dockertools.NewDockerContainerCommandRunner(),
+		httpClient:            &http.Client{},
+		pullQPS:               pullQPS,
+		pullBurst:             pullBurst,
 	}
 }
 
@@ -89,11 +91,12 @@ func NewMainKubelet(
 // TODO: add more integration tests, and expand parameter list as needed.
 func NewIntegrationTestKubelet(hn string, dc dockertools.DockerInterface) *Kubelet {
 	return &Kubelet{
-		hostname:       hn,
-		dockerClient:   dc,
-		dockerPuller:   &dockertools.FakeDockerPuller{},
-		resyncInterval: 3 * time.Second,
-		podWorkers:     newPodWorkers(),
+		hostname:              hn,
+		dockerClient:          dc,
+		dockerPuller:          &dockertools.FakeDockerPuller{},
+		networkContainerImage: NetworkContainerImage,
+		resyncInterval:        3 * time.Second,
+		podWorkers:            newPodWorkers(),
 	}
 }
 
@@ -103,11 +106,12 @@ type httpGetInterface interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	hostname       string
-	dockerClient   dockertools.DockerInterface
-	rootDirectory  string
-	podWorkers     podWorkers
-	resyncInterval time.Duration
+	hostname              string
+	dockerClient          dockertools.DockerInterface
+	rootDirectory         string
+	networkContainerImage string
+	podWorkers            podWorkers
+	resyncInterval        time.Duration
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
@@ -368,7 +372,7 @@ func (kl *Kubelet) killContainerByID(ID, name string) error {
 
 const (
 	networkContainerName  = "net"
-	networkContainerImage = "kubernetes/pause:latest"
+	NetworkContainerImage = "kubernetes/pause:latest"
 )
 
 // createNetworkContainer starts the network container for a pod. Returns the docker container ID of the newly created container.
@@ -381,11 +385,18 @@ func (kl *Kubelet) createNetworkContainer(pod *Pod) (dockertools.DockerID, error
 	}
 	container := &api.Container{
 		Name:  networkContainerName,
-		Image: networkContainerImage,
+		Image: kl.networkContainerImage,
 		Ports: ports,
 	}
-	if err := kl.dockerPuller.Pull(networkContainerImage); err != nil {
+	// TODO: make this a TTL based pull (if image older than X policy, pull)
+	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
+	if err != nil {
 		return "", err
+	}
+	if !ok {
+		if err := kl.dockerPuller.Pull(container.Image); err != nil {
+			return "", err
+		}
 	}
 	return kl.runContainer(pod, container, nil, "")
 }
