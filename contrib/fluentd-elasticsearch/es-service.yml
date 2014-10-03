@@ -1,0 +1,6 @@
+id: elastic-search
+selector:
+  app: ElasticSearch
+containerPort: 9200
+protocol: TCP
+port: 9200
