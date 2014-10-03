@@ -27,14 +27,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
 )
 
 func TestHTTPPodInfoGetter(t *testing.T) {
 	expectObj := api.PodInfo{
-		"myID": api.ContainerStatus{
-			DetailInfo: docker.Container{ID: "myID"},
-		},
+		"myID": api.ContainerStatus{},
 	}
 	body, err := json.Marshal(expectObj)
 	if err != nil {
@@ -69,17 +66,14 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 	}
 
 	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
-	if len(gotObj) != len(expectObj) ||
-		expectObj["myID"].DetailInfo.ID != gotObj["myID"].DetailInfo.ID {
+	if len(gotObj) != len(expectObj) {
 		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }
 
 func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 	expectObj := api.PodInfo{
-		"myID": api.ContainerStatus{
-			DetailInfo: docker.Container{ID: "myID"},
-		},
+		"myID": api.ContainerStatus{},
 	}
 	_, err := json.Marshal(expectObj)
 	if err != nil {

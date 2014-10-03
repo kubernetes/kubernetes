@@ -29,6 +29,7 @@ type FakeDockerClient struct {
 	sync.Mutex
 	ContainerList []docker.APIContainers
 	Container     *docker.Container
+	Image         *docker.Image
 	Err           error
 	called        []string
 	Stopped       []string
@@ -67,8 +68,17 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, "inspect")
+	f.called = append(f.called, "inspect_container")
 	return f.Container, f.Err
+}
+
+// InspectImage is a test-spy implementation of DockerInterface.InspectImage.
+// It adds an entry "inspect" to the internal method call record.
+func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "inspect_image")
+	return f.Image, f.Err
 }
 
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
