@@ -626,7 +626,7 @@ func TestValidateReplicationController(t *testing.T) {
 			field := errs[i].(errors.ValidationError).Field
 			if !strings.HasPrefix(field, "desiredState.podTemplate.") &&
 				field != "id" &&
-				field != "controller.Namespace" &&
+				field != "namespace" &&
 				field != "desiredState.replicaSelector" &&
 				field != "desiredState.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
