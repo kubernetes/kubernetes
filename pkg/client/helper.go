@@ -30,7 +30,12 @@ import (
 // initialization.
 type Config struct {
 	// Host must be a host string, a host:port pair, or a URL to the base of the API.
-	Host    string
+	Host string
+	// Prefix is the sub path of the server. If not specified, the client will set
+	// a default value.  Use "/" to indicate the server root should be used
+	Prefix string
+	// Version is the API version to talk to. If not specified, the client will use
+	// the preferred version.
 	Version string
 
 	// Server requires Basic authentication
@@ -61,7 +66,11 @@ type Config struct {
 // and delete on these objects. An error is returned if the provided configuration
 // is not valid.
 func New(c *Config) (*Client, error) {
-	client, err := RESTClientFor(c)
+	config := *c
+	if config.Prefix == "" {
+		config.Prefix = "/api"
+	}
+	client, err := RESTClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +159,7 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
-func DefaultServerURL(host, version string, defaultSecure bool) (*url.URL, error) {
+func DefaultServerURL(host, prefix, version string, defaultSecure bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
 	}
@@ -177,9 +186,12 @@ func DefaultServerURL(host, version string, defaultSecure bool) (*url.URL, error
 	}
 
 	// If the user specified a URL without a path component (http://server.com), automatically
-	// append the default API prefix
+	// append the default prefix
 	if hostURL.Path == "" {
-		hostURL.Path = "/api"
+		if prefix == "" {
+			prefix = "/"
+		}
+		hostURL.Path = prefix
 	}
 
 	// Add the version to the end of the path
@@ -211,7 +223,7 @@ func defaultServerUrlFor(config *Config) (*url.URL, error) {
 	if host == "" {
 		host = "localhost"
 	}
-	return DefaultServerURL(host, version, defaultSecure)
+	return DefaultServerURL(host, config.Prefix, version, defaultSecure)
 }
 
 // defaultVersionFor is shared between defaultServerUrlFor and RESTClientFor

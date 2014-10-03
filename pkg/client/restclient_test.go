@@ -37,9 +37,9 @@ func TestChecksCodec(t *testing.T) {
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
-		"":        {false, "/api/v1beta1/", v1beta1.Codec},
-		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
+		"v1beta1": {false, "/v1beta1/", v1beta1.Codec},
+		"":        {false, "/v1beta1/", v1beta1.Codec},
+		"v1beta2": {false, "/v1beta2/", v1beta2.Codec},
 		"v1beta3": {true, "", nil},
 	}
 	for version, expected := range testCases {
@@ -64,31 +64,36 @@ func TestChecksCodec(t *testing.T) {
 }
 
 func TestValidatesHostParameter(t *testing.T) {
-	testCases := map[string]struct {
+	testCases := []struct {
+		Host   string
+		Prefix string
+
 		URL string
 		Err bool
 	}{
-		"127.0.0.1":          {"http://127.0.0.1/api/v1beta1/", false},
-		"127.0.0.1:8080":     {"http://127.0.0.1:8080/api/v1beta1/", false},
-		"foo.bar.com":        {"http://foo.bar.com/api/v1beta1/", false},
-		"http://host/prefix": {"http://host/prefix/v1beta1/", false},
-		"http://host":        {"http://host/api/v1beta1/", false},
-		"host/server":        {"", true},
+		{"127.0.0.1", "", "http://127.0.0.1/v1beta1/", false},
+		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/v1beta1/", false},
+		{"foo.bar.com", "", "http://foo.bar.com/v1beta1/", false},
+		{"http://host/prefix", "", "http://host/prefix/v1beta1/", false},
+		{"http://host", "", "http://host/v1beta1/", false},
+		{"http://host", "/", "http://host/v1beta1/", false},
+		{"http://host", "/other", "http://host/other/v1beta1/", false},
+		{"host/server", "", "", true},
 	}
-	for k, expected := range testCases {
-		c, err := RESTClientFor(&Config{Host: k, Version: "v1beta1"})
+	for i, testCase := range testCases {
+		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1"})
 		switch {
-		case err == nil && expected.Err:
+		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
 			continue
-		case err != nil && !expected.Err:
+		case err != nil && !testCase.Err:
 			t.Errorf("unexpected error %v", err)
 			continue
 		case err != nil:
 			continue
 		}
-		if e, a := expected.URL, c.baseURL.String(); e != a {
-			t.Errorf("%s: expected host %s, got %s", k, e, a)
+		if e, a := testCase.URL, c.baseURL.String(); e != a {
+			t.Errorf("%d: expected host %s, got %s", i, e, a)
 			continue
 		}
 	}
