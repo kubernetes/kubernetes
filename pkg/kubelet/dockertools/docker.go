@@ -44,6 +44,7 @@ type DockerContainerData struct {
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
 	InspectContainer(id string) (*docker.Container, error)
+	InspectImage(name string) (*docker.Image, error)
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
@@ -270,30 +271,64 @@ func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail str
 	return
 }
 
-func generateContainerStatus(inspectResult *docker.Container) api.ContainerStatus {
+var (
+	// ErrNoContainersInPod is returned when there are no containers for a given pod
+	ErrNoContainersInPod = errors.New("no containers exist for this pod")
+
+	// ErrNoNetworkContainerInPod is returned when there is no network container for a given pod
+	ErrNoNetworkContainerInPod = errors.New("No network container exist for this pod")
+
+	// ErrContainerCannotRun is returned when a container is created, but cannot run properly
+	ErrContainerCannotRun = errors.New("Container cannot run")
+)
+
+func inspectContainer(client DockerInterface, dockerID, containerName string) (*api.ContainerStatus, error) {
+	inspectResult, err := client.InspectContainer(dockerID)
+	if err != nil {
+		return nil, err
+	}
 	if inspectResult == nil {
 		// Why did we not get an error?
-		return api.ContainerStatus{}
+		return &api.ContainerStatus{}, nil
 	}
 
+	glog.V(3).Infof("Container: %s [%s] inspect result %+v", *inspectResult)
 	var containerStatus api.ContainerStatus
+	waiting := true
 
 	if inspectResult.State.Running {
-		containerStatus.State.Running = &api.ContainerStateRunning{}
-	} else {
+		containerStatus.State.Running = &api.ContainerStateRunning{
+			StartedAt: inspectResult.State.StartedAt,
+		}
+		if containerName == "net" && inspectResult.NetworkSettings != nil {
+			containerStatus.PodIP = inspectResult.NetworkSettings.IPAddress
+		}
+		waiting = false
+	} else if !inspectResult.State.FinishedAt.IsZero() {
+		// TODO(dchen1107): Integrate with event to provide a better reason
 		containerStatus.State.Termination = &api.ContainerStateTerminated{
-			ExitCode: inspectResult.State.ExitCode,
+			ExitCode:   inspectResult.State.ExitCode,
+			Reason:     "",
+			StartedAt:  inspectResult.State.StartedAt,
+			FinishedAt: inspectResult.State.FinishedAt,
+		}
+		waiting = false
+	}
+
+	if waiting {
+		// TODO(dchen1107): Separate issue docker/docker#8294 was filed
+		// TODO(dchen1107): Need to figure out why we are still waiting
+		// Check any issue to run container
+		containerStatus.State.Waiting = &api.ContainerStateWaiting{
+			Reason: ErrContainerCannotRun.Error(),
 		}
 	}
-	containerStatus.DetailInfo = *inspectResult
-	return containerStatus
+
+	return &containerStatus, nil
 }
 
-// ErrNoContainersInPod is returned when there are no containers for a given pod
-var ErrNoContainersInPod = errors.New("no containers exist for this pod")
-
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
-func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.PodInfo, error) {
+func GetDockerPodInfo(client DockerInterface, manifest api.ContainerManifest, podFullName, uuid string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
 	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
@@ -316,14 +351,47 @@ func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.Pod
 			continue
 		}
 
-		inspectResult, err := client.InspectContainer(value.ID)
+		containerStatus, err := inspectContainer(client, value.ID, dockerContainerName)
 		if err != nil {
 			return nil, err
 		}
-		info[dockerContainerName] = generateContainerStatus(inspectResult)
+		info[dockerContainerName] = *containerStatus
 	}
+
 	if len(info) == 0 {
 		return nil, ErrNoContainersInPod
+	}
+
+	// First make sure we are not missing network container
+	if _, found := info["net"]; !found {
+		return nil, ErrNoNetworkContainerInPod
+	}
+
+	if len(info) < (len(manifest.Containers) + 1) {
+		var containerStatus api.ContainerStatus
+		// Not all containers expected are created, verify if there are
+		// image related issues
+		for _, container := range manifest.Containers {
+			if _, found := info[container.Name]; found {
+				continue
+			}
+
+			image := container.Image
+			containerStatus.State.Waiting = &api.ContainerStateWaiting{}
+			// Check image is ready on the node or not
+			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
+			_, err := client.InspectImage(image)
+			if err != nil && err == docker.ErrNoSuchImage {
+				if err == docker.ErrNoSuchImage {
+					containerStatus.State.Waiting.Reason = fmt.Sprintf("Image: %s is not ready on the node", image)
+				} else {
+					containerStatus.State.Waiting.Reason = err.Error()
+				}
+			} else {
+				containerStatus.State.Waiting.Reason = fmt.Sprintf("Image: %s is ready, container is creating", image)
+			}
+			info[container.Name] = containerStatus
+		}
 	}
 
 	return info, nil

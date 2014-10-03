@@ -113,6 +113,7 @@ type Kubelet struct {
 	networkContainerImage string
 	podWorkers            podWorkers
 	resyncInterval        time.Duration
+	pods                  []Pod
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
@@ -482,8 +483,8 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 			podFullName, uuid)
 	}
 	netInfo, found := info[networkContainerName]
-	if found && netInfo.DetailInfo.NetworkSettings != nil {
-		podState.PodIP = netInfo.DetailInfo.NetworkSettings.IPAddress
+	if found {
+		podState.PodIP = netInfo.PodIP
 	}
 
 	for _, container := range pod.Manifest.Containers {
@@ -699,15 +700,14 @@ func filterHostPortConflicts(pods []Pod) []Pod {
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync_frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
-	var pods []Pod
 	for {
 		select {
 		case u := <-updates:
 			switch u.Op {
 			case SET:
 				glog.V(3).Infof("Containers changed [%s]", kl.hostname)
-				pods = u.Pods
-				pods = filterHostPortConflicts(pods)
+				kl.pods = u.Pods
+				kl.pods = filterHostPortConflicts(kl.pods)
 
 			case UPDATE:
 				//TODO: implement updates of containers
@@ -718,12 +718,12 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 				panic("syncLoop does not support incremental changes")
 			}
 		case <-time.After(kl.resyncInterval):
-			if pods == nil {
+			if kl.pods == nil {
 				continue
 			}
 		}
 
-		err := handler.SyncPods(pods)
+		err := handler.SyncPods(kl.pods)
 		if err != nil {
 			glog.Errorf("Couldn't sync containers : %v", err)
 		}
@@ -769,7 +769,15 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 
 // GetPodInfo returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodInfo(podFullName, uuid string) (api.PodInfo, error) {
-	return dockertools.GetDockerPodInfo(kl.dockerClient, podFullName, uuid)
+	var manifest api.ContainerManifest
+	for _, pod := range kl.pods {
+		fullName := fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
+		if fullName == podFullName {
+			manifest = pod.Manifest
+			break
+		}
+	}
+	return dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uuid)
 }
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.

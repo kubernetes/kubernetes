@@ -17,8 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
 )
 
 // Common string formats
@@ -286,12 +287,15 @@ type ContainerStateWaiting struct {
 }
 
 type ContainerStateRunning struct {
+	StartedAt time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty"`
 }
 
 type ContainerStateTerminated struct {
-	ExitCode int    `json:"exitCode,omitempty" yaml:"exitCode,omitempty"`
-	Signal   int    `json:"signal,omitempty" yaml:"signal,omitempty"`
-	Reason   string `json:"reason,omitempty" yaml:"reason,omitempty"`
+	ExitCode   int       `json:"exitCode" yaml:"exitCode"`
+	Signal     int       `json:"signal,omitempty" yaml:"signal,omitempty"`
+	Reason     string    `json:"reason,omitempty" yaml:"reason,omitempty"`
+	StartedAt  time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty"`
+	FinishedAt time.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty"`
 }
 
 type ContainerState struct {
@@ -307,12 +311,11 @@ type ContainerStatus struct {
 	// defined for container?
 	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
 	RestartCount int            `json:"restartCount" yaml:"restartCount"`
-	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
+	// TODO(dchen1107): Deprecated this soon once we pull entire PodStatus from node,
+	// not just PodInfo. Now we need this to remove docker.Container from API
+	PodIP string `json:"podIP,omitempty" yaml:"podIP,omitempty"`
 	// TODO(dchen1107): Once we have done with integration with cadvisor, resource
 	// usage should be included.
-	// TODO(dchen1107):  In long run, I think we should replace this with our own struct to remove
-	// the dependency on docker.
-	DetailInfo docker.Container `json:"detailInfo,omitempty" yaml:"detailInfo,omitempty"`
 }
 
 // PodInfo contains one entry for every container with available info.

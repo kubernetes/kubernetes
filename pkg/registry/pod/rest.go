@@ -226,8 +226,8 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 		pod.CurrentState.Info = info
 		netContainerInfo, ok := info["net"]
 		if ok {
-			if netContainerInfo.DetailInfo.NetworkSettings != nil {
-				pod.CurrentState.PodIP = netContainerInfo.DetailInfo.NetworkSettings.IPAddress
+			if netContainerInfo.PodIP != "" {
+				pod.CurrentState.PodIP = netContainerInfo.PodIP
 			} else {
 				glog.Warningf("No network settings: %#v", netContainerInfo)
 			}
