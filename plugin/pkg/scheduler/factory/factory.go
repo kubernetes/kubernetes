@@ -20,6 +20,7 @@ package factory
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -69,6 +70,11 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 		algorithm.EqualPriority,
 		&storeToPodLister{podCache}, r)
 
+	podBackoff := podBackoff{
+		perPodBackoff: map[string]*backoffEntry{},
+		clock:         realClock{},
+	}
+
 	return &scheduler.Config{
 		MinionLister: &storeToMinionLister{minionCache},
 		Algorithm:    algo,
@@ -81,7 +87,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 				pod.ID, minionCache.Contains(), podCache.Contains())
 			return pod
 		},
-		Error: factory.makeDefaultErrorFunc(podQueue),
+		Error: factory.makeDefaultErrorFunc(&podBackoff, podQueue),
 	}
 }
 
@@ -157,15 +163,16 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &minionEnumerator{list}, nil
 }
 
-func (factory *ConfigFactory) makeDefaultErrorFunc(podQueue *cache.FIFO) func(pod *api.Pod, err error) {
+func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
 		glog.Errorf("Error scheduling %v: %v; retrying", pod.ID, err)
-
+		backoff.gc()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
 			defer util.HandleCrash()
 			podID := pod.ID
+			backoff.wait(podID)
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
 			err := factory.Client.Get().Path("pods").Path(podID).Do().Into(pod)
@@ -233,4 +240,63 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
 	return b.Post().Path("bindings").Body(binding).Do().Error()
+}
+
+type clock interface {
+	Now() time.Time
+}
+
+type realClock struct{}
+
+func (realClock) Now() time.Time {
+	return time.Now()
+}
+
+type backoffEntry struct {
+	backoff    time.Duration
+	lastUpdate time.Time
+}
+
+type podBackoff struct {
+	perPodBackoff map[string]*backoffEntry
+	lock          sync.Mutex
+	clock         clock
+}
+
+func (p *podBackoff) getEntry(podID string) *backoffEntry {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	entry, ok := p.perPodBackoff[podID]
+	if !ok {
+		entry = &backoffEntry{backoff: 1 * time.Second}
+		p.perPodBackoff[podID] = entry
+	}
+	entry.lastUpdate = p.clock.Now()
+	return entry
+}
+
+func (p *podBackoff) getBackoff(podID string) time.Duration {
+	entry := p.getEntry(podID)
+	duration := entry.backoff
+	entry.backoff *= 2
+	if entry.backoff > 60*time.Second {
+		entry.backoff = 60 * time.Second
+	}
+	glog.V(4).Infof("Backing off %s for pod %s", duration.String(), podID)
+	return duration
+}
+
+func (p *podBackoff) wait(podID string) {
+	time.Sleep(p.getBackoff(podID))
+}
+
+func (p *podBackoff) gc() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	now := p.clock.Now()
+	for podID, entry := range p.perPodBackoff {
+		if now.Sub(entry.lastUpdate) > 60*time.Second {
+			delete(p.perPodBackoff, podID)
+		}
+	}
 }
