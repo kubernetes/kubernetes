@@ -164,7 +164,7 @@ func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool,
 				continue
 			}
 			if accumulator[port] {
-				cErrs = append(cErrs, errs.NewFieldDuplicate("Port", port))
+				cErrs = append(cErrs, errs.NewFieldDuplicate("port", port))
 			} else {
 				accumulator[port] = true
 			}
@@ -314,7 +314,7 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
 	}
 	if !util.IsDNSSubdomain(pod.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("pod.Namespace", pod.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
 	return allErrs
@@ -329,10 +329,10 @@ func ValidateService(service *api.Service) errs.ErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
 	}
 	if !util.IsDNSSubdomain(service.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("service.Namespace", service.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace))
 	}
 	if !util.IsValidPortNum(service.Port) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
+		allErrs = append(allErrs, errs.NewFieldInvalid("port", service.Port))
 	}
 	if len(service.Protocol) == 0 {
 		service.Protocol = "TCP"
@@ -352,7 +352,7 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.E
 		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
 	}
 	if !util.IsDNSSubdomain(controller.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("controller.Namespace", controller.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
 	return allErrs
