@@ -74,6 +74,14 @@ func (r *Request) Sync(sync bool) *Request {
 	return r
 }
 
+// Namespace applies the namespace scope to a request
+func (r *Request) Namespace(namespace string) *Request {
+	if len(namespace) > 0 {
+		return r.setParam("namespace", namespace)
+	}
+	return r
+}
+
 // AbsPath overwrites an existing path with the path parameter.
 func (r *Request) AbsPath(path string) *Request {
 	if r.err != nil {
@@ -196,6 +204,7 @@ func (r *Request) finalURL() string {
 	for key, value := range r.params {
 		query.Add(key, value)
 	}
+
 	// sync and timeout are handled specially here, to allow setting them
 	// in any order.
 	if r.sync {

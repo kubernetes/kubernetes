@@ -215,7 +215,7 @@ func TestCreateReplica(t *testing.T) {
 		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 	}
-	fakeHandler.ValidateRequest(t, makeURL("/pods"), "POST", nil)
+	fakeHandler.ValidateRequest(t, makeURL("/pods?namespace=default"), "POST", nil)
 	actualPod := api.Pod{}
 	if err := json.Unmarshal([]byte(fakeHandler.RequestBody), &actualPod); err != nil {
 		t.Errorf("Unexpected error: %#v", err)

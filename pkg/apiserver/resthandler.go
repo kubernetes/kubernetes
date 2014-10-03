@@ -100,10 +100,17 @@ func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(
 //    timeout=<duration> Timeout for synchronous requests, only applies if sync=true
 //    labels=<label-selector> Used for filtering list operations
 func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w http.ResponseWriter, storage RESTStorage) {
-	// TODO for now, we perform all operations in the default namespace
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	sync := req.URL.Query().Get("sync") == "true"
 	timeout := parseTimeout(req.URL.Query().Get("timeout"))
+	// TODO for now, we pull namespace from query parameter, but according to spec, it must go in resource path in future PR
+	// if a namespace if specified, it's always used.
+	// for list/watch operations, a namespace is not required if omitted.
+	// for all other operations, if namespace is omitted, we will default to default namespace.
+	namespace := req.URL.Query().Get("namespace")
+	if len(namespace) > 0 {
+		ctx = api.WithNamespace(ctx, namespace)
+	}
 	switch req.Method {
 	case "GET":
 		switch len(parts) {
@@ -129,7 +136,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			}
 			writeJSON(http.StatusOK, h.codec, list, w)
 		case 2:
-			item, err := storage.Get(ctx, parts[1])
+			item, err := storage.Get(api.WithNamespaceDefaultIfNone(ctx), parts[1])
 			if err != nil {
 				errorJSON(err, h.codec, w)
 				return
@@ -159,7 +166,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		out, err := storage.Create(ctx, obj)
+		out, err := storage.Create(api.WithNamespaceDefaultIfNone(ctx), obj)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -172,7 +179,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			notFound(w, req)
 			return
 		}
-		out, err := storage.Delete(ctx, parts[1])
+		out, err := storage.Delete(api.WithNamespaceDefaultIfNone(ctx), parts[1])
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -196,7 +203,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		out, err := storage.Update(ctx, obj)
+		out, err := storage.Update(api.WithNamespaceDefaultIfNone(ctx), obj)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return

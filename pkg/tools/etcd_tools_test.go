@@ -141,10 +141,10 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 		},
 	}
 	expect := api.PodList{
-		JSONBase: api.JSONBase{ResourceVersion: 10},
+		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}},
-			{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 2}},
+			{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"}},
+			{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}},
 		},
 	}
 
@@ -187,11 +187,11 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 		},
 	}
 	expect := api.PodList{
-		JSONBase: api.JSONBase{ResourceVersion: 10},
+		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{JSONBase: api.JSONBase{ID: "foo", ResourceVersion: 1}},
-			{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 2}},
-			{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 3}},
+			{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"}},
+			{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}},
+			{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: "3"}},
 		},
 	}
 

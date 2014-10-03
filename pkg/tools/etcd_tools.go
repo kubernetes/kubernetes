@@ -179,18 +179,18 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 	for _, node := range nodes {
 		if node.Dir {
 			h.decodeNodeList(node.Nodes, slicePtr)
-		} else {
-			obj := reflect.New(v.Type().Elem())
-			err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object))
-			if h.ResourceVersioner != nil {
-				_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
-				// being unable to set the version does not prevent the object from being extracted
-			}
-			if err != nil {
-				return err
-			}
-			v.Set(reflect.Append(v, obj.Elem()))
+			continue
 		}
+		obj := reflect.New(v.Type().Elem())
+		err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object))
+		if h.ResourceVersioner != nil {
+			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
+			// being unable to set the version does not prevent the object from being extracted
+		}
+		if err != nil {
+			return err
+		}
+		v.Set(reflect.Append(v, obj.Elem()))
 	}
 	return nil
 }
