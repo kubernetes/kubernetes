@@ -293,8 +293,9 @@ func inspectContainer(client DockerInterface, dockerID, containerName string) (*
 
 	glog.V(3).Infof("Container: %s [%s] inspect result %+v", *inspectResult)
 	var containerStatus api.ContainerStatus
-	waiting := true
+	containerStatus.Image = inspectResult.Config.Image
 
+	waiting := true
 	if inspectResult.State.Running {
 		containerStatus.State.Running = &api.ContainerStateRunning{
 			StartedAt: inspectResult.State.StartedAt,

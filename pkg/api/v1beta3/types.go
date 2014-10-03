@@ -338,6 +338,7 @@ type ContainerStatus struct {
 	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
 	RestartCount int            `json:"restartCount" yaml:"restartCount"`
 	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
+	// TODO(dchen1107): Which image the container is running with?
 	// TODO(dchen1107): Once we have done with integration with cadvisor, resource
 	// usage should be included.
 }

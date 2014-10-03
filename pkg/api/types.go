@@ -329,6 +329,8 @@ type ContainerStatus struct {
 	// TODO(dchen1107): Deprecated this soon once we pull entire PodStatus from node,
 	// not just PodInfo. Now we need this to remove docker.Container from API
 	PodIP string `json:"podIP,omitempty" yaml:"podIP,omitempty"`
+	// TODO(dchen1107): Need to decide how to reprensent this in v1beta3
+	Image string `yaml:"image" json:"image"`
 	// TODO(dchen1107): Once we have done with integration with cadvisor, resource
 	// usage should be included.
 }
