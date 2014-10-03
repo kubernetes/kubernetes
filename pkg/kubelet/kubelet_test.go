@@ -273,7 +273,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "list", "inspect", "list", "create", "start"})
+		"list", "list", "create", "start", "list", "inspect_container", "list", "create", "start"})
 
 	fakeDocker.Lock()
 

@@ -140,10 +140,6 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	return f.Err
 }
 
-func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
-	return nil, f.Err
-}
-
 // FakeDockerPuller is a stub implementation of DockerPuller.
 type FakeDockerPuller struct {
 	sync.Mutex
