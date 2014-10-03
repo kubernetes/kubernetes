@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	masterPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
@@ -64,7 +65,11 @@ func main() {
 
 	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)
 
+	endpoints := service.NewEndpointController(kubeClient)
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+
 	controllerManager := controller.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
+
 	select {}
 }

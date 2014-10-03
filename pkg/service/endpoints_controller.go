@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
@@ -33,15 +32,13 @@ import (
 
 // EndpointController manages service endpoints.
 type EndpointController struct {
-	client          *client.Client
-	serviceRegistry service.Registry
+	client *client.Client
 }
 
 // NewEndpointController returns a new *EndpointController.
-func NewEndpointController(serviceRegistry service.Registry, client *client.Client) *EndpointController {
+func NewEndpointController(client *client.Client) *EndpointController {
 	return &EndpointController{
-		serviceRegistry: serviceRegistry,
-		client:          client,
+		client: client,
 	}
 }
 
