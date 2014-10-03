@@ -1,6 +1,8 @@
 ## Getting started on Google Compute Engine
 
-### Prerequisites for minions
+The example below creates a Kubernetes cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
+
+### Getting VMs
 
 1. You need a Google Cloud Platform account with billing enabled. Visit
    [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
@@ -9,7 +11,7 @@
 4. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled.
 
 
-### Prerequisites for the master
+### Prerequisites for your workstation
 
 1. You must have Go (version 1.2 or later) installed: [www.golang.org](http://www.golang.org).
 2. You must have the [`gcloud` components](https://developers.google.com/cloud/sdk/) installed.
