@@ -1,0 +1,6 @@
+id: go-webserver
+selector:
+  app: go-ws
+containerPort: 8080
+protocol: TCP
+port: 8085

@@ -1,0 +1,12 @@
+id: elasticsearch
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: es
+    containers:
+      - name: elasticsearch
+        image: dockerfile/elasticsearch
+labels:
+  app: ElasticSearch
