@@ -87,15 +87,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	nameList, err := rs.registry.List()
-	if err != nil {
-		return nil, err
-	}
-	var list api.MinionList
-	for _, name := range nameList {
-		list.Items = append(list.Items, *rs.toApiMinion(name))
-	}
-	return &list, nil
+	return rs.registry.List()
 }
 
 func (*REST) New() runtime.Object {

@@ -37,13 +37,13 @@ func TestCachingHit(t *testing.T) {
 		now: time.Unix(0, 0),
 	}
 	fakeRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2"})
-	expected := []string{"m1", "m2", "m3"}
+	expected := registrytest.MakeMinionList([]string{"m1", "m2", "m3"})
 	cache := CachingRegistry{
 		delegate:   fakeRegistry,
 		ttl:        1 * time.Second,
 		clock:      &fakeClock,
 		lastUpdate: fakeClock.Now().Unix(),
-		minions:    expected,
+		nodes:      expected,
 	}
 	list, err := cache.List()
 	if err != nil {
@@ -59,20 +59,20 @@ func TestCachingMiss(t *testing.T) {
 		now: time.Unix(0, 0),
 	}
 	fakeRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2"})
-	expected := []string{"m1", "m2", "m3"}
+	expected := registrytest.MakeMinionList([]string{"m1", "m2", "m3"})
 	cache := CachingRegistry{
 		delegate:   fakeRegistry,
 		ttl:        1 * time.Second,
 		clock:      &fakeClock,
 		lastUpdate: fakeClock.Now().Unix(),
-		minions:    expected,
+		nodes:      expected,
 	}
 	fakeClock.now = time.Unix(3, 0)
 	list, err := cache.List()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, fakeRegistry.Minions) {
+	if !reflect.DeepEqual(list, &fakeRegistry.Minions) {
 		t.Errorf("expected: %v, got %v", fakeRegistry.Minions, list)
 	}
 }
@@ -82,13 +82,13 @@ func TestCachingInsert(t *testing.T) {
 		now: time.Unix(0, 0),
 	}
 	fakeRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2"})
-	expected := []string{"m1", "m2", "m3"}
+	expected := registrytest.MakeMinionList([]string{"m1", "m2", "m3"})
 	cache := CachingRegistry{
 		delegate:   fakeRegistry,
 		ttl:        1 * time.Second,
 		clock:      &fakeClock,
 		lastUpdate: fakeClock.Now().Unix(),
-		minions:    expected,
+		nodes:      expected,
 	}
 	err := cache.Insert("foo")
 	if err != nil {
@@ -98,7 +98,7 @@ func TestCachingInsert(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, fakeRegistry.Minions) {
+	if !reflect.DeepEqual(list, &fakeRegistry.Minions) {
 		t.Errorf("expected: %v, got %v", fakeRegistry.Minions, list)
 	}
 }
@@ -108,13 +108,13 @@ func TestCachingDelete(t *testing.T) {
 		now: time.Unix(0, 0),
 	}
 	fakeRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2"})
-	expected := []string{"m1", "m2", "m3"}
+	expected := registrytest.MakeMinionList([]string{"m1", "m2", "m3"})
 	cache := CachingRegistry{
 		delegate:   fakeRegistry,
 		ttl:        1 * time.Second,
 		clock:      &fakeClock,
 		lastUpdate: fakeClock.Now().Unix(),
-		minions:    expected,
+		nodes:      expected,
 	}
 	err := cache.Delete("m2")
 	if err != nil {
@@ -124,7 +124,7 @@ func TestCachingDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !reflect.DeepEqual(list, fakeRegistry.Minions) {
+	if !reflect.DeepEqual(list, &fakeRegistry.Minions) {
 		t.Errorf("expected: %v, got %v", fakeRegistry.Minions, list)
 	}
 }

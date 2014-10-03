@@ -27,11 +27,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
@@ -52,6 +54,9 @@ var (
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
+	// TODO: Discover these by pinging the host machines, and rip out these flags.
+	nodeMilliCPU = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory   = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 )
 
 func init() {
@@ -150,6 +155,12 @@ func main() {
 		MinionCacheTTL:     *minionCacheTTL,
 		MinionRegexp:       *minionRegexp,
 		PodInfoGetter:      podInfoGetter,
+		NodeResources: api.NodeResources{
+			Capacity: api.ResourceList{
+				resources.CPU:    util.NewIntOrStringFromInt(*nodeMilliCPU),
+				resources.Memory: util.NewIntOrStringFromInt(*nodeMemory),
+			},
+		},
 	})
 
 	mux := http.NewServeMux()

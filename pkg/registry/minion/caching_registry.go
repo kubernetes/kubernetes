@@ -20,6 +20,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 type Clock interface {
@@ -35,7 +37,7 @@ func (SystemClock) Now() time.Time {
 type CachingRegistry struct {
 	delegate   Registry
 	ttl        time.Duration
-	minions    []string
+	nodes      *api.MinionList
 	lastUpdate int64
 	lock       sync.RWMutex
 	clock      Clock
@@ -49,13 +51,13 @@ func NewCachingRegistry(delegate Registry, ttl time.Duration) (Registry, error) 
 	return &CachingRegistry{
 		delegate:   delegate,
 		ttl:        ttl,
-		minions:    list,
+		nodes:      list,
 		lastUpdate: time.Now().Unix(),
 		clock:      SystemClock{},
 	}, nil
 }
 
-func (r *CachingRegistry) Contains(minion string) (bool, error) {
+func (r *CachingRegistry) Contains(nodeID string) (bool, error) {
 	if r.expired() {
 		if err := r.refresh(false); err != nil {
 			return false, err
@@ -64,8 +66,8 @@ func (r *CachingRegistry) Contains(minion string) (bool, error) {
 	// block updates in the middle of a contains.
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	for _, name := range r.minions {
-		if name == minion {
+	for _, node := range r.nodes.Items {
+		if node.ID == nodeID {
 			return true, nil
 		}
 	}
@@ -86,13 +88,13 @@ func (r *CachingRegistry) Insert(minion string) error {
 	return r.refresh(true)
 }
 
-func (r *CachingRegistry) List() ([]string, error) {
+func (r *CachingRegistry) List() (*api.MinionList, error) {
 	if r.expired() {
 		if err := r.refresh(false); err != nil {
-			return r.minions, err
+			return r.nodes, err
 		}
 	}
-	return r.minions, nil
+	return r.nodes, nil
 }
 
 func (r *CachingRegistry) expired() bool {
@@ -108,7 +110,7 @@ func (r *CachingRegistry) refresh(force bool) error {
 	defer r.lock.Unlock()
 	if force || r.expired() {
 		var err error
-		r.minions, err = r.delegate.List()
+		r.nodes, err = r.delegate.List()
 		time := r.clock.Now()
 		atomic.SwapInt64(&r.lastUpdate, time.Unix())
 		return err

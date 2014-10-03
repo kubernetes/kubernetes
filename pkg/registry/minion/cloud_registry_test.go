@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
 func TestCloudList(t *testing.T) {
@@ -28,7 +29,7 @@ func TestCloudList(t *testing.T) {
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
-	registry, err := NewCloudRegistry(&fakeCloud, ".*")
+	registry, err := NewCloudRegistry(&fakeCloud, ".*", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -38,7 +39,7 @@ func TestCloudList(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(list, instances) {
+	if !reflect.DeepEqual(list, registrytest.MakeMinionList(instances)) {
 		t.Errorf("Unexpected inequality: %#v, %#v", list, instances)
 	}
 }
@@ -48,7 +49,7 @@ func TestCloudContains(t *testing.T) {
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
-	registry, err := NewCloudRegistry(&fakeCloud, ".*")
+	registry, err := NewCloudRegistry(&fakeCloud, ".*", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestCloudListRegexp(t *testing.T) {
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
-	registry, err := NewCloudRegistry(&fakeCloud, "m[0-9]+")
+	registry, err := NewCloudRegistry(&fakeCloud, "m[0-9]+", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestCloudListRegexp(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedList := []string{"m1", "m2"}
+	expectedList := registrytest.MakeMinionList([]string{"m1", "m2"})
 	if !reflect.DeepEqual(list, expectedList) {
 		t.Errorf("Unexpected inequality: %#v, %#v", list, expectedList)
 	}

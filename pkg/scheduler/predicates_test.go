@@ -26,8 +26,9 @@ import (
 
 type FakeNodeInfo api.Minion
 
-func (n FakeNodeInfo) GetNodeInfo(nodeName string) (api.Minion, error) {
-	return api.Minion(n), nil
+func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*api.Minion, error) {
+	node := api.Minion(n)
+	return &node, nil
 }
 
 func makeResources(milliCPU int, memory int) api.NodeResources {

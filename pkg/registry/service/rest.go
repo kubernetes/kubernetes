@@ -84,7 +84,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 			if err != nil {
 				return nil, err
 			}
-			err = balancer.CreateTCPLoadBalancer(srv.ID, zone.Region, srv.Port, hosts)
+			err = balancer.CreateTCPLoadBalancer(srv.ID, zone.Region, srv.Port, hostsFromMinionList(hosts))
 			if err != nil {
 				return nil, err
 			}
@@ -95,6 +95,14 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		}
 		return rs.registry.GetService(ctx, srv.ID)
 	}), nil
+}
+
+func hostsFromMinionList(list *api.MinionList) []string {
+	result := make([]string, len(list.Items))
+	for ix := range list.Items {
+		result[ix] = list.Items[ix].ID
+	}
+	return result
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {

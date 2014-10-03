@@ -29,7 +29,10 @@ import (
 
 	"code.google.com/p/goauth2/compute/serviceaccount"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -252,6 +255,48 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 		instances = append(instances, instance.Name+suffix)
 	}
 	return instances, nil
+}
+
+func makeResources(cpu float32, memory float32) *api.NodeResources {
+	return &api.NodeResources{
+		Capacity: api.ResourceList{
+			resources.CPU:    util.NewIntOrStringFromInt(int(cpu * 1000)),
+			resources.Memory: util.NewIntOrStringFromInt(int(memory * 1024 * 1024 * 1024)),
+		},
+	}
+}
+
+func canonicalizeMachineType(machineType string) string {
+	ix := strings.LastIndex(machineType, "/")
+	return machineType[ix+1:]
+}
+
+func (gce *GCECloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	instance := canonicalizeInstanceName(name)
+	instanceCall := gce.service.Instances.Get(gce.projectID, gce.zone, instance)
+	res, err := instanceCall.Do()
+	if err != nil {
+		return nil, err
+	}
+	switch canonicalizeMachineType(res.MachineType) {
+	case "f1-micro":
+		return makeResources(1, 0.6), nil
+	case "g1-small":
+		return makeResources(1, 1.70), nil
+	case "n1-standard-1":
+		return makeResources(1, 3.75), nil
+	case "n1-standard-2":
+		return makeResources(2, 7.5), nil
+	case "n1-standard-4":
+		return makeResources(4, 15), nil
+	case "n1-standard-8":
+		return makeResources(8, 30), nil
+	case "n1-standard-16":
+		return makeResources(16, 30), nil
+	default:
+		glog.Errorf("unknown machine: %s", res.MachineType)
+		return nil, nil
+	}
 }
 
 func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {

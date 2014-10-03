@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 
 	"github.com/golang/glog"
@@ -65,20 +66,20 @@ func (r *HealthyRegistry) Insert(minion string) error {
 	return r.delegate.Insert(minion)
 }
 
-func (r *HealthyRegistry) List() (currentMinions []string, err error) {
-	var result []string
+func (r *HealthyRegistry) List() (currentMinions *api.MinionList, err error) {
+	result := &api.MinionList{}
 	list, err := r.delegate.List()
 	if err != nil {
 		return result, err
 	}
-	for _, minion := range list {
-		status, err := health.DoHTTPCheck(r.makeMinionURL(minion), r.client)
+	for _, minion := range list.Items {
+		status, err := health.DoHTTPCheck(r.makeMinionURL(minion.ID), r.client)
 		if err != nil {
 			glog.Errorf("%s failed health check with error: %s", minion, err)
 			continue
 		}
 		if status == health.Healthy {
-			result = append(result, minion)
+			result.Items = append(result.Items, minion)
 		} else {
 			glog.Errorf("%s failed a health check, ignoring.", minion)
 		}

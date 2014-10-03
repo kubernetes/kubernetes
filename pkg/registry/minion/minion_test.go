@@ -17,12 +17,13 @@ limitations under the License.
 package minion
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 func TestRegistry(t *testing.T) {
-	m := NewRegistry([]string{"foo", "bar"})
+	m := NewRegistry([]string{"foo", "bar"}, api.NodeResources{})
 	if has, err := m.Contains("foo"); !has || err != nil {
 		t.Errorf("missing expected object")
 	}
@@ -48,7 +49,16 @@ func TestRegistry(t *testing.T) {
 	if err != nil {
 		t.Errorf("got error calling List")
 	}
-	if !reflect.DeepEqual(list, []string{"baz", "foo"}) {
-		t.Errorf("Unexpected list value: %#v", list)
+	if len(list.Items) != 2 || !contains(list, "foo") || !contains(list, "baz") {
+		t.Errorf("unexpected %v", list)
 	}
+}
+
+func contains(nodes *api.MinionList, nodeID string) bool {
+	for _, node := range nodes.Items {
+		if node.ID == nodeID {
+			return true
+		}
+	}
+	return false
 }

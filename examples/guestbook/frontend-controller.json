@@ -13,6 +13,7 @@
            "containers": [{
              "name": "php-redis",
              "image": "brendanburns/php-redis",
+             "memory": 10000000,
              "ports": [{"containerPort": 80, "hostPort": 8000}]
            }]
          }

@@ -34,7 +34,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:     6502,
 		JSONBase: api.JSONBase{ID: "foo"},
@@ -156,7 +156,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:                       6502,
 		JSONBase:                   api.JSONBase{ID: "foo"},
@@ -183,7 +183,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		Err: fmt.Errorf("test error"),
 	}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:                       6502,
 		JSONBase:                   api.JSONBase{ID: "foo"},
@@ -206,7 +206,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -227,7 +227,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		JSONBase:                   api.JSONBase{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
@@ -314,7 +314,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -334,7 +334,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	registry.Endpoints = api.Endpoints{Endpoints: []string{"foo:80"}}
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -363,7 +363,7 @@ func TestServiceRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines))
+	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
 		JSONBase: api.JSONBase{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},

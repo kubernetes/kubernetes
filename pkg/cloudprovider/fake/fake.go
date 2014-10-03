@@ -20,16 +20,19 @@ import (
 	"net"
 	"regexp"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
 // FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
 type FakeCloud struct {
-	Exists   bool
-	Err      error
-	Calls    []string
-	IP       net.IP
-	Machines []string
+	Exists        bool
+	Err           error
+	Calls         []string
+	IP            net.IP
+	Machines      []string
+	NodeResources *api.NodeResources
+
 	cloudprovider.Zone
 }
 
@@ -109,4 +112,9 @@ func (f *FakeCloud) List(filter string) ([]string, error) {
 func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 	f.addCall("get-zone")
 	return f.Zone, f.Err
+}
+
+func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	f.addCall("get-node-resources")
+	return f.NodeResources, f.Err
 }
