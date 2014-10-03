@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -78,7 +78,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.ID)
 		if err != nil {
 			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
-			if strings.Contains(err.Error(), "not found") {
+			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
 					JSONBase: api.JSONBase{
 						ID: service.ID,
