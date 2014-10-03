@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // podex is a command line tool to bootstrap kubernetes container
-// manifests from docker image metadata.
+// manifest from docker image metadata.
 //
 // Manifests can then be edited by a human to match deployment needs.
 //
