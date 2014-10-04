@@ -27,7 +27,7 @@ import (
 
 const (
 	RunOnceManifestDelay     = 1 * time.Second
-	RunOnceMaxRetries        = 1
+	RunOnceMaxRetries        = 10
 	RunOnceRetryDelay        = 1 * time.Second
 	RunOnceRetryDelayBackoff = 2
 )
@@ -93,7 +93,9 @@ func (kl *Kubelet) runPod(pod Pod) (api.PodInfo, error) {
 	}
 
 	delay := RunOnceRetryDelay
-	for i := 0; i < RunOnceMaxRetries; i++ {
+	retry := 0
+	for {
+		glog.Infof("syncing pod")
 		err := kl.syncPod(&pod, dockerContainers)
 		if err != nil {
 			return nil, fmt.Errorf("error syncing pod: %v", err)
@@ -105,11 +107,14 @@ func (kl *Kubelet) runPod(pod Pod) (api.PodInfo, error) {
 		if podInfo(info).isRunning() {
 			return info, nil
 		}
+		if retry >= RunOnceMaxRetries {
+			return nil, fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, RunOnceMaxRetries)
+		}
 		glog.Infof("pod %q containers not running, waiting for %v", pod.Name, delay)
 		<-time.After(delay)
+		retry++
 		delay *= RunOnceRetryDelayBackoff
 	}
-	return nil, fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, RunOnceMaxRetries)
 }
 
 // Alias PodInfo for internal usage.
