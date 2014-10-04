@@ -23,6 +23,7 @@ package main
 import (
 	"flag"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -54,7 +55,7 @@ var (
 	httpCheckFrequency    = flag.Duration("http_check_frequency", 20*time.Second, "Duration between checking http for new data")
 	manifestURL           = flag.String("manifest_url", "", "URL for accessing the container manifest")
 	enableServer          = flag.Bool("enable_server", true, "Enable the info server")
-	address               = flag.String("address", "127.0.0.1", "The address for the info server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
+	address               = util.IP(net.ParseIP("127.0.0.1"))
 	port                  = flag.Uint("port", master.KubeletPort, "The port for the info server to serve on")
 	hostnameOverride      = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	networkContainerImage = flag.String("network_container_image", kubelet.NetworkContainerImage, "The image that network containers in each pod will use.")
@@ -69,6 +70,7 @@ var (
 
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+	flag.Var(&address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
 }
 
 func getDockerEndpoint() string {
@@ -199,7 +201,7 @@ func main() {
 	// start the kubelet server
 	if *enableServer {
 		go util.Forever(func() {
-			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), *address, *port)
+			kubelet.ListenAndServeKubeletServer(k, cfg.Channel("http"), net.IP(address), *port)
 		}, 0)
 	}
 

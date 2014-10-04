@@ -276,7 +276,8 @@ func logTimeout(err error) bool {
 	return false
 }
 
-func newProxySocket(protocol api.Protocol, host string, port int) (proxySocket, error) {
+func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
+	host := ip.String()
 	switch strings.ToUpper(string(protocol)) {
 	case "TCP":
 		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
@@ -304,12 +305,12 @@ type Proxier struct {
 	loadBalancer LoadBalancer
 	mu           sync.Mutex // protects serviceMap
 	serviceMap   map[string]*serviceInfo
-	address      string
+	address      net.IP
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an
 // address on which to listen
-func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, address net.IP) *Proxier {
 	return &Proxier{
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[string]*serviceInfo),

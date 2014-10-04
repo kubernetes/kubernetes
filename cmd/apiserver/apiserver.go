@@ -41,7 +41,7 @@ import (
 
 var (
 	port                  = flag.Uint("port", 8080, "The port to listen on. Default 8080")
-	address               = flag.String("address", "127.0.0.1", "The address on the local server to listen to. Default 127.0.0.1")
+	address               = util.IP(net.ParseIP("127.0.0.1"))
 	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'")
 	storageVersion        = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
 	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
@@ -60,6 +60,7 @@ var (
 )
 
 func init() {
+	flag.Var(&address, "address", "The IP address on to serve on (set to 0.0.0.0 for all interfaces)")
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 	flag.Var(&corsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
@@ -133,7 +134,7 @@ func main() {
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(*address, strconv.Itoa(int(*port))),
+		Host:    net.JoinHostPort(address.String(), strconv.Itoa(int(*port))),
 		Version: *storageVersion,
 	}
 	client, err := client.New(clientConfig)
@@ -179,7 +180,7 @@ func main() {
 	handler = apiserver.RecoverPanics(handler)
 
 	s := &http.Server{
-		Addr:           net.JoinHostPort(*address, strconv.Itoa(int(*port))),
+		Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*port))),
 		Handler:        handler,
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,

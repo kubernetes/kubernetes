@@ -38,11 +38,12 @@ import (
 
 var (
 	port         = flag.Int("port", masterPkg.ControllerManagerPort, "The port that the controller-manager's http service runs on")
-	address      = flag.String("address", "127.0.0.1", "The address to serve from")
+	address      = util.IP(net.ParseIP("127.0.0.1"))
 	clientConfig = &client.Config{}
 )
 
 func init() {
+	flag.Var(&address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
 }
 
@@ -62,7 +63,7 @@ func main() {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)
+	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 
 	controllerManager := controller.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
