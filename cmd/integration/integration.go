@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"runtime"
 	"sync"
@@ -48,6 +49,8 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
+
+const testRootDir = "/tmp/kubelet"
 
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
@@ -140,10 +143,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	controllerManager.Run(10 * time.Minute)
 
 	// Kubelet (localhost)
+	os.MkdirAll(testRootDir, 0750)
 	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, cfg1.Channel("etcd"))
 	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
-	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
+	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], testRootDir, &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
 	go util.Forever(func() {
 		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), "localhost", 10250)
@@ -154,7 +158,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// have a place they can schedule.
 	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, cfg2.Channel("etcd"))
-	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
+	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], testRootDir, &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
 	go util.Forever(func() {
 		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), "localhost", 10251)
