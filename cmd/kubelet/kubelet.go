@@ -64,6 +64,7 @@ var (
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
 	registryPullQPS       = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	registryBurst         = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
+	runonce               = flag.Bool("runonce", false, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --etcd_servers and --enable-server")
 )
 
 func init() {
@@ -106,6 +107,17 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	if *runonce {
+		exclusiveFlag := "invalid option: --runonce and %s are mutually exclusive"
+		if len(etcdServerList) > 0 {
+			glog.Fatalf(exclusiveFlag, "--etcd_servers")
+		}
+		if *enableServer {
+			glog.Infof("--runonce is set, disabling server")
+			*enableServer = false
+		}
+	}
+
 	etcd.SetLogger(util.NewLogger("etcd "))
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -128,7 +140,9 @@ func main() {
 		glog.Fatal("Invalid root directory path.")
 	}
 	*rootDirectory = path.Clean(*rootDirectory)
-	os.MkdirAll(*rootDirectory, 0750)
+	if err := os.MkdirAll(*rootDirectory, 0750); err != nil {
+		glog.Warningf("Error creating root directory: %v", err)
+	}
 
 	// source of all configuration
 	cfg := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates)
@@ -170,6 +184,14 @@ func main() {
 	health.AddHealthChecker(health.NewExecHealthChecker(k))
 	health.AddHealthChecker(health.NewHTTPHealthChecker(&http.Client{}))
 	health.AddHealthChecker(&health.TCPHealthChecker{})
+
+	// process pods and exit.
+	if *runonce {
+		if _, err := k.RunOnce(cfg.Updates()); err != nil {
+			glog.Fatalf("--runonce failed: %v", err)
+		}
+		return
+	}
 
 	// start the kubelet
 	go util.Forever(func() { k.Run(cfg.Updates()) }, 0)
