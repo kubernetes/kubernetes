@@ -836,8 +836,9 @@ type Event struct {
 
 // EventList is a list of events.
 type EventList struct {
-	JSONBase `json:",inline" yaml:",inline"`
-	Items    []Event `json:"items" yaml:"items"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	Metadata ListMeta `json:"metadata,inline" yaml:"metadata,inline"`
+	Items    []Event  `json:"items" yaml:"items"`
 }
 
 // TODO: for readability
