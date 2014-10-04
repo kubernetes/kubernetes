@@ -285,6 +285,10 @@ func TestMakePorts(t *testing.T) {
 				{HostPort: 443, ContainerPort: 444},
 			},
 		},
+		{
+			"",
+			[]api.Port{},
+		},
 	}
 	for _, tt := range testCases {
 		ports := portsFromString(tt.spec)

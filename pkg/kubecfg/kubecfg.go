@@ -159,6 +159,9 @@ func ResizeController(ctx api.Context, name string, replicas int, client client.
 }
 
 func portsFromString(spec string) []api.Port {
+	if spec == "" {
+		return []api.Port{}
+	}
 	parts := strings.Split(spec, ",")
 	var result []api.Port
 	for _, part := range parts {
