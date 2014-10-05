@@ -26,7 +26,7 @@ import (
 // Many fields in this API have formatting requirements.  The commonly used
 // formats are defined here.
 //
-// C_IDENTIFIER:  This is a string that conforms the definition of an "identifier"
+// C_IDENTIFIER:  This is a string that conforms to the definition of an "identifier"
 //     in the C language.  This is captured by the following regex:
 //         [A-Za-z_][A-Za-z0-9_]*
 //     This defines the format, but not the length restriction, which should be
