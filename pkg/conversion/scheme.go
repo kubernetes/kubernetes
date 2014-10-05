@@ -86,6 +86,11 @@ func NewScheme() *Scheme {
 	return s
 }
 
+// Log sets a logger on the scheme. For test purposes only
+func (s *Scheme) Log(l DebugLogger) {
+	s.converter.Debug = l
+}
+
 // nameFunc returns the name of the type that we wish to use for encoding. Defaults to
 // the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
