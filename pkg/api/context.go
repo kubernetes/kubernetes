@@ -64,10 +64,10 @@ func NamespaceFrom(ctx Context) (string, bool) {
 }
 
 // ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
-func ValidNamespace(ctx Context, resource *JSONBase) bool {
+func ValidNamespace(ctx Context, metadata *ObjectMeta) bool {
 	ns, ok := NamespaceFrom(ctx)
-	if len(resource.Namespace) == 0 {
-		resource.Namespace = ns
+	if len(metadata.Namespace) == 0 {
+		metadata.Namespace = ns
 	}
-	return ns == resource.Namespace && ok
+	return ns == metadata.Namespace && ok
 }

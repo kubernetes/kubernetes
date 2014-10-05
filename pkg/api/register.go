@@ -17,29 +17,58 @@ limitations under the License.
 package api
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-var Scheme = runtime.NewScheme()
+var Scheme = runtime.NewScheme(meta.MetaFactory{})
 
 func init() {
 	Scheme.AddKnownTypes("",
-		&PodList{},
 		&Pod{},
-		&ReplicationControllerList{},
+		&PodList{},
+		&PodTemplate{},
+		&PodTemplateList{},
+		&BoundPod{},
+		&BoundPods{},
 		&ReplicationController{},
-		&ServiceList{},
+		&ReplicationControllerList{},
 		&Service{},
-		&MinionList{},
-		&Minion{},
-		&Status{},
-		&ServerOpList{},
-		&ServerOp{},
-		&ContainerManifestList{},
+		&ServiceList{},
 		&Endpoints{},
 		&EndpointsList{},
+		&Node{},
+		&NodeList{},
 		&Binding{},
+		&Status{},
+		&Operation{},
+		&OperationList{},
 		&Event{},
 		&EventList{},
+		&ContainerManifestList{},
 	)
+	Scheme.AddKnownTypeWithName("", "ServerOp", &Operation{})
+	Scheme.AddKnownTypeWithName("", "ServerOpList", &OperationList{})
 }
+
+func (*Pod) IsAnAPIObject()                       {}
+func (*PodList) IsAnAPIObject()                   {}
+func (*PodTemplate) IsAnAPIObject()               {}
+func (*PodTemplateList) IsAnAPIObject()           {}
+func (*BoundPod) IsAnAPIObject()                  {}
+func (*BoundPods) IsAnAPIObject()                 {}
+func (*ReplicationController) IsAnAPIObject()     {}
+func (*ReplicationControllerList) IsAnAPIObject() {}
+func (*Service) IsAnAPIObject()                   {}
+func (*ServiceList) IsAnAPIObject()               {}
+func (*Endpoints) IsAnAPIObject()                 {}
+func (*EndpointsList) IsAnAPIObject()             {}
+func (*Node) IsAnAPIObject()                      {}
+func (*NodeList) IsAnAPIObject()                  {}
+func (*Binding) IsAnAPIObject()                   {}
+func (*Status) IsAnAPIObject()                    {}
+func (*Operation) IsAnAPIObject()                 {}
+func (*OperationList) IsAnAPIObject()             {}
+func (*Event) IsAnAPIObject()                     {}
+func (*EventList) IsAnAPIObject()                 {}
+func (*ContainerManifestList) IsAnAPIObject()     {}

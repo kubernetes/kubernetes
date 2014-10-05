@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -36,7 +38,7 @@ const OldestVersion = "v1beta1"
 // may be assumed to be least feature rich to most feature rich, and clients may
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
-var Versions = []string{"v1beta1", "v1beta2"}
+var Versions = []string{"v1beta1", "v1beta2", "v1beta3"}
 
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
@@ -47,13 +49,13 @@ var Codec = v1beta1.Codec
 // ResourceVersioner describes a default versioner that can handle all types
 // of versioning.
 // TODO: when versioning changes, make this part of each API definition.
-var ResourceVersioner = runtime.NewJSONBaseResourceVersioner()
+var ResourceVersioner = meta.NewObjectMetaResourceVersioner()
 
 // SelfLinker can set or get the SelfLink field of all API types.
 // TODO: when versioning changes, make this part of each API definition.
 // TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
 // to go through the InterfacesFor method below.
-var SelfLinker = runtime.NewJSONBaseSelfLinker()
+var SelfLinker = meta.NewObjectMetaSelfLinker()
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
@@ -75,6 +77,12 @@ func InterfacesFor(version string) (*VersionInterfaces, error) {
 	case "v1beta2":
 		return &VersionInterfaces{
 			Codec:             v1beta2.Codec,
+			ResourceVersioner: ResourceVersioner,
+			SelfLinker:        SelfLinker,
+		}, nil
+	case "v1beta3":
+		return &VersionInterfaces{
+			Codec:             v1beta3.Codec,
 			ResourceVersioner: ResourceVersioner,
 			SelfLinker:        SelfLinker,
 		}, nil

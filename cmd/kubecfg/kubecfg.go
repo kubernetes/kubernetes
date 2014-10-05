@@ -311,7 +311,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 	validStorage := checkStorage(storage)
 	verb := ""
 	setBody := false
-	var version uint64
+	var version string
 
 	printer := getPrinter()
 
@@ -342,11 +342,11 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
-		jsonBase, err := runtime.FindJSONBase(obj)
+		objectMeta, err := meta.FindObjectMeta(obj)
 		if err != nil {
 			glog.Fatalf("error finding json base for update: %v", err)
 		}
-		version = jsonBase.ResourceVersion()
+		version = objectMeta.ResourceVersion()
 		verb = "PUT"
 		setBody = true
 		if !validStorage || !hasSuffix {
@@ -369,17 +369,17 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		r.ParseSelectorParam("labels", *selector)
 	}
 	if setBody {
-		if version != 0 {
+		if len(version) > 0 {
 			data := readConfig(storage, c.RESTClient.Codec)
 			obj, err := latest.Codec.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
-			jsonBase, err := runtime.FindJSONBase(obj)
+			objectMeta, err := meta.FindObjectMeta(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
-			jsonBase.SetResourceVersion(version)
+			objectMeta.SetResourceVersion(version)
 			data, err = c.RESTClient.Codec.Encode(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)

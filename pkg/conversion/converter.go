@@ -258,10 +258,16 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 
 	// This should handle all simple types.
 	if st.AssignableTo(dt) {
+		if c.Debug != nil {
+			c.Debug.Logf("'%v' assigns to '%v'", st, dt)
+		}
 		dv.Set(sv)
 		return nil
 	}
 	if st.ConvertibleTo(dt) {
+		if c.Debug != nil {
+			c.Debug.Logf("'%v' converts to '%v'", st, dt)
+		}
 		dv.Set(sv.Convert(dt))
 		return nil
 	}
@@ -329,6 +335,9 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		dv.Set(reflect.New(dt.Elem()))
 		return c.convert(sv.Elem(), dv.Elem(), scope)
 	case reflect.Map:
+		if c.Debug != nil {
+			c.Debug.Logf("'%v' converts to '%v' as map", st, dt)
+		}
 		if sv.IsNil() {
 			// Don't copy a nil ptr!
 			dv.Set(reflect.Zero(dt))

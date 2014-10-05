@@ -14,32 +14,61 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package meta
 
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
+
+// findJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
+// obj must be a pointer to an api type.
+//
+// DEPRECATED: Will be removed when support for v1beta2 is dropped
+func findJSONBase(obj runtime.Object) (JSONBaseInterface, error) {
+	v, err := enforcePtr(obj)
+	if err != nil {
+		return nil, err
+	}
+	t := v.Type()
+	name := t.Name()
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
+	}
+	jsonBase := v.FieldByName("JSONBase")
+	if !jsonBase.IsValid() {
+		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
+	}
+	g, err := newGenericJSONBase(jsonBase)
+	if err != nil {
+		return nil, err
+	}
+	return g, nil
+}
 
 // NewJSONBaseResourceVersioner returns a ResourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from JSONBase.
-func NewJSONBaseResourceVersioner() ResourceVersioner {
+//
+// DEPRECATED: Will be removed when support for v1beta2 is dropped
+func NewJSONBaseResourceVersioner() runtime.ResourceVersioner {
 	return jsonBaseModifier{}
 }
 
 // jsonBaseModifier implements ResourceVersioner and SelfLinker.
 type jsonBaseModifier struct{}
 
-func (v jsonBaseModifier) ResourceVersion(obj Object) (uint64, error) {
-	json, err := FindJSONBase(obj)
+func (v jsonBaseModifier) ResourceVersion(obj runtime.Object) (uint64, error) {
+	json, err := findJSONBase(obj)
 	if err != nil {
 		return 0, err
 	}
 	return json.ResourceVersion(), nil
 }
 
-func (v jsonBaseModifier) SetResourceVersion(obj Object, version uint64) error {
-	json, err := FindJSONBase(obj)
+func (v jsonBaseModifier) SetResourceVersion(obj runtime.Object, version uint64) error {
+	json, err := findJSONBase(obj)
 	if err != nil {
 		return err
 	}
@@ -47,24 +76,24 @@ func (v jsonBaseModifier) SetResourceVersion(obj Object, version uint64) error {
 	return nil
 }
 
-func (v jsonBaseModifier) ID(obj Object) (string, error) {
-	json, err := FindJSONBase(obj)
+func (v jsonBaseModifier) ID(obj runtime.Object) (string, error) {
+	json, err := findJSONBase(obj)
 	if err != nil {
 		return "", err
 	}
 	return json.ID(), nil
 }
 
-func (v jsonBaseModifier) SelfLink(obj Object) (string, error) {
-	json, err := FindJSONBase(obj)
+func (v jsonBaseModifier) SelfLink(obj runtime.Object) (string, error) {
+	json, err := findJSONBase(obj)
 	if err != nil {
 		return "", err
 	}
 	return json.SelfLink(), nil
 }
 
-func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
-	json, err := FindJSONBase(obj)
+func (v jsonBaseModifier) SetSelfLink(obj runtime.Object, selfLink string) error {
+	json, err := findJSONBase(obj)
 	if err != nil {
 		return err
 	}
@@ -73,12 +102,14 @@ func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
 }
 
 // NewJSONBaseSelfLinker returns a SelfLinker that works on all JSONBase SelfLink fields.
-func NewJSONBaseSelfLinker() SelfLinker {
+func NewJSONBaseSelfLinker() runtime.SelfLinker {
 	return jsonBaseModifier{}
 }
 
 // JSONBaseInterface lets you work with a JSONBase from any of the versioned or
 // internal APIObjects.
+//
+// DEPRECATED: Will be removed when support for v1beta2 is dropped.
 type JSONBaseInterface interface {
 	ID() string
 	SetID(ID string)
@@ -138,31 +169,6 @@ func (g genericJSONBase) SelfLink() string {
 
 func (g genericJSONBase) SetSelfLink(selfLink string) {
 	*g.selfLink = selfLink
-}
-
-// fieldPtr puts the address of fieldName, which must be a member of v,
-// into dest, which must be an address of a variable to which this field's
-// address can be assigned.
-func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
-	field := v.FieldByName(fieldName)
-	if !field.IsValid() {
-		return fmt.Errorf("Couldn't find %v field in %#v", fieldName, v.Interface())
-	}
-	v = reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr {
-		return fmt.Errorf("dest should be ptr")
-	}
-	v = v.Elem()
-	field = field.Addr()
-	if field.Type().AssignableTo(v.Type()) {
-		v.Set(field)
-		return nil
-	}
-	if field.Type().ConvertibleTo(v.Type()) {
-		v.Set(field.Convert(v.Type()))
-		return nil
-	}
-	return fmt.Errorf("Couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
 // newGenericJSONBase creates a new generic JSONBase from v, which must be an

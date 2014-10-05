@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -29,7 +30,7 @@ var versionFromSelfLink = regexp.MustCompile("/api/([^/]*)/")
 // object, or an error if the object doesn't follow the conventions
 // that would allow this.
 func GetReference(obj runtime.Object) (*ObjectReference, error) {
-	jsonBase, err := runtime.FindJSONBase(obj)
+	objectMeta, err := meta.FindObjectMeta(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -37,16 +38,16 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	version := versionFromSelfLink.FindStringSubmatch(jsonBase.SelfLink())
+	version := versionFromSelfLink.FindStringSubmatch(objectMeta.SelfLink())
 	if len(version) < 2 {
-		return nil, fmt.Errorf("unexpected self link format: %v", jsonBase.SelfLink())
+		return nil, fmt.Errorf("unexpected self link format: %v", objectMeta.SelfLink())
 	}
 	return &ObjectReference{
-		Kind:       kind,
-		APIVersion: version[1],
-		// TODO: correct Name and UID when JSONBase makes a distinction
-		Name:            jsonBase.ID(),
-		UID:             jsonBase.ID(),
-		ResourceVersion: jsonBase.ResourceVersion(),
+		APIVersion:      version[1], //TODO: this seems like it violates the internal API assumptions
+		Kind:            kind,
+		Namespace:       objectMeta.Namespace(),
+		Name:            objectMeta.Name(),
+		UID:             objectMeta.UID(),
+		ResourceVersion: objectMeta.ResourceVersion(),
 	}, nil
 }

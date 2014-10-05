@@ -83,7 +83,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 )
 
 func TestInternalRoundTrip(t *testing.T) {
-	latest := "v1beta2"
+	latest := "v1beta3"
 
 	for k := range internal.Scheme.KnownTypes("") {
 		obj, err := internal.Scheme.New("", k)

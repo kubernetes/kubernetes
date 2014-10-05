@@ -58,6 +58,11 @@ type Scheme struct {
 	raw *conversion.Scheme
 }
 
+// TODO: test only remove me
+func (s *Scheme) Log(log conversion.DebugLogger) {
+	s.raw.Log(log)
+}
+
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
 func (self *Scheme) fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
@@ -242,29 +247,6 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	return s.raw.Convert(in, out)
 }
 
-// FindJSONBase takes an arbitary api type, returns pointer to its JSONBase field.
-// obj must be a pointer to an api type.
-func FindJSONBase(obj Object) (JSONBaseInterface, error) {
-	v, err := enforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	name := t.Name()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
-	}
-	jsonBase := v.FieldByName("JSONBase")
-	if !jsonBase.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
-	}
-	g, err := newGenericJSONBase(jsonBase)
-	if err != nil {
-		return nil, err
-	}
-	return g, nil
-}
-
 // EncodeToVersion turns the given api object into an appropriate JSON string.
 // Will return an error if the object doesn't have an embedded JSONBase.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
@@ -295,33 +277,6 @@ func FindJSONBase(obj Object) (JSONBaseInterface, error) {
 // config files.
 func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
 	return s.raw.EncodeToVersion(obj, destVersion)
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
-// dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj Object) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
-}
-
-// VersionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an APIObject, or an error.
-func VersionAndKind(data []byte) (version, kind string, err error) {
-	findKind := struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	return findKind.APIVersion, findKind.Kind, nil
 }
 
 // Decode converts a YAML or JSON string back into a pointer to an api object.
@@ -383,11 +338,38 @@ func ObjectDiff(a, b Object) string {
 	)
 }
 
+// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
+// dereferenced pointer, ensuring that it is settable/addressable.
+// Returns an error if this is not possible.
+func enforcePtr(obj Object) (reflect.Value, error) {
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Ptr {
+		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
+	}
+	return v.Elem(), nil
+}
+
+// VersionAndKind will return the APIVersion and Kind of the given wire-format
+// enconding of an APIObject, or an error.
+func VersionAndKind(data []byte) (version, kind string, err error) {
+	findKind := struct {
+		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	}{}
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, &findKind)
+	if err != nil {
+		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+	}
+	return findKind.APIVersion, findKind.Kind, nil
+}
+
 // metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
 // package figure out how to encode our object's types and versions. These fields are
 // located in our JSONBase.
 type metaInsertion struct {
-	JSONBase struct {
+	TypeMeta struct {
 		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	} `json:",inline" yaml:",inline"`
@@ -396,8 +378,8 @@ type metaInsertion struct {
 // Create returns a new metaInsertion with the version and kind fields set.
 func (metaInsertion) Create(version, kind string) interface{} {
 	m := metaInsertion{}
-	m.JSONBase.APIVersion = version
-	m.JSONBase.Kind = kind
+	m.TypeMeta.APIVersion = version
+	m.TypeMeta.Kind = kind
 	return &m
 }
 
@@ -405,5 +387,5 @@ func (metaInsertion) Create(version, kind string) interface{} {
 // a metaInsertion pointer object.
 func (metaInsertion) Interpret(in interface{}) (version, kind string) {
 	m := in.(*metaInsertion)
-	return m.JSONBase.APIVersion, m.JSONBase.Kind
+	return m.TypeMeta.APIVersion, m.TypeMeta.Kind
 }

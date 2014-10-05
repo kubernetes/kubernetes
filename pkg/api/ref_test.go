@@ -35,41 +35,43 @@ func TestGetReference(t *testing.T) {
 	}{
 		"pod": {
 			obj: &Pod{
-				JSONBase: JSONBase{
-					ID:              "foo",
-					ResourceVersion: 42,
+				Metadata: ObjectMeta{
+					Namespace:       "names",
+					Name:            "foo",
+					ResourceVersion: "42",
+					UID:             "uuid",
 					SelfLink:        "/api/v1beta1/pods/foo",
 				},
 			},
 			ref: &ObjectReference{
-				Kind:            "Pod",
 				APIVersion:      "v1beta1",
+				Kind:            "Pod",
+				Namespace:       "names",
 				Name:            "foo",
-				UID:             "foo",
-				ResourceVersion: 42,
+				UID:             "uuid",
+				ResourceVersion: "42",
 			},
 		},
 		"serviceList": {
 			obj: &ServiceList{
-				JSONBase: JSONBase{
-					ID:              "foo",
-					ResourceVersion: 42,
+				Metadata: ListMeta{
+					ResourceVersion: "42",
 					SelfLink:        "/api/v1beta2/services",
 				},
 			},
 			ref: &ObjectReference{
-				Kind:            "ServiceList",
 				APIVersion:      "v1beta2",
-				Name:            "foo",
-				UID:             "foo",
-				ResourceVersion: 42,
+				Kind:            "ServiceList",
+				Name:            "",
+				Namespace:       "",
+				UID:             "",
+				ResourceVersion: "42",
 			},
 		},
 		"badSelfLink": {
 			obj: &ServiceList{
-				JSONBase: JSONBase{
-					ID:              "foo",
-					ResourceVersion: 42,
+				Metadata: ListMeta{
+					ResourceVersion: "42",
 					SelfLink:        "v1beta2/services",
 				},
 			},
@@ -85,7 +87,7 @@ func TestGetReference(t *testing.T) {
 	for name, item := range table {
 		ref, err := GetReference(item.obj)
 		if e, a := item.shouldErr, (err != nil); e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
+			t.Errorf("%v: expected %v, got %v (%v)", name, e, a, err)
 			continue
 		}
 		if e, a := item.ref, ref; !reflect.DeepEqual(e, a) {

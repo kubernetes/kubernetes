@@ -20,9 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -42,6 +44,8 @@ type ListerWatcher interface {
 type Reflector struct {
 	// The type of object we expect to place in the store.
 	expectedType reflect.Type
+	// The interface for versioning objects.
+	versioner runtime.ResourceVersioner
 	// The destination to sync up with the watch source
 	store Store
 	// listerWatcher is used to perform lists and watches.
@@ -54,11 +58,12 @@ type Reflector struct {
 // NewReflector creates a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
 // only put things in the store that have the type of expectedType.
-func NewReflector(lw ListerWatcher, expectedType interface{}, store Store) *Reflector {
+func NewReflector(lw ListerWatcher, expectedType interface{}, versioner runtime.ResourceVersioner, store Store) *Reflector {
 	r := &Reflector{
 		listerWatcher: lw,
 		store:         store,
 		expectedType:  reflect.TypeOf(expectedType),
+		versioner:     versioner,
 		period:        time.Second,
 	}
 	return r
@@ -78,12 +83,11 @@ func (r *Reflector) listAndWatch() {
 		glog.Errorf("Failed to list %v: %v", r.expectedType, err)
 		return
 	}
-	jsonBase, err := runtime.FindJSONBase(list)
+	resourceVersion, err = r.versioner.ResourceVersion(list)
 	if err != nil {
-		glog.Errorf("Unable to understand list result %#v", list)
+		glog.Errorf("Unable to get resource version %#v (%v)", list, err)
 		return
 	}
-	resourceVersion = jsonBase.ResourceVersion()
 	items, err := runtime.ExtractList(list)
 	if err != nil {
 		glog.Errorf("Unable to understand list result %#v (%v)", list, err)
@@ -112,11 +116,12 @@ func (r *Reflector) listAndWatch() {
 func (r *Reflector) syncWith(items []runtime.Object) error {
 	found := map[string]interface{}{}
 	for _, item := range items {
-		jsonBase, err := runtime.FindJSONBase(item)
+		// TODO: replace with specialized interface for identity
+		objectMeta, err := meta.FindObjectMeta(item)
 		if err != nil {
 			return fmt.Errorf("unexpected item in list: %v", err)
 		}
-		found[jsonBase.ID()] = item
+		found[objectMeta.Name()] = item
 	}
 
 	r.store.Replace(found)
@@ -139,25 +144,34 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) err
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
 			continue
 		}
-		jsonBase, err := runtime.FindJSONBase(event.Object)
+		// TODO: replace with specialized interface for identity
+		objectMeta, err := meta.FindObjectMeta(event.Object)
 		if err != nil {
 			glog.Errorf("unable to understand watch event %#v", event)
 			continue
 		}
 		switch event.Type {
 		case watch.Added:
-			r.store.Add(jsonBase.ID(), event.Object)
+			r.store.Add(objectMeta.Name(), event.Object)
 		case watch.Modified:
-			r.store.Update(jsonBase.ID(), event.Object)
+			r.store.Update(objectMeta.Name(), event.Object)
 		case watch.Deleted:
 			// TODO: Will any consumers need access to the "last known
 			// state", which is passed in event.Object? If so, may need
 			// to change this.
-			r.store.Delete(jsonBase.ID())
+			r.store.Delete(objectMeta.Name())
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
-		*resourceVersion = jsonBase.ResourceVersion() + 1
+		// TODO: replace with generic behavior for watchers (watchAfter) rather than requring
+		// clients to know about incrementing resource version.
+		u, err := strconv.ParseUint(objectMeta.ResourceVersion(), 10, 64)
+		if err != nil {
+			*resourceVersion = 0
+			glog.Errorf("unable to understand watch resource version %v", objectMeta.ResourceVersion())
+			continue
+		}
+		*resourceVersion = u + 1
 		eventCount++
 	}
 

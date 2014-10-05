@@ -86,6 +86,11 @@ func NewScheme() *Scheme {
 	return s
 }
 
+// TODO: test only remove me
+func (s *Scheme) Log(log DebugLogger) {
+	s.converter.Debug = log
+}
+
 // nameFunc returns the name of the type that we wish to use for encoding. Defaults to
 // the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
