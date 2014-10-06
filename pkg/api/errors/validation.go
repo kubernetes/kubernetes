@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -105,30 +106,11 @@ func NewFieldNotFound(field string, value interface{}) ValidationError {
 // interface to avoid confusion where an empty ErrorList would still be an
 // error (non-nil).  To produce a single error instance from an ErrorList, use
 // the ToError() method, which will return nil for an empty ErrorList.
-type ErrorList []error
-
-// This helper implements the error interface for ErrorList, but prevents
-// accidental conversion of ErrorList to error.
-type errorListInternal ErrorList
-
-// Error is part of the error interface.
-func (list errorListInternal) Error() string {
-	if len(list) == 0 {
-		return ""
-	}
-	sl := make([]string, len(list))
-	for i := range list {
-		sl[i] = list[i].Error()
-	}
-	return strings.Join(sl, "; ")
-}
+type ErrorList util.ErrorList
 
 // ToError converts an ErrorList into a "normal" error, or nil if the list is empty.
 func (list ErrorList) ToError() error {
-	if len(list) == 0 {
-		return nil
-	}
-	return errorListInternal(list)
+	return util.ErrorList(list).ToError()
 }
 
 // Prefix adds a prefix to the Field of every ValidationError in the list. Returns
