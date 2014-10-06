@@ -85,8 +85,20 @@ func TestRunOnce(t *testing.T) {
 			}},
 		},
 		inspectContainersResults: []inspectContainersResult{
-			{label: "syncPod", container: docker.Container{State: docker.State{Running: true}}},
-			{label: "syncPod", container: docker.Container{State: docker.State{Running: true}}},
+			{
+				label: "syncPod",
+				container: docker.Container{
+					Config: &docker.Config{Image: "someimage"},
+					State:  docker.State{Running: true},
+				},
+			},
+			{
+				label: "syncPod",
+				container: docker.Container{
+					Config: &docker.Config{Image: "someimage"},
+					State:  docker.State{Running: true},
+				},
+			},
 		},
 		t: t,
 	}

@@ -31,8 +31,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-
-	"github.com/fsouza/go-dockerclient"
 )
 
 func expectApiStatusError(t *testing.T, ch <-chan runtime.Object, msg string) {
@@ -605,16 +603,17 @@ func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) 
 
 func TestFillPodInfo(t *testing.T) {
 	expectedIP := "1.2.3.4"
+	expectedTime, _ := time.Parse("2013-Feb-03", "2013-Feb-03")
 	fakeGetter := FakePodInfoGetter{
 		info: map[string]api.ContainerStatus{
 			"net": {
-				DetailInfo: docker.Container{
-					ID:   "foobar",
-					Path: "bin/run.sh",
-					NetworkSettings: &docker.NetworkSettings{
-						IPAddress: expectedIP,
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{
+						StartedAt: expectedTime,
 					},
 				},
+				RestartCount: 1,
+				PodIP:        expectedIP,
 			},
 		},
 	}
@@ -636,10 +635,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 	fakeGetter := FakePodInfoGetter{
 		info: map[string]api.ContainerStatus{
 			"net": {
-				DetailInfo: docker.Container{
-					ID:   "foobar",
-					Path: "bin/run.sh",
-				},
+				State: api.ContainerState{},
 			},
 		},
 	}

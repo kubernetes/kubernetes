@@ -47,12 +47,12 @@ function validate() {
       local template_string current_status current_image host_ip
       template_string="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
       current_status=$($KUBECFG -template="${template_string}" get "pods/$id")
-      if [[ "$current_status" != "{}" ]]; then
+      if [ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]; then
         echo "  $id is created but not running"
         continue
       fi
 
-      template_string="{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").DetailInfo.Config.Image}}"
+      template_string="{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Image}}"
       current_image=$($KUBECFG -template="${template_string}" get "pods/$id")
       if [[ "$current_image" != "${DOCKER_HUB_USER}/update-demo:${container_image_version}" ]]; then
         echo "  ${id} is created but running wrong image"
