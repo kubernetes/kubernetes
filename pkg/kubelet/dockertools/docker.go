@@ -275,7 +275,7 @@ var (
 	ErrNoContainersInPod = errors.New("no containers exist for this pod")
 
 	// ErrNoNetworkContainerInPod is returned when there is no network container for a given pod
-	ErrNoNetworkContainerInPod = errors.New("No network container exist for this pod")
+	ErrNoNetworkContainerInPod = errors.New("No network container exists for this pod")
 
 	// ErrContainerCannotRun is returned when a container is created, but cannot run properly
 	ErrContainerCannotRun = errors.New("Container cannot run")
@@ -292,8 +292,9 @@ func inspectContainer(client DockerInterface, dockerID, containerName string) (*
 	}
 
 	glog.V(3).Infof("Container: %s [%s] inspect result %+v", *inspectResult)
-	var containerStatus api.ContainerStatus
-	containerStatus.Image = inspectResult.Config.Image
+	containerStatus := api.ContainerStatus{
+		Image: inspectResult.Config.Image,
+	}
 
 	waiting := true
 	if inspectResult.State.Running {
@@ -377,19 +378,23 @@ func GetDockerPodInfo(client DockerInterface, manifest api.ContainerManifest, po
 			}
 
 			image := container.Image
-			containerStatus.State.Waiting = &api.ContainerStateWaiting{}
 			// Check image is ready on the node or not
 			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
 			_, err := client.InspectImage(image)
-			if err != nil && err == docker.ErrNoSuchImage {
-				if err == docker.ErrNoSuchImage {
-					containerStatus.State.Waiting.Reason = fmt.Sprintf("Image: %s is not ready on the node", image)
-				} else {
-					containerStatus.State.Waiting.Reason = err.Error()
+			if err == nil {
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{
+					Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
+				}
+			} else if err == docker.ErrNoSuchImage {
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{
+					Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
 				}
 			} else {
-				containerStatus.State.Waiting.Reason = fmt.Sprintf("Image: %s is ready, container is creating", image)
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{
+					Reason: err.Error(),
+				}
 			}
+
 			info[container.Name] = containerStatus
 		}
 	}

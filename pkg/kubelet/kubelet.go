@@ -771,8 +771,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 func (kl *Kubelet) GetPodInfo(podFullName, uuid string) (api.PodInfo, error) {
 	var manifest api.ContainerManifest
 	for _, pod := range kl.pods {
-		fullName := fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
-		if fullName == podFullName {
+		if GetPodFullName(&pod) == podFullName {
 			manifest = pod.Manifest
 			break
 		}
