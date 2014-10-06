@@ -223,9 +223,13 @@ func TestStoreToMinionLister(t *testing.T) {
 	}
 	sml := storeToMinionLister{store}
 
-	got, err := sml.List()
+	gotNodes, err := sml.List()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+	got := make([]string, len(gotNodes.Items))
+	for ix := range gotNodes.Items {
+		got[ix] = gotNodes.Items[ix].ID
 	}
 	if !ids.HasAll(got...) || len(got) != len(ids) {
 		t.Errorf("Expected %v, got %v", ids, got)

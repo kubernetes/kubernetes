@@ -43,8 +43,8 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 	}
 
 	result := []HostPriority{}
-	for _, minion := range minions {
-		result = append(result, HostPriority{host: minion, score: counts[minion]})
+	for _, minion := range minions.Items {
+		result = append(result, HostPriority{host: minion.ID, score: counts[minion.ID]})
 	}
 	return result, nil
 }

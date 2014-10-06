@@ -63,18 +63,18 @@ func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, er
 	return hosts[ix], nil
 }
 
-func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes []string) ([]string, error) {
-	filtered := []string{}
+func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes api.MinionList) (api.MinionList, error) {
+	filtered := []api.Minion{}
 	machineToPods, err := MapPodsToMachines(podLister)
 	if err != nil {
-		return nil, err
+		return api.MinionList{}, err
 	}
-	for _, node := range nodes {
+	for _, node := range nodes.Items {
 		fits := true
 		for _, predicate := range predicates {
-			fit, err := predicate(pod, machineToPods[node], node)
+			fit, err := predicate(pod, machineToPods[node.ID], node.ID)
 			if err != nil {
-				return nil, err
+				return api.MinionList{}, err
 			}
 			if !fit {
 				fits = false
@@ -85,7 +85,7 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicat
 			filtered = append(filtered, node)
 		}
 	}
-	return filtered, nil
+	return api.MinionList{Items: filtered}, nil
 }
 
 func getMinHosts(list HostPriorityList) []string {
@@ -109,9 +109,9 @@ func EqualPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) 
 		fmt.Errorf("failed to list nodes: %v", err)
 		return []HostPriority{}, err
 	}
-	for _, minion := range nodes {
+	for _, minion := range nodes.Items {
 		result = append(result, HostPriority{
-			host:  minion,
+			host:  minion.ID,
 			score: 1,
 		})
 	}
