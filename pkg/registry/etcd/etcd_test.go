@@ -1053,11 +1053,11 @@ func TestEtcdListMinions(t *testing.T) {
 	}
 }
 
-func TestEtcdInsertMinion(t *testing.T) {
+func TestEtcdCreateMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
-	err := registry.InsertMinion(ctx, &api.Minion{
+	err := registry.CreateMinion(ctx, &api.Minion{
 		JSONBase: api.JSONBase{ID: "foo"},
 	})
 	if err != nil {

@@ -55,7 +55,7 @@ func (r CloudRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	return fmt.Errorf("unsupported")
 }
 
-func (r CloudRegistry) InsertMinion(ctx api.Context, minion *api.Minion) error {
+func (r CloudRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	return fmt.Errorf("unsupported")
 }
 

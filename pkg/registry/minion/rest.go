@@ -52,7 +52,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	minion.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.InsertMinion(ctx, minion)
+		err := rs.registry.CreateMinion(ctx, minion)
 		if err != nil {
 			return nil, err
 		}

@@ -62,8 +62,8 @@ func (r *HealthyRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	return r.delegate.DeleteMinion(ctx, minionID)
 }
 
-func (r *HealthyRegistry) InsertMinion(ctx api.Context, minion *api.Minion) error {
-	return r.delegate.InsertMinion(ctx, minion)
+func (r *HealthyRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+	return r.delegate.CreateMinion(ctx, minion)
 }
 
 func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.MinionList, err error) {

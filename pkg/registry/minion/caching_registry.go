@@ -81,8 +81,8 @@ func (r *CachingRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	return r.refresh(ctx, true)
 }
 
-func (r *CachingRegistry) InsertMinion(ctx api.Context, minion *api.Minion) error {
-	if err := r.delegate.InsertMinion(ctx, minion); err != nil {
+func (r *CachingRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+	if err := r.delegate.CreateMinion(ctx, minion); err != nil {
 		return err
 	}
 	return r.refresh(ctx, true)

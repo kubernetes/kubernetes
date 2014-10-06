@@ -113,7 +113,7 @@ func makeMinionRegistry(c *Config) minion.Registry {
 	if minionRegistry == nil {
 		minionRegistry = etcd.NewRegistry(c.EtcdHelper, nil)
 		for _, minionID := range c.Minions {
-			minionRegistry.InsertMinion(nil, &api.Minion{
+			minionRegistry.CreateMinion(nil, &api.Minion{
 				JSONBase:      api.JSONBase{ID: minionID},
 				NodeResources: c.NodeResources,
 			})

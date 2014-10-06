@@ -52,7 +52,7 @@ func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 	return &r.Minions, r.Err
 }
 
-func (r *MinionRegistry) InsertMinion(ctx api.Context, minion *api.Minion) error {
+func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Minion = minion.ID

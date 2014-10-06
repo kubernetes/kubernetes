@@ -94,7 +94,7 @@ func TestCachingInsert(t *testing.T) {
 		lastUpdate: fakeClock.Now().Unix(),
 		nodes:      expected,
 	}
-	err := cache.InsertMinion(ctx, &api.Minion{
+	err := cache.CreateMinion(ctx, &api.Minion{
 		JSONBase: api.JSONBase{ID: "foo"},
 	})
 	if err != nil {

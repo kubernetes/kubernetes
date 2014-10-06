@@ -54,7 +54,7 @@ func TestBasicDelegation(t *testing.T) {
 	if !reflect.DeepEqual(list, &mockMinionRegistry.Minions) {
 		t.Errorf("Expected %v, Got %v", mockMinionRegistry.Minions, list)
 	}
-	err = healthy.InsertMinion(ctx, &api.Minion{
+	err = healthy.CreateMinion(ctx, &api.Minion{
 		JSONBase: api.JSONBase{ID: "foo"},
 	})
 	if err != nil {

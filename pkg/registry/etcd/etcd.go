@@ -392,7 +392,7 @@ func (r *Registry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 	return minions, err
 }
 
-func (r *Registry) InsertMinion(ctx api.Context, minion *api.Minion) error {
+func (r *Registry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	err := r.CreateObj(makeMinionKey(minion.ID), minion, 0)
 	return etcderr.InterpretCreateError(err, "minion", minion.ID)
 }
