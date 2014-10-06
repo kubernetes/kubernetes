@@ -219,6 +219,11 @@ func (s *Scheme) New(versionName, typeName string) (Object, error) {
 	return obj.(Object), nil
 }
 
+// Log sets a logger on the scheme. For test purposes only
+func (s *Scheme) Log(l conversion.DebugLogger) {
+	s.raw.Log(l)
+}
+
 // AddConversionFuncs adds a function to the list of conversion functions. The given
 // function should know how to convert between two API objects. We deduce how to call
 // it from the types of its two parameters; see the comment for Converter.Register.

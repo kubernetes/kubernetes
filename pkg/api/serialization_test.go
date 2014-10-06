@@ -146,6 +146,20 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	}
 }
 
+// For debugging problems
+func TestSpecificKind(t *testing.T) {
+	api.Scheme.Log(t)
+	kind := "PodList"
+	item, err := api.Scheme.New("", kind)
+	if err != nil {
+		t.Errorf("Couldn't make a %v? %v", kind, err)
+		return
+	}
+	runTest(t, v1beta1.Codec, item)
+	runTest(t, v1beta2.Codec, item)
+	api.Scheme.Log(nil)
+}
+
 func TestTypes(t *testing.T) {
 	for kind := range api.Scheme.KnownTypes("") {
 		// Try a few times, since runTest uses random values.
