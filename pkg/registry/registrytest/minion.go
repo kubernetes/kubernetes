@@ -76,7 +76,7 @@ func (r *MinionRegistry) Delete(minion string) error {
 	var newList []api.Minion
 	for _, node := range r.Minions.Items {
 		if node.ID != minion {
-			newList = append(newList, api.Minion{JSONBase: api.JSONBase{ID: minion}})
+			newList = append(newList, api.Minion{JSONBase: api.JSONBase{ID: node.ID}})
 		}
 	}
 	r.Minions.Items = newList
