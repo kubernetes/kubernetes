@@ -17,4 +17,4 @@
 {% endif %}
 
 
-DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}} {{address}} {{config}} --allow_privileged {{pillar['allow_privileged']}}"
+DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}}"
