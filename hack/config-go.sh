@@ -160,6 +160,7 @@ kube::default_build_targets() {
   echo "cmd/e2e"
   echo "cmd/kubelet"
   echo "cmd/kubecfg"
+  echo "cmd/kubectl"
   echo "plugin/cmd/scheduler"
 }
 
