@@ -47,11 +47,11 @@ type Server struct {
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address string, port uint) {
+func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address net.IP, port uint) {
 	glog.V(1).Infof("Starting to listen on %s:%d", address, port)
 	handler := NewServer(host, updates)
 	s := &http.Server{
-		Addr:           net.JoinHostPort(address, strconv.FormatUint(uint64(port), 10)),
+		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,

@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"net"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -32,13 +33,14 @@ import (
 var (
 	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
 	etcdServerList util.StringList
-	bindAddress    = flag.String("bindaddress", "0.0.0.0", "The address for the proxy server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
+	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
 	clientConfig   = &client.Config{}
 )
 
 func init() {
 	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional)")
+	flag.Var(&bindAddress, "bind_address", "The address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 }
 
 func main() {
@@ -85,7 +87,7 @@ func main() {
 	glog.Infof("Using configuration file %s", *configFile)
 
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, *bindAddress)
+	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress))
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services

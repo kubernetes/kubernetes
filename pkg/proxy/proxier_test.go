@@ -144,7 +144,7 @@ func TestTCPProxy(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -162,7 +162,7 @@ func TestUDPProxy(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -189,7 +189,7 @@ func TestTCPProxyStop(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -217,7 +217,7 @@ func TestUDPProxyStop(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -245,7 +245,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -272,7 +272,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -299,7 +299,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -331,7 +331,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -363,7 +363,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -408,7 +408,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
