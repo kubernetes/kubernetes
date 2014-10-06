@@ -21,6 +21,7 @@ base:
     - match: grain
     - golang
     - etcd
+    - etcdctl
     - apiserver
     - controller-manager
     - scheduler
