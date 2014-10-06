@@ -34,6 +34,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 )
@@ -621,15 +622,23 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	}
 }
 
-// Inject into master an authorizer that uses namespace information.
-// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
-type allowFooNamespaceAuthorizer struct{}
-
-func (allowFooNamespaceAuthorizer) Authorize(a authorizer.Attributes) error {
-	if a.GetNamespace() == "foo" {
-		return nil
+func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authorizer {
+	f, err := ioutil.TempFile("", "auth_test")
+	if err != nil {
+		t.Fatalf("unexpected error creating policyfile: %v", err)
 	}
-	return errors.New("I can't allow that.  Try another namespace, buddy.")
+	f.Close()
+	defer os.Remove(f.Name())
+
+	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+		t.Fatalf("unexpected error writing policyfile: %v", err)
+	}
+
+	pl, err := abac.NewFromFile(f.Name())
+	if err != nil {
+		t.Fatalf("unexpected error creating authorizer from policyfile: %v", err)
+	}
+	return pl
 }
 
 // TestNamespaceAuthorization tests that authorization can be controlled
@@ -641,13 +650,13 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
-	// Set up a master
-
 	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	a := newAuthorizerWithContents(t, `{"namespace": "foo"}
+`)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
@@ -655,7 +664,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		TokenAuthFile:     tokenFilename,
-		Authorizer:        allowFooNamespaceAuthorizer{},
+		Authorizer:        a,
 	})
 
 	s := httptest.NewServer(m.Handler)
@@ -706,17 +715,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 	}
 }
 
-// Inject into master an authorizer that uses kind information.
-// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
-type allowServicesAuthorizer struct{}
-
-func (allowServicesAuthorizer) Authorize(a authorizer.Attributes) error {
-	if a.GetKind() == "services" {
-		return nil
-	}
-	return errors.New("I can't allow that.  Hint: try services.")
-}
-
 // TestKindAuthorization tests that authorization can be controlled
 // by namespace.
 func TestKindAuthorization(t *testing.T) {
@@ -733,6 +731,8 @@ func TestKindAuthorization(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	a := newAuthorizerWithContents(t, `{"kind": "services"}
+`)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
@@ -740,7 +740,7 @@ func TestKindAuthorization(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		TokenAuthFile:     tokenFilename,
-		Authorizer:        allowServicesAuthorizer{},
+		Authorizer:        a,
 	})
 
 	s := httptest.NewServer(m.Handler)
@@ -786,17 +786,6 @@ func TestKindAuthorization(t *testing.T) {
 	}
 }
 
-// Inject into master an authorizer that uses ReadOnly information.
-// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
-type allowReadAuthorizer struct{}
-
-func (allowReadAuthorizer) Authorize(a authorizer.Attributes) error {
-	if a.IsReadOnly() {
-		return nil
-	}
-	return errors.New("I'm afraid I can't let you do that.")
-}
-
 // TestReadOnlyAuthorization tests that authorization can be controlled
 // by namespace.
 func TestReadOnlyAuthorization(t *testing.T) {
@@ -813,6 +802,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	a := newAuthorizerWithContents(t, `{"readonly": true}
+`)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
@@ -820,7 +811,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		TokenAuthFile:     tokenFilename,
-		Authorizer:        allowReadAuthorizer{},
+		Authorizer:        a,
 	})
 
 	s := httptest.NewServer(m.Handler)

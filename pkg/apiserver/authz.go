@@ -20,6 +20,7 @@ import (
 	"errors"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
 )
 
 // Attributes implements authorizer.Attributes interface.
@@ -56,20 +57,26 @@ func NewAlwaysDenyAuthorizer() authorizer.Authorizer {
 const (
 	ModeAlwaysAllow string = "AlwaysAllow"
 	ModeAlwaysDeny  string = "AlwaysDeny"
+	ModeABAC        string = "ABAC"
 )
 
 // Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of authorizer.Authorizer
 // based on the authorizationMode xor an error.  authorizationMode should be one of AuthorizationModeChoices.
-func NewAuthorizerFromAuthorizationConfig(authorizationMode string) (authorizer.Authorizer, error) {
+func NewAuthorizerFromAuthorizationConfig(authorizationMode string, authorizationPolicyFile string) (authorizer.Authorizer, error) {
+	if authorizationPolicyFile != "" && authorizationMode != "ABAC" {
+		return nil, errors.New("Cannot specify --authorization_policy_file without mode ABAC")
+	}
 	// Keep cases in sync with constant list above.
 	switch authorizationMode {
 	case ModeAlwaysAllow:
 		return NewAlwaysAllowAuthorizer(), nil
 	case ModeAlwaysDeny:
 		return NewAlwaysDenyAuthorizer(), nil
+	case ModeABAC:
+		return abac.NewFromFile(authorizationPolicyFile)
 	default:
 		return nil, errors.New("Unknown authorization mode")
 	}

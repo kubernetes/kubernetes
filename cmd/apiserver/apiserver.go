@@ -57,21 +57,22 @@ var (
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
 		"read-only address. It is assumed that firewall rules are set up such that "+
 		"this port is not reachable from outside of the cluster.")
-	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
-	storageVersion        = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
-	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
-	cloudConfigFile       = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
-	eventTTL              = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
-	tokenAuthFile         = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication.")
-	authorizationMode     = flag.String("authorization_mode", "AlwaysAllow", "Selects how to do authorization.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
-	etcdServerList        util.StringList
-	etcdConfigFile        = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
-	corsAllowedOriginList util.StringList
-	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
-	portalNet             util.IPNet // TODO: make this a list
-	enableLogsSupport     = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
-	kubeletConfig         = client.KubeletConfig{
+	apiPrefix               = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
+	storageVersion          = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
+	cloudProvider           = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	cloudConfigFile         = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	healthCheckMinions      = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
+	eventTTL                = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
+	tokenAuthFile           = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication.")
+	authorizationMode       = flag.String("authorization_mode", "AlwaysAllow", "Selects how to do authorization.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
+	authorizationPolicyFile = flag.String("authorization_policy_file", "", "File with authorization policy in csv format, used with --authorization_mode=ABAC.")
+	etcdServerList          util.StringList
+	etcdConfigFile          = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
+	corsAllowedOriginList   util.StringList
+	allowPrivileged         = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
+	portalNet               util.IPNet // TODO: make this a list
+	enableLogsSupport       = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
+	kubeletConfig           = client.KubeletConfig{
 		Port:        10250,
 		EnableHttps: false,
 	}
@@ -146,7 +147,7 @@ func main() {
 
 	n := net.IPNet(portalNet)
 
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(*authorizationMode)
+	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(*authorizationMode, *authorizationPolicyFile)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}
