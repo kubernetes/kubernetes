@@ -16,8 +16,9 @@
 
 # Tear down a Kubernetes cluster.
 
-# exit on any error
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"

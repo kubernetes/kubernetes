@@ -19,6 +19,10 @@
 # This makes the docker build image, builds the cross binaries and copies them
 # out of the docker container.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "$KUBE_ROOT/build/common.sh"
 

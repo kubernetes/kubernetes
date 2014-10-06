@@ -20,8 +20,9 @@
 # that directly.  If not then we assume we are doing development stuff and take
 # the defaults in the release config.
 
-# exit on any error
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
@@ -44,13 +45,15 @@ fi
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
     count=$(grep -c ${MINION_NAMES[i]} ${MINIONS_FILE}) || :
-    if [ "$count" == "0" ]; then
+    if [[ "$count" == "0" ]]; then
         echo "Failed to find ${MINION_NAMES[i]}, cluster is probably broken."
         exit 1
     fi
 
     # Make sure the kubelet is healthy
-    if [ "$(curl -s --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz)" != "ok" ]; then
+    curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
+        "https://${KUBE_MASTER_IP}/proxy/minion/${MINION_NAMES[$i]}/healthz")
+    if [[ "${curl_output}" != "ok" ]]; then
         echo "Kubelet failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
         echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
         exit 1

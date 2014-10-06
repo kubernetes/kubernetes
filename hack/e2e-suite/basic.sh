@@ -17,9 +17,11 @@
 # Launches an nginx container and verifies it can be reached. Assumes that
 # we're being called by hack/e2e-test.sh (we use some env vars it sets up).
 
-# Exit on error
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
@@ -41,17 +43,17 @@ function teardown() {
 
 trap "teardown" EXIT
 
-POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=myNginx list pods)
+pod_id_list=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=myNginx list pods)
 # Container turn up on a clean cluster can take a while for the docker image pull.
-ALL_RUNNING=0
-while [ $ALL_RUNNING -ne 1 ]; do
+all_running=0
+while [[ $all_running -ne 1 ]]; do
   echo "Waiting for all containers in pod to come up."
   sleep 5
-  ALL_RUNNING=1
-  for id in $POD_ID_LIST; do
-    CURRENT_STATUS=$($KUBECFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id)
-    if [ "$CURRENT_STATUS" != "{0001-01-01 00:00:00 +0000 UTC}" ]; then
-      ALL_RUNNING=0
+  all_running=1
+  for id in $pod_id_list; do
+    current_status=$($KUBECFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id) || true
+    if [[ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]]; then
+      all_running=0
     fi
   done
 done
@@ -65,9 +67,9 @@ sleep 5
 
 # Verify that something is listening (nginx should give us a 404)
 for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
-  IP_ADDRESS=${KUBE_MINION_IP_ADDRESSES[$i]}
-  echo "Trying to reach nginx instance that should be running at ${IP_ADDRESS}:8080..."
-  curl "http://${IP_ADDRESS}:8080"
+  ip_address=${KUBE_MINION_IP_ADDRESSES[$i]}
+  echo "Trying to reach nginx instance that should be running at ${ip_address}:8080..."
+  curl "http://${ip_address}:8080"
 done
 
 exit 0

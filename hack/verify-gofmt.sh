@@ -16,6 +16,11 @@
 
 # GoFmt apparently is changing @ head...
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
+
 GO_VERSION=($(go version))
 
 if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3') ]]; then

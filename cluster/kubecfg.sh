@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
@@ -22,34 +26,36 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 case "$(uname -s)" in
   Darwin)
     host_os=darwin
-  ;;
+    ;;
   Linux)
     host_os=linux
-  ;;
+    ;;
   *)
     echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
     exit 1
+    ;;
 esac
 
 case "$(uname -m)" in
   x86_64*)
     host_arch=amd64
-  ;;
+    ;;
   i?86_64*)
     host_arch=amd64
-  ;;
+    ;;
   amd64*)
     host_arch=amd64
-  ;;
+    ;;
   arm*)
     host_arch=arm
-  ;;
+    ;;
   i?86*)
     host_arch=x86
-  ;;
+    ;;
   *)
-  echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
-  exit 1
+    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+    exit 1
+    ;;
 esac
 
 kubecfg="${KUBE_ROOT}/_output/build/${host_os}/${host_arch}/kubecfg"
@@ -84,8 +90,8 @@ else
 fi
 
 detect-master > /dev/null
-if [[ "$KUBE_MASTER_IP" != "" ]] && [[ "$KUBERNETES_MASTER" == "" ]]; then
+if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
   export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
 fi
 
-"$kubecfg" "${auth_config[@]}" "$@"
+"$kubecfg" "${auth_config[@]:+${auth_config[@]}}" "$@"

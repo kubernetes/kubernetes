@@ -17,7 +17,9 @@
 # This script will build a dev release and bring up a new cluster with that
 # release.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 

@@ -199,6 +199,7 @@ export KUBE_GO_PACKAGE
   set -o errexit
   set -o nounset
   set -o pipefail
+
   go_pkg_dir="${KUBE_TARGET}/src/${KUBE_GO_PACKAGE}"
   go_pkg_basedir=$(dirname "${go_pkg_dir}")
   mkdir -p "${go_pkg_basedir}"

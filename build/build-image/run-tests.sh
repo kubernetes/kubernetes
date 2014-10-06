@@ -14,14 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/build/build-image/common.sh"
 
 echo "+++ Running unit tests"
 
-if [[ -n "$1" ]]; then
+if [[ -n "${1-}" ]]; then
   godep go test -cover -coverprofile=tmp.out "$KUBE_GO_PACKAGE/$1"
   exit 0
 fi

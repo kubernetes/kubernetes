@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_COVER=" " KUBE_RACE=" " hack/test-go.sh "" -test.run="^X" -benchtime=1s -bench=. -benchmem

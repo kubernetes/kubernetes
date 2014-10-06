@@ -16,7 +16,9 @@
 
 # This script installs std -race on Travis (see https://code.google.com/p/go/issues/detail?id=6479)
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 if [ "${TRAVIS}" == "true" ]; then
   GO_VERSION=($(go version))

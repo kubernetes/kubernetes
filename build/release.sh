@@ -18,6 +18,10 @@
 # images and other build artifacts.  All intermediate artifacts will be hosted
 # publicly on Google Cloud Storage currently.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "$KUBE_ROOT/build/common.sh"
 

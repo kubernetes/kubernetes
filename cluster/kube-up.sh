@@ -20,8 +20,9 @@
 # that directly.  If not then we assume we are doing development stuff and take
 # the defaults in the release config.
 
-# exit on any error
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"

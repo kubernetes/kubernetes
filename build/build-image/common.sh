@@ -46,18 +46,20 @@ function kube::build::make_binary() {
 }
 
 function kube::build::make_binaries() {
-  if [[ ${#targets[@]} -eq 0 ]]; then
-    targets=(
-      cmd/proxy
-      cmd/apiserver
-      cmd/controller-manager
-      cmd/kubelet
-      cmd/kubecfg
-      plugin/cmd/scheduler
-    )
+  local -a targets=(
+    cmd/proxy
+    cmd/apiserver
+    cmd/controller-manager
+    cmd/kubelet
+    cmd/kubecfg
+    plugin/cmd/scheduler
+  )
+
+  if [[ -n "${1-}" ]]; then
+    targets=("$1")
   fi
 
-  binaries=()
+  local -a binaries=()
   local target
   for target in "${targets[@]}"; do
     binaries+=("${KUBE_GO_PACKAGE}/${target}")
@@ -65,11 +67,6 @@ function kube::build::make_binaries() {
 
   ARCH_TARGET="${KUBE_TARGET}/${GOOS}/${GOARCH}"
   mkdir -p "${ARCH_TARGET}"
-
-  if [[ -n "$1" ]]; then
-    kube::build::make_binary "$1"
-    exit 0
-  fi
 
   local b
   for b in "${binaries[@]}"; do

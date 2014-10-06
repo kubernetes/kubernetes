@@ -53,7 +53,7 @@ readonly LOCAL_OUTPUT_BUILD="${LOCAL_OUTPUT_ROOT}/build"
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_DIR="${REMOTE_OUTPUT_ROOT}/build"
 readonly DOCKER_CONTAINER_NAME=kube-build
-readonly DOCKER_MOUNT="-v ${LOCAL_OUTPUT_BUILD}:${REMOTE_OUTPUT_DIR}"
+readonly DOCKER_MOUNT_ARGS=(--volume "${LOCAL_OUTPUT_BUILD}:${REMOTE_OUTPUT_DIR}")
 
 readonly KUBE_CLIENT_BINARIES=(
   kubecfg
@@ -114,6 +114,7 @@ function kube::build::verify_prereqs() {
     echo "  - On Mac OS X, boot2docker VM isn't started" >&2
     echo "  - On Mac OS X, DOCKER_HOST env variable isn't set approriately" >&2
     echo "  - On Linux, user isn't in 'docker' group.  Add and relogin." >&2
+    echo "    Something like 'sudo usermod -a -G docker ${USER-user}'" >&2
     echo "  - On Linux, Docker daemon hasn't been started or has crashed" >&2
     return 1
   fi
@@ -207,25 +208,23 @@ function kube::build::run_image() {
 function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
-  local -r build_cmd="docker build -t ${image} ${context_dir}"
+  local -ra build_cmd=(docker build -t "${image}" "${context_dir}")
 
   echo "+++ Building Docker image ${image}. This can take a while."
-  set +e # We are handling the error here manually
   local docker_output
-  docker_output=$(${build_cmd} 2>&1)
-  if [[ $? -ne 0 ]]; then
-    set -e
-    echo "+++ Docker build command failed for ${image}" >&2
-    echo >&2
-    echo "${docker_output}" >&2
-    echo >&2
-    echo "To retry manually, run:" >&2
-    echo >&2
-    echo "  ${build_cmd}" >&2
-    echo >&2
+  docker_output=$("${build_cmd[@]}" 2>&1) || {
+    cat <<EOF >&2
++++ Docker build command failed for ${image}
+
+${docker_output}
+
+To retry manually, run:
+
+${build_cmd[*]}
+
+EOF
     return 1
-  fi
-  set -e
+  }
 }
 
 function kube::build::clean_image() {
@@ -252,18 +251,21 @@ function kube::build::clean_images() {
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
 function kube::build::run_build_command() {
-  [[ -n "$@" ]] || { echo "Invalid input." >&2; return 4; }
+  [[ $# != 0 ]] || { echo "Invalid input." >&2; return 4; }
 
-  local -r docker="docker run --name=${DOCKER_CONTAINER_NAME} --attach=stdout --attach=stderr --attach=stdin --tty ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+  local -ra docker_cmd=(
+    docker run "--name=${DOCKER_CONTAINER_NAME}"
+    --interactive --tty
+    "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
 
   # Remove the container if it is left over from some previous aborted run
-  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
-  ${docker} "$@"
+  docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  "${docker_cmd[@]}" "$@"
 
   # Remove the container after we run.  '--rm' might be appropriate but it
   # appears that sometimes it fails. See
   # https://github.com/docker/docker/issues/3968
-  docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
+  docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
 }
 
 # If the Docker server is remote, copy the results back out.
@@ -278,21 +280,23 @@ function kube::build::copy_output() {
     # The easiest thing I (jbeda) could figure out was to launch another
     # container pointed at the same volume, tar the output directory and ship
     # that tar over stdou.
-    local -r docker="docker run -a stdout --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+    local -ra docker_cmd=(
+      docker run -a stdout "--name=${DOCKER_CONTAINER_NAME}"
+      "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
 
     # Kill any leftover container
-    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
+    docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
     echo "+++ Syncing back _output directory from boot2docker VM"
     rm -rf "${LOCAL_OUTPUT_BUILD}"
     mkdir -p "${LOCAL_OUTPUT_BUILD}"
-    ${docker} sh -c "tar c -C ${REMOTE_OUTPUT_DIR} . ; sleep 1"  \
+    "${docker_cmd[@]}" sh -c "tar c -C ${REMOTE_OUTPUT_DIR} . ; sleep 1"  \
       | tar xv -C "${LOCAL_OUTPUT_BUILD}"
 
     # Remove the container after we run.  '--rm' might be appropriate but it
     # appears that sometimes it fails. See
     # https://github.com/docker/docker/issues/3968
-    docker rm ${DOCKER_CONTAINER_NAME} >/dev/null 2>&1 || true
+    docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
     # I (jbeda) also tried getting rsync working using 'docker run' as the
     # 'remote shell'.  This mostly worked but there was a hang when
@@ -440,7 +444,7 @@ function kube::release::gcs::verify_prereqs() {
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
     GCLOUD_ACCOUNT=$(gcloud auth list 2>/dev/null | awk '/(active)/ { print $2 }')
   fi
-  if [[ -z "${GCLOUD_ACCOUNT}" ]]; then
+  if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
     echo
     echo "  gcloud auth login"
@@ -450,7 +454,7 @@ function kube::release::gcs::verify_prereqs() {
   if [[ -z "${GCLOUD_PROJECT-}" ]]; then
     GCLOUD_PROJECT=$(gcloud config list project | awk '{project = $3} END {print project}')
   fi
-  if [[ -z "${GCLOUD_PROJECT}" ]]; then
+  if [[ -z "${GCLOUD_PROJECT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
     echo
     echo "  gcloud config set project <project id>"
@@ -471,9 +475,9 @@ function kube::release::gcs::ensure_release_bucket() {
   KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel/}
   KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg/}
 
-  if ! gsutil ls gs://${KUBE_GCS_RELEASE_BUCKET} >/dev/null 2>&1 ; then
+  if ! gsutil ls "gs://${KUBE_GCS_RELEASE_BUCKET}" >/dev/null 2>&1 ; then
     echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
-    gsutil mb gs://${KUBE_GCS_RELEASE_BUCKET}
+    gsutil mb "gs://${KUBE_GCS_RELEASE_BUCKET}"
   fi
 }
 
@@ -487,7 +491,8 @@ function kube::release::gcs::ensure_docker_registry() {
 
   # Grovel around and find the OAuth token in the gcloud config
   local -r boto=~/.config/gcloud/legacy_credentials/${GCLOUD_ACCOUNT}/.boto
-  local -r refresh_token=$(grep 'gs_oauth2_refresh_token =' $boto | awk '{ print $3 }')
+  local refresh_token
+  refresh_token=$(grep 'gs_oauth2_refresh_token =' "$boto" | awk '{ print $3 }')
 
   if [[ -z "$refresh_token" ]]; then
     echo "Couldn't find OAuth 2 refresh token in ${boto}" >&2
@@ -498,14 +503,16 @@ function kube::release::gcs::ensure_docker_registry() {
   docker rm ${reg_container_name} >/dev/null 2>&1 || true
 
   echo "+++ Starting GCS backed Docker registry"
-  local docker="docker run -d --name=${reg_container_name} "
-  docker+="-e GCS_BUCKET=${KUBE_GCS_RELEASE_BUCKET} "
-  docker+="-e STORAGE_PATH=${KUBE_GCS_DOCKER_REG_PREFIX} "
-  docker+="-e GCP_OAUTH2_REFRESH_TOKEN=${refresh_token} "
-  docker+="-p 127.0.0.1:5000:5000 "
-  docker+="google/docker-registry"
+  local -ra docker_cmd=(
+    docker run -d "--name=${reg_container_name}"
+    -e "GCS_BUCKET=${KUBE_GCS_RELEASE_BUCKET}"
+    -e "STORAGE_PATH=${KUBE_GCS_DOCKER_REG_PREFIX}"
+    -e "GCP_OAUTH2_REFRESH_TOKEN=${refresh_token}"
+    -p 127.0.0.1:5000:5000
+    google/docker-registry
+  )
 
-  ${docker}
+  "${docker[@]}"
 
   # Give it time to spin up before we start throwing stuff at it
   sleep 5

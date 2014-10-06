@@ -17,6 +17,10 @@
 # Starts a Kubernetes cluster, runs the e2e test suite, and shuts it
 # down.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 # Use testing config
 export KUBE_CONFIG_FILE="config-test.sh"
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
@@ -33,9 +37,6 @@ source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 ALREADY_UP=${1:-0}
 LEAVE_UP=${2:-0}
 TEAR_DOWN=${3:-0}
-
-# Exit on error
-set -e
 
 if [[ $TEAR_DOWN -ne 0 ]]; then
   detect-project

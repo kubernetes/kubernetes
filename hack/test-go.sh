@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/config-go.sh"
@@ -138,7 +139,7 @@ if [[ "${iterations}" -gt 1 ]]; then
   fi
 fi
 
-if [[ -n "$1" ]]; then
+if [[ -n "${1-}" ]]; then
   covdir="/tmp/k8s_coverage/$(date "+%s")"
   echo saving coverage output in "${covdir}"
   for arg; do

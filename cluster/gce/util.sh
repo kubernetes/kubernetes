@@ -23,12 +23,25 @@ source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 # Verify prereqs
 function verify-prereqs {
-  for x in gcloud gcutil gsutil; do
-    if [ "$(which $x)" == "" ]; then
-      echo "Can't find $x in PATH, please fix and retry."
+  local cmd
+  for cmd in gcloud gcutil gsutil; do
+    which "${cmd}" >/dev/null || {
+      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
+      echo "SDK can be downloaded from https://cloud.google.com/sdk/."
       exit 1
-    fi
+    }
   done
+}
+
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+function ensure-temp-dir {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  fi
 }
 
 # Verify and find the various tar files that we are going to use on the server.
@@ -62,12 +75,13 @@ function find-release-tars {
 # Vars set:
 #   PROJECT
 function detect-project () {
-  if [ -z "$PROJECT" ]; then
+  if [[ -z "${PROJECT-}" ]]; then
     PROJECT=$(gcloud config list project | tail -n 1 | cut -f 3 -d ' ')
   fi
 
-  if [ -z "$PROJECT" ]; then
-    echo "Could not detect Google Cloud Platform project.  Set the default project using 'gcloud config set project <PROJECT>'" 1>&2
+  if [[ -z "${PROJECT-}" ]]; then
+    echo "Could not detect Google Cloud Platform project.  Set the default project using " >&2
+    echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
   echo "Project: $PROJECT (autodetected from gcloud config)"
@@ -126,15 +140,15 @@ function detect-minions () {
     local minion_ip=$(gcutil listinstances --format=csv --sort=external-ip \
       --columns=external-ip --zone ${ZONE} --filter="name eq ${MINION_NAMES[$i]}" \
       | tail -n '+2' | tail -n 1)
-    if [ -z "$minion_ip" ] ; then
-      echo "Did not find ${MINION_NAMES[$i]}" 1>&2
+    if [[ -z "${minion_ip-}" ]] ; then
+      echo "Did not find ${MINION_NAMES[$i]}" >&2
     else
       echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
       KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
     fi
   done
-  if [ -z "$KUBE_MINION_IP_ADDRESSES" ]; then
-    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
+  if [[ -z "${KUBE_MINION_IP_ADDRESSES-}" ]]; then
+    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
 }
@@ -149,14 +163,14 @@ function detect-minions () {
 #   KUBE_MASTER_IP
 function detect-master () {
   KUBE_MASTER=${MASTER_NAME}
-  if [ -z "$KUBE_MASTER_IP" ]; then
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     # gcutil will print the "external-ip" column header even if no instances are found
     KUBE_MASTER_IP=$(gcutil listinstances --format=csv --sort=external-ip \
       --columns=external-ip --zone ${ZONE} --filter="name eq ${MASTER_NAME}" \
       | tail -n '+2' | tail -n 1)
   fi
-  if [ -z "$KUBE_MASTER_IP" ]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" 1>&2
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
     exit 1
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
@@ -201,16 +215,15 @@ function kube-up {
   find-release-tars
   upload-server-tars
 
-  # Build up start up script for master
-  local kube_temp=$(mktemp -d -t kubernetes.XXXXXX)
-  trap 'rm -rf "${kube_temp}"' EXIT
+  ensure-temp-dir
 
   get-password
   python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-    -b -c "${kube_temp}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
-  local htpasswd=$(cat "${kube_temp}/htpasswd")
+    -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
+  local htpasswd
+  htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
-  if ! gcutil getnetwork "${NETWORK}"; then
+  if ! gcutil getnetwork "${NETWORK}" >/dev/null 2>&1; then
     echo "Creating new network for: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
@@ -232,12 +245,12 @@ function kube-up {
   fi
 
   echo "Starting VMs and configuring firewalls"
-  gcutil addfirewall ${MASTER_NAME}-https \
-    --project ${PROJECT} \
+  gcutil addfirewall "${MASTER_NAME}-https" \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-    --network ${NETWORK} \
-    --target_tags ${MASTER_TAG} \
+    --network "${NETWORK}" \
+    --target_tags "${MASTER_TAG}" \
     --allowed tcp:443 &
 
   (
@@ -251,67 +264,66 @@ function kube-up {
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
-  ) > "${kube_temp}/master-start.sh"
+  ) > "${KUBE_TEMP}/master-start.sh"
 
-  gcutil addinstance ${MASTER_NAME}\
-    --project ${PROJECT} \
+  gcutil addinstance "${MASTER_NAME}" \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-    --zone ${ZONE} \
-    --machine_type ${MASTER_SIZE} \
-    --image ${IMAGE} \
-    --tags ${MASTER_TAG} \
-    --network ${NETWORK} \
+    --zone "${ZONE}" \
+    --machine_type "${MASTER_SIZE}" \
+    --image "${IMAGE}" \
+    --tags "${MASTER_TAG}" \
+    --network "${NETWORK}" \
     --service_account_scopes="storage-ro,compute-rw" \
     --automatic_restart \
-    --metadata_from_file "startup-script:${kube_temp}/master-start.sh" &
+    --metadata_from_file "startup-script:${KUBE_TEMP}/master-start.sh" &
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
       echo "#! /bin/bash"
       echo "MASTER_NAME='${MASTER_NAME}'"
-      echo "MINION_IP_RANGE=${MINION_IP_RANGES[$i]}"
+      echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-minion.sh"
-    ) > "${kube_temp}/minion-start-${i}.sh"
+    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
-    gcutil addfirewall ${MINION_NAMES[$i]}-all \
-      --project ${PROJECT} \
+    gcutil addfirewall "${MINION_NAMES[$i]}-all" \
+      --project "${PROJECT}" \
       --norespect_terminal_width \
       --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-      --network ${NETWORK} \
-      --allowed_ip_sources ${MINION_IP_RANGES[$i]} \
+      --network "${NETWORK}" \
+      --allowed_ip_sources "${MINION_IP_RANGES[$i]}" \
       --allowed "tcp,udp,icmp,esp,ah,sctp" &
 
     gcutil addinstance ${MINION_NAMES[$i]} \
-      --project ${PROJECT} \
+      --project "${PROJECT}" \
       --norespect_terminal_width \
       --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-      --zone ${ZONE} \
-      --machine_type ${MINION_SIZE} \
-      --image ${IMAGE} \
-      --tags ${MINION_TAG} \
-      --network ${NETWORK} \
-      --service_account_scopes=${MINION_SCOPES} \
+      --zone "${ZONE}" \
+      --machine_type "${MINION_SIZE}" \
+      --image "${IMAGE}" \
+      --tags "${MINION_TAG}" \
+      --network "${NETWORK}" \
+      --service_account_scopes "${MINION_SCOPES}" \
       --automatic_restart \
       --can_ip_forward \
-      --metadata_from_file "startup-script:${kube_temp}/minion-start-${i}.sh" &
+      --metadata_from_file "startup-script:${KUBE_TEMP}/minion-start-${i}.sh" &
 
-    gcutil addroute ${MINION_NAMES[$i]} ${MINION_IP_RANGES[$i]} \
-      --project ${PROJECT} \
+    gcutil addroute "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" \
+      --project "${PROJECT}" \
       --norespect_terminal_width \
       --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-      --network ${NETWORK} \
-      --next_hop_instance ${ZONE}/instances/${MINION_NAMES[$i]} &
+      --network "${NETWORK}" \
+      --next_hop_instance "${ZONE}/instances/${MINION_NAMES[$i]}" &
   done
 
   local fail=0
   local job
-  for job in `jobs -p`
-  do
-      wait $job || let "fail+=1"
+  for job in $(jobs -p); do
+      wait "${job}" || fail=$((fail + 1))
   done
   if (( $fail != 0 )); then
-    echo "${fail} commands failed.  Exiting."
+    echo "${fail} commands failed.  Exiting." >&2
     exit 2
   fi
 
@@ -324,8 +336,8 @@ function kube-up {
   echo "  up."
   echo
 
-  until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
-          --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
+  until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
+          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
       printf "."
       sleep 2
   done
@@ -340,12 +352,12 @@ function kube-up {
   local rc # Capture return code without exiting because of errexit bash option
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
       # Make sure docker is installed
-      gcutil ssh ${MINION_NAMES[$i]} which docker >/dev/null && rc=$? || rc=$?
-      if [[ "$rc" != "0" ]]; then
-          echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
-          echo "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)"
-          exit 1
-      fi
+      gcutil ssh "${MINION_NAMES[$i]}" which docker >/dev/null || {
+        echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
+        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+        echo "cluster. (sorry!)" >&2
+        exit 1
+      }
   done
 
   echo
@@ -387,43 +399,43 @@ function kube-down {
 
   echo "Bringing down cluster"
   gcutil deletefirewall  \
-    --project ${PROJECT} \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
-    ${MASTER_NAME}-https &
+    "${MASTER_NAME}-https" &
 
   gcutil deleteinstance \
-    --project ${PROJECT} \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     --delete_boot_pd \
-    --zone ${ZONE} \
-    ${MASTER_NAME} &
+    --zone "${ZONE}" \
+    "${MASTER_NAME}" &
 
   gcutil deletefirewall  \
-    --project ${PROJECT} \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
-    ${MINION_NAMES[*]/%/-all} &
+    "${MINION_NAMES[@]/%/-all}" &
 
   gcutil deleteinstance \
-    --project ${PROJECT} \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
     --delete_boot_pd \
-    --zone ${ZONE} \
-    ${MINION_NAMES[*]} &
+    --zone "${ZONE}" \
+    "${MINION_NAMES[@]}" &
 
   gcutil deleteroute  \
-    --project ${PROJECT} \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
-    ${MINION_NAMES[*]} &
+    "${MINION_NAMES[@]}" &
 
   wait
 
@@ -442,13 +454,13 @@ function kube-push {
     echo "#! /bin/bash"
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
-    echo "readonly SERVER_BINARY_TAR_URL=${SERVER_BINARY_TAR_URL}"
-    echo "readonly SALT_TAR_URL=${SALT_TAR_URL}"
+    echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
+    echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"
-  ) | gcutil ssh --project $PROJECT --zone $ZONE $KUBE_MASTER sudo bash
+  ) | gcutil ssh --project "$PROJECT" --zone "$ZONE" "$KUBE_MASTER" sudo bash
 
   get-password
 
@@ -470,10 +482,8 @@ function kube-push {
 # Assumed Vars:
 #   KUBE_ROOT
 function test-build-release {
-  # Build source
-  "${KUBE_ROOT}/hack/build-go.sh"
   # Make a release
-  "${KUBE_ROOT}/release/release.sh"
+  "${KUBE_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -492,13 +502,13 @@ function test-setup {
   if [[ ${ALREADY_UP} -ne 1 ]]; then
     # Open up port 80 & 8080 so common containers on minions can be reached
     gcutil addfirewall \
-      --project ${PROJECT} \
+      --project "${PROJECT}" \
       --norespect_terminal_width \
       --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-      --target_tags ${MINION_TAG} \
+      --target_tags "${MINION_TAG}" \
       --allowed tcp:80,tcp:8080 \
-      --network ${NETWORK} \
-      ${MINION_TAG}-${INSTANCE_PREFIX}-http-alt
+      --network "${NETWORK}" \
+      "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
   fi
 
 }
@@ -511,10 +521,10 @@ function test-setup {
 function test-teardown {
   echo "Shutting down test cluster in background."
   gcutil deletefirewall  \
-    --project ${PROJECT} \
+    --project "${PROJECT}" \
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --force \
-    ${MINION_TAG}-${INSTANCE_PREFIX}-http-alt || true > /dev/null
+    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true > /dev/null
   "${KUBE_ROOT}/cluster/kube-down.sh" > /dev/null
 }
