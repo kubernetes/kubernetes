@@ -17,8 +17,11 @@ limitations under the License.
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // GetItemsPtr returns a pointer to the list object's Items member.
@@ -88,4 +91,25 @@ func SetList(list Object, objects []Object) error {
 	}
 	items.Set(slice)
 	return nil
+}
+
+// ObjectDiff prints a difference between two objects.
+func ObjectDiff(a, b Object) string {
+	ab, err := json.Marshal(a)
+	if err != nil {
+		panic(fmt.Sprintf("a: %v", err))
+	}
+	bb, err := json.Marshal(b)
+	if err != nil {
+		panic(fmt.Sprintf("b: %v", err))
+	}
+	return util.StringDiff(string(ab), string(bb))
+
+	// An alternate diff attempt, in case json isn't showing you
+	// the difference. (reflect.DeepEqual makes a distinction between
+	// nil and empty slices, for example.)
+	return util.StringDiff(
+		fmt.Sprintf("%#v", a),
+		fmt.Sprintf("%#v", b),
+	)
 }

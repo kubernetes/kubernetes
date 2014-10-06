@@ -20,18 +20,20 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+type JSONBase struct {
+	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
+	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+}
+
 func TestGenericJSONBase(t *testing.T) {
-	type JSONBase struct {
-		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
-		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-		ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}
 	j := JSONBase{
 		ID:              "foo",
 		APIVersion:      "a",
@@ -98,7 +100,7 @@ func (*MyIncorrectlyMarkedAsAPIObject) IsAnAPIObject() {}
 
 func TestResourceVersionerOfAPI(t *testing.T) {
 	type T struct {
-		Object
+		runtime.Object
 		Expected uint64
 	}
 	testCases := map[string]T{
@@ -118,7 +120,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 
 	failingCases := map[string]struct {
-		Object
+		runtime.Object
 		Expected uint64
 	}{
 		"not a valid object to try": {&MyIncorrectlyMarkedAsAPIObject{}, 1},
@@ -131,7 +133,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 
 	setCases := map[string]struct {
-		Object
+		runtime.Object
 		Expected uint64
 	}{
 		"pointer to api object with version": {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
@@ -152,7 +154,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 
 func TestJSONBaseSelfLinker(t *testing.T) {
 	table := map[string]struct {
-		obj     Object
+		obj     runtime.Object
 		expect  string
 		try     string
 		succeed bool

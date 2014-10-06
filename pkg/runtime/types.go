@@ -16,34 +16,26 @@ limitations under the License.
 
 package runtime
 
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-)
-
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
-// JSONBase is shared by all top level objects. The proper way to use it is to inline it in your type,
+// TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type,
 // like this:
 // type MyAwesomeAPIObject struct {
-// 	runtime.JSONBase    `yaml:",inline" json:",inline"`
+// 	runtime.TypeMeta    `yaml:",inline" json:",inline"`
 // 	... // other fields
 // }
 // func (*MyAwesomeAPIObject) IsAnAPIObject() {}
 //
-// JSONBase is provided here for convenience. You may use it directly from this package or define
+// TypeMeta is provided here for convenience. You may use it directly from this package or define
 // your own with the same fields.
 //
-type JSONBase struct {
-	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
-	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+type TypeMeta struct {
+	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 }
 
-// PluginBase is like JSONBase, but it's intended for plugin objects that won't ever be encoded
+// PluginBase is like TypeMeta, but it's intended for plugin objects that won't ever be encoded
 // except while embedded in other objects.
 type PluginBase struct {
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
@@ -111,11 +103,11 @@ type RawExtension struct {
 }
 
 // Unknown allows api objects with unknown types to be passed-through. This can be used
-// to deal with the API objects from a plug-in. Unknown objects still have functioning
-// JSONBase features-- kind, version, resourceVersion, etc.
+// to deal with the API objects from a plug-in. Unknown objects are still identifiable
+// via TypeMeta
 // TODO: Not implemented yet!
 type Unknown struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 	// RawJSON will hold the complete JSON of the object which couldn't be matched
 	// with a registered type. Most likely, nothing should be done with this
 	// except for passing it through the system.

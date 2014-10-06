@@ -17,40 +17,10 @@ limitations under the License.
 package runtime
 
 import (
-	"encoding/json"
-	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"gopkg.in/v1/yaml"
 )
-
-// codecWrapper implements encoding to an alternative
-// default version for a scheme.
-type codecWrapper struct {
-	*Scheme
-	version string
-}
-
-// Encode implements Codec
-func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
-	return c.Scheme.EncodeToVersion(obj, c.version)
-}
-
-// CodecFor returns a Codec that invokes Encode with the provided version.
-func CodecFor(scheme *Scheme, version string) Codec {
-	return &codecWrapper{scheme, version}
-}
-
-// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func EncodeOrDie(codec Codec, obj Object) string {
-	bytes, err := codec.Encode(obj)
-	if err != nil {
-		panic(err)
-	}
-	return string(bytes)
-}
 
 // Scheme defines methods for serializing and deserializing API objects. It
 // is an adaptation of conversion's Scheme for our API objects.
@@ -175,10 +145,10 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 }
 
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
-func NewScheme() *Scheme {
+func NewScheme(meta conversion.MetaFactory) *Scheme {
 	s := &Scheme{conversion.NewScheme()}
 	s.raw.InternalVersion = ""
-	s.raw.MetaInsertionFactory = metaInsertion{}
+	s.raw.MetaFactory = meta
 	s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
@@ -316,76 +286,4 @@ func (s *Scheme) CopyOrDie(obj Object) Object {
 		panic(err)
 	}
 	return newObj
-}
-
-func ObjectDiff(a, b Object) string {
-	ab, err := json.Marshal(a)
-	if err != nil {
-		panic(fmt.Sprintf("a: %v", err))
-	}
-	bb, err := json.Marshal(b)
-	if err != nil {
-		panic(fmt.Sprintf("b: %v", err))
-	}
-	return util.StringDiff(string(ab), string(bb))
-
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
-	return util.StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
-	)
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
-// dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj Object) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
-}
-
-// VersionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an APIObject, or an error.
-func VersionAndKind(data []byte) (version, kind string, err error) {
-	findKind := struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	return findKind.APIVersion, findKind.Kind, nil
-}
-
-// metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
-// package figure out how to encode our object's types and versions. These fields are
-// located in our JSONBase.
-type metaInsertion struct {
-	TypeMeta struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	} `json:",inline" yaml:",inline"`
-}
-
-// Create returns a new metaInsertion with the version and kind fields set.
-func (metaInsertion) Create(version, kind string) interface{} {
-	m := metaInsertion{}
-	m.TypeMeta.APIVersion = version
-	m.TypeMeta.Kind = kind
-	return &m
-}
-
-// Interpret returns the version and kind information from in, which must be
-// a metaInsertion pointer object.
-func (metaInsertion) Interpret(in interface{}) (version, kind string) {
-	m := in.(*metaInsertion)
-	return m.TypeMeta.APIVersion, m.TypeMeta.Kind
 }

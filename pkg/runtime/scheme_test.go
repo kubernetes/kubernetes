@@ -24,18 +24,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-type JSONBase struct {
-	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+type TypeMeta struct {
+	Kind    string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Version string `json:"version,omitempty" yaml:"version,omitempty"`
 }
 
 type InternalSimple struct {
-	JSONBase   `json:",inline" yaml:",inline"`
+	TypeMeta   `json:",inline" yaml:",inline"`
 	TestString string `json:"testString" yaml:"testString"`
 }
 
 type ExternalSimple struct {
-	JSONBase   `json:",inline" yaml:",inline"`
+	TypeMeta   `json:",inline" yaml:",inline"`
 	TestString string `json:"testString" yaml:"testString"`
 }
 
@@ -43,7 +43,7 @@ func (*InternalSimple) IsAnAPIObject() {}
 func (*ExternalSimple) IsAnAPIObject() {}
 
 func TestScheme(t *testing.T) {
-	scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme(conversion.SimpleMetaFactory{[]string{"TypeMeta"}})
 	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
 	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
 
@@ -59,7 +59,7 @@ func TestScheme(t *testing.T) {
 			if e, a := "externalVersion", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			scope.Convert(&in.JSONBase, &out.JSONBase, 0)
+			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			internalToExternalCalls++
 			return nil
@@ -71,7 +71,7 @@ func TestScheme(t *testing.T) {
 			if e, a := "", scope.Meta().DestVersion; e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
-			scope.Convert(&in.JSONBase, &out.JSONBase, 0)
+			scope.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			scope.Convert(&in.TestString, &out.TestString, 0)
 			externalToInternalCalls++
 			return nil
@@ -124,7 +124,7 @@ func TestScheme(t *testing.T) {
 }
 
 func TestBadJSONRejection(t *testing.T) {
-	scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme(conversion.SimpleMetaFactory{})
 	badJSONMissingKind := []byte(`{ }`)
 	if _, err := scheme.Decode(badJSONMissingKind); err == nil {
 		t.Errorf("Did not reject despite lack of kind field: %s", badJSONMissingKind)
@@ -150,12 +150,12 @@ type ExtensionB struct {
 }
 
 type ExternalExtensionType struct {
-	JSONBase  `json:",inline" yaml:",inline"`
+	TypeMeta  `json:",inline" yaml:",inline"`
 	Extension runtime.RawExtension `json:"extension" yaml:"extension"`
 }
 
 type InternalExtensionType struct {
-	JSONBase  `json:",inline" yaml:",inline"`
+	TypeMeta  `json:",inline" yaml:",inline"`
 	Extension runtime.EmbeddedObject `json:"extension" yaml:"extension"`
 }
 
@@ -165,7 +165,7 @@ func (*ExternalExtensionType) IsAnAPIObject() {}
 func (*InternalExtensionType) IsAnAPIObject() {}
 
 func TestExtensionMapping(t *testing.T) {
-	scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme(conversion.SimpleMetaFactory{[]string{"TypeMeta", "PluginBase"}})
 	scheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionType{})
 	scheme.AddKnownTypeWithName("", "A", &ExtensionA{})
 	scheme.AddKnownTypeWithName("", "B", &ExtensionB{})
@@ -179,13 +179,13 @@ func TestExtensionMapping(t *testing.T) {
 	}{
 		{
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
+			`{"kind":"ExtensionType","version":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionB{TestString: "bar"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
+			`{"kind":"ExtensionType","version":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{nil}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
+			`{"kind":"ExtensionType","version":"testExternal","extension":null}`,
 		},
 	}
 
@@ -214,7 +214,7 @@ func TestExtensionMapping(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	scheme := runtime.NewScheme()
+	scheme := runtime.NewScheme(conversion.SimpleMetaFactory{[]string{"TypeMeta"}})
 	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
 	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
 	codec := runtime.CodecFor(scheme, "externalVersion")

@@ -18,27 +18,9 @@ package conversion
 
 import (
 	"fmt"
+	"log"
 	"reflect"
-
-	"gopkg.in/v1/yaml"
 )
-
-// MetaInsertionFactory is used to create an object to store and retrieve
-// the version and kind information for all objects. The default uses the
-// keys "version" and "kind" respectively. The object produced by this
-// factory is used to clear the version and kind fields in memory, so it
-// must match the layout of your actual api structs. (E.g., if you have your
-// version and kind field inside an inlined struct, this must produce an
-// inlined struct with the same field name.)
-type MetaInsertionFactory interface {
-	// Create should make a new object with two fields.
-	// This object will be used to encode this metadata along with your
-	// API objects, so the tags on the fields you use shouldn't conflict.
-	Create(version, kind string) interface{}
-	// Interpret should take the same type of object that Create creates.
-	// It should return the version and kind information from this object.
-	Interpret(interface{}) (version, kind string)
-}
 
 // Scheme defines an entire encoding and decoding scheme.
 type Scheme struct {
@@ -53,7 +35,7 @@ type Scheme struct {
 
 	// typeToKind allows one to figure out the desired "kind" field for a given
 	// go object. Requirements and caveats are the same as typeToVersion.
-	typeToKind map[reflect.Type]string
+	typeToKind map[reflect.Type][]string
 
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
@@ -66,21 +48,19 @@ type Scheme struct {
 	// you use "" for the internal version.
 	InternalVersion string
 
-	// MetaInsertionFactory is used to create an object to store and retrieve
-	// the version and kind information for all objects. The default uses the
-	// keys "version" and "kind" respectively.
-	MetaInsertionFactory MetaInsertionFactory
+	// MetaFactory is used to convert between objects.
+	MetaFactory MetaFactory
 }
 
 // NewScheme manufactures a new scheme.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		versionMap:           map[string]map[string]reflect.Type{},
-		typeToVersion:        map[reflect.Type]string{},
-		typeToKind:           map[reflect.Type]string{},
-		converter:            NewConverter(),
-		InternalVersion:      "",
-		MetaInsertionFactory: metaInsertion{},
+		versionMap:      map[string]map[string]reflect.Type{},
+		typeToVersion:   map[reflect.Type]string{},
+		typeToKind:      map[reflect.Type][]string{},
+		converter:       NewConverter(),
+		InternalVersion: "",
+		MetaFactory:     SimpleMetaFactory{},
 	}
 	s.converter.NameFunc = s.nameFunc
 	return s
@@ -95,7 +75,7 @@ func (s *Scheme) Log(log DebugLogger) {
 // the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
 	if kind, ok := s.typeToKind[t]; ok {
-		return kind
+		return kind[0]
 	}
 	return t.Name()
 }
@@ -121,7 +101,7 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 		}
 		knownTypes[t.Name()] = t
 		s.typeToVersion[t] = version
-		s.typeToKind[t] = t.Name()
+		s.typeToKind[t] = append(s.typeToKind[t], t.Name())
 	}
 }
 
@@ -144,7 +124,7 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
 	}
 	knownTypes[kind] = t
 	s.typeToVersion[t] = version
-	s.typeToKind[t] = kind
+	s.typeToKind[t] = append(s.typeToKind[t], kind)
 }
 
 // KnownTypes returns an array of the types that are known for a particular version.
@@ -167,6 +147,7 @@ func (s *Scheme) NewObject(versionName, typeName string) (interface{}, error) {
 		if t, ok := types[typeName]; ok {
 			return reflect.New(t).Interface(), nil
 		}
+		log.Printf("[%s]types[%s]: %#v", versionName, typeName, types)
 		return nil, fmt.Errorf("No type '%v' for version '%v'", typeName, versionName)
 	}
 	return nil, fmt.Errorf("No version '%v'", versionName)
@@ -238,65 +219,33 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) *Meta {
 	}
 }
 
-// metaInsertion provides a default implementation of MetaInsertionFactory.
-type metaInsertion struct {
-	Version string `json:"version,omitempty" yaml:"version,omitempty"`
-	Kind    string `json:"kind,omitempty" yaml:"kind,omitempty"`
-}
-
-// Create should make a new object with two fields.
-// This object will be used to encode this metadata along with your
-// API objects, so the tags on the fields you use shouldn't conflict.
-func (metaInsertion) Create(version, kind string) interface{} {
-	m := metaInsertion{}
-	m.Version = version
-	m.Kind = kind
-	return &m
-}
-
-// Interpret should take the same type of object that Create creates.
-// It should return the version and kind information from this object.
-func (metaInsertion) Interpret(in interface{}) (version, kind string) {
-	m := in.(*metaInsertion)
-	return m.Version, m.Kind
-}
-
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
 // enconding of an API Object, or an error.
 func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
-	findKind := s.MetaInsertionFactory.Create("", "")
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	version, kind = s.MetaInsertionFactory.Interpret(findKind)
-	return version, kind, nil
+	return s.MetaFactory.Interpret(data)
 }
 
 // ObjectVersionAndKind returns the API version and kind of the go object,
 // or an error if it's not a pointer or is unregistered.
 func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string, err error) {
-	v, err := enforcePtr(obj)
+	v, err := EnforcePtr(obj)
 	if err != nil {
 		return "", "", err
 	}
 	t := v.Type()
 	version, vOK := s.typeToVersion[t]
-	kind, kOK := s.typeToKind[t]
+	kinds, kOK := s.typeToKind[t]
 	if !vOK || !kOK {
 		return "", "", fmt.Errorf("Unregistered type: %v", t)
 	}
-	return version, kind, nil
+	return version, kinds[0], nil
 }
 
 // SetVersionAndKind sets the version and kind fields (with help from
-// MetaInsertionFactory). Returns an error if this isn't possible. obj
+// MetaFactory). Returns an error if this isn't possible. obj
 // must be a pointer.
 func (s *Scheme) SetVersionAndKind(version, kind string, obj interface{}) error {
-	versionAndKind := s.MetaInsertionFactory.Create(version, kind)
-	return s.converter.Convert(versionAndKind, obj, SourceToDest|IgnoreMissingFields|AllowDifferentFieldTypeNames, nil)
+	return s.MetaFactory.Update(version, kind, obj)
 }
 
 // maybeCopy copies obj if it is not a pointer, to get a settable/addressable
@@ -309,15 +258,4 @@ func maybeCopy(obj interface{}) interface{} {
 	v2 := reflect.New(v.Type())
 	v2.Elem().Set(v)
 	return v2.Interface()
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value
-// of the dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj interface{}) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
 }

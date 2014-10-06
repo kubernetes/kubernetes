@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -28,7 +29,7 @@ import (
 //
 // DEPRECATED: Will be removed when support for v1beta2 is dropped
 func findJSONBase(obj runtime.Object) (JSONBaseInterface, error) {
-	v, err := enforcePtr(obj)
+	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
 	}

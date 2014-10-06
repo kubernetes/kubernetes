@@ -21,37 +21,37 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-var scheme = runtime.NewScheme()
-var Codec = runtime.CodecFor(scheme, "v1test")
-
 type EmbeddedTest struct {
-	runtime.JSONBase `yaml:",inline" json:",inline"`
-	Object           runtime.EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      runtime.EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	TypeMeta    `yaml:",inline" json:",inline"`
+	ID          string                 `json:"id,omitempty" yaml:"id,omitempty"`
+	Object      runtime.EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
+	EmptyObject runtime.EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 }
 
 type EmbeddedTestExternal struct {
-	runtime.JSONBase `yaml:",inline" json:",inline"`
-	Object           runtime.RawExtension `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      runtime.RawExtension `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	TypeMeta    `yaml:",inline" json:",inline"`
+	ID          string               `json:"id,omitempty" yaml:"id,omitempty"`
+	Object      runtime.RawExtension `yaml:"object,omitempty" json:"object,omitempty"`
+	EmptyObject runtime.RawExtension `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 }
 
 func (*EmbeddedTest) IsAnAPIObject()         {}
 func (*EmbeddedTestExternal) IsAnAPIObject() {}
 
 func TestEmbeddedObject(t *testing.T) {
-	s := scheme
+	s := runtime.NewScheme(conversion.SimpleMetaFactory{[]string{"TypeMeta"}})
 	s.AddKnownTypes("", &EmbeddedTest{})
 	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
 
 	outer := &EmbeddedTest{
-		JSONBase: runtime.JSONBase{ID: "outer"},
+		ID: "outer",
 		Object: runtime.EmbeddedObject{
 			&EmbeddedTest{
-				JSONBase: runtime.JSONBase{ID: "inner"},
+				ID: "inner",
 			},
 		},
 	}
@@ -79,7 +79,7 @@ func TestEmbeddedObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
-	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
+	if externalViaJSON.Kind == "" || externalViaJSON.Version == "" || externalViaJSON.ID != "outer" {
 		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
 	}
 	if !reflect.DeepEqual(externalViaJSON.EmptyObject.RawJSON, []byte("null")) || len(externalViaJSON.Object.RawJSON) == 0 {

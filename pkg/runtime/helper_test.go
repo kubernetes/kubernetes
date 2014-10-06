@@ -20,18 +20,23 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/google/gofuzz"
 )
 
+type InternalSimpleList struct {
+	Items []InternalSimple `json:"items" yaml:"items"`
+}
+
+func (InternalSimpleList) IsAnAPIObject() {}
+
 func TestExtractList(t *testing.T) {
-	pl := &api.PodList{
-		Items: []api.Pod{
-			{JSONBase: api.JSONBase{ID: "1"}},
-			{JSONBase: api.JSONBase{ID: "2"}},
-			{JSONBase: api.JSONBase{ID: "3"}},
+	pl := &InternalSimpleList{
+		Items: []InternalSimple{
+			{TestString: "1"},
+			{TestString: "2"},
+			{TestString: "3"},
 		},
 	}
 	list, err := runtime.ExtractList(pl)
@@ -42,18 +47,18 @@ func TestExtractList(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
 	for i := range list {
-		if e, a := list[i].(*api.Pod).ID, pl.Items[i].ID; e != a {
+		if e, a := list[i].(*InternalSimple).TestString, pl.Items[i].TestString; e != a {
 			t.Fatalf("Expected %v, got %v", e, a)
 		}
 	}
 }
 
 func TestSetList(t *testing.T) {
-	pl := &api.PodList{}
+	pl := &InternalSimpleList{}
 	list := []runtime.Object{
-		&api.Pod{JSONBase: api.JSONBase{ID: "1"}},
-		&api.Pod{JSONBase: api.JSONBase{ID: "2"}},
-		&api.Pod{JSONBase: api.JSONBase{ID: "3"}},
+		&InternalSimple{TestString: "1"},
+		&InternalSimple{TestString: "2"},
+		&InternalSimple{TestString: "3"},
 	}
 	err := runtime.SetList(pl, list)
 	if err != nil {
@@ -63,7 +68,7 @@ func TestSetList(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
 	for i := range list {
-		if e, a := list[i].(*api.Pod).ID, pl.Items[i].ID; e != a {
+		if e, a := list[i].(*InternalSimple).TestString, pl.Items[i].TestString; e != a {
 			t.Fatalf("Expected %v, got %v", e, a)
 		}
 	}
@@ -72,7 +77,7 @@ func TestSetList(t *testing.T) {
 func TestSetExtractListRoundTrip(t *testing.T) {
 	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5)
 	for i := 0; i < 5; i++ {
-		start := &api.PodList{}
+		start := &InternalSimpleList{}
 		fuzzer.Fuzz(&start.Items)
 
 		list, err := runtime.ExtractList(start)
@@ -80,7 +85,7 @@ func TestSetExtractListRoundTrip(t *testing.T) {
 			t.Errorf("Unexpected error %v", err)
 			continue
 		}
-		got := &api.PodList{}
+		got := &InternalSimpleList{}
 		err = runtime.SetList(got, list)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)

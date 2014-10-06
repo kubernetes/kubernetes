@@ -21,8 +21,67 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"gopkg.in/v1/yaml"
 )
+
+// MetaFactory provides methods for retrieving the type and version of API objects.
+type MetaFactory struct{}
+
+// Interpret will return the APIVersion and Kind of the given wire-format
+// encoding of an APIObject, or an error.
+func (MetaFactory) Interpret(data []byte) (version, kind string, err error) {
+	findKind := struct {
+		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	}{}
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, &findKind)
+	if err != nil {
+		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+	}
+	return findKind.APIVersion, findKind.Kind, nil
+}
+
+func (MetaFactory) Update(version, kind string, obj interface{}) error {
+	v, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return err
+	}
+	t := v.Type()
+	name := t.Name()
+	if v.Kind() != reflect.Struct {
+		return fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
+	}
+
+	var value reflect.Value
+	if jsonBase := v.FieldByName("JSONBase"); jsonBase.IsValid() {
+		value = jsonBase
+	} else if typeBase := v.FieldByName("TypeMeta"); typeBase.IsValid() {
+		value = typeBase
+	} else {
+		return fmt.Errorf("struct %v lacks JSONBase or TypeMeta struct", name)
+	}
+
+	if err := setStringValue(value, "APIVersion", version); err != nil {
+		return err
+	}
+	if err := setStringValue(value, "Kind", kind); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setStringValue(v reflect.Value, fieldName string, value string) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+	}
+	field.SetString(value)
+	return nil
+}
 
 type ObjectInterface interface {
 	TypeMetaInterface
@@ -34,7 +93,7 @@ var EmptyObjectMeta ObjectMetaInterface = &emptyObjectMeta{}
 // FindObjectMeta takes an arbitary type satisfying the ObjectMeta interface
 // obj must be a pointer to an api type.
 func FindObjectMeta(obj runtime.Object) (ObjectInterface, error) {
-	v, err := enforcePtr(obj)
+	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -350,6 +409,9 @@ func (m objectMetaFromJSONBase) SetUID(uid string) {
 }
 
 func (m objectMetaFromJSONBase) ResourceVersion() string {
+	if m.json.ResourceVersion() == 0 {
+		return ""
+	}
 	return strconv.FormatUint(m.json.ResourceVersion(), 10)
 }
 
@@ -368,17 +430,6 @@ func (m objectMetaFromJSONBase) SelfLink() string {
 
 func (m objectMetaFromJSONBase) SetSelfLink(selfLink string) {
 	m.json.SetSelfLink(selfLink)
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value
-// of the dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj interface{}) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
 }
 
 type emptyObjectMeta struct{}
