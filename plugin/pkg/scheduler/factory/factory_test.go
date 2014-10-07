@@ -141,8 +141,8 @@ func TestPollMinions(t *testing.T) {
 	}{
 		{
 			minions: []api.Minion{
-				{JSONBase: api.JSONBase{ID: "foo"}},
-				{JSONBase: api.JSONBase{ID: "bar"}},
+				{TypeMeta: api.TypeMeta{ID: "foo"}},
+				{TypeMeta: api.TypeMeta{ID: "bar"}},
 			},
 		},
 	}
@@ -175,7 +175,7 @@ func TestPollMinions(t *testing.T) {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	testPod := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
 	handler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
@@ -215,7 +215,7 @@ func TestStoreToMinionLister(t *testing.T) {
 	store := cache.NewStore()
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(id, &api.Minion{JSONBase: api.JSONBase{ID: id}})
+		store.Add(id, &api.Minion{TypeMeta: api.TypeMeta{ID: id}})
 	}
 	sml := storeToMinionLister{store}
 
@@ -233,7 +233,7 @@ func TestStoreToPodLister(t *testing.T) {
 	ids := []string{"foo", "bar", "baz"}
 	for _, id := range ids {
 		store.Add(id, &api.Pod{
-			JSONBase: api.JSONBase{ID: id},
+			TypeMeta: api.TypeMeta{ID: id},
 			Labels:   map[string]string{"name": id},
 		})
 	}
@@ -259,9 +259,9 @@ func TestStoreToPodLister(t *testing.T) {
 func TestMinionEnumerator(t *testing.T) {
 	testList := &api.MinionList{
 		Items: []api.Minion{
-			{JSONBase: api.JSONBase{ID: "foo"}},
-			{JSONBase: api.JSONBase{ID: "bar"}},
-			{JSONBase: api.JSONBase{ID: "baz"}},
+			{TypeMeta: api.TypeMeta{ID: "foo"}},
+			{TypeMeta: api.TypeMeta{ID: "bar"}},
+			{TypeMeta: api.TypeMeta{ID: "baz"}},
 		},
 	}
 	me := minionEnumerator{testList}

@@ -40,8 +40,8 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	func(j *runtime.PluginBase, c fuzz.Continue) {
 		// Do nothing; this struct has only a Kind field and it must stay blank in memory.
 	},
-	func(j *runtime.JSONBase, c fuzz.Continue) {
-		// We have to customize the randomization of JSONBases because their
+	func(j *runtime.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
@@ -57,8 +57,8 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		c.Fuzz(&nsec)
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
 	},
-	func(j *api.JSONBase, c fuzz.Continue) {
-		// We have to customize the randomization of JSONBases because their
+	func(j *api.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
@@ -110,7 +110,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
-	j, err := runtime.FindJSONBase(source)
+	j, err := runtime.FindTypeMeta(source)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, source)
 	}

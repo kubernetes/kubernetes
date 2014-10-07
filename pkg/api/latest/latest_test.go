@@ -32,8 +32,8 @@ import (
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
-	func(j *internal.JSONBase, c fuzz.Continue) {
-		// We have to customize the randomization of JSONBases because their
+	func(j *internal.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
@@ -120,7 +120,7 @@ func TestInternalRoundTrip(t *testing.T) {
 }
 
 func TestResourceVersioner(t *testing.T) {
-	pod := internal.Pod{JSONBase: internal.JSONBase{ResourceVersion: 10}}
+	pod := internal.Pod{TypeMeta: internal.TypeMeta{ResourceVersion: 10}}
 	version, err := ResourceVersioner.ResourceVersion(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

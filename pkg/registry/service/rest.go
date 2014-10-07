@@ -52,7 +52,7 @@ func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.R
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &srv.JSONBase) {
+	if !api.ValidNamespace(ctx, &srv.TypeMeta) {
 		return nil, errors.NewConflict("service", srv.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
@@ -176,7 +176,7 @@ func GetServiceEnvironmentVariables(ctx api.Context, registry Registry, machine 
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	srv := obj.(*api.Service)
-	if !api.ValidNamespace(ctx, &srv.JSONBase) {
+	if !api.ValidNamespace(ctx, &srv.TypeMeta) {
 		return nil, errors.NewConflict("service", srv.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateService(srv); len(errs) > 0 {
@@ -224,7 +224,7 @@ func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {
 	if err != nil {
 		return err
 	}
-	if err := balancer.DeleteTCPLoadBalancer(service.JSONBase.ID, zone.Region); err != nil {
+	if err := balancer.DeleteTCPLoadBalancer(service.TypeMeta.ID, zone.Region); err != nil {
 		return err
 	}
 	return nil

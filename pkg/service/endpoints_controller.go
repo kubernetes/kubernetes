@@ -77,7 +77,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
-					JSONBase: api.JSONBase{
+					TypeMeta: api.TypeMeta{
 						ID: service.ID,
 					},
 				}

@@ -45,7 +45,7 @@ func (s sortedServices) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 func (s sortedServices) Less(i, j int) bool {
-	return s[i].JSONBase.ID < s[j].JSONBase.ID
+	return s[i].TypeMeta.ID < s[j].TypeMeta.ID
 }
 
 type ServiceHandlerMock struct {
@@ -136,7 +136,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	handler := NewServiceHandlerMock()
 	handler.Wait(1)
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "foo"}, Port: 10})
+	serviceUpdate := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "foo"}, Port: 10})
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
@@ -147,24 +147,24 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "foo"}, Port: 10})
+	serviceUpdate := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "foo"}, Port: 10})
 	handler.Wait(1)
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "bar"}, Port: 20})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "bar"}, Port: 20})
 	handler.Wait(1)
 	channel <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{JSONBase: api.JSONBase{ID: "foo"}})
+	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{TypeMeta: api.TypeMeta{ID: "foo"}})
 	handler.Wait(1)
 	channel <- serviceUpdate3
 	services = []api.Service{serviceUpdate2.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{JSONBase: api.JSONBase{ID: "foobar"}, Port: 99})
+	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{TypeMeta: api.TypeMeta{ID: "foobar"}, Port: 99})
 	handler.Wait(1)
 	channel <- serviceUpdate4
 	services = []api.Service{serviceUpdate4.Services[0]}
@@ -180,8 +180,8 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 	}
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "foo"}, Port: 10})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "bar"}, Port: 20})
+	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "foo"}, Port: 10})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "bar"}, Port: 20})
 	handler.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
@@ -197,8 +197,8 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 	handler2 := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "foo"}, Port: 10})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{JSONBase: api.JSONBase{ID: "bar"}, Port: 20})
+	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "foo"}, Port: 10})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{TypeMeta: api.TypeMeta{ID: "bar"}, Port: 20})
 	handler.Wait(2)
 	handler2.Wait(2)
 	channelOne <- serviceUpdate1
@@ -217,11 +217,11 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		TypeMeta:  api.TypeMeta{ID: "foo"},
 		Endpoints: []string{"endpoint1", "endpoint2"},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "bar"},
+		TypeMeta:  api.TypeMeta{ID: "bar"},
 		Endpoints: []string{"endpoint3", "endpoint4"},
 	})
 	handler.Wait(2)
@@ -243,11 +243,11 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		TypeMeta:  api.TypeMeta{ID: "foo"},
 		Endpoints: []string{"endpoint1", "endpoint2"},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "bar"},
+		TypeMeta:  api.TypeMeta{ID: "bar"},
 		Endpoints: []string{"endpoint3", "endpoint4"},
 	})
 	handler.Wait(2)
@@ -261,7 +261,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 
 	// Add one more
 	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foobar"},
+		TypeMeta:  api.TypeMeta{ID: "foobar"},
 		Endpoints: []string{"endpoint5", "endpoint6"},
 	})
 	handler.Wait(1)
@@ -273,7 +273,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 
 	// Update the "foo" service with new endpoints
 	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		TypeMeta:  api.TypeMeta{ID: "foo"},
 		Endpoints: []string{"endpoint77"},
 	})
 	handler.Wait(1)
@@ -284,7 +284,7 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	handler2.ValidateEndpoints(t, endpoints)
 
 	// Remove "bar" service
-	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{JSONBase: api.JSONBase{ID: "bar"}})
+	endpointsUpdate2 = CreateEndpointsUpdate(REMOVE, api.Endpoints{TypeMeta: api.TypeMeta{ID: "bar"}})
 	handler.Wait(1)
 	handler2.Wait(1)
 	channelTwo <- endpointsUpdate2

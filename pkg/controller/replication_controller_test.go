@@ -89,7 +89,7 @@ func newPodList(count int) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
-			JSONBase: api.JSONBase{
+			TypeMeta: api.TypeMeta{
 				ID: fmt.Sprintf("pod%d", i),
 			},
 		})
@@ -183,7 +183,7 @@ func TestCreateReplica(t *testing.T) {
 	}
 
 	controllerSpec := api.ReplicationController{
-		JSONBase: api.JSONBase{
+		TypeMeta: api.TypeMeta{
 			Kind: "ReplicationController",
 		},
 		DesiredState: api.ReplicationControllerState{
@@ -208,7 +208,7 @@ func TestCreateReplica(t *testing.T) {
 	podControl.createReplica(ctx, controllerSpec)
 
 	expectedPod := api.Pod{
-		JSONBase: api.JSONBase{
+		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: testapi.Version(),
 		},
@@ -228,7 +228,7 @@ func TestCreateReplica(t *testing.T) {
 
 func TestSynchonize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
-		JSONBase: api.JSONBase{APIVersion: testapi.Version()},
+		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 4,
 			PodTemplate: api.PodTemplate{
@@ -249,7 +249,7 @@ func TestSynchonize(t *testing.T) {
 		},
 	}
 	controllerSpec2 := api.ReplicationController{
-		JSONBase: api.JSONBase{APIVersion: testapi.Version()},
+		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 3,
 			PodTemplate: api.PodTemplate{

@@ -37,7 +37,7 @@ func TestMinionREST(t *testing.T) {
 		t.Errorf("has unexpected object")
 	}
 
-	c, err := ms.Create(ctx, &api.Minion{JSONBase: api.JSONBase{ID: "baz"}})
+	c, err := ms.Create(ctx, &api.Minion{TypeMeta: api.TypeMeta{ID: "baz"}})
 	if err != nil {
 		t.Errorf("insert failed")
 	}
@@ -72,9 +72,9 @@ func TestMinionREST(t *testing.T) {
 	}
 	expect := []api.Minion{
 		{
-			JSONBase: api.JSONBase{ID: "baz"},
+			TypeMeta: api.TypeMeta{ID: "baz"},
 		}, {
-			JSONBase: api.JSONBase{ID: "foo"},
+			TypeMeta: api.TypeMeta{ID: "foo"},
 		},
 	}
 	nodeList := list.(*api.MinionList)

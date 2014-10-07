@@ -43,7 +43,7 @@ func TestOperation(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		c <- &Simple{JSONBase: api.JSONBase{ID: "All done"}}
+		c <- &Simple{TypeMeta: api.TypeMeta{ID: "All done"}}
 	}()
 
 	if op.expired(time.Now().Add(-time.Minute)) {

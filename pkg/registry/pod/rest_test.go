@@ -143,7 +143,7 @@ func TestListPodsError(t *testing.T) {
 }
 
 func TestListEmptyPodList(t *testing.T) {
-	podRegistry := registrytest.NewPodRegistry(&api.PodList{JSONBase: api.JSONBase{ResourceVersion: 1}})
+	podRegistry := registrytest.NewPodRegistry(&api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: 1}})
 	storage := REST{
 		registry: podRegistry,
 	}
@@ -174,12 +174,12 @@ func TestListPodList(t *testing.T) {
 	podRegistry.Pods = &api.PodList{
 		Items: []api.Pod{
 			{
-				JSONBase: api.JSONBase{
+				TypeMeta: api.TypeMeta{
 					ID: "foo",
 				},
 			},
 			{
-				JSONBase: api.JSONBase{
+				TypeMeta: api.TypeMeta{
 					ID: "bar",
 				},
 			},
@@ -213,18 +213,18 @@ func TestListPodListSelection(t *testing.T) {
 	podRegistry.Pods = &api.PodList{
 		Items: []api.Pod{
 			{
-				JSONBase: api.JSONBase{ID: "foo"},
+				TypeMeta: api.TypeMeta{ID: "foo"},
 			}, {
-				JSONBase:     api.JSONBase{ID: "bar"},
+				TypeMeta:     api.TypeMeta{ID: "bar"},
 				DesiredState: api.PodState{Host: "barhost"},
 			}, {
-				JSONBase:     api.JSONBase{ID: "baz"},
+				TypeMeta:     api.TypeMeta{ID: "baz"},
 				DesiredState: api.PodState{Status: "bazstatus"},
 			}, {
-				JSONBase: api.JSONBase{ID: "qux"},
+				TypeMeta: api.TypeMeta{ID: "qux"},
 				Labels:   map[string]string{"label": "qux"},
 			}, {
-				JSONBase: api.JSONBase{ID: "zot"},
+				TypeMeta: api.TypeMeta{ID: "zot"},
 			},
 		},
 	}
@@ -297,7 +297,7 @@ func TestPodDecode(t *testing.T) {
 		registry: podRegistry,
 	}
 	expected := &api.Pod{
-		JSONBase: api.JSONBase{
+		TypeMeta: api.TypeMeta{
 			ID: "foo",
 		},
 	}
@@ -318,7 +318,7 @@ func TestPodDecode(t *testing.T) {
 
 func TestGetPod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podRegistry.Pod = &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
 	storage := REST{
 		registry: podRegistry,
 		ipCache:  ipCache{},
@@ -339,7 +339,7 @@ func TestGetPod(t *testing.T) {
 func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}, CurrentState: api.PodState{Host: "machine"}}
+	podRegistry.Pod = &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}, CurrentState: api.PodState{Host: "machine"}}
 
 	clock := &fakeClock{t: time.Now()}
 
@@ -385,7 +385,7 @@ func TestMakePodStatus(t *testing.T) {
 		Minions: api.MinionList{
 			Items: []api.Minion{
 				{
-					JSONBase: api.JSONBase{ID: "machine"},
+					TypeMeta: api.TypeMeta{ID: "machine"},
 				},
 			},
 		},
@@ -560,7 +560,7 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 func TestCreatePod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		CurrentState: api.PodState{
 			Host: "machine",
 		},
@@ -575,7 +575,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{
-		JSONBase:     api.JSONBase{ID: "foo"},
+		TypeMeta:     api.TypeMeta{ID: "foo"},
 		DesiredState: desiredState,
 	}
 	ctx := api.NewDefaultContext()

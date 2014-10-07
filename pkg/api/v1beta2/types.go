@@ -65,7 +65,7 @@ type ContainerManifest struct {
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
 type ContainerManifestList struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
@@ -253,8 +253,8 @@ type Lifecycle struct {
 
 // The below types are used by kube_client and api_server.
 
-// JSONBase is shared by all objects sent to, or returned from the client.
-type JSONBase struct {
+// TypeMeta is shared by all objects sent to, or returned from the client.
+type TypeMeta struct {
 	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
 	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
@@ -355,7 +355,7 @@ type PodState struct {
 
 // PodList is a list of Pods.
 type PodList struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []Pod `json:"items" yaml:"items,omitempty"`
 }
 
@@ -363,7 +363,7 @@ func (*PodList) IsAnAPIObject() {}
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
-	JSONBase     `json:",inline" yaml:",inline"`
+	TypeMeta     `json:",inline" yaml:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
@@ -380,7 +380,7 @@ type ReplicationControllerState struct {
 
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
@@ -388,7 +388,7 @@ func (*ReplicationControllerList) IsAnAPIObject() {}
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	JSONBase     `json:",inline" yaml:",inline"`
+	TypeMeta     `json:",inline" yaml:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	CurrentState ReplicationControllerState `json:"currentState,omitempty" yaml:"currentState,omitempty"`
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -404,7 +404,7 @@ type PodTemplate struct {
 
 // ServiceList holds a list of services.
 type ServiceList struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []Service `json:"items" yaml:"items"`
 }
 
@@ -414,7 +414,7 @@ func (*ServiceList) IsAnAPIObject() {}
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 
 	// Required.
 	Port int `json:"port" yaml:"port"`
@@ -438,7 +438,7 @@ func (*Service) IsAnAPIObject() {}
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	JSONBase  `json:",inline" yaml:",inline"`
+	TypeMeta  `json:",inline" yaml:",inline"`
 	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }
 
@@ -446,7 +446,7 @@ func (*Endpoints) IsAnAPIObject() {}
 
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []Endpoints `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
@@ -464,9 +464,9 @@ type ResourceName string
 type ResourceList map[ResourceName]util.IntOrString
 
 // Minion is a worker node in Kubernetenes.
-// The name of the minion according to etcd is in JSONBase.ID.
+// The name of the minion according to etcd is in TypeMeta.ID.
 type Minion struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	// Queried from cloud provider, if available.
 	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 	// Resources available on the node
@@ -477,7 +477,7 @@ func (*Minion) IsAnAPIObject() {}
 
 // MinionList is a list of minions.
 type MinionList struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	// DEPRECATED: the below Minions is due to a naming mistake and
 	// will be replaced with Items in the future.
 	Minions []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
@@ -488,7 +488,7 @@ func (*MinionList) IsAnAPIObject() {}
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
 type Binding struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	PodID    string `json:"podID" yaml:"podID"`
 	Host     string `json:"host" yaml:"host"`
 }
@@ -499,7 +499,7 @@ func (*Binding) IsAnAPIObject() {}
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
 type Status struct {
-	JSONBase `json:",inline" yaml:",inline"`
+	TypeMeta `json:",inline" yaml:",inline"`
 	// One of: "Success", "Failure", "Working" (for operations not yet completed)
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
 	// A human-readable description of the status of this operation.
@@ -653,14 +653,14 @@ const (
 
 // ServerOp is an operation delivered to API clients.
 type ServerOp struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 }
 
 func (*ServerOp) IsAnAPIObject() {}
 
 // ServerOpList is a list of operations, as delivered to API clients.
 type ServerOpList struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
@@ -687,7 +687,7 @@ type ObjectReference struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty" yaml:"involvedObject,omitempty"`
@@ -720,7 +720,7 @@ func (*Event) IsAnAPIObject() {}
 
 // EventList is a list of events.
 type EventList struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 	Items    []Event `yaml:"items,omitempty" json:"items,omitempty"`
 }
 

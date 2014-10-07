@@ -62,13 +62,13 @@ func init() {
 
 		// MinionList.Items had a wrong name in v1beta1
 		func(in *newer.MinionList, out *MinionList, s conversion.Scope) error {
-			s.Convert(&in.JSONBase, &out.JSONBase, 0)
+			s.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			s.Convert(&in.Items, &out.Items, 0)
 			out.Minions = out.Items
 			return nil
 		},
 		func(in *MinionList, out *newer.MinionList, s conversion.Scope) error {
-			s.Convert(&in.JSONBase, &out.JSONBase, 0)
+			s.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			if len(in.Items) == 0 {
 				s.Convert(&in.Minions, &out.Items, 0)
 			} else {

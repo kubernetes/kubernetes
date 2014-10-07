@@ -78,7 +78,7 @@ func (m *minionList) List() (currentMinions *api.MinionList, err error) {
 	minions := []api.Minion{}
 	for minion := range m.minions {
 		minions = append(minions, api.Minion{
-			JSONBase:      api.JSONBase{ID: minion},
+			TypeMeta:      api.TypeMeta{ID: minion},
 			NodeResources: m.nodeResources,
 		})
 	}

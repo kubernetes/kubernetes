@@ -29,9 +29,9 @@ import (
 func TestExtractList(t *testing.T) {
 	pl := &api.PodList{
 		Items: []api.Pod{
-			{JSONBase: api.JSONBase{ID: "1"}},
-			{JSONBase: api.JSONBase{ID: "2"}},
-			{JSONBase: api.JSONBase{ID: "3"}},
+			{TypeMeta: api.TypeMeta{ID: "1"}},
+			{TypeMeta: api.TypeMeta{ID: "2"}},
+			{TypeMeta: api.TypeMeta{ID: "3"}},
 		},
 	}
 	list, err := runtime.ExtractList(pl)
@@ -51,9 +51,9 @@ func TestExtractList(t *testing.T) {
 func TestSetList(t *testing.T) {
 	pl := &api.PodList{}
 	list := []runtime.Object{
-		&api.Pod{JSONBase: api.JSONBase{ID: "1"}},
-		&api.Pod{JSONBase: api.JSONBase{ID: "2"}},
-		&api.Pod{JSONBase: api.JSONBase{ID: "3"}},
+		&api.Pod{TypeMeta: api.TypeMeta{ID: "1"}},
+		&api.Pod{TypeMeta: api.TypeMeta{ID: "2"}},
+		&api.Pod{TypeMeta: api.TypeMeta{ID: "3"}},
 	}
 	err := runtime.SetList(pl, list)
 	if err != nil {

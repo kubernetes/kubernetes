@@ -21,9 +21,9 @@ import (
 	"reflect"
 )
 
-// NewJSONBaseResourceVersioner returns a ResourceVersioner that can set or
-// retrieve ResourceVersion on objects derived from JSONBase.
-func NewJSONBaseResourceVersioner() ResourceVersioner {
+// NewTypeMetaResourceVersioner returns a ResourceVersioner that can set or
+// retrieve ResourceVersion on objects derived from TypeMeta.
+func NewTypeMetaResourceVersioner() ResourceVersioner {
 	return jsonBaseModifier{}
 }
 
@@ -31,7 +31,7 @@ func NewJSONBaseResourceVersioner() ResourceVersioner {
 type jsonBaseModifier struct{}
 
 func (v jsonBaseModifier) ResourceVersion(obj Object) (uint64, error) {
-	json, err := FindJSONBase(obj)
+	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return 0, err
 	}
@@ -39,7 +39,7 @@ func (v jsonBaseModifier) ResourceVersion(obj Object) (uint64, error) {
 }
 
 func (v jsonBaseModifier) SetResourceVersion(obj Object, version uint64) error {
-	json, err := FindJSONBase(obj)
+	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (v jsonBaseModifier) SetResourceVersion(obj Object, version uint64) error {
 }
 
 func (v jsonBaseModifier) ID(obj Object) (string, error) {
-	json, err := FindJSONBase(obj)
+	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +56,7 @@ func (v jsonBaseModifier) ID(obj Object) (string, error) {
 }
 
 func (v jsonBaseModifier) SelfLink(obj Object) (string, error) {
-	json, err := FindJSONBase(obj)
+	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return "", err
 	}
@@ -64,7 +64,7 @@ func (v jsonBaseModifier) SelfLink(obj Object) (string, error) {
 }
 
 func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
-	json, err := FindJSONBase(obj)
+	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return err
 	}
@@ -72,14 +72,14 @@ func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
 	return nil
 }
 
-// NewJSONBaseSelfLinker returns a SelfLinker that works on all JSONBase SelfLink fields.
-func NewJSONBaseSelfLinker() SelfLinker {
+// NewTypeMetaSelfLinker returns a SelfLinker that works on all TypeMeta SelfLink fields.
+func NewTypeMetaSelfLinker() SelfLinker {
 	return jsonBaseModifier{}
 }
 
-// JSONBaseInterface lets you work with a JSONBase from any of the versioned or
+// TypeMetaInterface lets you work with a TypeMeta from any of the versioned or
 // internal APIObjects.
-type JSONBaseInterface interface {
+type TypeMetaInterface interface {
 	ID() string
 	SetID(ID string)
 	APIVersion() string
@@ -92,7 +92,7 @@ type JSONBaseInterface interface {
 	SetSelfLink(selfLink string)
 }
 
-type genericJSONBase struct {
+type genericTypeMeta struct {
 	id              *string
 	apiVersion      *string
 	kind            *string
@@ -100,43 +100,43 @@ type genericJSONBase struct {
 	selfLink        *string
 }
 
-func (g genericJSONBase) ID() string {
+func (g genericTypeMeta) ID() string {
 	return *g.id
 }
 
-func (g genericJSONBase) SetID(id string) {
+func (g genericTypeMeta) SetID(id string) {
 	*g.id = id
 }
 
-func (g genericJSONBase) APIVersion() string {
+func (g genericTypeMeta) APIVersion() string {
 	return *g.apiVersion
 }
 
-func (g genericJSONBase) SetAPIVersion(version string) {
+func (g genericTypeMeta) SetAPIVersion(version string) {
 	*g.apiVersion = version
 }
 
-func (g genericJSONBase) Kind() string {
+func (g genericTypeMeta) Kind() string {
 	return *g.kind
 }
 
-func (g genericJSONBase) SetKind(kind string) {
+func (g genericTypeMeta) SetKind(kind string) {
 	*g.kind = kind
 }
 
-func (g genericJSONBase) ResourceVersion() uint64 {
+func (g genericTypeMeta) ResourceVersion() uint64 {
 	return *g.resourceVersion
 }
 
-func (g genericJSONBase) SetResourceVersion(version uint64) {
+func (g genericTypeMeta) SetResourceVersion(version uint64) {
 	*g.resourceVersion = version
 }
 
-func (g genericJSONBase) SelfLink() string {
+func (g genericTypeMeta) SelfLink() string {
 	return *g.selfLink
 }
 
-func (g genericJSONBase) SetSelfLink(selfLink string) {
+func (g genericTypeMeta) SetSelfLink(selfLink string) {
 	*g.selfLink = selfLink
 }
 
@@ -165,11 +165,11 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("Couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
-// newGenericJSONBase creates a new generic JSONBase from v, which must be an
-// addressable/setable reflect.Value having the same fields as api.JSONBase.
+// newGenericTypeMeta creates a new generic TypeMeta from v, which must be an
+// addressable/setable reflect.Value having the same fields as api.TypeMeta.
 // Returns an error if this isn't the case.
-func newGenericJSONBase(v reflect.Value) (genericJSONBase, error) {
-	g := genericJSONBase{}
+func newGenericTypeMeta(v reflect.Value) (genericTypeMeta, error) {
+	g := genericTypeMeta{}
 	if err := fieldPtr(v, "ID", &g.id); err != nil {
 		return g, err
 	}

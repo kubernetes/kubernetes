@@ -116,10 +116,10 @@ func TestVolumeMountConversionToNew(t *testing.T) {
 
 func TestMinionListConversionToNew(t *testing.T) {
 	oldMinion := func(id string) v1beta1.Minion {
-		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
+		return v1beta1.Minion{TypeMeta: v1beta1.TypeMeta{ID: id}}
 	}
 	newMinion := func(id string) newer.Minion {
-		return newer.Minion{JSONBase: newer.JSONBase{ID: id}}
+		return newer.Minion{TypeMeta: newer.TypeMeta{ID: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
@@ -163,10 +163,10 @@ func TestMinionListConversionToNew(t *testing.T) {
 
 func TestMinionListConversionToOld(t *testing.T) {
 	oldMinion := func(id string) v1beta1.Minion {
-		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
+		return v1beta1.Minion{TypeMeta: v1beta1.TypeMeta{ID: id}}
 	}
 	newMinion := func(id string) newer.Minion {
-		return newer.Minion{JSONBase: newer.JSONBase{ID: id}}
+		return newer.Minion{TypeMeta: newer.TypeMeta{ID: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),

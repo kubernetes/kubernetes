@@ -244,7 +244,7 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: latest.Version},
+			TypeMeta: api.TypeMeta{ID: "atomicservice", APIVersion: latest.Version},
 			Port:     12345,
 			Labels: map[string]string{
 				"name": "atomicService",
@@ -318,7 +318,7 @@ func runAtomicPutTest(c *client.Client) {
 func runServiceTest(client *client.Client) {
 	ctx := api.NewDefaultContext()
 	pod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
@@ -348,7 +348,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	svc := api.Service{
-		JSONBase: api.JSONBase{ID: "service1"},
+		TypeMeta: api.TypeMeta{ID: "service1"},
 		Selector: map[string]string{
 			"name": "thisisalonglabel",
 		},
