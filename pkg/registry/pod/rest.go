@@ -340,5 +340,4 @@ func (rs *REST) waitForPodRunning(ctx api.Context, pod *api.Pod) (runtime.Object
 			time.Sleep(rs.podPollPeriod)
 		}
 	}
-	return pod, nil
 }
