@@ -266,6 +266,7 @@ var supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
+// DEPRECATED: replaced by PodSpec
 func ValidateManifest(manifest *api.ContainerManifest) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
@@ -278,6 +279,19 @@ func ValidateManifest(manifest *api.ContainerManifest) errs.ErrorList {
 	allErrs = append(allErrs, vErrs.Prefix("volumes")...)
 	allErrs = append(allErrs, validateContainers(manifest.Containers, allVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&manifest.RestartPolicy).Prefix("restartPolicy")...)
+	return allErrs
+}
+
+// ValidatePodSpec tests that the specified PodSpec has valid data.
+// This includes checking formatting and uniqueness.  It also canonicalizes the
+// structure by setting default values and implementing any backwards-compatibility
+// tricks.
+func ValidatePodSpec(spec *api.PodSpec) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	allVolumes, vErrs := validateVolumes(spec.Volumes)
+	allErrs = append(allErrs, vErrs.Prefix("volumes")...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
+	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	return allErrs
 }
 
@@ -302,11 +316,6 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ErrorList {
 	return allErrors
 }
 
-func ValidatePodState(podState *api.PodStatus) errs.ErrorList {
-	allErrs := errs.ErrorList(ValidateManifest(&podState.Manifest)).Prefix("manifest")
-	return allErrs
-}
-
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
@@ -316,7 +325,7 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 	if !util.IsDNSSubdomain(pod.Metadata.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Metadata.Namespace))
 	}
-	allErrs = append(allErrs, ValidatePodState(&pod.Spec).Prefix("desiredState")...)
+	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec).Prefix("spec")...)
 	return allErrs
 }
 
@@ -324,23 +333,23 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 func ValidateService(service *api.Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(service.Metadata.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", service.Metadata.Name))
+		allErrs = append(allErrs, errs.NewFieldRequired("metadata.name", service.Metadata.Name))
 	} else if !util.IsDNS952Label(service.Metadata.Name) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.Metadata.Name))
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.name", service.Metadata.Name))
 	}
 	if !util.IsDNSSubdomain(service.Metadata.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Metadata.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("metadata.namespace", service.Metadata.Namespace))
 	}
 	if !util.IsValidPortNum(service.Spec.Port) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("port", service.Spec.Port))
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port))
 	}
 	if len(service.Spec.Protocol) == 0 {
 		service.Spec.Protocol = "TCP"
 	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
-		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", service.Spec.Protocol))
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
 	}
 	if labels.Set(service.Spec.Selector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Spec.Selector))
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.selector", service.Spec.Selector))
 	}
 	return allErrs
 }
@@ -349,29 +358,30 @@ func ValidateService(service *api.Service) errs.ErrorList {
 func ValidateReplicationController(controller *api.ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if len(controller.Metadata.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.Metadata.Name))
+		allErrs = append(allErrs, errs.NewFieldRequired("metadata.name", controller.Metadata.Name))
 	}
 	if !util.IsDNSSubdomain(controller.Metadata.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Metadata.Namespace))
+		allErrs = append(allErrs, errs.NewFieldInvalid("metdata.namespace", controller.Metadata.Namespace))
 	}
-	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.Spec).Prefix("desiredState")...)
+	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
 	return allErrs
 }
 
 // ValidateReplicationControllerState tests if required fields in the replication controller state are set.
-func ValidateReplicationControllerState(state *api.ReplicationControllerState) errs.ErrorList {
+func ValidateReplicationControllerSpec(state *api.ReplicationControllerSpec) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if labels.Set(state.ReplicaSelector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("replicaSelector", state.ReplicaSelector))
-	}
-	selector := labels.Set(state.ReplicaSelector).AsSelector()
-	labels := labels.Set(state.PodTemplate.Labels)
-	if !selector.Matches(labels) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("podTemplate.labels", state.PodTemplate))
+	if labels.Set(state.Selector).AsSelector().Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector", state.Selector))
 	}
 	if state.Replicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
-	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.Spec).Prefix("podTemplate.desiredState.manifest")...)
+	/* TODO: restore by loading template
+	selector := labels.Set(state.Selector).AsSelector()
+	labels := labels.Set(state.Template.Metadata.Labels)
+	if !selector.Matches(labels) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("template.metadata.labels", state.Template))
+	}
+	allErrs = append(allErrs, ValidatePodSpec(&state.Template.Spec).Prefix("template.spec")...)*/
 	return allErrs
 }
