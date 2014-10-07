@@ -43,11 +43,11 @@ func IsExitError(err error) bool {
 	return ok
 }
 
-func (e *ExecHealthChecker) HealthCheck(podFullName string, currentState api.PodStatus, container api.Container) (Status, error) {
+func (e *ExecHealthChecker) HealthCheck(podFullName, podUID string, status api.PodStatus, container api.Container) (Status, error) {
 	if container.LivenessProbe.Exec == nil {
 		return Unknown, fmt.Errorf("Missing exec parameters")
 	}
-	data, err := e.runner.RunInContainer(podFullName, currentState.Manifest.UUID, container.Name, container.LivenessProbe.Exec.Command)
+	data, err := e.runner.RunInContainer(podFullName, podUID, container.Name, container.LivenessProbe.Exec.Command)
 	glog.V(1).Infof("container %s failed health check: %s", podFullName, string(data))
 	if err != nil {
 		if IsExitError(err) {

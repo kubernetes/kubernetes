@@ -123,7 +123,7 @@ func TestHTTPHealthChecker(t *testing.T) {
 			params.Port = util.NewIntOrStringFromString(port)
 			params.Host = host
 		}
-		health, err := hc.HealthCheck("test", api.PodStatus{PodIP: host}, container)
+		health, err := hc.HealthCheck("test", "uid", api.PodStatus{PodIP: host}, container)
 		if test.health == Unknown && err == nil {
 			t.Errorf("Expected error")
 		}

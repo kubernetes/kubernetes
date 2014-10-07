@@ -506,7 +506,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 
 type FalseHealthChecker struct{}
 
-func (f *FalseHealthChecker) HealthCheck(podFullName string, state api.PodStatus, container api.Container) (health.Status, error) {
+func (f *FalseHealthChecker) HealthCheck(podFullName, podUID string, status api.PodStatus, container api.Container) (health.Status, error) {
 	return health.Unhealthy, nil
 }
 
