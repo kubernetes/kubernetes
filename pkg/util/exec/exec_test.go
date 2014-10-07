@@ -23,7 +23,7 @@ import (
 func TestExecutorNoArgs(t *testing.T) {
 	ex := New()
 
-	cmd := ex.Command("/bin/true")
+	cmd := ex.Command("true")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Errorf("expected success, got %+v", err)
@@ -32,7 +32,7 @@ func TestExecutorNoArgs(t *testing.T) {
 		t.Errorf("expected no output, got %q", string(out))
 	}
 
-	cmd = ex.Command("/bin/false")
+	cmd = ex.Command("false")
 	out, err = cmd.CombinedOutput()
 	if err == nil {
 		t.Errorf("expected failure, got nil error")
