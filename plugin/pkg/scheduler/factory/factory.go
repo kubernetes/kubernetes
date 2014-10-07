@@ -64,6 +64,7 @@ func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
+	// TODO: remove this construction-time listing.
 	nodes, err := factory.Client.ListMinions()
 	if err != nil {
 		return nil, err

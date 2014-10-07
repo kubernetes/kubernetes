@@ -136,7 +136,12 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	handler.delegate = mux
 
 	// Scheduler
-	scheduler.New((&factory.ConfigFactory{cl}).Create()).Run()
+	schedulerConfigFactory := &factory.ConfigFactory{cl}
+	schedulerConfig, err := schedulerConfigFactory.Create()
+	if err != nil {
+		glog.Fatalf("Unable to construct scheduler config: %v", err)
+	}
+	scheduler.New(schedulerConfig).Run()
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
