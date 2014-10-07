@@ -295,7 +295,7 @@ func (kl *Kubelet) newActionHandler(handler *api.Handler) actionHandler {
 	case handler.HTTPGet != nil:
 		return &httpActionHandler{client: kl.httpClient, kubelet: kl}
 	default:
-		glog.Errorf("Invalid handler: %v")
+		glog.Errorf("Invalid handler: %v", handler)
 		return nil
 	}
 }
