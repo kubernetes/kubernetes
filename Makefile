@@ -83,3 +83,11 @@ clean:
 vet:
 	hack/vet-go.sh $(WHAT) $(TESTS)
 .PHONY: vet
+
+# Build a release
+#
+# Example:
+#   make clean
+release:
+	build/release.sh
+.PHONY: release
