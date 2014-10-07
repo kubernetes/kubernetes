@@ -32,6 +32,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 * [Discussion and Community Support](#community-discussion-and-support)
 * [Hacking on Kubernetes](#development)
 * [Hacking on Kubernetes Salt configuration](docs/salt.md)
+* [Kubernetes User Interface](docs/ux.md)
 
 ## Where to go next?
 
