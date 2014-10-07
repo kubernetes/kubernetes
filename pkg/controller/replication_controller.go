@@ -144,7 +144,7 @@ func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 }
 
 func (rm *ReplicationManager) syncReplicationController(controllerSpec api.ReplicationController) error {
-	s := labels.Set(controllerSpec.Spec.ReplicaSelector).AsSelector()
+	s := labels.Set(controllerSpec.Spec.Selector).AsSelector()
 	ctx := api.WithNamespace(api.NewContext(), controllerSpec.Namespace)
 	podList, err := rm.kubeClient.ListPods(ctx, s)
 	if err != nil {

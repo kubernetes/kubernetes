@@ -27,7 +27,7 @@ import (
 func (c *Client) ControllerHasDesiredReplicas(controller api.ReplicationController) wait.ConditionFunc {
 	return func() (bool, error) {
 		ctx := api.WithNamespace(api.NewContext(), controller.Metadata.Namespace)
-		pods, err := c.ListPods(ctx, labels.Set(controller.Spec.ReplicaSelector).AsSelector())
+		pods, err := c.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
 		if err != nil {
 			return false, err
 		}

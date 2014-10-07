@@ -175,7 +175,7 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 
 func (rs *REST) waitForController(ctx api.Context, ctrl *api.ReplicationController) (runtime.Object, error) {
 	for {
-		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.Spec.ReplicaSelector).AsSelector())
+		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.Spec.Selector).AsSelector())
 		if err != nil {
 			return ctrl, err
 		}
@@ -191,7 +191,7 @@ func (rs *REST) fillCurrentState(ctx api.Context, ctrl *api.ReplicationControlle
 	if rs.podLister == nil {
 		return nil
 	}
-	list, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.Spec.ReplicaSelector).AsSelector())
+	list, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.Spec.Selector).AsSelector())
 	if err != nil {
 		return err
 	}

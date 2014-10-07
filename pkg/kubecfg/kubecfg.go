@@ -106,7 +106,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 		}
 	}
 
-	s := labels.Set(controller.Spec.ReplicaSelector).AsSelector()
+	s := labels.Set(controller.Spec.Selector).AsSelector()
 
 	podList, err := client.ListPods(ctx, s)
 	if err != nil {
