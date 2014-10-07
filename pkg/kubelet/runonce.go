@@ -59,7 +59,8 @@ func (kl *Kubelet) runOnce(pods []Pod) (results []RunPodResult, err error) {
 	pods = filterHostPortConflicts(pods)
 
 	ch := make(chan RunPodResult)
-	for _, pod := range pods {
+	for i := range pods {
+		pod := pods[i] // Make a copy
 		go func() {
 			info, err := kl.runPod(pod)
 			ch <- RunPodResult{&pod, info, err}
