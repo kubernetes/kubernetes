@@ -26,6 +26,7 @@ source hack/config-go.sh
 
 # Incoming options
 #
+readonly KUBE_SKIP_CONFIRMATIONS="${KUBE_SKIP_CONFIRMATIONS:-n}"
 readonly KUBE_BUILD_RUN_IMAGES="${KUBE_BUILD_RUN_IMAGES:-n}"
 readonly KUBE_GCS_UPLOAD_RELEASE="${KUBE_GCS_UPLOAD_RELEASE:-n}"
 readonly KUBE_GCS_NO_CACHING="${KUBE_GCS_NO_CACHING:-y}"
@@ -142,14 +143,43 @@ function kube::build::clean_output() {
   rm -rf "${LOCAL_OUTPUT_ROOT}"
 }
 
+# Detect if a specific image exists
+#
+# $1 - image repo name
+# #2 - image tag
+function kube::build::docker_image_exists() {
+  [[ -n $1 && -n $2 ]] || {
+    echo "!!! Internal error. Image not specified in docker_image_exists." >&2
+    exit 2
+  }
+
+  # We cannot just specify the IMAGE here as `docker images` doesn't behave as
+  # expected.  See: https://github.com/docker/docker/issues/8048
+  docker images | grep -Eq "^${1}\s+${2}\s+"
+}
+
 # ---------------------------------------------------------------------------
 # Building
 
-# Returns 0 if the image is already built.  Otherwise 1
 function kube::build::build_image_built() {
-  # We cannot just specify the IMAGE here as `docker images` doesn't behave as
-  # expected.  See: https://github.com/docker/docker/issues/8048
-  docker images | grep -q "${KUBE_BUILD_IMAGE_REPO}\s*${KUBE_BUILD_IMAGE_TAG}"
+  kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
+}
+
+function kube::build::ensure_golang_cross() {
+  kube::build::docker_image_exists golang cross || {
+    [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
+      echo "You don't have a local copy of the golang:cross docker image. This image is 1.8GB."
+      read -p "Download it now? [y/n] " -n 1 -r
+      echo
+      [[ $REPLY =~ ^[yY]$ ]] || {
+        echo "Aborting." >&2
+        exit 1
+      }
+    }
+
+    echo "+++ Pulling docker image: golang:cross"
+    docker pull golang:cross
+  }
 }
 
 # Set up the context directory for the kube-build image and build it.
@@ -169,6 +199,9 @@ function kube::build::build_image() {
     README.md
     third_party
   )
+
+  kube::build::ensure_golang_cross
+
   mkdir -p "${build_context_dir}"
   tar czf "${build_context_dir}/kube-source.tar.gz" "${source[@]}"
   cat >"${build_context_dir}/kube-version-defs" <<EOF
@@ -181,7 +214,7 @@ EOF
 # Builds the runtime image.  Assumes that the appropriate binaries are already
 # built and in _output/build/.
 function kube::build::run_image() {
-  [[ "${KUBE_BUILD_RUN_IMAGES}" == "y" ]] || return 0
+  [[ ${KUBE_BUILD_RUN_IMAGES} =~ ^[yY]$ ]] || return 0
 
   local -r build_context_base="${LOCAL_OUTPUT_ROOT}/images/${KUBE_RUN_IMAGE_BASE}"
 
@@ -210,7 +243,7 @@ function kube::build::docker_build() {
   local -r context_dir=$2
   local -ra build_cmd=(docker build -t "${image}" "${context_dir}")
 
-  echo "+++ Building Docker image ${image}. This can take a while."
+  echo "+++ Building Docker image ${image}."
   local docker_output
   docker_output=$("${build_cmd[@]}" 2>&1) || {
     cat <<EOF >&2
@@ -423,7 +456,7 @@ function kube::release::package_full_tarball() {
 # GCS Release
 
 function kube::release::gcs::release() {
-  [[ "${KUBE_GCS_UPLOAD_RELEASE}" == "y" ]] || return 0
+  [[ ${KUBE_GCS_UPLOAD_RELEASE} =~ ^[yY]$ ]] || return 0
 
   kube::release::gcs::verify_prereqs
   kube::release::gcs::ensure_release_bucket
@@ -519,7 +552,7 @@ function kube::release::gcs::ensure_docker_registry() {
 }
 
 function kube::release::gcs::push_images() {
-  [[ "${KUBE_BUILD_RUN_IMAGES}" == "y" ]] || return 0
+  [[ ${KUBE_BUILD_RUN_IMAGES} =~ ^[yY]$ ]] || return 0
 
   kube::release::gcs::ensure_docker_registry
 
@@ -542,7 +575,7 @@ function kube::release::gcs::copy_release_tarballs() {
   local -r gcs_destination="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_RELEASE_PREFIX}"
   local gcs_options=()
 
-  if [[ ${KUBE_GCS_NO_CACHING} == "y" ]]; then
+  if [[ ${KUBE_GCS_NO_CACHING} =~ ^[yY]$ ]]; then
     gcs_options=("-h" "Cache-Control:private, max-age=0")
   fi
 
@@ -554,7 +587,7 @@ function kube::release::gcs::copy_release_tarballs() {
   # Now upload everything in release directory
   gsutil -m "${gcs_options[@]-}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}" >/dev/null 2>&1
 
-  if [[ ${KUBE_GCS_MAKE_PUBLIC} == "y" ]]; then
+  if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
     gsutil acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
   fi
 

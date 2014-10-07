@@ -48,6 +48,7 @@ The release utilities grab a set of environment variables to modify behavior.  A
 
 Env Variable | Default | Description
 -------------|---------|------------
+`KUBE_SKIP_CONFIRMATIONS` | `n` | If `y` then no questions are asked and the scripts just continue.
 `KUBE_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
 `KUBE_GCS_RELEASE_BUCKET` | `kubernetes-releases-${project_hash}` | The bucket to upload releases to
 `KUBE_GCS_RELEASE_PREFIX` | `devel/` | The path under the release bucket to put releases
