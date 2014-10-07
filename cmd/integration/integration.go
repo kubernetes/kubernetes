@@ -232,7 +232,7 @@ func runReplicationControllerTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}
-	if err := wait.Poll(time.Second, time.Second*30, podsOnMinions(c, *pods)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*120, podsOnMinions(c, *pods)); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 
