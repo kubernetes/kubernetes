@@ -368,6 +368,9 @@ func (s *Scheme) CopyOrDie(obj Object) Object {
 	return newObj
 }
 
+// ObjectDiff writes the two objects out as JSON and prints out the identical part of
+// the objects followed by the remaining part of 'a' and finally the remaining part of 'b'.
+// For debugging tests.
 func ObjectDiff(a, b Object) string {
 	ab, err := json.Marshal(a)
 	if err != nil {
@@ -378,10 +381,13 @@ func ObjectDiff(a, b Object) string {
 		panic(fmt.Sprintf("b: %v", err))
 	}
 	return util.StringDiff(string(ab), string(bb))
+}
 
-	// An alternate diff attempt, in case json isn't showing you
-	// the difference. (reflect.DeepEqual makes a distinction between
-	// nil and empty slices, for example.)
+// ObjectGoPrintDiff is like ObjectDiff, but uses go's %#v formatter to print the
+// objects, in case json isn't showing you the difference. (reflect.DeepEqual makes
+// a distinction between nil and empty slices, for example, even though nothing else
+// really does.)
+func ObjectGoPrintDiff(a, b Object) string {
 	return util.StringDiff(
 		fmt.Sprintf("%#v", a),
 		fmt.Sprintf("%#v", b),

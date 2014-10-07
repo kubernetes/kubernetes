@@ -44,12 +44,13 @@ import (
 )
 
 // serviceConfig is a deserialized form of the config file format which ConfigSourceFile accepts.
+// TODO: this is apparently untested; is it used?
 type serviceConfig struct {
 	Services []struct {
 		Name      string   `json: "name"`
 		Port      int      `json: "port"`
 		Endpoints []string `json: "endpoints"`
-	} `json: "service"`
+	} `json:"service"`
 }
 
 // ConfigSourceFile periodically reads service configurations in JSON from a file, and sends the services and endpoints defined in the file to the specified channels.

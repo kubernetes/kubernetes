@@ -252,7 +252,7 @@ type TypeMeta struct {
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	Namespace         string    `json:"namespace",omitempty" yaml:"namespace,omitempty"`
+	Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
 
 	// Annotations are unstructured key value data stored with a resource that may be set by
