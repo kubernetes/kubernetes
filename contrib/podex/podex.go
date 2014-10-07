@@ -68,6 +68,10 @@ func main() {
 	baseName := parts[len(parts)-1]
 
 	dockerHost := os.Getenv("DOCKER_HOST")
+	if dockerHost == "" {
+		log.Fatalf("DOCKER_HOST is not set")
+	}
+
 	docker, err := dockerclient.NewClient(dockerHost)
 	if err != nil {
 		log.Fatalf("failed to connect to %q: %v", dockerHost, err)
