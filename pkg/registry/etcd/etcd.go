@@ -74,7 +74,7 @@ func (r *Registry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool
 			// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 			// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
 			// matches our desires.
-			pod.CurrentState.Host = pod.DesiredState.Host
+			pod.CurrentState.Host = pod.Spec.Host
 			filtered = append(filtered, pod)
 		}
 	}
@@ -104,7 +104,7 @@ func (r *Registry) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
 	// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 	// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
 	// matches our desires.
-	pod.CurrentState.Host = pod.DesiredState.Host
+	pod.CurrentState.Host = pod.Spec.Host
 	return &pod, nil
 }
 
@@ -117,9 +117,9 @@ func (r *Registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	// Set current status to "Waiting".
 	pod.CurrentState.Status = api.PodWaiting
 	pod.CurrentState.Host = ""
-	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
-	pod.DesiredState.Status = api.PodRunning
-	pod.DesiredState.Host = ""
+	// Spec.Host == "" is a signal to the scheduler that this pod needs scheduling.
+	pod.Spec.Status = api.PodRunning
+	pod.Spec.Host = ""
 	err := r.CreateObj(makePodKey(pod.ID), pod, 0)
 	return etcderr.InterpretCreateError(err, "pod", pod.ID)
 }
@@ -138,10 +138,10 @@ func (r *Registry) setPodHostTo(podID, oldMachine, machine string) (finalPod *ap
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
-		if pod.DesiredState.Host != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.ID, pod.DesiredState.Host)
+		if pod.Spec.Host != oldMachine {
+			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.ID, pod.Spec.Host)
 		}
-		pod.DesiredState.Host = machine
+		pod.Spec.Host = machine
 		finalPod = pod
 		return pod, nil
 	})
@@ -196,7 +196,7 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 	if err != nil {
 		return etcderr.InterpretDeleteError(err, "pod", podID)
 	}
-	machine := pod.DesiredState.Host
+	machine := pod.Spec.Host
 	if machine == "" {
 		// Pod was never scheduled anywhere, just return.
 		return nil

@@ -36,9 +36,9 @@ func (b *BasicManifestFactory) MakeManifest(machine string, pod api.Pod) (api.Co
 	if err != nil {
 		return api.ContainerManifest{}, err
 	}
-	for ix, container := range pod.DesiredState.Manifest.Containers {
-		pod.DesiredState.Manifest.ID = pod.ID
-		pod.DesiredState.Manifest.Containers[ix].Env = append(container.Env, envVars...)
+	for ix, container := range pod.Spec.Manifest.Containers {
+		pod.Spec.Manifest.ID = pod.ID
+		pod.Spec.Manifest.Containers[ix].Env = append(container.Env, envVars...)
 	}
-	return pod.DesiredState.Manifest, nil
+	return pod.Spec.Manifest, nil
 }

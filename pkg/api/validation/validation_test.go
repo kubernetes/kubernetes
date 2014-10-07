@@ -370,7 +370,7 @@ func TestValidatePod(t *testing.T) {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 				ID:      "abc",
@@ -388,7 +388,7 @@ func TestValidatePod(t *testing.T) {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
 		},
 	})
@@ -401,7 +401,7 @@ func TestValidatePod(t *testing.T) {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 				ID:      "abc",
@@ -545,7 +545,7 @@ func TestValidateService(t *testing.T) {
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 			},
@@ -556,14 +556,14 @@ func TestValidateReplicationController(t *testing.T) {
 	successCases := []api.ReplicationController{
 		{
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		{
 			Metadata: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
@@ -578,40 +578,40 @@ func TestValidateReplicationController(t *testing.T) {
 	errorCases := map[string]api.ReplicationController{
 		"zero-length ID": {
 			JSONBase: api.JSONBase{ID: "", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"missing-namespace": {
 			Metadata: api.ObjectMeta{Name: "abc-123"},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"empty selector": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				PodTemplate: validPodTemplate,
 			},
 		},
 		"selector_doesnt_match": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"foo": "bar"},
 				PodTemplate:     validPodTemplate,
 			},
 		},
 		"invalid manifest": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: validSelector,
 			},
 		},
 		"negative_replicas": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				Replicas:        -1,
 				ReplicaSelector: validSelector,
 			},

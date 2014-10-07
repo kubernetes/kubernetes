@@ -203,7 +203,7 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.ListPods(ctx, labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	pods, err := c.ListPods(ctx, labels.Set(controllerRequest.Spec.ReplicaSelector).AsSelector())
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}

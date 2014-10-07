@@ -74,9 +74,9 @@ func TestUpdateWithNewImage(t *testing.T) {
 			},
 		},
 		Ctrl: api.ReplicationController{
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				PodTemplate: api.PodTemplate{
-					DesiredState: api.PodState{
+					Spec: api.PodState{
 						Manifest: api.ContainerManifest{
 							Containers: []api.Container{
 								{Image: "fooImage:1"},
@@ -94,7 +94,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
 
 	newCtrl := api.Scheme.CopyOrDie(&fakeClient.Ctrl).(*api.ReplicationController)
-	newCtrl.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = "fooImage:2"
+	newCtrl.Spec.PodTemplate.Spec.Manifest.Containers[0].Image = "fooImage:2"
 	validateAction(client.FakeAction{Action: "update-controller", Value: newCtrl}, fakeClient.Actions[1], t)
 
 	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[2], t)
@@ -115,8 +115,8 @@ func TestRunController(t *testing.T) {
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
 	if controller.ID != name ||
-		controller.DesiredState.Replicas != replicas ||
-		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
+		controller.Spec.Replicas != replicas ||
+		controller.Spec.PodTemplate.Spec.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
 	}
 }
@@ -134,8 +134,8 @@ func TestRunControllerWithService(t *testing.T) {
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
 	if controller.ID != name ||
-		controller.DesiredState.Replicas != replicas ||
-		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
+		controller.Spec.Replicas != replicas ||
+		controller.Spec.PodTemplate.Spec.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
 	}
 }
@@ -153,7 +153,7 @@ func TestStopController(t *testing.T) {
 	}
 	controller := fakeClient.Actions[1].Value.(*api.ReplicationController)
 	if fakeClient.Actions[1].Action != "update-controller" ||
-		controller.DesiredState.Replicas != 0 {
+		controller.Spec.Replicas != 0 {
 		t.Errorf("Unexpected Action: %#v", fakeClient.Actions[1])
 	}
 }
@@ -172,7 +172,7 @@ func TestResizeController(t *testing.T) {
 	}
 	controller := fakeClient.Actions[1].Value.(*api.ReplicationController)
 	if fakeClient.Actions[1].Action != "update-controller" ||
-		controller.DesiredState.Replicas != 17 {
+		controller.Spec.Replicas != 17 {
 		t.Errorf("Unexpected Action: %#v", fakeClient.Actions[1])
 	}
 }
@@ -200,7 +200,7 @@ func TestCloudCfgDeleteController(t *testing.T) {
 func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 	fakeClient := client.Fake{
 		Ctrl: api.ReplicationController{
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				Replicas: 2,
 			},
 		},

@@ -290,7 +290,7 @@ func TestListControllers(t *testing.T) {
 				Items: []api.ReplicationController{
 					{
 						Metadata: api.ObjectMeta{Name: "foo"},
-						DesiredState: api.ReplicationControllerState{
+						Spec: api.ReplicationControllerState{
 							Replicas: 2,
 						},
 						Labels: map[string]string{
@@ -314,7 +314,7 @@ func TestGetController(t *testing.T) {
 			StatusCode: 200,
 			Body: &api.ReplicationController{
 				Metadata: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerState{
 					Replicas: 2,
 				},
 				Labels: map[string]string{
@@ -338,7 +338,7 @@ func TestUpdateController(t *testing.T) {
 			StatusCode: 200,
 			Body: &api.ReplicationController{
 				Metadata: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerState{
 					Replicas: 2,
 				},
 				Labels: map[string]string{
@@ -371,7 +371,7 @@ func TestCreateController(t *testing.T) {
 			StatusCode: 200,
 			Body: &api.ReplicationController{
 				Metadata: api.ObjectMeta{Name: "foo"},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerState{
 					Replicas: 2,
 				},
 				Labels: map[string]string{

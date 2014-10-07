@@ -99,14 +99,14 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 	}
 
 	if len(imageName) != 0 {
-		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = imageName
+		controller.Spec.PodTemplate.Spec.Manifest.Containers[0].Image = imageName
 		controller, err = client.UpdateReplicationController(ctx, controller)
 		if err != nil {
 			return err
 		}
 	}
 
-	s := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
+	s := labels.Set(controller.Spec.ReplicaSelector).AsSelector()
 
 	podList, err := client.ListPods(ctx, s)
 	if err != nil {
@@ -145,7 +145,7 @@ func ResizeController(ctx api.Context, name string, replicas int, client client.
 	if err != nil {
 		return err
 	}
-	controller.DesiredState.Replicas = replicas
+	controller.Spec.Replicas = replicas
 	controllerOut, err := client.UpdateReplicationController(ctx, controller)
 	if err != nil {
 		return err
@@ -207,13 +207,13 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 		JSONBase: api.JSONBase{
 			ID: name,
 		},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: replicas,
 			ReplicaSelector: map[string]string{
 				"simpleService": name,
 			},
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						Version: "v1beta2",
 						Containers: []api.Container{
@@ -278,8 +278,8 @@ func DeleteController(ctx api.Context, name string, client client.Interface) err
 	if err != nil {
 		return err
 	}
-	if controller.DesiredState.Replicas != 0 {
-		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.DesiredState.Replicas)
+	if controller.Spec.Replicas != 0 {
+		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.Spec.Replicas)
 	}
 	return client.DeleteReplicationController(ctx, name)
 }

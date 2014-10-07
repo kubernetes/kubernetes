@@ -68,7 +68,7 @@ func newPod(host string, hostPorts ...int) api.Pod {
 		CurrentState: api.PodState{
 			Host: host,
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
 					{

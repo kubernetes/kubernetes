@@ -70,7 +70,7 @@ var testParser = NewParser(map[string]runtime.Object{
 func TestParsePod(t *testing.T) {
 	DoParseTest(t, "pods", &api.Pod{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "test pod", Kind: "Pod"},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "My manifest",
 				Containers: []api.Container{
@@ -100,10 +100,10 @@ func TestParseService(t *testing.T) {
 func TestParseController(t *testing.T) {
 	DoParseTest(t, "replicationControllers", &api.ReplicationController{
 		JSONBase: api.JSONBase{APIVersion: "v1beta1", ID: "my controller", Kind: "ReplicationController"},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: 9001,
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						ID: "My manifest",
 						Containers: []api.Container{

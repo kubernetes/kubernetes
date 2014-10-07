@@ -54,7 +54,7 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 		})
 	}
 	return api.Pod{
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: containers,
 			},

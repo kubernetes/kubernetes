@@ -87,7 +87,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
 					{
@@ -190,7 +190,7 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if existingPod.DesiredState.Host == "machine" {
+	if existingPod.Spec.Host == "machine" {
 		t.Fatal("Pod's host changed in response to an non-apply-able binding.")
 	}
 }
@@ -216,7 +216,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "foo",
 				Containers: []api.Container{
@@ -282,7 +282,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "foo",
 				Containers: []api.Container{
@@ -336,7 +336,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
 		Metadata: api.ObjectMeta{Name: "foo"},
-		DesiredState: api.PodState{Host: "machine"},
+		Spec:     api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
 		Items: []api.ContainerManifest{
@@ -373,7 +373,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
 		Metadata: api.ObjectMeta{Name: "foo"},
-		DesiredState: api.PodState{Host: "machine"},
+		Spec:     api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
 		Items: []api.ContainerManifest{
@@ -459,13 +459,13 @@ func TestEtcdListPods(t *testing.T) {
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
 							Metadata: api.ObjectMeta{Name: "foo"},
-							DesiredState: api.PodState{Host: "machine"},
+							Spec:     api.PodState{Host: "machine"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
 							Metadata: api.ObjectMeta{Name: "bar"},
-							DesiredState: api.PodState{Host: "machine"},
+							Spec:     api.PodState{Host: "machine"},
 						}),
 					},
 				},
@@ -662,7 +662,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.UpdateController(ctx, &api.ReplicationController{
 		Metadata: api.ObjectMeta{Name: "foo", ResourceVersion: resp.Node.ModifiedIndex},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: 2,
 		},
 	})
@@ -671,7 +671,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	}
 
 	ctrl, err := registry.GetController(ctx, "foo")
-	if ctrl.DesiredState.Replicas != 2 {
+	if ctrl.Spec.Replicas != 2 {
 		t.Errorf("Unexpected controller: %#v", ctrl)
 	}
 }
@@ -868,7 +868,7 @@ func TestEtcdGetEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := &api.Endpoints{
-		Metadata: api.ObjectMeta{Name: "foo"},
+		Metadata:  api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"127.0.0.1:34855"},
 	}
 
@@ -890,7 +890,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient.TestIndex = true
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := api.Endpoints{
-		Metadata: api.ObjectMeta{Name: "foo"},
+		Metadata:  api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"baz", "bar"},
 	}
 

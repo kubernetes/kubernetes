@@ -67,7 +67,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		controller.ID = uuid.NewUUID().String()
 	}
 	// Pod Manifest ID should be assigned by the pod API
-	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
+	controller.Spec.PodTemplate.Spec.Manifest.ID = ""
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
 	}
@@ -175,11 +175,11 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 
 func (rs *REST) waitForController(ctx api.Context, ctrl *api.ReplicationController) (runtime.Object, error) {
 	for {
-		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.Spec.ReplicaSelector).AsSelector())
 		if err != nil {
 			return ctrl, err
 		}
-		if len(pods.Items) == ctrl.DesiredState.Replicas {
+		if len(pods.Items) == ctrl.Spec.Replicas {
 			break
 		}
 		time.Sleep(rs.pollPeriod)
@@ -191,7 +191,7 @@ func (rs *REST) fillCurrentState(ctx api.Context, ctrl *api.ReplicationControlle
 	if rs.podLister == nil {
 		return nil
 	}
-	list, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+	list, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.Spec.ReplicaSelector).AsSelector())
 	if err != nil {
 		return err
 	}

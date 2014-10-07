@@ -136,13 +136,13 @@ func TestControllerParsing(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "nginxController",
 		},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: 2,
 			ReplicaSelector: map[string]string{
 				"name": "nginx",
 			},
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{
@@ -204,7 +204,7 @@ func TestControllerParsing(t *testing.T) {
 }
 
 var validPodTemplate = api.PodTemplate{
-	DesiredState: api.PodState{
+	Spec: api.PodState{
 		Manifest: api.ContainerManifest{
 			Version: "v1beta1",
 			Containers: []api.Container{
@@ -237,7 +237,7 @@ func TestCreateController(t *testing.T) {
 	}
 	controller := &api.ReplicationController{
 		Metadata: api.ObjectMeta{Name: "test"},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas:        2,
 			ReplicaSelector: map[string]string{"a": "b"},
 			PodTemplate:     validPodTemplate,
@@ -270,13 +270,13 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			Metadata:     api.ObjectMeta{Name: "abc"},
-			DesiredState: api.ReplicationControllerState{},
+			Metadata: api.ObjectMeta{Name: "abc"},
+			Spec:     api.ReplicationControllerState{},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -301,13 +301,13 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
 			JSONBase: api.JSONBase{ID: ""},
-			DesiredState: api.ReplicationControllerState{
+			Spec: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			Metadata:     api.ObjectMeta{Name: "abc"},
-			DesiredState: api.ReplicationControllerState{},
+			Metadata: api.ObjectMeta{Name: "abc"},
+			Spec:     api.ReplicationControllerState{},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -348,7 +348,7 @@ func TestFillCurrentState(t *testing.T) {
 		podLister: &fakeLister,
 	}
 	controller := api.ReplicationController{
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			ReplicaSelector: map[string]string{
 				"foo": "bar",
 			},
@@ -359,7 +359,7 @@ func TestFillCurrentState(t *testing.T) {
 	if controller.CurrentState.Replicas != 2 {
 		t.Errorf("expected 2, got: %d", controller.CurrentState.Replicas)
 	}
-	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()) {
-		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.DesiredState.ReplicaSelector).AsSelector(), fakeLister.s)
+	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.Spec.ReplicaSelector).AsSelector()) {
+		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.Spec.ReplicaSelector).AsSelector(), fakeLister.s)
 	}
 }

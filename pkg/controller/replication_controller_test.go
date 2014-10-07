@@ -64,10 +64,10 @@ func (f *FakePodControl) deletePod(ctx api.Context, podID string) error {
 
 func newReplicationController(replicas int) api.ReplicationController {
 	return api.ReplicationController{
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: replicas,
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{
@@ -186,9 +186,9 @@ func TestCreateReplica(t *testing.T) {
 		JSONBase: api.JSONBase{
 			Kind: "ReplicationController",
 		},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{
@@ -212,8 +212,8 @@ func TestCreateReplica(t *testing.T) {
 			Kind:       "Pod",
 			APIVersion: testapi.Version(),
 		},
-		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
-		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
+		Labels: controllerSpec.Spec.PodTemplate.Labels,
+		Spec:   controllerSpec.Spec.PodTemplate.Spec,
 	}
 	fakeHandler.ValidateRequest(t, makeURL("/pods"), "POST", nil)
 	actualPod := api.Pod{}
@@ -229,10 +229,10 @@ func TestCreateReplica(t *testing.T) {
 func TestSynchonize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
 		JSONBase: api.JSONBase{APIVersion: testapi.Version()},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: 4,
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{
@@ -250,10 +250,10 @@ func TestSynchonize(t *testing.T) {
 	}
 	controllerSpec2 := api.ReplicationController{
 		JSONBase: api.JSONBase{APIVersion: testapi.Version()},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerState{
 			Replicas: 3,
 			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
+				Spec: api.PodState{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{

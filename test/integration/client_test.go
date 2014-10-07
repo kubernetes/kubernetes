@@ -82,7 +82,7 @@ func TestClient(t *testing.T) {
 
 		// get a validation error
 		pod := &api.Pod{
-			DesiredState: api.PodState{
+			Spec: api.PodState{
 				Manifest: api.ContainerManifest{
 					Version: "v1beta2",
 					Containers: []api.Container{
@@ -99,7 +99,7 @@ func TestClient(t *testing.T) {
 		}
 
 		// get a created pod
-		pod.DesiredState.Manifest.Containers[0].Image = "an-image"
+		pod.Spec.Manifest.Containers[0].Image = "an-image"
 		got, err = client.CreatePod(ctx, pod)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

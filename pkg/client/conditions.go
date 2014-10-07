@@ -27,10 +27,10 @@ import (
 func (c *Client) ControllerHasDesiredReplicas(controller api.ReplicationController) wait.ConditionFunc {
 	return func() (bool, error) {
 		ctx := api.WithNamespace(api.NewContext(), controller.Namespace)
-		pods, err := c.ListPods(ctx, labels.Set(controller.DesiredState.ReplicaSelector).AsSelector())
+		pods, err := c.ListPods(ctx, labels.Set(controller.Spec.ReplicaSelector).AsSelector())
 		if err != nil {
 			return false, err
 		}
-		return len(pods.Items) == controller.DesiredState.Replicas, nil
+		return len(pods.Items) == controller.Spec.Replicas, nil
 	}
 }

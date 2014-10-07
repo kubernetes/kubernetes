@@ -316,7 +316,7 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 	if !util.IsDNSSubdomain(pod.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
 	}
-	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
+	allErrs = append(allErrs, ValidatePodState(&pod.Spec).Prefix("desiredState")...)
 	return allErrs
 }
 
@@ -354,7 +354,7 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.E
 	if !util.IsDNSSubdomain(controller.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
 	}
-	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
+	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.Spec).Prefix("desiredState")...)
 	return allErrs
 }
 
@@ -372,6 +372,6 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 	if state.Replicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
-	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
+	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.Spec.Manifest).Prefix("podTemplate.desiredState.manifest")...)
 	return allErrs
 }

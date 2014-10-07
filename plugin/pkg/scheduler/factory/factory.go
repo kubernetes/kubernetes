@@ -115,7 +115,7 @@ func (lw *listWatch) Watch(resourceVersion uint64) (watch.Interface, error) {
 func (factory *ConfigFactory) createUnassignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
-		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
+		fieldSelector: labels.Set{"Spec.Host": ""}.AsSelector(),
 		resource:      "pods",
 	}
 }
@@ -133,7 +133,7 @@ func parseSelectorOrDie(s string) labels.Selector {
 func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
 	return &listWatch{
 		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
+		fieldSelector: parseSelectorOrDie("Spec.Host!="),
 		resource:      "pods",
 	}
 }
@@ -173,7 +173,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(podQueue *cache.FIFO) func(po
 				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
 				return
 			}
-			if pod.DesiredState.Host == "" {
+			if pod.Spec.Host == "" {
 				podQueue.Add(pod.ID, pod)
 			}
 		}()

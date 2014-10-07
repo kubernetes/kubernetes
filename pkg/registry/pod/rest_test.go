@@ -68,7 +68,7 @@ func TestCreatePodRegistryError(t *testing.T) {
 			Version: "v1beta1",
 		},
 	}
-	pod := &api.Pod{DesiredState: desiredState}
+	pod := &api.Pod{Spec: desiredState}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
@@ -88,7 +88,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 			Version: "v1beta1",
 		},
 	}
-	pod := &api.Pod{DesiredState: desiredState}
+	pod := &api.Pod{Spec: desiredState}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
@@ -99,7 +99,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 	if len(podRegistry.Pod.ID) == 0 {
 		t.Errorf("Expected pod ID to be set, Got %#v", pod)
 	}
-	if podRegistry.Pod.DesiredState.Manifest.ID != podRegistry.Pod.ID {
+	if podRegistry.Pod.Spec.Manifest.ID != podRegistry.Pod.ID {
 		t.Errorf("Expected manifest ID to be equal to pod ID, Got %#v", pod)
 	}
 }
@@ -115,7 +115,7 @@ func TestCreatePodSetsUUIDs(t *testing.T) {
 			Version: "v1beta1",
 		},
 	}
-	pod := &api.Pod{DesiredState: desiredState}
+	pod := &api.Pod{Spec: desiredState}
 	ctx := api.NewDefaultContext()
 	ch, err := storage.Create(ctx, pod)
 	if err != nil {
@@ -123,7 +123,7 @@ func TestCreatePodSetsUUIDs(t *testing.T) {
 	}
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 
-	if len(podRegistry.Pod.DesiredState.Manifest.UUID) == 0 {
+	if len(podRegistry.Pod.Spec.Manifest.UUID) == 0 {
 		t.Errorf("Expected pod UUID to be set, Got %#v", pod)
 	}
 }
@@ -208,10 +208,10 @@ func TestListPodListSelection(t *testing.T) {
 				Metadata: api.ObjectMeta{Name: "foo"},
 			}, {
 				Metadata: api.ObjectMeta{Name: "bar"},
-				DesiredState: api.PodState{Host: "barhost"},
+				Spec:     api.PodState{Host: "barhost"},
 			}, {
 				Metadata: api.ObjectMeta{Name: "baz"},
-				DesiredState: api.PodState{Status: "bazstatus"},
+				Spec:     api.PodState{Status: "bazstatus"},
 			}, {
 				Metadata: api.ObjectMeta{Name: "qux"},
 				Labels:   map[string]string{"label": "qux"},
@@ -238,16 +238,16 @@ func TestListPodListSelection(t *testing.T) {
 			label:       "label=qux",
 			expectedIDs: util.NewStringSet("qux"),
 		}, {
-			field:       "DesiredState.Status=bazstatus",
+			field:       "Spec.Status=bazstatus",
 			expectedIDs: util.NewStringSet("baz"),
 		}, {
-			field:       "DesiredState.Host=barhost",
+			field:       "Spec.Host=barhost",
 			expectedIDs: util.NewStringSet("bar"),
 		}, {
-			field:       "DesiredState.Host=",
+			field:       "Spec.Host=",
 			expectedIDs: util.NewStringSet("foo", "baz", "qux", "zot"),
 		}, {
-			field:       "DesiredState.Host!=",
+			field:       "Spec.Host!=",
 			expectedIDs: util.NewStringSet("bar"),
 		},
 	}
@@ -385,10 +385,10 @@ func TestMakePodStatus(t *testing.T) {
 		status api.PodStatus
 		test   string
 	}{
-		{&api.Pod{DesiredState: desiredState, CurrentState: currentState}, api.PodWaiting, "waiting"},
+		{&api.Pod{Spec: desiredState, CurrentState: currentState}, api.PodWaiting, "waiting"},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Host: "machine-2",
 				},
@@ -398,7 +398,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
@@ -412,7 +412,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
@@ -426,7 +426,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Info: map[string]api.ContainerStatus{
 						"containerA": stoppedState,
@@ -440,7 +440,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Info: map[string]api.ContainerStatus{
 						"containerA": stoppedState,
@@ -454,7 +454,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
@@ -468,7 +468,7 @@ func TestMakePodStatus(t *testing.T) {
 		},
 		{
 			&api.Pod{
-				DesiredState: desiredState,
+				Spec: desiredState,
 				CurrentState: api.PodState{
 					Info: map[string]api.ContainerStatus{
 						"containerA": runningState,
@@ -543,7 +543,7 @@ func TestCreatePod(t *testing.T) {
 	}
 	pod := &api.Pod{
 		Metadata: api.ObjectMeta{Name: "foo"},
-		DesiredState: desiredState,
+		Spec:     desiredState,
 	}
 	ctx := api.NewDefaultContext()
 	channel, err := storage.Create(ctx, pod)
@@ -586,7 +586,7 @@ func TestFillPodInfo(t *testing.T) {
 	storage := REST{
 		podCache: &fakeGetter,
 	}
-	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
+	pod := api.Pod{Spec: api.PodState{Host: "foo"}}
 	storage.fillPodInfo(&pod)
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
 		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
@@ -611,7 +611,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 	storage := REST{
 		podCache: &fakeGetter,
 	}
-	pod := api.Pod{DesiredState: api.PodState{Host: "foo"}}
+	pod := api.Pod{Spec: api.PodState{Host: "foo"}}
 	storage.fillPodInfo(&pod)
 	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
 		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)

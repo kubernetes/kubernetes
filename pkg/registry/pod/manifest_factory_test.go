@@ -33,7 +33,7 @@ func TestMakeManifestNoServices(t *testing.T) {
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
 		Metadata: api.ObjectMeta{Name: "foobar"},
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
 					{
@@ -78,7 +78,7 @@ func TestMakeManifestServices(t *testing.T) {
 	}
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
 					{
@@ -158,7 +158,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 	}
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
-		DesiredState: api.PodState{
+		Spec: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
 					{

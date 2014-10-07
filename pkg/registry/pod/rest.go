@@ -72,11 +72,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !api.ValidNamespace(ctx, &pod.JSONBase) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
-	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
+	pod.Spec.Manifest.UUID = uuid.NewUUID().String()
 	if len(pod.ID) == 0 {
-		pod.ID = pod.DesiredState.Manifest.UUID
+		pod.ID = pod.Spec.Manifest.UUID
 	}
-	pod.DesiredState.Manifest.ID = pod.ID
+	pod.Spec.Manifest.ID = pod.ID
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
 	}
@@ -118,9 +118,9 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 
 func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 	return labels.Set{
-		"ID": pod.ID,
-		"DesiredState.Status": string(pod.DesiredState.Status),
-		"DesiredState.Host":   pod.DesiredState.Host,
+		"ID":          pod.ID,
+		"Spec.Status": string(pod.Spec.Status),
+		"Spec.Host":   pod.Spec.Host,
 	}
 }
 
@@ -176,7 +176,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 }
 
 func (rs *REST) fillPodInfo(pod *api.Pod) {
-	pod.CurrentState.Host = pod.DesiredState.Host
+	pod.CurrentState.Host = pod.Spec.Host
 	if pod.CurrentState.Host == "" {
 		return
 	}
@@ -257,7 +257,7 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 	running := 0
 	stopped := 0
 	unknown := 0
-	for _, container := range pod.DesiredState.Manifest.Containers {
+	for _, container := range pod.Spec.Manifest.Containers {
 		if containerStatus, ok := pod.CurrentState.Info[container.Name]; ok {
 			if containerStatus.State.Running != nil {
 				running++

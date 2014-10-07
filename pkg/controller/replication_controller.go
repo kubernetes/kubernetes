@@ -53,14 +53,14 @@ type RealPodControl struct {
 }
 
 func (r RealPodControl) createReplica(ctx api.Context, controllerSpec api.ReplicationController) {
-	labels := controllerSpec.DesiredState.PodTemplate.Labels
+	labels := controllerSpec.Spec.PodTemplate.Labels
 	// TODO: don't fail to set this label just because the map isn't created.
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
 	pod := &api.Pod{
-		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
-		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
+		Spec:   controllerSpec.Spec.PodTemplate.Spec,
+		Labels: controllerSpec.Spec.PodTemplate.Labels,
 	}
 	_, err := r.kubeClient.CreatePod(ctx, pod)
 	if err != nil {
@@ -144,14 +144,14 @@ func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 }
 
 func (rm *ReplicationManager) syncReplicationController(controllerSpec api.ReplicationController) error {
-	s := labels.Set(controllerSpec.DesiredState.ReplicaSelector).AsSelector()
+	s := labels.Set(controllerSpec.Spec.ReplicaSelector).AsSelector()
 	ctx := api.WithNamespace(api.NewContext(), controllerSpec.Namespace)
 	podList, err := rm.kubeClient.ListPods(ctx, s)
 	if err != nil {
 		return err
 	}
 	filteredList := rm.filterActivePods(podList.Items)
-	diff := len(filteredList) - controllerSpec.DesiredState.Replicas
+	diff := len(filteredList) - controllerSpec.Spec.Replicas
 	if diff < 0 {
 		diff *= -1
 		wait := sync.WaitGroup{}
