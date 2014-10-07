@@ -29,6 +29,9 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/tokenfile"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -51,6 +54,7 @@ var (
 	minionPort            = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
 	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true")
 	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. Default 30 seconds")
+	tokenAuthFile         = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication")
 	etcdServerList        util.StringList
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
@@ -172,6 +176,7 @@ func main() {
 	ui.InstallSupport(mux)
 
 	handler := http.Handler(mux)
+
 	if len(corsAllowedOriginList) > 0 {
 		allowedOriginRegexps, err := util.CompileRegexps(corsAllowedOriginList)
 		if err != nil {
@@ -179,6 +184,16 @@ func main() {
 		}
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
+
+	if len(*tokenAuthFile) != 0 {
+		auth, err := tokenfile.New(*tokenAuthFile)
+		if err != nil {
+			glog.Fatalf("Unable to load the token authentication file '%s': %v", *tokenAuthFile, err)
+		}
+		userContexts := handlers.NewUserRequestContext()
+		handler = handlers.NewRequestAuthenticator(userContexts, bearertoken.New(auth), handlers.Unauthorized, handler)
+	}
+
 	handler = apiserver.RecoverPanics(handler)
 
 	s := &http.Server{
