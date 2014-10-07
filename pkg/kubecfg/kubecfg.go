@@ -158,9 +158,9 @@ func ResizeController(ctx api.Context, name string, replicas int, client client.
 	return nil
 }
 
-func portsFromString(spec string) []api.Port {
+func portsFromString(spec string) ([]api.Port, error) {
 	if spec == "" {
-		return []api.Port{}
+		return []api.Port{}, nil
 	}
 	parts := strings.Split(spec, ",")
 	var result []api.Port
@@ -168,7 +168,7 @@ func portsFromString(spec string) []api.Port {
 		pieces := strings.Split(part, ":")
 		if len(pieces) < 1 || len(pieces) > 2 {
 			glog.Infof("Bad port spec: %s", part)
-			continue
+			return nil, fmt.Errorf("Bad port spec: %s", part)
 		}
 		host := 0
 		container := 0
@@ -177,34 +177,38 @@ func portsFromString(spec string) []api.Port {
 			container, err = strconv.Atoi(pieces[0])
 			if err != nil {
 				glog.Errorf("Container port is not integer: %s %v", pieces[0], err)
-				continue
+				return nil, err
 			}
 		} else {
 			host, err = strconv.Atoi(pieces[0])
 			if err != nil {
 				glog.Errorf("Host port is not integer: %s %v", pieces[0], err)
-				continue
+				return nil, err
 			}
 			container, err = strconv.Atoi(pieces[1])
 			if err != nil {
 				glog.Errorf("Container port is not integer: %s %v", pieces[1], err)
-				continue
+				return nil, err
 			}
 		}
 		if container < 1 {
 			glog.Errorf("Container port is not valid: %d", container)
-			continue
+			return nil, err
 		}
 
 		result = append(result, api.Port{ContainerPort: container, HostPort: host})
 	}
-	return result
+	return result, nil
 }
 
 // RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'.
 func RunController(ctx api.Context, image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
 	if servicePort > 0 && !util.IsDNSLabel(name) {
 		return fmt.Errorf("Service creation requested, but an invalid name for a service was provided (%s). Service names must be valid DNS labels.", name)
+	}
+	ports, err := portsFromString(portSpec)
+	if err != nil {
+		return err
 	}
 	controller := &api.ReplicationController{
 		JSONBase: api.JSONBase{
@@ -223,7 +227,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 							{
 								Name:  strings.ToLower(name),
 								Image: image,
-								Ports: portsFromString(portSpec),
+								Ports: ports,
 							},
 						},
 					},
