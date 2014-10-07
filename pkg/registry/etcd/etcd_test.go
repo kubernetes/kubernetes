@@ -483,8 +483,8 @@ func TestEtcdListPods(t *testing.T) {
 	if len(pods.Items) != 2 || pods.Items[0].ID != "foo" || pods.Items[1].ID != "bar" {
 		t.Errorf("Unexpected pod list: %#v", pods)
 	}
-	if pods.Items[0].CurrentState.Host != "machine" ||
-		pods.Items[1].CurrentState.Host != "machine" {
+	if pods.Items[0].Status.Host != "machine" ||
+		pods.Items[1].Status.Host != "machine" {
 		t.Errorf("Failed to populate host name.")
 	}
 }

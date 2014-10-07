@@ -356,8 +356,8 @@ func TestFillCurrentState(t *testing.T) {
 	}
 	ctx := api.NewContext()
 	storage.fillCurrentState(ctx, &controller)
-	if controller.CurrentState.Replicas != 2 {
-		t.Errorf("expected 2, got: %d", controller.CurrentState.Replicas)
+	if controller.Status.Replicas != 2 {
+		t.Errorf("expected 2, got: %d", controller.Status.Replicas)
 	}
 	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.Spec.ReplicaSelector).AsSelector()) {
 		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.Spec.ReplicaSelector).AsSelector(), fakeLister.s)

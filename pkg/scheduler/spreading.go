@@ -39,7 +39,7 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 
 	counts := map[string]int{}
 	for _, pod := range pods {
-		counts[pod.CurrentState.Host]++
+		counts[pod.Status.Host]++
 	}
 
 	result := []HostPriority{}

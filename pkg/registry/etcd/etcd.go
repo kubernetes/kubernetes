@@ -74,7 +74,7 @@ func (r *Registry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool
 			// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 			// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
 			// matches our desires.
-			pod.CurrentState.Host = pod.Spec.Host
+			pod.Status.Host = pod.Spec.Host
 			filtered = append(filtered, pod)
 		}
 	}
@@ -104,7 +104,7 @@ func (r *Registry) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
 	// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
 	// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
 	// matches our desires.
-	pod.CurrentState.Host = pod.Spec.Host
+	pod.Status.Host = pod.Spec.Host
 	return &pod, nil
 }
 
@@ -115,8 +115,8 @@ func makeContainerKey(machine string) string {
 // CreatePod creates a pod based on a specification.
 func (r *Registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	// Set current status to "Waiting".
-	pod.CurrentState.Status = api.PodWaiting
-	pod.CurrentState.Host = ""
+	pod.Status.Condition = api.PodWaiting
+	pod.Status.Host = ""
 	// Spec.Host == "" is a signal to the scheduler that this pod needs scheduling.
 	pod.Spec.Status = api.PodRunning
 	pod.Spec.Host = ""

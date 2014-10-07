@@ -588,11 +588,11 @@ func TestFillPodInfo(t *testing.T) {
 	}
 	pod := api.Pod{Spec: api.PodStatus{Host: "foo"}}
 	storage.fillPodInfo(&pod)
-	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
-		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
+	if !reflect.DeepEqual(fakeGetter.info, pod.Status.Info) {
+		t.Errorf("Expected: %#v, Got %#v", fakeGetter.info, pod.Status.Info)
 	}
-	if pod.CurrentState.PodIP != expectedIP {
-		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
+	if pod.Status.PodIP != expectedIP {
+		t.Errorf("Expected %s, Got %s", expectedIP, pod.Status.PodIP)
 	}
 }
 
@@ -613,10 +613,10 @@ func TestFillPodInfoNoData(t *testing.T) {
 	}
 	pod := api.Pod{Spec: api.PodStatus{Host: "foo"}}
 	storage.fillPodInfo(&pod)
-	if !reflect.DeepEqual(fakeGetter.info, pod.CurrentState.Info) {
-		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.CurrentState.Info)
+	if !reflect.DeepEqual(fakeGetter.info, pod.Status.Info) {
+		t.Errorf("Expected %#v, Got %#v", fakeGetter.info, pod.Status.Info)
 	}
-	if pod.CurrentState.PodIP != expectedIP {
-		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
+	if pod.Status.PodIP != expectedIP {
+		t.Errorf("Expected %s, Got %s", expectedIP, pod.Status.PodIP)
 	}
 }

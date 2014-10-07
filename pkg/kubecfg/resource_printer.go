@@ -185,8 +185,8 @@ func makeImageList(manifest api.ContainerManifest) string {
 func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.Metadata.Name, makeImageList(pod.Spec),
-		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP,
-		labels.Set(pod.Metadata.Labels), pod.CurrentState.Status)
+		pod.Status.Host+"/"+pod.Status.HostIP,
+		labels.Set(pod.Metadata.Labels), pod.Status.Condition)
 	return err
 }
 

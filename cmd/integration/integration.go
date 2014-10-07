@@ -168,7 +168,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	podInfo := fakePodInfoGetter{}
 	return func() (bool, error) {
 		for i := range pods.Items {
-			host, id := pods.Items[i].CurrentState.Host, pods.Items[i].ID
+			host, id := pods.Items[i].Status.Host, pods.Items[i].ID
 			if len(host) == 0 {
 				return false, nil
 			}

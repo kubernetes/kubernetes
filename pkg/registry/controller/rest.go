@@ -195,6 +195,6 @@ func (rs *REST) fillCurrentState(ctx api.Context, ctrl *api.ReplicationControlle
 	if err != nil {
 		return err
 	}
-	ctrl.CurrentState.Replicas = len(list.Items)
+	ctrl.Status.Replicas = len(list.Items)
 	return nil
 }

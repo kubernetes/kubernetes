@@ -120,7 +120,7 @@ func TestClient(t *testing.T) {
 		if actual.ID != got.ID {
 			t.Errorf("expected pod %#v, got %#v", got, actual)
 		}
-		if actual.CurrentState.Host != "" {
+		if actual.Status.Host != "" {
 			t.Errorf("expected pod to be unscheduled, got %#v", actual)
 		}
 	}
