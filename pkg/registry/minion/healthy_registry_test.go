@@ -55,7 +55,7 @@ func TestBasicDelegation(t *testing.T) {
 		t.Errorf("Expected %v, Got %v", mockMinionRegistry.Minions, list)
 	}
 	err = healthy.CreateMinion(ctx, &api.Minion{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

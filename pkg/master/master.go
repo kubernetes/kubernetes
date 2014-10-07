@@ -114,7 +114,7 @@ func makeMinionRegistry(c *Config) minion.Registry {
 		minionRegistry = etcd.NewRegistry(c.EtcdHelper, nil)
 		for _, minionID := range c.Minions {
 			minionRegistry.CreateMinion(nil, &api.Minion{
-				JSONBase:      api.JSONBase{ID: minionID},
+				TypeMeta:      api.TypeMeta{ID: minionID},
 				NodeResources: c.NodeResources,
 			})
 		}

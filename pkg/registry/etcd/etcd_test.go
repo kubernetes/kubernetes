@@ -1029,12 +1029,12 @@ func TestEtcdListMinions(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
-							JSONBase: api.JSONBase{ID: "foo"},
+							TypeMeta: api.TypeMeta{ID: "foo"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
-							JSONBase: api.JSONBase{ID: "bar"},
+							TypeMeta: api.TypeMeta{ID: "bar"},
 						}),
 					},
 				},
@@ -1058,7 +1058,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateMinion(ctx, &api.Minion{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1083,7 +1083,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 func TestEtcdContainsMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	contains, err := registry.ContainsMinion(ctx, "foo")
 	if err != nil {

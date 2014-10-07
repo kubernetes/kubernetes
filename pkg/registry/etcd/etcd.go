@@ -34,7 +34,7 @@ import (
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
 //       kubelet (and vice versa)
 
-// Registry implements PodRegistry, ControllerRegistry, ServiceRegistry and  MinionRegitry, backed by etcd.
+// Registry implements PodRegistry, ControllerRegistry, ServiceRegistry and MinionRegistry, backed by etcd.
 type Registry struct {
 	tools.EtcdHelper
 	manifestFactory pod.ManifestFactory
@@ -393,6 +393,7 @@ func (r *Registry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 }
 
 func (r *Registry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+	// TODO: Add some validations.
 	err := r.CreateObj(makeMinionKey(minion.ID), minion, 0)
 	return etcderr.InterpretCreateError(err, "minion", minion.ID)
 }

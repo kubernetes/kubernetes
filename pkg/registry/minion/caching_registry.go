@@ -57,7 +57,7 @@ func NewCachingRegistry(delegate Registry, ttl time.Duration) (Registry, error) 
 	}, nil
 }
 
-func (r *CachingRegistry) ContainsMinion(ctx api.Context, minionID string) (bool, error) {
+func (r *CachingRegistry) ContainsMinion(ctx api.Context, nodeID string) (bool, error) {
 	if r.expired() {
 		if err := r.refresh(ctx, false); err != nil {
 			return false, err
@@ -67,15 +67,15 @@ func (r *CachingRegistry) ContainsMinion(ctx api.Context, minionID string) (bool
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	for _, node := range r.nodes.Items {
-		if node.ID == minionID {
+		if node.ID == nodeID {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func (r *CachingRegistry) DeleteMinion(ctx api.Context, minionID string) error {
-	if err := r.delegate.DeleteMinion(ctx, minionID); err != nil {
+func (r *CachingRegistry) DeleteMinion(ctx api.Context, nodeID string) error {
+	if err := r.delegate.DeleteMinion(ctx, nodeID); err != nil {
 		return err
 	}
 	return r.refresh(ctx, true)

@@ -37,21 +37,21 @@ func NewCloudRegistry(cloud cloudprovider.Interface, matchRE string, staticResou
 	}, nil
 }
 
-func (r *CloudRegistry) ContainsMinion(ctx api.Context, minionID string) (bool, error) {
+func (r *CloudRegistry) ContainsMinion(ctx api.Context, nodeID string) (bool, error) {
 	instances, err := r.ListMinions(ctx)
 
 	if err != nil {
 		return false, err
 	}
 	for _, node := range instances.Items {
-		if node.ID == minionID {
+		if node.ID == nodeID {
 			return true, nil
 		}
 	}
 	return false, nil
 }
 
-func (r CloudRegistry) DeleteMinion(ctx api.Context, minionID string) error {
+func (r CloudRegistry) DeleteMinion(ctx api.Context, nodeID string) error {
 	return fmt.Errorf("unsupported")
 }
 

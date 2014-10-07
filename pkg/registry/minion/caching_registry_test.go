@@ -95,7 +95,7 @@ func TestCachingInsert(t *testing.T) {
 		nodes:      expected,
 	}
 	err := cache.CreateMinion(ctx, &api.Minion{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
