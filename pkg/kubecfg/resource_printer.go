@@ -186,7 +186,7 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.Metadata.Name, makeImageList(pod.Spec),
 		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP,
-		labels.Set(pod.Labels), pod.CurrentState.Status)
+		labels.Set(pod.Metadata.Labels), pod.CurrentState.Status)
 	return err
 }
 
@@ -216,7 +216,7 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printService(svc *api.Service, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.Metadata.Name, labels.Set(svc.Labels),
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.Metadata.Name, labels.Set(svc.Metadata.Labels),
 		labels.Set(svc.Spec.Selector), svc.Spec.Port)
 	return err
 }

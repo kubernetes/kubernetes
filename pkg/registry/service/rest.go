@@ -124,7 +124,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	}
 	var filtered []api.Service
 	for _, service := range list.Items {
-		if label.Matches(labels.Set(service.Labels)) {
+		if label.Matches(labels.Set(service.Metadata.Labels)) {
 			filtered = append(filtered, service)
 		}
 	}

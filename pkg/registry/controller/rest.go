@@ -111,7 +111,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	}
 	filtered := []api.ReplicationController{}
 	for _, controller := range controllers.Items {
-		if label.Matches(labels.Set(controller.Labels)) {
+		if label.Matches(labels.Set(controller.Metadata.Labels)) {
 			rs.fillCurrentState(ctx, &controller)
 			filtered = append(filtered, controller)
 		}

@@ -200,7 +200,7 @@ type storeToPodLister struct {
 func (s *storeToPodLister) ListPods(selector labels.Selector) (pods []api.Pod, err error) {
 	for _, m := range s.List() {
 		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
+		if selector.Matches(labels.Set(pod.Metadata.Labels)) {
 			pods = append(pods, *pod)
 		}
 	}

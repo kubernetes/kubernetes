@@ -46,7 +46,7 @@ type FakePodLister []api.Pod
 // ListPods returns []api.Pod matching a query.
 func (f FakePodLister) ListPods(s labels.Selector) (selected []api.Pod, err error) {
 	for _, pod := range f {
-		if s.Matches(labels.Set(pod.Labels)) {
+		if s.Matches(labels.Set(pod.Metadata.Labels)) {
 			selected = append(selected, pod)
 		}
 	}

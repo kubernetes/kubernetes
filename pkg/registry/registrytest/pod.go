@@ -59,7 +59,7 @@ func (r *PodRegistry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) b
 
 func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
 	return r.ListPodsPredicate(ctx, func(pod *api.Pod) bool {
-		return selector.Matches(labels.Set(pod.Labels))
+		return selector.Matches(labels.Set(pod.Metadata.Labels))
 	})
 }
 

@@ -129,7 +129,7 @@ func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
 	return func(pod *api.Pod) bool {
 		fields := rs.podToSelectableFields(pod)
-		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
+		return label.Matches(labels.Set(pod.Metadata.Labels)) && field.Matches(fields)
 	}
 }
 
