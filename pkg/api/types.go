@@ -253,6 +253,12 @@ type TypeMeta struct {
 	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	Namespace         string    `json:"namespace",omitempty" yaml:"namespace,omitempty"`
+	UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
+
+	// Annotations are unstructured key value data stored with a resource that may be set by
+	// external tooling. They are not queryable and should be preserved when modifying
+	// objects.
+	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
 const (
@@ -665,6 +671,7 @@ func (*ServerOpList) IsAnAPIObject() {}
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	Kind            string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Namespace       string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
 	UID             string `json:"uid,omitempty" yaml:"uid,omitempty"`
 	APIVersion      string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`

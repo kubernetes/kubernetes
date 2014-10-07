@@ -253,7 +253,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	}
 
 	if !scope.flags.IsSet(AllowDifferentFieldTypeNames) && c.NameFunc(dt) != c.NameFunc(st) {
-		return fmt.Errorf("Can't convert %v to %v because type names don't match.", st, dt)
+		return fmt.Errorf("Can't convert %v to %v because type names don't match (%v, %v).", st, dt, c.NameFunc(st), c.NameFunc(dt))
 	}
 
 	// This should handle all simple types.
