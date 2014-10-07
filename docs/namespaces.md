@@ -46,8 +46,8 @@ Introduce a new attribute *Namespace* for each resource that must be scoped in a
 A *Namespace* is a DNS compatible subdomain.
 
 ```
-// JSONBase is shared by all objects sent to, or returned from the client
-type JSONBase struct {
+// TypeMeta is shared by all objects sent to, or returned from the client
+type TypeMeta struct {
   Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
   Uid               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
   CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
