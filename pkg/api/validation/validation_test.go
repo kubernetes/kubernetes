@@ -370,7 +370,7 @@ func TestValidatePod(t *testing.T) {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 				ID:      "abc",
@@ -388,7 +388,7 @@ func TestValidatePod(t *testing.T) {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
 		},
 	})
@@ -401,7 +401,7 @@ func TestValidatePod(t *testing.T) {
 		Labels: map[string]string{
 			"foo": "bar",
 		},
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 				ID:      "abc",
@@ -545,7 +545,7 @@ func TestValidateService(t *testing.T) {
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
 			},

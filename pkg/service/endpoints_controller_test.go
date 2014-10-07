@@ -39,7 +39,7 @@ func newPodList(count int) api.PodList {
 				ID:         fmt.Sprintf("pod%d", i),
 				APIVersion: testapi.Version(),
 			},
-			Spec: api.PodState{
+			Spec: api.PodStatus{
 				Manifest: api.ContainerManifest{
 					Containers: []api.Container{
 						{
@@ -52,7 +52,7 @@ func newPodList(count int) api.PodList {
 					},
 				},
 			},
-			CurrentState: api.PodState{
+			CurrentState: api.PodStatus{
 				PodIP: "1.2.3.4",
 			},
 		})

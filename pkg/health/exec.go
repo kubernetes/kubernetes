@@ -43,7 +43,7 @@ func IsExitError(err error) bool {
 	return ok
 }
 
-func (e *ExecHealthChecker) HealthCheck(podFullName string, currentState api.PodState, container api.Container) (Status, error) {
+func (e *ExecHealthChecker) HealthCheck(podFullName string, currentState api.PodStatus, container api.Container) (Status, error) {
 	if container.LivenessProbe.Exec == nil {
 		return Unknown, fmt.Errorf("Missing exec parameters")
 	}

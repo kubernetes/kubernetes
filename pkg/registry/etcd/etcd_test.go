@@ -87,7 +87,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
 					{
@@ -216,7 +216,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{
 				ID: "foo",
 				Containers: []api.Container{
@@ -282,7 +282,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		JSONBase: api.JSONBase{
 			ID: "foo",
 		},
-		Spec: api.PodState{
+		Spec: api.PodStatus{
 			Manifest: api.ContainerManifest{
 				ID: "foo",
 				Containers: []api.Container{
@@ -336,7 +336,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
 		Metadata: api.ObjectMeta{Name: "foo"},
-		Spec:     api.PodState{Host: "machine"},
+		Spec:     api.PodStatus{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
 		Items: []api.ContainerManifest{
@@ -373,7 +373,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
 		Metadata: api.ObjectMeta{Name: "foo"},
-		Spec:     api.PodState{Host: "machine"},
+		Spec:     api.PodStatus{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
 		Items: []api.ContainerManifest{
@@ -459,13 +459,13 @@ func TestEtcdListPods(t *testing.T) {
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
 							Metadata: api.ObjectMeta{Name: "foo"},
-							Spec:     api.PodState{Host: "machine"},
+							Spec:     api.PodStatus{Host: "machine"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
 							Metadata: api.ObjectMeta{Name: "bar"},
-							Spec:     api.PodState{Host: "machine"},
+							Spec:     api.PodStatus{Host: "machine"},
 						}),
 					},
 				},

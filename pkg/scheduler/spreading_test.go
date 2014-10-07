@@ -32,10 +32,10 @@ func TestSpreadPriority(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	machine1State := api.PodState{
+	machine1State := api.PodStatus{
 		Host: "machine1",
 	}
-	machine2State := api.PodState{
+	machine2State := api.PodStatus{
 		Host: "machine2",
 	}
 	tests := []struct {

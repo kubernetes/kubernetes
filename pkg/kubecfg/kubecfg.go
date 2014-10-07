@@ -213,7 +213,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 				"simpleService": name,
 			},
 			PodTemplate: api.PodTemplate{
-				Spec: api.PodState{
+				Spec: api.PodStatus{
 					Manifest: api.ContainerManifest{
 						Version: "v1beta2",
 						Containers: []api.Container{

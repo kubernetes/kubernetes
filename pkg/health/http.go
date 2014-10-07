@@ -42,7 +42,7 @@ func NewHTTPHealthChecker(client *http.Client) HealthChecker {
 }
 
 // getURLParts parses the components of the target URL.  For testability.
-func getURLParts(currentState api.PodState, container api.Container) (string, int, string, error) {
+func getURLParts(currentState api.PodStatus, container api.Container) (string, int, string, error) {
 	params := container.LivenessProbe.HTTPGet
 	if params == nil {
 		return "", -1, "", fmt.Errorf("no HTTP parameters specified: %v", container)
@@ -98,7 +98,7 @@ func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 }
 
 // HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
-func (h *HTTPHealthChecker) HealthCheck(podFullName string, currentState api.PodState, container api.Container) (Status, error) {
+func (h *HTTPHealthChecker) HealthCheck(podFullName string, currentState api.PodStatus, container api.Container) (Status, error) {
 	host, port, path, err := getURLParts(currentState, container)
 	if err != nil {
 		return Unknown, err

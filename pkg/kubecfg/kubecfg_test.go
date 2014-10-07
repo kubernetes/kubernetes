@@ -76,7 +76,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 		Ctrl: api.ReplicationController{
 			Spec: api.ReplicationControllerState{
 				PodTemplate: api.PodTemplate{
-					Spec: api.PodState{
+					Spec: api.PodStatus{
 						Manifest: api.ContainerManifest{
 							Containers: []api.Container{
 								{Image: "fooImage:1"},

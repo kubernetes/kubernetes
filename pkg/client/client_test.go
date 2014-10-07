@@ -162,7 +162,7 @@ func TestListPods(t *testing.T) {
 			Body: &api.PodList{
 				Items: []api.Pod{
 					{
-						CurrentState: api.PodState{
+						CurrentState: api.PodStatus{
 							Status: "Foobar",
 						},
 						Labels: map[string]string{
@@ -193,7 +193,7 @@ func TestListPodsLabels(t *testing.T) {
 			Body: &api.PodList{
 				Items: []api.Pod{
 					{
-						CurrentState: api.PodState{
+						CurrentState: api.PodStatus{
 							Status: "Foobar",
 						},
 						Labels: map[string]string{
@@ -219,7 +219,7 @@ func TestGetPod(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.Pod{
-				CurrentState: api.PodState{
+				CurrentState: api.PodStatus{
 					Status: "Foobar",
 				},
 				Labels: map[string]string{
@@ -244,7 +244,7 @@ func TestDeletePod(t *testing.T) {
 
 func TestCreatePod(t *testing.T) {
 	requestPod := &api.Pod{
-		CurrentState: api.PodState{
+		CurrentState: api.PodStatus{
 			Status: "Foobar",
 		},
 		Labels: map[string]string{
@@ -266,7 +266,7 @@ func TestCreatePod(t *testing.T) {
 func TestUpdatePod(t *testing.T) {
 	requestPod := &api.Pod{
 		Metadata: api.ObjectMeta{Name: "foo", ResourceVersion: 1},
-		CurrentState: api.PodState{
+		CurrentState: api.PodStatus{
 			Status: "Foobar",
 		},
 		Labels: map[string]string{

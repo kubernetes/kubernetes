@@ -142,7 +142,7 @@ func TestControllerParsing(t *testing.T) {
 				"name": "nginx",
 			},
 			PodTemplate: api.PodTemplate{
-				Spec: api.PodState{
+				Spec: api.PodStatus{
 					Manifest: api.ContainerManifest{
 						Containers: []api.Container{
 							{
@@ -204,7 +204,7 @@ func TestControllerParsing(t *testing.T) {
 }
 
 var validPodTemplate = api.PodTemplate{
-	Spec: api.PodState{
+	Spec: api.PodStatus{
 		Manifest: api.ContainerManifest{
 			Version: "v1beta1",
 			Containers: []api.Container{

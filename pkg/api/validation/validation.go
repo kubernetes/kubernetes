@@ -302,7 +302,7 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy) errs.ErrorList {
 	return allErrors
 }
 
-func ValidatePodState(podState *api.PodState) errs.ErrorList {
+func ValidatePodState(podState *api.PodStatus) errs.ErrorList {
 	allErrs := errs.ErrorList(ValidateManifest(&podState.Manifest)).Prefix("manifest")
 	return allErrs
 }
