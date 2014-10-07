@@ -42,7 +42,7 @@ type ConfigFactory struct {
 }
 
 // Create creates a scheduler and all support functions.
-func (factory *ConfigFactory) Create() *scheduler.Config {
+func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 	// Watch and queue pods that need scheduling.
 	podQueue := cache.NewFIFO()
 	cache.NewReflector(factory.createUnassignedPodLW(), &api.Pod{}, podQueue).Run()
@@ -66,8 +66,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 
 	nodes, err := factory.Client.ListMinions()
 	if err != nil {
-		glog.Errorf("failed to obtain minion information, aborting")
-		return nil
+		return nil, err
 	}
 	algo := algorithm.NewGenericScheduler(
 		[]algorithm.FitPredicate{
@@ -98,7 +97,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 			return pod
 		},
 		Error: factory.makeDefaultErrorFunc(&podBackoff, podQueue),
-	}
+	}, nil
 }
 
 type listWatch struct {
