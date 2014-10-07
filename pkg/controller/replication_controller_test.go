@@ -324,7 +324,7 @@ type FakeWatcher struct {
 	*client.Fake
 }
 
-func (fw FakeWatcher) WatchReplicationControllers(ctx api.Context, l, f labels.Selector, rv uint64) (watch.Interface, error) {
+func (fw FakeWatcher) WatchReplicationControllers(ctx api.Context, l, f labels.Selector, rv string) (watch.Interface, error) {
 	return fw.w, nil
 }
 
@@ -341,7 +341,7 @@ func TestWatchControllers(t *testing.T) {
 		return nil
 	}
 
-	resourceVersion := uint64(0)
+	resourceVersion := ""
 	go manager.watchControllers(&resourceVersion)
 
 	// Test normal case

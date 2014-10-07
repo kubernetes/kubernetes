@@ -176,7 +176,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 }
 
 // Watch begins watching for new, changed, or deleted pods.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchPods(ctx, resourceVersion, rs.filterFunc(label, field))
 }
 

@@ -194,7 +194,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		serverResponse{http.StatusOK, api.Endpoints{
 			TypeMeta: api.TypeMeta{
 				ID:              "foo",
-				ResourceVersion: 1,
+				ResourceVersion: "1",
 			},
 			Endpoints: []string{"6.7.8.9:1000"},
 		}})
@@ -206,7 +206,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	data := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Endpoints{
 		TypeMeta: api.TypeMeta{
 			ID:              "foo",
-			ResourceVersion: 1,
+			ResourceVersion: "1",
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})
@@ -229,7 +229,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{
 			TypeMeta: api.TypeMeta{
-				ResourceVersion: 1,
+				ResourceVersion: "1",
 			},
 			Endpoints: []string{"1.2.3.4:8080"},
 		}})
@@ -263,7 +263,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	}
 	data := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Endpoints{
 		TypeMeta: api.TypeMeta{
-			ResourceVersion: 0,
+			ResourceVersion: "",
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
 	})

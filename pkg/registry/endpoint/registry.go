@@ -26,6 +26,6 @@ import (
 type Registry interface {
 	ListEndpoints(ctx api.Context) (*api.EndpointsList, error)
 	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
-	WatchEndpoints(ctx api.Context, labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
 }

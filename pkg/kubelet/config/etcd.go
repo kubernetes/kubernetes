@@ -47,7 +47,7 @@ func NewSourceEtcd(key string, client tools.EtcdClient, updates chan<- interface
 	helper := tools.EtcdHelper{
 		client,
 		latest.Codec,
-		latest.ResourceVersioner,
+		tools.RuntimeVersionAdapter{latest.ResourceVersioner},
 	}
 	source := &SourceEtcd{
 		key:     key,

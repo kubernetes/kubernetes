@@ -50,7 +50,7 @@ func TestListControllersError(t *testing.T) {
 }
 
 func TestListEmptyControllerList(t *testing.T) {
-	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{TypeMeta: api.TypeMeta{ResourceVersion: 1}}}
+	mockRegistry := registrytest.ControllerRegistry{nil, &api.ReplicationControllerList{TypeMeta: api.TypeMeta{ResourceVersion: "1"}}}
 	storage := REST{
 		registry: &mockRegistry,
 	}
@@ -63,7 +63,7 @@ func TestListEmptyControllerList(t *testing.T) {
 	if len(controllers.(*api.ReplicationControllerList).Items) != 0 {
 		t.Errorf("Unexpected non-zero ctrl list: %#v", controllers)
 	}
-	if controllers.(*api.ReplicationControllerList).ResourceVersion != 1 {
+	if controllers.(*api.ReplicationControllerList).ResourceVersion != "1" {
 		t.Errorf("Unexpected resource version: %#v", controllers)
 	}
 }

@@ -395,7 +395,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 
 	testCases := map[string]struct {
 		Response        EtcdResponseWithError
-		ExpectedVersion uint64
+		ExpectedVersion string
 		ExpectedType    watch.EventType
 	}{
 		"get value created": {
@@ -410,7 +410,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 					EtcdIndex: 2,
 				},
 			},
-			1,
+			"1",
 			watch.Added,
 		},
 		"get value modified": {
@@ -425,7 +425,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 					EtcdIndex: 3,
 				},
 			},
-			2,
+			"2",
 			watch.Modified,
 		},
 	}
@@ -510,10 +510,10 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected a pod, got %#v", event.Object)
 		}
-		if actualPod.ResourceVersion != 1 {
+		if actualPod.ResourceVersion != "1" {
 			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
 		}
-		pod.ResourceVersion = 1
+		pod.ResourceVersion = "1"
 		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}

@@ -265,7 +265,7 @@ func TestCreatePod(t *testing.T) {
 
 func TestUpdatePod(t *testing.T) {
 	requestPod := &api.Pod{
-		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: 1},
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"},
 		CurrentState: api.PodState{
 			Status: "Foobar",
 		},
@@ -330,7 +330,7 @@ func TestGetController(t *testing.T) {
 
 func TestUpdateController(t *testing.T) {
 	requestController := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: 1},
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: "/replicationControllers/foo"},
@@ -464,7 +464,7 @@ func TestCreateService(t *testing.T) {
 }
 
 func TestUpdateService(t *testing.T) {
-	svc := &api.Service{TypeMeta: api.TypeMeta{ID: "service-1", ResourceVersion: 1}}
+	svc := &api.Service{TypeMeta: api.TypeMeta{ID: "service-1", ResourceVersion: "1"}}
 	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: svc},
 		Response: Response{StatusCode: 200, Body: svc},

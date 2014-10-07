@@ -116,13 +116,13 @@ func (lw *listWatch) List() (runtime.Object, error) {
 		Get()
 }
 
-func (lw *listWatch) Watch(resourceVersion uint64) (watch.Interface, error) {
+func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
 	return lw.client.
 		Get().
 		Path("watch").
 		Path(lw.resource).
 		SelectorParam("fields", lw.fieldSelector).
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		Watch()
 }
 

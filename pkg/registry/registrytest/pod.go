@@ -63,7 +63,7 @@ func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.
 	})
 }
 
-func (r *PodRegistry) WatchPods(ctx api.Context, resourceVersion uint64, filter func(*api.Pod) bool) (watch.Interface, error) {
+func (r *PodRegistry) WatchPods(ctx api.Context, resourceVersion string, filter func(*api.Pod) bool) (watch.Interface, error) {
 	// TODO: wire filter down into the mux; it needs access to current and previous state :(
 	return r.mux.Watch(), nil
 }

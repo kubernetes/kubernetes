@@ -87,12 +87,12 @@ func NewReplicationManager(kubeClient client.Interface) *ReplicationManager {
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(period time.Duration) {
 	rm.syncTime = time.Tick(period)
-	resourceVersion := uint64(0)
+	resourceVersion := ""
 	go util.Forever(func() { rm.watchControllers(&resourceVersion) }, period)
 }
 
 // resourceVersion is a pointer to the resource version to use/update.
-func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
+func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 	ctx := api.NewContext()
 	watching, err := rm.kubeClient.WatchReplicationControllers(
 		ctx,
@@ -124,7 +124,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *uint64) {
 				continue
 			}
 			// If we get disconnected, start where we left off.
-			*resourceVersion = rc.ResourceVersion + 1
+			*resourceVersion = rc.ResourceVersion
 			// Sync even if this is a deletion event, to ensure that we leave
 			// it in the desired state.
 			glog.V(4).Infof("About to sync from watch: %v", rc.ID)

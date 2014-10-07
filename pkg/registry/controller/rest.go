@@ -149,7 +149,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 
 // Watch returns ReplicationController events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	if !field.Empty() {
 		return nil, fmt.Errorf("no field selector implemented for controllers")
 	}

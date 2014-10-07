@@ -31,8 +31,8 @@ import (
 type Watcher interface {
 	ListServices(ctx api.Context, label labels.Selector) (*api.ServiceList, error)
 	ListEndpoints(ctx api.Context, label labels.Selector) (*api.EndpointsList, error)
-	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
-	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // SourceAPI implements a configuration source for services and endpoints that
@@ -57,12 +57,12 @@ func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceU
 		// prevent hot loops if the server starts to misbehave
 		reconnectDuration: time.Second * 1,
 	}
-	serviceVersion := uint64(0)
+	serviceVersion := ""
 	go util.Forever(func() {
 		config.runServices(&serviceVersion)
 		time.Sleep(wait.Jitter(config.reconnectDuration, 0.0))
 	}, period)
-	endpointVersion := uint64(0)
+	endpointVersion := ""
 	go util.Forever(func() {
 		config.runEndpoints(&endpointVersion)
 		time.Sleep(wait.Jitter(config.reconnectDuration, 0.0))
@@ -71,9 +71,9 @@ func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceU
 }
 
 // runServices loops forever looking for changes to services.
-func (s *SourceAPI) runServices(resourceVersion *uint64) {
+func (s *SourceAPI) runServices(resourceVersion *string) {
 	ctx := api.NewContext()
-	if *resourceVersion == 0 {
+	if len(*resourceVersion) == 0 {
 		services, err := s.client.ListServices(ctx, labels.Everything())
 		if err != nil {
 			glog.Errorf("Unable to load services: %v", err)
@@ -97,7 +97,7 @@ func (s *SourceAPI) runServices(resourceVersion *uint64) {
 }
 
 // handleServicesWatch loops over an event channel and delivers config changes to an update channel.
-func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates chan<- ServiceUpdate) {
+func handleServicesWatch(resourceVersion *string, ch <-chan watch.Event, updates chan<- ServiceUpdate) {
 	for {
 		select {
 		case event, ok := <-ch:
@@ -107,7 +107,7 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 			}
 
 			service := event.Object.(*api.Service)
-			*resourceVersion = service.ResourceVersion + 1
+			*resourceVersion = service.ResourceVersion
 
 			switch event.Type {
 			case watch.Added, watch.Modified:
@@ -121,9 +121,9 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 }
 
 // runEndpoints loops forever looking for changes to endpoints.
-func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
+func (s *SourceAPI) runEndpoints(resourceVersion *string) {
 	ctx := api.NewContext()
-	if *resourceVersion == 0 {
+	if len(*resourceVersion) == 0 {
 		endpoints, err := s.client.ListEndpoints(ctx, labels.Everything())
 		if err != nil {
 			glog.Errorf("Unable to load endpoints: %v", err)
@@ -147,7 +147,7 @@ func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
 }
 
 // handleEndpointsWatch loops over an event channel and delivers config changes to an update channel.
-func handleEndpointsWatch(resourceVersion *uint64, ch <-chan watch.Event, updates chan<- EndpointsUpdate) {
+func handleEndpointsWatch(resourceVersion *string, ch <-chan watch.Event, updates chan<- EndpointsUpdate) {
 	for {
 		select {
 		case event, ok := <-ch:
@@ -157,7 +157,7 @@ func handleEndpointsWatch(resourceVersion *uint64, ch <-chan watch.Event, update
 			}
 
 			endpoints := event.Object.(*api.Endpoints)
-			*resourceVersion = endpoints.ResourceVersion + 1
+			*resourceVersion = endpoints.ResourceVersion
 
 			switch event.Type {
 			case watch.Added, watch.Modified:

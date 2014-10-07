@@ -44,7 +44,7 @@ func (*TestResource) IsAnAPIObject() {}
 
 var scheme *runtime.Scheme
 var codec runtime.Codec
-var versioner = runtime.NewTypeMetaResourceVersioner()
+var versioner = RuntimeVersionAdapter{runtime.NewTypeMetaResourceVersioner()}
 
 func init() {
 	scheme = runtime.NewScheme()
@@ -89,11 +89,11 @@ func TestExtractToList(t *testing.T) {
 		},
 	}
 	expect := api.PodList{
-		TypeMeta: api.TypeMeta{ResourceVersion: 10},
+		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: 1}},
-			{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: 2}},
-			{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: 3}},
+			{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"}},
+			{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}},
+			{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: "3"}},
 		},
 	}
 
@@ -204,7 +204,7 @@ func TestSetObj(t *testing.T) {
 }
 
 func TestSetObjWithVersion(t *testing.T) {
-	obj := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: 1}}
+	obj := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
@@ -254,7 +254,7 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 func TestAtomicUpdate(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, runtime.NewTypeMetaResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -308,7 +308,7 @@ func TestAtomicUpdate(t *testing.T) {
 func TestAtomicUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, runtime.NewTypeMetaResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
@@ -339,7 +339,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 func TestAtomicUpdate_CreateCollision(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	helper := EtcdHelper{fakeClient, codec, runtime.NewTypeMetaResourceVersioner()}
+	helper := EtcdHelper{fakeClient, codec, versioner}
 
 	fakeClient.ExpectNotFoundGet("/some/key")
 

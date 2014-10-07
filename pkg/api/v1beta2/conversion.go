@@ -17,12 +17,78 @@ limitations under the License.
 package v1beta2
 
 import (
+	"strconv"
+
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 func init() {
 	newer.Scheme.AddConversionFuncs(
+		// TypeMeta has changed type of ResourceVersion internally
+		func(in *newer.TypeMeta, out *TypeMeta, s conversion.Scope) error {
+			out.APIVersion = in.APIVersion
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.ID = in.ID
+			out.CreationTimestamp = in.CreationTimestamp
+			out.SelfLink = in.SelfLink
+			out.Annotations = in.Annotations
+
+			if len(in.ResourceVersion) > 0 {
+				v, err := strconv.ParseUint(in.ResourceVersion, 10, 64)
+				if err != nil {
+					return err
+				}
+				out.ResourceVersion = v
+			}
+			return nil
+		},
+		func(in *TypeMeta, out *newer.TypeMeta, s conversion.Scope) error {
+			out.APIVersion = in.APIVersion
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.ID = in.ID
+			out.CreationTimestamp = in.CreationTimestamp
+			out.SelfLink = in.SelfLink
+			out.Annotations = in.Annotations
+
+			if in.ResourceVersion != 0 {
+				out.ResourceVersion = strconv.FormatUint(in.ResourceVersion, 10)
+			}
+			return nil
+		},
+
+		// ObjectReference has changed type of ResourceVersion internally
+		func(in *newer.ObjectReference, out *ObjectReference, s conversion.Scope) error {
+			out.APIVersion = in.APIVersion
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.Name = in.Name
+			out.FieldPath = in.FieldPath
+
+			if len(in.ResourceVersion) > 0 {
+				v, err := strconv.ParseUint(in.ResourceVersion, 10, 64)
+				if err != nil {
+					return err
+				}
+				out.ResourceVersion = v
+			}
+			return nil
+		},
+		func(in *ObjectReference, out *newer.ObjectReference, s conversion.Scope) error {
+			out.APIVersion = in.APIVersion
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.Name = in.Name
+			out.FieldPath = in.FieldPath
+
+			if in.ResourceVersion != 0 {
+				out.ResourceVersion = strconv.FormatUint(in.ResourceVersion, 10)
+			}
+			return nil
+		},
+
 		// EnvVar's Key is deprecated in favor of Name.
 		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
 			out.Value = in.Value

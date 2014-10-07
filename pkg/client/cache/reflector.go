@@ -35,7 +35,7 @@ type ListerWatcher interface {
 	// ResourceVersion field will be used to start the watch in the right place.
 	List() (runtime.Object, error)
 	// Watch should begin a watch at the specified version.
-	Watch(resourceVersion uint64) (watch.Interface, error)
+	Watch(resourceVersion string) (watch.Interface, error)
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -71,7 +71,7 @@ func (r *Reflector) Run() {
 }
 
 func (r *Reflector) listAndWatch() {
-	var resourceVersion uint64
+	var resourceVersion string
 
 	list, err := r.listerWatcher.List()
 	if err != nil {
@@ -124,7 +124,7 @@ func (r *Reflector) syncWith(items []runtime.Object) error {
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) error {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) error {
 	start := time.Now()
 	eventCount := 0
 	for {
@@ -157,7 +157,7 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) err
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
-		*resourceVersion = jsonBase.ResourceVersion() + 1
+		*resourceVersion = jsonBase.ResourceVersion()
 		eventCount++
 	}
 

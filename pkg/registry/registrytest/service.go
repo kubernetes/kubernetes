@@ -63,7 +63,7 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) error
 	return r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return nil, r.Err
 }
 
@@ -81,6 +81,6 @@ func (r *ServiceRegistry) UpdateEndpoints(ctx api.Context, e *api.Endpoints) err
 	return r.Err
 }
 
-func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return nil, r.Err
 }

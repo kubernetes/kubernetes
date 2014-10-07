@@ -39,7 +39,7 @@ type TypeMeta struct {
 	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-	ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
 

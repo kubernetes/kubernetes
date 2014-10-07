@@ -47,6 +47,6 @@ func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error 
 	return r.Err
 }
 
-func (r *ControllerRegistry) WatchControllers(ctx api.Context, resourceVersion uint64) (watch.Interface, error) {
+func (r *ControllerRegistry) WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
 	return nil, r.Err
 }

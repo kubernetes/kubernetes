@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
@@ -62,12 +63,43 @@ type EtcdGetSet interface {
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
 
+type EtcdResourceVersioner interface {
+	SetResourceVersion(obj runtime.Object, version uint64) error
+	ResourceVersion(obj runtime.Object) (uint64, error)
+}
+
+// RuntimeVersionAdapter converts a string based versioner to EtcdResourceVersioner
+type RuntimeVersionAdapter struct {
+	Versioner runtime.ResourceVersioner
+}
+
+// SetResourceVersion implements EtcdResourceVersioner
+func (a RuntimeVersionAdapter) SetResourceVersion(obj runtime.Object, version uint64) error {
+	if version == 0 {
+		return a.Versioner.SetResourceVersion(obj, "")
+	}
+	s := strconv.FormatUint(version, 10)
+	return a.Versioner.SetResourceVersion(obj, s)
+}
+
+// SetResourceVersion implements EtcdResourceVersioner
+func (a RuntimeVersionAdapter) ResourceVersion(obj runtime.Object) (uint64, error) {
+	version, err := a.Versioner.ResourceVersion(obj)
+	if err != nil {
+		return 0, err
+	}
+	if version == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(version, 10, 64)
+}
+
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
 	Client EtcdGetSet
 	Codec  runtime.Codec
 	// optional, no atomic operations can be performed without this interface
-	ResourceVersioner runtime.ResourceVersioner
+	ResourceVersioner EtcdResourceVersioner
 }
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.

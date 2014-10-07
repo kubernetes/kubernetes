@@ -21,6 +21,7 @@ import (
 	"flag"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -49,7 +50,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
@@ -66,13 +67,26 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
 		c.Fuzz(&sec)
 		c.Fuzz(&nsec)
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+	},
+	func(j *api.ObjectReference, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
+		// APIVersion and Kind must remain blank in memory.
+		j.APIVersion = c.RandString()
+		j.Kind = c.RandString()
+		j.Namespace = c.RandString()
+		j.Name = c.RandString()
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.FieldPath = c.RandString()
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
