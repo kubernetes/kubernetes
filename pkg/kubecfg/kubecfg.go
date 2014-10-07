@@ -99,7 +99,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 	}
 
 	if len(imageName) != 0 {
-		controller.Spec.PodTemplate.Spec.Manifest.Containers[0].Image = imageName
+		controller.Spec.PodTemplate.Spec.Containers[0].Image = imageName
 		controller, err = client.UpdateReplicationController(ctx, controller)
 		if err != nil {
 			return err

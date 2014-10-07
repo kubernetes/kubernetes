@@ -67,7 +67,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		controller.ID = uuid.NewUUID().String()
 	}
 	// Pod Manifest ID should be assigned by the pod API
-	controller.Spec.PodTemplate.Spec.Manifest.ID = ""
+	controller.Spec.PodTemplate.Spec.ID = ""
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
 	}

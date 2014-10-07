@@ -94,7 +94,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 	validateAction(client.FakeAction{Action: "get-controller", Value: "foo"}, fakeClient.Actions[0], t)
 
 	newCtrl := api.Scheme.CopyOrDie(&fakeClient.Ctrl).(*api.ReplicationController)
-	newCtrl.Spec.PodTemplate.Spec.Manifest.Containers[0].Image = "fooImage:2"
+	newCtrl.Spec.PodTemplate.Spec.Containers[0].Image = "fooImage:2"
 	validateAction(client.FakeAction{Action: "update-controller", Value: newCtrl}, fakeClient.Actions[1], t)
 
 	validateAction(client.FakeAction{Action: "list-pods"}, fakeClient.Actions[2], t)
@@ -116,7 +116,7 @@ func TestRunController(t *testing.T) {
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
 	if controller.ID != name ||
 		controller.Spec.Replicas != replicas ||
-		controller.Spec.PodTemplate.Spec.Manifest.Containers[0].Image != image {
+		controller.Spec.PodTemplate.Spec.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
 	}
 }
@@ -135,7 +135,7 @@ func TestRunControllerWithService(t *testing.T) {
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
 	if controller.ID != name ||
 		controller.Spec.Replicas != replicas ||
-		controller.Spec.PodTemplate.Spec.Manifest.Containers[0].Image != image {
+		controller.Spec.PodTemplate.Spec.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
 	}
 }

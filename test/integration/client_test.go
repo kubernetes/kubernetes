@@ -99,7 +99,7 @@ func TestClient(t *testing.T) {
 		}
 
 		// get a created pod
-		pod.Spec.Manifest.Containers[0].Image = "an-image"
+		pod.Spec.Containers[0].Image = "an-image"
 		got, err = client.CreatePod(ctx, pod)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

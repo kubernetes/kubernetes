@@ -38,9 +38,9 @@ type resourceRequest struct {
 
 func getResourceRequest(pod *api.Pod) resourceRequest {
 	result := resourceRequest{}
-	for ix := range pod.Spec.Manifest.Containers {
-		result.memory += pod.Spec.Manifest.Containers[ix].Memory
-		result.milliCPU += pod.Spec.Manifest.Containers[ix].CPU
+	for ix := range pod.Spec.Containers {
+		result.memory += pod.Spec.Containers[ix].Memory
+		result.milliCPU += pod.Spec.Containers[ix].CPU
 	}
 	return result
 }
@@ -77,7 +77,7 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	for _, scheduledPod := range existingPods {
-		for _, container := range pod.Spec.Manifest.Containers {
+		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.HostPort == 0 {
 					continue
@@ -92,7 +92,7 @@ func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error
 }
 
 func containsPort(pod api.Pod, port api.Port) bool {
-	for _, container := range pod.Spec.Manifest.Containers {
+	for _, container := range pod.Spec.Containers {
 		for _, podPort := range container.Ports {
 			if podPort.HostPort == port.HostPort {
 				return true

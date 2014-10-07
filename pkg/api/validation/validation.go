@@ -372,6 +372,6 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 	if state.Replicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
-	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.Spec.Manifest).Prefix("podTemplate.desiredState.manifest")...)
+	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.Spec).Prefix("podTemplate.desiredState.manifest")...)
 	return allErrs
 }

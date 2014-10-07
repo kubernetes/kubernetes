@@ -184,7 +184,7 @@ func makeImageList(manifest api.ContainerManifest) string {
 
 func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-		pod.ID, makeImageList(pod.Spec.Manifest),
+		pod.ID, makeImageList(pod.Spec),
 		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP,
 		labels.Set(pod.Labels), pod.CurrentState.Status)
 	return err
@@ -201,7 +201,7 @@ func printPodList(podList *api.PodList, w io.Writer) error {
 
 func printReplicationController(ctrl *api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		ctrl.ID, makeImageList(ctrl.Spec.PodTemplate.Spec.Manifest),
+		ctrl.ID, makeImageList(ctrl.Spec.PodTemplate.Spec),
 		labels.Set(ctrl.Spec.ReplicaSelector), ctrl.Spec.Replicas)
 	return err
 }

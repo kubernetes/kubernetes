@@ -72,11 +72,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !api.ValidNamespace(ctx, &pod.JSONBase) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
-	pod.Spec.Manifest.UUID = uuid.NewUUID().String()
+	pod.Spec.UUID = uuid.NewUUID().String()
 	if len(pod.ID) == 0 {
-		pod.ID = pod.Spec.Manifest.UUID
+		pod.ID = pod.Spec.UUID
 	}
-	pod.Spec.Manifest.ID = pod.ID
+	pod.Spec.ID = pod.ID
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.ID, errs)
 	}
@@ -257,7 +257,7 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 	running := 0
 	stopped := 0
 	unknown := 0
-	for _, container := range pod.Spec.Manifest.Containers {
+	for _, container := range pod.Spec.Containers {
 		if containerStatus, ok := pod.CurrentState.Info[container.Name]; ok {
 			if containerStatus.State.Running != nil {
 				running++

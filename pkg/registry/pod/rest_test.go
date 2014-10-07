@@ -99,7 +99,7 @@ func TestCreatePodSetsIds(t *testing.T) {
 	if len(podRegistry.Pod.ID) == 0 {
 		t.Errorf("Expected pod ID to be set, Got %#v", pod)
 	}
-	if podRegistry.Pod.Spec.Manifest.ID != podRegistry.Pod.ID {
+	if podRegistry.Pod.Spec.ID != podRegistry.Pod.ID {
 		t.Errorf("Expected manifest ID to be equal to pod ID, Got %#v", pod)
 	}
 }
@@ -123,7 +123,7 @@ func TestCreatePodSetsUUIDs(t *testing.T) {
 	}
 	expectApiStatusError(t, ch, podRegistry.Err.Error())
 
-	if len(podRegistry.Pod.Spec.Manifest.UUID) == 0 {
+	if len(podRegistry.Pod.Spec.UUID) == 0 {
 		t.Errorf("Expected pod UUID to be set, Got %#v", pod)
 	}
 }
