@@ -36,7 +36,7 @@ var updateServer = function($http, server) {
       server.labels = data.labels;
       server.host = data.currentState.host.split('.')[0];
       server.status = data.currentState.status;
-      server.dockerImage = data.currentState.info["update-demo"].Config.Image;
+      server.dockerImage = data.currentState.info["update-demo"].detailInfo.Config.Image;
       updateImage($http, server);
     })
     .error(function(data) {
