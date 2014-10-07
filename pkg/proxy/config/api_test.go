@@ -66,7 +66,7 @@ func TestServices(t *testing.T) {
 	fakeWatch.Stop()
 
 	newFakeWatch.Add(&service)
-	if !reflect.DeepEqual(fakeClient.Actions, []client.FakeAction{{"watch-services", "1"}, {"watch-services", "3"}}) {
+	if !reflect.DeepEqual(fakeClient.Actions, []client.FakeAction{{"watch-services", "1"}, {"watch-services", "2"}}) {
 		t.Errorf("expected call to watch-endpoints, got %#v", fakeClient)
 	}
 }
@@ -191,7 +191,7 @@ func TestEndpoints(t *testing.T) {
 	fakeWatch.Stop()
 
 	newFakeWatch.Add(&endpoint)
-	if !reflect.DeepEqual(fakeClient.Actions, []client.FakeAction{{"watch-endpoints", "1"}, {"watch-endpoints", "3"}}) {
+	if !reflect.DeepEqual(fakeClient.Actions, []client.FakeAction{{"watch-endpoints", "1"}, {"watch-endpoints", "2"}}) {
 		t.Errorf("expected call to watch-endpoints, got %#v", fakeClient)
 	}
 }

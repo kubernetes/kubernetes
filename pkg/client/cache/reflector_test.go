@@ -92,8 +92,8 @@ func TestReflector_watchHandler(t *testing.T) {
 		}
 	}
 
-	// RV should stay 1 higher than the last id we see.
-	if e, a := "33", resumeRV; e != a {
+	// RV should send the last version we see.
+	if e, a := "32", resumeRV; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -102,9 +102,9 @@ func TestReflector_listAndWatch(t *testing.T) {
 	createdFakes := make(chan *watch.FakeWatcher)
 
 	// The ListFunc says that it's at revision 1. Therefore, we expect our WatchFunc
-	// to get called at the beginning of the watch with 1, and again with 4 when we
-	// inject an error at 3.
-	expectedRVs := []string{"1", "4"}
+	// to get called at the beginning of the watch with 1, and again with 3 when we
+	// inject an error.
+	expectedRVs := []string{"1", "3"}
 	lw := &testLW{
 		WatchFunc: func(rv string) (watch.Interface, error) {
 			fw := watch.NewFake()
