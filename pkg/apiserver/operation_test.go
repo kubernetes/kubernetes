@@ -43,7 +43,7 @@ func TestOperation(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		c <- &Simple{Metadata: api.ObjectMeta{Name: "All done"}}
+		c <- &Simple{Name: "All done"}
 	}()
 
 	if op.expired(time.Now().Add(-time.Minute)) {
@@ -96,7 +96,7 @@ func TestOperation(t *testing.T) {
 		t.Errorf("expire failed to remove the operation %#v", ops)
 	}
 
-	if op.result.(*Simple).ID != "All done" {
+	if op.result.(*Simple).Name != "All done" {
 		t.Errorf("Got unexpected result: %#v", op.result)
 	}
 }
@@ -148,9 +148,9 @@ func TestOperationsList(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	oplist, ok := obj.(*api.ServerOpList)
+	oplist, ok := obj.(*api.OperationList)
 	if !ok {
-		t.Fatalf("expected ServerOpList, got %#v", obj)
+		t.Fatalf("expected OperationList, got %#v", obj)
 	}
 	if len(oplist.Items) != 1 {
 		t.Errorf("expected 1 operation, got %#v", obj)
