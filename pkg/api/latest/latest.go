@@ -47,13 +47,13 @@ var Codec = v1beta1.Codec
 // ResourceVersioner describes a default versioner that can handle all types
 // of versioning.
 // TODO: when versioning changes, make this part of each API definition.
-var ResourceVersioner = runtime.NewJSONBaseResourceVersioner()
+var ResourceVersioner = runtime.NewTypeMetaResourceVersioner()
 
 // SelfLinker can set or get the SelfLink field of all API types.
 // TODO: when versioning changes, make this part of each API definition.
 // TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
 // to go through the InterfacesFor method below.
-var SelfLinker = runtime.NewJSONBaseSelfLinker()
+var SelfLinker = runtime.NewTypeMetaSelfLinker()
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {

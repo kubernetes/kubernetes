@@ -24,11 +24,11 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-type FakeJSONBase struct {
+type FakeTypeMeta struct {
 	ID string
 }
 type FakePod struct {
-	FakeJSONBase `json:",inline" yaml:",inline"`
+	FakeTypeMeta `json:",inline" yaml:",inline"`
 	Labels       map[string]string
 	Int          int
 	Str          string
@@ -36,7 +36,7 @@ type FakePod struct {
 
 func TestEncodeJSON(t *testing.T) {
 	pod := FakePod{
-		FakeJSONBase: FakeJSONBase{ID: "foo"},
+		FakeTypeMeta: FakeTypeMeta{ID: "foo"},
 		Labels: map[string]string{
 			"foo": "bar",
 			"baz": "blah",

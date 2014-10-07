@@ -23,8 +23,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestGenericJSONBase(t *testing.T) {
-	type JSONBase struct {
+func TestGenericTypeMeta(t *testing.T) {
+	type TypeMeta struct {
 		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
 		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
 		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
@@ -32,19 +32,19 @@ func TestGenericJSONBase(t *testing.T) {
 		ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	}
-	j := JSONBase{
+	j := TypeMeta{
 		ID:              "foo",
 		APIVersion:      "a",
 		Kind:            "b",
 		ResourceVersion: 1,
 		SelfLink:        "some/place/only/we/know",
 	}
-	g, err := newGenericJSONBase(reflect.ValueOf(&j).Elem())
+	g, err := newGenericTypeMeta(reflect.ValueOf(&j).Elem())
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}
-	// Prove g supports JSONBaseInterface.
-	jbi := JSONBaseInterface(g)
+	// Prove g supports TypeMetaInterface.
+	jbi := TypeMetaInterface(g)
 	if e, a := "foo", jbi.ID(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -86,7 +86,7 @@ func TestGenericJSONBase(t *testing.T) {
 }
 
 type MyAPIObject struct {
-	JSONBase `yaml:",inline" json:",inline"`
+	TypeMeta `yaml:",inline" json:",inline"`
 }
 
 func (*MyAPIObject) IsAnAPIObject() {}
@@ -103,10 +103,10 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 	testCases := map[string]T{
 		"empty api object":                   {&MyAPIObject{}, 0},
-		"api object with version":            {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
-		"pointer to api object with version": {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+		"api object with version":            {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: 1}}, 1},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: 1}}, 1},
 	}
-	versioning := NewJSONBaseResourceVersioner()
+	versioning := NewTypeMetaResourceVersioner()
 	for key, testCase := range testCases {
 		actual, err := versioning.ResourceVersion(testCase.Object)
 		if err != nil {
@@ -134,7 +134,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		Object
 		Expected uint64
 	}{
-		"pointer to api object with version": {&MyAPIObject{JSONBase: JSONBase{ResourceVersion: 1}}, 1},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: 1}}, 1},
 	}
 	for key, testCase := range setCases {
 		if err := versioning.SetResourceVersion(testCase.Object, 5); err != nil {
@@ -150,7 +150,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 }
 
-func TestJSONBaseSelfLinker(t *testing.T) {
+func TestTypeMetaSelfLinker(t *testing.T) {
 	table := map[string]struct {
 		obj     Object
 		expect  string
@@ -158,7 +158,7 @@ func TestJSONBaseSelfLinker(t *testing.T) {
 		succeed bool
 	}{
 		"normal": {
-			obj:     &MyAPIObject{JSONBase: JSONBase{SelfLink: "foobar"}},
+			obj:     &MyAPIObject{TypeMeta: TypeMeta{SelfLink: "foobar"}},
 			expect:  "foobar",
 			try:     "newbar",
 			succeed: true,
@@ -169,7 +169,7 @@ func TestJSONBaseSelfLinker(t *testing.T) {
 		},
 	}
 
-	linker := NewJSONBaseSelfLinker()
+	linker := NewTypeMetaSelfLinker()
 	for name, item := range table {
 		got, err := linker.SelfLink(item.obj)
 		if e, a := item.succeed, err == nil; e != a {

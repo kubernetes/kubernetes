@@ -99,5 +99,5 @@ func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.O
 }
 
 func (rs *REST) toApiMinion(name string) *api.Minion {
-	return &api.Minion{JSONBase: api.JSONBase{ID: name}}
+	return &api.Minion{TypeMeta: api.TypeMeta{ID: name}}
 }

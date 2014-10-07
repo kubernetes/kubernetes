@@ -53,14 +53,14 @@ func init() {
 }
 
 type Simple struct {
-	api.JSONBase `yaml:",inline" json:",inline"`
+	api.TypeMeta `yaml:",inline" json:",inline"`
 	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
 
 type SimpleList struct {
-	api.JSONBase `yaml:",inline" json:",inline"`
+	api.TypeMeta `yaml:",inline" json:",inline"`
 	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
@@ -107,7 +107,7 @@ func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan run
 	}
 	return MakeAsync(func() (runtime.Object, error) {
 		if storage.injectedFunction != nil {
-			return storage.injectedFunction(&Simple{JSONBase: api.JSONBase{ID: id}})
+			return storage.injectedFunction(&Simple{TypeMeta: api.TypeMeta{ID: id}})
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil
 	}), nil
@@ -288,7 +288,7 @@ func TestNonEmptyList(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{
 		list: []Simple{
 			{
-				JSONBase: api.JSONBase{Kind: "Simple"},
+				TypeMeta: api.TypeMeta{Kind: "Simple"},
 				Name:     "foo",
 			},
 		},

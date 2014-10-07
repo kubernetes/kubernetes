@@ -221,7 +221,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 		parts := strings.Split(response.Node.Key[1:], "/")
 		if len(parts) == 4 {
 			glog.V(4).Infof("Deleting service: %s", parts[3])
-			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{JSONBase: api.JSONBase{ID: parts[3]}}}}
+			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{TypeMeta: api.TypeMeta{ID: parts[3]}}}}
 			s.serviceChannel <- serviceUpdate
 			return
 		}

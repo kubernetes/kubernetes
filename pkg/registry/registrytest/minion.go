@@ -55,7 +55,7 @@ func (r *MinionRegistry) Insert(minion string) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Minion = minion
-	r.Minions.Items = append(r.Minions.Items, api.Minion{JSONBase: api.JSONBase{ID: minion}})
+	r.Minions.Items = append(r.Minions.Items, api.Minion{TypeMeta: api.TypeMeta{ID: minion}})
 	return r.Err
 }
 
@@ -76,7 +76,7 @@ func (r *MinionRegistry) Delete(minion string) error {
 	var newList []api.Minion
 	for _, node := range r.Minions.Items {
 		if node.ID != minion {
-			newList = append(newList, api.Minion{JSONBase: api.JSONBase{ID: node.ID}})
+			newList = append(newList, api.Minion{TypeMeta: api.TypeMeta{ID: node.ID}})
 		}
 	}
 	r.Minions.Items = newList

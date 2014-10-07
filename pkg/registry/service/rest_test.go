@@ -37,7 +37,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx := api.NewDefaultContext()
@@ -68,11 +68,11 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			Port:     6502,
-			JSONBase: api.JSONBase{ID: ""},
+			TypeMeta: api.TypeMeta{ID: ""},
 			Selector: map[string]string{"bar": "baz"},
 		},
 		"empty selector": {
-			JSONBase: api.JSONBase{ID: "foo"},
+			TypeMeta: api.TypeMeta{ID: "foo"},
 			Selector: map[string]string{},
 		},
 	}
@@ -94,13 +94,13 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(ctx, &api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz1"},
 	})
 	storage := NewREST(registry, nil, nil)
 	c, err := storage.Update(ctx, &api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz2"},
 	})
 	if c == nil {
@@ -124,19 +124,19 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(ctx, &api.Service{
 		Port:     6502,
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	storage := NewREST(registry, nil, nil)
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			Port:     6502,
-			JSONBase: api.JSONBase{ID: ""},
+			TypeMeta: api.TypeMeta{ID: ""},
 			Selector: map[string]string{"bar": "baz"},
 		},
 		"empty selector": {
 			Port:     6502,
-			JSONBase: api.JSONBase{ID: "foo"},
+			TypeMeta: api.TypeMeta{ID: "foo"},
 			Selector: map[string]string{},
 		},
 	}
@@ -159,7 +159,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:                       6502,
-		JSONBase:                   api.JSONBase{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
@@ -186,7 +186,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:                       6502,
-		JSONBase:                   api.JSONBase{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
@@ -208,7 +208,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	registry.CreateService(ctx, svc)
@@ -229,7 +229,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
-		JSONBase:                   api.JSONBase{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
@@ -250,19 +250,19 @@ func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 	registry.List = api.ServiceList{
 		Items: []api.Service{
 			{
-				JSONBase: api.JSONBase{ID: "foo-bar"},
+				TypeMeta: api.TypeMeta{ID: "foo-bar"},
 				Selector: map[string]string{"bar": "baz"},
 				Port:     8080,
 				Protocol: "TCP",
 			},
 			{
-				JSONBase: api.JSONBase{ID: "abc-123"},
+				TypeMeta: api.TypeMeta{ID: "abc-123"},
 				Selector: map[string]string{"bar": "baz"},
 				Port:     8081,
 				Protocol: "UDP",
 			},
 			{
-				JSONBase: api.JSONBase{ID: "q-u-u-x"},
+				TypeMeta: api.TypeMeta{ID: "q-u-u-x"},
 				Selector: map[string]string{"bar": "baz"},
 				Port:     8082,
 				Protocol: "",
@@ -316,7 +316,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	storage.Get(ctx, "foo")
@@ -336,7 +336,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	redirector := apiserver.Redirector(storage)
@@ -365,11 +365,11 @@ func TestServiceRegistryList(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	registry.CreateService(ctx, &api.Service{
-		JSONBase: api.JSONBase{ID: "foo2"},
+		TypeMeta: api.TypeMeta{ID: "foo2"},
 		Selector: map[string]string{"bar2": "baz2"},
 	})
 	registry.List.ResourceVersion = 1

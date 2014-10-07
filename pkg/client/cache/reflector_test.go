@@ -53,13 +53,13 @@ func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore()
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
 	fw := watch.NewFake()
-	s.Add("foo", &api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
-	s.Add("bar", &api.Pod{JSONBase: api.JSONBase{ID: "bar"}})
+	s.Add("foo", &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}})
+	s.Add("bar", &api.Pod{TypeMeta: api.TypeMeta{ID: "bar"}})
 	go func() {
-		fw.Add(&api.Service{JSONBase: api.JSONBase{ID: "rejected"}})
-		fw.Delete(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
-		fw.Modify(&api.Pod{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 55}})
-		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 32}})
+		fw.Add(&api.Service{TypeMeta: api.TypeMeta{ID: "rejected"}})
+		fw.Delete(&api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}})
+		fw.Modify(&api.Pod{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: 55}})
+		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: 32}})
 		fw.Stop()
 	}()
 	var resumeRV uint64
@@ -117,7 +117,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{JSONBase: api.JSONBase{ResourceVersion: 1}}, nil
+			return &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: 1}}, nil
 		},
 	}
 	s := NewFIFO()
@@ -131,7 +131,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			fw = <-createdFakes
 		}
 		sendingRV := uint64(i + 2)
-		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: id, ResourceVersion: sendingRV}})
+		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{ID: id, ResourceVersion: sendingRV}})
 		if sendingRV == 3 {
 			// Inject a failure.
 			fw.Stop()
@@ -157,10 +157,10 @@ func TestReflector_listAndWatch(t *testing.T) {
 
 func TestReflector_listAndWatchWithErrors(t *testing.T) {
 	mkPod := func(id string, rv uint64) *api.Pod {
-		return &api.Pod{JSONBase: api.JSONBase{ID: id, ResourceVersion: rv}}
+		return &api.Pod{TypeMeta: api.TypeMeta{ID: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv uint64, pods ...*api.Pod) *api.PodList {
-		list := &api.PodList{JSONBase: api.JSONBase{ResourceVersion: rv}}
+		list := &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: rv}}
 		for _, pod := range pods {
 			list.Items = append(list.Items, *pod)
 		}

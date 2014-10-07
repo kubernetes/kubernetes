@@ -32,7 +32,7 @@ func TestMakeManifestNoServices(t *testing.T) {
 	}
 
 	manifest, err := factory.MakeManifest("machine", api.Pod{
-		JSONBase: api.JSONBase{ID: "foobar"},
+		TypeMeta: api.TypeMeta{ID: "foobar"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
@@ -63,7 +63,7 @@ func TestMakeManifestServices(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					JSONBase: api.JSONBase{ID: "test"},
+					TypeMeta: api.TypeMeta{ID: "test"},
 					Port:     8080,
 					ContainerPort: util.IntOrString{
 						Kind:   util.IntstrInt,
@@ -143,7 +143,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					JSONBase: api.JSONBase{ID: "test"},
+					TypeMeta: api.TypeMeta{ID: "test"},
 					Port:     8080,
 					ContainerPort: util.IntOrString{
 						Kind:   util.IntstrInt,

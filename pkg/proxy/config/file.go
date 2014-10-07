@@ -111,8 +111,8 @@ func (s ConfigSourceFile) Run() {
 		newServices := make([]api.Service, len(config.Services))
 		newEndpoints := make([]api.Endpoints, len(config.Services))
 		for i, service := range config.Services {
-			newServices[i] = api.Service{JSONBase: api.JSONBase{ID: service.Name}, Port: service.Port}
-			newEndpoints[i] = api.Endpoints{JSONBase: api.JSONBase{ID: service.Name}, Endpoints: service.Endpoints}
+			newServices[i] = api.Service{TypeMeta: api.TypeMeta{ID: service.Name}, Port: service.Port}
+			newEndpoints[i] = api.Endpoints{TypeMeta: api.TypeMeta{ID: service.Name}, Endpoints: service.Endpoints}
 		}
 		if !reflect.DeepEqual(lastServices, newServices) {
 			serviceUpdate := ServiceUpdate{Op: SET, Services: newServices}

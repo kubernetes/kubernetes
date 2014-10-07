@@ -35,7 +35,7 @@ func TestGetReference(t *testing.T) {
 	}{
 		"pod": {
 			obj: &Pod{
-				JSONBase: JSONBase{
+				TypeMeta: TypeMeta{
 					ID:              "foo",
 					ResourceVersion: 42,
 					SelfLink:        "/api/v1beta1/pods/foo",
@@ -51,7 +51,7 @@ func TestGetReference(t *testing.T) {
 		},
 		"serviceList": {
 			obj: &ServiceList{
-				JSONBase: JSONBase{
+				TypeMeta: TypeMeta{
 					ID:              "foo",
 					ResourceVersion: 42,
 					SelfLink:        "/api/v1beta2/services",
@@ -67,7 +67,7 @@ func TestGetReference(t *testing.T) {
 		},
 		"badSelfLink": {
 			obj: &ServiceList{
-				JSONBase: JSONBase{
+				TypeMeta: TypeMeta{
 					ID:              "foo",
 					ResourceVersion: 42,
 					SelfLink:        "v1beta2/services",
