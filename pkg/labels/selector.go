@@ -17,6 +17,7 @@ limitations under the License.
 package labels
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -138,45 +139,158 @@ func (t andTerm) String() string {
 
 // Operator represents a key's relationship
 // to a set of values in a Requirement.
-// TODO: Should also represent key's existence.
 type Operator int
 
 const (
-	IN Operator = iota + 1
-	NOT_IN
+	In Operator = iota + 1
+	NotIn
+	Exists
 )
 
-// LabelSelector only not named 'Selector' due
-// to name conflict until Selector is deprecated.
+// LabelSelector contains a list of Requirements.
+// LabelSelector is set-based and is distinguished from exact
+// match-based selectors composed of key=value matching conjunctions.
+// TODO: Remove previous sentence when exact match-based
+// selectors are removed.
 type LabelSelector struct {
 	Requirements []Requirement
 }
 
+// Requirement is a selector that contains values, a key
+// and an operator that relates the key and values. The zero
+// value of Requirement is invalid. See the NewRequirement
+// constructor for creating a valid Requirement.
+// Requirement is set-based and is distinguished from exact
+// match-based selectors composed of key=value matching.
+// TODO: Remove previous sentence when exact match-based
+// selectors are removed.
 type Requirement struct {
 	key       string
 	operator  Operator
 	strValues util.StringSet
 }
 
-func (r *Requirement) Matches(ls Labels) bool {
-	switch r.operator {
-	case IN:
-		return r.strValues.Has(ls.Get(r.key))
-	case NOT_IN:
-		return !r.strValues.Has(ls.Get(r.key))
+// NewRequirement is the constructor for a Requirement.
+// If either of these rules is violated, an error is returned:
+// (1) The operator can only be In, NotIn or Exists.
+// (2) If the operator is In or NotIn, the values set must
+//     be non-empty.
+//
+// The empty string is a valid value in the input values set.
+func NewRequirement(key string, op Operator, vals util.StringSet) (*Requirement, error) {
+	switch op {
+	case In, NotIn:
+		if len(vals) == 0 {
+			return nil, fmt.Errorf("for In,NotIn operators, values set can't be empty")
+		}
+	case Exists:
 	default:
-		return false
+		return nil, fmt.Errorf("operator '%v' is not recognized", op)
+	}
+	return &Requirement{key: key, operator: op, strValues: vals}, nil
+}
+
+// Matches returns true if the Requirement matches the input Labels.
+// There is a match in the following cases:
+// (1) The operator is Exists and Labels has the Requirement's key.
+// (2) The operator is In, Labels has the Requirement's key and Labels'
+//     value for that key is in Requirement's value set.
+// (3) The operator is NotIn, Labels has the Requirement's key and
+//     Labels' value for that key is not in Requirement's value set.
+// (4) The operator is NotIn and Labels does not have the
+//     Requirement's key.
+//
+// If called on an invalid Requirement, an error is returned. See
+// NewRequirement for creating a valid Requirement.
+func (r *Requirement) Matches(ls Labels) (bool, error) {
+	switch r.operator {
+	case In:
+		if !ls.Has(r.key) {
+			return false, nil
+		}
+		return r.strValues.Has(ls.Get(r.key)), nil
+	case NotIn:
+		if !ls.Has(r.key) {
+			return true, nil
+		}
+		return !r.strValues.Has(ls.Get(r.key)), nil
+	case Exists:
+		return ls.Has(r.key), nil
+	default:
+		return false, fmt.Errorf("requirement is not set: %+v", r)
 	}
 }
 
-func (sg *LabelSelector) Matches(ls Labels) bool {
-	for _, req := range sg.Requirements {
-		if !req.Matches(ls) {
-			return false
+// String returns a human-readable string that represents this
+// Requirement. If called on an invalid Requirement, an error is
+// returned. See NewRequirement for creating a valid Requirement.
+func (r *Requirement) String() (string, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(r.key)
+
+	switch r.operator {
+	case In:
+		buffer.WriteString(" in ")
+	case NotIn:
+		buffer.WriteString(" not in ")
+	case Exists:
+		return buffer.String(), nil
+	default:
+		return "", fmt.Errorf("requirement is not set: %+v", r)
+	}
+
+	buffer.WriteString("(")
+	if len(r.strValues) == 1 {
+		buffer.WriteString(r.strValues.List()[0])
+	} else { // only > 1 since == 0 prohibited by NewRequirement
+		buffer.WriteString(strings.Join(r.strValues.List(), ","))
+	}
+	buffer.WriteString(")")
+	return buffer.String(), nil
+}
+
+// Matches for a LabelSelector returns true if all
+// its Requirements match the input Labels. If any
+// Requirement does not match, false is returned.
+// An error is returned if any match attempt between
+// a Requirement and the input Labels returns an error.
+func (lsel *LabelSelector) Matches(l Labels) (bool, error) {
+	for _, req := range lsel.Requirements {
+		if matches, err := req.Matches(l); err != nil {
+			return false, err
+		} else if !matches {
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
+
+// String returns a comma-separated string of all
+// the LabelSelector Requirements' human-readable strings.
+// An error is returned if any attempt to get a
+// Requirement's  human-readable string returns an error.
+func (lsel *LabelSelector) String() (string, error) {
+	var reqs []string
+	for _, req := range lsel.Requirements {
+		if str, err := req.String(); err != nil {
+			return "", err
+		} else {
+			reqs = append(reqs, str)
+		}
+	}
+	return strings.Join(reqs, ","), nil
+}
+
+// TODO: Parse takes a string representing a selector and returns
+// a selector, or an error. A well-formed input string follows
+// the syntax of that which is returned by LabelSelector.String
+// and therefore is largely controlled by that which is returned
+// by Requirement.String. The returned selector object's type
+// should be an interface implemented by LabelSelector. Note that
+// this parsing function is different than ParseSelector since
+// they parse different selectors with different syntaxes.
+// See comments above for LabelSelector and Requirement struct
+// definition for more details.
 
 func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 	pieces := strings.Split(selectorPiece, op)

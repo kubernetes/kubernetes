@@ -35,6 +35,23 @@ func TestSetString(t *testing.T) {
 	// with ",=!" characters in their names.
 }
 
+func TestLabelHas(t *testing.T) {
+	labelHasTests := []struct {
+		Ls  Labels
+		Key string
+		Has bool
+	}{
+		{Set{"x": "y"}, "x", true},
+		{Set{"x": ""}, "x", true},
+		{Set{"x": "y"}, "foo", false},
+	}
+	for _, lh := range labelHasTests {
+		if has := lh.Ls.Has(lh.Key); has != lh.Has {
+			t.Errorf("%#v.Has(%#v) => %v, expected %v", lh.Ls, lh.Key, has, lh.Has)
+		}
+	}
+}
+
 func TestLabelGet(t *testing.T) {
 	ls := Set{"x": "y"}
 	if ls.Get("x") != "y" {
