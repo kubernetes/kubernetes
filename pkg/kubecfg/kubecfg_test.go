@@ -121,6 +121,27 @@ func TestRunController(t *testing.T) {
 	}
 }
 
+func TestRunControllerWithWrongArgs(t *testing.T) {
+	fakeClient := client.Fake{}
+	name := "name"
+	image := "foo/bar"
+	replicas := 3
+	err := RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "8080:", -1)
+	if err == nil {
+		t.Errorf("Unexpected non-error: %#v", fakeClient.Actions)
+	}
+	RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "8080:80", -1)
+	if len(fakeClient.Actions) != 1 || fakeClient.Actions[0].Action != "create-controller" {
+		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
+	}
+	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
+	if controller.ID != name ||
+		controller.DesiredState.Replicas != replicas ||
+		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
+		t.Errorf("Unexpected controller: %#v", controller)
+	}
+}
+
 func TestRunControllerWithService(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
@@ -273,7 +294,7 @@ func TestLoadAuthInfo(t *testing.T) {
 }
 
 func TestMakePorts(t *testing.T) {
-	var testCases = []struct {
+	var successTestCases = []struct {
 		spec  string
 		ports []api.Port
 	}{
@@ -290,10 +311,27 @@ func TestMakePorts(t *testing.T) {
 			[]api.Port{},
 		},
 	}
-	for _, tt := range testCases {
-		ports := portsFromString(tt.spec)
+	for _, tt := range successTestCases {
+		ports, err := portsFromString(tt.spec)
 		if !reflect.DeepEqual(ports, tt.ports) {
 			t.Errorf("Expected %#v, got %#v", tt.ports, ports)
+		}
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	var failTestCases = []struct {
+		spec string
+	}{
+		{"8080:"},
+		{":80"},
+		{":"},
+	}
+	for _, tt := range failTestCases {
+		_, err := portsFromString(tt.spec)
+		if err == nil {
+			t.Errorf("Unexpected non-error")
 		}
 	}
 }
