@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -105,10 +106,10 @@ func TestDoRequest(t *testing.T) {
 	testClients := []testClient{
 		{Request: testRequest{Method: "GET", Path: "good"}, Response: Response{StatusCode: 200}},
 		{Request: testRequest{Method: "GET", Path: "bad%ZZ"}, Error: true},
-		{Client: &Client{&RESTClient{baseURL: uri}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "error"}, Response: Response{StatusCode: 500}, Error: true},
 		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
 		{Request: testRequest{Method: "GET", Path: "failread"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
+		{Client: &Client{&RESTClient{baseURL: uri, Codec: testapi.CodecForVersionOrDie()}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
 	}
 	for _, c := range testClients {
 		client := c.Setup()
