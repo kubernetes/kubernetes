@@ -42,11 +42,13 @@ API_HOST=${API_HOST:-127.0.0.1}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
+LOG_LEVEL=${LOG_LEVEL:-3}
 
 GO_OUT=$(dirname $0)/../_output/go/bin
 
 APISERVER_LOG=/tmp/apiserver.log
 "${GO_OUT}/apiserver" \
+  -v=${LOG_LEVEL} \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
@@ -59,11 +61,13 @@ wait_for_url "http://$API_HOST:$API_PORT/api/v1beta1/pods" "apiserver: "
 
 CTLRMGR_LOG=/tmp/controller-manager.log
 "${GO_OUT}/controller-manager" \
+  -v=${LOG_LEVEL} \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
 "${GO_OUT}/kubelet" \
+  -v=${LOG_LEVEL} \
   --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
@@ -72,11 +76,13 @@ KUBELET_PID=$!
 
 PROXY_LOG=/tmp/kube-proxy.log
 "${GO_OUT}/proxy" \
+  -v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 
 SCHEDULER_LOG=/tmp/k8s-scheduler.log
 "${GO_OUT}/scheduler" \
+  -v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!
 
