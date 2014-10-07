@@ -17,7 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -194,26 +193,6 @@ const (
 	// Pull if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "PullIfNotPresent"
 )
-
-func IsPullAlways(p PullPolicy) bool {
-	// Default to pull always
-	if len(p) == 0 {
-		return true
-	}
-	return pullPoliciesEqual(p, PullAlways)
-}
-
-func IsPullNever(p PullPolicy) bool {
-	return pullPoliciesEqual(p, PullNever)
-}
-
-func IsPullIfNotPresent(p PullPolicy) bool {
-	return pullPoliciesEqual(p, PullIfNotPresent)
-}
-
-func pullPoliciesEqual(p1, p2 PullPolicy) bool {
-	return strings.ToLower(string(p1)) == strings.ToLower(string(p2))
-}
 
 // Container represents a single container that is expected to be run on the host.
 type Container struct {
