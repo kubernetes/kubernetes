@@ -54,6 +54,9 @@ APISERVER_LOG=/tmp/apiserver.log
   --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
 APISERVER_PID=$!
 
+# Wait for apiserver to come up before launching the rest of the components.
+wait_for_url "http://$API_HOST:$API_PORT/api/v1beta1/pods" "apiserver: "
+
 CTLRMGR_LOG=/tmp/controller-manager.log
 "${GO_OUT}/controller-manager" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
