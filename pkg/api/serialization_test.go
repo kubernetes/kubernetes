@@ -52,14 +52,20 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	},
 	func(j *api.ListMeta, c fuzz.Continue) {
 		j.SelfLink = c.RandString()
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64()%(0x1<<31), 10) // JSON does not support high precision uints
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 	},
 	func(j *api.ObjectMeta, c fuzz.Continue) {
 		j.Namespace = c.RandString()
 		j.Name = c.RandString()
 		j.UID = c.RandString()
 		j.SelfLink = c.RandString()
-		j.ResourceVersion = strconv.FormatUint(c.RandUint64()%(0x1<<31), 10) // JSON does not support high precision uints
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 
 		var sec, nsec int64
 		c.Fuzz(&sec)
@@ -79,7 +85,10 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		j.ID = c.RandString()
 		j.UID = c.RandString()
 		j.SelfLink = c.RandString()
-		j.ResourceVersion = c.RandUint64() % (0x1 << 31) // JSON does not support high precision uints
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = c.RandUint64() >> 8
 
 		var sec, nsec int64
 		c.Fuzz(&sec)
@@ -96,7 +105,10 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		j.ID = c.RandString()
 		j.UID = c.RandString()
 		j.SelfLink = c.RandString()
-		j.ResourceVersion = c.RandUint64() % (0x1 << 31) // JSON does not support high precision uints
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = c.RandUint64() >> 8
 
 		var sec, nsec int64
 		c.Fuzz(&sec)

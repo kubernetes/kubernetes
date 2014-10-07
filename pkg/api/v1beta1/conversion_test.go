@@ -119,7 +119,7 @@ func TestMinionListConversionToNew(t *testing.T) {
 		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
 	}
 	newMinion := func(id string) newer.Node {
-		return newer.Node{JSONBase: newer.JSONBase{ID: id}}
+		return newer.Node{Metadata: newer.ObjectMeta{Name: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
@@ -166,7 +166,7 @@ func TestMinionListConversionToOld(t *testing.T) {
 		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
 	}
 	newMinion := func(id string) newer.Node {
-		return newer.Node{JSONBase: newer.JSONBase{ID: id}}
+		return newer.Node{Metadata: newer.ObjectMeta{Name: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),

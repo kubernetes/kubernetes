@@ -35,21 +35,21 @@ func validateObject(obj runtime.Object) (errors []error) {
 	ctx := api.NewDefaultContext()
 	switch t := obj.(type) {
 	case *api.ReplicationController:
-		errors = validation.ValidateManifest(&t.Spec.PodTemplate.Spec)
+		errors = validation.ValidateReplicationController(t)
 	case *api.ReplicationControllerList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Service:
-		api.ValidNamespace(ctx, &t.JSONBase)
+		api.ValidNamespace(ctx, &t.Metadata)
 		errors = validation.ValidateService(t)
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Pod:
-		api.ValidNamespace(ctx, &t.JSONBase)
-		errors = validation.ValidateManifest(&t.Spec)
+		api.ValidNamespace(ctx, &t.Metadata)
+		errors = validation.ValidatePodSpec(&t.Spec)
 	case *api.PodList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)

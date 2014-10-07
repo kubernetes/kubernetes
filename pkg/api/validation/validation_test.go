@@ -366,17 +366,16 @@ func TestValidateManifest(t *testing.T) {
 
 func TestValidatePod(t *testing.T) {
 	errs := ValidatePod(&api.Pod{
-		Metadata: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Labels: map[string]string{
-			"foo": "bar",
+		Metadata: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"foo": "bar",
+			},
 		},
-		Spec: api.PodStatus{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-				ID:      "abc",
-				RestartPolicy: api.RestartPolicy{
-					Always: &api.RestartPolicyAlways{},
-				},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{
+				Always: &api.RestartPolicyAlways{},
 			},
 		},
 	})
@@ -384,12 +383,12 @@ func TestValidatePod(t *testing.T) {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
 	errs = ValidatePod(&api.Pod{
-		Metadata: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Labels: map[string]string{
-			"foo": "bar",
-		},
-		Spec: api.PodStatus{
-			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
+		Metadata: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"foo": "bar",
+			},
 		},
 	})
 	if len(errs) != 0 {
@@ -397,17 +396,16 @@ func TestValidatePod(t *testing.T) {
 	}
 
 	errs = ValidatePod(&api.Pod{
-		Metadata: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Labels: map[string]string{
-			"foo": "bar",
-		},
-		Spec: api.PodStatus{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-				ID:      "abc",
-				RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{},
-					Never: &api.RestartPolicyNever{}},
+		Metadata: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"foo": "bar",
 			},
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{},
+				Never: &api.RestartPolicyNever{}},
 		},
 	})
 	if len(errs) != 1 {
@@ -424,9 +422,13 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "missing id",
 			svc: api.Service{
-				JSONBase: api.JSONBase{Namespace: api.NamespaceDefault},
-				Port:     8675,
-				Selector: map[string]string{"foo": "bar"},
+				Metadata: api.ObjectMeta{
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the ID is missing.
 			numErrs: 1,
@@ -434,9 +436,13 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "missing namespace",
 			svc: api.Service{
-				Metadata: api.ObjectMeta{Name: "foo"},
-				Port:     8675,
-				Selector: map[string]string{"foo": "bar"},
+				Metadata: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the Namespace is missing.
 			numErrs: 1,
@@ -444,9 +450,14 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "invalid id",
 			svc: api.Service{
-				Metadata: api.ObjectMeta{Name: "123abc", Namespace: api.NamespaceDefault},
-				Port:     8675,
-				Selector: map[string]string{"foo": "bar"},
+				Metadata: api.ObjectMeta{
+					Name:      "123abc",
+					Namespace: api.NamespaceDefault,
+				},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the ID is invalid.
 			numErrs: 1,
@@ -455,7 +466,9 @@ func TestValidateService(t *testing.T) {
 			name: "missing port",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Selector: map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the port number is missing/invalid.
 			numErrs: 1,
@@ -464,8 +477,10 @@ func TestValidateService(t *testing.T) {
 			name: "invalid port",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:     65536,
-				Selector: map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     65536,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the port number is invalid.
 			numErrs: 1,
@@ -474,9 +489,11 @@ func TestValidateService(t *testing.T) {
 			name: "invalid protocol",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:     8675,
-				Protocol: "INVALID",
-				Selector: map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Protocol: "INVALID",
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the protocol is invalid.
 			numErrs: 1,
@@ -485,7 +502,9 @@ func TestValidateService(t *testing.T) {
 			name: "missing selector",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-				Port:     8675,
+				Spec: api.ServiceSpec{
+					Port: 8675,
+				},
 			},
 			// Should fail because the selector is missing.
 			numErrs: 1,
@@ -494,9 +513,11 @@ func TestValidateService(t *testing.T) {
 			name: "valid 1",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:     1,
-				Protocol: "TCP",
-				Selector: map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     1,
+					Protocol: "TCP",
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			numErrs: 0,
 		},
@@ -504,9 +525,11 @@ func TestValidateService(t *testing.T) {
 			name: "valid 2",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:     65535,
-				Protocol: "UDP",
-				Selector: map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     65535,
+					Protocol: "UDP",
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			numErrs: 0,
 		},
@@ -514,8 +537,10 @@ func TestValidateService(t *testing.T) {
 			name: "valid 3",
 			svc: api.Service{
 				Metadata: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:     80,
-				Selector: map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     80,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			numErrs: 0,
 		},
@@ -529,9 +554,11 @@ func TestValidateService(t *testing.T) {
 	}
 
 	svc := api.Service{
-		Port:     6502,
 		Metadata: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Selector: map[string]string{"foo": "bar"},
+		Spec: api.ServiceSpec{
+			Port:     6502,
+			Selector: map[string]string{"foo": "bar"},
+		},
 	}
 	errs := ValidateService(&svc)
 	if len(errs) != 0 {
@@ -545,27 +572,23 @@ func TestValidateService(t *testing.T) {
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		Spec: api.PodStatus{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-			},
-		},
-		Labels: validSelector,
+		Spec:     api.PodTemplateSpec{},
+		Metadata: api.ObjectMeta{Labels: validSelector},
 	}
 
 	successCases := []api.ReplicationController{
 		{
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: validPodTemplate,
 			},
 		},
 		{
 			Metadata: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: validPodTemplate,
 			},
 		},
 	}
@@ -577,43 +600,43 @@ func TestValidateReplicationController(t *testing.T) {
 
 	errorCases := map[string]api.ReplicationController{
 		"zero-length ID": {
-			JSONBase: api.JSONBase{ID: "", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Metadata: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: validPodTemplate,
 			},
 		},
 		"missing-namespace": {
 			Metadata: api.ObjectMeta{Name: "abc-123"},
-			Spec: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: validPodTemplate,
 			},
 		},
 		"empty selector": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				PodTemplate: validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Template: validPodTemplate,
 			},
 		},
 		"selector_doesnt_match": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				ReplicaSelector: map[string]string{"foo": "bar"},
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: map[string]string{"foo": "bar"},
+				Template: validPodTemplate,
 			},
 		},
 		"invalid manifest": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
 			},
 		},
 		"negative_replicas": {
 			Metadata: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			Spec: api.ReplicationControllerState{
-				Replicas:        -1,
-				ReplicaSelector: validSelector,
+			Spec: api.ReplicationControllerSpec{
+				Replicas: -1,
+				Selector: validSelector,
 			},
 		},
 	}

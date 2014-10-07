@@ -65,15 +65,13 @@ func newPod(host string, hostPorts ...int) api.Pod {
 		networkPorts = append(networkPorts, api.Port{HostPort: port})
 	}
 	return api.Pod{
-		CurrentState: api.PodStatus{
+		Status: api.PodStatus{
 			Host: host,
 		},
-		Spec: api.PodStatus{
-			Manifest: api.ContainerManifest{
-				Containers: []api.Container{
-					{
-						Ports: networkPorts,
-					},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Ports: networkPorts,
 				},
 			},
 		},

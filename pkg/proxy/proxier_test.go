@@ -139,7 +139,7 @@ func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
@@ -157,7 +157,7 @@ func TestUDPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
@@ -184,7 +184,7 @@ func TestTCPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
@@ -212,7 +212,7 @@ func TestUDPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
@@ -240,7 +240,7 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
@@ -267,7 +267,7 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
@@ -294,7 +294,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
@@ -317,7 +317,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	proxyPortNum, _ := strconv.Atoi(proxyPort)
 	p.OnUpdate([]api.Service{
-		{Metadata: api.ObjectMeta{Name: "echo"}, Port: proxyPortNum, Protocol: "TCP"},
+		{Metadata: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: proxyPortNum, Protocol: "TCP"}},
 	})
 	testEchoTCP(t, "127.0.0.1", proxyPort)
 }
@@ -326,7 +326,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
@@ -349,7 +349,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	proxyPortNum, _ := strconv.Atoi(proxyPort)
 	p.OnUpdate([]api.Service{
-		{Metadata: api.ObjectMeta{Name: "echo"}, Port: proxyPortNum, Protocol: "UDP"},
+		{Metadata: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: proxyPortNum, Protocol: "UDP"}},
 	})
 	testEchoUDP(t, "127.0.0.1", proxyPort)
 }
@@ -358,7 +358,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
@@ -384,7 +384,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{Metadata: api.ObjectMeta{Name: "echo"}, Port: newPortNum, Protocol: "TCP"},
+		{Metadata: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPortNum, Protocol: "TCP"}},
 	})
 	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
@@ -403,7 +403,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			Metadata: api.ObjectMeta{Name: "echo"},
+			Metadata:  api.ObjectMeta{Name: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
@@ -429,7 +429,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{Metadata: api.ObjectMeta{Name: "echo"}, Port: newPortNum, Protocol: "UDP"},
+		{Metadata: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPortNum, Protocol: "UDP"}},
 	})
 	if err := waitForClosedPortUDP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())

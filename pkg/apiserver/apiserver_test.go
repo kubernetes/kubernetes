@@ -53,14 +53,14 @@ func init() {
 }
 
 type Simple struct {
-	api.JSONBase `yaml:",inline" json:",inline"`
+	api.TypeMeta `yaml:",inline" json:",inline"`
 	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
 
 type SimpleList struct {
-	api.JSONBase `yaml:",inline" json:",inline"`
+	api.TypeMeta `yaml:",inline" json:",inline"`
 	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
