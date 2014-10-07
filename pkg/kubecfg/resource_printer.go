@@ -217,7 +217,7 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 
 func printService(svc *api.Service, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.Metadata.Name, labels.Set(svc.Labels),
-		labels.Set(svc.Selector), svc.Port)
+		labels.Set(svc.Spec.Selector), svc.Spec.Port)
 	return err
 }
 

@@ -283,8 +283,8 @@ func runAtomicPutTest(c *client.Client) {
 	if err := c.Get().Path("services").Path(svc.Metadata.Name).Do().Into(&svc); err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
-	if !reflect.DeepEqual(testLabels, labels.Set(svc.Selector)) {
-		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Selector)
+	if !reflect.DeepEqual(testLabels, labels.Set(svc.Spec.Selector)) {
+		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Spec.Selector)
 	}
 	glog.Info("Atomic PUTs work.")
 }

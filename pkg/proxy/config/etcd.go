@@ -149,7 +149,7 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.Metadata.Name, err)
 				endpoints = api.Endpoints{}
 			} else {
-				glog.V(3).Infof("Got service: %s on localport %d mapping to: %s", svc.Metadata.Name, svc.Port, endpoints)
+				glog.V(3).Infof("Got service: %s on localport %d mapping to: %s", svc.Metadata.Name, svc.Spec.Port, endpoints)
 			}
 			retEndpoints[i] = endpoints
 		}

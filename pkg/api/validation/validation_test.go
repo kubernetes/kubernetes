@@ -537,7 +537,7 @@ func TestValidateService(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
-	if svc.Protocol != "TCP" {
+	if svc.Spec.Protocol != "TCP" {
 		t.Errorf("Expected default protocol of 'TCP': %#v", errs)
 	}
 }

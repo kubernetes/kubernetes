@@ -156,7 +156,7 @@ func GetServiceEnvironmentVariables(ctx api.Context, registry Registry, machine 
 		result = append(result, api.EnvVar{Name: name, Value: machine})
 		// Port
 		name = makeEnvVariableName(service.Metadata.Name) + "_SERVICE_PORT"
-		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Port)})
+		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Spec.Port)})
 		// Docker-compatible vars.
 		result = append(result, makeLinkVariables(service, machine)...)
 	}
@@ -229,18 +229,18 @@ func makeEnvVariableName(str string) string {
 func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
 	prefix := makeEnvVariableName(service.Metadata.Name)
 	protocol := string(api.ProtocolTCP)
-	if service.Protocol != "" {
-		protocol = string(service.Protocol)
+	if service.Spec.Protocol != "" {
+		protocol = string(service.Spec.Protocol)
 	}
-	portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, service.Port, strings.ToUpper(protocol))
+	portPrefix := fmt.Sprintf("%s_PORT_%d_%s", prefix, service.Spec.Port, strings.ToUpper(protocol))
 	return []api.EnvVar{
 		{
 			Name:  prefix + "_PORT",
-			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), machine, service.Port),
+			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), machine, service.Spec.Port),
 		},
 		{
 			Name:  portPrefix,
-			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), machine, service.Port),
+			Value: fmt.Sprintf("%s://%s:%d", strings.ToLower(protocol), machine, service.Spec.Port),
 		},
 		{
 			Name:  portPrefix + "_PROTO",
@@ -248,7 +248,7 @@ func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
 		},
 		{
 			Name:  portPrefix + "_PORT",
-			Value: strconv.Itoa(service.Port),
+			Value: strconv.Itoa(service.Spec.Port),
 		},
 		{
 			Name:  portPrefix + "_ADDR",

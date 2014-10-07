@@ -56,7 +56,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	var resultErr error
 	for _, service := range services.Items {
 		nsCtx := api.WithNamespace(ctx, service.Metadata.Namespace)
-		pods, err := e.client.ListPods(nsCtx, labels.Set(service.Selector).AsSelector())
+		pods, err := e.client.ListPods(nsCtx, labels.Set(service.Spec.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error syncing service: %#v, skipping.", service)
 			resultErr = err
