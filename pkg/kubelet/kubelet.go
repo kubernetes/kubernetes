@@ -635,8 +635,9 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 	}
 
 	// Check for any containers that need starting
-	for _, pod := range pods {
-		podFullName := GetPodFullName(&pod)
+	for ix := range pods {
+		pod := &pods[ix]
+		podFullName := GetPodFullName(pod)
 		uuid := pod.Manifest.UUID
 
 		// Add all containers (including net) to the map.
@@ -647,7 +648,7 @@ func (kl *Kubelet) SyncPods(pods []Pod) error {
 
 		// Run the sync in an async manifest worker.
 		kl.podWorkers.Run(podFullName, func() {
-			err := kl.syncPod(&pod, dockerContainers)
+			err := kl.syncPod(pod, dockerContainers)
 			if err != nil {
 				glog.Errorf("Error syncing pod: %v skipping.", err)
 			}
