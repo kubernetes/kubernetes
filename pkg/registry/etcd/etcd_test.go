@@ -1019,6 +1019,121 @@ func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
 	}
 }
 
+func TestEtcdListMinions(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	key := "/registry/minions"
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
+							TypeMeta: api.TypeMeta{ID: "foo"},
+						}),
+					},
+					{
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
+							TypeMeta: api.TypeMeta{ID: "bar"},
+						}),
+					},
+				},
+			},
+		},
+		E: nil,
+	}
+	registry := NewTestEtcdRegistry(fakeClient)
+	minions, err := registry.ListMinions(ctx)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(minions.Items) != 2 || minions.Items[0].ID != "foo" || minions.Items[1].ID != "bar" {
+		t.Errorf("Unexpected minion list: %#v", minions)
+	}
+}
+
+func TestEtcdCreateMinion(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient)
+	err := registry.CreateMinion(ctx, &api.Minion{
+		TypeMeta: api.TypeMeta{ID: "foo"},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	resp, err := fakeClient.Get("/registry/minions/foo", false, false)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	var minion api.Minion
+	err = latest.Codec.DecodeInto([]byte(resp.Node.Value), &minion)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if minion.ID != "foo" {
+		t.Errorf("Unexpected minion: %#v %s", minion, resp.Node.Value)
+	}
+}
+
+func TestEtcdContainsMinion(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "foo"}}), 0)
+	registry := NewTestEtcdRegistry(fakeClient)
+	contains, err := registry.ContainsMinion(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if contains == false {
+		t.Errorf("Expected true, but got false")
+	}
+}
+
+func TestEtcdContainsMinionNotFound(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.Data["/registry/minions/foo"] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: nil,
+		},
+		E: tools.EtcdErrorNotFound,
+	}
+	registry := NewTestEtcdRegistry(fakeClient)
+	contains, err := registry.ContainsMinion(ctx, "foo")
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if contains == true {
+		t.Errorf("Expected false, but got true")
+	}
+}
+
+func TestEtcdDeleteMinion(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	registry := NewTestEtcdRegistry(fakeClient)
+	err := registry.DeleteMinion(ctx, "foo")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(fakeClient.DeletedKeys) != 1 {
+		t.Errorf("Expected 1 delete, found %#v", fakeClient.DeletedKeys)
+	}
+	key := "/registry/minions/foo"
+	if fakeClient.DeletedKeys[0] != key {
+		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
+	}
+}
+
 // TODO We need a test for the compare and swap behavior.  This basically requires two things:
 //   1) Add a per-operation synchronization channel to the fake etcd client, such that any operation waits on that
 //      channel, this will enable us to orchestrate the flow of etcd requests in the test.

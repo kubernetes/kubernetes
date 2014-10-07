@@ -20,11 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
 func TestCloudList(t *testing.T) {
+	ctx := api.NewContext()
 	instances := []string{"m1", "m2"}
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
@@ -34,17 +36,18 @@ func TestCloudList(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	list, err := registry.List()
+	list, err := registry.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(list, registrytest.MakeMinionList(instances)) {
+	if !reflect.DeepEqual(list, registrytest.MakeMinionList(instances, api.NodeResources{})) {
 		t.Errorf("Unexpected inequality: %#v, %#v", list, instances)
 	}
 }
 
 func TestCloudContains(t *testing.T) {
+	ctx := api.NewContext()
 	instances := []string{"m1", "m2"}
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
@@ -54,7 +57,7 @@ func TestCloudContains(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	contains, err := registry.Contains("m1")
+	contains, err := registry.ContainsMinion(ctx, "m1")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -63,7 +66,7 @@ func TestCloudContains(t *testing.T) {
 		t.Errorf("Unexpected !contains")
 	}
 
-	contains, err = registry.Contains("m100")
+	contains, err = registry.ContainsMinion(ctx, "m100")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -74,6 +77,7 @@ func TestCloudContains(t *testing.T) {
 }
 
 func TestCloudListRegexp(t *testing.T) {
+	ctx := api.NewContext()
 	instances := []string{"m1", "m2", "n1", "n2"}
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
@@ -83,12 +87,12 @@ func TestCloudListRegexp(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	list, err := registry.List()
+	list, err := registry.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedList := registrytest.MakeMinionList([]string{"m1", "m2"})
+	expectedList := registrytest.MakeMinionList([]string{"m1", "m2"}, api.NodeResources{})
 	if !reflect.DeepEqual(list, expectedList) {
 		t.Errorf("Unexpected inequality: %#v, %#v", list, expectedList)
 	}

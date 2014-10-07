@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
@@ -34,7 +33,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:     6502,
 		TypeMeta: api.TypeMeta{ID: "foo"},
@@ -156,7 +155,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:                       6502,
 		TypeMeta:                   api.TypeMeta{ID: "foo"},
@@ -183,7 +182,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 		Err: fmt.Errorf("test error"),
 	}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		Port:                       6502,
 		TypeMeta:                   api.TypeMeta{ID: "foo"},
@@ -206,7 +205,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -227,7 +226,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	svc := &api.Service{
 		TypeMeta:                   api.TypeMeta{ID: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
@@ -314,7 +313,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
 		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -334,7 +333,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	registry.Endpoints = api.Endpoints{Endpoints: []string{"foo:80"}}
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
 		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},
@@ -363,7 +362,7 @@ func TestServiceRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
-	storage := NewREST(registry, fakeCloud, minion.NewRegistry(machines, api.NodeResources{}))
+	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}))
 	registry.CreateService(ctx, &api.Service{
 		TypeMeta: api.TypeMeta{ID: "foo"},
 		Selector: map[string]string{"bar": "baz"},

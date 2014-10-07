@@ -44,7 +44,7 @@ type CachingRegistry struct {
 }
 
 func NewCachingRegistry(delegate Registry, ttl time.Duration) (Registry, error) {
-	list, err := delegate.List()
+	list, err := delegate.ListMinions(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +57,9 @@ func NewCachingRegistry(delegate Registry, ttl time.Duration) (Registry, error) 
 	}, nil
 }
 
-func (r *CachingRegistry) Contains(nodeID string) (bool, error) {
+func (r *CachingRegistry) ContainsMinion(ctx api.Context, nodeID string) (bool, error) {
 	if r.expired() {
-		if err := r.refresh(false); err != nil {
+		if err := r.refresh(ctx, false); err != nil {
 			return false, err
 		}
 	}
@@ -74,23 +74,23 @@ func (r *CachingRegistry) Contains(nodeID string) (bool, error) {
 	return false, nil
 }
 
-func (r *CachingRegistry) Delete(minion string) error {
-	if err := r.delegate.Delete(minion); err != nil {
+func (r *CachingRegistry) DeleteMinion(ctx api.Context, nodeID string) error {
+	if err := r.delegate.DeleteMinion(ctx, nodeID); err != nil {
 		return err
 	}
-	return r.refresh(true)
+	return r.refresh(ctx, true)
 }
 
-func (r *CachingRegistry) Insert(minion string) error {
-	if err := r.delegate.Insert(minion); err != nil {
+func (r *CachingRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+	if err := r.delegate.CreateMinion(ctx, minion); err != nil {
 		return err
 	}
-	return r.refresh(true)
+	return r.refresh(ctx, true)
 }
 
-func (r *CachingRegistry) List() (*api.MinionList, error) {
+func (r *CachingRegistry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 	if r.expired() {
-		if err := r.refresh(false); err != nil {
+		if err := r.refresh(ctx, false); err != nil {
 			return r.nodes, err
 		}
 	}
@@ -105,12 +105,12 @@ func (r *CachingRegistry) expired() bool {
 
 // refresh updates the current store.  It double checks expired under lock with the assumption
 // of optimistic concurrency with the other functions.
-func (r *CachingRegistry) refresh(force bool) error {
+func (r *CachingRegistry) refresh(ctx api.Context, force bool) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if force || r.expired() {
 		var err error
-		r.nodes, err = r.delegate.List()
+		r.nodes, err = r.delegate.ListMinions(ctx)
 		time := r.clock.Now()
 		atomic.SwapInt64(&r.lastUpdate, time.Unix())
 		return err

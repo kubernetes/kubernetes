@@ -40,8 +40,8 @@ func NewHealthyRegistry(delegate Registry, client *http.Client) Registry {
 	}
 }
 
-func (r *HealthyRegistry) Contains(minion string) (bool, error) {
-	contains, err := r.delegate.Contains(minion)
+func (r *HealthyRegistry) ContainsMinion(ctx api.Context, minion string) (bool, error) {
+	contains, err := r.delegate.ContainsMinion(ctx, minion)
 	if err != nil {
 		return false, err
 	}
@@ -58,17 +58,17 @@ func (r *HealthyRegistry) Contains(minion string) (bool, error) {
 	return true, nil
 }
 
-func (r *HealthyRegistry) Delete(minion string) error {
-	return r.delegate.Delete(minion)
+func (r *HealthyRegistry) DeleteMinion(ctx api.Context, minionID string) error {
+	return r.delegate.DeleteMinion(ctx, minionID)
 }
 
-func (r *HealthyRegistry) Insert(minion string) error {
-	return r.delegate.Insert(minion)
+func (r *HealthyRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+	return r.delegate.CreateMinion(ctx, minion)
 }
 
-func (r *HealthyRegistry) List() (currentMinions *api.MinionList, err error) {
+func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.MinionList, err error) {
 	result := &api.MinionList{}
-	list, err := r.delegate.List()
+	list, err := r.delegate.ListMinions(ctx)
 	if err != nil {
 		return result, err
 	}

@@ -29,53 +29,55 @@ type MinionRegistry struct {
 	sync.Mutex
 }
 
-func MakeMinionList(minions []string) *api.MinionList {
+func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.MinionList {
 	list := api.MinionList{
 		Items: make([]api.Minion, len(minions)),
 	}
 	for i := range minions {
 		list.Items[i].ID = minions[i]
+		list.Items[i].NodeResources = nodeResources
 	}
 	return &list
 }
 
-func NewMinionRegistry(minions []string) *MinionRegistry {
+func NewMinionRegistry(minions []string, nodeResources api.NodeResources) *MinionRegistry {
 	return &MinionRegistry{
-		Minions: *MakeMinionList(minions),
+		Minions: *MakeMinionList(minions, nodeResources),
 	}
 }
 
-func (r *MinionRegistry) List() (*api.MinionList, error) {
+func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 	r.Lock()
 	defer r.Unlock()
 	return &r.Minions, r.Err
 }
 
-func (r *MinionRegistry) Insert(minion string) error {
+func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	r.Lock()
 	defer r.Unlock()
-	r.Minion = minion
-	r.Minions.Items = append(r.Minions.Items, api.Minion{TypeMeta: api.TypeMeta{ID: minion}})
+	r.Minion = minion.ID
+	r.Minions.Items = append(r.Minions.Items, *minion)
 	return r.Err
 }
 
-func (r *MinionRegistry) Contains(nodeID string) (bool, error) {
+func (r *MinionRegistry) ContainsMinion(ctx api.Context, minionID string) (bool, error) {
 	r.Lock()
 	defer r.Unlock()
 	for _, node := range r.Minions.Items {
-		if node.ID == nodeID {
+		if node.ID == minionID {
 			return true, r.Err
 		}
 	}
 	return false, r.Err
 }
 
-func (r *MinionRegistry) Delete(minion string) error {
+func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	r.Lock()
 	defer r.Unlock()
 	var newList []api.Minion
 	for _, node := range r.Minions.Items {
-		if node.ID != minion {
+
+		if node.ID != minionID {
 			newList = append(newList, api.Minion{TypeMeta: api.TypeMeta{ID: node.ID}})
 		}
 	}

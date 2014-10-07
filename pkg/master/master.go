@@ -111,7 +111,13 @@ func makeMinionRegistry(c *Config) minion.Registry {
 		}
 	}
 	if minionRegistry == nil {
-		minionRegistry = minion.NewRegistry(c.Minions, c.NodeResources)
+		minionRegistry = etcd.NewRegistry(c.EtcdHelper, nil)
+		for _, minionID := range c.Minions {
+			minionRegistry.CreateMinion(nil, &api.Minion{
+				TypeMeta:      api.TypeMeta{ID: minionID},
+				NodeResources: c.NodeResources,
+			})
+		}
 	}
 	if c.HealthCheckMinions {
 		minionRegistry = minion.NewHealthyRegistry(minionRegistry, &http.Client{})

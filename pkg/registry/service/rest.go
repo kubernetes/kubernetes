@@ -76,7 +76,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 			if !ok {
 				return nil, fmt.Errorf("The cloud provider does not support zone enumeration.")
 			}
-			hosts, err := rs.machines.List()
+			hosts, err := rs.machines.ListMinions(ctx)
 			if err != nil {
 				return nil, err
 			}
