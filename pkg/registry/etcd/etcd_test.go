@@ -43,7 +43,7 @@ func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 func TestEtcdGetPod(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/pods/foo", runtime.EncodeOrDie(latest.Codec, &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/pods/foo", runtime.EncodeOrDie(latest.Codec, &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	pod, err := registry.GetPod(ctx, "foo")
 	if err != nil {
@@ -138,7 +138,7 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 	fakeClient.Data["/registry/pods/foo"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}),
+				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}),
 			},
 		},
 		E: nil,
@@ -335,7 +335,7 @@ func TestEtcdDeletePod(t *testing.T) {
 
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		JSONBase:     api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
@@ -372,7 +372,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 
 	key := "/registry/pods/foo"
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		JSONBase:     api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
@@ -458,13 +458,13 @@ func TestEtcdListPods(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-							JSONBase:     api.JSONBase{ID: "foo"},
+							Metadata: api.ObjectMeta{Name: "foo"},
 							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-							JSONBase:     api.JSONBase{ID: "bar"},
+							Metadata: api.ObjectMeta{Name: "bar"},
 							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
@@ -536,10 +536,10 @@ func TestEtcdListControllers(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{Metadata: api.ObjectMeta{Name: "foo"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{Metadata: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -560,7 +560,7 @@ func TestEtcdListControllers(t *testing.T) {
 func TestEtcdGetController(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	ctrl, err := registry.GetController(ctx, "foo")
 	if err != nil {
@@ -640,7 +640,7 @@ func TestEtcdCreateController(t *testing.T) {
 func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateController(ctx, &api.ReplicationController{
@@ -658,10 +658,10 @@ func TestEtcdUpdateController(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 
-	resp, _ := fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	resp, _ := fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.UpdateController(ctx, &api.ReplicationController{
-		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+		Metadata: api.ObjectMeta{Name: "foo", ResourceVersion: resp.Node.ModifiedIndex},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
@@ -685,10 +685,10 @@ func TestEtcdListServices(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{Metadata: api.ObjectMeta{Name: "foo"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{Metadata: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -711,7 +711,7 @@ func TestEtcdCreateService(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateService(ctx, &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -736,10 +736,10 @@ func TestEtcdCreateService(t *testing.T) {
 func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateService(ctx, &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 	})
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %#v", err)
@@ -749,7 +749,7 @@ func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 func TestEtcdGetService(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	service, err := registry.GetService(ctx, "foo")
 	if err != nil {
@@ -804,10 +804,10 @@ func TestEtcdUpdateService(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 
-	resp, _ := fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+	resp, _ := fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{Metadata: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	testService := api.Service{
-		JSONBase: api.JSONBase{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+		Metadata: api.ObjectMeta{Name: "foo", ResourceVersion: resp.Node.ModifiedIndex},
 		Labels: map[string]string{
 			"baz": "bar",
 		},
@@ -842,10 +842,10 @@ func TestEtcdListEndpoints(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:8345"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{Metadata: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:8345"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{Metadata: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -868,7 +868,7 @@ func TestEtcdGetEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := &api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"127.0.0.1:34855"},
 	}
 
@@ -890,7 +890,7 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient.TestIndex = true
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := api.Endpoints{
-		JSONBase:  api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		Endpoints: []string{"baz", "bar"},
 	}
 

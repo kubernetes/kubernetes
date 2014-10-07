@@ -141,8 +141,8 @@ func TestPollMinions(t *testing.T) {
 	}{
 		{
 			minions: []api.Minion{
-				{JSONBase: api.JSONBase{ID: "foo"}},
-				{JSONBase: api.JSONBase{ID: "bar"}},
+				{Metadata: api.ObjectMeta{Name: "foo"}},
+				{Metadata: api.ObjectMeta{Name: "bar"}},
 			},
 		},
 	}
@@ -175,7 +175,7 @@ func TestPollMinions(t *testing.T) {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	testPod := &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}
 	handler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
@@ -255,9 +255,9 @@ func TestStoreToPodLister(t *testing.T) {
 func TestMinionEnumerator(t *testing.T) {
 	testList := &api.MinionList{
 		Items: []api.Minion{
-			{JSONBase: api.JSONBase{ID: "foo"}},
-			{JSONBase: api.JSONBase{ID: "bar"}},
-			{JSONBase: api.JSONBase{ID: "baz"}},
+			{Metadata: api.ObjectMeta{Name: "foo"}},
+			{Metadata: api.ObjectMeta{Name: "bar"}},
+			{Metadata: api.ObjectMeta{Name: "baz"}},
 		},
 	}
 	me := minionEnumerator{testList}

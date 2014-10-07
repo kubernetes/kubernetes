@@ -205,18 +205,18 @@ func TestListPodListSelection(t *testing.T) {
 	podRegistry.Pods = &api.PodList{
 		Items: []api.Pod{
 			{
-				JSONBase: api.JSONBase{ID: "foo"},
+				Metadata: api.ObjectMeta{Name: "foo"},
 			}, {
-				JSONBase:     api.JSONBase{ID: "bar"},
+				Metadata: api.ObjectMeta{Name: "bar"},
 				DesiredState: api.PodState{Host: "barhost"},
 			}, {
-				JSONBase:     api.JSONBase{ID: "baz"},
+				Metadata: api.ObjectMeta{Name: "baz"},
 				DesiredState: api.PodState{Status: "bazstatus"},
 			}, {
-				JSONBase: api.JSONBase{ID: "qux"},
+				Metadata: api.ObjectMeta{Name: "qux"},
 				Labels:   map[string]string{"label": "qux"},
 			}, {
-				JSONBase: api.JSONBase{ID: "zot"},
+				Metadata: api.ObjectMeta{Name: "zot"},
 			},
 		},
 	}
@@ -308,7 +308,7 @@ func TestPodDecode(t *testing.T) {
 
 func TestGetPod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podRegistry.Pod = &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}
 	storage := REST{
 		registry: podRegistry,
 	}
@@ -327,7 +327,7 @@ func TestGetPod(t *testing.T) {
 func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	podRegistry.Pod = &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}
 	storage := REST{
 		registry:      podRegistry,
 		cloudProvider: fakeCloud,
@@ -352,7 +352,7 @@ func TestMakePodStatus(t *testing.T) {
 		Minions: api.MinionList{
 			Items: []api.Minion{
 				{
-					JSONBase: api.JSONBase{ID: "machine"},
+					Metadata: api.ObjectMeta{Name: "machine"},
 				},
 			},
 		},
@@ -527,7 +527,7 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 func TestCreatePod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		CurrentState: api.PodState{
 			Host: "machine",
 		},
@@ -542,7 +542,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{
-		JSONBase:     api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		DesiredState: desiredState,
 	}
 	ctx := api.NewDefaultContext()

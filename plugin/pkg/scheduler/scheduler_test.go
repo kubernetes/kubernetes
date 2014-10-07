@@ -32,7 +32,7 @@ type fakeBinder struct {
 func (fb fakeBinder) Bind(binding *api.Binding) error { return fb.b(binding) }
 
 func podWithID(id string) *api.Pod {
-	return &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	return &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}
 }
 
 type mockScheduler struct {

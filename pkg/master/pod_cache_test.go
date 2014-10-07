@@ -97,7 +97,7 @@ func TestPodGetPodInfoGetter(t *testing.T) {
 
 func TestPodUpdateAllContainers(t *testing.T) {
 	pod := api.Pod{
-		JSONBase: api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 		CurrentState: api.PodState{
 			Host: "machine",
 		},

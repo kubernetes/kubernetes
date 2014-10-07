@@ -33,7 +33,7 @@ func TestDecoder(t *testing.T) {
 	out, in := io.Pipe()
 	decoder := NewDecoder(out, v1beta1.Codec)
 
-	expect := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	expect := &api.Pod{Metadata: api.ObjectMeta{Name: "foo"}}
 	encoder := json.NewEncoder(in)
 	go func() {
 		data, err := v1beta1.Codec.Encode(expect)

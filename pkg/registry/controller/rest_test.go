@@ -224,7 +224,7 @@ func TestCreateController(t *testing.T) {
 		Pods: &api.PodList{
 			Items: []api.Pod{
 				{
-					JSONBase: api.JSONBase{ID: "foo"},
+					Metadata: api.ObjectMeta{Name: "foo"},
 					Labels:   map[string]string{"a": "b"},
 				},
 			},
@@ -236,7 +236,7 @@ func TestCreateController(t *testing.T) {
 		pollPeriod: time.Millisecond * 1,
 	}
 	controller := &api.ReplicationController{
-		JSONBase: api.JSONBase{ID: "test"},
+		Metadata: api.ObjectMeta{Name: "test"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas:        2,
 			ReplicaSelector: map[string]string{"a": "b"},
@@ -275,7 +275,7 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 			},
 		},
 		"empty selector": {
-			JSONBase:     api.JSONBase{ID: "abc"},
+			Metadata:     api.ObjectMeta{Name: "abc"},
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
@@ -306,7 +306,7 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 			},
 		},
 		"empty selector": {
-			JSONBase:     api.JSONBase{ID: "abc"},
+			Metadata:     api.ObjectMeta{Name: "abc"},
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
@@ -337,8 +337,8 @@ func TestFillCurrentState(t *testing.T) {
 	fakeLister := fakePodLister{
 		l: api.PodList{
 			Items: []api.Pod{
-				{JSONBase: api.JSONBase{ID: "foo"}},
-				{JSONBase: api.JSONBase{ID: "bar"}},
+				{Metadata: api.ObjectMeta{Name: "foo"}},
+				{Metadata: api.ObjectMeta{Name: "bar"}},
 			},
 		},
 	}

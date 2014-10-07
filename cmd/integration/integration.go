@@ -218,7 +218,7 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: latest.Version},
+			Metadata: api.ObjectMeta{Name: "atomicservice", APIVersion: latest.Version},
 			Port:     12345,
 			Labels: map[string]string{
 				"name": "atomicService",

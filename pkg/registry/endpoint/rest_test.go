@@ -29,7 +29,7 @@ import (
 func TestGetEndpoints(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
-			JSONBase:  api.JSONBase{ID: "foo"},
+			Metadata:  api.ObjectMeta{Name: "foo"},
 			Endpoints: []string{"127.0.0.1:9000"},
 		},
 	}
@@ -59,7 +59,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	// returns empty endpoints
 	registry.Err = nil
 	registry.Service = &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		Metadata: api.ObjectMeta{Name: "foo"},
 	}
 	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
@@ -76,8 +76,8 @@ func TestEndpointsRegistryList(t *testing.T) {
 	registry.EndpointsList = api.EndpointsList{
 		JSONBase: api.JSONBase{ResourceVersion: 1},
 		Items: []api.Endpoints{
-			{JSONBase: api.JSONBase{ID: "foo"}},
-			{JSONBase: api.JSONBase{ID: "bar"}},
+			{Metadata: api.ObjectMeta{Name: "foo"}},
+			{Metadata: api.ObjectMeta{Name: "bar"}},
 		},
 	}
 	ctx := api.NewContext()

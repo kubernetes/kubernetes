@@ -186,7 +186,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				JSONBase: api.JSONBase{ID: "foo"},
+				Metadata: api.ObjectMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -223,7 +223,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				JSONBase: api.JSONBase{ID: "foo"},
+				Metadata: api.ObjectMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -252,7 +252,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				JSONBase: api.JSONBase{ID: "foo"},
+				Metadata: api.ObjectMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
