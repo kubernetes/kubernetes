@@ -70,15 +70,15 @@ func NewREST(config *RESTConfig) *REST {
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	if !api.ValidNamespace(ctx, &pod.JSONBase) {
-		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
+		return nil, errors.NewConflict("pod", pod.Metadata.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	pod.Spec.UUID = uuid.NewUUID().String()
-	if len(pod.ID) == 0 {
-		pod.ID = pod.Spec.UUID
+	if len(pod.Metadata.Name) == 0 {
+		pod.Metadata.Name = pod.Spec.UUID
 	}
-	pod.Spec.ID = pod.ID
+	pod.Spec.ID = pod.Metadata.Name
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
-		return nil, errors.NewInvalid("pod", pod.ID, errs)
+		return nil, errors.NewInvalid("pod", pod.Metadata.Name, errs)
 	}
 	pod.CreationTimestamp = util.Now()
 
@@ -86,7 +86,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err := rs.registry.CreatePod(ctx, pod); err != nil {
 			return nil, err
 		}
-		return rs.registry.GetPod(ctx, pod.ID)
+		return rs.registry.GetPod(ctx, pod.Metadata.Name)
 	}), nil
 }
 
@@ -118,7 +118,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 
 func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 	return labels.Set{
-		"ID":          pod.ID,
+		"ID":          pod.Metadata.Name,
 		"Spec.Status": string(pod.Spec.Status),
 		"Spec.Host":   pod.Spec.Host,
 	}
@@ -162,16 +162,16 @@ func (*REST) New() runtime.Object {
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
 	if !api.ValidNamespace(ctx, &pod.JSONBase) {
-		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
+		return nil, errors.NewConflict("pod", pod.Metadata.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
-		return nil, errors.NewInvalid("pod", pod.ID, errs)
+		return nil, errors.NewInvalid("pod", pod.Metadata.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := rs.registry.UpdatePod(ctx, pod); err != nil {
 			return nil, err
 		}
-		return rs.registry.GetPod(ctx, pod.ID)
+		return rs.registry.GetPod(ctx, pod.Metadata.Name)
 	}), nil
 }
 
@@ -183,13 +183,13 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 	// Get cached info for the list currently.
 	// TODO: Optionally use fresh info
 	if rs.podCache != nil {
-		info, err := rs.podCache.GetPodInfo(pod.CurrentState.Host, pod.ID)
+		info, err := rs.podCache.GetPodInfo(pod.CurrentState.Host, pod.Metadata.Name)
 		if err != nil {
 			if err != client.ErrPodInfoNotAvailable {
 				glog.Errorf("Error getting container info from cache: %#v", err)
 			}
 			if rs.podInfoGetter != nil {
-				info, err = rs.podInfoGetter.GetPodInfo(pod.CurrentState.Host, pod.ID)
+				info, err = rs.podInfoGetter.GetPodInfo(pod.CurrentState.Host, pod.Metadata.Name)
 			}
 			if err != nil {
 				if err != client.ErrPodInfoNotAvailable {
@@ -207,7 +207,7 @@ func (rs *REST) fillPodInfo(pod *api.Pod) {
 				glog.Warningf("No network settings: %#v", netContainerInfo)
 			}
 		} else {
-			glog.Warningf("Couldn't find network container for %s in %v", pod.ID, info)
+			glog.Warningf("Couldn't find network container for %s in %v", pod.Metadata.Name, info)
 		}
 	}
 }
@@ -284,7 +284,7 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 
 func (rs *REST) waitForPodRunning(ctx api.Context, pod *api.Pod) (runtime.Object, error) {
 	for {
-		podObj, err := rs.Get(ctx, pod.ID)
+		podObj, err := rs.Get(ctx, pod.Metadata.Name)
 		if err != nil || podObj == nil {
 			return nil, err
 		}

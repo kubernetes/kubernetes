@@ -152,10 +152,10 @@ func GetServiceEnvironmentVariables(ctx api.Context, registry Registry, machine 
 	}
 	for _, service := range services.Items {
 		// Host
-		name := makeEnvVariableName(service.ID) + "_SERVICE_HOST"
+		name := makeEnvVariableName(service.Metadata.Name) + "_SERVICE_HOST"
 		result = append(result, api.EnvVar{Name: name, Value: machine})
 		// Port
-		name = makeEnvVariableName(service.ID) + "_SERVICE_PORT"
+		name = makeEnvVariableName(service.Metadata.Name) + "_SERVICE_PORT"
 		result = append(result, api.EnvVar{Name: name, Value: strconv.Itoa(service.Port)})
 		// Docker-compatible vars.
 		result = append(result, makeLinkVariables(service, machine)...)
@@ -227,7 +227,7 @@ func makeEnvVariableName(str string) string {
 }
 
 func makeLinkVariables(service api.Service, machine string) []api.EnvVar {
-	prefix := makeEnvVariableName(service.ID)
+	prefix := makeEnvVariableName(service.Metadata.Name)
 	protocol := string(api.ProtocolTCP)
 	if service.Protocol != "" {
 		protocol = string(service.Protocol)

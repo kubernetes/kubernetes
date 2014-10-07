@@ -60,16 +60,16 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if !api.ValidNamespace(ctx, &controller.JSONBase) {
-		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
+		return nil, errors.NewConflict("controller", controller.Metadata.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 
-	if len(controller.ID) == 0 {
-		controller.ID = uuid.NewUUID().String()
+	if len(controller.Metadata.Name) == 0 {
+		controller.Metadata.Name = uuid.NewUUID().String()
 	}
 	// Pod Manifest ID should be assigned by the pod API
 	controller.Spec.PodTemplate.Spec.ID = ""
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
+		return nil, errors.NewInvalid("replicationController", controller.Metadata.Name, errs)
 	}
 
 	controller.CreationTimestamp = util.Now()
@@ -79,7 +79,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(ctx, controller.ID)
+		return rs.registry.GetController(ctx, controller.Metadata.Name)
 	}), nil
 }
 
@@ -133,17 +133,17 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
 	if !api.ValidNamespace(ctx, &controller.JSONBase) {
-		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
+		return nil, errors.NewConflict("controller", controller.Metadata.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
+		return nil, errors.NewInvalid("replicationController", controller.Metadata.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.UpdateController(ctx, controller)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(ctx, controller.ID)
+		return rs.registry.GetController(ctx, controller.Metadata.Name)
 	}), nil
 }
 

@@ -119,7 +119,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 	for _, pod := range podList.Items {
 		// We delete the pod here, the controller will recreate it.  This will result in pulling
 		// a new Docker image.  This isn't a full "update" but it's what we support for now.
-		err = client.DeletePod(ctx, pod.ID)
+		err = client.DeletePod(ctx, pod.Metadata.Name)
 		if err != nil {
 			return err
 		}

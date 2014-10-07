@@ -71,7 +71,7 @@ func (s *Scheduler) scheduleOne() {
 		return
 	}
 	b := &api.Binding{
-		PodID: pod.ID,
+		PodID: pod.Metadata.Name,
 		Host:  dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {

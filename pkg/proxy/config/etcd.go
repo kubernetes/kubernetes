@@ -141,15 +141,15 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 				continue
 			}
 			retServices[i] = svc
-			endpoints, err := s.GetEndpoints(svc.ID)
+			endpoints, err := s.GetEndpoints(svc.Metadata.Name)
 			if err != nil {
 				if tools.IsEtcdNotFound(err) {
-					glog.V(4).Infof("Unable to get endpoints for %s : %v", svc.ID, err)
+					glog.V(4).Infof("Unable to get endpoints for %s : %v", svc.Metadata.Name, err)
 				}
-				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.ID, err)
+				glog.Errorf("Couldn't get endpoints for %s : %v skipping", svc.Metadata.Name, err)
 				endpoints = api.Endpoints{}
 			} else {
-				glog.V(3).Infof("Got service: %s on localport %d mapping to: %s", svc.ID, svc.Port, endpoints)
+				glog.V(3).Infof("Got service: %s on localport %d mapping to: %s", svc.Metadata.Name, svc.Port, endpoints)
 			}
 			retEndpoints[i] = endpoints
 		}

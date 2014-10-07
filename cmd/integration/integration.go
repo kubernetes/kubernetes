@@ -249,7 +249,7 @@ func runAtomicPutTest(c *client.Client) {
 				var tmpSvc api.Service
 				err := c.Get().
 					Path("services").
-					Path(svc.ID).
+					Path(svc.Metadata.Name).
 					PollPeriod(100 * time.Millisecond).
 					Do().
 					Into(&tmpSvc)
@@ -263,7 +263,7 @@ func runAtomicPutTest(c *client.Client) {
 					tmpSvc.Selector[l] = v
 				}
 				glog.Infof("Posting update (%s, %s)", l, v)
-				err = c.Put().Path("services").Path(svc.ID).Body(&tmpSvc).Do().Error()
+				err = c.Put().Path("services").Path(svc.Metadata.Name).Body(&tmpSvc).Do().Error()
 				if err != nil {
 					if errors.IsConflict(err) {
 						glog.Infof("Conflict: (%s, %s)", l, v)
@@ -280,7 +280,7 @@ func runAtomicPutTest(c *client.Client) {
 		}(label, value)
 	}
 	wg.Wait()
-	if err := c.Get().Path("services").Path(svc.ID).Do().Into(&svc); err != nil {
+	if err := c.Get().Path("services").Path(svc.Metadata.Name).Do().Into(&svc); err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
 	if !reflect.DeepEqual(testLabels, labels.Set(svc.Selector)) {

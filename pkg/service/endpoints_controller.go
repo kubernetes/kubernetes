@@ -55,7 +55,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	}
 	var resultErr error
 	for _, service := range services.Items {
-		nsCtx := api.WithNamespace(ctx, service.Namespace)
+		nsCtx := api.WithNamespace(ctx, service.Metadata.Namespace)
 		pods, err := e.client.ListPods(nsCtx, labels.Set(service.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error syncing service: %#v, skipping.", service)
@@ -75,13 +75,13 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			}
 			endpoints[ix] = net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port))
 		}
-		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.ID)
+		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.Metadata.Name)
 		if err != nil {
 			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
 			if strings.Contains(err.Error(), "not found") {
 				currentEndpoints = &api.Endpoints{
 					JSONBase: api.JSONBase{
-						ID: service.ID,
+						ID: service.Metadata.Name,
 					},
 				}
 			} else {
@@ -99,7 +99,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		} else {
 			// Pre-existing
 			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(2).Infof("endpoints are equal for %s, skipping update", service.ID)
+				glog.V(2).Infof("endpoints are equal for %s, skipping update", service.Metadata.Name)
 				continue
 			}
 			_, err = e.client.UpdateEndpoints(nsCtx, newEndpoints)

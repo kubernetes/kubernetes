@@ -109,7 +109,7 @@ func TestWatch(t *testing.T) {
 
 		// version should match what we set
 		pod := event.Object.(*api.Pod)
-		if pod.ResourceVersion != expectedVersion {
+		if pod.Metadata.ResourceVersion != expectedVersion {
 			t.Errorf("expected version %d, got %#v", expectedVersion, pod)
 		}
 
@@ -134,7 +134,7 @@ func TestWatch(t *testing.T) {
 			t.Errorf("expected deleted event %#v", event)
 		}
 		pod = event.Object.(*api.Pod)
-		if pod.ResourceVersion != expectedVersion {
+		if pod.Metadata.ResourceVersion != expectedVersion {
 			t.Errorf("expected version %d, got %#v", expectedVersion, pod)
 		}
 	})

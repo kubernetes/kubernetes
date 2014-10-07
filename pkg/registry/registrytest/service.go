@@ -59,7 +59,7 @@ func (r *ServiceRegistry) DeleteService(ctx api.Context, id string) error {
 }
 
 func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) error {
-	r.UpdatedID = svc.ID
+	r.UpdatedID = svc.Metadata.Name
 	return r.Err
 }
 

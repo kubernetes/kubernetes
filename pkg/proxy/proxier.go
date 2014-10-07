@@ -392,32 +392,32 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	glog.V(4).Infof("Received update notice: %+v", services)
 	activeServices := util.StringSet{}
 	for _, service := range services {
-		activeServices.Insert(service.ID)
-		info, exists := proxier.getServiceInfo(service.ID)
+		activeServices.Insert(service.Metadata.Name)
+		info, exists := proxier.getServiceInfo(service.Metadata.Name)
 		// TODO: check health of the socket?  What if ProxyLoop exited?
 		if exists && info.isActive() && info.port == service.Port {
 			continue
 		}
 		if exists && info.port != service.Port {
-			err := proxier.stopProxy(service.ID, info)
+			err := proxier.stopProxy(service.Metadata.Name, info)
 			if err != nil {
-				glog.Errorf("error stopping %s: %v", service.ID, err)
+				glog.Errorf("error stopping %s: %v", service.Metadata.Name, err)
 			}
 		}
-		glog.V(3).Infof("Adding a new service %s on %s port %d", service.ID, service.Protocol, service.Port)
+		glog.V(3).Infof("Adding a new service %s on %s port %d", service.Metadata.Name, service.Protocol, service.Port)
 		sock, err := newProxySocket(service.Protocol, proxier.address, service.Port)
 		if err != nil {
-			glog.Errorf("Failed to get a socket for %s: %+v", service.ID, err)
+			glog.Errorf("Failed to get a socket for %s: %+v", service.Metadata.Name, err)
 			continue
 		}
-		proxier.setServiceInfo(service.ID, &serviceInfo{
+		proxier.setServiceInfo(service.Metadata.Name, &serviceInfo{
 			port:     service.Port,
 			protocol: service.Protocol,
 			active:   true,
 			socket:   sock,
 			timeout:  udpIdleTimeout,
 		})
-		proxier.startAccepting(service.ID, sock)
+		proxier.startAccepting(service.Metadata.Name, sock)
 	}
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()

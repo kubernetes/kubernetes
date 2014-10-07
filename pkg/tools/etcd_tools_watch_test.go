@@ -454,7 +454,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		if actualPod.ResourceVersion != testCase.ExpectedVersion {
 			t.Errorf("%s: expected pod with resource version %d, Got %#v", k, testCase.ExpectedVersion, actualPod)
 		}
-		pod.ResourceVersion = testCase.ExpectedVersion
+		pod.Metadata.ResourceVersion = testCase.ExpectedVersion
 		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", k, e, a)
 		}
@@ -513,7 +513,7 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 		if actualPod.ResourceVersion != 1 {
 			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
 		}
-		pod.ResourceVersion = 1
+		pod.Metadata.ResourceVersion = 1
 		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}

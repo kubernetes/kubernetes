@@ -114,7 +114,7 @@ func TestRunController(t *testing.T) {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
-	if controller.ID != name ||
+	if controller.Metadata.Name != name ||
 		controller.Spec.Replicas != replicas ||
 		controller.Spec.PodTemplate.Spec.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
@@ -133,7 +133,7 @@ func TestRunControllerWithService(t *testing.T) {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
-	if controller.ID != name ||
+	if controller.Metadata.Name != name ||
 		controller.Spec.Replicas != replicas ||
 		controller.Spec.PodTemplate.Spec.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)

@@ -63,7 +63,7 @@ func (c *Fake) CreatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error) {
 }
 
 func (c *Fake) UpdatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error) {
-	c.Actions = append(c.Actions, FakeAction{Action: "update-pod", Value: pod.ID})
+	c.Actions = append(c.Actions, FakeAction{Action: "update-pod", Value: pod.Metadata.Name})
 	return &api.Pod{}, nil
 }
 

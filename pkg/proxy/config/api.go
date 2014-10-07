@@ -107,7 +107,7 @@ func handleServicesWatch(resourceVersion *uint64, ch <-chan watch.Event, updates
 			}
 
 			service := event.Object.(*api.Service)
-			*resourceVersion = service.ResourceVersion + 1
+			*resourceVersion = service.Metadata.ResourceVersion + 1
 
 			switch event.Type {
 			case watch.Added, watch.Modified:
@@ -130,7 +130,7 @@ func (s *SourceAPI) runEndpoints(resourceVersion *uint64) {
 			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
 			return
 		}
-		*resourceVersion = endpoints.ResourceVersion
+		*resourceVersion = endpoints.Metadata.ResourceVersion
 		s.endpoints <- EndpointsUpdate{Op: SET, Endpoints: endpoints.Items}
 	}
 
@@ -157,7 +157,7 @@ func handleEndpointsWatch(resourceVersion *uint64, ch <-chan watch.Event, update
 			}
 
 			endpoints := event.Object.(*api.Endpoints)
-			*resourceVersion = endpoints.ResourceVersion + 1
+			*resourceVersion = endpoints.Metadata.ResourceVersion + 1
 
 			switch event.Type {
 			case watch.Added, watch.Modified:

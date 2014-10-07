@@ -78,7 +78,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 			glog.V(2).Infof("About to try and schedule pod %v\n"+
 				"\tknown minions: %v\n"+
 				"\tknown scheduled pods: %v\n",
-				pod.ID, minionCache.Contains(), podCache.Contains())
+				pod.Metadata.Name, minionCache.Contains(), podCache.Contains())
 			return pod
 		},
 		Error: factory.makeDefaultErrorFunc(podQueue),
@@ -159,13 +159,13 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
-		glog.Errorf("Error scheduling %v: %v; retrying", pod.ID, err)
+		glog.Errorf("Error scheduling %v: %v; retrying", pod.Metadata.Name, err)
 
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
 		go func() {
 			defer util.HandleCrash()
-			podID := pod.ID
+			podID := pod.Metadata.Name
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
 			err := factory.Client.Get().Path("pods").Path(podID).Do().Into(pod)
@@ -174,7 +174,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(podQueue *cache.FIFO) func(po
 				return
 			}
 			if pod.Spec.Host == "" {
-				podQueue.Add(pod.ID, pod)
+				podQueue.Add(pod.Metadata.Name, pod)
 			}
 		}()
 	}

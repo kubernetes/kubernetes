@@ -282,7 +282,7 @@ func (s *podStorage) MergedState() interface{} {
 	for source, sourcePods := range s.pods {
 		for _, podRef := range sourcePods {
 			pod := *podRef
-			pod.Namespace = source
+			pod.Metadata.Namespace = source
 			pods = append(pods, pod)
 		}
 	}

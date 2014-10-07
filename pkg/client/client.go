@@ -122,11 +122,11 @@ func (c *Client) CreatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *Client) UpdatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	if pod.ResourceVersion == 0 {
+	if pod.Metadata.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
 		return
 	}
-	err = c.Put().Path("pods").Path(pod.ID).Body(pod).Do().Into(result)
+	err = c.Put().Path("pods").Path(pod.Metadata.Name).Body(pod).Do().Into(result)
 	return
 }
 
@@ -154,11 +154,11 @@ func (c *Client) CreateReplicationController(ctx api.Context, controller *api.Re
 // UpdateReplicationController updates an existing replication controller.
 func (c *Client) UpdateReplicationController(ctx api.Context, controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	if controller.ResourceVersion == 0 {
+	if controller.Metadata.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
 		return
 	}
-	err = c.Put().Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(result)
+	err = c.Put().Path("replicationControllers").Path(controller.Metadata.Name).Body(controller).Do().Into(result)
 	return
 }
 
@@ -202,11 +202,11 @@ func (c *Client) CreateService(ctx api.Context, svc *api.Service) (result *api.S
 // UpdateService updates an existing service.
 func (c *Client) UpdateService(ctx api.Context, svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	if svc.ResourceVersion == 0 {
+	if svc.Metadata.ResourceVersion == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
-	err = c.Put().Path("services").Path(svc.ID).Body(svc).Do().Into(result)
+	err = c.Put().Path("services").Path(svc.Metadata.Name).Body(svc).Do().Into(result)
 	return
 }
 
@@ -259,12 +259,12 @@ func (c *Client) CreateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*ap
 
 func (c *Client) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	if endpoints.ResourceVersion == 0 {
+	if endpoints.Metadata.ResourceVersion == 0 {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
 	}
 	err := c.Put().
 		Path("endpoints").
-		Path(endpoints.ID).
+		Path(endpoints.Metadata.Name).
 		Body(endpoints).
 		Do().
 		Into(result)

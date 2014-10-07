@@ -273,10 +273,10 @@ func TestListPodListSelection(t *testing.T) {
 			t.Errorf("%v: Expected %v, got %v", index, e, a)
 		}
 		for _, pod := range pods.Items {
-			if !item.expectedIDs.Has(pod.ID) {
-				t.Errorf("%v: Unexpected pod %v", index, pod.ID)
+			if !item.expectedIDs.Has(pod.Metadata.Name) {
+				t.Errorf("%v: Unexpected pod %v", index, pod.Metadata.Name)
 			}
-			t.Logf("%v: Got pod ID: %v", index, pod.ID)
+			t.Logf("%v: Got pod ID: %v", index, pod.Metadata.Name)
 		}
 	}
 }

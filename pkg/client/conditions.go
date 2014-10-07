@@ -26,7 +26,7 @@ import (
 // for a controller's ReplicaSelector equals the Replicas count.
 func (c *Client) ControllerHasDesiredReplicas(controller api.ReplicationController) wait.ConditionFunc {
 	return func() (bool, error) {
-		ctx := api.WithNamespace(api.NewContext(), controller.Namespace)
+		ctx := api.WithNamespace(api.NewContext(), controller.Metadata.Namespace)
 		pods, err := c.ListPods(ctx, labels.Set(controller.Spec.ReplicaSelector).AsSelector())
 		if err != nil {
 			return false, err

@@ -50,7 +50,7 @@ func TestEtcdGetPod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.Metadata.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v", pod)
 	}
 }
@@ -117,7 +117,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.Metadata.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
@@ -247,7 +247,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.Metadata.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
@@ -313,7 +313,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if pod.ID != "foo" {
+	if pod.Metadata.Name != "foo" {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var manifests api.ContainerManifestList
@@ -728,7 +728,7 @@ func TestEtcdCreateService(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if service.ID != "foo" {
+	if service.Metadata.Name != "foo" {
 		t.Errorf("Unexpected service: %#v %s", service, resp.Node.Value)
 	}
 }
@@ -756,7 +756,7 @@ func TestEtcdGetService(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if service.ID != "foo" {
+	if service.Metadata.Name != "foo" {
 		t.Errorf("Unexpected service: %#v", service)
 	}
 }
@@ -826,7 +826,7 @@ func TestEtcdUpdateService(t *testing.T) {
 	}
 
 	// Clear modified indices before the equality test.
-	svc.ResourceVersion = 0
+	svc.Metadata.ResourceVersion = 0
 	testService.ResourceVersion = 0
 	if !reflect.DeepEqual(*svc, testService) {
 		t.Errorf("Unexpected service: got\n %#v\n, wanted\n %#v", svc, testService)

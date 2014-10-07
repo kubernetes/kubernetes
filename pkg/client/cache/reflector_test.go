@@ -142,10 +142,10 @@ func TestReflector_listAndWatch(t *testing.T) {
 	// Verify we received the right ids with the right resource versions.
 	for i, id := range ids {
 		pod := s.Pop().(*api.Pod)
-		if e, a := id, pod.ID; e != a {
+		if e, a := id, pod.Metadata.Name; e != a {
 			t.Errorf("%v: Expected %v, got %v", i, e, a)
 		}
-		if e, a := uint64(i+2), pod.ResourceVersion; e != a {
+		if e, a := uint64(i+2), pod.Metadata.ResourceVersion; e != a {
 			t.Errorf("%v: Expected %v, got %v", i, e, a)
 		}
 	}
@@ -207,11 +207,11 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 			checkMap := map[string]uint64{}
 			for _, item := range current {
 				pod := item.(*api.Pod)
-				checkMap[pod.ID] = pod.ResourceVersion
+				checkMap[pod.Metadata.Name] = pod.Metadata.ResourceVersion
 			}
 			for _, pod := range item.list.Items {
-				if e, a := pod.ResourceVersion, checkMap[pod.ID]; e != a {
-					t.Errorf("%v: expected %v, got %v for pod %v", line, e, a, pod.ID)
+				if e, a := pod.Metadata.ResourceVersion, checkMap[pod.Metadata.Name]; e != a {
+					t.Errorf("%v: expected %v, got %v for pod %v", line, e, a, pod.Metadata.Name)
 				}
 			}
 			if e, a := len(item.list.Items), len(checkMap); e != a {

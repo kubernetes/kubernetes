@@ -44,8 +44,8 @@ func TestServiceRegistryCreate(t *testing.T) {
 	c, _ := storage.Create(ctx, svc)
 	created_svc := <-c
 	created_service := created_svc.(*api.Service)
-	if created_service.ID != "foo" {
-		t.Errorf("Expected foo, but got %v", created_service.ID)
+	if created_service.Metadata.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", created_service.Metadata.Name)
 	}
 	if created_service.CreationTimestamp.IsZero() {
 		t.Errorf("Expected timestamp to be set, got %:v", created_service.CreationTimestamp)
@@ -53,12 +53,12 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(ctx, svc.ID)
+	srv, err := registry.GetService(ctx, svc.Metadata.Name)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if srv == nil {
-		t.Errorf("Failed to find service: %s", svc.ID)
+		t.Errorf("Failed to find service: %s", svc.Metadata.Name)
 	}
 }
 
@@ -111,8 +111,8 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	}
 	updated_svc := <-c
 	updated_service := updated_svc.(*api.Service)
-	if updated_service.ID != "foo" {
-		t.Errorf("Expected foo, but got %v", updated_service.ID)
+	if updated_service.Metadata.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", updated_service.Metadata.Name)
 	}
 	if e, a := "foo", registry.UpdatedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
@@ -168,12 +168,12 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(ctx, svc.ID)
+	srv, err := registry.GetService(ctx, svc.Metadata.Name)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if srv == nil {
-		t.Errorf("Failed to find service: %s", svc.ID)
+		t.Errorf("Failed to find service: %s", svc.Metadata.Name)
 	}
 }
 
@@ -212,7 +212,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 		Selector: map[string]string{"bar": "baz"},
 	}
 	registry.CreateService(ctx, svc)
-	c, _ := storage.Delete(ctx, svc.ID)
+	c, _ := storage.Delete(ctx, svc.Metadata.Name)
 	<-c
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -234,7 +234,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 		CreateExternalLoadBalancer: true,
 	}
 	registry.CreateService(ctx, svc)
-	c, _ := storage.Delete(ctx, svc.ID)
+	c, _ := storage.Delete(ctx, svc.Metadata.Name)
 	<-c
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)

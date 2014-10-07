@@ -34,7 +34,7 @@ func truePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, erro
 }
 
 func matchesPredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	return pod.ID == node, nil
+	return pod.Metadata.Name == node, nil
 }
 
 func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {

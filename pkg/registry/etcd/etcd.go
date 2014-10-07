@@ -120,8 +120,8 @@ func (r *Registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	// Spec.Host == "" is a signal to the scheduler that this pod needs scheduling.
 	pod.Spec.Status = api.PodRunning
 	pod.Spec.Host = ""
-	err := r.CreateObj(makePodKey(pod.ID), pod, 0)
-	return etcderr.InterpretCreateError(err, "pod", pod.ID)
+	err := r.CreateObj(makePodKey(pod.Metadata.Name), pod, 0)
+	return etcderr.InterpretCreateError(err, "pod", pod.Metadata.Name)
 }
 
 // ApplyBinding implements binding's registry
@@ -139,7 +139,7 @@ func (r *Registry) setPodHostTo(podID, oldMachine, machine string) (finalPod *ap
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
 		if pod.Spec.Host != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.ID, pod.Spec.Host)
+			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.Metadata.Name, pod.Spec.Host)
 		}
 		pod.Spec.Host = machine
 		finalPod = pod
@@ -254,14 +254,14 @@ func (r *Registry) GetController(ctx api.Context, controllerID string) (*api.Rep
 
 // CreateController creates a new ReplicationController.
 func (r *Registry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
-	err := r.CreateObj(makeControllerKey(controller.ID), controller, 0)
-	return etcderr.InterpretCreateError(err, "replicationController", controller.ID)
+	err := r.CreateObj(makeControllerKey(controller.Metadata.Name), controller, 0)
+	return etcderr.InterpretCreateError(err, "replicationController", controller.Metadata.Name)
 }
 
 // UpdateController replaces an existing ReplicationController.
 func (r *Registry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
-	err := r.SetObj(makeControllerKey(controller.ID), controller)
-	return etcderr.InterpretUpdateError(err, "replicationController", controller.ID)
+	err := r.SetObj(makeControllerKey(controller.Metadata.Name), controller)
+	return etcderr.InterpretUpdateError(err, "replicationController", controller.Metadata.Name)
 }
 
 // DeleteController deletes a ReplicationController specified by its ID.
@@ -284,8 +284,8 @@ func (r *Registry) ListServices(ctx api.Context) (*api.ServiceList, error) {
 
 // CreateService creates a new Service.
 func (r *Registry) CreateService(ctx api.Context, svc *api.Service) error {
-	err := r.CreateObj(makeServiceKey(svc.ID), svc, 0)
-	return etcderr.InterpretCreateError(err, "service", svc.ID)
+	err := r.CreateObj(makeServiceKey(svc.Metadata.Name), svc, 0)
+	return etcderr.InterpretCreateError(err, "service", svc.Metadata.Name)
 }
 
 // GetService obtains a Service specified by its name.
@@ -333,8 +333,8 @@ func (r *Registry) DeleteService(ctx api.Context, name string) error {
 
 // UpdateService replaces an existing Service.
 func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) error {
-	err := r.SetObj(makeServiceKey(svc.ID), svc)
-	return etcderr.InterpretUpdateError(err, "service", svc.ID)
+	err := r.SetObj(makeServiceKey(svc.Metadata.Name), svc)
+	return etcderr.InterpretUpdateError(err, "service", svc.Metadata.Name)
 }
 
 // WatchServices begins watching for new, changed, or deleted service configurations.

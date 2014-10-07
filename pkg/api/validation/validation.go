@@ -310,11 +310,11 @@ func ValidatePodState(podState *api.PodStatus) errs.ErrorList {
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(pod.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
+	if len(pod.Metadata.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.Metadata.Name))
 	}
-	if !util.IsDNSSubdomain(pod.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
+	if !util.IsDNSSubdomain(pod.Metadata.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Metadata.Namespace))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.Spec).Prefix("desiredState")...)
 	return allErrs
@@ -323,13 +323,13 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(service.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", service.ID))
-	} else if !util.IsDNS952Label(service.ID) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
+	if len(service.Metadata.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("id", service.Metadata.Name))
+	} else if !util.IsDNS952Label(service.Metadata.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.Metadata.Name))
 	}
-	if !util.IsDNSSubdomain(service.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace))
+	if !util.IsDNSSubdomain(service.Metadata.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Metadata.Namespace))
 	}
 	if !util.IsValidPortNum(service.Port) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("port", service.Port))
@@ -348,11 +348,11 @@ func ValidateService(service *api.Service) errs.ErrorList {
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(controller.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
+	if len(controller.Metadata.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.Metadata.Name))
 	}
-	if !util.IsDNSSubdomain(controller.Namespace) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
+	if !util.IsDNSSubdomain(controller.Metadata.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Metadata.Namespace))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.Spec).Prefix("desiredState")...)
 	return allErrs
