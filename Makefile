@@ -51,3 +51,19 @@ clean:
 	rm -rf $(OUT_DIR)
 	rm -rf $(GODEPS_PKG_DIR)
 .PHONY: clean
+
+# Run 'go vet'.
+#
+# Args:
+#   WHAT: Directory names to vet.  All *.go files under these
+#     directories will be vetted.  If not specified, "everything" will be
+#     vetted.
+#   TESTS: Same as WHAT.
+#   GOFLAGS: Extra flags to pass to 'go' when building.
+#
+# Example:
+#   make vet
+#   make vet WHAT=pkg/kubelet
+vet:
+	hack/vet-go.sh $(WHAT) $(TESTS)
+.PHONY: vet
