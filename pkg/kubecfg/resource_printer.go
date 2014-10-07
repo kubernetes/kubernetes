@@ -230,12 +230,12 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 	return nil
 }
 
-func printMinion(minion *api.Minion, w io.Writer) error {
+func printMinion(minion *api.Node, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\n", minion.ID)
 	return err
 }
 
-func printMinionList(list *api.MinionList, w io.Writer) error {
+func printMinionList(list *api.NodeList, w io.Writer) error {
 	for _, minion := range list.Items {
 		if err := printMinion(&minion, w); err != nil {
 			return err

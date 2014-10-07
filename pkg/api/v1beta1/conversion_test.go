@@ -118,39 +118,39 @@ func TestMinionListConversionToNew(t *testing.T) {
 	oldMinion := func(id string) v1beta1.Minion {
 		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
 	}
-	newMinion := func(id string) newer.Minion {
-		return newer.Minion{JSONBase: newer.JSONBase{ID: id}}
+	newMinion := func(id string) newer.Node {
+		return newer.Node{JSONBase: newer.JSONBase{ID: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []newer.Minion{
+	newMinions := []newer.Node{
 		newMinion("foo"),
 		newMinion("bar"),
 	}
 
 	table := []struct {
 		oldML *v1beta1.MinionList
-		newML *newer.MinionList
+		newML *newer.NodeList
 	}{
 		{
 			oldML: &v1beta1.MinionList{Items: oldMinions},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		}, {
 			oldML: &v1beta1.MinionList{Minions: oldMinions},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		}, {
 			oldML: &v1beta1.MinionList{
 				Items:   oldMinions,
 				Minions: []v1beta1.Minion{oldMinion("baz")},
 			},
-			newML: &newer.MinionList{Items: newMinions},
+			newML: &newer.NodeList{Items: newMinions},
 		},
 	}
 
 	for _, item := range table {
-		got := &newer.MinionList{}
+		got := &newer.NodeList{}
 		err := Convert(item.oldML, got)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -165,19 +165,19 @@ func TestMinionListConversionToOld(t *testing.T) {
 	oldMinion := func(id string) v1beta1.Minion {
 		return v1beta1.Minion{JSONBase: v1beta1.JSONBase{ID: id}}
 	}
-	newMinion := func(id string) newer.Minion {
-		return newer.Minion{JSONBase: newer.JSONBase{ID: id}}
+	newMinion := func(id string) newer.Node {
+		return newer.Node{JSONBase: newer.JSONBase{ID: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
 		oldMinion("bar"),
 	}
-	newMinions := []newer.Minion{
+	newMinions := []newer.Node{
 		newMinion("foo"),
 		newMinion("bar"),
 	}
 
-	newML := &newer.MinionList{Items: newMinions}
+	newML := &newer.NodeList{Items: newMinions}
 	oldML := &v1beta1.MinionList{
 		Items:   oldMinions,
 		Minions: oldMinions,

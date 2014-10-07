@@ -56,7 +56,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 	minionCache := cache.NewStore()
 	if false {
 		// Disable this code until minions support watches.
-		cache.NewReflector(factory.createMinionLW(), &api.Minion{}, minionCache).Run()
+		cache.NewReflector(factory.createMinionLW(), &api.Node{}, minionCache).Run()
 	} else {
 		cache.NewPoller(factory.pollMinions, 10*time.Second, minionCache).Run()
 	}
@@ -149,7 +149,7 @@ func (factory *ConfigFactory) createMinionLW() *listWatch {
 
 // pollMinions lists all minions and returns an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
-	list := &api.MinionList{}
+	list := &api.NodeList{}
 	err := factory.Client.Get().Path("minions").Do().Into(list)
 	if err != nil {
 		return nil, err
@@ -187,7 +187,7 @@ type storeToMinionLister struct {
 
 func (s *storeToMinionLister) List() (machines []string, err error) {
 	for _, m := range s.Store.List() {
-		machines = append(machines, m.(*api.Minion).ID)
+		machines = append(machines, m.(*api.Node).ID)
 	}
 	return machines, nil
 }
@@ -209,7 +209,7 @@ func (s *storeToPodLister) ListPods(selector labels.Selector) (pods []api.Pod, e
 
 // minionEnumerator allows a cache.Poller to enumerate items in an api.PodList
 type minionEnumerator struct {
-	*api.MinionList
+	*api.NodeList
 }
 
 // Len returns the number of items in the pod list.

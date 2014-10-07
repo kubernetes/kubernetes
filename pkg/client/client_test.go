@@ -489,7 +489,7 @@ func TestListEndpooints(t *testing.T) {
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
 					{
-						Metadata: api.ObjectMeta{Name: "endpoint-1"},
+						Metadata:  api.ObjectMeta{Name: "endpoint-1"},
 						Endpoints: []string{"10.245.1.2:8080", "10.245.1.3:8080"},
 					},
 				},
@@ -539,7 +539,7 @@ func TestGetServerVersion(t *testing.T) {
 func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions"},
-		Response: Response{StatusCode: 200, Body: &api.MinionList{Metadata: api.ObjectMeta{Name: "minion-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.NodeList{Metadata: api.ObjectMeta{Name: "minion-1"}}},
 	}
 	response, err := c.Setup().ListMinions()
 	c.Validate(t, response, err)

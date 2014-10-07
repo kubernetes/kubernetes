@@ -28,25 +28,25 @@ func TestMinionREST(t *testing.T) {
 	m := NewRegistry([]string{"foo", "bar"})
 	ms := NewREST(m)
 	ctx := api.NewContext()
-	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Minion).ID != "foo" {
+	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Node).ID != "foo" {
 		t.Errorf("missing expected object")
 	}
-	if obj, err := ms.Get(ctx, "bar"); err != nil || obj.(*api.Minion).ID != "bar" {
+	if obj, err := ms.Get(ctx, "bar"); err != nil || obj.(*api.Node).ID != "bar" {
 		t.Errorf("missing expected object")
 	}
 	if _, err := ms.Get(ctx, "baz"); err != ErrDoesNotExist {
 		t.Errorf("has unexpected object")
 	}
 
-	c, err := ms.Create(ctx, &api.Minion{Metadata: api.ObjectMeta{Name: "baz"}})
+	c, err := ms.Create(ctx, &api.Node{Metadata: api.ObjectMeta{Name: "baz"}})
 	if err != nil {
 		t.Errorf("insert failed")
 	}
 	obj := <-c
-	if m, ok := obj.(*api.Minion); !ok || m.ID != "baz" {
+	if m, ok := obj.(*api.Node); !ok || m.ID != "baz" {
 		t.Errorf("insert return value was weird: %#v", obj)
 	}
-	if obj, err := ms.Get(ctx, "baz"); err != nil || obj.(*api.Minion).ID != "baz" {
+	if obj, err := ms.Get(ctx, "baz"); err != nil || obj.(*api.Node).ID != "baz" {
 		t.Errorf("insert didn't actually insert")
 	}
 
@@ -71,14 +71,14 @@ func TestMinionREST(t *testing.T) {
 	if err != nil {
 		t.Errorf("got error calling List")
 	}
-	expect := []api.Minion{
+	expect := []api.Node{
 		{
 			Metadata: api.ObjectMeta{Name: "baz"},
 		}, {
 			Metadata: api.ObjectMeta{Name: "foo"},
 		},
 	}
-	if !reflect.DeepEqual(list.(*api.MinionList).Items, expect) {
+	if !reflect.DeepEqual(list.(*api.NodeList).Items, expect) {
 		t.Errorf("Unexpected list value: %#v", list)
 	}
 }

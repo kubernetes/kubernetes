@@ -24,10 +24,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type FakeNodeInfo api.Minion
+type FakeNodeInfo api.Node
 
-func (n FakeNodeInfo) GetNodeInfo(nodeName string) (api.Minion, error) {
-	return api.Minion(n), nil
+func (n FakeNodeInfo) GetNodeInfo(nodeName string) (api.Node, error) {
+	return api.Node(n), nil
 }
 
 func makeResources(milliCPU int, memory int) api.NodeResources {
@@ -111,7 +111,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Minion{NodeResources: makeResources(10, 20)}
+		node := api.Node{NodeResources: makeResources(10, 20)}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")

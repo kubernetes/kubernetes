@@ -137,10 +137,10 @@ func TestCreateWatches(t *testing.T) {
 
 func TestPollMinions(t *testing.T) {
 	table := []struct {
-		minions []api.Minion
+		minions []api.Node
 	}{
 		{
-			minions: []api.Minion{
+			minions: []api.Node{
 				{Metadata: api.ObjectMeta{Name: "foo"}},
 				{Metadata: api.ObjectMeta{Name: "bar"}},
 			},
@@ -148,7 +148,7 @@ func TestPollMinions(t *testing.T) {
 	}
 
 	for _, item := range table {
-		ml := &api.MinionList{Items: item.minions}
+		ml := &api.NodeList{Items: item.minions}
 		handler := util.FakeHandler{
 			StatusCode:   200,
 			ResponseBody: runtime.EncodeOrDie(latest.Codec, ml),
@@ -211,7 +211,7 @@ func TestStoreToMinionLister(t *testing.T) {
 	store := cache.NewStore()
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(id, &api.Minion{JSONBase: api.JSONBase{ID: id}})
+		store.Add(id, &api.Node{JSONBase: api.JSONBase{ID: id}})
 	}
 	sml := storeToMinionLister{store}
 
@@ -253,8 +253,8 @@ func TestStoreToPodLister(t *testing.T) {
 }
 
 func TestMinionEnumerator(t *testing.T) {
-	testList := &api.MinionList{
-		Items: []api.Minion{
+	testList := &api.NodeList{
+		Items: []api.Node{
 			{Metadata: api.ObjectMeta{Name: "foo"}},
 			{Metadata: api.ObjectMeta{Name: "bar"}},
 			{Metadata: api.ObjectMeta{Name: "baz"}},

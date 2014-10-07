@@ -39,7 +39,7 @@ func NewREST(m Registry) *REST {
 }
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
-	minion, ok := obj.(*api.Minion)
+	minion, ok := obj.(*api.Node)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
@@ -91,7 +91,7 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 	if err != nil {
 		return nil, err
 	}
-	var list api.MinionList
+	var list api.NodeList
 	for _, name := range nameList {
 		list.Items = append(list.Items, *rs.toApiMinion(name))
 	}
@@ -99,13 +99,13 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 }
 
 func (*REST) New() runtime.Object {
-	return &api.Minion{}
+	return &api.Node{}
 }
 
 func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.Object, error) {
 	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
 }
 
-func (rs *REST) toApiMinion(name string) *api.Minion {
-	return &api.Minion{JSONBase: api.JSONBase{ID: name}}
+func (rs *REST) toApiMinion(name string) *api.Node {
+	return &api.Node{JSONBase: api.JSONBase{ID: name}}
 }

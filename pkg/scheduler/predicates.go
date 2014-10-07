@@ -24,7 +24,7 @@ import (
 )
 
 type NodeInfo interface {
-	GetNodeInfo(nodeName string) (api.Minion, error)
+	GetNodeInfo(nodeName string) (api.Node, error)
 }
 
 type ResourceFit struct {

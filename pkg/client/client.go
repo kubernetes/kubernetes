@@ -79,7 +79,7 @@ type VersionInterface interface {
 }
 
 type MinionInterface interface {
-	ListMinions() (*api.MinionList, error)
+	ListMinions() (*api.NodeList, error)
 }
 
 // APIStatus is exposed by errors that can be converted to an api.Status object
@@ -286,8 +286,8 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 }
 
 // ListMinions lists all the minions in the cluster.
-func (c *Client) ListMinions() (result *api.MinionList, err error) {
-	result = &api.MinionList{}
+func (c *Client) ListMinions() (result *api.NodeList, err error) {
+	result = &api.NodeList{}
 	err = c.Get().Path("minions").Do().Into(result)
 	return
 }
