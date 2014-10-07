@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 // IP adapts net.IP for use as a flag.
@@ -29,9 +30,26 @@ func (ip IP) String() string {
 }
 
 func (ip *IP) Set(value string) error {
-	*ip = IP(net.ParseIP(value))
+	*ip = IP(net.ParseIP(strings.TrimSpace(value)))
 	if *ip == nil {
 		return fmt.Errorf("invalid IP address: '%s'", value)
 	}
+	return nil
+}
+
+// IPNet adapts net.IPNet for use as a flag.
+type IPNet net.IPNet
+
+func (ipnet IPNet) String() string {
+	n := net.IPNet(ipnet)
+	return n.String()
+}
+
+func (ipnet *IPNet) Set(value string) error {
+	_, n, err := net.ParseCIDR(strings.TrimSpace(value))
+	if err != nil {
+		return err
+	}
+	*ipnet = IPNet(*n)
 	return nil
 }
