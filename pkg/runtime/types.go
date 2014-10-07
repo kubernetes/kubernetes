@@ -50,7 +50,7 @@ type PluginBase struct {
 }
 
 // EmbeddedObject has appropriate encoder and decoder functions, such that on the wire, it's
-// stored as a []byte, but in memory, the contained object is accessable as an Object
+// stored as a []byte, but in memory, the contained object is accessible as an Object
 // via the Get() function. Only valid API objects may be stored via EmbeddedObject.
 // The purpose of this is to allow an API object of type known only at runtime to be
 // embedded within other API objects.
