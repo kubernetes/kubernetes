@@ -318,9 +318,11 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		errors.New("pod level status currently unimplemented")
 	case 3:
 		// Backward compatibility without uuid information
-		stats, err = s.host.GetContainerInfo(components[1], "", components[2], &query)
+		podFullName := GetPodFullName(&Pod{Name: components[1], Namespace: "etcd"})
+		stats, err = s.host.GetContainerInfo(podFullName, "", components[2], &query)
 	case 4:
-		stats, err = s.host.GetContainerInfo(components[1], components[2], components[2], &query)
+		podFullName := GetPodFullName(&Pod{Name: components[1], Namespace: "etcd"})
+		stats, err = s.host.GetContainerInfo(podFullName, components[2], components[2], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return
