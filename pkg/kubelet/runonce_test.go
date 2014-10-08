@@ -69,12 +69,12 @@ func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{}
 	podContainers := []docker.APIContainers{
 		{
-			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo.test"},
+			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo.new.test"},
 			ID:     "1234",
 			Status: "running",
 		},
 		{
-			Names:  []string{"/k8s_net_foo.test_"},
+			Names:  []string{"/k8s_net_foo.new.test_"},
 			ID:     "9876",
 			Status: "running",
 		},
@@ -106,12 +106,14 @@ func TestRunOnce(t *testing.T) {
 		t: t,
 	}
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
-	results, err := kb.runOnce([]Pod{
+	results, err := kb.runOnce([]api.BoundPod{
 		{
-			Name:      "foo",
-			Namespace: "test",
-			Manifest: api.ContainerManifest{
-				ID: "foo",
+			TypeMeta: api.TypeMeta{
+				ID:          "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{Name: "bar"},
 				},
@@ -124,7 +126,7 @@ func TestRunOnce(t *testing.T) {
 	if results[0].Err != nil {
 		t.Errorf("unexpected run pod error: %v", results[0].Err)
 	}
-	if results[0].Pod.Name != "foo" {
-		t.Errorf("unexpected pod: %q", results[0].Pod.Name)
+	if results[0].Pod.ID != "foo" {
+		t.Errorf("unexpected pod: %q", results[0].Pod.ID)
 	}
 }

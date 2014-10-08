@@ -437,3 +437,25 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ErrorList {
 	}
 	return allErrs
 }
+
+// ValidateBoundPod tests if required fields on a bound pod are set.
+func ValidateBoundPod(pod *api.BoundPod) (errors []error) {
+	if !util.IsDNSSubdomain(pod.ID) {
+		errors = append(errors, errs.NewFieldInvalid("id", pod.ID))
+	}
+	if !util.IsDNSSubdomain(pod.Namespace) {
+		errors = append(errors, errs.NewFieldInvalid("namespace", pod.Namespace))
+	}
+	containerManifest := &api.ContainerManifest{
+		Version:       "v1beta2",
+		ID:            pod.ID,
+		UUID:          pod.UID,
+		Containers:    pod.Spec.Containers,
+		Volumes:       pod.Spec.Volumes,
+		RestartPolicy: pod.Spec.RestartPolicy,
+	}
+	if errs := ValidateManifest(containerManifest); len(errs) != 0 {
+		errors = append(errors, errs...)
+	}
+	return errors
+}
