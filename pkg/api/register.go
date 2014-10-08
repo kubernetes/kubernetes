@@ -35,11 +35,31 @@ func init() {
 		&Status{},
 		&ServerOpList{},
 		&ServerOp{},
-		&ContainerManifestList{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Binding{},
 		&Event{},
 		&EventList{},
+		&ContainerManifestList{},
+		&BoundPods{},
 	)
 }
+
+func (*Pod) IsAnAPIObject()                       {}
+func (*PodList) IsAnAPIObject()                   {}
+func (*ReplicationController) IsAnAPIObject()     {}
+func (*ReplicationControllerList) IsAnAPIObject() {}
+func (*Service) IsAnAPIObject()                   {}
+func (*ServiceList) IsAnAPIObject()               {}
+func (*Endpoints) IsAnAPIObject()                 {}
+func (*EndpointsList) IsAnAPIObject()             {}
+func (*Minion) IsAnAPIObject()                    {}
+func (*MinionList) IsAnAPIObject()                {}
+func (*Binding) IsAnAPIObject()                   {}
+func (*Status) IsAnAPIObject()                    {}
+func (*ServerOp) IsAnAPIObject()                  {}
+func (*ServerOpList) IsAnAPIObject()              {}
+func (*Event) IsAnAPIObject()                     {}
+func (*EventList) IsAnAPIObject()                 {}
+func (*ContainerManifestList) IsAnAPIObject()     {}
+func (*BoundPods) IsAnAPIObject()                 {}
