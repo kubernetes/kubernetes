@@ -131,22 +131,13 @@ type VolumeMount struct {
 	// Optional: Defaults to false (read-write).
 	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
 	// Required.
-	// Exactly one of the following must be set.  If both are set, prefer MountPath.
-	// DEPRECATED: Path will be removed in a future version of the API.
 	MountPath string `yaml:"mountPath,omitempty" json:"mountPath,omitempty"`
-	Path      string `yaml:"path,omitempty" json:"path,omitempty"`
-	// One of: "LOCAL" (local volume) or "HOST" (external mount from the host). Default: LOCAL.
-	// DEPRECATED: MountType will be removed in a future version of the API.
-	MountType string `yaml:"mountType,omitempty" json:"mountType,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
-	// Exactly one of the following must be set.  If both are set, prefer Name.
-	// DEPRECATED: EnvVar.Key will be removed in a future version of the API.
 	Name string `yaml:"name" json:"name"`
-	Key  string `yaml:"key,omitempty" json:"key,omitempty"`
 	// Optional: defaults to "".
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
 }
@@ -464,10 +455,7 @@ type Minion struct {
 // MinionList is a list of minions.
 type MinionList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	// DEPRECATED: the below Minions is due to a naming mistake and
-	// will be replaced with Items in the future.
-	Minions []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
-	Items   []Minion `json:"items,omitempty" yaml:"items,omitempty"`
+	Items    []Minion `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
