@@ -29,8 +29,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
@@ -79,7 +81,7 @@ func (s *SourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]kubelet.Pod{pod}, kubelet.SET}
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -88,28 +90,29 @@ func (s *SourceFile) extractFromPath() error {
 	return nil
 }
 
-func extractFromDir(name string) ([]kubelet.Pod, error) {
-	pods := []kubelet.Pod{}
-
+func extractFromDir(name string) ([]api.BoundPod, error) {
 	files, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
-		return pods, err
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, nil
 	}
 
 	sort.Strings(files)
-
+	pods := []api.BoundPod{}
 	for _, file := range files {
 		pod, err := extractFromFile(file)
 		if err != nil {
-			return []kubelet.Pod{}, err
+			return nil, err
 		}
 		pods = append(pods, pod)
 	}
 	return pods, nil
 }
 
-func extractFromFile(name string) (kubelet.Pod, error) {
-	var pod kubelet.Pod
+func extractFromFile(name string) (api.BoundPod, error) {
+	var pod api.BoundPod
 
 	file, err := os.Open(name)
 	if err != nil {
@@ -123,15 +126,23 @@ func extractFromFile(name string) (kubelet.Pod, error) {
 		return pod, err
 	}
 
-	if err := yaml.Unmarshal(data, &pod.Manifest); err != nil {
-		return pod, fmt.Errorf("could not unmarshal manifest: %v", err)
+	manifest := &api.ContainerManifest{}
+	// TODO: use api.Scheme.DecodeInto
+	if err := yaml.Unmarshal(data, manifest); err != nil {
+		return pod, err
 	}
 
-	podName := pod.Manifest.ID
-	if podName == "" {
-		podName = simpleSubdomainSafeHash(name)
+	if err := api.Scheme.Convert(manifest, &pod); err != nil {
+		return pod, err
 	}
-	pod.Name = podName
+
+	pod.ID = simpleSubdomainSafeHash(name)
+	if len(pod.UID) == 0 {
+		pod.UID = simpleSubdomainSafeHash(name)
+	}
+	if len(pod.Namespace) == 0 {
+		pod.Namespace = api.NamespaceDefault
+	}
 
 	return pod, nil
 }
