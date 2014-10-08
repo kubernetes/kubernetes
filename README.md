@@ -1,7 +1,7 @@
 # Kubernetes
 Kubernetes is an open source implementation of container cluster management.
 
-[Kubernetes Design Document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md) - [Kubernetes @ Google I/O 2014](http://youtu.be/tsk0pWf4ipw)
+[Kubernetes Design Document](DESIGN.md) - [Kubernetes @ Google I/O 2014](http://youtu.be/tsk0pWf4ipw)
 
 [![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes)
 [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes)
@@ -26,9 +26,9 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Circle CI](https://circleci.com/docs/docker#google-compute-engine-and-kubernetes)
   * [Digital Ocean](https://github.com/bketelsen/coreos-kubernetes-digitalocean)
   * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
-* [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
+* [kubecfg command line tool](docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
-* [Kubernetes Client Libraries](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/client-libraries.md)
+* [Kubernetes Client Libraries](docs/client-libraries.md)
 * [Discussion and Community Support](#community-discussion-and-support)
 * [Hacking on Kubernetes](#development)
 * [Hacking on Kubernetes Salt configuration](docs/salt.md)
@@ -38,8 +38,8 @@ While the concepts and architecture in Kubernetes represent years of experience 
 
 Check out examples of Kubernetes in action, and community projects in the larger ecosystem:
 
-* [Detailed example application](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md)
-* [Example of dynamic updates](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/update-demo/README.md)
+* [Detailed example application](examples/guestbook/README.md)
+* [Example of dynamic updates](examples/update-demo/README.md)
 * [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
 * [Community projects](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Kubernetes-Community)
 
@@ -178,7 +178,7 @@ hack/e2e-test.sh 1 1 1
 ```
 
 ### Testing out flaky tests
-[Instructions here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/flaky-tests.md)
+[Instructions here](docs/flaky-tests.md)
 
 ### Add/Update dependencies
 

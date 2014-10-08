@@ -2,7 +2,7 @@
 
 ## What is a _pod_?
 
-A _pod_ (as in a pod of whales or pea pod) models an application-specific "logical host" in a containerized environment. It may contain one or more containers which are relatively tightly coupled -- in a pre-container world, they would have executed on the same physical or virtual host. 
+A _pod_ (as in a pod of whales or pea pod) models an application-specific "logical host" in a containerized environment. It may contain one or more containers which are relatively tightly coupled -- in a pre-container world, they would have executed on the same physical or virtual host.
 
 Like running containers, pods are considered to be relatively ephemeral rather than durable entities. As discussed in [life of a pod](pod-states.md), pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced (see [replication controller](replication-controller.md) for more details). (In the future, a higher-level API may support pod migration.)
 
@@ -10,9 +10,9 @@ Like running containers, pods are considered to be relatively ephemeral rather t
 
 ### Resource sharing and communication
 
-Pods facilitate data sharing and communication among their constituents. 
+Pods facilitate data sharing and communication among their constituents.
 
-The containers in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname is set to the pod's Name for the containers within the pod. [More details on networking](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md).
+The containers in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname is set to the pod's Name for the containers within the pod. [More details on networking](docs/networking.md).
 
 In addition to defining the containers that run in the pod, the pod specifies a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the containers within the pod.
 
