@@ -14,12 +14,15 @@
 
 # This file creates a standard build environment for building Kubernetes
 
-FROM  golang:cross
+FROM  golang:1.3
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 ENV KUBE_CROSSPLATFORMS \
   linux/386 linux/arm \
   darwin/amd64 darwin/386
+
+RUN cd /usr/src/go/src && for platform in ${KUBE_CROSSPLATFORMS}; do GOOS=${platform%/*} GOARCH=${platform##*/} ./make.bash --no-clean; done
+
 # (set an explicit GOARM of 5 for maximum compatibility)
 ENV GOARM 5
 ENV GOOS    linux
