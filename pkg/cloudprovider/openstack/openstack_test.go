@@ -14,15 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package openstack
 
-// This file exists to force the desired plugin implementations to be linked.
-// This should probably be part of some configuration fed into the build for a
-// given binary target.
 import (
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
+	"strings"
+	"testing"
 )
+
+func TestNewOpenStack(t *testing.T) {
+	_, err := newOpenStack(strings.NewReader(""))
+	if err != nil {
+		t.Errorf("Should succeed when a valid config is provided: %s", err)
+	}
+}
