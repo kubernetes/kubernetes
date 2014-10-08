@@ -6,5 +6,8 @@
   "containerPort": 6379,
   "selector": {
     "name": "redis-master"
+  },
+  "labels": {
+    "name": "redis-master"
   }
 }

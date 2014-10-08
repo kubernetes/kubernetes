@@ -18,10 +18,40 @@ limitations under the License.
   {{ groupName }}
 
 <div ng-if="group.kind != 'grouping'">
+  <div ng-if="!display || display=='box'">
   <div class="content k8s-item k8s-inline" ng-repeat="item in group">
     <div class="k8s-title-font k8s-font-regular">
-      <a href="#/pods/{{ item.id }}">{{ item.id }}</a>
+      <div ng-switch on='item.labels["type"]'>
+        <a ng-switch-when='pod' href="#/pods/{{ item.id }}">{{ item.id }}</a>
+	<a ng-switch-when='service' href="#/services/{{ item.id }}">{{ item.id }}</a>
+	<a ng-switch-when='replicationController' href="#/replicationControllers/{{ item.id }}">{{ item.id }}</a>
+	<span ng-switch-default>{{item.id}}</span>
+      </div>
     </div>
+  </div>
+  </div>
+  <div ng-if="display=='list'">
+    <table style="width: 90%; padding: 10px">
+    <tr ng-repeat="item in group" ng-class-odd="'k8s-odd'" ng-class-even="'k8s-even'" valign="top">
+      <td class="k8s-cell">
+        <div ng-switch on='item.labels["type"]'>
+          <a ng-switch-when='pod' href="#/pods/{{ item.id }}">{{ item.id }}</a>
+	  <a ng-switch-when='service' href="#/services/{{ item.id }}">{{ item.id }}</a>
+	  <a ng-switch-when='replicationController' href="#/replicationControllers/{{ item.id }}">{{ item.id }}</a>
+	  <span ng-switch-default>{{item.id}}</span>
+      </div>
+      </td>
+      <td class="k8s-cell">
+        <div ng-repeat='(key, value) in item.labels'>
+	  <a href="#/groups/{{key}}/selector/{{controller.routeParams.selector}}">{{key}}</a> :
+	  <a href="#/groups/{{controller.routeParams.grouping}}/selector/{{key}}={{value}}">{{value}}</a> </span>
+      </td>
+    </tr>
+    </table>
+  </div>
+  <div>
+    <a ng-click="display='box'">box</a>
+    <a ng-click="display='list'">list</a>
   </div>
 </div>
 <div ng-if="group.kind == 'grouping'">
