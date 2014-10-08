@@ -2,12 +2,12 @@
 # Kubernetes Container Environment
 
 ## Overview
-This document describes the environment for Kubelet managed containers on a Kubernetes node (kNode).  In contrast to the Kubernetes cluster API, which provides an API for creating and managing containers, the Kubernetes container environment provides the container access to information about what else is going on in the cluster.  
+This document describes the environment for Kubelet managed containers on a Kubernetes node (kNode).  In contrast to the Kubernetes cluster API, which provides an API for creating and managing containers, the Kubernetes container environment provides the container access to information about what else is going on in the cluster. 
 
 This cluster information makes it possible to build applications that are *cluster aware*.  
-Additionally, the Kubernetes container environment defines a series of signals that are surfaced to optional signal handlers defined as part of individual containers.  Container signals are somewhat analagous to operating system signals in a traditional process model.   However these signals are designed to make it easier to build reliable, scalable cloud applications in the Kubernetes cluster.  Containers that participate in this cluster lifecycle become *cluster native*.  
+Additionally, the Kubernetes container environment defines a series of signals that are surfaced to optional signal handlers defined as part of individual containers.  Container signals are somewhat analagous to operating system signals in a traditional process model.   However these signals are designed to make it easier to build reliable, scalable cloud applications in the Kubernetes cluster.  Containers that participate in this cluster lifecycle become *cluster native*. 
 
-Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of the Docker image and pod volumes. The design and usage of pod volumes is described in its own [document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md)
+Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of the Docker image and pod volumes. The design and usage of pod volumes is described in its own [document](docs/volumes.md)
 
 
 The following sections describe both the cluster information provided to containers, as well as the signals and life-cycle that allows containers to interact with the management system.
@@ -44,7 +44,7 @@ There are currently two container signals that are surfaced to containers, and t
 
 This signal is sent immediately before a container is created.  It signals that the container will be created immediately after the call completes.  No parameters are passed. *Note - *Some event handlers (namely ‘exec’ are incompatible with this event)
 
-*PostStart* 
+*PostStart*
 
 This signal is sent immediately after a container is created.  It signals to the container that it has been created.  No parameters are passed to the handler.
 

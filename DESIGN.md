@@ -52,7 +52,7 @@ While Docker itself works with individual containers, Kubernetes provides higher
 
 A _pod_ (as in a pod of whales or pea pod) is a relatively tightly coupled group of containers that are scheduled onto the same host. It models an application-specific "virtual host" in a containerized environment. Pods serve as units of scheduling, deployment, and horizontal scaling/replication, share fate, and share some resources, such as storage volumes and IP addresses.
 
-[More details on pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md).
+[More details on pods](docs/pods.md).
 
 ### Labels
 
@@ -66,11 +66,11 @@ Kubernetes currently supports two objects that use label selectors to keep track
 - `service`: A service is a configuration unit for the [proxies](#kubernetes-proxy) that run on every worker node.  It is named and points to one or more pods.
 - `replicationController`: A replication controller takes a template and ensures that there is a specified number of "replicas" of that template running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
 
-The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. 
+The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector.
 
 For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
 
-[More details on labels](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/labels.md).
+[More details on labels](docs/labels.md).
 
 ## The Kubernetes Node
 
@@ -138,7 +138,7 @@ The heavy lifting of configuring the VMs is done by [SaltStack](http://www.salts
 The bootstrapping works like this:
 
 1. The `kube-up.sh` script uses the GCE [`startup-script`](https://developers.google.com/compute/docs/howtos/startupscript) mechanism for both the master node and the minion nodes.
-  * For the minion, this simply configures and installs SaltStack.  The network range that this minion is assigned is baked into the startup-script for that minion (see [the networking doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) for more details).
+  * For the minion, this simply configures and installs SaltStack.  The network range that this minion is assigned is baked into the startup-script for that minion (see [the networking doc](docs/networking.md) for more details).
   * For the master, the release files are downloaded from GCS and unpacked.  Various parts (specifically the SaltStack configuration) are installed in the right places.
 2. SaltStack then installs the necessary servers on each node.
   * All go code is currently downloaded to each machine and compiled at install time.

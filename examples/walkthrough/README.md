@@ -3,7 +3,7 @@
 ## Pods
 The first atom of Kubernetes is a _pod_.  A pod is a collection of containers that are symbiotically group.
 
-See [pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) for more details.
+See [pods](docs/pods.md) for more details.
 
 ### Intro
 
@@ -23,7 +23,7 @@ desiredState:
 
 A pod definition is a declaration of a _desired state_.  Desired state is a really important part of Kubernetes.  Many things present a desired state to the system, and it is Kubernetes' responsibility to make sure that the current state matches the desired state.  For example, when you create a Pod, you declare that you want the containers in it to be running.  If the containers happen to not be running (program failure, ...), Kubernetes will continue to (re)create them for you until you delete the Pod.
 
-See the [design document](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md) for more details.
+See the [design document](DESIGN.md) for more details.
 
 ### Volumes
 
@@ -75,7 +75,7 @@ In Kubernetes, ```emptyDir``` Volumes live for the lifespan of the Pod, which is
 
 If you want to mount a directory that already exists in the file system (e.g. ```/var/logs```) you can use the ```hostDir``` directive.
 
-See [volumes](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md) for more details.
+See [volumes](docs/volumes.md) for more details.
 
 ### Multiple Containers
 
