@@ -58,59 +58,5 @@ func init() {
 			}
 			return nil
 		},
-
-		// EnvVar's Key is deprecated in favor of Name.
-		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
-			out.Value = in.Value
-			out.Key = in.Name
-			out.Name = in.Name
-			return nil
-		},
-		func(in *EnvVar, out *newer.EnvVar, s conversion.Scope) error {
-			out.Value = in.Value
-			if in.Name != "" {
-				out.Name = in.Name
-			} else {
-				out.Name = in.Key
-			}
-			return nil
-		},
-
-		// Path & MountType are deprecated.
-		func(in *newer.VolumeMount, out *VolumeMount, s conversion.Scope) error {
-			out.Name = in.Name
-			out.ReadOnly = in.ReadOnly
-			out.MountPath = in.MountPath
-			out.Path = in.MountPath
-			out.MountType = "" // MountType is ignored.
-			return nil
-		},
-		func(in *VolumeMount, out *newer.VolumeMount, s conversion.Scope) error {
-			out.Name = in.Name
-			out.ReadOnly = in.ReadOnly
-			if in.MountPath == "" {
-				out.MountPath = in.Path
-			} else {
-				out.MountPath = in.MountPath
-			}
-			return nil
-		},
-
-		// MinionList.Items had a wrong name in v1beta1
-		func(in *newer.MinionList, out *MinionList, s conversion.Scope) error {
-			s.Convert(&in.TypeMeta, &out.TypeMeta, 0)
-			s.Convert(&in.Items, &out.Items, 0)
-			out.Minions = out.Items
-			return nil
-		},
-		func(in *MinionList, out *newer.MinionList, s conversion.Scope) error {
-			s.Convert(&in.TypeMeta, &out.TypeMeta, 0)
-			if len(in.Items) == 0 {
-				s.Convert(&in.Minions, &out.Items, 0)
-			} else {
-				s.Convert(&in.Items, &out.Items, 0)
-			}
-			return nil
-		},
 	)
 }
