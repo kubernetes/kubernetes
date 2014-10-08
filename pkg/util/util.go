@@ -165,7 +165,7 @@ func StringDiff(a, b string) string {
 }
 
 // Takes a list of strings and compiles them into a list of regular expressions
-func CompileRegexps(regexpStrings StringList) ([]*regexp.Regexp, error) {
+func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 	regexps := []*regexp.Regexp{}
 	for _, regexpStr := range regexpStrings {
 		r, err := regexp.Compile(regexpStr)
