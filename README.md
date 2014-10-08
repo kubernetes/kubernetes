@@ -186,15 +186,19 @@ Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. 
 
 To add a new package ``foo/bar``:
 
+- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
+- Run ``godep restore`` to make sure you have all dependancies pulled.
 - Download foo/bar into the first directory in GOPATH: ``go get foo/bar``.
 - Change code in kubernetes to use ``foo/bar``.
 - Run ``godep save ./...`` under kubernetes' root directory.
 
 To update a package ``foo/bar``:
 
+- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
+- Run ``godep restore`` to make sure you have all dependancies pulled.
 - Update the package with ``go get -u foo/bar``.
 - Change code in kubernetes accordingly if necessary.
-- Run ``godep update foo/bar``.
+- Run ``godep update foo/bar`` under kubernetes' root directory.
 
 ### Keeping your development fork in sync
 
