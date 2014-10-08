@@ -38,7 +38,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	goetcd "github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
@@ -69,8 +68,7 @@ type Master struct {
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdHelper(etcdServers []string, version string) (helper tools.EtcdHelper, err error) {
-	client := goetcd.NewClient(etcdServers)
+func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHelper, err error) {
 	if version == "" {
 		version = latest.Version
 	}

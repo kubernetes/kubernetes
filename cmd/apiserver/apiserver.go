@@ -37,9 +37,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
+
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
 )
 
@@ -56,6 +59,7 @@ var (
 	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. Default 30 seconds")
 	tokenAuthFile         = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication")
 	etcdServerList        util.StringList
+	etcdConfigFile        = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
@@ -66,7 +70,7 @@ var (
 
 func init() {
 	flag.Var(&address, "address", "The IP address on to serve on (set to 0.0.0.0 for all interfaces)")
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 	flag.Var(&corsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 }
@@ -114,6 +118,20 @@ func initCloudProvider(name string, configFilePath string) cloudprovider.Interfa
 	return cloud
 }
 
+func newEtcd(etcdConfigFile string, etcdServerList util.StringList) (helper tools.EtcdHelper, err error) {
+	var client tools.EtcdGetSet
+	if etcdConfigFile != "" {
+		client, err = etcd.NewClientFromFile(etcdConfigFile)
+		if err != nil {
+			return helper, err
+		}
+	} else {
+		client = etcd.NewClient(etcdServerList)
+	}
+
+	return master.NewEtcdHelper(client, *storageVersion)
+}
+
 func main() {
 	flag.Parse()
 	util.InitLogs()
@@ -122,8 +140,8 @@ func main() {
 	verflag.PrintAndExitIfRequested()
 	verifyMinionFlags()
 
-	if len(etcdServerList) == 0 {
-		glog.Fatalf("-etcd_servers flag is required.")
+	if (*etcdConfigFile != "" && len(etcdServerList) != 0) || (*etcdConfigFile == "" && len(etcdServerList) == 0) {
+		glog.Fatalf("specify either -etcd_servers or -etcd_config")
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
@@ -147,9 +165,9 @@ func main() {
 		glog.Fatalf("Invalid server address: %v", err)
 	}
 
-	helper, err := master.NewEtcdHelper(etcdServerList, *storageVersion)
+	helper, err := newEtcd(*etcdConfigFile, etcdServerList)
 	if err != nil {
-		glog.Fatalf("Invalid storage version: %v", err)
+		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
 
 	m := master.New(&master.Config{

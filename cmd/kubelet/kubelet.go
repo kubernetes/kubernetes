@@ -37,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/coreos/go-etcd/etcd"
@@ -61,6 +60,7 @@ var (
 	networkContainerImage = flag.String("network_container_image", kubelet.NetworkContainerImage, "The image that network containers in each pod will use.")
 	dockerEndpoint        = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 	etcdServerList        util.StringList
+	etcdConfigFile        = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
 	rootDirectory         = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
 	registryPullQPS       = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
@@ -69,7 +69,7 @@ var (
 )
 
 func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated")
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
 }
 
@@ -160,10 +160,19 @@ func main() {
 	}
 
 	// define etcd config source and initialize etcd client
-	var etcdClient tools.EtcdClient
+	var etcdClient *etcd.Client
 	if len(etcdServerList) > 0 {
-		glog.Infof("Watching for etcd configs at %v", etcdServerList)
 		etcdClient = etcd.NewClient(etcdServerList)
+	} else if *etcdConfigFile != "" {
+		var err error
+		etcdClient, err = etcd.NewClientFromFile(*etcdConfigFile)
+		if err != nil {
+			glog.Fatalf("Error with etcd config file: %v", err)
+		}
+	}
+
+	if etcdClient != nil {
+		glog.Infof("Watching for etcd configs at %v", etcdClient.GetCluster())
 		kconfig.NewSourceEtcd(kconfig.EtcdKeyForHost(hostname), etcdClient, cfg.Channel("etcd"))
 	}
 

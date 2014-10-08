@@ -38,7 +38,7 @@ func init() {
 }
 
 func TestClient(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient().GetCluster(), "v1beta1")
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
