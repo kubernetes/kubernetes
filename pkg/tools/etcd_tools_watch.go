@@ -82,7 +82,7 @@ type TransformFunc func(runtime.Object) (runtime.Object, error)
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
 	encoding  runtime.Codec
-	versioner runtime.ResourceVersioner
+	versioner EtcdResourceVersioner
 	transform TransformFunc
 
 	list   bool // If we're doing a recursive watch, should be true.
@@ -107,7 +107,7 @@ const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.  If you provide a transform
 // and a versioner, the versioner must be able to handle the objects that transform creates.
-func newEtcdWatcher(list bool, filter FilterFunc, encoding runtime.Codec, versioner runtime.ResourceVersioner, transform TransformFunc) *etcdWatcher {
+func newEtcdWatcher(list bool, filter FilterFunc, encoding runtime.Codec, versioner EtcdResourceVersioner, transform TransformFunc) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:     encoding,
 		versioner:    versioner,

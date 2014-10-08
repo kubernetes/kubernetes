@@ -36,8 +36,8 @@ type Codec interface {
 // ResourceVersioner provides methods for setting and retrieving
 // the resource version from an API object.
 type ResourceVersioner interface {
-	SetResourceVersion(obj Object, version uint64) error
-	ResourceVersion(obj Object) (uint64, error)
+	SetResourceVersion(obj Object, version string) error
+	ResourceVersion(obj Object) (string, error)
 }
 
 // SelfLinker provides methods for setting and retrieving the SelfLink field of an API object.

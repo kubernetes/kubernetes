@@ -114,6 +114,14 @@ func (r *Request) UintParam(paramName string, u uint64) *Request {
 	return r.setParam(paramName, strconv.FormatUint(u, 10))
 }
 
+// Param creates a query parameter with the given string value.
+func (r *Request) Param(paramName, s string) *Request {
+	if r.err != nil {
+		return r
+	}
+	return r.setParam(paramName, s)
+}
+
 func (r *Request) setParam(paramName, value string) *Request {
 	if specialParams.Has(paramName) {
 		r.err = fmt.Errorf("must set %v through the corresponding function, not directly.", paramName)

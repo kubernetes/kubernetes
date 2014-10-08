@@ -64,3 +64,10 @@ func InterpretDeleteError(err error, kind, name string) error {
 		return err
 	}
 }
+
+// InterpretResourceVersionError returns the appropriate api error
+// for a failure to convert the resource version of an object sent
+// to the API to an etcd uint64 index.
+func InterpretResourceVersionError(err error, kind, value string) error {
+	return errors.NewInvalid(kind, "", errors.ErrorList{errors.NewFieldInvalid("resourceVersion", value)})
+}

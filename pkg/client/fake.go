@@ -92,7 +92,7 @@ func (c *Fake) DeleteReplicationController(ctx api.Context, controller string) e
 	return nil
 }
 
-func (c *Fake) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Fake) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-controllers", Value: resourceVersion})
 	return c.Watch, nil
 }
@@ -122,7 +122,7 @@ func (c *Fake) DeleteService(ctx api.Context, service string) error {
 	return nil
 }
 
-func (c *Fake) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Fake) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-services", Value: resourceVersion})
 	return c.Watch, c.Err
 }
@@ -137,7 +137,7 @@ func (c *Fake) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error
 	return &api.Endpoints{}, nil
 }
 
-func (c *Fake) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Fake) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
 	return c.Watch, c.Err
 }

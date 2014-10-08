@@ -29,14 +29,14 @@ func TestGenericTypeMeta(t *testing.T) {
 		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
 		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-		ResourceVersion   uint64    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+		ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	}
 	j := TypeMeta{
 		ID:              "foo",
 		APIVersion:      "a",
 		Kind:            "b",
-		ResourceVersion: 1,
+		ResourceVersion: "1",
 		SelfLink:        "some/place/only/we/know",
 	}
 	g, err := newGenericTypeMeta(reflect.ValueOf(&j).Elem())
@@ -54,7 +54,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "b", jbi.Kind(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := uint64(1), jbi.ResourceVersion(); e != a {
+	if e, a := "1", jbi.ResourceVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "some/place/only/we/know", jbi.SelfLink(); e != a {
@@ -64,7 +64,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	jbi.SetID("bar")
 	jbi.SetAPIVersion("c")
 	jbi.SetKind("d")
-	jbi.SetResourceVersion(2)
+	jbi.SetResourceVersion("2")
 	jbi.SetSelfLink("google.com")
 
 	// Prove that jbi changes the original object.
@@ -77,7 +77,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "d", j.Kind; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := uint64(2), j.ResourceVersion; e != a {
+	if e, a := "2", j.ResourceVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "google.com", j.SelfLink; e != a {
@@ -99,12 +99,12 @@ func (*MyIncorrectlyMarkedAsAPIObject) IsAnAPIObject() {}
 func TestResourceVersionerOfAPI(t *testing.T) {
 	type T struct {
 		Object
-		Expected uint64
+		Expected string
 	}
 	testCases := map[string]T{
-		"empty api object":                   {&MyAPIObject{}, 0},
-		"api object with version":            {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: 1}}, 1},
-		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: 1}}, 1},
+		"empty api object":                   {&MyAPIObject{}, ""},
+		"api object with version":            {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: "1"}}, "1"},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: "1"}}, "1"},
 	}
 	versioning := NewTypeMetaResourceVersioner()
 	for key, testCase := range testCases {
@@ -119,9 +119,9 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 
 	failingCases := map[string]struct {
 		Object
-		Expected uint64
+		Expected string
 	}{
-		"not a valid object to try": {&MyIncorrectlyMarkedAsAPIObject{}, 1},
+		"not a valid object to try": {&MyIncorrectlyMarkedAsAPIObject{}, "1"},
 	}
 	for key, testCase := range failingCases {
 		_, err := versioning.ResourceVersion(testCase.Object)
@@ -132,20 +132,20 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 
 	setCases := map[string]struct {
 		Object
-		Expected uint64
+		Expected string
 	}{
-		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: 1}}, 1},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: "1"}}, "1"},
 	}
 	for key, testCase := range setCases {
-		if err := versioning.SetResourceVersion(testCase.Object, 5); err != nil {
+		if err := versioning.SetResourceVersion(testCase.Object, "5"); err != nil {
 			t.Errorf("%s: unexpected error %#v", key, err)
 		}
 		actual, err := versioning.ResourceVersion(testCase.Object)
 		if err != nil {
 			t.Errorf("%s: unexpected error %#v", key, err)
 		}
-		if actual != 5 {
-			t.Errorf("%s: expected %d, got %d", key, 5, actual)
+		if actual != "5" {
+			t.Errorf("%s: expected %d, got %d", key, "5", actual)
 		}
 	}
 }

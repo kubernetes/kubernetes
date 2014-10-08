@@ -85,37 +85,41 @@ func TestCreateLists(t *testing.T) {
 func TestCreateWatches(t *testing.T) {
 	factory := ConfigFactory{nil}
 	table := []struct {
-		rv       uint64
+		rv       string
 		location string
 		factory  func() *listWatch
 	}{
 		// Minion watch
 		{
-			rv:       0,
+			rv:       "",
+			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=",
+			factory:  factory.createMinionLW,
+		}, {
+			rv:       "0",
 			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=0",
 			factory:  factory.createMinionLW,
 		}, {
-			rv:       42,
+			rv:       "42",
 			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=42",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod watches
 		{
-			rv:       0,
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=0",
+			rv:       "",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=",
 			factory:  factory.createAssignedPodLW,
 		}, {
-			rv:       42,
+			rv:       "42",
 			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod watches
 		{
-			rv:       0,
-			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=0",
+			rv:       "",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=",
 			factory:  factory.createUnassignedPodLW,
 		}, {
-			rv:       42,
+			rv:       "42",
 			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
 			factory:  factory.createUnassignedPodLW,
 		},

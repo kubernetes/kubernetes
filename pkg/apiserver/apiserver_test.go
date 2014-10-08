@@ -78,7 +78,7 @@ type SimpleRESTStorage struct {
 	fakeWatch                *watch.FakeWatcher
 	requestedLabelSelector   labels.Selector
 	requestedFieldSelector   labels.Selector
-	requestedResourceVersion uint64
+	requestedResourceVersion string
 
 	// The id requested, and location to return for ResourceLocation
 	requestedResourceLocationID string
@@ -144,7 +144,7 @@ func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (<
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	storage.requestedLabelSelector = label
 	storage.requestedFieldSelector = field
 	storage.requestedResourceVersion = resourceVersion

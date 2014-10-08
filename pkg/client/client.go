@@ -53,7 +53,7 @@ type ReplicationControllerInterface interface {
 	CreateReplicationController(ctx api.Context, ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateReplicationController(ctx api.Context, ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteReplicationController(ctx api.Context, id string) error
-	WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // ServiceInterface has methods to work with Service resources.
@@ -63,14 +63,14 @@ type ServiceInterface interface {
 	CreateService(ctx api.Context, srv *api.Service) (*api.Service, error)
 	UpdateService(ctx api.Context, srv *api.Service) (*api.Service, error)
 	DeleteService(ctx api.Context, id string) error
-	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
 	ListEndpoints(ctx api.Context, selector labels.Selector) (*api.EndpointsList, error)
 	GetEndpoints(ctx api.Context, id string) (*api.Endpoints, error)
-	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // VersionInterface has a method to retrieve the server version.
@@ -122,7 +122,7 @@ func (c *Client) CreatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
 func (c *Client) UpdatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	if pod.ResourceVersion == 0 {
+	if len(pod.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
 		return
 	}
@@ -154,7 +154,7 @@ func (c *Client) CreateReplicationController(ctx api.Context, controller *api.Re
 // UpdateReplicationController updates an existing replication controller.
 func (c *Client) UpdateReplicationController(ctx api.Context, controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	if controller.ResourceVersion == 0 {
+	if len(controller.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
 		return
 	}
@@ -168,11 +168,11 @@ func (c *Client) DeleteReplicationController(ctx api.Context, id string) error {
 }
 
 // WatchReplicationControllers returns a watch.Interface that watches the requested controllers.
-func (c *Client) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("replicationControllers").
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
@@ -202,7 +202,7 @@ func (c *Client) CreateService(ctx api.Context, svc *api.Service) (result *api.S
 // UpdateService updates an existing service.
 func (c *Client) UpdateService(ctx api.Context, svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	if svc.ResourceVersion == 0 {
+	if len(svc.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
@@ -216,11 +216,11 @@ func (c *Client) DeleteService(ctx api.Context, id string) error {
 }
 
 // WatchServices returns a watch.Interface that watches the requested services.
-func (c *Client) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("services").
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
@@ -241,11 +241,11 @@ func (c *Client) GetEndpoints(ctx api.Context, id string) (result *api.Endpoints
 }
 
 // WatchEndpoints returns a watch.Interface that watches the requested endpoints for a service.
-func (c *Client) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("endpoints").
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
@@ -259,7 +259,7 @@ func (c *Client) CreateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*ap
 
 func (c *Client) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	if endpoints.ResourceVersion == 0 {
+	if len(endpoints.ResourceVersion) == 0 {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
 	}
 	err := c.Put().

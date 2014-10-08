@@ -30,7 +30,7 @@ type Registry interface {
 	GetService(ctx api.Context, name string) (*api.Service, error)
 	DeleteService(ctx api.Context, name string) error
 	UpdateService(ctx api.Context, svc *api.Service) error
-	WatchServices(ctx api.Context, labels, fields labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	WatchServices(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error)
 
 	// TODO: endpoints and their implementation should be separated, setting endpoints should be
 	// supported via the API, and the endpoints-controller should use the API to update endpoints.

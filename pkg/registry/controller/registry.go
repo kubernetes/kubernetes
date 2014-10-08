@@ -24,7 +24,7 @@ import (
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
 	ListControllers(ctx api.Context) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, resourceVersion uint64) (watch.Interface, error)
+	WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
 	CreateController(ctx api.Context, controller *api.ReplicationController) error
 	UpdateController(ctx api.Context, controller *api.ReplicationController) error

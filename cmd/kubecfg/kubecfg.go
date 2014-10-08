@@ -311,7 +311,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 	validStorage := checkStorage(storage)
 	verb := ""
 	setBody := false
-	var version uint64
+	var version string
 
 	printer := getPrinter()
 
@@ -369,7 +369,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		r.ParseSelectorParam("labels", *selector)
 	}
 	if setBody {
-		if version != 0 {
+		if len(version) > 0 {
 			data := readConfig(storage, c.RESTClient.Codec)
 			obj, err := latest.Codec.Decode(data)
 			if err != nil {

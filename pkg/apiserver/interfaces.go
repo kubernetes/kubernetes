@@ -54,7 +54,7 @@ type ResourceWatcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx api.Context, label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // Redirector know how to return a remote resource's location.

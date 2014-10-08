@@ -74,7 +74,7 @@ func TestEndpointsRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	storage := NewREST(registry)
 	registry.EndpointsList = api.EndpointsList{
-		TypeMeta: api.TypeMeta{ResourceVersion: 1},
+		TypeMeta: api.TypeMeta{ResourceVersion: "1"},
 		Items: []api.Endpoints{
 			{TypeMeta: api.TypeMeta{ID: "foo"}},
 			{TypeMeta: api.TypeMeta{ID: "bar"}},
@@ -92,7 +92,7 @@ func TestEndpointsRegistryList(t *testing.T) {
 	if e, a := "bar", sl.Items[1].ID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
-	if sl.ResourceVersion != 1 {
+	if sl.ResourceVersion != "1" {
 		t.Errorf("Unexpected resource version: %#v", sl)
 	}
 }

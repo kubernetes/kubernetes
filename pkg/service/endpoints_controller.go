@@ -90,7 +90,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		*newEndpoints = *currentEndpoints
 		newEndpoints.Endpoints = endpoints
 
-		if currentEndpoints.ResourceVersion == 0 {
+		if len(currentEndpoints.ResourceVersion) == 0 {
 			// No previous endpoints, create them
 			_, err = e.client.CreateEndpoints(nsCtx, newEndpoints)
 		} else {

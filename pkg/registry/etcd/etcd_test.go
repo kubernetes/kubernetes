@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -33,11 +34,46 @@ import (
 )
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
-	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, latest.ResourceVersioner},
+	registry := NewRegistry(tools.EtcdHelper{client, latest.Codec, tools.RuntimeVersionAdapter{latest.ResourceVersioner}},
 		&pod.BasicManifestFactory{
 			ServiceRegistry: &registrytest.ServiceRegistry{},
 		})
 	return registry
+}
+
+func TestEtcdParseWatchResourceVersion(t *testing.T) {
+	testCases := []struct {
+		Version       string
+		Kind          string
+		ExpectVersion uint64
+		Err           bool
+	}{
+		{Version: "", ExpectVersion: 0},
+		{Version: "a", Err: true},
+		{Version: " ", Err: true},
+		{Version: "1", ExpectVersion: 2},
+		{Version: "10", ExpectVersion: 11},
+	}
+	for _, testCase := range testCases {
+		version, err := parseWatchResourceVersion(testCase.Version, testCase.Kind)
+		switch {
+		case testCase.Err:
+			if err == nil {
+				t.Errorf("%s: unexpected non-error", testCase.Version)
+				continue
+			}
+			if !errors.IsInvalid(err) {
+				t.Errorf("%s: unexpected error: %v", testCase.Version, err)
+				continue
+			}
+		case !testCase.Err && err != nil:
+			t.Errorf("%s: unexpected error: %v", testCase.Version, err)
+			continue
+		}
+		if version != testCase.ExpectVersion {
+			t.Errorf("%s: expected version %d but was %d", testCase.Version, testCase.ExpectVersion, version)
+		}
+	}
 }
 
 func TestEtcdGetPod(t *testing.T) {
@@ -661,7 +697,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	resp, _ := fakeClient.Set("/registry/controllers/foo", runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{ID: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.UpdateController(ctx, &api.ReplicationController{
-		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
@@ -807,7 +843,7 @@ func TestEtcdUpdateService(t *testing.T) {
 	resp, _ := fakeClient.Set("/registry/services/specs/foo", runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{ID: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	testService := api.Service{
-		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: resp.Node.ModifiedIndex},
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
 		Labels: map[string]string{
 			"baz": "bar",
 		},
@@ -826,8 +862,8 @@ func TestEtcdUpdateService(t *testing.T) {
 	}
 
 	// Clear modified indices before the equality test.
-	svc.ResourceVersion = 0
-	testService.ResourceVersion = 0
+	svc.ResourceVersion = ""
+	testService.ResourceVersion = ""
 	if !reflect.DeepEqual(*svc, testService) {
 		t.Errorf("Unexpected service: got\n %#v\n, wanted\n %#v", svc, testService)
 	}
@@ -919,7 +955,7 @@ func TestEtcdWatchServices(t *testing.T) {
 	watching, err := registry.WatchServices(ctx,
 		labels.Everything(),
 		labels.SelectorFromSet(labels.Set{"ID": "foo"}),
-		1,
+		"1",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -948,7 +984,7 @@ func TestEtcdWatchServicesBadSelector(t *testing.T) {
 		ctx,
 		labels.Everything(),
 		labels.SelectorFromSet(labels.Set{"Field.Selector": "foo"}),
-		0,
+		"",
 	)
 	if err == nil {
 		t.Errorf("unexpected non-error: %v", err)
@@ -958,7 +994,7 @@ func TestEtcdWatchServicesBadSelector(t *testing.T) {
 		ctx,
 		labels.SelectorFromSet(labels.Set{"Label.Selector": "foo"}),
 		labels.Everything(),
-		0,
+		"",
 	)
 	if err == nil {
 		t.Errorf("unexpected non-error: %v", err)
@@ -973,7 +1009,7 @@ func TestEtcdWatchEndpoints(t *testing.T) {
 		ctx,
 		labels.Everything(),
 		labels.SelectorFromSet(labels.Set{"ID": "foo"}),
-		1,
+		"1",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1002,7 +1038,7 @@ func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
 		ctx,
 		labels.Everything(),
 		labels.SelectorFromSet(labels.Set{"Field.Selector": "foo"}),
-		0,
+		"",
 	)
 	if err == nil {
 		t.Errorf("unexpected non-error: %v", err)
@@ -1012,7 +1048,7 @@ func TestEtcdWatchEndpointsBadSelector(t *testing.T) {
 		ctx,
 		labels.SelectorFromSet(labels.Set{"Label.Selector": "foo"}),
 		labels.Everything(),
-		0,
+		"",
 	)
 	if err == nil {
 		t.Errorf("unexpected non-error: %v", err)

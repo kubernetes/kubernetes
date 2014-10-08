@@ -638,7 +638,7 @@ type ObjectReference struct {
 	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
 	UID             string `json:"uid,omitempty" yaml:"uid,omitempty"`
 	APIVersion      string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	ResourceVersion uint64 `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain a valid field access statement. For example,

@@ -143,7 +143,7 @@ func TestListPodsError(t *testing.T) {
 }
 
 func TestListEmptyPodList(t *testing.T) {
-	podRegistry := registrytest.NewPodRegistry(&api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: 1}})
+	podRegistry := registrytest.NewPodRegistry(&api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: "1"}})
 	storage := REST{
 		registry: podRegistry,
 	}
@@ -156,7 +156,7 @@ func TestListEmptyPodList(t *testing.T) {
 	if len(pods.(*api.PodList).Items) != 0 {
 		t.Errorf("Unexpected non-zero pod list: %#v", pods)
 	}
-	if pods.(*api.PodList).ResourceVersion != 1 {
+	if pods.(*api.PodList).ResourceVersion != "1" {
 		t.Errorf("Unexpected resource version: %#v", pods)
 	}
 }

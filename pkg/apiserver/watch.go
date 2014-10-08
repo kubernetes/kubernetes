@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"code.google.com/p/go.net/websocket"
@@ -37,7 +36,7 @@ type WatchHandler struct {
 	codec   runtime.Codec
 }
 
-func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion uint64) {
+func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string) {
 	if s, err := labels.ParseSelector(query.Get("labels")); err != nil {
 		label = labels.Everything()
 	} else {
@@ -48,10 +47,8 @@ func getWatchParams(query url.Values) (label, field labels.Selector, resourceVer
 	} else {
 		field = s
 	}
-	if rv, err := strconv.ParseUint(query.Get("resourceVersion"), 10, 64); err == nil {
-		resourceVersion = rv
-	}
-	return label, field, resourceVersion
+	resourceVersion = query.Get("resourceVersion")
+	return
 }
 
 var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")

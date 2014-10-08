@@ -78,7 +78,7 @@ func NewEtcdHelper(etcdServers []string, version string) (helper tools.EtcdHelpe
 	if err != nil {
 		return helper, err
 	}
-	return tools.EtcdHelper{client, versionInterfaces.Codec, versionInterfaces.ResourceVersioner}, nil
+	return tools.EtcdHelper{client, versionInterfaces.Codec, tools.RuntimeVersionAdapter{versionInterfaces.ResourceVersioner}}, nil
 }
 
 // New returns a new instance of Master connected to the given etcd server.

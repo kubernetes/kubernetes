@@ -21,6 +21,7 @@ import (
 	"flag"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -49,7 +50,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
@@ -66,7 +67,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64

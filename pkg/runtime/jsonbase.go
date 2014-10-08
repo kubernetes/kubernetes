@@ -30,15 +30,15 @@ func NewTypeMetaResourceVersioner() ResourceVersioner {
 // jsonBaseModifier implements ResourceVersioner and SelfLinker.
 type jsonBaseModifier struct{}
 
-func (v jsonBaseModifier) ResourceVersion(obj Object) (uint64, error) {
+func (v jsonBaseModifier) ResourceVersion(obj Object) (string, error) {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	return json.ResourceVersion(), nil
 }
 
-func (v jsonBaseModifier) SetResourceVersion(obj Object, version uint64) error {
+func (v jsonBaseModifier) SetResourceVersion(obj Object, version string) error {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return err
@@ -86,8 +86,8 @@ type TypeMetaInterface interface {
 	SetAPIVersion(version string)
 	Kind() string
 	SetKind(kind string)
-	ResourceVersion() uint64
-	SetResourceVersion(version uint64)
+	ResourceVersion() string
+	SetResourceVersion(version string)
 	SelfLink() string
 	SetSelfLink(selfLink string)
 }
@@ -96,7 +96,7 @@ type genericTypeMeta struct {
 	id              *string
 	apiVersion      *string
 	kind            *string
-	resourceVersion *uint64
+	resourceVersion *string
 	selfLink        *string
 }
 
@@ -124,11 +124,11 @@ func (g genericTypeMeta) SetKind(kind string) {
 	*g.kind = kind
 }
 
-func (g genericTypeMeta) ResourceVersion() uint64 {
+func (g genericTypeMeta) ResourceVersion() string {
 	return *g.resourceVersion
 }
 
-func (g genericTypeMeta) SetResourceVersion(version uint64) {
+func (g genericTypeMeta) SetResourceVersion(version string) {
 	*g.resourceVersion = version
 }
 
