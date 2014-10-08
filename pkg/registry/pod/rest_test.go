@@ -19,6 +19,7 @@ package pod
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -649,5 +650,41 @@ func TestFillPodInfoNoData(t *testing.T) {
 	}
 	if pod.CurrentState.PodIP != expectedIP {
 		t.Errorf("Expected %s, Got %s", expectedIP, pod.CurrentState.PodIP)
+	}
+}
+
+func TestCreatePodWithConflictingNamespace(t *testing.T) {
+	storage := REST{}
+	pod := &api.Pod{
+		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+	}
+
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Create(ctx, pod)
+	if channel != nil {
+		t.Error("Expected a nil channel, but we got a value")
+	}
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Index(err.Error(), "Pod.Namespace does not match the provided context") == -1 {
+		t.Errorf("Expected 'Pod.Namespace does not match the provided context' error, got '%v'", err.Error())
+	}
+}
+
+func TestUpdatePodWithConflictingNamespace(t *testing.T) {
+	storage := REST{}
+	pod := &api.Pod{
+		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+	}
+
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Update(ctx, pod)
+	if channel != nil {
+		t.Error("Expected a nil channel, but we got a value")
+	}
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Index(err.Error(), "Pod.Namespace does not match the provided context") == -1 {
+		t.Errorf("Expected 'Pod.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
