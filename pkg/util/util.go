@@ -60,6 +60,19 @@ func Forever(f func(), period time.Duration) {
 	}
 }
 
+// OnceAndForever runs f first then loops forever running f every d.  Catches any panics, and keeps going.
+func OnceAndForever(f func(), period time.Duration) {
+	defer HandleCrash()
+	f()
+	for {
+		func() {
+			defer HandleCrash()
+			f()
+		}()
+		time.Sleep(period)
+	}
+}
+
 // EncodeJSON returns obj marshalled as a JSON string, ignoring any errors.
 func EncodeJSON(obj interface{}) string {
 	data, _ := json.Marshal(obj)
