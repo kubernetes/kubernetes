@@ -130,7 +130,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj2) {
-			t.Errorf("1: %v: diff: %v", name, runtime.ObjectDiff(source, obj2))
+			t.Errorf("1: %v: diff: %v", name, util.ObjectDiff(source, obj2))
 			return
 		}
 	}
@@ -141,7 +141,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj3) {
-			t.Errorf("3: %v: diff: %v", name, runtime.ObjectDiff(source, obj3))
+			t.Errorf("3: %v: diff: %v", name, util.ObjectDiff(source, obj3))
 			return
 		}
 	}
