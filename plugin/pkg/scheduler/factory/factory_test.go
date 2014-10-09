@@ -317,7 +317,7 @@ func TestBind(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), item.binding)
+		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
 		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
 	}
 }

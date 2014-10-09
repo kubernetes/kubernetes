@@ -149,7 +149,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 }
 
 func TestSyncReplicationControllerCreates(t *testing.T) {
-	body := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), newPodList(0))
+	body := runtime.EncodeOrDie(testapi.Codec(), newPodList(0))
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
@@ -170,7 +170,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 
 func TestCreateReplica(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	body := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Pod{})
+	body := runtime.EncodeOrDie(testapi.Codec(), &api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: string(body),
