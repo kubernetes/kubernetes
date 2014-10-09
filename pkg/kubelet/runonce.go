@@ -94,11 +94,7 @@ func (kl *Kubelet) runPod(pod Pod) error {
 		if err != nil {
 			return fmt.Errorf("failed to get kubelet docker containers: %v", err)
 		}
-		running, err := kl.isPodRunning(pod, dockerContainers)
-		if err != nil {
-			return fmt.Errorf("error checking pod status: %v", err)
-		}
-		if running {
+		if running := kl.isPodRunning(pod, dockerContainers); running {
 			glog.Infof("pod %q containers running", pod.Name)
 			return nil
 		}
@@ -118,12 +114,12 @@ func (kl *Kubelet) runPod(pod Pod) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod Pod, dockerContainers dockertools.DockerContainers) (bool, error) {
+func (kl *Kubelet) isPodRunning(pod Pod, dockerContainers dockertools.DockerContainers) bool {
 	for _, container := range pod.Manifest.Containers {
 		if dockerContainer, found, _ := dockerContainers.FindPodContainer(GetPodFullName(&pod), pod.Manifest.UUID, container.Name); !found || dockerContainer.Status != "running" {
 			glog.Infof("container %q not found (%v) or not running: %#v", container.Name, found, dockerContainer)
-			return false, nil
+			return false
 		}
 	}
-	return true, nil
+	return true
 }
