@@ -26,6 +26,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Circle CI](https://circleci.com/docs/docker#google-compute-engine-and-kubernetes)
   * [Digital Ocean](https://github.com/bketelsen/coreos-kubernetes-digitalocean)
   * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
+* [Kubernetes 101](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough)
 * [kubecfg command line tool](docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
 * [Kubernetes Client Libraries](docs/client-libraries.md)
@@ -38,6 +39,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 
 Check out examples of Kubernetes in action, and community projects in the larger ecosystem:
 
+* [Kubernetes 101](examples/walkthrough/README.md)
 * [Detailed example application](examples/guestbook/README.md)
 * [Example of dynamic updates](examples/update-demo/README.md)
 * [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
