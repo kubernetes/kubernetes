@@ -7,7 +7,7 @@ This document describes the environment for Kubelet managed containers on a Kube
 This cluster information makes it possible to build applications that are *cluster aware*.  
 Additionally, the Kubernetes container environment defines a series of signals that are surfaced to optional signal handlers defined as part of individual containers.  Container signals are somewhat analagous to operating system signals in a traditional process model.   However these signals are designed to make it easier to build reliable, scalable cloud applications in the Kubernetes cluster.  Containers that participate in this cluster lifecycle become *cluster native*. 
 
-Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of the Docker image and pod volumes. The design and usage of pod volumes is described in its own [document](docs/volumes.md)
+Another important part of the container environment is the file system that is available to the container.  In Kubernetes, the filesystem is a combination of an [image](./images.md) and one or more [volumes](./volumes.md).
 
 
 The following sections describe both the cluster information provided to containers, as well as the signals and life-cycle that allows containers to interact with the management system.
