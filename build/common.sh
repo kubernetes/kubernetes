@@ -109,14 +109,17 @@ function kube::build::verify_prereqs() {
   fi
 
   if ! docker info > /dev/null 2>&1 ; then
-    echo "Can't connect to 'docker' daemon.  please fix and retry." >&2
-    echo >&2
-    echo "Possible causes:" >&2
-    echo "  - On Mac OS X, boot2docker VM isn't started" >&2
-    echo "  - On Mac OS X, DOCKER_HOST env variable isn't set approriately" >&2
-    echo "  - On Linux, user isn't in 'docker' group.  Add and relogin." >&2
-    echo "    Something like 'sudo usermod -a -G docker ${USER-user}'" >&2
-    echo "  - On Linux, Docker daemon hasn't been started or has crashed" >&2
+    {
+      echo "Can't connect to 'docker' daemon.  please fix and retry."
+      echo
+      echo "Possible causes:"
+      echo "  - On Mac OS X, boot2docker VM isn't started"
+      echo "  - On Mac OS X, DOCKER_HOST env variable isn't set approriately"
+      echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
+      echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
+      echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
+      echo "  - On Linux, Docker daemon hasn't been started or has crashed"
+    } >&2
     return 1
   fi
 }
@@ -141,6 +144,26 @@ function kube::build::clean_output() {
 
   echo "+++ Cleaning out _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
+}
+
+# Make sure the _output directory is created and mountable by docker
+function kube::build::prepare_output() {
+  mkdir -p "${LOCAL_OUTPUT_ROOT}"
+
+  # On RHEL/Fedora SELinux is enabled by default and currently breaks docker
+  # volume mounts.  We can work around this by explicitly adding a security
+  # context to the _output directory.
+  # Details: https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Resource_Management_and_Linux_Containers_Guide/sec-Sharing_Data_Across_Containers.html#sec-Mounting_a_Host_Directory_to_a_Container
+  if which selinuxenabled >/dev/null && \
+      selinuxenabled && \
+      which chcon >/dev/null ; then
+    if [[ ! $(ls -Zd "${LOCAL_OUTPUT_ROOT}") =~ svirt_sandbox_file_t ]] ; then
+      echo "+++ Applying SELinux policy to '_output' directory.  If this fails it may be"
+      echo "    because you have root owned files under _output.  Delete those and continue"
+      chcon -Rt svirt_sandbox_file_t "${LOCAL_OUTPUT_ROOT}"
+    fi
+  fi
+
 }
 
 # Detect if a specific image exists
@@ -285,6 +308,8 @@ function kube::build::clean_images() {
 # already been built.  This will sync out all output data from the build.
 function kube::build::run_build_command() {
   [[ $# != 0 ]] || { echo "Invalid input." >&2; return 4; }
+
+  kube::build::prepare_output
 
   local -ra docker_cmd=(
     docker run "--name=${DOCKER_CONTAINER_NAME}"
