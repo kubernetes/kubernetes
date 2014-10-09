@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div class="content" style="width: 90%; margin-left: 5%" ng-if="selector && selector.length > 0">
-  <div class="k8s-inline">{{selector}}</div>
-  <div class="k8s-inline k8s-button" ng-click="controller.clearSelector()">X</div>
+  <div class="k8s-inline k8s-font-regular k8s-title-font">{{selector}}</div>
+  <div class="k8s-inline k8s-title-font k8s-button" ng-click="controller.clearSelector(controller.routeParams.grouping)">X</div>
 </div>
 <div ng-repeat="(groupName,group) in groups.items" ng-include="'box.ng'">

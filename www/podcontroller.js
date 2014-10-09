@@ -50,7 +50,6 @@ GroupController.prototype.handlePath = function(path) {
     var parts = path.split("/")
     // split leaves an empty string at the beginning.
     parts = parts.slice(1);
-    console.log(parts)
 
     if (parts.length == 0) {
 	return;
@@ -59,8 +58,8 @@ GroupController.prototype.handlePath = function(path) {
 };
 
 
-GroupController.prototype.clearSelector = function() {
-    window.location.hash = "/groups/" + this.groupBy.join("/") + "/selector";
+GroupController.prototype.clearSelector = function(grouping) {
+    window.location.hash = "/groups/" + grouping + "/selector/";
 };
 
 GroupController.prototype.createBarrier = function(count, callback) {
@@ -82,6 +81,7 @@ GroupController.prototype.handleGroups = function(parts, selector) {
     this.scope.loading = true;
     this.scope.selector = selector;
     var args = [];
+    var type = "";
     if (selector && selector.length > 0) {
 	this.scope.selectorPieces = selector.split(",");
 	var labels = [];
@@ -91,7 +91,14 @@ GroupController.prototype.handleGroups = function(parts, selector) {
 	    if (piece[0] == '$') {
 		fields.push(piece.slice(2));
 	    } else {
-		labels.push(piece);
+		if (piece.indexOf("type=") == 0) {
+		    var labelParts = piece.split("=");
+		    if (labelParts.length > 1) {
+			type = labelParts[1];
+		    }
+		} else {
+		    labels.push(piece);
+		}
 	    }
 	}
 	if (labels.length > 0) {
@@ -103,38 +110,45 @@ GroupController.prototype.handleGroups = function(parts, selector) {
     }
     var query = "?" + args.join("&");
     var list = [];
-    var barrier = this.createBarrier(3, angular.bind(this, function() {
+    var count = type.length > 0 ? 1 : 3;
+    var barrier = this.createBarrier(count, angular.bind(this, function() {
 	    this.scope.groups = this.groupData(list, 0);
 	    this.scope.loading = false;
 	    }));
-    this.http.get(apiBase + "pods" + query)
-    .success(angular.bind(this, function(data) {
-                this.addLabel("type", "pod", data.items);
-                for (var i = 0; data.items && i < data.items.length; ++i) {
-		    data.items[i].labels["host"] = data.items[i].currentState.host;
-		    list.push(data.items[i]);
-		}
-		barrier();
-	    }))
-    .error(angular.bind(this, this.handleError));
-    this.http.get(apiBase + "services" + query)
-    .success(angular.bind(this, function(data) {
-		this.addLabel("type", "service", data.items);
-		for (var i = 0; data.items && i < data.items.length; ++i) {
-		    list.push(data.items[i]);
-		}
-		barrier();
-	    }))
-    .error(angular.bind(this, this.handleError));
-    this.http.get(apiBase + "replicationControllers" + query)
-    .success(angular.bind(this, function(data) {
-		this.addLabel("type", "replicationController", data.items);
-		for (var i = 0; data.items && i < data.items.length; ++i) {
-		    list.push(data.items[i]);
-		}
-		barrier();
-	    }))
-    .error(angular.bind(this, this.handleError));
+    if (type == "" || type == "pod") {
+	this.http.get(apiBase + "pods" + query)
+	    .success(angular.bind(this, function(data) {
+			this.addLabel("type", "pod", data.items);
+			for (var i = 0; data.items && i < data.items.length; ++i) {
+			    data.items[i].labels["host"] = data.items[i].currentState.host;
+			    list.push(data.items[i]);
+			}
+			barrier();
+		    }))
+	    .error(angular.bind(this, this.handleError));
+    }
+    if (type == "" || type == "service") {
+	this.http.get(apiBase + "services" + query)
+	.success(angular.bind(this, function(data) {
+		    this.addLabel("type", "service", data.items);
+		    for (var i = 0; data.items && i < data.items.length; ++i) {
+			list.push(data.items[i]);
+		    }
+		    barrier();
+		}))
+	.error(angular.bind(this, this.handleError));
+    }
+    if (type == "" || type == "replicationController") {
+	this.http.get(apiBase + "replicationControllers" + query)
+	.success(angular.bind(this, function(data) {
+		    this.addLabel("type", "replicationController", data.items);
+		    for (var i = 0; data.items && i < data.items.length; ++i) {
+			list.push(data.items[i]);
+		    }
+		    barrier();
+		}))
+	.error(angular.bind(this, this.handleError));
+    }
 };
 
 GroupController.prototype.addLabel = function(key, value, items) {
@@ -200,7 +214,7 @@ k8sApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
 k8sApp.config(['$routeProvider',
 		function($routeProvider) {
 			  $routeProvider.
-			      when('/groups/:grouping*?\/selector/:selector?', {
+			      when('/groups/:grouping*?\/selector/:selector*?', {
 				      templateUrl: 'partials/groups.html',
 					  controller: 'GroupCtrl'
 					  }).
@@ -209,6 +223,6 @@ k8sApp.config(['$routeProvider',
 					  controller: 'PodCtrl'
 					  }).
 			      otherwise({
-				      redirectTo: '/groups//selector'
+				      redirectTo: '/groups//selector/'
 					  });
 		  }]);
