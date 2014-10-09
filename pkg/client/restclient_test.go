@@ -109,7 +109,7 @@ func TestDoRequest(t *testing.T) {
 		{Request: testRequest{Method: "GET", Path: "error"}, Response: Response{StatusCode: 500}, Error: true},
 		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
 		{Request: testRequest{Method: "GET", Path: "failread"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
-		{Client: &Client{&RESTClient{baseURL: uri, Codec: testapi.CodecForVersionOrDie()}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
+		{Client: &Client{&RESTClient{baseURL: uri, Codec: testapi.Codec()}}, Request: testRequest{Method: "GET", Path: "nocertificate"}, Error: true},
 	}
 	for _, c := range testClients {
 		client := c.Setup()
