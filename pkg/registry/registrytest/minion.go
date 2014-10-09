@@ -60,15 +60,15 @@ func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error
 	return r.Err
 }
 
-func (r *MinionRegistry) ContainsMinion(ctx api.Context, minionID string) (bool, error) {
+func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
 	r.Lock()
 	defer r.Unlock()
 	for _, node := range r.Minions.Items {
 		if node.ID == minionID {
-			return true, r.Err
+			return &node, r.Err
 		}
 	}
-	return false, r.Err
+	return nil, r.Err
 }
 
 func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {

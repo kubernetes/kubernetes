@@ -22,6 +22,6 @@ import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 type Registry interface {
 	ListMinions(ctx api.Context) (*api.MinionList, error)
 	CreateMinion(ctx api.Context, minion *api.Minion) error
-	ContainsMinion(ctx api.Context, minionID string) (bool, error)
+	GetMinion(ctx api.Context, minionID string) (*api.Minion, error)
 	DeleteMinion(ctx api.Context, minionID string) error
 }

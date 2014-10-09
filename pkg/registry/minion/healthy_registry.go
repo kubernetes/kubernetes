@@ -40,22 +40,22 @@ func NewHealthyRegistry(delegate Registry, client *http.Client) Registry {
 	}
 }
 
-func (r *HealthyRegistry) ContainsMinion(ctx api.Context, minion string) (bool, error) {
-	contains, err := r.delegate.ContainsMinion(ctx, minion)
-	if err != nil {
-		return false, err
+func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
+	minion, err := r.delegate.GetMinion(ctx, minionID)
+	if minion == nil {
+		return nil, ErrDoesNotExist
 	}
-	if !contains {
-		return false, nil
-	}
-	status, err := health.DoHTTPCheck(r.makeMinionURL(minion), r.client)
 	if err != nil {
-		return false, err
+		return nil, err
+	}
+	status, err := health.DoHTTPCheck(r.makeMinionURL(minionID), r.client)
+	if err != nil {
+		return nil, err
 	}
 	if status == health.Unhealthy {
-		return false, nil
+		return nil, ErrNotHealty
 	}
-	return true, nil
+	return minion, nil
 }
 
 func (r *HealthyRegistry) DeleteMinion(ctx api.Context, minionID string) error {
