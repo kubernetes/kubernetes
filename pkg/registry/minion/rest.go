@@ -39,6 +39,7 @@ func NewREST(m Registry) *REST {
 }
 
 var ErrDoesNotExist = fmt.Errorf("The requested resource does not exist.")
+var ErrNotHealty = fmt.Errorf("The requested minion is not healthy.")
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	minion, ok := obj.(*api.Minion)
@@ -56,20 +57,20 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
-		contains, err := rs.registry.ContainsMinion(ctx, minion.ID)
+		minion, err := rs.registry.GetMinion(ctx, minion.ID)
+		if minion == nil {
+			return nil, ErrDoesNotExist
+		}
 		if err != nil {
 			return nil, err
 		}
-		if contains {
-			return rs.toApiMinion(minion.ID), nil
-		}
-		return nil, fmt.Errorf("unable to add minion %#v", minion)
+		return minion, nil
 	}), nil
 }
 
 func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
-	exists, err := rs.registry.ContainsMinion(ctx, id)
-	if !exists {
+	minion, err := rs.registry.GetMinion(ctx, id)
+	if minion == nil {
 		return nil, ErrDoesNotExist
 	}
 	if err != nil {
@@ -81,11 +82,11 @@ func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error
 }
 
 func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	exists, err := rs.registry.ContainsMinion(ctx, id)
-	if !exists {
+	minion, err := rs.registry.GetMinion(ctx, id)
+	if minion == nil {
 		return nil, ErrDoesNotExist
 	}
-	return rs.toApiMinion(id), err
+	return minion, err
 }
 
 func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {

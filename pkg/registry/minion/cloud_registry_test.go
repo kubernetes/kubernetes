@@ -46,7 +46,7 @@ func TestCloudList(t *testing.T) {
 	}
 }
 
-func TestCloudContains(t *testing.T) {
+func TestCloudGet(t *testing.T) {
 	ctx := api.NewContext()
 	instances := []string{"m1", "m2"}
 	fakeCloud := fake_cloud.FakeCloud{
@@ -57,21 +57,21 @@ func TestCloudContains(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	contains, err := registry.ContainsMinion(ctx, "m1")
+	minion, err := registry.GetMinion(ctx, "m1")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !contains {
+	if minion == nil {
 		t.Errorf("Unexpected !contains")
 	}
 
-	contains, err = registry.ContainsMinion(ctx, "m100")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	minion, err = registry.GetMinion(ctx, "m100")
+	if err == nil {
+		t.Errorf("unexpected non error")
 	}
 
-	if contains {
+	if minion != nil {
 		t.Errorf("Unexpected contains")
 	}
 }

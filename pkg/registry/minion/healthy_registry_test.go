@@ -60,18 +60,18 @@ func TestBasicDelegation(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	ok, err := healthy.ContainsMinion(ctx, "m1")
+	minion, err := healthy.GetMinion(ctx, "m1")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if !ok {
+	if minion == nil {
 		t.Errorf("Unexpected absence of 'm1'")
 	}
-	ok, err = healthy.ContainsMinion(ctx, "m5")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	minion, err = healthy.GetMinion(ctx, "m5")
+	if err == nil {
+		t.Errorf("unexpected non-error")
 	}
-	if ok {
+	if minion != nil {
 		t.Errorf("Unexpected presence of 'm5'")
 	}
 }
@@ -104,11 +104,11 @@ func TestFiltering(t *testing.T) {
 	if !reflect.DeepEqual(list, registrytest.MakeMinionList(expected, api.NodeResources{})) {
 		t.Errorf("Expected %v, Got %v", expected, list)
 	}
-	ok, err := healthy.ContainsMinion(ctx, "m1")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	minion, err := healthy.GetMinion(ctx, "m1")
+	if err == nil {
+		t.Errorf("unexpected non-error")
 	}
-	if ok {
+	if minion != nil {
 		t.Errorf("Unexpected presence of 'm1'")
 	}
 }

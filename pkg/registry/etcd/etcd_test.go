@@ -1116,22 +1116,22 @@ func TestEtcdCreateMinion(t *testing.T) {
 	}
 }
 
-func TestEtcdContainsMinion(t *testing.T) {
+func TestEtcdGetMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
-	contains, err := registry.ContainsMinion(ctx, "foo")
+	minion, err := registry.GetMinion(ctx, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if contains == false {
-		t.Errorf("Expected true, but got false")
+	if minion.ID != "foo" {
+		t.Errorf("Unexpected minion: %#v", minion)
 	}
 }
 
-func TestEtcdContainsMinionNotFound(t *testing.T) {
+func TestEtcdGetMinionNotFound(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.Data["/registry/minions/foo"] = tools.EtcdResponseWithError{
@@ -1141,14 +1141,10 @@ func TestEtcdContainsMinionNotFound(t *testing.T) {
 		E: tools.EtcdErrorNotFound,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
-	contains, err := registry.ContainsMinion(ctx, "foo")
+	_, err := registry.GetMinion(ctx, "foo")
 
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if contains == true {
-		t.Errorf("Expected false, but got true")
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error returned: %#v", err)
 	}
 }
 

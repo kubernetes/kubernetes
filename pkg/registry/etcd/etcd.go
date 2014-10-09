@@ -430,17 +430,14 @@ func (r *Registry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	return etcderr.InterpretCreateError(err, "minion", minion.ID)
 }
 
-func (r *Registry) ContainsMinion(ctx api.Context, minionID string) (bool, error) {
+func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
 	var minion api.Minion
 	key := makeMinionKey(minionID)
 	err := r.ExtractObj(key, &minion, false)
-	if err == nil {
-		return true, nil
-	} else if tools.IsEtcdNotFound(err) {
-		return false, nil
-	} else {
-		return false, etcderr.InterpretGetError(err, "minion", minion.ID)
+	if err != nil {
+		return nil, etcderr.InterpretGetError(err, "minion", minion.ID)
 	}
+	return &minion, nil
 }
 
 func (r *Registry) DeleteMinion(ctx api.Context, minionID string) error {
