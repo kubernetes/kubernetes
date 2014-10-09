@@ -22,6 +22,9 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 cd "${KUBE_ROOT}"
 
+# This'll canonicalize the path
+KUBE_ROOT=$PWD
+
 source hack/config-go.sh
 
 # Incoming options
@@ -39,8 +42,10 @@ readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_TAG=build
-readonly KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
+# These get set in verify_prereqs with a unique hash based on KUBE_ROOT
+# KUBE_BUILD_IMAGE_TAG=<hash>
+# KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
+# KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
 
 readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 
@@ -53,7 +58,6 @@ readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/_output"
 readonly LOCAL_OUTPUT_BUILD="${LOCAL_OUTPUT_ROOT}/build"
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_DIR="${REMOTE_OUTPUT_ROOT}/build"
-readonly DOCKER_CONTAINER_NAME=kube-build
 readonly DOCKER_MOUNT_ARGS=(--volume "${LOCAL_OUTPUT_BUILD}:${REMOTE_OUTPUT_DIR}")
 
 readonly KUBE_CLIENT_BINARIES=(
@@ -88,7 +92,14 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 # ---------------------------------------------------------------------------
 # Basic setup functions
 
-# Verify that the right utilities and such are installed for building Kube.
+# Verify that the right utilities and such are installed for building Kube.  Set
+# up some dynamic constants.
+#
+# Vars set:
+#   KUBE_BUILD_IMAGE_TAG
+#   KUBE_BUILD_IMAGE
+#   KUBE_BUILD_CONTAINER_NAME
+#   KUBE_ROOT_HASH
 function kube::build::verify_prereqs() {
   if [[ -z "$(which docker)" ]]; then
     echo "Can't find 'docker' in PATH, please fix and retry." >&2
@@ -122,6 +133,11 @@ function kube::build::verify_prereqs() {
     } >&2
     return 1
   fi
+
+  KUBE_ROOT_HASH=$(kube::build::short_hash "$KUBE_ROOT")
+  KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
+  KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
 }
 
 # ---------------------------------------------------------------------------
@@ -179,6 +195,22 @@ function kube::build::docker_image_exists() {
   # We cannot just specify the IMAGE here as `docker images` doesn't behave as
   # expected.  See: https://github.com/docker/docker/issues/8048
   docker images | grep -Eq "^${1}\s+${2}\s+"
+}
+
+# Takes $1 and computes a short has for it. Useful for unique tag generation
+function kube::build::short_hash() {
+  [[ $# -eq 1 ]] || {
+    echo "!!! Internal error.  No data based to short_hash." >&2
+    exit 2
+  }
+
+  local short_hash
+  if which md5 >/dev/null 2>&1; then
+    short_hash=$(md5 -q -s "$1")
+  else
+    short_hash=$(echo -n "$1" | md5sum)
+  fi
+  echo ${short_hash:0:5}
 }
 
 # ---------------------------------------------------------------------------
@@ -312,18 +344,18 @@ function kube::build::run_build_command() {
   kube::build::prepare_output
 
   local -ra docker_cmd=(
-    docker run "--name=${DOCKER_CONTAINER_NAME}"
+    docker run "--name=${KUBE_BUILD_CONTAINER_NAME}"
     --interactive --tty
     "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
 
   # Remove the container if it is left over from some previous aborted run
-  docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
   "${docker_cmd[@]}" "$@"
 
   # Remove the container after we run.  '--rm' might be appropriate but it
   # appears that sometimes it fails. See
   # https://github.com/docker/docker/issues/3968
-  docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
 }
 
 # If the Docker server is remote, copy the results back out.
@@ -339,11 +371,11 @@ function kube::build::copy_output() {
     # container pointed at the same volume, tar the output directory and ship
     # that tar over stdou.
     local -ra docker_cmd=(
-      docker run -a stdout "--name=${DOCKER_CONTAINER_NAME}"
+      docker run -a stdout "--name=${KUBE_BUILD_CONTAINER_NAME}"
       "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
 
     # Kill any leftover container
-    docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
     echo "+++ Syncing back _output directory from boot2docker VM"
     rm -rf "${LOCAL_OUTPUT_BUILD}"
@@ -354,13 +386,13 @@ function kube::build::copy_output() {
     # Remove the container after we run.  '--rm' might be appropriate but it
     # appears that sometimes it fails. See
     # https://github.com/docker/docker/issues/3968
-    docker rm "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
     # I (jbeda) also tried getting rsync working using 'docker run' as the
     # 'remote shell'.  This mostly worked but there was a hang when
     # closing/finishing things off. Ug.
     #
-    # local DOCKER="docker run -i --rm --name=${DOCKER_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
+    # local DOCKER="docker run -i --rm --name=${KUBE_BUILD_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
     # DOCKER+=" bash -c 'shift ; exec \"\$@\"' --"
     # rsync --blocking-io -av -e "${DOCKER}" foo:${REMOTE_OUTPUT_DIR}/ ${LOCAL_OUTPUT_BUILD}
   fi
@@ -523,12 +555,7 @@ function kube::release::gcs::verify_prereqs() {
 # Create a unique bucket name for releasing Kube and make sure it exists.
 function kube::release::gcs::ensure_release_bucket() {
   local project_hash
-  if which md5 > /dev/null 2>&1; then
-    project_hash=$(md5 -q -s "$GCLOUD_PROJECT")
-  else
-    project_hash=$(echo -n "$GCLOUD_PROJECT" | md5sum)
-  fi
-  project_hash=${project_hash:0:5}
+  project_hash=$(kube::build::short_hash "$GCLOUD_PROJECT")
   KUBE_GCS_RELEASE_BUCKET=${KUBE_GCS_RELEASE_BUCKET-kubernetes-releases-${project_hash}}
   KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel/}
   KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg/}
