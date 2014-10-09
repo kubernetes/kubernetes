@@ -228,7 +228,7 @@ func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err erro
 // ObjectVersionAndKind returns the API version and kind of the go object,
 // or an error if it's not a pointer or is unregistered.
 func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string, err error) {
-	v, err := enforcePtr(obj)
+	v, err := EnforcePtr(obj)
 	if err != nil {
 		return "", "", err
 	}
@@ -260,15 +260,4 @@ func maybeCopy(obj interface{}) interface{} {
 	v2 := reflect.New(v.Type())
 	v2.Elem().Set(v)
 	return v2.Interface()
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value
-// of the dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj interface{}) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
 }

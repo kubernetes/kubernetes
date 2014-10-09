@@ -222,7 +222,7 @@ func (s *Scheme) Convert(in, out interface{}) error {
 // FindTypeMeta takes an arbitary api type, returns pointer to its TypeMeta field.
 // obj must be a pointer to an api type.
 func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
-	v, err := enforcePtr(obj)
+	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -231,11 +231,11 @@ func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
 	if v.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
 	}
-	jsonBase := v.FieldByName("TypeMeta")
-	if !jsonBase.IsValid() {
+	typeMeta := v.FieldByName("TypeMeta")
+	if !typeMeta.IsValid() {
 		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
 	}
-	g, err := newGenericTypeMeta(jsonBase)
+	g, err := newGenericTypeMeta(typeMeta)
 	if err != nil {
 		return nil, err
 	}
