@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -48,7 +48,7 @@ func TestRESTCreate(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	if e, a := eventA, <-c; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 }
 
@@ -88,7 +88,7 @@ func TestRESTGet(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	if e, a := eventA, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 }
 
@@ -111,7 +111,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	if e, a := label, (labels.Set{}); !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 	expect := labels.Set{
 		"InvolvedObject.Kind":            "Pod",
@@ -124,7 +124,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		"Reason":                         "forTesting",
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 }
 
@@ -194,7 +194,7 @@ func TestRESTList(t *testing.T) {
 		Items: []api.Event{*eventA, *eventB},
 	}
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 }
 
@@ -221,6 +221,6 @@ func TestRESTWatch(t *testing.T) {
 	}()
 	got := <-wi.ResultChan()
 	if e, a := eventA, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 }

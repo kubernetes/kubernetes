@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -98,7 +99,7 @@ func TestEventCreate(t *testing.T) {
 		}
 
 		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, runtime.ObjectDiff(e, a))
+			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
 }

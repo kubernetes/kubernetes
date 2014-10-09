@@ -209,7 +209,7 @@ func TestEtcdCreate(t *testing.T) {
 		}
 
 		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, runtime.ObjectDiff(e, a))
+			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
 }
@@ -284,7 +284,7 @@ func TestEtcdUpdate(t *testing.T) {
 		}
 
 		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, runtime.ObjectDiff(e, a))
+			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
 }
@@ -340,7 +340,7 @@ func TestEtcdGet(t *testing.T) {
 		}
 
 		if e, a := item.expect, got; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, runtime.ObjectDiff(e, a))
+			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
 }
@@ -396,7 +396,7 @@ func TestEtcdDelete(t *testing.T) {
 		}
 
 		if e, a := item.expect, fakeClient.Data[path]; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, runtime.ObjectDiff(e, a))
+			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
 	}
 }
@@ -432,6 +432,6 @@ func TestEtcdWatch(t *testing.T) {
 	}
 
 	if e, a := podA, got.Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("difference: %s", runtime.ObjectDiff(e, a))
+		t.Errorf("difference: %s", util.ObjectDiff(e, a))
 	}
 }
