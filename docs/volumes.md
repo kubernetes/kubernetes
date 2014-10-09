@@ -1,7 +1,6 @@
 # Volumes
 This document describes the current state of Volumes in kubernetes.  Familiarity with [pods](./pods.md) is suggested.
 
-
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/).
 
 A Pod specifies which Volumes its containers need in its [ContainerManifest](https://developers.google.com/compute/docs/containers/container_vms#container_manifest) property.
@@ -10,7 +9,7 @@ A process in a Container sees a filesystem view composed from two sources: a sin
 
 ## Types of Volumes
 
-Kubernetes currently supports two types of Volumes, but more may be added in the future.
+Kubernetes currently supports three types of Volumes, but more may be added in the future.
 
 ### EmptyDir
 
@@ -33,3 +32,13 @@ Watch out when using this type of volume, because:
   - pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
   - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDir.
 
+### GCEPersistentDisk
+A Volume with a GCEPersistentDisk property allows access to files on a Google Compute Engine (GCE)
+[Persistent Disk](http://cloud.google.com/compute/docs/disks).
+
+There are some restrictions when using a GCEPersistentDisk:
+  - the nodes (what the kubelet runs on) need to be GCE VMs
+  - those VMs need to be in the same GCE project and zone as the PD
+  - avoid creating multiple pods that use the same Volume
+    - if multiple pods refer to the same Volume and both are scheduled on the same machine, regardless of whether they are read-only or read-write, then the second pod scheduled will fail.
+    - Replication controllers can only be created for pods that use read-only mounts.
