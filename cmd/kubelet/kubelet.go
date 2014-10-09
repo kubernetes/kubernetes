@@ -131,11 +131,6 @@ func main() {
 		glog.Fatal("Couldn't connect to docker.")
 	}
 
-	cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:4194")
-	if err != nil {
-		glog.Errorf("Error on creating cadvisor client: %v", err)
-	}
-
 	hostname := getHostname()
 
 	if *rootDirectory == "" {
@@ -182,13 +177,25 @@ func main() {
 	k := kubelet.NewMainKubelet(
 		getHostname(),
 		dockerClient,
-		cadvisorClient,
 		etcdClient,
 		*rootDirectory,
 		*networkContainerImage,
 		*syncFrequency,
 		float32(*registryPullQPS),
 		*registryBurst)
+
+	go func() {
+		defer util.HandleCrash()
+		// TODO: Monitor this connection, reconnect if needed?
+		glog.V(1).Infof("Trying to create cadvisor client.")
+		cadvisorClient, err := cadvisor.NewClient("http://127.0.0.1:4194")
+		if err != nil {
+			glog.Errorf("Error on creating cadvisor client: %v", err)
+			return
+		}
+		glog.V(1).Infof("Successfully created cadvisor client.")
+		k.SetCadvisorClient(cadvisorClient)
+	}()
 
 	// TODO: These should probably become more plugin-ish: register a factory func
 	// in each checker's init(), iterate those here.

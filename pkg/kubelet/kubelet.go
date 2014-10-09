@@ -64,7 +64,6 @@ type volumeMap map[string]volume.Interface
 func NewMainKubelet(
 	hn string,
 	dc dockertools.DockerInterface,
-	cc CadvisorInterface,
 	ec tools.EtcdClient,
 	rd string,
 	ni string,
@@ -74,7 +73,6 @@ func NewMainKubelet(
 	return &Kubelet{
 		hostname:              hn,
 		dockerClient:          dc,
-		cadvisorClient:        cc,
 		etcdClient:            ec,
 		rootDirectory:         rd,
 		resyncInterval:        ri,
@@ -117,8 +115,6 @@ type Kubelet struct {
 
 	// Optional, no events will be sent without it
 	etcdClient tools.EtcdClient
-	// Optional, no statistics will be available if omitted
-	cadvisorClient CadvisorInterface
 	// Optional, defaults to simple implementaiton
 	healthChecker health.HealthChecker
 	// Optional, defaults to simple Docker implementation
@@ -133,6 +129,24 @@ type Kubelet struct {
 	pullQPS float32
 	// Optional, maximum burst QPS from the docker registry, must be positive if QPS is > 0.0
 	pullBurst int
+
+	// Optional, no statistics will be available if omitted
+	cadvisorClient CadvisorInterface
+	cadvisorLock   sync.RWMutex
+}
+
+// SetCadvisorClient sets the cadvisor client in a thread-safe way.
+func (kl *Kubelet) SetCadvisorClient(c CadvisorInterface) {
+	kl.cadvisorLock.Lock()
+	defer kl.cadvisorLock.Unlock()
+	kl.cadvisorClient = c
+}
+
+// GetCadvisorClient gets the cadvisor client.
+func (kl *Kubelet) GetCadvisorClient() CadvisorInterface {
+	kl.cadvisorLock.RLock()
+	defer kl.cadvisorLock.RUnlock()
+	return kl.cadvisorClient
 }
 
 // Run starts the kubelet reacting to config updates
@@ -742,8 +756,8 @@ func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.Conta
 // container.  The container's absolute path refers to its hierarchy in the
 // cgroup file system. e.g. The root container, which represents the whole
 // machine, has path "/"; all docker containers have path "/docker/<docker id>"
-func (kl *Kubelet) statsFromContainerPath(containerPath string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
-	cinfo, err := kl.cadvisorClient.ContainerInfo(containerPath, getCadvisorContainerInfoRequest(req))
+func (kl *Kubelet) statsFromContainerPath(cc CadvisorInterface, containerPath string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+	cinfo, err := cc.ContainerInfo(containerPath, getCadvisorContainerInfoRequest(req))
 	if err != nil {
 		return nil, err
 	}
@@ -782,7 +796,8 @@ func (kl *Kubelet) GetPodInfo(podFullName, uuid string) (api.PodInfo, error) {
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
-	if kl.cadvisorClient == nil {
+	cc := kl.GetCadvisorClient()
+	if cc == nil {
 		return nil, nil
 	}
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
@@ -793,16 +808,24 @@ func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req
 	if !found {
 		return nil, errors.New("couldn't find container")
 	}
-	return kl.statsFromContainerPath(fmt.Sprintf("/docker/%s", dockerContainer.ID), req)
+	return kl.statsFromContainerPath(cc, fmt.Sprintf("/docker/%s", dockerContainer.ID), req)
 }
 
 // GetRootInfo returns stats (from Cadvisor) of current machine (root container).
 func (kl *Kubelet) GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
-	return kl.statsFromContainerPath("/", req)
+	cc := kl.GetCadvisorClient()
+	if cc == nil {
+		return nil, fmt.Errorf("no cadvisor connection")
+	}
+	return kl.statsFromContainerPath(cc, "/", req)
 }
 
 func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
-	return kl.cadvisorClient.MachineInfo()
+	cc := kl.GetCadvisorClient()
+	if cc == nil {
+		return nil, fmt.Errorf("no cadvisor connection")
+	}
+	return cc.MachineInfo()
 }
 
 func (kl *Kubelet) healthy(podFullName string, currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
