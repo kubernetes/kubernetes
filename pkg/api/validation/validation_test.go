@@ -40,12 +40,13 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path2"}}},
 		{Name: "abc-123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path3"}}},
 		{Name: "empty", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+		{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}},
 	}
 	names, errs := validateVolumes(successCase)
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != 4 || !names.HasAll("abc", "123", "abc-123", "empty") {
+	if len(names) != 5 || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd") {
 		t.Errorf("wrong names result: %v", names)
 	}
 
@@ -552,7 +553,14 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 		Labels: validSelector,
 	}
-
+	invalidVolumePodTemplate := api.PodTemplate{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				Volumes: []api.Volume{{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
+			},
+		},
+	}
 	successCases := []api.ReplicationController{
 		{
 			TypeMeta: api.TypeMeta{ID: "abc", Namespace: api.NamespaceDefault},
@@ -609,6 +617,13 @@ func TestValidateReplicationController(t *testing.T) {
 				ReplicaSelector: validSelector,
 			},
 		},
+		"read-write presistent disk": {
+			TypeMeta: api.TypeMeta{ID: "abc"},
+			DesiredState: api.ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     invalidVolumePodTemplate,
+			},
+		},
 		"negative_replicas": {
 			TypeMeta: api.TypeMeta{ID: "abc", Namespace: api.NamespaceDefault},
 			DesiredState: api.ReplicationControllerState{
@@ -628,6 +643,7 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "id" &&
 				field != "namespace" &&
 				field != "desiredState.replicaSelector" &&
+				field != "GCEPersistentDisk.ReadOnly" &&
 				field != "desiredState.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
