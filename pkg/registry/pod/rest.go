@@ -321,23 +321,3 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 		return api.PodWaiting, nil
 	}
 }
-
-func (rs *REST) waitForPodRunning(ctx api.Context, pod *api.Pod) (runtime.Object, error) {
-	for {
-		podObj, err := rs.Get(ctx, pod.ID)
-		if err != nil || podObj == nil {
-			return nil, err
-		}
-		podPtr, ok := podObj.(*api.Pod)
-		if !ok {
-			// This should really never happen.
-			return nil, fmt.Errorf("Error %#v is not an api.Pod!", podObj)
-		}
-		switch podPtr.CurrentState.Status {
-		case api.PodRunning, api.PodTerminated:
-			return pod, nil
-		default:
-			time.Sleep(rs.podPollPeriod)
-		}
-	}
-}
