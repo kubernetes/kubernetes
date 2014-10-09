@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"gopkg.in/v1/yaml"
 )
 
 // Scheme defines methods for serializing and deserializing API objects. It
@@ -272,33 +271,6 @@ func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
 // config files.
 func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
 	return s.raw.EncodeToVersion(obj, destVersion)
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
-// dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj Object) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
-}
-
-// VersionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an APIObject, or an error.
-func VersionAndKind(data []byte) (version, kind string, err error) {
-	findKind := struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	return findKind.APIVersion, findKind.Kind, nil
 }
 
 // Decode converts a YAML or JSON string back into a pointer to an api object.
