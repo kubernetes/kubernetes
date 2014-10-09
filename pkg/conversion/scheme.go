@@ -53,7 +53,7 @@ type Scheme struct {
 
 	// typeToKind allows one to figure out the desired "kind" field for a given
 	// go object. Requirements and caveats are the same as typeToVersion.
-	typeToKind map[reflect.Type]string
+	typeToKind map[reflect.Type][]string
 
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
@@ -77,7 +77,7 @@ func NewScheme() *Scheme {
 	s := &Scheme{
 		versionMap:           map[string]map[string]reflect.Type{},
 		typeToVersion:        map[reflect.Type]string{},
-		typeToKind:           map[reflect.Type]string{},
+		typeToKind:           map[reflect.Type][]string{},
 		converter:            NewConverter(),
 		InternalVersion:      "",
 		MetaInsertionFactory: metaInsertion{},
@@ -95,7 +95,7 @@ func (s *Scheme) Log(l DebugLogger) {
 // the go name of the type if the type is not registered.
 func (s *Scheme) nameFunc(t reflect.Type) string {
 	if kind, ok := s.typeToKind[t]; ok {
-		return kind
+		return kind[0]
 	}
 	return t.Name()
 }
@@ -121,7 +121,7 @@ func (s *Scheme) AddKnownTypes(version string, types ...interface{}) {
 		}
 		knownTypes[t.Name()] = t
 		s.typeToVersion[t] = version
-		s.typeToKind[t] = t.Name()
+		s.typeToKind[t] = append(s.typeToKind[t], t.Name())
 	}
 }
 
@@ -144,7 +144,7 @@ func (s *Scheme) AddKnownTypeWithName(version, kind string, obj interface{}) {
 	}
 	knownTypes[kind] = t
 	s.typeToVersion[t] = version
-	s.typeToKind[t] = kind
+	s.typeToKind[t] = append(s.typeToKind[t], kind)
 }
 
 // KnownTypes returns an array of the types that are known for a particular version.
@@ -284,11 +284,13 @@ func (s *Scheme) ObjectVersionAndKind(obj interface{}) (apiVersion, kind string,
 	}
 	t := v.Type()
 	version, vOK := s.typeToVersion[t]
-	kind, kOK := s.typeToKind[t]
+	kinds, kOK := s.typeToKind[t]
 	if !vOK || !kOK {
 		return "", "", fmt.Errorf("Unregistered type: %v", t)
 	}
-	return version, kind, nil
+	apiVersion = version
+	kind = kinds[0]
+	return
 }
 
 // SetVersionAndKind sets the version and kind fields (with help from
