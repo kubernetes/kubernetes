@@ -21,9 +21,23 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestSpreadPriority(t *testing.T) {
+func makeMinion(node string, cpu, memory int) api.Minion {
+	return api.Minion{
+		TypeMeta: api.TypeMeta{ID: node},
+		NodeResources: api.NodeResources{
+			Capacity: api.ResourceList{
+				resources.CPU:    util.NewIntOrStringFromInt(cpu),
+				resources.Memory: util.NewIntOrStringFromInt(memory),
+			},
+		},
+	}
+}
+
+func TestLeastRequested(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
 		"baz": "blah",
@@ -38,69 +52,58 @@ func TestSpreadPriority(t *testing.T) {
 	machine2State := api.PodState{
 		Host: "machine2",
 	}
+	cpuOnly := api.PodState{
+		Manifest: api.ContainerManifest{
+			Containers: []api.Container{
+				{CPU: 1000},
+				{CPU: 2000},
+			},
+		},
+	}
+	cpuAndMemory := api.PodState{
+		Manifest: api.ContainerManifest{
+			Containers: []api.Container{
+				{CPU: 1000, Memory: 2000},
+				{CPU: 2000, Memory: 3000},
+			},
+		},
+	}
 	tests := []struct {
 		pod          api.Pod
 		pods         []api.Pod
-		nodes        []string
+		nodes        []api.Minion
 		expectedList HostPriorityList
 		test         string
 	}{
 		{
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "nothing scheduled",
 		},
 		{
-			pod:          api.Pod{Labels: labels1},
-			pods:         []api.Pod{{CurrentState: machine1State}},
-			nodes:        []string{"machine1", "machine2"},
+			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
-			test:         "no labels",
-		},
-		{
-			pod:          api.Pod{Labels: labels1},
-			pods:         []api.Pod{{CurrentState: machine1State, Labels: labels2}},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
-			test:         "different labels",
-		},
-		{
-			pod: api.Pod{Labels: labels1},
-			pods: []api.Pod{
-				{CurrentState: machine1State, Labels: labels2},
-				{CurrentState: machine2State, Labels: labels1},
-			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 1}},
-			test:         "one label match",
-		},
-		{
-			pod: api.Pod{Labels: labels1},
-			pods: []api.Pod{
-				{CurrentState: machine1State, Labels: labels2},
-				{CurrentState: machine1State, Labels: labels1},
-				{CurrentState: machine2State, Labels: labels1},
-			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 1}},
-			test:         "two label matches on different machines",
-		},
-		{
-			pod: api.Pod{Labels: labels1},
+			test:         "no resources requested",
 			pods: []api.Pod{
 				{CurrentState: machine1State, Labels: labels2},
 				{CurrentState: machine1State, Labels: labels1},
 				{CurrentState: machine2State, Labels: labels1},
 				{CurrentState: machine2State, Labels: labels1},
 			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
-			test:         "three label matches",
+		},
+		{
+			nodes:        []api.Minion{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
+			expectedList: []HostPriority{{"machine1", 37 /* int(75% / 2) */}, {"machine2", 62 /* int( 75% + 50% / 2) */}},
+			test:         "no resources requested",
+			pods: []api.Pod{
+				{DesiredState: cpuOnly, CurrentState: machine1State},
+				{DesiredState: cpuAndMemory, CurrentState: machine2State},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		list, err := CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeMinionList(test.nodes)))
+		list, err := LeastRequestedPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(api.MinionList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

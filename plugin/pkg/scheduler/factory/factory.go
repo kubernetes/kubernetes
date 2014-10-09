@@ -202,9 +202,9 @@ type storeToMinionLister struct {
 	cache.Store
 }
 
-func (s *storeToMinionLister) List() (machines []string, err error) {
+func (s *storeToMinionLister) List() (machines api.MinionList, err error) {
 	for _, m := range s.Store.List() {
-		machines = append(machines, m.(*api.Minion).ID)
+		machines.Items = append(machines.Items, *(m.(*api.Minion)))
 	}
 	return machines, nil
 }

@@ -81,8 +81,10 @@ func TestScheduler(t *testing.T) {
 		var gotPod *api.Pod
 		var gotBinding *api.Binding
 		c := &Config{
-			MinionLister: scheduler.FakeMinionLister{"machine1"},
-			Algorithm:    item.algo,
+			MinionLister: scheduler.FakeMinionLister(
+				api.MinionList{Items: []api.Minion{{TypeMeta: api.TypeMeta{ID: "machine1"}}}},
+			),
+			Algorithm: item.algo,
 			Binder: fakeBinder{func(b *api.Binding) error {
 				gotBinding = b
 				return item.injectBindError

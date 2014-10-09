@@ -45,17 +45,27 @@ func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister
 		fmt.Errorf("failed to list nodes: %v", err)
 		return nil, err
 	}
-	for _, minion := range nodes {
-		score, err := strconv.Atoi(minion)
+	for _, minion := range nodes.Items {
+		score, err := strconv.Atoi(minion.ID)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, HostPriority{
-			host:  minion,
+			host:  minion.ID,
 			score: score,
 		})
 	}
 	return result, nil
+}
+
+func makeMinionList(nodeNames []string) api.MinionList {
+	result := api.MinionList{
+		Items: make([]api.Minion, len(nodeNames)),
+	}
+	for ix := range nodeNames {
+		result.Items[ix].ID = nodeNames[ix]
+	}
+	return result
 }
 
 func TestGenericScheduler(t *testing.T) {
@@ -112,7 +122,7 @@ func TestGenericScheduler(t *testing.T) {
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
 		scheduler := NewGenericScheduler(test.predicates, test.prioritizer, FakePodLister([]api.Pod{}), random)
-		machine, err := scheduler.Schedule(test.pod, FakeMinionLister(test.nodes))
+		machine, err := scheduler.Schedule(test.pod, FakeMinionLister(makeMinionList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
 				t.Error("Unexpected non-error")
