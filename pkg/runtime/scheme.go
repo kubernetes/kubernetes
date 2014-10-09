@@ -24,32 +24,6 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-// codecWrapper implements encoding to an alternative
-// default version for a scheme.
-type codecWrapper struct {
-	*Scheme
-	version string
-}
-
-// Encode implements Codec
-func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
-	return c.Scheme.EncodeToVersion(obj, c.version)
-}
-
-// CodecFor returns a Codec that invokes Encode with the provided version.
-func CodecFor(scheme *Scheme, version string) Codec {
-	return &codecWrapper{scheme, version}
-}
-
-// EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.
-func EncodeOrDie(codec Codec, obj Object) string {
-	bytes, err := codec.Encode(obj)
-	if err != nil {
-		panic(err)
-	}
-	return string(bytes)
-}
-
 // Scheme defines methods for serializing and deserializing API objects. It
 // is an adaptation of conversion's Scheme for our API objects.
 type Scheme struct {
