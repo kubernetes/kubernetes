@@ -117,8 +117,18 @@ func (kl *Kubelet) runPod(pod api.BoundPod) error {
 // isPodRunning returns true if all containers of a manifest are running.
 func (kl *Kubelet) isPodRunning(pod api.BoundPod, dockerContainers dockertools.DockerContainers) bool {
 	for _, container := range pod.Spec.Containers {
-		if dockerContainer, found, _ := dockerContainers.FindPodContainer(GetPodFullName(&pod), pod.UID, container.Name); !found || dockerContainer.Status != "running" {
-			glog.Infof("container %q not found (%v) or not running: %#v", container.Name, found, dockerContainer)
+		dockerContainer, found, _ := dockerContainers.FindPodContainer(GetPodFullName(&pod), pod.UID, container.Name)
+		if !found {
+			glog.Infof("container %q not found", container.Name)
+			return false
+		}
+		inspectResult, err := kl.dockerClient.InspectContainer(dockerContainer.ID)
+		if err != nil {
+			glog.Infof("failed to inspect container %q: %v", container.Name, err)
+			return false
+		}
+		if !inspectResult.State.Running {
+			glog.Infof("container %q not running: %#v", container.Name, inspectResult.State)
 			return false
 		}
 	}
