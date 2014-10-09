@@ -25,7 +25,6 @@ import (
 	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/gofuzz"
@@ -128,7 +127,7 @@ func TestInternalRoundTrip(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(obj, actual) {
-			t.Errorf("%s: diff %s", k, runtime.ObjectDiff(obj, actual))
+			t.Errorf("%s: diff %s", k, util.ObjectDiff(obj, actual))
 		}
 	}
 }
