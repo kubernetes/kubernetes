@@ -67,22 +67,25 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 
 func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{}
-	container := api.Container{Name: "bar"}
+	podContainers := []docker.APIContainers{
+		{
+			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo.test"},
+			ID:     "1234",
+			Status: "running",
+		},
+		{
+			Names:  []string{"/k8s_net_foo.test_"},
+			ID:     "9876",
+			Status: "running",
+		},
+	}
 	kb.dockerClient = &testDocker{
 		listContainersResults: []listContainersResult{
-			{label: "pre syncPod", containers: []docker.APIContainers{}},
-			{label: "syncPod #1", containers: []docker.APIContainers{}},
-			{label: "syncPod #2", containers: []docker.APIContainers{}},
-			{label: "post syncPod", containers: []docker.APIContainers{
-				{
-					Names: []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&container), 16) + "_foo.test"},
-					ID:    "1234",
-				},
-				{
-					Names: []string{"/k8s_net_foo.test_"},
-					ID:    "9876",
-				},
-			}},
+			{label: "list pod container", containers: []docker.APIContainers{}},
+			{label: "syncPod", containers: []docker.APIContainers{}},
+			{label: "list pod container", containers: []docker.APIContainers{}},
+			{label: "syncPod", containers: podContainers},
+			{label: "list pod container", containers: podContainers},
 		},
 		inspectContainersResults: []inspectContainersResult{
 			{
