@@ -167,6 +167,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 				Value:         value,
 				CreatedIndex:  i,
 				ModifiedIndex: i,
+				TTL:           int64(ttl),
 			},
 		},
 	}
