@@ -17,22 +17,78 @@ limitations under the License.
 package openstack
 
 import (
+	"fmt"
 	"io"
+
+	"code.google.com/p/gcfg"
+	"github.com/rackspace/gophercloud"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
-type OpenStack struct {}
+type OpenStack struct {
+	provider string
+	authOpt  gophercloud.AuthOptions
+	region   string
+	access   *gophercloud.Access
+}
+
+type Config struct {
+	Global struct {
+		AuthUrl              string
+		Username, Password   string
+		ApiKey               string
+		TenantId, TenantName string
+		Region               string
+	}
+}
 
 func init() {
 	cloudprovider.RegisterCloudProvider("openstack", func(config io.Reader) (cloudprovider.Interface, error) {
-		return newOpenStack(config)
+		cfg, err := readConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return newOpenStack(cfg)
 	})
 }
 
-func newOpenStack(config io.Reader) (*OpenStack, error) {
-	return &OpenStack{}, nil
+func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
+	return gophercloud.AuthOptions{
+		Username:   cfg.Global.Username,
+		Password:   cfg.Global.Password,
+		ApiKey:     cfg.Global.ApiKey,
+		TenantId:   cfg.Global.TenantId,
+		TenantName: cfg.Global.TenantName,
+
+		// Persistent service, so we need to be able to renew tokens
+		AllowReauth: true,
+	}
+}
+
+func readConfig(config io.Reader) (Config, error) {
+	if config == nil {
+		err := fmt.Errorf("No OpenStack cloud provider config file given")
+		return Config{}, err
+	}
+
+	var cfg Config
+	err := gcfg.ReadInto(&cfg, config)
+	return cfg, err
+}
+
+func newOpenStack(cfg Config) (*OpenStack, error) {
+	os := OpenStack{
+		provider: cfg.Global.AuthUrl,
+		authOpt:  cfg.toAuthOptions(),
+		region:   cfg.Global.Region,
+	}
+
+	access, err := gophercloud.Authenticate(os.provider, os.authOpt)
+	os.access = access
+
+	return &os, err
 }
 
 func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
