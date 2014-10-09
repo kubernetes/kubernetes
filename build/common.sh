@@ -70,6 +70,7 @@ readonly KUBE_RUN_IMAGES=(
   controller-manager
   proxy
   scheduler
+  kubelet
 )
 
 
