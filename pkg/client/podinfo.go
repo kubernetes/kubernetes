@@ -36,7 +36,7 @@ var ErrPodInfoNotAvailable = errors.New("no pod info available")
 type PodInfoGetter interface {
 	// GetPodInfo returns information about all containers which are part
 	// Returns an api.PodInfo, or an error if one occurs.
-	GetPodInfo(host, podID string) (api.PodInfo, error)
+	GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error)
 }
 
 // HTTPPodInfoGetter is the default implementation of PodInfoGetter, accesses the kubelet over HTTP.
@@ -46,13 +46,14 @@ type HTTPPodInfoGetter struct {
 }
 
 // GetPodInfo gets information about the specified pod.
-func (c *HTTPPodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (c *HTTPPodInfoGetter) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
 	request, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf(
-			"http://%s/podInfo?podID=%s",
+			"http://%s/podInfo?podID=%s&podNamespace=%s",
 			net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
-			podID),
+			podID,
+			podNamespace),
 		nil)
 	if err != nil {
 		return nil, err
@@ -85,6 +86,6 @@ type FakePodInfoGetter struct {
 }
 
 // GetPodInfo is a fake implementation of PodInfoGetter.GetPodInfo.
-func (c *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (c *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodInfo, error) {
 	return c.data, c.err
 }

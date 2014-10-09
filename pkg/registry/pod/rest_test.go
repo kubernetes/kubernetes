@@ -597,7 +597,7 @@ type FakePodInfoGetter struct {
 	err  error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (f *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodInfo, error) {
 	return f.info, f.err
 }
 

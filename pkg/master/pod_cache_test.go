@@ -25,16 +25,48 @@ import (
 )
 
 type FakePodInfoGetter struct {
-	host string
-	id   string
-	data api.PodInfo
-	err  error
+	host      string
+	id        string
+	namespace string
+	data      api.PodInfo
+	err       error
 }
 
-func (f *FakePodInfoGetter) GetPodInfo(host, id string) (api.PodInfo, error) {
+func (f *FakePodInfoGetter) GetPodInfo(host, namespace, id string) (api.PodInfo, error) {
 	f.host = host
 	f.id = id
+	f.namespace = namespace
 	return f.data, f.err
+}
+
+func TestPodCacheGetDifferentNamespace(t *testing.T) {
+	cache := NewPodCache(nil, nil)
+
+	expectedDefault := api.PodInfo{
+		"foo": api.ContainerStatus{},
+	}
+	expectedOther := api.PodInfo{
+		"bar": api.ContainerStatus{},
+	}
+
+	cache.podInfo[makePodCacheKey(api.NamespaceDefault, "foo")] = expectedDefault
+	cache.podInfo[makePodCacheKey("other", "foo")] = expectedOther
+
+	info, err := cache.GetPodInfo("host", api.NamespaceDefault, "foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if !reflect.DeepEqual(info, expectedDefault) {
+		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", &expectedOther, info)
+	}
+
+	info, err = cache.GetPodInfo("host", "other", "foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %#v", err)
+	}
+	if !reflect.DeepEqual(info, expectedOther) {
+		t.Errorf("Unexpected mismatch. Expected: %#v, Got: #%v", &expectedOther, info)
+	}
 }
 
 func TestPodCacheGet(t *testing.T) {
@@ -43,9 +75,9 @@ func TestPodCacheGet(t *testing.T) {
 	expected := api.PodInfo{
 		"foo": api.ContainerStatus{},
 	}
-	cache.podInfo["foo"] = expected
+	cache.podInfo[makePodCacheKey(api.NamespaceDefault, "foo")] = expected
 
-	info, err := cache.GetPodInfo("host", "foo")
+	info, err := cache.GetPodInfo("host", api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
@@ -57,7 +89,7 @@ func TestPodCacheGet(t *testing.T) {
 func TestPodCacheGetMissing(t *testing.T) {
 	cache := NewPodCache(nil, nil)
 
-	info, err := cache.GetPodInfo("host", "foo")
+	info, err := cache.GetPodInfo("host", api.NamespaceDefault, "foo")
 	if err == nil {
 		t.Errorf("Unexpected non-error: %#v", err)
 	}
@@ -75,13 +107,13 @@ func TestPodGetPodInfoGetter(t *testing.T) {
 	}
 	cache := NewPodCache(&fake, nil)
 
-	cache.updatePodInfo("host", "foo")
+	cache.updatePodInfo("host", api.NamespaceDefault, "foo")
 
-	if fake.host != "host" || fake.id != "foo" {
+	if fake.host != "host" || fake.id != "foo" || fake.namespace != api.NamespaceDefault {
 		t.Errorf("Unexpected access: %#v", fake)
 	}
 
-	info, err := cache.GetPodInfo("host", "foo")
+	info, err := cache.GetPodInfo("host", api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
@@ -92,7 +124,7 @@ func TestPodGetPodInfoGetter(t *testing.T) {
 
 func TestPodUpdateAllContainers(t *testing.T) {
 	pod := api.Pod{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo", Namespace: api.NamespaceDefault},
 		CurrentState: api.PodState{
 			Host: "machine",
 		},
@@ -111,11 +143,11 @@ func TestPodUpdateAllContainers(t *testing.T) {
 
 	cache.UpdateAllContainers()
 
-	if fake.host != "machine" || fake.id != "foo" {
+	if fake.host != "machine" || fake.id != "foo" || fake.namespace != api.NamespaceDefault {
 		t.Errorf("Unexpected access: %#v", fake)
 	}
 
-	info, err := cache.GetPodInfo("machine", "foo")
+	info, err := cache.GetPodInfo("machine", api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
