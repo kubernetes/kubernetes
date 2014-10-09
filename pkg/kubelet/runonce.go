@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/golang/glog"
 )
@@ -33,9 +32,8 @@ const (
 )
 
 type RunPodResult struct {
-	Pod  *Pod
-	Info api.PodInfo
-	Err  error
+	Pod *Pod
+	Err error
 }
 
 // RunOnce polls from one configuration update and run the associated pods.
@@ -62,8 +60,8 @@ func (kl *Kubelet) runOnce(pods []Pod) (results []RunPodResult, err error) {
 	for i := range pods {
 		pod := pods[i] // Make a copy
 		go func() {
-			info, err := kl.runPod(pod)
-			ch <- RunPodResult{&pod, info, err}
+			err := kl.runPod(pod)
+			ch <- RunPodResult{&pod, err}
 		}()
 	}
 
@@ -73,10 +71,11 @@ func (kl *Kubelet) runOnce(pods []Pod) (results []RunPodResult, err error) {
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {
+			// TODO(proppy): report which containers failed the pod.
 			glog.Infof("failed to start pod %q: %v", res.Pod.Name, res.Err)
 			failedPods = append(failedPods, res.Pod.Name)
 		} else {
-			glog.Infof("started pod %q: %#v", res.Pod.Name, res.Info)
+			glog.Infof("started pod %q", res.Pod.Name)
 		}
 	}
 	if len(failedPods) > 0 {
@@ -86,45 +85,39 @@ func (kl *Kubelet) runOnce(pods []Pod) (results []RunPodResult, err error) {
 	return results, err
 }
 
-// Run a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod Pod) (api.PodInfo, error) {
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get kubelet docker containers: %v", err)
-	}
-
+// runPod runs a single pod and wait until all containers are running.
+func (kl *Kubelet) runPod(pod Pod) error {
 	delay := RunOnceRetryDelay
 	retry := 0
 	for {
-		glog.Infof("syncing pod")
-		err := kl.syncPod(&pod, dockerContainers)
+		dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
 		if err != nil {
-			return nil, fmt.Errorf("error syncing pod: %v", err)
+			return fmt.Errorf("failed to get kubelet docker containers: %v", err)
 		}
-		info, err := kl.GetPodInfo(GetPodFullName(&pod), pod.Manifest.UUID)
-		if err != nil {
-			return nil, fmt.Errorf("error getting pod info: %v", err)
+		if running := kl.isPodRunning(pod, dockerContainers); running {
+			glog.Infof("pod %q containers running", pod.Name)
+			return nil
 		}
-		if podInfo(info).isRunning() {
-			return info, nil
+		glog.Infof("pod %q containers not running: syncing", pod.Name)
+		if err = kl.syncPod(&pod, dockerContainers); err != nil {
+			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
-			return nil, fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, RunOnceMaxRetries)
+			return fmt.Errorf("timeout error: pod %q containers not running after %d retries", pod.Name, RunOnceMaxRetries)
 		}
-		glog.Infof("pod %q containers not running, waiting for %v", pod.Name, delay)
+		// TODO(proppy): health checking would be better than waiting + checking the state at the next iteration.
+		glog.Infof("pod %q containers synced, waiting for %v", pod.Name, delay)
 		<-time.After(delay)
 		retry++
 		delay *= RunOnceRetryDelayBackoff
 	}
 }
 
-// Alias PodInfo for internal usage.
-type podInfo api.PodInfo
-
-// Check if all containers of a pod are running.
-func (info podInfo) isRunning() bool {
-	for _, container := range info {
-		if container.State.Running == nil {
+// isPodRunning returns true if all containers of a manifest are running.
+func (kl *Kubelet) isPodRunning(pod Pod, dockerContainers dockertools.DockerContainers) bool {
+	for _, container := range pod.Manifest.Containers {
+		if dockerContainer, found, _ := dockerContainers.FindPodContainer(GetPodFullName(&pod), pod.Manifest.UUID, container.Name); !found || dockerContainer.Status != "running" {
+			glog.Infof("container %q not found (%v) or not running: %#v", container.Name, found, dockerContainer)
 			return false
 		}
 	}
