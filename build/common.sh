@@ -160,8 +160,11 @@ function kube::build::build_image() {
     README.md
     third_party
   )
+  local -r exclude=(
+    Godeps/_workspace/pkg
+  )
   mkdir -p "${build_context_dir}"
-  tar czf "${build_context_dir}/kube-source.tar.gz" "${source[@]}"
+  tar czf "${build_context_dir}/kube-source.tar.gz" "${source[@]}" --exclude "${exclude[@]}"
   cat >"${build_context_dir}/kube-version-defs" <<EOF
 KUBE_LD_FLAGS="$(kube::version_ldflags)"
 EOF
