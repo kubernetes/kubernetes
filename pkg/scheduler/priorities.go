@@ -22,6 +22,13 @@ import (
 	"github.com/golang/glog"
 )
 
+func calculatePercentage(requested, capacity int) int {
+	if capacity == 0 {
+		return 0
+	}
+	return (requested * 100) / capacity
+}
+
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
@@ -34,8 +41,9 @@ func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
 			totalMemory += container.Memory
 		}
 	}
-	percentageCPU := (totalCPU * 100) / resources.GetIntegerResource(node.NodeResources.Capacity, resources.CPU, 0)
-	percentageMemory := (totalMemory * 100) / resources.GetIntegerResource(node.NodeResources.Capacity, resources.Memory, 0)
+
+	percentageCPU := calculatePercentage(totalCPU, resources.GetIntegerResource(node.NodeResources.Capacity, resources.CPU, 0))
+	percentageMemory := calculatePercentage(totalMemory, resources.GetIntegerResource(node.NodeResources.Capacity, resources.Memory, 0))
 	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Percentage:(%d\\%m, %d\\%)", totalCPU, totalMemory, percentageCPU, percentageMemory)
 
 	return HostPriority{

@@ -76,8 +76,8 @@ func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 			// Fit is determined by resource availability
 			algorithm.NewResourceFitPredicate(algorithm.StaticNodeInfo{nodes}),
 		},
-		// All nodes where things fit are equally likely (Random)
-		algorithm.EqualPriority,
+		// Prioritize nodes by least requested utilization.
+		algorithm.LeastRequestedPriority,
 		&storeToPodLister{podCache}, r)
 
 	podBackoff := podBackoff{
