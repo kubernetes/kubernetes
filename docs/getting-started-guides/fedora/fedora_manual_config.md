@@ -116,6 +116,8 @@ KUBE_LOGTOSTDERR="true"
 
 # journal message level, 0 is debug
 KUBE_LOG_LEVEL=0
+
+KUBE_ALLOW_PRIV="true"
 ```
 
 * Start the appropriate services on fed1:
@@ -193,6 +195,8 @@ KUBE_LOGTOSTDERR="true"
 
 # journal message level, 0 is debug
 KUBE_LOG_LEVEL=0
+
+KUBE_ALLOW_PRIV="true"
 ```
 
 * Start the appropriate services on fed2.
