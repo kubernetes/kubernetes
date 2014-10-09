@@ -145,7 +145,7 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 func NewScheme() *Scheme {
 	s := &Scheme{conversion.NewScheme()}
 	s.raw.InternalVersion = ""
-	s.raw.MetaInsertionFactory = metaInsertion{}
+	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
 	s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
@@ -338,29 +338,4 @@ func (s *Scheme) CopyOrDie(obj Object) Object {
 		panic(err)
 	}
 	return newObj
-}
-
-// metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
-// package figure out how to encode our object's types and versions. These fields are
-// located in our TypeMeta.
-type metaInsertion struct {
-	TypeMeta struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	} `json:",inline" yaml:",inline"`
-}
-
-// Create returns a new metaInsertion with the version and kind fields set.
-func (metaInsertion) Create(version, kind string) interface{} {
-	m := metaInsertion{}
-	m.TypeMeta.APIVersion = version
-	m.TypeMeta.Kind = kind
-	return &m
-}
-
-// Interpret returns the version and kind information from in, which must be
-// a metaInsertion pointer object.
-func (metaInsertion) Interpret(in interface{}) (version, kind string) {
-	m := in.(*metaInsertion)
-	return m.TypeMeta.APIVersion, m.TypeMeta.Kind
 }
