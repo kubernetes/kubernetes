@@ -21,24 +21,27 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 )
 
-type ManifestFactory interface {
+type BoundPodFactory interface {
 	// Make a container object for a given pod, given the machine that the pod is running on.
-	MakeManifest(machine string, pod api.Pod) (api.ContainerManifest, error)
+	MakeBoundPod(machine string, pod *api.Pod) (*api.BoundPod, error)
 }
 
-type BasicManifestFactory struct {
+type BasicBoundPodFactory struct {
 	// TODO: this should really point at the API rather than a registry
 	ServiceRegistry service.Registry
 }
 
-func (b *BasicManifestFactory) MakeManifest(machine string, pod api.Pod) (api.ContainerManifest, error) {
+func (b *BasicBoundPodFactory) MakeBoundPod(machine string, pod *api.Pod) (*api.BoundPod, error) {
 	envVars, err := service.GetServiceEnvironmentVariables(api.NewContext(), b.ServiceRegistry, machine)
 	if err != nil {
-		return api.ContainerManifest{}, err
+		return nil, err
 	}
-	for ix, container := range pod.DesiredState.Manifest.Containers {
-		pod.DesiredState.Manifest.ID = pod.ID
-		pod.DesiredState.Manifest.Containers[ix].Env = append(container.Env, envVars...)
+	boundPod := &api.BoundPod{}
+	if err := api.Scheme.Convert(pod, boundPod); err != nil {
+		return nil, err
 	}
-	return pod.DesiredState.Manifest, nil
+	for ix, container := range boundPod.Spec.Containers {
+		boundPod.Spec.Containers[ix].Env = append(container.Env, envVars...)
+	}
+	return boundPod, nil
 }

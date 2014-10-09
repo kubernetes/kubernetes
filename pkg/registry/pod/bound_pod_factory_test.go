@@ -25,13 +25,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestMakeManifestNoServices(t *testing.T) {
+func TestMakeBoundPodNoServices(t *testing.T) {
 	registry := registrytest.ServiceRegistry{}
-	factory := &BasicManifestFactory{
+	factory := &BasicBoundPodFactory{
 		ServiceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", api.Pod{
+	pod, err := factory.MakeBoundPod("machine", &api.Pod{
 		TypeMeta: api.TypeMeta{ID: "foobar"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
@@ -44,19 +44,19 @@ func TestMakeManifestNoServices(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	container := manifest.Containers[0]
+	container := pod.Spec.Containers[0]
 	if len(container.Env) != 0 {
-		t.Errorf("Expected zero env vars, got: %#v", manifest)
+		t.Errorf("Expected zero env vars, got: %#v", pod)
 	}
-	if manifest.ID != "foobar" {
-		t.Errorf("Failed to assign ID to manifest: %#v", manifest.ID)
+	if pod.ID != "foobar" {
+		t.Errorf("Failed to assign ID to pod: %#v", pod.ID)
 	}
 }
 
-func TestMakeManifestServices(t *testing.T) {
+func TestMakeBoundPodServices(t *testing.T) {
 	registry := registrytest.ServiceRegistry{
 		List: api.ServiceList{
 			Items: []api.Service{
@@ -72,11 +72,11 @@ func TestMakeManifestServices(t *testing.T) {
 			},
 		},
 	}
-	factory := &BasicManifestFactory{
+	factory := &BasicBoundPodFactory{
 		ServiceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", api.Pod{
+	pod, err := factory.MakeBoundPod("machine", &api.Pod{
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
@@ -88,10 +88,10 @@ func TestMakeManifestServices(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	container := manifest.Containers[0]
+	container := pod.Spec.Containers[0]
 	envs := []api.EnvVar{
 		{
 			Name:  "TEST_SERVICE_HOST",
@@ -123,8 +123,7 @@ func TestMakeManifestServices(t *testing.T) {
 		},
 	}
 	if len(container.Env) != len(envs) {
-		t.Errorf("Expected %d env vars, got %d: %#v", len(envs), len(container.Env), manifest)
-		return
+		t.Fatalf("Expected %d env vars, got %d: %#v", len(envs), len(container.Env), pod)
 	}
 	for ix := range container.Env {
 		if !reflect.DeepEqual(envs[ix], container.Env[ix]) {
@@ -133,7 +132,7 @@ func TestMakeManifestServices(t *testing.T) {
 	}
 }
 
-func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
+func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 	registry := registrytest.ServiceRegistry{
 		List: api.ServiceList{
 			Items: []api.Service{
@@ -149,11 +148,11 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 			},
 		},
 	}
-	factory := &BasicManifestFactory{
+	factory := &BasicBoundPodFactory{
 		ServiceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", api.Pod{
+	pod, err := factory.MakeBoundPod("machine", &api.Pod{
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
@@ -170,10 +169,10 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	container := manifest.Containers[0]
+	container := pod.Spec.Containers[0]
 
 	envs := []api.EnvVar{
 		{
@@ -210,8 +209,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		},
 	}
 	if len(container.Env) != len(envs) {
-		t.Errorf("Expected %d env vars, got: %#v", len(envs), manifest)
-		return
+		t.Fatalf("Expected %d env vars, got: %#v", len(envs), pod)
 	}
 	for ix := range container.Env {
 		if !reflect.DeepEqual(envs[ix], container.Env[ix]) {

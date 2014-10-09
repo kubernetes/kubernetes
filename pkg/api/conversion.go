@@ -61,5 +61,20 @@ func init() {
 			}
 			out.ResourceVersion = in.ResourceVersion
 			return nil
-		})
+		},
+
+		// Convert Pod to BoundPod
+		func(in *Pod, out *BoundPod, s conversion.Scope) error {
+			if err := s.Convert(&in.DesiredState.Manifest, out, 0); err != nil {
+				return err
+			}
+			// Only copy a subset of fields, and override manifest attributes with the pod
+			// metadata
+			out.UID = in.UID
+			out.ID = in.ID
+			out.Namespace = in.Namespace
+			out.CreationTimestamp = in.CreationTimestamp
+			return nil
+		},
+	)
 }
