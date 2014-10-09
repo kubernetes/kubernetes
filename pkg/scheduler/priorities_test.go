@@ -100,6 +100,15 @@ func TestLeastRequested(t *testing.T) {
 				{DesiredState: cpuAndMemory, CurrentState: machine2State},
 			},
 		},
+		{
+			nodes:        []api.Minion{makeMinion("machine1", 0, 0), makeMinion("machine2", 0, 0)},
+			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:         "zero minion resources",
+			pods: []api.Pod{
+				{DesiredState: cpuOnly, CurrentState: machine1State},
+				{DesiredState: cpuAndMemory, CurrentState: machine2State},
+			},
+		},
 	}
 
 	for _, test := range tests {
