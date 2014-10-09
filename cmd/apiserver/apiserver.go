@@ -64,8 +64,9 @@ var (
 	corsAllowedOriginList util.StringList
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
-	nodeMilliCPU = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory   = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
+	nodeMilliCPU      = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory        = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
+	enableLogsSupport = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
 )
 
 func init() {
@@ -191,6 +192,9 @@ func main() {
 	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, *apiPrefix+"/v1beta1")
 	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(mux, *apiPrefix+"/v1beta2")
 	apiserver.InstallSupport(mux)
+	if *enableLogsSupport {
+		apiserver.InstallLogsSupport(mux)
+	}
 	ui.InstallSupport(mux)
 
 	handler := http.Handler(mux)
