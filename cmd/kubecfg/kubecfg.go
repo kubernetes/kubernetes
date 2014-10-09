@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
+	"github.com/skratchdot/open-golang/open"
 )
 
 var (
@@ -58,6 +59,7 @@ var (
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 	clientConfig  = &client.Config{}
+	openBrowser   = flag.Bool("open_browser", true, "If true, and -proxy is specified, open a browser pointed at the Kubernetes UX. Default true.")
 )
 
 func init() {
@@ -236,6 +238,12 @@ func main() {
 
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
+		if *openBrowser {
+			go func() {
+				time.Sleep(2 * time.Second)
+				open.Start("http://localhost:8001/static/")
+			}()
+		}
 		server := kubecfg.NewProxyServer(*www, kubeClient)
 		glog.Fatal(server.Serve())
 	}
