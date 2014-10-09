@@ -17,7 +17,6 @@ limitations under the License.
 package runtime
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
@@ -216,29 +215,6 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 // possible.
 func (s *Scheme) Convert(in, out interface{}) error {
 	return s.raw.Convert(in, out)
-}
-
-// FindTypeMeta takes an arbitary api type, returns pointer to its TypeMeta field.
-// obj must be a pointer to an api type.
-func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
-	v, err := conversion.EnforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	name := t.Name()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
-	}
-	typeMeta := v.FieldByName("TypeMeta")
-	if !typeMeta.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
-	}
-	g, err := newGenericTypeMeta(typeMeta)
-	if err != nil {
-		return nil, err
-	}
-	return g, nil
 }
 
 // EncodeToVersion turns the given api object into an appropriate JSON string.
