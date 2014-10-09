@@ -28,4 +28,7 @@ func BindClientConfigFlags(flags FlagSet, config *Config) {
 	flags.StringVar(&config.Host, "master", config.Host, "The address of the Kubernetes API server")
 	flags.StringVar(&config.Version, "api_version", config.Version, "The API version to use when talking to the server")
 	flags.BoolVar(&config.Insecure, "insecure_skip_tls_verify", config.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
+	flags.StringVar(&config.CertFile, "client_certificate", config.CertFile, "Path to a client key file for TLS.")
+	flags.StringVar(&config.KeyFile, "client_key", config.KeyFile, "Path to a client key file for TLS.")
+	flags.StringVar(&config.CAFile, "certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority")
 }
