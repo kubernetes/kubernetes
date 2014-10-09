@@ -173,6 +173,7 @@ type DockerContainers map[DockerID]*docker.APIContainers
 
 func (c DockerContainers) FindPodContainer(podFullName, uuid, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
+		// TODO(proppy): build the docker container name and do a map lookup instead?
 		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
 		if dockerManifestID == podFullName &&
 			(uuid == "" || dockerUUID == uuid) &&
