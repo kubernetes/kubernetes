@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -125,6 +126,8 @@ func GetTestScheme() *Scheme {
 	s.AddKnownTypes("v1", &ExternalInternalSame{})
 	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
 	s.AddKnownTypeWithName("v1", "TestType2", &ExternalTestType2{})
+	s.AddKnownTypeWithName("", "TestType3", &TestType1{})
+	s.AddKnownTypeWithName("v1", "TestType3", &ExternalTestType1{})
 	s.InternalVersion = ""
 	s.MetaInsertionFactory = testMetaInsertionFactory{}
 	return s
@@ -213,6 +216,27 @@ func TestTypes(t *testing.T) {
 		for i := 0; i < *fuzzIters; i++ {
 			runTest(t, item)
 		}
+	}
+}
+
+func TestMultipleNames(t *testing.T) {
+	s := GetTestScheme()
+
+	obj, err := s.Decode([]byte(`{"myKindKey":"TestType3","myVersionKey":"v1","A":"value"}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	internal := obj.(*TestType1)
+	if internal.A != "value" {
+		t.Fatalf("unexpected decoded object: %#v", internal)
+	}
+
+	out, err := s.EncodeToVersion(internal, "v1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(string(out), `"myKindKey":"TestType1"`) {
+		t.Errorf("unexpected encoded output: %s", string(out))
 	}
 }
 
