@@ -47,9 +47,9 @@ type Server struct {
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address net.IP, port uint) {
+func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address net.IP, port uint, enableDebuggingHandlers bool) {
 	glog.V(1).Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, updates)
+	handler := NewServer(host, updates, enableDebuggingHandlers)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -73,26 +73,35 @@ type HostInterface interface {
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, updates chan<- interface{}) Server {
+func NewServer(host HostInterface, updates chan<- interface{}, enableDebuggingHandlers bool) Server {
 	server := Server{
 		host:    host,
 		updates: updates,
 		mux:     http.NewServeMux(),
 	}
 	server.InstallDefaultHandlers()
+	if enableDebuggingHandlers {
+		server.InstallDebuggingHandlers()
+	}
 	return server
 }
 
-// InstallDefaultHandlers registers the set of supported HTTP request patterns with the mux.
+// InstallDefaultHandlers registers the default set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.mux)
-	s.mux.HandleFunc("/container", s.handleContainer)
-	s.mux.HandleFunc("/containers", s.handleContainers)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfo)
 	s.mux.HandleFunc("/stats/", s.handleStats)
-	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
+}
+
+// InstallDeguggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
+func (s *Server) InstallDebuggingHandlers() {
+	// ToDo: /container, /run, and /containers aren't debugging options, should probably be handled separately
+	s.mux.HandleFunc("/container", s.handleContainer)
+	s.mux.HandleFunc("/containers", s.handleContainers)
 	s.mux.HandleFunc("/run/", s.handleRun)
+
+	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
 }
 
