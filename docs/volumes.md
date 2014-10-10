@@ -7,6 +7,14 @@ A Pod specifies which Volumes its containers need in its [ContainerManifest](htt
 
 A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes.  A [Docker image](https://docs.docker.com/userguide/dockerimages/) is at the root of the file hierarchy.  Any Volumes are mounted at points on the Docker image;  Volumes do not mount on other Volumes and do not have hard links to other Volumes.  Each container in the Pod independently specifies where on its its image to mount each Volume.  This is specified a VolumeMount property.
 
+## Resources
+
+The storage media (Disk, SSD, or memory) of a volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`).
+There is no limit on how much space an EmptyDir or PersistentDir volume can consume, and no isolation between containers or between pods.
+
+In the future, we expect that a Volume will be able to request a certain amount of space using a [resource](./resources.md) specification,
+and to select the type of media to use, for clusters that have several media types.
+
 ## Types of Volumes
 
 Kubernetes currently supports three types of Volumes, but more may be added in the future.
