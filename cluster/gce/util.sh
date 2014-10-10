@@ -531,3 +531,15 @@ function test-teardown {
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true > /dev/null
   "${KUBE_ROOT}/cluster/kube-down.sh" > /dev/null
 }
+
+# SSH to a node by name ($1) and run a command ($2).
+function ssh-to-node {
+  local node="$1"
+  local cmd="$2"
+  gcutil --log_level=WARNING ssh --ssh_arg "-o LogLevel=quiet" "${node}" "${cmd}"
+}
+
+# Restart the kube-proxy on a node ($1)
+function restart-kube-proxy {
+  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+}
