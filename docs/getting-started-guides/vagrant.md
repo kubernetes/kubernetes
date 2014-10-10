@@ -3,8 +3,7 @@
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
-3. Get the Kubernetes source:
-   * Kubernetes 0.3 [tar.gz](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.tar.gz) or [zip](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.zip)
+3. Get or build a [binary release](binary_release.md)
 
 ### Setup
 
@@ -15,7 +14,7 @@ cd kubernetes
 vagrant up
 ```
 
-Vagrant will provision each machine in the cluster with all the necessary components to build and run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
+Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
 
 By default, each VM in the cluster is running Fedora, and all of the Kubernetes services are installed into systemd.
 
@@ -102,7 +101,7 @@ cluster/kube-up.sh
 ```
 
 Destroy the vagrant cluster
- 
+
 ```
 cluster/kube-down.sh
 ```
@@ -200,10 +199,10 @@ Once the docker image for nginx has been downloaded, the container will start an
 ```
 $ sudo docker ps
 CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
-dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f   
-fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b       
-aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2                                                                            
-65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561                                                               
+dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
+fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
+aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
+65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561
 ```
 
 Going back to listing the pods, services and replicationControllers, you now have:
@@ -262,7 +261,7 @@ rm ~/.kubernetes_auth_vagrant
 After using kubecfg.sh make sure that the correct credentials are set:
 
 ```
-cat ~/.kubernetes_vagrant_auth 
+cat ~/.kubernetes_vagrant_auth
 {
   "User": "vagrant",
   "Password": "vagrant"

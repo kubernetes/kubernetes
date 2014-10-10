@@ -16,7 +16,8 @@
 
 # exit on any error
 set -e
-source $(dirname $0)/provision-config.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
 
 MINION_IP=$4
 MINION_ID=$5

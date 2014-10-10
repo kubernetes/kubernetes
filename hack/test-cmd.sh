@@ -17,17 +17,21 @@
 # This command checks that the built commands can function together for
 # simple scenarios.  It does not require Docker so it can run in travis.
 
-source $(dirname $0)/util.sh
-source $(dirname $0)/config-go.sh
+set -o errexit
+set -o nounset
+set -o pipefail
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/util.sh"
+source "${KUBE_ROOT}/hack/config-go.sh"
 
 function cleanup()
 {
-    set +e
-    kill ${APISERVER_PID} 1>&2 2>/dev/null
-    kill ${CTLRMGR_PID} 1>&2 2>/dev/null
-    kill ${KUBELET_PID} 1>&2 2>/dev/null
-    kill ${PROXY_PID} 1>&2 2>/dev/null
-    kill ${ETCD_PID} 1>&2 2>/dev/null
+    [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
+    [[ -n ${CTLRMGR_PID-} ]] && kill ${CTLRMGR_PID} 1>&2 2>/dev/null
+    [[ -n ${KUBELET_PID-} ]] && kill ${KUBELET_PID} 1>&2 2>/dev/null
+    [[ -n ${PROXY_PID-} ]] && kill ${PROXY_PID} 1>&2 2>/dev/null
+    [[ -n ${ETCD_PID-} ]] && kill ${ETCD_PID} 1>&2 2>/dev/null
     rm -rf ${ETCD_DIR} 1>&2 2>/dev/null
     echo
     echo "Complete"
@@ -48,7 +52,7 @@ KUBELET_PORT=${KUBELET_PORT:-10250}
 GO_OUT=${KUBE_TARGET}/bin
 
 # Check kubecfg
-out=$(${GO_OUT}/kubecfg -version)
+out=$("${GO_OUT}/kubecfg" -version)
 echo kubecfg: $out
 
 # Start kubelet

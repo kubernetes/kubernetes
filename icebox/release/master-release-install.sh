@@ -42,4 +42,3 @@ cp -R --preserve=mode $RELEASE_BASE/src/go/* /srv/salt/scheduler/go
 
 mkdir -p /srv/salt/kubelet/go
 cp -R --preserve=mode $RELEASE_BASE/src/go/* /srv/salt/kubelet/go
-

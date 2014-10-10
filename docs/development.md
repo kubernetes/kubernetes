@@ -1,5 +1,9 @@
 # Development Guide
 
+# Releases and Official Builds
+
+Official releases are built in Docker containers.  Details are [here](build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+
 ## Go development environment
 
 Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.

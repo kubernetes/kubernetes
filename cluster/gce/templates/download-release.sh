@@ -14,13 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script will build a dev release and bring up a new cluster with that
-# release.
+# Download and install release
 
-SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
+# This script assumes that the environment variable MASTER_RELEASE_TAR contains
+# the release tar to download and unpack.  It is meant to be pushed to the
+# master and run.
 
-# First build a release
-$SCRIPT_DIR/../../release/azure/release.sh
 
-# Now bring a new cluster up with that release.
-$SCRIPT_DIR/../../cluster/azure/kube-up.sh
+echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
+gsutil cp "$SERVER_BINARY_TAR_URL" .
+
+echo "Downloading binary release tar ($SALT_TAR_URL)"
+gsutil cp "$SALT_TAR_URL" .
+
+echo "Unpacking Salt tree"
+rm -rf kubernetes
+tar xzf "${SALT_TAR_URL##*/}"
+
+echo "Running release install script"
+sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"

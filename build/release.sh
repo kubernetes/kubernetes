@@ -18,16 +18,25 @@
 # images and other build artifacts.  All intermediate artifacts will be hosted
 # publicly on Google Cloud Storage currently.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-source $(dirname $0)/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
+
+KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 
 kube::build::verify_prereqs
 kube::build::build_image
 kube::build::run_build_command build/build-image/make-binaries.sh
 kube::build::run_build_command build/build-image/make-cross.sh
-kube::build::run_build_command build/build-image/run-tests.sh
-kube::build::run_build_command build/build-image/run-integration.sh
+
+if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
+  kube::build::run_build_command build/build-image/run-tests.sh
+  kube::build::run_build_command build/build-image/run-integration.sh
+fi
+
 kube::build::copy_output
 kube::build::run_image
 kube::release::package_tarballs

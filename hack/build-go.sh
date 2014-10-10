@@ -20,13 +20,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-hackdir=$(CDPATH="" cd $(dirname $0); pwd)
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 # Set the environment variables required by the build.
-. "${hackdir}/config-go.sh"
+source "${KUBE_ROOT}/hack/config-go.sh"
 
 # Go to the top of the tree.
-cd "${KUBE_REPO_ROOT}"
+cd "${KUBE_ROOT}"
 
 # Check for `go` binary and set ${GOPATH}.
 kube::setup_go_environment
@@ -54,10 +54,9 @@ fi
 binaries=($(kube::binaries_from_targets "${targets[@]}"))
 
 echo "Building local go components"
-# Note that the flags to 'go build' are duplicated in the salt build setup
-# (release/build-release.sh) for our cluster deploy.  If we add more command
-# line options to our standard build we'll want to duplicate them there.  As we
-# move to distributing pre- built binaries we can eliminate this duplication.
+# Note that the flags to 'go build' are duplicated in the dockerized build setup
+# (build/build-image/common.sh).  If we add more command line options to our
+# standard build we'll want to duplicate them there.  This needs to be fixed
 go install "${goflags[@]:+${goflags[@]}}" \
     -ldflags "${version_ldflags}" \
     "${binaries[@]}"

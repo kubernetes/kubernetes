@@ -1,3 +1,8 @@
+# WARNING
+These instructions are broken at git HEAD.  Please either:
+* Sync back to `v0.3` with `git checkout v0.3`
+* Download a [snapshot of `v0.3`](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.tar.gz)
+
 # Rackspace
 In general, the dev-build-and-up.sh workflow for Rackspace is the similar to GCE. The specific implementation is different mainly due to network differences between the providers:
 

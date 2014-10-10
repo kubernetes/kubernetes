@@ -17,9 +17,10 @@
 # This script sets up a go workspace locally and builds all go components.
 # You can 'source' this file if you want to set up GOPATH in your local shell.
 
-cd $(dirname "${BASH_SOURCE}")/../.. >/dev/null
-readonly KUBE_REPO_ROOT="${PWD}"
-readonly KUBE_TARGET="${KUBE_REPO_ROOT}/_output/build"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+cd "${KUBE_ROOT}"
+
+readonly KUBE_TARGET="${KUBE_ROOT}/_output/build"
 readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 
 mkdir -p "${KUBE_TARGET}"
@@ -39,24 +40,26 @@ function kube::build::make_binary() {
   local -r bin=${gopkg##*/}
 
   echo "+++ Building ${bin} for ${GOOS}/${GOARCH}"
-  pushd "${KUBE_REPO_ROOT}" >/dev/null
+  pushd "${KUBE_ROOT}" >/dev/null
   godep go build -ldflags "${KUBE_LD_FLAGS-}" -o "${ARCH_TARGET}/${bin}" "${gopkg}"
   popd >/dev/null
 }
 
 function kube::build::make_binaries() {
-  if [[ ${#targets[@]} -eq 0 ]]; then
-    targets=(
-      cmd/proxy
-      cmd/apiserver
-      cmd/controller-manager
-      cmd/kubelet
-      cmd/kubecfg
-      plugin/cmd/scheduler
-    )
+  local -a targets=(
+    cmd/proxy
+    cmd/apiserver
+    cmd/controller-manager
+    cmd/kubelet
+    cmd/kubecfg
+    plugin/cmd/scheduler
+  )
+
+  if [[ -n "${1-}" ]]; then
+    targets=("$1")
   fi
 
-  binaries=()
+  local -a binaries=()
   local target
   for target in "${targets[@]}"; do
     binaries+=("${KUBE_GO_PACKAGE}/${target}")
@@ -64,11 +67,6 @@ function kube::build::make_binaries() {
 
   ARCH_TARGET="${KUBE_TARGET}/${GOOS}/${GOARCH}"
   mkdir -p "${ARCH_TARGET}"
-
-  if [[ -n "$1" ]]; then
-    kube::build::make_binary "$1"
-    exit 0
-  fi
 
   local b
   for b in "${binaries[@]}"; do
