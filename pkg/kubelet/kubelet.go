@@ -490,7 +490,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 		return err
 	}
 
-	podState := api.PodState{Manifest: api.ContainerManifest{UUID: uuid}}
+	podState := api.PodState{}
 	info, err := kl.GetPodInfo(podFullName, uuid)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %s and uuid %s info, health checks may be invalid.",
@@ -510,7 +510,7 @@ func (kl *Kubelet) syncPod(pod *Pod, dockerContainers dockertools.DockerContaine
 			// look for changes in the container.
 			if hash == 0 || hash == expectedHash {
 				// TODO: This should probably be separated out into a separate goroutine.
-				healthy, err := kl.healthy(podFullName, podState, container, dockerContainer)
+				healthy, err := kl.healthy(podFullName, uuid, podState, container, dockerContainer)
 				if err != nil {
 					glog.V(1).Infof("health check errored: %v", err)
 					containersToKeep[containerID] = empty{}
@@ -828,7 +828,7 @@ func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
 	return cc.MachineInfo()
 }
 
-func (kl *Kubelet) healthy(podFullName string, currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
+func (kl *Kubelet) healthy(podFullName, podUUID string, currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {
 	// Give the container 60 seconds to start up.
 	if container.LivenessProbe == nil {
 		return health.Healthy, nil
@@ -839,7 +839,7 @@ func (kl *Kubelet) healthy(podFullName string, currentState api.PodState, contai
 	if kl.healthChecker == nil {
 		return health.Healthy, nil
 	}
-	return kl.healthChecker.HealthCheck(podFullName, currentState, container)
+	return kl.healthChecker.HealthCheck(podFullName, podUUID, currentState, container)
 }
 
 // Returns logs of current machine.

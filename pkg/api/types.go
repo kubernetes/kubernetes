@@ -45,32 +45,6 @@ import (
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
 
-// ContainerManifest corresponds to the Container Manifest format, documented at:
-// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
-type ContainerManifest struct {
-	// Required: This must be a supported version string, such as "v1beta1".
-	Version string `yaml:"version" json:"version"`
-	// Required: This must be a DNS_SUBDOMAIN.
-	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID string `yaml:"id" json:"id"`
-	// TODO: UUID on Manifest is deprecated in the future once we are done
-	// with the API refactoring. It is required for now to determine the instance
-	// of a Pod.
-	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty"`
-	Volumes       []Volume      `yaml:"volumes" json:"volumes"`
-	Containers    []Container   `yaml:"containers" json:"containers"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
-}
-
-// ContainerManifestList is used to communicate container manifests to kubelet.
-type ContainerManifestList struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
-}
-
-func (*ContainerManifestList) IsAnAPIObject() {}
-
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
@@ -387,8 +361,6 @@ type PodList struct {
 	Items    []Pod `json:"items" yaml:"items,omitempty"`
 }
 
-func (*PodList) IsAnAPIObject() {}
-
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	TypeMeta     `json:",inline" yaml:",inline"`
@@ -396,8 +368,6 @@ type Pod struct {
 	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	CurrentState PodState          `json:"currentState,omitempty" yaml:"currentState,omitempty"`
 }
-
-func (*Pod) IsAnAPIObject() {}
 
 // ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get).
 type ReplicationControllerState struct {
@@ -412,8 +382,6 @@ type ReplicationControllerList struct {
 	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
 }
 
-func (*ReplicationControllerList) IsAnAPIObject() {}
-
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
 	TypeMeta     `json:",inline" yaml:",inline"`
@@ -421,8 +389,6 @@ type ReplicationController struct {
 	CurrentState ReplicationControllerState `json:"currentState,omitempty" yaml:"currentState,omitempty"`
 	Labels       map[string]string          `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
-
-func (*ReplicationController) IsAnAPIObject() {}
 
 // PodTemplate holds the information used for creating pods.
 type PodTemplate struct {
@@ -435,8 +401,6 @@ type ServiceList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []Service `json:"items" yaml:"items"`
 }
-
-func (*ServiceList) IsAnAPIObject() {}
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
@@ -461,8 +425,6 @@ type Service struct {
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 }
 
-func (*Service) IsAnAPIObject() {}
-
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
@@ -470,15 +432,11 @@ type Endpoints struct {
 	Endpoints []string `json:"endpoints,omitempty" yaml:"endpoints,omitempty"`
 }
 
-func (*Endpoints) IsAnAPIObject() {}
-
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []Endpoints `json:"items,omitempty" yaml:"items,omitempty"`
 }
-
-func (*EndpointsList) IsAnAPIObject() {}
 
 // NodeResources represents resources on a Kubernetes system node
 // see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
@@ -502,15 +460,11 @@ type Minion struct {
 	NodeResources NodeResources `json:"resources,omitempty" yaml:"resources,omitempty"`
 }
 
-func (*Minion) IsAnAPIObject() {}
-
 // MinionList is a list of minions.
 type MinionList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	Items    []Minion `json:"items,omitempty" yaml:"items,omitempty"`
 }
-
-func (*MinionList) IsAnAPIObject() {}
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
 type Binding struct {
@@ -518,8 +472,6 @@ type Binding struct {
 	PodID    string `json:"podID" yaml:"podID"`
 	Host     string `json:"host" yaml:"host"`
 }
-
-func (*Binding) IsAnAPIObject() {}
 
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
@@ -543,8 +495,6 @@ type Status struct {
 	// Suggested HTTP return code for this status, 0 if not set.
 	Code int `json:"code,omitempty" yaml:"code,omitempty"`
 }
-
-func (*Status) IsAnAPIObject() {}
 
 // StatusDetails is a set of additional properties that MAY be set by the
 // server to provide additional information about a response. The Reason
@@ -682,15 +632,11 @@ type ServerOp struct {
 	TypeMeta `yaml:",inline" json:",inline"`
 }
 
-func (*ServerOp) IsAnAPIObject() {}
-
 // ServerOpList is a list of operations, as delivered to API clients.
 type ServerOpList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
 	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
 }
-
-func (*ServerOpList) IsAnAPIObject() {}
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
@@ -743,12 +689,65 @@ type Event struct {
 	Source string `json:"source,omitempty" yaml:"source,omitempty"`
 }
 
-func (*Event) IsAnAPIObject() {}
-
 // EventList is a list of events.
 type EventList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
 	Items    []Event `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
-func (*EventList) IsAnAPIObject() {}
+// ContainerManifest corresponds to the Container Manifest format, documented at:
+// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
+// This is used as the representation of Kubernetes workloads.
+// DEPRECATED: Replaced with BoundPod
+type ContainerManifest struct {
+	// Required: This must be a supported version string, such as "v1beta1".
+	Version string `yaml:"version" json:"version"`
+	// Required: This must be a DNS_SUBDOMAIN.
+	// TODO: ID on Manifest is deprecated and will be removed in the future.
+	ID string `yaml:"id" json:"id"`
+	// TODO: UUID on Manifest is deprecated in the future once we are done
+	// with the API refactoring. It is required for now to determine the instance
+	// of a Pod.
+	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty"`
+	Volumes       []Volume      `yaml:"volumes" json:"volumes"`
+	Containers    []Container   `yaml:"containers" json:"containers"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+}
+
+// ContainerManifestList is used to communicate container manifests to kubelet.
+// DEPRECATED: Replaced with BoundPods
+type ContainerManifestList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+// Included in partial form from v1beta3 to replace ContainerManifest
+
+// PodSpec is a description of a pod
+type PodSpec struct {
+	Volumes       []Volume      `json:"volumes" yaml:"volumes"`
+	Containers    []Container   `json:"containers" yaml:"containers"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+}
+
+// BoundPod is a collection of containers that should be run on a host. A BoundPod
+// defines how a Pod may change after a Binding is created. A Pod is a request to
+// execute a pod, whereas a BoundPod is the specification that would be run on a server.
+type BoundPod struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Spec defines the behavior of a pod.
+	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// BoundPods is a list of Pods bound to a common server. The resource version of
+// the pod list is guaranteed to only change when the list of bound pods changes.
+type BoundPods struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Host is the name of a node that these pods were bound to.
+	Host string `json:"host" yaml:"host"`
+
+	// Items is the list of all pods bound to a given host.
+	Items []BoundPod `json:"items" yaml:"items"`
+}

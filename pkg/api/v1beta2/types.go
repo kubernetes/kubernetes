@@ -45,30 +45,6 @@ import (
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
 
-// ContainerManifest corresponds to the Container Manifest format, documented at:
-// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
-type ContainerManifest struct {
-	// Required: This must be a supported version string, such as "v1beta1".
-	Version string `yaml:"version" json:"version"`
-	// Required: This must be a DNS_SUBDOMAIN.
-	// TODO: ID on Manifest is deprecated and will be removed in the future.
-	ID string `yaml:"id" json:"id"`
-	// TODO: UUID on Manifest is deprecated in the future once we are done
-	// with the API refactoring. It is required for now to determine the instance
-	// of a Pod.
-	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty"`
-	Volumes       []Volume      `yaml:"volumes" json:"volumes"`
-	Containers    []Container   `yaml:"containers" json:"containers"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
-}
-
-// ContainerManifestList is used to communicate container manifests to kubelet.
-type ContainerManifestList struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
-}
-
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
@@ -709,4 +685,61 @@ type Event struct {
 type EventList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
 	Items    []Event `yaml:"items,omitempty" json:"items,omitempty"`
+}
+
+// ContainerManifest corresponds to the Container Manifest format, documented at:
+// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
+// This is used as the representation of Kubernetes workloads.
+// DEPRECATED: Replaced with BoundPod
+type ContainerManifest struct {
+	// Required: This must be a supported version string, such as "v1beta1".
+	Version string `yaml:"version" json:"version"`
+	// Required: This must be a DNS_SUBDOMAIN.
+	// TODO: ID on Manifest is deprecated and will be removed in the future.
+	ID string `yaml:"id" json:"id"`
+	// TODO: UUID on Manifest is deprecated in the future once we are done
+	// with the API refactoring. It is required for now to determine the instance
+	// of a Pod.
+	UUID          string        `yaml:"uuid,omitempty" json:"uuid,omitempty"`
+	Volumes       []Volume      `yaml:"volumes" json:"volumes"`
+	Containers    []Container   `yaml:"containers" json:"containers"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+}
+
+// ContainerManifestList is used to communicate container manifests to kubelet.
+// DEPRECATED: Replaced with BoundPods
+type ContainerManifestList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+// Backported from v1beta3 to replace ContainerManifest
+
+// PodSpec is a description of a pod
+type PodSpec struct {
+	Volumes       []Volume      `json:"volumes" yaml:"volumes"`
+	Containers    []Container   `json:"containers" yaml:"containers"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+}
+
+// BoundPod is a collection of containers that should be run on a host. A BoundPod
+// defines how a Pod may change after a Binding is created. A Pod is a request to
+// execute a pod, whereas a BoundPod is the specification that would be run on a server.
+type BoundPod struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Spec defines the behavior of a pod.
+	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// BoundPods is a list of Pods bound to a common server. The resource version of
+// the pod list is guaranteed to only change when the list of bound pods changes.
+type BoundPods struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+
+	// Host is the name of a node that these pods were bound to.
+	Host string `json:"host" yaml:"host"`
+
+	// Items is the list of all pods bound to a given host.
+	Items []BoundPod `json:"items" yaml:"items"`
 }

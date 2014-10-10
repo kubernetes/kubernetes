@@ -98,7 +98,7 @@ func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 }
 
 // HealthCheck checks if the container is healthy by trying sending HTTP Get requests to the container.
-func (h *HTTPHealthChecker) HealthCheck(podFullName string, currentState api.PodState, container api.Container) (Status, error) {
+func (h *HTTPHealthChecker) HealthCheck(podFullName, podUUID string, currentState api.PodState, container api.Container) (Status, error) {
 	host, port, path, err := getURLParts(currentState, container)
 	if err != nil {
 		return Unknown, err
