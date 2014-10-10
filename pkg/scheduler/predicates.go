@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/golang/glog"
@@ -39,7 +40,15 @@ func (nodes StaticNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
 			return &nodes.Items[ix], nil
 		}
 	}
-	return nil, fmt.Errorf("failed to find node: %s", nodeID)
+	return nil, fmt.Errorf("failed to find node: %s, %#v", nodeID, nodes)
+}
+
+type ClientNodeInfo struct {
+	*client.Client
+}
+
+func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
+	return nodes.GetMinion(nodeID)
 }
 
 type ResourceFit struct {

@@ -291,3 +291,9 @@ func (c *Client) ListMinions() (result *api.MinionList, err error) {
 	err = c.Get().Path("minions").Do().Into(result)
 	return
 }
+
+func (c *Client) GetMinion(id string) (result *api.Minion, err error) {
+	result = &api.Minion{}
+	err = c.Get().Path("minions").Path(id).Do().Into(result)
+	return
+}
