@@ -16,7 +16,6 @@ limitations under the License.
 <div style="margin-top: 10px">
 <div class="k8s-title-font k8s-box">
   {{ groupName }}
-  {{ settings.display }}
 
 <div ng-if="group.kind != 'grouping'">
   <div ng-if="!settings.display || settings.display=='box'">
