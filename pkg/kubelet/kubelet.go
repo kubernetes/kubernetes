@@ -111,7 +111,7 @@ type Kubelet struct {
 	dockerClient          dockertools.DockerInterface
 	rootDirectory         string
 	networkContainerImage string
-	podWorkers            podWorkers
+	podWorkers            *podWorkers
 	resyncInterval        time.Duration
 	pods                  []Pod
 
@@ -157,8 +157,8 @@ type podWorkers struct {
 	workers util.StringSet
 }
 
-func newPodWorkers() podWorkers {
-	return podWorkers{
+func newPodWorkers() *podWorkers {
+	return &podWorkers{
 		workers: util.NewStringSet(),
 	}
 }
