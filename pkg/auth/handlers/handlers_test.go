@@ -49,7 +49,7 @@ func TestAuthenticateRequest(t *testing.T) {
 
 	<-success
 	if len(context.requests) > 0 {
-		t.Errorf("context should have no stored requests", context)
+		t.Errorf("context should have no stored requests: %v", context)
 	}
 }
 
@@ -73,7 +73,7 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 
 	<-failed
 	if len(context.requests) > 0 {
-		t.Errorf("context should have no stored requests", context)
+		t.Errorf("context should have no stored requests: %v", context)
 	}
 }
 
@@ -97,6 +97,6 @@ func TestAuthenticateRequestError(t *testing.T) {
 
 	<-failed
 	if len(context.requests) > 0 {
-		t.Errorf("context should have no stored requests", context)
+		t.Errorf("context should have no stored requests: %v", context)
 	}
 }

@@ -452,7 +452,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			t.Fatalf("%s: expected a pod, got %#v", k, event.Object)
 		}
 		if actualPod.ResourceVersion != testCase.ExpectedVersion {
-			t.Errorf("%s: expected pod with resource version %d, Got %#v", k, testCase.ExpectedVersion, actualPod)
+			t.Errorf("%s: expected pod with resource version %v, Got %#v", k, testCase.ExpectedVersion, actualPod)
 		}
 		pod.ResourceVersion = testCase.ExpectedVersion
 		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {

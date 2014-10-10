@@ -67,7 +67,7 @@ token2,user2,uid2
 			t.Errorf("%d: expected user %#v, got %#v", i, testCase.User, user)
 		}
 		if testCase.Ok != ok {
-			t.Errorf("%d: expected auth %f, got %f", i, testCase.Ok, ok)
+			t.Errorf("%d: expected auth %v, got %v", i, testCase.Ok, ok)
 		}
 		switch {
 		case err == nil && testCase.Err:

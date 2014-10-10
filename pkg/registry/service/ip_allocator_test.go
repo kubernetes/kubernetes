@@ -236,7 +236,7 @@ func TestIPSub(t *testing.T) {
 	for _, tc := range testCases {
 		r := ipSub(net.ParseIP(tc.lhs), net.ParseIP(tc.rhs))
 		if r != tc.expected {
-			t.Errorf("Expected %s, got %s", tc.expected, r)
+			t.Errorf("Expected %v, got %v", tc.expected, r)
 		}
 	}
 }

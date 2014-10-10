@@ -79,7 +79,7 @@ func TestGetInteger(t *testing.T) {
 	for _, test := range tests {
 		val := GetIntegerResource(test.res, test.name, test.def)
 		if val != test.expected {
-			t.Errorf("%s: expected: %d found %d", test.expected, val)
+			t.Errorf("expected: %d found %d", test.expected, val)
 		}
 	}
 }
@@ -130,7 +130,7 @@ func TestGetFloat(t *testing.T) {
 	for _, test := range tests {
 		val := GetFloatResource(test.res, test.name, test.def)
 		if val != test.expected {
-			t.Errorf("%s: expected: %d found %d", test.expected, val)
+			t.Errorf("%expected: %d found %d", test.expected, val)
 		}
 	}
 }
@@ -163,7 +163,7 @@ func TestGetString(t *testing.T) {
 	for _, test := range tests {
 		val := GetStringResource(test.res, test.name, test.def)
 		if val != test.expected {
-			t.Errorf("%s: expected: %d found %d", test.expected, val)
+			t.Errorf("expected: %d found %d", test.expected, val)
 		}
 	}
 }

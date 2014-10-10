@@ -85,7 +85,7 @@ func TestOVirtCloudXmlParsing(t *testing.T) {
 		t.Fatalf("Unexpected error listing instances: %s", err3)
 	}
 	if len(instances3) > 0 {
-		t.Fatalf("Unexpected number of instance(s): %i", len(instances3))
+		t.Fatalf("Unexpected number of instance(s): %d", len(instances3))
 	}
 
 	body4 := strings.NewReader(`
@@ -116,7 +116,7 @@ func TestOVirtCloudXmlParsing(t *testing.T) {
 		t.Fatalf("Unexpected error listing instances: %s", err4)
 	}
 	if len(instances4) != 2 {
-		t.Fatalf("Unexpected number of instance(s): %i", len(instances4))
+		t.Fatalf("Unexpected number of instance(s): %d", len(instances4))
 	}
 	if instances4[0] != "host1" || instances4[1] != "host3" {
 		t.Fatalf("Unexpected instance(s): %s", instances4)

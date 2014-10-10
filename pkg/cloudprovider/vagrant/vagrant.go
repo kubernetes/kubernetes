@@ -112,7 +112,7 @@ func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
 			return net.ParseIP(minion.IP), nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find IP address for instance:", instance)
+	return nil, fmt.Errorf("Unable to find IP address for instance: %s", instance)
 }
 
 // saltMinionsByRole filters a list of minions that have a matching role.
