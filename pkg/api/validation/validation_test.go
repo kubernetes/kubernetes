@@ -416,6 +416,179 @@ func TestValidatePod(t *testing.T) {
 	}
 }
 
+func TestValidatePodUpdate(t *testing.T) {
+	tests := []struct {
+		a       api.Pod
+		b       api.Pod
+		isValid bool
+		test    string
+	}{
+		{api.Pod{}, api.Pod{}, true, "nothing"},
+		{
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+			},
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "bar"},
+			},
+			false,
+			"ids",
+		},
+		{
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				Labels: map[string]string{
+					"bar": "foo",
+				},
+			},
+			true,
+			"labels",
+		},
+		{
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V1",
+							},
+						},
+					},
+				},
+			},
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V2",
+							},
+							{
+								Image: "bar:V2",
+							},
+						},
+					},
+				},
+			},
+			false,
+			"more containers",
+		},
+		{
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V1",
+							},
+						},
+					},
+				},
+			},
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V2",
+							},
+						},
+					},
+				},
+			},
+			true,
+			"image change",
+		},
+		{
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V1",
+								CPU:   100,
+							},
+						},
+					},
+				},
+			},
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V2",
+								CPU:   1000,
+							},
+						},
+					},
+				},
+			},
+			false,
+			"cpu change",
+		},
+		{
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V1",
+								Ports: []api.Port{
+									{HostPort: 8080, ContainerPort: 80},
+								},
+							},
+						},
+					},
+				},
+			},
+			api.Pod{
+				TypeMeta: api.TypeMeta{ID: "foo"},
+				DesiredState: api.PodState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							{
+								Image: "foo:V2",
+								Ports: []api.Port{
+									{HostPort: 8000, ContainerPort: 80},
+								},
+							},
+						},
+					},
+				},
+			},
+			false,
+			"port change",
+		},
+	}
+
+	for _, test := range tests {
+		errs := ValidatePodUpdate(&test.a, &test.b)
+		if test.isValid {
+			if len(errs) != 0 {
+				t.Errorf("unexpected invalid: %s %v, %v", test.test, test.a, test.b)
+			}
+		} else {
+			if len(errs) == 0 {
+				t.Errorf("unexpected valid: %s %v, %v", test.test, test.a, test.b)
+			}
+		}
+	}
+}
+
 func TestValidateService(t *testing.T) {
 	testCases := []struct {
 		name    string
