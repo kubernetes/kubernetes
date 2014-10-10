@@ -108,6 +108,7 @@ function upload-server-tars() {
   else
     project_hash=$(echo -n "$PROJECT" | md5sum)
   fi
+  project_hash=${project_hash:0:5}
 
   local -r staging_bucket="gs://kubernetes-staging-${project_hash}"
 
