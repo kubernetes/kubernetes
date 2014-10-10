@@ -26,10 +26,22 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 )
 
 // ErrPodInfoNotAvailable may be returned when the requested pod info is not available.
 var ErrPodInfoNotAvailable = errors.New("no pod info available")
+
+// KubeletClient is an interface for all kubelet functionality
+type KubeletClient interface {
+	KubeletHealthChecker
+	PodInfoGetter
+}
+
+// KubeletHealthchecker is an interface for healthchecking kubelets
+type KubeletHealthChecker interface {
+	HealthCheck(host string) (health.Status, error)
+}
 
 // PodInfoGetter is an interface for things that can get information about a pod's containers.
 // Injectable for easy testing.
@@ -39,19 +51,50 @@ type PodInfoGetter interface {
 	GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error)
 }
 
-// HTTPPodInfoGetter is the default implementation of PodInfoGetter, accesses the kubelet over HTTP.
-type HTTPPodInfoGetter struct {
-	Client *http.Client
-	Port   uint
+// HTTPKubeletClient is the default implementation of PodInfoGetter and KubeletHealthchecker, accesses the kubelet over HTTP.
+type HTTPKubeletClient struct {
+	Client      *http.Client
+	Port        uint
+	EnableHttps bool
+}
+
+func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
+	transport := http.DefaultTransport
+	if config.CAFile != "" {
+		t, err := NewClientCertTLSTransport(config.CertFile, config.KeyFile, config.CAFile)
+		if err != nil {
+			return nil, err
+		}
+		transport = t
+	}
+
+	c := &http.Client{Transport: transport}
+	return &HTTPKubeletClient{
+		Client:      c,
+		Port:        config.Port,
+		EnableHttps: config.EnableHttps,
+	}, nil
+}
+
+func (c *HTTPKubeletClient) url(host string) string {
+	scheme := "http://"
+	if c.EnableHttps {
+		scheme = "https://"
+	}
+
+	return fmt.Sprintf(
+		"%s%s",
+		scheme,
+		net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)))
 }
 
 // GetPodInfo gets information about the specified pod.
-func (c *HTTPPodInfoGetter) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
+func (c *HTTPKubeletClient) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
 	request, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf(
-			"http://%s/podInfo?podID=%s&podNamespace=%s",
-			net.JoinHostPort(host, strconv.FormatUint(uint64(c.Port), 10)),
+			"%s/podInfo?podID=%s&podNamespace=%s",
+			c.url(host),
 			podID,
 			podNamespace),
 		nil)
@@ -79,7 +122,11 @@ func (c *HTTPPodInfoGetter) GetPodInfo(host, podNamespace, podID string) (api.Po
 	return info, nil
 }
 
-// FakePodInfoGetter is a fake implementation of PodInfoGetter. It is useful for testing.
+func (c *HTTPKubeletClient) HealthCheck(host string) (health.Status, error) {
+	return health.DoHTTPCheck(fmt.Sprintf("%s/healthz", c.url(host)), c.Client)
+}
+
+// FakeKubeletClient is a fake implementation of PodInfoGetter. It is useful for testing.
 type FakePodInfoGetter struct {
 	data api.PodInfo
 	err  error

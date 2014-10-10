@@ -18,7 +18,6 @@ package master
 
 import (
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -53,7 +52,7 @@ type Config struct {
 	MinionCacheTTL     time.Duration
 	EventTTL           time.Duration
 	MinionRegexp       string
-	PodInfoGetter      client.PodInfoGetter
+	KubeletClient      client.KubeletClient
 	NodeResources      api.NodeResources
 	PortalNet          *net.IPNet
 }
@@ -110,14 +109,14 @@ func New(c *Config) *Master {
 func makeMinionRegistry(c *Config) minion.Registry {
 	var minionRegistry minion.Registry = etcd.NewRegistry(c.EtcdHelper, nil)
 	if c.HealthCheckMinions {
-		minionRegistry = minion.NewHealthyRegistry(minionRegistry, &http.Client{})
+		minionRegistry = minion.NewHealthyRegistry(minionRegistry, c.KubeletClient)
 	}
 	return minionRegistry
 }
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	podCache := NewPodCache(c.PodInfoGetter, m.podRegistry)
+	podCache := NewPodCache(c.KubeletClient, m.podRegistry)
 	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
 	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
@@ -136,7 +135,7 @@ func (m *Master) init(c *Config) {
 		"pods": pod.NewREST(&pod.RESTConfig{
 			CloudProvider: c.Cloud,
 			PodCache:      podCache,
-			PodInfoGetter: c.PodInfoGetter,
+			PodInfoGetter: c.KubeletClient,
 			Registry:      m.podRegistry,
 			Minions:       m.client,
 		}),

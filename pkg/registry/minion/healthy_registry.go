@@ -17,10 +17,8 @@ limitations under the License.
 package minion
 
 import (
-	"fmt"
-	"net/http"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 
 	"github.com/golang/glog"
@@ -28,15 +26,13 @@ import (
 
 type HealthyRegistry struct {
 	delegate Registry
-	client   health.HTTPGetInterface
-	port     int
+	client   client.KubeletHealthChecker
 }
 
-func NewHealthyRegistry(delegate Registry, client *http.Client) Registry {
+func NewHealthyRegistry(delegate Registry, client client.KubeletHealthChecker) Registry {
 	return &HealthyRegistry{
 		delegate: delegate,
 		client:   client,
-		port:     10250,
 	}
 }
 
@@ -48,7 +44,7 @@ func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Mini
 	if err != nil {
 		return nil, err
 	}
-	status, err := health.DoHTTPCheck(r.makeMinionURL(minionID), r.client)
+	status, err := r.client.HealthCheck(minionID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +69,7 @@ func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.Mini
 		return result, err
 	}
 	for _, minion := range list.Items {
-		status, err := health.DoHTTPCheck(r.makeMinionURL(minion.Name), r.client)
+		status, err := r.client.HealthCheck(minion.Name)
 		if err != nil {
 			glog.V(1).Infof("%#v failed health check with error: %s", minion, err)
 			continue
@@ -85,8 +81,4 @@ func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.Mini
 		}
 	}
 	return result, nil
-}
-
-func (r *HealthyRegistry) makeMinionURL(minion string) string {
-	return fmt.Sprintf("http://%s:%d/healthz", minion, r.port)
 }

@@ -55,7 +55,6 @@ var (
 	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	cloudConfigFile       = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	minionRegexp          = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
-	minionPort            = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
 	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
 	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. Default 30 seconds.")
 	eventTTL              = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
@@ -70,6 +69,10 @@ var (
 	nodeMilliCPU      = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
 	nodeMemory        = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 	enableLogsSupport = flag.Bool("enable_logs_support", true, "Enables server endpoint for log collection")
+	kubeletConfig     = client.KubeletConfig{
+		Port:        10250,
+		EnableHttps: false,
+	}
 )
 
 func init() {
@@ -78,6 +81,7 @@ func init() {
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 	flag.Var(&corsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	flag.Var(&portalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	client.BindKubeletClientConfigFlags(flag.CommandLine, &kubeletConfig)
 }
 
 func verifyMinionFlags() {
@@ -163,9 +167,9 @@ func main() {
 
 	cloud := initCloudProvider(*cloudProvider, *cloudConfigFile)
 
-	podInfoGetter := &client.HTTPPodInfoGetter{
-		Client: http.DefaultClient,
-		Port:   *minionPort,
+	kubeletClient, err := client.NewKubeletClient(&kubeletConfig)
+	if err != nil {
+		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
@@ -193,7 +197,7 @@ func main() {
 		MinionCacheTTL:     *minionCacheTTL,
 		EventTTL:           *eventTTL,
 		MinionRegexp:       *minionRegexp,
-		PodInfoGetter:      podInfoGetter,
+		KubeletClient:      kubeletClient,
 		NodeResources: api.NodeResources{
 			Capacity: api.ResourceList{
 				resources.CPU:    util.NewIntOrStringFromInt(*nodeMilliCPU),
