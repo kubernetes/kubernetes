@@ -46,6 +46,10 @@ k8sApp.controller('PodCtrl', function ($scope, $http, $routeParams) {
 
 function GroupController() {}
 
+GroupController.prototype.resetGroupLayout = function(group) {
+	delete group.settings;
+};
+
 GroupController.prototype.handlePath = function(path) {
     var parts = path.split("/")
     // split leaves an empty string at the beginning.

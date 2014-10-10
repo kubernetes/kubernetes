@@ -16,9 +16,10 @@ limitations under the License.
 <div style="margin-top: 10px">
 <div class="k8s-title-font k8s-box">
   {{ groupName }}
+  {{ settings.display }}
 
 <div ng-if="group.kind != 'grouping'">
-  <div ng-if="!display || display=='box'">
+  <div ng-if="!settings.display || settings.display=='box'">
   <div class="content k8s-item k8s-inline" ng-repeat="item in group">
     <div class="k8s-title-font k8s-font-regular">
       <div ng-switch on='item.labels["type"]'>
@@ -30,7 +31,7 @@ limitations under the License.
     </div>
   </div>
   </div>
-  <div ng-if="display=='list'">
+  <div ng-if="settings.display=='list'">
     <table style="width: 90%; padding: 10px">
     <tr ng-repeat="item in group" ng-class-odd="'k8s-odd'" ng-class-even="'k8s-even'" valign="top">
       <td class="k8s-cell">
@@ -49,14 +50,14 @@ limitations under the License.
     </tr>
     </table>
   </div>
-  <div>
-    <a ng-click="display='box'">box</a>
-    <a ng-click="display='list'">list</a>
-  </div>
 </div>
 <div ng-if="group.kind == 'grouping'">
   <div ng-repeat="(groupName,group) in group.items" ng-include="'box.ng'">
   </div>
 </div>
+<div>
+<a ng-click="settings={display:'box'}">box</a>
+<a ng-click="settings={display:'list'}">list</a>
+<a ng-click="controller.resetGroupLayout(this);">reset</a> 
 </div>
 </div>
