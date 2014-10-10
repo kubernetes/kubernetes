@@ -1,3 +1,5 @@
+#! /bin/bash
+
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file creates a minimal container for running Kubernetes binaries
+# Build the docker image necessary for running Kubernetes
+#
+# This script will make the 'run image' after building all of the necessary
+# binaries.
 
-FROM  kubernetes
-MAINTAINER  Joe Beda <jbeda@google.com>
+set -o errexit
+set -o nounset
+set -o pipefail
 
-ENV API_SERVER   127.0.0.1:8080
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_BUILD_RUN_IMAGES=y
+source "$KUBE_ROOT/build/common.sh"
 
-ADD . /kubernetes
-
-CMD ["/kubernetes/run.sh"]
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command build/build-image/make-binaries.sh "$@"
+kube::build::copy_output
+kube::build::run_image
