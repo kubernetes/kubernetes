@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package generic
+package etcd
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -50,35 +51,13 @@ type Etcd struct {
 }
 
 // List returns a list of all the items matching m.
-func (e *Etcd) List(ctx api.Context, m Matcher) (runtime.Object, error) {
+func (e *Etcd) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
 	err := e.Helper.ExtractToList(e.KeyRoot, list)
 	if err != nil {
 		return nil, err
 	}
-	return FilterList(list, m)
-}
-
-// FilterList filters any list object that conforms to the api conventions,
-// provided that 'm' works with the concrete type of list.
-func FilterList(list runtime.Object, m Matcher) (filtered runtime.Object, err error) {
-	// TODO: push a matcher down into tools.EtcdHelper to avoid all this
-	// nonsense. This is a lot of unnecessary copies.
-	items, err := runtime.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-	var filteredItems []runtime.Object
-	for _, obj := range items {
-		if match, err := m.Matches(obj); err == nil && match {
-			filteredItems = append(filteredItems, obj)
-		}
-	}
-	err = runtime.SetList(list, filteredItems)
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
+	return generic.FilterList(list, m)
 }
 
 // Create inserts a new item.
@@ -89,6 +68,7 @@ func (e *Etcd) Create(ctx api.Context, id string, obj runtime.Object) error {
 
 // Update updates the item.
 func (e *Etcd) Update(ctx api.Context, id string, obj runtime.Object) error {
+	// TODO: verify that SetObj checks ResourceVersion before succeeding.
 	err := e.Helper.SetObj(e.KeyFunc(id), obj)
 	return etcderr.InterpretUpdateError(err, e.EndpointName, id)
 }
@@ -111,7 +91,7 @@ func (e *Etcd) Delete(ctx api.Context, id string) error {
 
 // Watch starts a watch for the items that m matches.
 // TODO: Detect if m references a single object instead of a list.
-func (e *Etcd) Watch(ctx api.Context, m Matcher, resourceVersion uint64) (watch.Interface, error) {
+func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion uint64) (watch.Interface, error) {
 	return e.Helper.WatchList(e.KeyRoot, resourceVersion, func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		return err == nil && matches

@@ -22,13 +22,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
+	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 )
 
 // registry implements custom changes to generic.Etcd.
 type registry struct {
-	*generic.Etcd
+	*etcdgeneric.Etcd
 	ttl uint64
 }
 
@@ -42,7 +43,7 @@ func (r registry) Create(ctx api.Context, id string, obj runtime.Object) error {
 // EtcdHelper. ttl is the time that Events will be retained by the system.
 func NewEtcdRegistry(h tools.EtcdHelper, ttl uint64) generic.Registry {
 	return registry{
-		Etcd: &generic.Etcd{
+		Etcd: &etcdgeneric.Etcd{
 			NewFunc:      func() runtime.Object { return &api.Event{} },
 			NewListFunc:  func() runtime.Object { return &api.EventList{} },
 			EndpointName: "events",

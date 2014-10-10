@@ -18,15 +18,23 @@ package generic
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-type Ignored struct{}
+type Ignored struct {
+	ID string
+}
 
-func (*Ignored) IsAnAPIObject() {}
+type IgnoredList struct {
+	Items []Ignored
+}
+
+func (*Ignored) IsAnAPIObject()     {}
+func (*IgnoredList) IsAnAPIObject() {}
 
 func TestSelectionPredicate(t *testing.T) {
 	table := map[string]struct {
@@ -88,5 +96,40 @@ func TestSelectionPredicate(t *testing.T) {
 		if e, a := item.shouldMatch, got; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 		}
+	}
+}
+
+func TestFilterList(t *testing.T) {
+	try := &IgnoredList{
+		Items: []Ignored{
+			{"foo"},
+			{"bar"},
+			{"baz"},
+			{"qux"},
+			{"zot"},
+		},
+	}
+	expect := &IgnoredList{
+		Items: []Ignored{
+			{"bar"},
+			{"baz"},
+		},
+	}
+
+	got, err := FilterList(try,
+		MatcherFunc(func(obj runtime.Object) (bool, error) {
+			i, ok := obj.(*Ignored)
+			if !ok {
+				return false, errors.New("wrong type")
+			}
+			return i.ID[0] == 'b', nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }

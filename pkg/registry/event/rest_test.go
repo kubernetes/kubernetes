@@ -114,14 +114,14 @@ func TestRESTgetAttrs(t *testing.T) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 	expect := labels.Set{
-		"InvolvedObject.Kind":            "Pod",
-		"InvolvedObject.Name":            "foo",
-		"InvolvedObject.UID":             "long uid string",
-		"InvolvedObject.APIVersion":      testapi.Version(),
-		"InvolvedObject.ResourceVersion": "0",
-		"InvolvedObject.FieldPath":       "",
-		"Status":                         "tested",
-		"Reason":                         "forTesting",
+		"involvedObject.kind":            "Pod",
+		"involvedObject.name":            "foo",
+		"involvedObject.uid":             "long uid string",
+		"involvedObject.apiVersion":      testapi.Version(),
+		"involvedObject.resourceVersion": "0",
+		"involvedObject.fieldPath":       "",
+		"status":                         "tested",
+		"reason":                         "forTesting",
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
@@ -186,7 +186,7 @@ func TestRESTList(t *testing.T) {
 	reg.ObjectList = &api.EventList{
 		Items: []api.Event{*eventA, *eventB, *eventC},
 	}
-	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Set{"Status": "tested"}.AsSelector())
+	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Set{"status": "tested"}.AsSelector())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

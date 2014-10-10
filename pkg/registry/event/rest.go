@@ -89,14 +89,14 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, e
 		return nil, nil, fmt.Errorf("invalid object type")
 	}
 	return labels.Set{}, labels.Set{
-		"InvolvedObject.Kind":            event.InvolvedObject.Kind,
-		"InvolvedObject.Name":            event.InvolvedObject.Name,
-		"InvolvedObject.UID":             event.InvolvedObject.UID,
-		"InvolvedObject.APIVersion":      event.InvolvedObject.APIVersion,
-		"InvolvedObject.ResourceVersion": fmt.Sprintf("%s", event.InvolvedObject.ResourceVersion),
-		"InvolvedObject.FieldPath":       event.InvolvedObject.FieldPath,
-		"Status":                         event.Status,
-		"Reason":                         event.Reason,
+		"involvedObject.kind":            event.InvolvedObject.Kind,
+		"involvedObject.name":            event.InvolvedObject.Name,
+		"involvedObject.uid":             event.InvolvedObject.UID,
+		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
+		"involvedObject.resourceVersion": fmt.Sprintf("%s", event.InvolvedObject.ResourceVersion),
+		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
+		"status":                         event.Status,
+		"reason":                         event.Reason,
 	}, nil
 }
 

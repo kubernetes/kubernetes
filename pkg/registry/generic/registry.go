@@ -54,6 +54,19 @@ type Matcher interface {
 	Matches(obj runtime.Object) (bool, error)
 }
 
+// MatcherFunc makes a matcher from the provided function. For easy definition
+// of matchers for testing.
+func MatcherFunc(f func(obj runtime.Object) (bool, error)) Matcher {
+	return matcherFunc(f)
+}
+
+type matcherFunc func(obj runtime.Object) (bool, error)
+
+// Matches calls the embedded function.
+func (m matcherFunc) Matches(obj runtime.Object) (bool, error) {
+	return m(obj)
+}
+
 // Registry knows how to store & list any runtime.Object. Can be used for
 // any object types which don't require special features from the storage
 // layer.
@@ -64,4 +77,30 @@ type Registry interface {
 	Get(ctx api.Context, id string) (runtime.Object, error)
 	Delete(ctx api.Context, id string) error
 	Watch(ctx api.Context, m Matcher, resourceVersion uint64) (watch.Interface, error)
+}
+
+// FilterList filters any list object that conforms to the api conventions,
+// provided that 'm' works with the concrete type of list.
+func FilterList(list runtime.Object, m Matcher) (filtered runtime.Object, err error) {
+	// TODO: push a matcher down into tools.EtcdHelper to avoid all this
+	// nonsense. This is a lot of unnecessary copies.
+	items, err := runtime.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+	var filteredItems []runtime.Object
+	for _, obj := range items {
+		match, err := m.Matches(obj)
+		if err != nil {
+			return nil, err
+		}
+		if match {
+			filteredItems = append(filteredItems, obj)
+		}
+	}
+	err = runtime.SetList(list, filteredItems)
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
 }
