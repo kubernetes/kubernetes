@@ -62,7 +62,7 @@ func TestValidateVolumes(t *testing.T) {
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
 		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+			t.Errorf("expected failure %s for %v", k, v.V)
 			continue
 		}
 		for i := range errs {

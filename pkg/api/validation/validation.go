@@ -33,10 +33,13 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
 		el := errs.ErrorList{}
-		// TODO(thockin) enforce that a source is set once we deprecate the implied form.
-		if vol.Source != nil {
-			el = validateSource(vol.Source).Prefix("source")
+		if vol.Source == nil {
+			// TODO: Enforce that a source is set once we deprecate the implied form.
+			vol.Source = &api.VolumeSource{
+				EmptyDir: &api.EmptyDir{},
+			}
 		}
+		el = validateSource(vol.Source).Prefix("source")
 		if len(vol.Name) == 0 {
 			el = append(el, errs.NewFieldRequired("name", vol.Name))
 		} else if !util.IsDNSLabel(vol.Name) {
