@@ -60,7 +60,7 @@ var (
 
 type fakePodInfoGetter struct{}
 
-func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (fakePodInfoGetter) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
 	var c client.PodInfoGetter
@@ -76,9 +76,9 @@ func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 			Port:   10251,
 		}
 	default:
-		glog.Fatalf("Can't get info for: '%v', '%v'", host, podID)
+		glog.Fatalf("Can't get info for: '%v', '%v'", host, podNamespace, podID)
 	}
-	return c.GetPodInfo("localhost", podID)
+	return c.GetPodInfo("localhost", podNamespace, podID)
 }
 
 type delegateHandler struct {
@@ -182,11 +182,11 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	podInfo := fakePodInfoGetter{}
 	return func() (bool, error) {
 		for i := range pods.Items {
-			host, id := pods.Items[i].CurrentState.Host, pods.Items[i].ID
+			host, id, namespace := pods.Items[i].CurrentState.Host, pods.Items[i].ID, pods.Items[i].Namespace
 			if len(host) == 0 {
 				return false, nil
 			}
-			if _, err := podInfo.GetPodInfo(host, id); err != nil {
+			if _, err := podInfo.GetPodInfo(host, namespace, id); err != nil {
 				return false, nil
 			}
 		}

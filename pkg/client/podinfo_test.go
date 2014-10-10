@@ -60,7 +60,7 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	gotObj, err := podInfoGetter.GetPodInfo(parts[0], "foo")
+	gotObj, err := podInfoGetter.GetPodInfo(parts[0], api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	_, err = podInfoGetter.GetPodInfo(parts[0], "foo")
+	_, err = podInfoGetter.GetPodInfo(parts[0], api.NamespaceDefault, "foo")
 	if err != ErrPodInfoNotAvailable {
 		t.Errorf("Expected %#v, Got %#v", ErrPodInfoNotAvailable, err)
 	}
