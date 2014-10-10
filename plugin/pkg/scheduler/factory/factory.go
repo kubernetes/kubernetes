@@ -64,17 +64,12 @@ func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// TODO: remove this construction-time listing.
-	nodes, err := factory.Client.ListMinions()
-	if err != nil {
-		return nil, err
-	}
 	algo := algorithm.NewGenericScheduler(
 		[]algorithm.FitPredicate{
 			// Fit is defined based on the absence of port conflicts.
 			algorithm.PodFitsPorts,
 			// Fit is determined by resource availability
-			algorithm.NewResourceFitPredicate(algorithm.StaticNodeInfo{nodes}),
+			algorithm.NewResourceFitPredicate(algorithm.ClientNodeInfo{factory.Client}),
 		},
 		// All nodes where things fit are equally likely (Random)
 		algorithm.EqualPriority,
