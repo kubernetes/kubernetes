@@ -45,7 +45,7 @@ func TestBearerAuthRoundTripper(t *testing.T) {
 	req := &http.Request{}
 	NewBearerAuthRoundTripper("test", rt).RoundTrip(req)
 	if rt.Request == nil {
-		t.Fatalf("unexpected nil request", rt)
+		t.Fatalf("unexpected nil request: %v", rt)
 	}
 	if rt.Request == req {
 		t.Fatalf("round tripper should have copied request object: %#v", rt.Request)
@@ -60,7 +60,7 @@ func TestBasicAuthRoundTripper(t *testing.T) {
 	req := &http.Request{}
 	NewBasicAuthRoundTripper("user", "pass", rt).RoundTrip(req)
 	if rt.Request == nil {
-		t.Fatalf("unexpected nil request", rt)
+		t.Fatalf("unexpected nil request: %v", rt)
 	}
 	if rt.Request == req {
 		t.Fatalf("round tripper should have copied request object: %#v", rt.Request)

@@ -174,7 +174,7 @@ func TestPodFitsPorts(t *testing.T) {
 	for _, test := range tests {
 		fits, err := PodFitsPorts(test.pod, test.existingPods, "machine")
 		if err != nil {
-			t.Errorf("unexpected error: %v")
+			t.Errorf("unexpected error: %v", err)
 		}
 		if test.fits != fits {
 			t.Errorf("%s: expected %v, saw %v", test.test, test.fits, fits)

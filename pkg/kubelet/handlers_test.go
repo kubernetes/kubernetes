@@ -27,7 +27,7 @@ func TestResolvePortInt(t *testing.T) {
 	expected := 80
 	port, err := ResolvePort(util.IntOrString{Kind: util.IntstrInt, IntVal: expected}, &api.Container{})
 	if port != expected {
-		t.Errorf("expected: %d, saw: %d", port)
+		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -44,7 +44,7 @@ func TestResolvePortString(t *testing.T) {
 	}
 	port, err := ResolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
 	if port != expected {
-		t.Errorf("expected: %d, saw: %d", port)
+		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

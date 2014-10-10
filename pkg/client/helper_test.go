@@ -80,7 +80,7 @@ func TestIsConfigTransportSecure(t *testing.T) {
 	for _, testCase := range testCases {
 		secure := IsConfigTransportSecure(testCase.Config)
 		if testCase.Secure != secure {
-			t.Errorf("expected %d for %#v", testCase.Secure, testCase.Config)
+			t.Errorf("expected %v for %#v", testCase.Secure, testCase.Config)
 		}
 	}
 }

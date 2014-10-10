@@ -113,7 +113,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 			t.Errorf("%s: unexpected error %#v", key, err)
 		}
 		if actual != testCase.Expected {
-			t.Errorf("%s: expected %d, got %d", key, testCase.Expected, actual)
+			t.Errorf("%s: expected %v, got %v", key, testCase.Expected, actual)
 		}
 	}
 
@@ -145,7 +145,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 			t.Errorf("%s: unexpected error %#v", key, err)
 		}
 		if actual != "5" {
-			t.Errorf("%s: expected %d, got %d", key, "5", actual)
+			t.Errorf("%s: expected %v, got %v", key, "5", actual)
 		}
 	}
 }

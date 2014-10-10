@@ -287,7 +287,7 @@ func TestValidateRestartPolicy(t *testing.T) {
 	}
 	for k, policy := range errorCases {
 		if errs := validateRestartPolicy(&policy); len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+			t.Errorf("expected failure for %d", k)
 		}
 	}
 
