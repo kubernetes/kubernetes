@@ -149,16 +149,14 @@ function kube::build::is_osx() {
 
 function kube::build::clean_output() {
   # Clean out the output directory if it exists.
-  if kube::build::is_osx ; then
-    if kube::build::build_image_built ; then
-      echo "+++ Cleaning out boot2docker _output/"
-      kube::build::run_build_command rm -rf "${REMOTE_OUTPUT_ROOT}" || true
-    else
-      echo "!!! Build image not built.  Assuming boot2docker _output is clean."
-    fi
+  if kube::build::build_image_built ; then
+    echo "+++ Cleaning out _output/ via docker build image"
+    kube::build::run_build_command rm -rf '${REMOTE_OUTPUT_ROOT}/*'
+  else
+    echo "!!! Build image not built.  Cannot clean via docker build image."
   fi
 
-  echo "+++ Cleaning out _output directory"
+  echo "+++ Cleaning out local _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
 }
 
