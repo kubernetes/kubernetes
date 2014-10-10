@@ -151,7 +151,7 @@ function kube::build::clean_output() {
   # Clean out the output directory if it exists.
   if kube::build::build_image_built ; then
     echo "+++ Cleaning out _output/ via docker build image"
-    kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_ROOT}'/*"
+    kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_DIR}'/*"
   else
     echo "!!! Build image not built.  Cannot clean via docker build image."
   fi
