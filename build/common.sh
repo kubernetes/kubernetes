@@ -343,10 +343,23 @@ function kube::build::run_build_command() {
 
   kube::build::prepare_output
 
+  local -a docker_run_opts=(
+    "--name=${KUBE_BUILD_CONTAINER_NAME}"
+     "${DOCKER_MOUNT_ARGS[@]}"
+    )
+
+  # If we have stdin we can run interactive.  This allows things like 'shell.sh'
+  # to work.  However, if we run this way and don't have stdin, then it ends up
+  # running in a daemon-ish mode.  So if we don't have a stdin, we explicitly
+  # attach stderr/stdout but don't bother asking for a tty.
+  if [[ -t 0 ]]; then
+    docker_run_opts+=(--interactive --tty)
+  else
+    docker_run_opts+=(--attach=stdout --attach=stderr)
+  fi
+
   local -ra docker_cmd=(
-    docker run "--name=${KUBE_BUILD_CONTAINER_NAME}"
-    --interactive --tty
-    "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
+    docker run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
 
   # Remove the container if it is left over from some previous aborted run
   docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
