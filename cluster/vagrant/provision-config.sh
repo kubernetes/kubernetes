@@ -26,6 +26,7 @@ MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 MINION_IP_RANGES=($(eval echo "10.245.{2..${NUM_MINIONS}}.2/24"))
 MINION_SCOPES=""
+MINION_PREFIX="${INSTANCE_PREFIX}-minion"
 
 # simplified setup for local vagrant 2 node cluster
 MASTER_USER=vagrant

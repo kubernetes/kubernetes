@@ -22,8 +22,6 @@ set -o pipefail
 
 SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
 
-INSTANCE_PREFIX=$1
-
 KUBE_DIR=$SCRIPT_DIR/..
 
 . "${KUBE_DIR}/hack/config-go.sh"
@@ -47,7 +45,6 @@ version_ldflags=$(kube::version_ldflags)
 
 # Note: go_opt must stay in sync with the flags in hack/build-go.sh.
 cat << EOF > $MASTER_RELEASE_DIR/src/saltbase/pillar/common.sls
-instance_prefix: $INSTANCE_PREFIX-minion
 go_opt: -ldflags '${version_ldflags}'
 EOF
 

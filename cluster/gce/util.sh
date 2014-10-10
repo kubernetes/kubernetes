@@ -178,6 +178,7 @@ function kube-up {
     echo "MASTER_NAME='${MASTER_NAME}'"
     echo "MASTER_RELEASE_TAR=${RELEASE_NORMALIZED}/master-release.tgz"
     echo "MASTER_HTPASSWD='${HTPASSWD}'"
+    echo "MINION_PREFIX=${INSTANCE_PREFIX}-minion"
     grep -v "^#" "${base_dir}/cluster/templates/download-release.sh"
     grep -v "^#" "${base_dir}/cluster/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"

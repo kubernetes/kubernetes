@@ -32,7 +32,7 @@ source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
 source $SCRIPT_DIR/../../cluster/rackspace/${KUBE_CONFIG_FILE-"config-default.sh"}
 source $SCRIPT_DIR/../../cluster/rackspace/util.sh
 
-$SCRIPT_DIR/../build-release.sh $INSTANCE_PREFIX
+$SCRIPT_DIR/../build-release.sh
 
 # Copy everything up to swift object store
 echo "release/rackspace/release.sh: Uploading to Cloud Files"

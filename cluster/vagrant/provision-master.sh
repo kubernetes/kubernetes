@@ -44,6 +44,12 @@ grains:
     - kubernetes-master
 EOF
 
+# Specify the minion prefix
+mkdir -p /srv/pillar/
+cat <<EOF >>/srv/pillar/common.sls
+instance_prefix: $MINION_PREFIX
+EOF
+
 # Configure the salt-master
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
@@ -108,7 +114,7 @@ fi
 # Build release
 echo "Building release"
 pushd /vagrant
-  ./release/build-release.sh kubernetes
+  ./release/build-release.sh
 popd
 
 echo "Running release install script"

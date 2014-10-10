@@ -66,8 +66,8 @@ cd kubernetes
 # Build source
 hack/build-go.sh
 
-# Build a release (argument is the instance prefix)
-release/build-release.sh kubernetes
+# Build a release
+release/build-release.sh
 
 # Deploy Kubernetes (takes ~5 minutes, provided everything works out)
 export KUBERNETES_PROVIDER=vsphere
