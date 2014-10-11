@@ -73,6 +73,14 @@ type EndpointsInterface interface {
 	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
+// EventInterface has methods to work with Event resources
+type EventInterface interface {
+	CreateEvent(event *api.Event) (*api.Event, error)
+	ListEvents(selector labels.Selector) (*api.EventList, error)
+	GetEvent(id string) (*api.Event, error)
+	WatchEvents(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+}
+
 // VersionInterface has a method to retrieve the server version.
 type VersionInterface interface {
 	ServerVersion() (*version.Info, error)
@@ -296,4 +304,41 @@ func (c *Client) GetMinion(id string) (result *api.Minion, err error) {
 	result = &api.Minion{}
 	err = c.Get().Path("minions").Path(id).Do().Into(result)
 	return
+}
+
+// CreateEvent makes a new event. Returns the copy of the event the server returns, or an error.
+func (c *Client) CreateEvent(event *api.Event) (*api.Event, error) {
+	result := &api.Event{}
+	err := c.Post().Path("events").Body(event).Do().Into(result)
+	return result, err
+}
+
+// ListEvents returns a list of events matching the selectors.
+func (c *Client) ListEvents(label, field labels.Selector) (*api.EventList, error) {
+	result := &api.EventList{}
+	err := c.Get().
+		Path("events").
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Do().
+		Into(result)
+	return result, err
+}
+
+// GetEvent returns the given event, or an error.
+func (c *Client) GetEvent(id string) (*api.Event, error) {
+	result := &api.Event{}
+	err := c.Get().Path("events").Path(id).Do().Into(result)
+	return result, err
+}
+
+// WatchEvents starts watching for events matching the given selectors.
+func (c *Client) WatchEvents(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.Get().
+		Path("watch").
+		Path("events").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
 }
