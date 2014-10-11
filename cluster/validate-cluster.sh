@@ -36,7 +36,7 @@ MINIONS_FILE=/tmp/minions
 "${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.Items}}{{.Name}}\n{{end}}' list minions > ${MINIONS_FILE}
 
 # On vSphere, use minion IPs as their names
-if [ "$KUBERNETES_PROVIDER" == "vsphere" ]; then
+if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]]; then
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     MINION_NAMES[i]=${KUBE_MINION_IP_ADDRESSES[i]}
   done
