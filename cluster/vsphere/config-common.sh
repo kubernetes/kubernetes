@@ -28,8 +28,6 @@ function public-key {
   exit 1
 }
 
-DISK=./kube/kube.vmdk
-GUEST_ID=debian7_64Guest
 PUBLIC_KEY_FILE=${PUBLIC_KEY_FILE-$(public-key)}
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 

@@ -17,39 +17,45 @@
 # Use other Debian mirror
 sed -i -e "s/http.us.debian.org/mirrors.kernel.org/" /etc/apt/sources.list
 
-# Resolve hostname of master
-if ! grep -q $MASTER_NAME /etc/hosts; then
-  echo "Adding host entry for $MASTER_NAME"
-  echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
-fi
-
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-# Turn on debugging for salt-minion
-# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
-
-# Our minions will have a pool role to distinguish them from the master.
-#
-# Setting the "minion_ip" here causes the kubelet to use its IP for
-# identification instead of its hostname.
-#
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  minion_ip: $(ip route get 1.1.1.1 | awk '{print $7}')
   roles:
-    - kubernetes-pool
-    - kubernetes-pool-vsphere
-  cbr-cidr: $MINION_IP_RANGE
+    - kubernetes-master
+  cloud: vsphere
 EOF
+
+cat <<EOF >/srv/pillar/cluster-params.sls
+node_instance_prefix: $NODE_INSTANCE_PREFIX
+EOF
+
+# Auto accept all keys from minions that try to join
+mkdir -p /etc/salt/master.d
+cat <<EOF >/etc/salt/master.d/auto-accept.conf
+auto_accept: True
+EOF
+
+cat <<EOF >/etc/salt/master.d/reactor.conf
+# React to new minions starting by running highstate on them.
+reactor:
+  - 'salt/minion/*/start':
+    - /srv/reactor/highstate-all.sls
+EOF
+
+mkdir -p /srv/salt/nginx
+echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
 # Install Salt
 #
 # We specify -X to avoid a race condition that can cause minion failure to
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-if [ ! -x /etc/init.d/salt-minion ]; then
-  wget -q -O - https://bootstrap.saltstack.com | sh -s -- -X
-else
-  /etc/init.d/salt-minion restart
-fi
+#
+# -M installs the master
+set +x
+wget -q -O - https://bootstrap.saltstack.com | sh -s -- -M -X
+set -x
+
+echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
