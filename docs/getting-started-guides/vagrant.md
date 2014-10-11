@@ -88,13 +88,13 @@ Minion identifier
 
 Alternatively to using the vagrant commands, you can also use the `cluster/kube-*.sh` scripts to interact with the vagrant based provider just like any other hosting platform for kubernetes.
 
-You need to build the binary required by `kube*` scripts:
+All of these commands assume you have set `KUBERNETES_PROVIDER` appropriately:
 
 ```
-hack/build-go.sh
+export KUBERNETES_PROVIDER=vagrant
 ```
 
-Then bring up a vagrant cluster
+Bring up a vagrant cluster
 
 ```
 cluster/kube-up.sh
@@ -106,7 +106,7 @@ Destroy the vagrant cluster
 cluster/kube-down.sh
 ```
 
-Update the vagrant cluster
+Update the vagrant cluster after you make changes (only works when building your own releases locally):
 
 ```
 cluster/kube-push.sh
