@@ -56,6 +56,7 @@ readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 # this is still inside the VM.  We use the same directory in both cases though.
 readonly LOCAL_OUTPUT_ROOT="${KUBE_ROOT}/_output"
 readonly LOCAL_OUTPUT_BUILD="${LOCAL_OUTPUT_ROOT}/build"
+readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
 readonly REMOTE_OUTPUT_DIR="${REMOTE_OUTPUT_ROOT}/build"
 readonly DOCKER_MOUNT_ARGS=(--volume "${LOCAL_OUTPUT_BUILD}:${REMOTE_OUTPUT_DIR}")
@@ -150,7 +151,7 @@ function kube::build::is_osx() {
 function kube::build::clean_output() {
   # Clean out the output directory if it exists.
   if kube::build::build_image_built ; then
-    echo "+++ Cleaning out _output/ via docker build image"
+    echo "+++ Cleaning out _output/build via docker build image"
     kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_DIR}'/*"
   else
     echo "!!! Build image not built.  Cannot clean via docker build image."
@@ -237,7 +238,7 @@ function kube::build::ensure_golang_cross() {
 
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
-  local -r build_context_dir="${LOCAL_OUTPUT_ROOT}/images/${KUBE_BUILD_IMAGE}"
+  local -r build_context_dir="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
   local -r source=(
     api
     build
@@ -269,7 +270,7 @@ EOF
 function kube::build::run_image() {
   [[ ${KUBE_BUILD_RUN_IMAGES} =~ ^[yY]$ ]] || return 0
 
-  local -r build_context_base="${LOCAL_OUTPUT_ROOT}/images/${KUBE_RUN_IMAGE_BASE}"
+  local -r build_context_base="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_RUN_IMAGE_BASE}"
 
   # First build the base image.  This one brings in all of the binaries.
   mkdir -p "${build_context_base}"

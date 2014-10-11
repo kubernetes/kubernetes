@@ -64,6 +64,7 @@ test_e2e:
 # Example:
 #   make clean
 clean:
+	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf $(GODEPS_PKG_DIR)
 .PHONY: clean
@@ -87,7 +88,7 @@ vet:
 # Build a release
 #
 # Example:
-#   make clean
+#   make release
 release:
 	build/release.sh
 .PHONY: release
