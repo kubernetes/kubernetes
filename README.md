@@ -23,11 +23,12 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [CoreOS](docs/getting-started-guides/coreos.md)
   * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
   * [CloudStack](docs/getting-started-guides/cloudstack.md)
+  * [Rackspace](docs/getting-started-guides/rackspace.md)
+
 * The following clouds are currently broken at Kubernetes head.  Please sync your client to `v0.3` (`git checkout v0.3`) to use these:
   * [Locally](docs/getting-started-guides/locally.md)
   * [vSphere](docs/getting-started-guides/vsphere.md)
   * [Microsoft Azure](docs/getting-started-guides/azure.md)
-  * [Rackspace](docs/getting-started-guides/rackspace.md)
 * [Kubernetes 101](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough)
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)

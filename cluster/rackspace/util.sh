@@ -18,6 +18,7 @@
 
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
 
 verify-prereqs() {
@@ -28,6 +29,32 @@ verify-prereqs() {
       exit 1
     fi
   done
+}
+
+# Ensure that we have a password created for validating to the master.  Will
+# read from $HOME/.kubernetres_auth if available.
+#
+# Vars set:
+#   KUBE_USER
+#   KUBE_PASSWORD
+get-password() {
+  local file="$HOME/.kubernetes_auth"
+  if [[ -r "$file" ]]; then
+    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
+    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
+    return
+  fi
+  KUBE_USER=admin
+  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+
+  # Store password for reuse.
+  cat << EOF > "$file"
+{
+  "User": "$KUBE_USER",
+  "Password": "$KUBE_PASSWORD"
+}
+EOF
+  chmod 0600 "$file"
 }
 
 rax-ssh-key() {
@@ -45,17 +72,22 @@ rax-ssh-key() {
   fi
 }
 
-find-object-url() {
-  if [ -n "$1" ]; then
-    CONTAINER=$1
-  else
-    local RELEASE_CONFIG_SCRIPT=$(dirname $0)/../release/rackspace/config.sh
-    if [ -f $(dirname $0)/../release/rackspace/config.sh ]; then
-      . $RELEASE_CONFIG_SCRIPT
-    fi
+find-release-tars() {
+  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
+    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
   fi
+  if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
+    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
+    exit 1
+  fi
+}
 
-  TEMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET $1/$2)
+find-object-url() {
+
+  RELEASE=kubernetes-releases-${OS_USERNAME}/devel/kubernetes-server-linux-amd64.tar.gz
+
+  TEMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET $RELEASE)
   echo "cluster/rackspace/util.sh: Object temp URL:"
   echo -e "\t${TEMP_URL}"
 
@@ -63,17 +95,20 @@ find-object-url() {
 
 rax-boot-master() {
 
-  (
-  echo "#! /bin/bash"
-  echo "OBJECT_URL=\"${TEMP_URL}\""
-  echo "MASTER_HTPASSWD=${HTPASSWD}"
-  grep -v "^#" $(dirname $0)/templates/download-release.sh
-  ) > ${KUBE_TEMP}/masterStart.sh
+  DISCOVERY_URL=$(curl https://discovery.etcd.io/new)
+  DISCOVERY_ID=$(echo "${DISCOVERY_URL}" | cut -f 4 -d /)
+  echo "cluster/rackspace/util.sh: etcd discovery URL: ${DISCOVERY_URL}"
+
+  get-password
+  find-object-url
 
 # Copy cloud-config to KUBE_TEMP and work some sed magic
-  sed -e "s/KUBE_MASTER/$MASTER_NAME/g" \
-      -e "s/MASTER_HTPASSWD/$HTPASSWD/" \
-      $(dirname $0)/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
+  sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
+      -e "s|CLOUD_FILES_URL|${TEMP_URL}|" \
+      -e "s|KUBE_USER|${KUBE_USER}|" \
+      -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
+      -e "s|PORTAL_NET|${PORTAL_NET}|" \
+      $(dirname $0)/rackspace/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
 
   MASTER_BOOT_CMD="nova boot \
@@ -81,9 +116,9 @@ rax-boot-master() {
 --flavor ${KUBE_MASTER_FLAVOR} \
 --image ${KUBE_IMAGE} \
 --meta ${MASTER_TAG} \
+--meta ETCD=${DISCOVERY_ID} \
 --user-data ${KUBE_TEMP}/master-cloud-config.yaml \
 --config-drive true \
---file /root/masterStart.sh=${KUBE_TEMP}/masterStart.sh \
 --nic net-id=${NETWORK_UUID} \
 ${MASTER_NAME}"
 
@@ -94,28 +129,25 @@ ${MASTER_NAME}"
 
 rax-boot-minions() {
 
-  cp $(dirname $0)/cloud-config/minion-cloud-config.yaml \
+  cp $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml \
   ${KUBE_TEMP}/minion-cloud-config.yaml
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
 
-    (
-      echo "#! /bin/bash"
-      echo "MASTER_NAME=${MASTER_IP}"
-      echo "MINION_IP_RANGE=${KUBE_NETWORK[$i]}"
-      echo "NUM_MINIONS=${RAX_NUM_MINIONS}"
-      grep -v "^#" $(dirname $0)/templates/salt-minion.sh
-    ) > ${KUBE_TEMP}/minionStart${i}.sh
+    sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
+        -e "s|INDEX|$((i + 1))|g" \
+        -e "s|CLOUD_FILES_URL|${TEMP_URL}|" \
+    $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
+
 
     MINION_BOOT_CMD="nova boot \
 --key-name ${SSH_KEY_NAME} \
 --flavor ${KUBE_MINION_FLAVOR} \
 --image ${KUBE_IMAGE} \
 --meta ${MINION_TAG} \
---user-data ${KUBE_TEMP}/minion-cloud-config.yaml \
+--user-data ${KUBE_TEMP}/minion-cloud-config-$(( i +1 )).yaml \
 --config-drive true \
 --nic net-id=${NETWORK_UUID} \
---file=/root/minionStart.sh=${KUBE_TEMP}/minionStart${i}.sh \
 ${MINION_NAMES[$i]}"
 
     echo "cluster/rackspace/util.sh: Booting ${MINION_NAMES[$i]} with following command:"
@@ -169,21 +201,17 @@ detect-master-nova-net() {
 kube-up() {
 
   SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
-  source $(dirname $0)/../gce/util.sh
-  source $(dirname $0)/util.sh
-  source $(dirname $0)/../../release/rackspace/config.sh
-
   # Find the release to use.  Generally it will be passed when doing a 'prod'
   # install and will default to the release/config.sh version when doing a
   # developer up.
-  find-object-url $CONTAINER output/release/$TAR_FILE
+  #find-object-url $CONTAINER output/release/$TAR_FILE
 
   # Create a temp directory to hold scripts that will be uploaded to master/minions
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
   get-password
-  python $(dirname $0)/../../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $user $passwd
+  python $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
   rax-nova-network
@@ -195,11 +223,6 @@ kube-up() {
   echo "cluster/rackspace/util.sh: Starting Cloud Servers"
   rax-boot-master
 
-  # a bit of a hack to wait until master is has an IP from the extra network
-  echo "cluster/rackspace/util.sh: sleeping 35 seconds"
-  sleep 35
-
-  detect-master-nova-net $NOVA_NETWORK_LABEL
   rax-boot-minions
 
   FAIL=0
@@ -222,20 +245,16 @@ kube-up() {
   echo
 
   #This will fail until apiserver salt is updated
-  until $(curl --insecure --user ${user}:${passwd} --max-time 5 \
+  until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
           --fail --output /dev/null --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
       printf "."
       sleep 2
   done
 
   echo "Kubernetes cluster created."
-  echo "Sanity checking cluster..."
-
-  sleep 5
 
   # Don't bail on errors, we want to be able to print some info.
   set +e
-  sleep 45
 
   detect-minions
 
