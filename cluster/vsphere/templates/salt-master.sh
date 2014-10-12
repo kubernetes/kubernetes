@@ -42,7 +42,9 @@ cat <<EOF >/etc/salt/master.d/reactor.conf
 # React to new minions starting by running highstate on them.
 reactor:
   - 'salt/minion/*/start':
-    - /srv/reactor/highstate-all.sls
+    - /srv/reactor/highstate-new.sls
+    - /srv/reactor/highstate-masters.sls
+    - /srv/reactor/highstate-minions.sls
 EOF
 
 mkdir -p /srv/salt/nginx

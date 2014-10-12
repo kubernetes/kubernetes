@@ -92,7 +92,7 @@ cat <<EOF >/etc/salt/master.d/reactor.conf
 # React to new minions starting by running highstate on them.
 reactor:
   - 'salt/minion/*/start':
-    - /srv/reactor/start.sls
+    - /srv/reactor/highstate-new.sls
 EOF
 
 cat <<EOF >/etc/salt/master.d/salt-output.conf
