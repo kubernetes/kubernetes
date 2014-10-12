@@ -64,8 +64,19 @@ function detect-minions {
   fi
 }
 
+function trap-add {
+  local handler="$1"
+  local signal="${2-EXIT}"
+  local cur
 
-# Verify prereqs
+  cur="$(eval "sh -c 'echo \$3' -- $(trap -p ${signal})")"
+  if [[ -n "${cur}" ]]; then
+    handler="${cur}; ${handler}"
+  fi
+
+  trap "${handler}" ${signal}
+}
+
 function verify-prereqs {
   which "govc" >/dev/null || {
     echo "Can't find govc in PATH, please install and retry."
@@ -76,6 +87,33 @@ function verify-prereqs {
   }
 }
 
+function verify-ssh-prereqs {
+  local rc
+
+  rc=0
+  ssh-add -L 1> /dev/null 2> /dev/null || rc="$?"
+  # "Could not open a connection to your authentication agent."
+  if [[ "${rc}" -eq 2 ]]; then
+    eval "$(ssh-agent)" > /dev/null
+    trap-add "kill ${SSH_AGENT_PID}" EXIT
+  fi
+
+  rc=0
+  ssh-add -L 1> /dev/null 2> /dev/null || rc="$?"
+  # "The agent has no identities."
+  if [[ "${rc}" -eq 1 ]]; then
+    # Try adding one of the default identities, with or without passphrase.
+    ssh-add || true
+  fi
+
+  # Expect at least one identity to be available.
+  if ! ssh-add -L 1> /dev/null 2> /dev/null; then
+    echo "Could not find or add an SSH identity."
+    echo "Please start ssh-agent, add your identity, and retry."
+    exit 1
+  fi
+}
+
 # Create a temp dir that'll be deleted at the end of this bash session.
 #
 # Vars set:
@@ -83,7 +121,7 @@ function verify-prereqs {
 function ensure-temp-dir {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+    trap-add 'rm -rf "${KUBE_TEMP}"' EXIT
   fi
 }
 
@@ -173,7 +211,6 @@ function kube-ssh {
 # Assumed vars:
 #   DISK
 #   GUEST_ID
-#   PUBLIC_KEY_FILE
 function kube-up-vm {
   local vm_name="$1"
   shift
@@ -194,10 +231,12 @@ function kube-up-vm {
     -p \
     /home/kube/.ssh
 
+  ssh-add -L > "${KUBE_TEMP}/${vm_name}-authorized_keys"
+
   govc guest.upload \
     -vm="${vm_name}" \
     -f \
-    "${PUBLIC_KEY_FILE}" \
+    "${KUBE_TEMP}/${vm_name}-authorized_keys" \
     /home/kube/.ssh/authorized_keys
 }
 
@@ -222,6 +261,7 @@ function kube-run {
 #   KUBE_ROOT
 #   <Various vars set in config file>
 function kube-up {
+  verify-ssh-prereqs
   find-release-tars
 
   ensure-temp-dir
@@ -378,6 +418,7 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
+  verify-ssh-prereqs
   find-release-tars
 
   detect-master
