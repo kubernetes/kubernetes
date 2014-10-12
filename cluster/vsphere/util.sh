@@ -157,13 +157,14 @@ function find-release-tars {
 #   SERVER_BINARY_TAR
 #   SALT_TAR
 function upload-server-tars {
-  local args="-vm ${MASTER_NAME}"
+  local vm_ip
 
-  govc guest.mkdir ${args} -p /home/kube/cache/kubernetes-install
+  vm_ip=$(govc vm.ip "${MASTER_NAME}")
+  kube-ssh ${vm_ip} "mkdir -p /home/kube/cache/kubernetes-install"
 
   local tar
   for tar in "${SERVER_BINARY_TAR}" "${SALT_TAR}"; do
-    govc guest.upload ${args} -f "${tar}" "/home/kube/cache/kubernetes-install/${tar##*/}"
+    kube-scp ${vm_ip} "${tar}" "/home/kube/cache/kubernetes-install/${tar##*/}"
   done
 }
 
@@ -198,6 +199,14 @@ function kube-ssh {
   local host="$1"
   shift
   ssh ${SSH_OPTS-} "kube@${host}" "$@" 2> /dev/null
+}
+
+# Copy file over ssh
+function kube-scp {
+  local host="$1"
+  local src="$2"
+  local dst="$3"
+  scp ${SSH_OPTS-} "${src}" "kube@${host}:${dst}"
 }
 
 # Instantiate a generic kubernetes virtual machine (master or minion)
