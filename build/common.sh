@@ -663,3 +663,68 @@ function kube::release::gcs::copy_release_tarballs() {
 
   gsutil ls -lh "${gcs_destination}"
 }
+
+# ---------------------------------------------------------------------------
+# Rackspace Release
+
+function kube::release::rackspace::release() {
+
+  [[ ${KUBE_RACKSPACE_UPLOAD_RELEASE-y} =~ ^[yY]$ ]] || return 0
+  
+  CLOUDFILES_CONTAINER="kubernetes-releases-${OS_USERNAME}"
+
+  kube::release::rackspace::verify_prereqs
+  kube::release::rackspace::ensure_release_container
+  kube::release::rackspace::copy_release_tarballs
+}
+
+# Verify things are set up for uploading to GCS
+function kube::release::rackspace::verify_prereqs() {
+
+  # Make sure swiftly is installed and available
+  if [[ -z "$(which gsutil)" ]]; then
+    echo "build/common.sh: Couldn't find swiftly in PATH. Please install swiftly:"
+    echo -e "\tpip install swiftly"
+    return 1
+  fi
+
+  if [[ -z "${OS_AUTH_URL-}" ]]; then
+    echo "build/common.sh: OS_AUTH_URL not set."
+    echo -e "\texport OS_AUTH_URL=https://identity.api.rackspacecloud.com/v2.0/"
+    return 1
+  fi
+
+  if [[ -z "${OS_USERNAME-}" ]]; then
+    echo "build/common.sh: OS_USERNAME not set."
+    echo -e "\texport OS_USERNAME=myusername"
+    return 1
+  fi
+
+  if [[ -z "${OS_PASSWORD-}" ]]; then
+    echo "build/common.sh: OS_PASSWORD not set."
+    echo -e "\texport OS_PASSWORD=myapikey"
+    return 1
+  fi
+}
+
+function kube::release::rackspace::ensure_release_container() {
+
+  KUBE_RACKSPACE_RELEASE_BUCKET=${KUBE_RACKSPACE_RELEASE_BUCKET-kubernetes-releases-${OS_USERNAME}}
+  KUBE_RACKSPACE_RELEASE_PREFIX=${KUBE_RACKSPACE_RELEASE_PREFIX-devel/}
+
+  SWIFTLY_CMD="swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD}"
+
+  if ! ${SWIFTLY_CMD} get ${CLOUDFILES_CONTAINER} > /dev/null 2>&1 ; then
+    echo "build/common.sh: Container doesn't exist. Creating container ${CLOUDFILES_CONTAINER}"
+    ${SWIFTLY_CMD} put ${CLOUDFILES_CONTAINER} > /dev/null 2>&1
+  fi
+}
+
+function kube::release::rackspace::copy_release_tarballs() {
+
+  # Copy release tar.gz to cloud files object store
+  echo "build/common.sh: Uploading to Cloud Files"
+  ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz ${CLOUDFILES_CONTAINER}/devel/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
+  
+  echo "Release pushed."
+}

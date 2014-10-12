@@ -45,15 +45,6 @@
   {% set machines = "-machines=$(echo ${MACHINE_IPS[@]} | xargs -n1 echo | paste -sd,)" %}
   {% set minion_regexp = "" %}
 {% endif %}
-{%- if grains.cloud == 'rackspace' %}
-  {%- set ip_addrs = [] %}
-  {%- for addrs in salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').values() %}
-    {%- do ip_addrs.append(addrs.ip_interfaces.eth2[0]) %}
-  {%- endfor %}
-    MACHINES="{{ip_addrs|join(',')}}"
-  {%- set machines = "-machines=$MACHINES" %}
-  {%- set minion_regexp = "" %}
-{% endif %}
 {% endif %}
 {% if pillar['portal_net'] is defined %}
   {% set portal_net = "-portal_net=" + pillar['portal_net'] %}
