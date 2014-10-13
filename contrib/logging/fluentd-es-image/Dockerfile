@@ -1,9 +1,8 @@
 # This Dockerfile will build an image that is configured
 # to run Fluentd with an Elasticsearch plug-in and the
 # provided configuration file.
-# TODO(satnam): Use a lighter base image, e.g. some form of busybox.
-# The image acts as an executable for the binary /usr/sbin/td-agent
-# which runs fluentd with the default flag -v (which can be over-ridden).
+# TODO(satnam6502): Use a lighter base image, e.g. some form of busybox.
+# The image acts as an executable for the binary /usr/sbin/td-agent.
 # Note that fluentd is run with root permssion to allow access to
 # log files with root only access under /var/lib/docker/containers/*
 # Please see http://docs.fluentd.org/articles/install-by-deb for more

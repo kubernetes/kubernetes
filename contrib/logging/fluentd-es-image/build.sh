@@ -14,5 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-docker build -t google/fluentd-elasticsearch .
-docker push google/lambda-fluentd
+
+# Build the fluentd-elasticsearch image and push
+# to google/fluentd-elasticsearch.
+
+sudo docker build -t google/fluentd-elasticsearch .
+sudo docker push google/fluentd-elasticsearch
