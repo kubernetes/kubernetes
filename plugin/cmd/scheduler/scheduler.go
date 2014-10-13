@@ -58,10 +58,7 @@ func main() {
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 
 	configFactory := &factory.ConfigFactory{Client: kubeClient}
-	config, err := configFactory.Create()
-	if err != nil {
-		glog.Fatalf("Can't create scheduler config: %v", err)
-	}
+	config := configFactory.Create()
 	s := scheduler.New(config)
 	s.Run()
 

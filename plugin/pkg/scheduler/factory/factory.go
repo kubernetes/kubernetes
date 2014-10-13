@@ -19,6 +19,7 @@ limitations under the License.
 package factory
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -42,7 +43,7 @@ type ConfigFactory struct {
 }
 
 // Create creates a scheduler and all support functions.
-func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
+func (factory *ConfigFactory) Create() *scheduler.Config {
 	// Watch and queue pods that need scheduling.
 	podQueue := cache.NewFIFO()
 	cache.NewReflector(factory.createUnassignedPodLW(), &api.Pod{}, podQueue).Run()
@@ -63,13 +64,14 @@ func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 	}
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	minionLister := &storeToMinionLister{minionCache}
 
 	algo := algorithm.NewGenericScheduler(
 		[]algorithm.FitPredicate{
 			// Fit is defined based on the absence of port conflicts.
 			algorithm.PodFitsPorts,
 			// Fit is determined by resource availability
-			algorithm.NewResourceFitPredicate(algorithm.ClientNodeInfo{factory.Client}),
+			algorithm.NewResourceFitPredicate(minionLister),
 		},
 		// Prioritize nodes by least requested utilization.
 		algorithm.LeastRequestedPriority,
@@ -81,7 +83,7 @@ func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 	}
 
 	return &scheduler.Config{
-		MinionLister: &storeToMinionLister{minionCache},
+		MinionLister: minionLister,
 		Algorithm:    algo,
 		Binder:       &binder{factory.Client},
 		NextPod: func() *api.Pod {
@@ -93,7 +95,7 @@ func (factory *ConfigFactory) Create() (*scheduler.Config, error) {
 			return pod
 		},
 		Error: factory.makeDefaultErrorFunc(&podBackoff, podQueue),
-	}, nil
+	}
 }
 
 type listWatch struct {
@@ -202,6 +204,14 @@ func (s *storeToMinionLister) List() (machines api.MinionList, err error) {
 		machines.Items = append(machines.Items, *(m.(*api.Minion)))
 	}
 	return machines, nil
+}
+
+// GetNodeInfo returns cached data for the minion 'id'.
+func (s *storeToMinionLister) GetNodeInfo(id string) (*api.Minion, error) {
+	if minion, ok := s.Get(id); ok {
+		return minion.(*api.Minion), nil
+	}
+	return nil, fmt.Errorf("minion '%v' is not in cache")
 }
 
 // storeToPodLister turns a store into a pod lister. The store must contain (only) pods.
