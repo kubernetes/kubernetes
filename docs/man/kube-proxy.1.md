@@ -23,9 +23,6 @@ The kube-proxy takes several options.
 **-bindaddress**="0.0.0.0"
 	The address for the proxy server to serve on (set to 0.0.0.0 or "" for all interfaces)
 
-**-configfile**="/tmp/proxy_config"
-	Configuration file for the proxy
-
 **-etcd_servers**=[]
 	List of etcd servers to watch (http://ip:port), comma separated (optional)
 

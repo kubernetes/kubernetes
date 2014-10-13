@@ -31,7 +31,6 @@ import (
 )
 
 var (
-	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
 	etcdServerList util.StringList
 	etcdConfigFile = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
 	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
@@ -96,12 +95,6 @@ func main() {
 				endpointsConfig.Channel("etcd"))
 		}
 	}
-
-	// And create a configuration source that reads from a local file
-	config.NewConfigSourceFile(*configFile,
-		serviceConfig.Channel("file"),
-		endpointsConfig.Channel("file"))
-	glog.Infof("Using configuration file %s", *configFile)
 
 	loadBalancer := proxy.NewLoadBalancerRR()
 	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress))
