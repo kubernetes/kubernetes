@@ -12,5 +12,4 @@ sdn:
     - watch:
       - pkg: docker-io
       - pkg: openvswitch
-
 {% endif %}

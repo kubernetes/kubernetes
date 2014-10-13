@@ -86,30 +86,37 @@ cat <<EOF > /${NETWORK_CONF_PATH}route-${DOCKER_BRIDGE}
 ${BRIDGE_BASE}.0.0/16 dev ${DOCKER_BRIDGE} scope link src ${BRIDGE_ADDRESS}
 EOF
 
-
 # generate the post-configure script to be called by salt as cmd.wait
 cat <<EOF > ${POST_NETWORK_SCRIPT}
 #!/bin/bash
 
 set -e
-# NAT interface fails to revive on network restart, so OR-gate to true
-systemctl restart network.service || true
 
-# set docker bridge up, and set stp on the ovs bridge
-ip link set dev ${DOCKER_BRIDGE} up
-ovs-vsctl set Bridge ${OVS_SWITCH} stp_enable=true
+# Only do this operation once, otherwise, we get docker.servicee files output on disk, and the command line arguments get applied multiple times
+grep -q kbr0 /etc/sysconfig/docker || {
+  # Stop docker before making these updates
+  systemctl stop docker
 
-# modify the docker service file such that it uses the kube docker bridge and not its own
-sed -ie "s/ExecStart=\/usr\/bin\/docker -d/ExecStart=\/usr\/bin\/docker -d -b=${DOCKER_BRIDGE} --iptables=false/g" /usr/lib/systemd/system/docker.service
-systemctl daemon-reload
-systemctl restart docker.service
+  # NAT interface fails to revive on network restart, so OR-gate to true
+  systemctl restart network.service || true
 
-# setup iptables masquerade rules so the pods can reach the internet
-iptables -t nat -A POSTROUTING -s ${BRIDGE_BASE}.0.0/16 ! -d ${BRIDGE_BASE}.0.0/16 -j MASQUERADE
+  # set docker bridge up, and set stp on the ovs bridge
+  ip link set dev ${DOCKER_BRIDGE} up
+  ovs-vsctl set Bridge ${OVS_SWITCH} stp_enable=true
 
-# persist please
-iptables-save >& /etc/sysconfig/iptables
+  # modify the docker service file such that it uses the kube docker bridge and not its own
+  #echo "OPTIONS=-b=kbr0 --iptables=false --selinux-enabled" > /etc/sysconfig/docker
+  echo "OPTIONS='-b=kbr0 --iptables=false --selinux-enabled'" >/etc/sysconfig/docker
+  systemctl daemon-reload
+  systemctl restart docker.service
 
+  # setup iptables masquerade rules so the pods can reach the internet
+  iptables -t nat -A POSTROUTING -s ${BRIDGE_BASE}.0.0/16 ! -d ${BRIDGE_BASE}.0.0/16 -j MASQUERADE
+
+  # persist please
+  iptables-save >& /etc/sysconfig/iptables
+
+}
 EOF
 
 chmod +x ${POST_NETWORK_SCRIPT}
