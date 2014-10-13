@@ -12,8 +12,8 @@ Markdown (*.md) files.
 	kubelet.1.md  
 	kube-proxy.1.md  
 	kube-scheduler.1.md
-    Dockerfile
-    md2man-all.sh
+	Dockerfile
+	md2man-all.sh
 
 # Generating man pages from the Markdown files
 
