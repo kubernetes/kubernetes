@@ -203,7 +203,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	data := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
 		TypeMeta: api.TypeMeta{
 			ID:              "foo",
 			ResourceVersion: "1",
@@ -261,7 +261,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	data := runtime.EncodeOrDie(testapi.CodecForVersionOrDie(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
 		TypeMeta: api.TypeMeta{
 			ResourceVersion: "",
 		},
