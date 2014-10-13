@@ -8,12 +8,11 @@ Not running Linux? Consider running Linux in a local virtual machine with [Vagra
 
 #### Docker
 
-At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. Ensure the Docker daemon is running and can be contacted by the user you plan to run as (try `docker ps`).
+At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. Ensure the Docker daemon is running and can be contacted (try `docker ps`).  Some of the kubernetes components need to run as root, which normally works fine with docker.
 
 #### etcd
 
 You need an [etcd](https://github.com/coreos/etcd) somewhere in your path. Get the [latest release](https://github.com/coreos/etcd/releases/) and place it in `/usr/bin`.
-
 
 ### Starting the cluster
 
@@ -21,19 +20,18 @@ In a separate tab of your terminal, run:
 
 ```
 cd kubernetes
-hack/local-up-cluster.sh
+sudo hack/local-up-cluster.sh
 ```
 
-This will build and start a lightweight local cluster, consisting of a master and a single minion. Type Control-C to shut it down.
+This will build and start a lightweight local cluster, consisting of a master
+and a single minion. Type Control-C to shut it down.
 
 You can use the cluster/kubecfg.sh script to interact with the local cluster.
+You must set the KUBERNETES_MASTER environment variable to let other programs
+know how to reach your master.
 
 ```
-cd kubernetes
-modify cluster/kube-env.sh:
-  KUBERNETES_PROVIDER="local"
-
-cluster/kubecfg.sh => interact with the local cluster
+export KUBERNETES_MASTER=http://localhost:8080
 ```
 
 ### Running a container
@@ -41,6 +39,7 @@ cluster/kubecfg.sh => interact with the local cluster
 Your cluster is running, and you want to start running containers!
 
 You can now use any of the cluster/kubecfg.sh commands to interact with your local setup.
+
 ```
 cluster/kubecfg.sh list /pods
 cluster/kubecfg.sh list /services
@@ -65,6 +64,17 @@ cluster/kubecfg.sh list /replicationControllers
 Congratulations!
 
 ### Troubleshooting
+
+#### I can't reach service IPs on the network.
+
+Some firewall software that uses iptables may not interact well with
+kubernetes.  If you're having trouble around networking, try disabling any
+firewall or other iptables-using systems, first.
+
+By default the IP range for service portals is 10.0.*.* - depending on your
+docker installation, this may conflict with IPs for containers.  If you find
+containers running with IPs in this range, edit hack/local-cluster-up.sh and
+change the portal_net flag to something else.
 
 #### I cannot create a replication controller with replica size greater than 1!  What gives?
 
