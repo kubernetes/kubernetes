@@ -51,7 +51,7 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 		return "", nil, err
 	}
 	switch got.Type {
-	case watch.Added, watch.Modified, watch.Deleted:
+	case watch.Added, watch.Modified, watch.Deleted, watch.Error:
 	default:
 		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 	}
