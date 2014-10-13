@@ -28,3 +28,4 @@ source "$KUBE_ROOT/build/common.sh"
 kube::build::verify_prereqs
 kube::build::build_image
 kube::build::run_build_command build/build-image/make-binaries.sh "$@"
+kube::build::copy_output

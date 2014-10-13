@@ -62,13 +62,18 @@ kubecfg="${KUBE_ROOT}/_output/build/${host_os}/${host_arch}/kubecfg"
 if [[ ! -x "$kubecfg" ]]; then
   kubecfg="${KUBE_ROOT}/platforms/${host_os}/${host_arch}/kubecfg"
 fi
+
 if [[ ! -x "$kubecfg" ]]; then
-  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
-  echo "are running from a clone of the git repo, please run ./build/make-cross.sh." >&2
-  echo "Note that this requires having Docker installed.  If you are running " >&2
-  echo "from a release tarball, something is wrong.  Look at " >&2
-  echo "http://kubernetes.io/ for information on how to contact the "
-  echo "development team for help." >&2
+  {
+    echo "It looks as if you don't have a compiled kubecfg binary."
+    echo
+    echo "If you are running from a clone of the git repo, please run"
+    echo "'./build/make-cross.sh'. Note that this requires having Docker installed."
+    echo
+    echo "If you are running from a binary release tarball, something is wrong. "
+    echo "Look at http://kubernetes.io/ for information on how to contact the "
+    echo "development team for help."
+  } >&2
   exit 1
 fi
 
