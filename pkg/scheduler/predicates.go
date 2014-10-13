@@ -51,6 +51,39 @@ func (nodes ClientNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
 	return nodes.GetMinion(nodeID)
 }
 
+func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
+	if volume.Source.GCEPersistentDisk == nil {
+		return false
+	}
+	pdName := volume.Source.GCEPersistentDisk.PDName
+
+	manifest := &(pod.DesiredState.Manifest)
+	for ix := range manifest.Volumes {
+		if manifest.Volumes[ix].Source.GCEPersistentDisk != nil &&
+			manifest.Volumes[ix].Source.GCEPersistentDisk.PDName == pdName {
+			return true
+		}
+	}
+	return false
+}
+
+// NoDiskConflict evaluates if a pod can fit due to the volumes it requests, and those that
+// are already mounted. Some times of volumes are mounted onto node machines.  For now, these mounts
+// are exclusive so if there is already a volume mounted on that node, another pod can't schedule
+// there. This is GCE specific for now.
+// TODO: migrate this into some per-volume specific code?
+func NoDiskConflict(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	manifest := &(pod.DesiredState.Manifest)
+	for ix := range manifest.Volumes {
+		for podIx := range existingPods {
+			if isVolumeConflict(manifest.Volumes[ix], &existingPods[podIx]) {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
+}
+
 type ResourceFit struct {
 	info NodeInfo
 }
