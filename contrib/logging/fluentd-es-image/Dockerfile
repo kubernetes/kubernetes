@@ -34,8 +34,8 @@ RUN /usr/sbin/td-agent-gem install fluent-plugin-elasticsearch
 COPY td-agent.conf /etc/td-agent/td-agent.conf
 
 # Copy a script that determines the name of the host machine
-# and then patches the Fluentd configuration files and then
-# runs Fluentd in the foreground.
+# and then patch the Fluentd configuration files and then
+# run Fluentd in the foreground.
 ADD run.sh /run.sh
 
 # Always run the this setup script.
