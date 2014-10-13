@@ -75,6 +75,11 @@ grains:
     - kubernetes-master
 EOF
 
+mkdir -p /srv/salt-overlay/pillar
+cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
+  portal_net: $PORTAL_NET
+EOF
+
 # Configure the salt-master
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d

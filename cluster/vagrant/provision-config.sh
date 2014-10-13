@@ -33,3 +33,5 @@ MASTER_PASSWD=vagrant
 
 # Location to hold temp files for provision process
 KUBE_TEMP=/var/kube-temp
+
+PORTAL_NET=10.0.0.0/16
