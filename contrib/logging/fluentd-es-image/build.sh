@@ -18,5 +18,5 @@
 # Build the fluentd-elasticsearch image and push
 # to google/fluentd-elasticsearch.
 
-sudo docker build -t google/fluentd-elasticsearch .
-sudo docker push google/fluentd-elasticsearch
+sudo docker build -t kubernetes/fluentd-elasticsearch .
+sudo docker push kubernetes/fluentd-elasticsearch
