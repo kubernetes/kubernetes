@@ -49,17 +49,18 @@ import (
 var (
 	port                  = flag.Uint("port", 8080, "The port to listen on. Default 8080")
 	address               = util.IP(net.ParseIP("127.0.0.1"))
-	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'")
+	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
 	storageVersion        = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
 	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
 	cloudConfigFile       = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	minionRegexp          = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs")
+	minionRegexp          = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
 	minionPort            = flag.Uint("minion_port", 10250, "The port at which kubelet will be listening on the minions.")
-	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true")
-	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. Default 30 seconds")
-	tokenAuthFile         = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication")
+	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
+	minionCacheTTL        = flag.Duration("minion_cache_ttl", 30*time.Second, "Duration of time to cache minion information. Default 30 seconds.")
+	eventTTL              = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
+	tokenAuthFile         = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication.")
 	etcdServerList        util.StringList
-	etcdConfigFile        = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
+	etcdConfigFile        = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
@@ -178,6 +179,7 @@ func main() {
 		HealthCheckMinions: *healthCheckMinions,
 		Minions:            machineList,
 		MinionCacheTTL:     *minionCacheTTL,
+		EventTTL:           *eventTTL,
 		MinionRegexp:       *minionRegexp,
 		PodInfoGetter:      podInfoGetter,
 		NodeResources: api.NodeResources{

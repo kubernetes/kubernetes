@@ -31,6 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
@@ -49,6 +51,7 @@ type Config struct {
 	HealthCheckMinions bool
 	Minions            []string
 	MinionCacheTTL     time.Duration
+	EventTTL           time.Duration
 	MinionRegexp       string
 	PodInfoGetter      client.PodInfoGetter
 	NodeResources      api.NodeResources
@@ -62,6 +65,7 @@ type Master struct {
 	endpointRegistry   endpoint.Registry
 	minionRegistry     minion.Registry
 	bindingRegistry    binding.Registry
+	eventRegistry      generic.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 }
@@ -92,6 +96,7 @@ func New(c *Config) *Master {
 		serviceRegistry:    serviceRegistry,
 		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper, nil),
 		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper, manifestFactory),
+		eventRegistry:      event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 	}
@@ -147,6 +152,7 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 		"services":               service.NewREST(m.serviceRegistry, cloud, m.minionRegistry),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                minion.NewREST(m.minionRegistry),
+		"events":                 event.NewREST(m.eventRegistry),
 
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
