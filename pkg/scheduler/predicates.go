@@ -143,7 +143,7 @@ func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
 		return map[string][]api.Pod{}, err
 	}
 	for _, scheduledPod := range pods {
-		host := scheduledPod.CurrentState.Host
+		host := scheduledPod.DesiredState.Host
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	return machineToPods, nil
