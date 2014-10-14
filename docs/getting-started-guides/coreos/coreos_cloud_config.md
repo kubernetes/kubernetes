@@ -4,9 +4,7 @@ The recommended way to run Kubernetes on CoreOS is to use [Cloud-Config](https:/
 
 ## Setup
 
-Node specification
-
-Get the cloud-config templates which we'll be editing in place for this example:
+Get the cloud-config templates which we'll be editing in place for this example.
 ```
 git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 cd kubernetes/docs/getting-started-guides/coreos/configs
@@ -70,7 +68,9 @@ Now create the ISO images that cloud-config will access when booting your node(s
 mkdir -p /tmp/new-drive/openstack/latest/
 mkdir -p ~/iso
 ```
+
 Using Linux:
+
 ```
 for i in standalone master node1 node2; do
   cp ${i}.yml /tmp/new-drive/openstack/latest/user_data
@@ -79,6 +79,7 @@ done
 ```
 
 Using OS X:
+
 ```
 for i in standalone master node1 node2; do
   cp ${i}.yml /tmp/new-drive/openstack/latest/user_data
