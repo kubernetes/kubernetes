@@ -46,6 +46,10 @@ const (
 	// ValidationErrorTypeNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
 	ValidationErrorTypeNotSupported ValidationErrorType = "FieldValueNotSupported"
+	// ValidationErrorTypeForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted by some api instances, but which would invoke behavior
+	// not permitted by this api instance (such as due to stricter security policy).
+	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
 )
 
 func ValueOf(t ValidationErrorType) string {
@@ -60,6 +64,8 @@ func ValueOf(t ValidationErrorType) string {
 		return "invalid value"
 	case ValidationErrorTypeNotSupported:
 		return "unsupported value"
+	case ValidationErrorTypeForbidden:
+		return "forbidden"
 	default:
 		glog.Errorf("unrecognized validation type: %#v", t)
 		return ""
@@ -90,6 +96,11 @@ func NewFieldInvalid(field string, value interface{}) ValidationError {
 // NewFieldNotSupported returns a ValidationError indicating "unsupported value"
 func NewFieldNotSupported(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeNotSupported, field, value}
+}
+
+// NewFieldForbidden returns a ValidationError indicating "forbidden"
+func NewFieldForbidden(field string, value interface{}) ValidationError {
+	return ValidationError{ValidationErrorTypeForbidden, field, value}
 }
 
 // NewFieldDuplicate returns a ValidationError indicating "duplicate value"
