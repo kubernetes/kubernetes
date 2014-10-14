@@ -311,7 +311,7 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 		}
 	}
 	switch {
-	case running > 0 && stopped == 0 && unknown == 0:
+	case running > 0 && unknown == 0:
 		return api.PodRunning, nil
 	case running == 0 && stopped > 0 && unknown == 0:
 		return api.PodTerminated, nil
