@@ -64,6 +64,7 @@ var (
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
+	allowEscapeChroot     = flag.Bool("allow_escape_chroot", false, "If true, allow HostDir volume types, which expose the node filesystem.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	nodeMilliCPU      = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
 	nodeMemory        = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
@@ -147,7 +148,8 @@ func main() {
 	}
 
 	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: *allowPrivileged,
+		AllowPrivileged:   *allowPrivileged,
+		AllowEscapeChroot: *allowEscapeChroot,
 	})
 
 	cloud := initCloudProvider(*cloudProvider, *cloudConfigFile)
