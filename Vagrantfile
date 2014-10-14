@@ -64,7 +64,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     config.vm.provision "shell", inline: "/vagrant/cluster/vagrant/provision-master.sh #{$master_ip} #{$num_minion} #{$minion_ips_str}"
     config.vm.network "private_network", ip: "#{$master_ip}"
     config.vm.hostname = "kubernetes-master"
-end
+  end
 
   # Kubernetes minion
   $num_minion.times do |n|
