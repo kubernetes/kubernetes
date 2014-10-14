@@ -49,16 +49,6 @@ if [[ ! -f "$salt_tar" ]]; then
 fi
 
 
-echo "Running release install script"
-rm -rf /kube-install
-mkdir -p /kube-install
-pushd /kube-install
-  tar xzf "$salt_tar"
-  cp "$server_binary_tar" .
-  ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
-popd
-
-
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
 minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -108,10 +98,19 @@ EOF
 
 # Configure nginx authorization
 mkdir -p "$KUBE_TEMP"
-mkdir -p /srv/salt/nginx
+mkdir -p /srv/salt-overlay/salt/nginx
 python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpasswd" "$MASTER_USER" "$MASTER_PASSWD"
 MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
+echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
+
+echo "Running release install script"
+rm -rf /kube-install
+mkdir -p /kube-install
+pushd /kube-install
+  tar xzf "$salt_tar"
+  cp "$server_binary_tar" .
+  ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
+popd
 
 # we will run provision to update code each time we test, so we do not want to do salt installs each time
 if ! which salt-master >/dev/null 2>&1; then
@@ -152,7 +151,7 @@ if ! which salt-minion >/dev/null 2>&1; then
 
   # Install Salt minion
   curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
-  
+
 else
   # Only run highstate when updating the config.  In the first-run case, Salt is
   # set up to run highstate as new minions join for the first time.
