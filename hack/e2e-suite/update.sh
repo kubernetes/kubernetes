@@ -44,7 +44,7 @@ function validate() {
 
     local id
     num_running=0
-    for id in "${pod_id_list[@]}"; do
+    for id in "${pod_id_list[@]+${pod_id_list[@]}}"; do
       local template_string current_status current_image host_ip
       template_string="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
       current_status=$($KUBECFG -template="${template_string}" get "pods/$id")
