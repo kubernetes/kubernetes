@@ -117,7 +117,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
+	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
 		TypeMeta: api.TypeMeta{
@@ -157,7 +157,7 @@ func TestEtcdCreatePod(t *testing.T) {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var boundPods api.BoundPods
-	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	resp, err = fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
+	fakeClient.Data["/registry/nodes/machine/boundpods"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -241,7 +241,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Data["/registry/hosts/machine/kubelet"] = tools.EtcdResponseWithError{
+	fakeClient.Data["/registry/nodes/machine/boundpods"] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
 		},
@@ -287,7 +287,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var boundPods api.BoundPods
-	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	resp, err = fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		},
 		E: tools.EtcdErrorNotFound,
 	}
-	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
+	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
 			{TypeMeta: api.TypeMeta{ID: "bar"}},
 		},
@@ -353,7 +353,7 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 		t.Errorf("Unexpected pod: %#v %s", pod, resp.Node.Value)
 	}
 	var boundPods api.BoundPods
-	resp, err = fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	resp, err = fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -441,7 +441,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 		},
 	}), 1)
 
-	contKey := "/registry/hosts/machine/kubelet"
+	contKey := "/registry/nodes/machine/boundpods"
 	fakeClient.Set(contKey, runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
 		Items: []api.ContainerManifest{
 			{
@@ -516,7 +516,7 @@ func TestEtcdDeletePod(t *testing.T) {
 		TypeMeta:     api.TypeMeta{ID: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
-	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
+	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
 			{TypeMeta: api.TypeMeta{ID: "foo"}},
 		},
@@ -532,7 +532,7 @@ func TestEtcdDeletePod(t *testing.T) {
 	} else if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
-	response, err := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	response, err := fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -553,7 +553,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 		TypeMeta:     api.TypeMeta{ID: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
-	fakeClient.Set("/registry/hosts/machine/kubelet", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
+	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
 			{TypeMeta: api.TypeMeta{ID: "foo"}},
 			{TypeMeta: api.TypeMeta{ID: "bar"}},
@@ -571,7 +571,7 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	if fakeClient.DeletedKeys[0] != key {
 		t.Errorf("Unexpected key: %s, expected %s", fakeClient.DeletedKeys[0], key)
 	}
-	response, err := fakeClient.Get("/registry/hosts/machine/kubelet", false, false)
+	response, err := fakeClient.Get("/registry/nodes/machine/boundpods", false, false)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

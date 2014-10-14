@@ -130,7 +130,7 @@ func (r *Registry) GetPod(ctx api.Context, podID string) (*api.Pod, error) {
 }
 
 func makeContainerKey(machine string) string {
-	return "/registry/hosts/" + machine + "/kubelet"
+	return "/registry/nodes/" + machine + "/boundpods"
 }
 
 // CreatePod creates a pod based on a specification.
