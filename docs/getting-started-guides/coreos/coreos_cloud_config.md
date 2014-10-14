@@ -53,7 +53,8 @@ Search for occurrences of 'ens33' in these templates and replace with the interf
 Replace all occurrences of '192.168.12.10' with the IP address you wish to apply to the master node, '192.168.12.11' 
 with the IP address to assign to node1, '192.168.12.12' with IP address for node2. In the section 
 'coreos/units/static.network' set the DNS and Gateway entries to match your network. (VMWare Fusion users can find this 
-information in: "/Library/Preferences/VMware Fusion/vmnet8/dhcpd.conf" see [the blog post](https://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-2/) )
+information in: "/Library/Preferences/VMware Fusion/vmnet8/dhcpd.conf" see [the blog post](https://coreos.com/blog/running-kubernetes-example-on-CoreOS-part-2/)
+ - be sure to choose static IPs outside the dynamic ip range specified here).
 
 ### Configure Access
 
