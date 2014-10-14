@@ -25,7 +25,9 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/google/gofuzz"
+	"gopkg.in/v1/yaml"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
@@ -129,30 +131,28 @@ func GetTestScheme() *Scheme {
 	s.AddKnownTypeWithName("", "TestType3", &TestType1{})
 	s.AddKnownTypeWithName("v1", "TestType3", &ExternalTestType1{})
 	s.InternalVersion = ""
-	s.MetaInsertionFactory = testMetaInsertionFactory{}
+	s.MetaFactory = testMetaFactory{}
 	return s
 }
 
-type testMetaInsertionFactory struct {
-	MyWeirdCustomEmbeddedVersionKindField struct {
+type testMetaFactory struct{}
+
+func (testMetaFactory) Interpret(data []byte) (version, kind string, err error) {
+	findKind := struct {
 		APIVersion string `json:"myVersionKey,omitempty" yaml:"myVersionKey,omitempty"`
 		ObjectKind string `json:"myKindKey,omitempty" yaml:"myKindKey,omitempty"`
-	} `json:",inline" yaml:",inline"`
+	}{}
+	// yaml is a superset of json, so we use it to decode here. That way,
+	// we understand both.
+	err = yaml.Unmarshal(data, &findKind)
+	if err != nil {
+		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
+	}
+	return findKind.APIVersion, findKind.ObjectKind, nil
 }
 
-// Create returns a new testMetaInsertionFactory with the version and kind fields set.
-func (testMetaInsertionFactory) Create(version, kind string) interface{} {
-	m := testMetaInsertionFactory{}
-	m.MyWeirdCustomEmbeddedVersionKindField.APIVersion = version
-	m.MyWeirdCustomEmbeddedVersionKindField.ObjectKind = kind
-	return &m
-}
-
-// Interpret returns the version and kind information from in, which must be
-// a testMetaInsertionFactory pointer object.
-func (testMetaInsertionFactory) Interpret(in interface{}) (version, kind string) {
-	m := in.(*testMetaInsertionFactory)
-	return m.MyWeirdCustomEmbeddedVersionKindField.APIVersion, m.MyWeirdCustomEmbeddedVersionKindField.ObjectKind
+func (testMetaFactory) Update(version, kind string, obj interface{}) error {
+	return UpdateVersionAndKind(nil, "APIVersion", version, "ObjectKind", kind, obj)
 }
 
 func objDiff(a, b interface{}) string {
@@ -306,145 +306,5 @@ func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
 	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
 	if err := s.DecodeInto(badJSONKindMismatch, &TestType1{}); err == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
-	}
-}
-
-func TestMetaValues(t *testing.T) {
-	type InternalSimple struct {
-		Version    string `json:"version,omitempty" yaml:"version,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
-	}
-	type ExternalSimple struct {
-		Version    string `json:"version,omitempty" yaml:"version,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
-	}
-	s := NewScheme()
-	s.InternalVersion = ""
-	s.AddKnownTypeWithName("", "Simple", &InternalSimple{})
-	s.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
-
-	internalToExternalCalls := 0
-	externalToInternalCalls := 0
-
-	// Register functions to verify that scope.Meta() gets set correctly.
-	err := s.AddConversionFuncs(
-		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			if e, a := "", scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := "externalVersion", scope.Meta().DestVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			scope.Convert(&in.TestString, &out.TestString, 0)
-			internalToExternalCalls++
-			return nil
-		},
-		func(in *ExternalSimple, out *InternalSimple, scope Scope) error {
-			if e, a := "externalVersion", scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := "", scope.Meta().DestVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			scope.Convert(&in.TestString, &out.TestString, 0)
-			externalToInternalCalls++
-			return nil
-		},
-	)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	simple := &InternalSimple{
-		TestString: "foo",
-	}
-
-	// Test Encode, Decode, and DecodeInto
-	data, err := s.EncodeToVersion(simple, "externalVersion")
-	obj2, err2 := s.Decode(data)
-	obj3 := &InternalSimple{}
-	err3 := s.DecodeInto(data, obj3)
-	if err != nil || err2 != nil {
-		t.Fatalf("Failure: '%v' '%v' '%v'", err, err2, err3)
-	}
-	if _, ok := obj2.(*InternalSimple); !ok {
-		t.Fatalf("Got wrong type")
-	}
-	if e, a := simple, obj2; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
-	}
-	if e, a := simple, obj3; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected:\n %#v,\n Got:\n %#v", e, a)
-	}
-
-	// Test Convert
-	external := &ExternalSimple{}
-	err = s.Convert(simple, external)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := simple.TestString, external.TestString; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-
-	// Encode and Convert should each have caused an increment.
-	if e, a := 2, internalToExternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-	// Decode and DecodeInto should each have caused an increment.
-	if e, a := 2, externalToInternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-}
-
-func TestMetaValuesUnregisteredConvert(t *testing.T) {
-	type InternalSimple struct {
-		Version    string `json:"version,omitempty" yaml:"version,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
-	}
-	type ExternalSimple struct {
-		Version    string `json:"version,omitempty" yaml:"version,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
-	}
-	s := NewScheme()
-	s.InternalVersion = ""
-	// We deliberately don't register the types.
-
-	internalToExternalCalls := 0
-
-	// Register functions to verify that scope.Meta() gets set correctly.
-	err := s.AddConversionFuncs(
-		func(in *InternalSimple, out *ExternalSimple, scope Scope) error {
-			if e, a := "unknown", scope.Meta().SrcVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			if e, a := "unknown", scope.Meta().DestVersion; e != a {
-				t.Errorf("Expected '%v', got '%v'", e, a)
-			}
-			scope.Convert(&in.TestString, &out.TestString, 0)
-			internalToExternalCalls++
-			return nil
-		},
-	)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	simple := &InternalSimple{TestString: "foo"}
-	external := &ExternalSimple{}
-	err = s.Convert(simple, external)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := simple.TestString, external.TestString; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
-
-	// Verify that our conversion handler got called.
-	if e, a := 1, internalToExternalCalls; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
 	}
 }

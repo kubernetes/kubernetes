@@ -19,7 +19,32 @@ package runtime
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
+
+// FindTypeMeta takes an arbitary api type, returns pointer to its TypeMeta field.
+// obj must be a pointer to an api type.
+func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
+	v, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return nil, err
+	}
+	t := v.Type()
+	name := t.Name()
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
+	}
+	typeMeta := v.FieldByName("TypeMeta")
+	if !typeMeta.IsValid() {
+		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
+	}
+	g, err := newGenericTypeMeta(typeMeta)
+	if err != nil {
+		return nil, err
+	}
+	return g, nil
+}
 
 // NewTypeMetaResourceVersioner returns a ResourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from TypeMeta.

@@ -17,11 +17,9 @@ limitations under the License.
 package runtime
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"gopkg.in/v1/yaml"
 )
 
 // Scheme defines methods for serializing and deserializing API objects. It
@@ -145,7 +143,7 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 func NewScheme() *Scheme {
 	s := &Scheme{conversion.NewScheme()}
 	s.raw.InternalVersion = ""
-	s.raw.MetaInsertionFactory = metaInsertion{}
+	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
 	s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
@@ -219,29 +217,6 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	return s.raw.Convert(in, out)
 }
 
-// FindTypeMeta takes an arbitary api type, returns pointer to its TypeMeta field.
-// obj must be a pointer to an api type.
-func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
-	v, err := enforcePtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	t := v.Type()
-	name := t.Name()
-	if v.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
-	}
-	jsonBase := v.FieldByName("TypeMeta")
-	if !jsonBase.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
-	}
-	g, err := newGenericTypeMeta(jsonBase)
-	if err != nil {
-		return nil, err
-	}
-	return g, nil
-}
-
 // EncodeToVersion turns the given api object into an appropriate JSON string.
 // Will return an error if the object doesn't have an embedded TypeMeta.
 // Obj may be a pointer to a struct, or a struct. If a struct, a copy
@@ -272,33 +247,6 @@ func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
 // config files.
 func (s *Scheme) EncodeToVersion(obj Object, destVersion string) (data []byte, err error) {
 	return s.raw.EncodeToVersion(obj, destVersion)
-}
-
-// enforcePtr ensures that obj is a pointer of some sort. Returns a reflect.Value of the
-// dereferenced pointer, ensuring that it is settable/addressable.
-// Returns an error if this is not possible.
-func enforcePtr(obj Object) (reflect.Value, error) {
-	v := reflect.ValueOf(obj)
-	if v.Kind() != reflect.Ptr {
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v", v.Type().Name())
-	}
-	return v.Elem(), nil
-}
-
-// VersionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an APIObject, or an error.
-func VersionAndKind(data []byte) (version, kind string, err error) {
-	findKind := struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	return findKind.APIVersion, findKind.Kind, nil
 }
 
 // Decode converts a YAML or JSON string back into a pointer to an api object.
@@ -338,29 +286,4 @@ func (s *Scheme) CopyOrDie(obj Object) Object {
 		panic(err)
 	}
 	return newObj
-}
-
-// metaInsertion implements conversion.MetaInsertionFactory, which lets the conversion
-// package figure out how to encode our object's types and versions. These fields are
-// located in our TypeMeta.
-type metaInsertion struct {
-	TypeMeta struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	} `json:",inline" yaml:",inline"`
-}
-
-// Create returns a new metaInsertion with the version and kind fields set.
-func (metaInsertion) Create(version, kind string) interface{} {
-	m := metaInsertion{}
-	m.TypeMeta.APIVersion = version
-	m.TypeMeta.Kind = kind
-	return &m
-}
-
-// Interpret returns the version and kind information from in, which must be
-// a metaInsertion pointer object.
-func (metaInsertion) Interpret(in interface{}) (version, kind string) {
-	m := in.(*metaInsertion)
-	return m.TypeMeta.APIVersion, m.TypeMeta.Kind
 }
