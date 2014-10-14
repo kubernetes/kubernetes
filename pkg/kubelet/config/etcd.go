@@ -68,7 +68,7 @@ func (s *SourceEtcd) run() {
 				return
 			}
 			if event.Type == watch.Error {
-				glog.Errorf("Watch error: %v", event.Object)
+				glog.Infof("Watch closed (%#v). Reopening.", event.Object)
 				watching.Stop()
 				return
 			}
