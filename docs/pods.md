@@ -12,7 +12,7 @@ Like running containers, pods are considered to be relatively ephemeral rather t
 
 Pods facilitate data sharing and communication among their constituents.
 
-The containers in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname is set to the pod's Name for the containers within the pod. [More details on networking](docs/networking.md).
+The containers in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname is set to the pod's Name for the containers within the pod. [More details on networking](networking.md).
 
 In addition to defining the containers that run in the pod, the pod specifies a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the containers within the pod.
 
