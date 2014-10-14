@@ -35,17 +35,37 @@ KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
 trap 'rm -rf "${KUBE_TEMP}"' EXIT
 
 # This file is meant to run on the master.  It will install the salt configs
-# into the appropriate place on the master.
+# into the appropriate place on the master.  We do this by creating a new set of
+# salt trees and then quickly mv'ing them where the old ones were.
 
-echo "+++ Installing salt files"
-mkdir -p /srv
+readonly SALTDIRS=(salt pillar reactor)
+
+echo "+++ Installing salt files into new trees"
+rm -rf /srv/salt-new
+mkdir -p /srv/salt-new
+
 # This bash voodoo will prepend $SALT_ROOT to the start of each item in the
 # $SALTDIRS array
-readonly SALTDIRS=(salt pillar reactor)
-cp -R --preserve=mode "${SALTDIRS[@]/#/${SALT_ROOT}/}" /srv/
+cp -v -R --preserve=mode "${SALTDIRS[@]/#/${SALT_ROOT}/}" /srv/salt-new
 
+echo "+++ Installing salt overlay files"
+for dir in "${SALTDIRS[@]}"; do
+  if [[ -d "/srv/salt-overlay/$dir" ]]; then
+    cp -v -R --preserve=mode "/srv/salt-overlay/$dir" "/srv/salt-new/"
+  fi
+done
 
 echo "+++ Install binaries from tar: $1"
 tar -xz -C "${KUBE_TEMP}" -f "$1"
-mkdir -p /srv/salt/kube-bins
-cp "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt/kube-bins/
+mkdir -p /srv/salt-new/salt/kube-bins
+cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
+
+echo "+++ Swapping in new configs"
+for dir in "${SALTDIRS[@]}"; do
+  if [[ -d "/srv/$dir" ]]; then
+    rm -rf "/srv/$dir"
+  fi
+  mv -v "/srv/salt-new/$dir" "/srv/$dir"
+done
+
+rm -rf /srv/salt-new
