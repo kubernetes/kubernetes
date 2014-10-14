@@ -18,6 +18,7 @@ package controller
 
 import (
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -64,10 +65,7 @@ func TestSyncCreateMinion(t *testing.T) {
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
-	minionController, err := NewMinionController(&fakeCloud, ".*", nil, registry)
-	if err != nil {
-		t.Errorf("Unexpected error")
-	}
+	minionController := NewMinionController(&fakeCloud, ".*", nil, registry, time.Second)
 
 	minion, err := registry.GetMinion(ctx, "m3")
 	if minion != nil {
@@ -112,10 +110,7 @@ func TestSyncDeleteMinion(t *testing.T) {
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
-	minionController, err := NewMinionController(&fakeCloud, ".*", nil, registry)
-	if err != nil {
-		t.Errorf("Unexpected error")
-	}
+	minionController := NewMinionController(&fakeCloud, ".*", nil, registry, time.Second)
 
 	minion, err := registry.GetMinion(ctx, "m3")
 	if minion == nil {
@@ -150,12 +145,9 @@ func TestSyncMinionRegexp(t *testing.T) {
 	fakeCloud := fake_cloud.FakeCloud{
 		Machines: instances,
 	}
-	minionController, err := NewMinionController(&fakeCloud, "m[0-9]+", nil, registry)
-	if err != nil {
-		t.Errorf("Unexpected error")
-	}
+	minionController := NewMinionController(&fakeCloud, "m[0-9]+", nil, registry, time.Second)
 
-	err = minionController.Sync()
+	err := minionController.Sync()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

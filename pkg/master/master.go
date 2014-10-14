@@ -40,7 +40,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 // Config is a structure used to configure a Master.
@@ -119,12 +118,7 @@ func (m *Master) init(c *Config) {
 
 	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
 		// TODO: Move minion controller to its own code.
-		minionController, err := cloudcontroller.NewMinionController(c.Cloud, c.MinionRegexp, &c.NodeResources, m.minionRegistry)
-		if err != nil {
-			glog.Errorf("Failed to initalize minion controller (%#v)", err)
-		}
-		// TODO: Create a Run() method on controller to invoke Sync().
-		go util.OnceAndForever(func() { minionController.Sync() }, c.MinionCacheTTL)
+		cloudcontroller.NewMinionController(c.Cloud, c.MinionRegexp, &c.NodeResources, m.minionRegistry, c.MinionCacheTTL).Run()
 	} else {
 		for _, minionID := range c.Minions {
 			m.minionRegistry.CreateMinion(nil, &api.Minion{

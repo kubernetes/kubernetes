@@ -18,10 +18,12 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -30,16 +32,30 @@ type MinionController struct {
 	matchRE         string
 	staticResources *api.NodeResources
 	registry        minion.Registry
+	period          time.Duration
 }
 
 // NewMinionController returns a new minion controller to sync instances from cloudprovider.
-func NewMinionController(cloud cloudprovider.Interface, matchRE string, staticResources *api.NodeResources, registry minion.Registry) (*MinionController, error) {
+func NewMinionController(
+	cloud cloudprovider.Interface,
+	matchRE string,
+	staticResources *api.NodeResources,
+	registry minion.Registry,
+	period time.Duration) *MinionController {
 	return &MinionController{
 		cloud:           cloud,
 		matchRE:         matchRE,
 		staticResources: staticResources,
 		registry:        registry,
-	}, nil
+		period:          period,
+	}
+}
+
+// Run starts syncing instances from cloudprovider periodically.
+func (s *MinionController) Run() {
+	// Call Sync() first to warm up minion registry.
+	s.Sync()
+	go util.Forever(func() { s.Sync() }, s.period)
 }
 
 // Sync syncs list of instances from cloudprovider to master etcd registry.
