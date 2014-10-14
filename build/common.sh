@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Common utilties, variables and checks for all build scripts.
+# Common utilities, variables and checks for all build scripts.
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -145,7 +145,7 @@ function kube::build::verify_prereqs() {
 # Utility functions
 
 function kube::build::is_osx() {
-  [[ "$OSTYPE" == "darwin"* ]]
+  [[ "$(uname)" == "Darwin" ]]
 }
 
 function kube::build::clean_output() {
