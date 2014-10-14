@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Push built inmage to kubernetes/fluentd-elasticsearch.
 
-# Build the fluentd-elasticsearch image,
-
-sudo docker build -t kubernetes/fluentd-elasticsearch .
+sudo docker push kubernetes/fluentd-elasticsearch
