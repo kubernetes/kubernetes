@@ -35,6 +35,7 @@ type FakeDockerClient struct {
 	Stopped       []string
 	pulled        []string
 	Created       []string
+	VersionInfo   docker.Env
 }
 
 func (f *FakeDockerClient) clearCalls() {
@@ -138,6 +139,17 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	f.called = append(f.called, "pull")
 	f.pulled = append(f.pulled, fmt.Sprintf("%s/%s:%s", opts.Repository, opts.Registry, opts.Tag))
 	return f.Err
+}
+
+func (f *FakeDockerClient) Version() (*docker.Env, error) {
+	return &f.VersionInfo, nil
+}
+
+func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec, error) {
+	return &docker.Exec{"12345678"}, nil
+}
+func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error {
+	return nil
 }
 
 // FakeDockerPuller is a stub implementation of DockerPuller.

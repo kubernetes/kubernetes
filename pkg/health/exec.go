@@ -18,13 +18,13 @@ package health
 
 import (
 	"fmt"
-	"os/exec"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/golang/glog"
 )
 
-const defaultHealthyRegex = "^OK$"
+const defaultHealthyOutput = "ok"
 
 type CommandRunner interface {
 	RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
@@ -38,11 +38,6 @@ func NewExecHealthChecker(runner CommandRunner) HealthChecker {
 	return &ExecHealthChecker{runner}
 }
 
-func IsExitError(err error) bool {
-	_, ok := err.(*exec.ExitError)
-	return ok
-}
-
 func (e *ExecHealthChecker) HealthCheck(podFullName, podUUID string, currentState api.PodState, container api.Container) (Status, error) {
 	if container.LivenessProbe.Exec == nil {
 		return Unknown, fmt.Errorf("Missing exec parameters")
@@ -50,10 +45,10 @@ func (e *ExecHealthChecker) HealthCheck(podFullName, podUUID string, currentStat
 	data, err := e.runner.RunInContainer(podFullName, podUUID, container.Name, container.LivenessProbe.Exec.Command)
 	glog.V(1).Infof("container %s failed health check: %s", podFullName, string(data))
 	if err != nil {
-		if IsExitError(err) {
-			return Unhealthy, nil
-		}
 		return Unknown, err
+	}
+	if strings.ToLower(string(data)) != defaultHealthyOutput {
+		return Unhealthy, nil
 	}
 	return Healthy, nil
 }

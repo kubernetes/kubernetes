@@ -122,6 +122,46 @@ func TestContainerManifestNaming(t *testing.T) {
 	}
 }
 
+func TestGetDockerServerVersion(t *testing.T) {
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
+	runner := dockerContainerCommandRunner{fakeDocker}
+	version, err := runner.getDockerServerVersion()
+	if err != nil {
+		t.Errorf("got error while getting docker server version - %s", err)
+	}
+	expectedVersion := []uint{1, 1, 3}
+	if len(expectedVersion) != len(version) {
+		t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
+	} else {
+		for idx, val := range expectedVersion {
+			if version[idx] != val {
+				t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
+			}
+		}
+	}
+}
+
+func TestExecSupportExists(t *testing.T) {
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
+	runner := dockerContainerCommandRunner{fakeDocker}
+	useNativeExec, err := runner.nativeExecSupportExists()
+	if err != nil {
+		t.Errorf("got error while checking for exec support - %s", err)
+	}
+	if !useNativeExec {
+		t.Errorf("invalid exec support check output. Expected true")
+	}
+}
+
+func TestExecSupportNotExists(t *testing.T) {
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.2", "Server API version=1.15"}}
+	runner := dockerContainerCommandRunner{fakeDocker}
+	useNativeExec, _ := runner.nativeExecSupportExists()
+	if useNativeExec {
+		t.Errorf("invalid exec support check output.")
+	}
+}
+
 func TestDockerContainerCommand(t *testing.T) {
 	runner := dockerContainerCommandRunner{}
 	containerID := "1234"
