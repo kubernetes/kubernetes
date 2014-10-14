@@ -21,7 +21,9 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/constraint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
@@ -198,7 +200,44 @@ func (r *Registry) assignPod(podID string, machine string) error {
 }
 
 func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
-	return fmt.Errorf("unimplemented!")
+	var podOut api.Pod
+	podKey := makePodKey(pod.ID)
+	err := r.EtcdHelper.ExtractObj(podKey, &podOut, false)
+	if err != nil {
+		return err
+	}
+	scheduled := podOut.DesiredState.Host != ""
+	if scheduled {
+		pod.DesiredState.Host = podOut.DesiredState.Host
+		// If it's already been scheduled, limit the types of updates we'll accept.
+		errs := validation.ValidatePodUpdate(pod, &podOut)
+		if len(errs) != 0 {
+			return errors.NewInvalid("Pod", pod.ID, errs)
+		}
+	}
+	// There's no race with the scheduler, because either this write will fail because the host
+	// has been updated, or the host update will fail because this pod has been updated.
+	err = r.EtcdHelper.SetObj(podKey, pod)
+	if err != nil {
+		return err
+	}
+	if !scheduled {
+		// never scheduled, just update.
+		return nil
+	}
+	containerKey := makeContainerKey(podOut.DesiredState.Host)
+	return r.AtomicUpdate(containerKey, &api.ContainerManifestList{}, func(in runtime.Object) (runtime.Object, error) {
+		manifests := in.(*api.ContainerManifestList)
+		for ix := range manifests.Items {
+			if manifests.Items[ix].ID == pod.ID {
+				manifests.Items[ix] = pod.DesiredState.Manifest
+				return manifests, nil
+			}
+		}
+		// This really shouldn't happen
+		glog.Warningf("Couldn't find: %s in %#v", pod.ID, manifests)
+		return manifests, fmt.Errorf("Failed to update pod, couldn't find %s in %#v", pod.ID, manifests)
+	})
 }
 
 // DeletePod deletes an existing pod specified by its ID.

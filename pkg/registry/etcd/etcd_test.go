@@ -364,6 +364,148 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	}
 }
 
+func TestEtcdUpdatePodNotFound(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+
+	key := "/registry/pods/foo"
+	fakeClient.Data[key] = tools.EtcdResponseWithError{
+		R: &etcd.Response{},
+		E: tools.EtcdErrorNotFound,
+	}
+
+	registry := NewTestEtcdRegistry(fakeClient)
+	podIn := api.Pod{
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"},
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+	}
+	err := registry.UpdatePod(ctx, &podIn)
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestEtcdUpdatePodNotScheduled(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+
+	key := "/registry/pods/foo"
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
+		TypeMeta: api.TypeMeta{ID: "foo"},
+	}), 1)
+
+	registry := NewTestEtcdRegistry(fakeClient)
+	podIn := api.Pod{
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"},
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+	}
+	err := registry.UpdatePod(ctx, &podIn)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	response, err := fakeClient.Get(key, false, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	var podOut api.Pod
+	latest.Codec.DecodeInto([]byte(response.Node.Value), &podOut)
+	if !reflect.DeepEqual(podOut, podIn) {
+		t.Errorf("expected: %v, got: %v", podOut, podIn)
+	}
+}
+
+func TestEtcdUpdatePodScheduled(t *testing.T) {
+	ctx := api.NewContext()
+	fakeClient := tools.NewFakeEtcdClient(t)
+	fakeClient.TestIndex = true
+
+	key := "/registry/pods/foo"
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
+		TypeMeta: api.TypeMeta{ID: "foo"},
+		DesiredState: api.PodState{
+			Host: "machine",
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{
+						Image: "foo:v1",
+					},
+				},
+			},
+		},
+	}), 1)
+
+	contKey := "/registry/hosts/machine/kubelet"
+	fakeClient.Set(contKey, runtime.EncodeOrDie(latest.Codec, &api.ContainerManifestList{
+		Items: []api.ContainerManifest{
+			{
+				ID: "foo",
+				Containers: []api.Container{
+					{
+						Image: "foo:v1",
+					},
+				},
+			},
+			{
+				ID: "bar",
+				Containers: []api.Container{
+					{
+						Image: "bar:v1",
+					},
+				},
+			},
+		},
+	}), 0)
+
+	registry := NewTestEtcdRegistry(fakeClient)
+	podIn := api.Pod{
+		TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				ID: "foo",
+				Containers: []api.Container{
+					{
+						Image: "foo:v2",
+					},
+				},
+			},
+		},
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+	}
+	err := registry.UpdatePod(ctx, &podIn)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	response, err := fakeClient.Get(key, false, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	var podOut api.Pod
+	latest.Codec.DecodeInto([]byte(response.Node.Value), &podOut)
+	podIn.DesiredState.Host = "machine"
+	if !reflect.DeepEqual(podOut, podIn) {
+		t.Errorf("expected: %#v, got: %#v", podOut, podIn)
+	}
+
+	response, err = fakeClient.Get(contKey, false, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	var list api.ContainerManifestList
+	latest.Codec.DecodeInto([]byte(response.Node.Value), &list)
+	if len(list.Items) != 2 || !reflect.DeepEqual(list.Items[0], podIn.DesiredState.Manifest) {
+		t.Errorf("unexpected container list: %d %v %v", len(list.Items), list.Items[0], podIn.DesiredState.Manifest)
+	}
+}
+
 func TestEtcdDeletePod(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)

@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -338,6 +339,30 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
+	return allErrs
+}
+
+// ValidatePodUpdate tests to see if the update is legal
+func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+
+	if len(newPod.DesiredState.Manifest.Containers) != len(oldPod.DesiredState.Manifest.Containers) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
+		return allErrs
+	}
+	pod := *newPod
+	pod.Labels = oldPod.Labels
+	pod.TypeMeta.ResourceVersion = oldPod.TypeMeta.ResourceVersion
+	// Tricky, we need to copy the container list so that we don't overwrite the update
+	var newContainers []api.Container
+	for ix, container := range pod.DesiredState.Manifest.Containers {
+		container.Image = oldPod.DesiredState.Manifest.Containers[ix].Image
+		newContainers = append(newContainers, container)
+	}
+	pod.DesiredState.Manifest.Containers = newContainers
+	if !reflect.DeepEqual(&pod, oldPod) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
+	}
 	return allErrs
 }
 
