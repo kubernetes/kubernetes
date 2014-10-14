@@ -272,6 +272,7 @@ function kube-up {
     --norespect_terminal_width \
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --zone "${ZONE}" \
+    --permit_root_ssh \
     --machine_type "${MASTER_SIZE}" \
     --image "${IMAGE}" \
     --tags "${MASTER_TAG}" \
@@ -301,6 +302,7 @@ function kube-up {
       --norespect_terminal_width \
       --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --zone "${ZONE}" \
+      --permit_root_ssh \
       --machine_type "${MINION_SIZE}" \
       --image "${IMAGE}" \
       --tags "${MINION_TAG}" \
@@ -353,7 +355,7 @@ function kube-up {
   local rc # Capture return code without exiting because of errexit bash option
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
       # Make sure docker is installed
-      gcutil ssh "${MINION_NAMES[$i]}" which docker >/dev/null || {
+      gcutil --permit_root_ssh ssh "${MINION_NAMES[$i]}" which docker >/dev/null || {
         echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
         echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
         echo "cluster. (sorry!)" >&2
@@ -374,9 +376,9 @@ function kube-up {
   local ca_cert=".kubernetes.ca.crt"
 
   (umask 077
-   gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-   gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-   gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+   gcutil --permit_root_ssh ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+   gcutil --permit_root_ssh ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+   gcutil --permit_root_ssh ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
 
    cat << EOF > ~/.kubernetes_auth
 {
