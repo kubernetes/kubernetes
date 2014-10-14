@@ -63,6 +63,7 @@ var (
 	etcdConfigFile          = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
 	rootDirectory           = flag.String("root_dir", defaultRootDir, "Directory path for managing kubelet files (volume mounts,etc).")
 	allowPrivileged         = flag.Bool("allow_privileged", false, "If true, allow containers to request privileged mode. [default=false]")
+	allowEscapeChroot       = flag.Bool("allow_escape_chroot", true, "If true, allow pods to mount node directories as volumes.  [default=true]")
 	registryPullQPS         = flag.Float64("registry_qps", 0.0, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	registryBurst           = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
 	runonce                 = flag.Bool("runonce", false, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --etcd_servers and --enable-server")
@@ -124,7 +125,8 @@ func main() {
 	etcd.SetLogger(util.NewLogger("etcd "))
 
 	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: *allowPrivileged,
+		AllowPrivileged:   *allowPrivileged,
+		AllowEscapeChroot: *allowEscapeChroot,
 	})
 
 	dockerClient, err := docker.NewClient(getDockerEndpoint())

@@ -35,6 +35,10 @@ func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
 }
 
 func TestValidateVolumes(t *testing.T) {
+	c := capabilities.Get()
+	c.AllowEscapeChroot = true
+	capabilities.SetForTests(c)
+
 	successCase := []api.Volume{
 		{Name: "abc"},
 		{Name: "123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path2"}}},
@@ -59,6 +63,36 @@ func TestValidateVolumes(t *testing.T) {
 		"name > 63 characters": {[]api.Volume{{Name: strings.Repeat("a", 64)}}, errors.ValidationErrorTypeInvalid, "[0].name"},
 		"name not a DNS label": {[]api.Volume{{Name: "a.b.c"}}, errors.ValidationErrorTypeInvalid, "[0].name"},
 		"name not unique":      {[]api.Volume{{Name: "abc"}, {Name: "abc"}}, errors.ValidationErrorTypeDuplicate, "[1].name"},
+	}
+	for k, v := range errorCases {
+		_, errs := validateVolumes(v.V)
+		if len(errs) == 0 {
+			t.Errorf("expected failure %s for %v", k, v.V)
+			continue
+		}
+		for i := range errs {
+			if errs[i].(errors.ValidationError).Type != v.T {
+				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
+			}
+			if errs[i].(errors.ValidationError).Field != v.F {
+				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
+			}
+		}
+	}
+
+}
+
+func TestValidateHostDirForbidden(t *testing.T) {
+	c := capabilities.Get()
+	c.AllowEscapeChroot = false
+	capabilities.SetForTests(c)
+
+	errorCases := map[string]struct {
+		V []api.Volume
+		T errors.ValidationErrorType
+		F string
+	}{
+		"HostDir requested": {[]api.Volume{{Name: "123", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/path2"}}}}, errors.ValidationErrorTypeInvalid, "[0].source.hostDir"},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)
@@ -303,6 +337,10 @@ func TestValidateRestartPolicy(t *testing.T) {
 }
 
 func TestValidateManifest(t *testing.T) {
+	c := capabilities.Get()
+	c.AllowEscapeChroot = true
+	capabilities.SetForTests(c)
+
 	successCases := []api.ContainerManifest{
 		{Version: "v1beta1", ID: "abc"},
 		{Version: "v1beta2", ID: "123"},
@@ -310,8 +348,8 @@ func TestValidateManifest(t *testing.T) {
 		{
 			Version: "v1beta1",
 			ID:      "abc",
-			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/vol1"}}},
-				{Name: "vol2", Source: &api.VolumeSource{HostDir: &api.HostDir{"/mnt/vol2"}}}},
+			Volumes: []api.Volume{{Name: "vol1", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}},
+				{Name: "vol2", Source: &api.VolumeSource{EmptyDir: &api.EmptyDir{}}}},
 			Containers: []api.Container{
 				{
 					Name:       "abc",

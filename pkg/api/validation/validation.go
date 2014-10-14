@@ -63,6 +63,11 @@ func validateSource(source *api.VolumeSource) errs.ErrorList {
 	if source.HostDir != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateHostDir(source.HostDir).Prefix("hostDirectory")...)
+		capabilities := capabilities.Get()
+		if !capabilities.AllowEscapeChroot {
+			allErrs = append(allErrs, errs.NewFieldInvalid("hostDir", source.HostDir))
+
+		}
 	}
 	if source.EmptyDir != nil {
 		numVolumes++
