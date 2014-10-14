@@ -16,7 +16,7 @@ The standalone cloud-config file can be used to setup a single node Kubernetes c
 
 * [standalone.yml](configs/standalone.yml)
 
-Skip to ['Configure Access'](#Configure%20Access).
+Skip to ['Configure Access'](#configure-access).
 
 
 ### Cluster 
