@@ -22,6 +22,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Digital Ocean](https://github.com/bketelsen/coreos-kubernetes-digitalocean)
   * [CoreOS](docs/getting-started-guides/coreos.md)
   * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
+  * [CloudStack](docs/getting-started-guides/cloudstack.md)
 * The following clouds are currently broken at Kubernetes head.  Please sync your client to `v0.3` (`git checkout v0.3`) to use these:
   * [Locally](docs/getting-started-guides/locally.md)
   * [vSphere](docs/getting-started-guides/vsphere.md)

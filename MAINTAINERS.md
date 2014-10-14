@@ -17,3 +17,4 @@ least one maintainer on relevant issues and PRs.
 * oVirt: [Federico Simoncelli](https://github.com/simon3z)
 * Local: [Derek Carr](https://github.com/derekwaynecarr)
 * Vagrant: [Derek Carr](https://github.com/derekwaynecarr)
+* CloudStack: [Sebastien Goasguen](https://github.com/runseb)
