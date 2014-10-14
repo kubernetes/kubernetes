@@ -496,7 +496,7 @@ func TestMakePodStatus(t *testing.T) {
 					Host: "machine",
 				},
 			},
-			api.PodWaiting,
+			api.PodRunning,
 			"mixed state #1",
 		},
 		{
