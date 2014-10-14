@@ -346,6 +346,10 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
+	if newPod.ID != oldPod.ID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("ID", newPod.ID))
+	}
+
 	if len(newPod.DesiredState.Manifest.Containers) != len(oldPod.DesiredState.Manifest.Containers) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
 		return allErrs
@@ -360,7 +364,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
 		newContainers = append(newContainers, container)
 	}
 	pod.DesiredState.Manifest.Containers = newContainers
-	if !reflect.DeepEqual(&pod, oldPod) {
+	if !reflect.DeepEqual(pod.DesiredState.Manifest, oldPod.DesiredState.Manifest) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
 	}
 	return allErrs
