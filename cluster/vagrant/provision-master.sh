@@ -113,7 +113,7 @@ python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpas
 MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
 echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
-# we will run provision to update code each time we test, so we do not want to do salt install each time
+# we will run provision to update code each time we test, so we do not want to do salt installs each time
 if ! which salt-master >/dev/null 2>&1; then
 
   # Configure the salt-api
@@ -130,10 +130,12 @@ rest_cherrypy:
   webhook_disable_auth: True
 EOF
 
-  # Install Salt
+
+  # Install Salt Master
   #
   # -M installs the master
-  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M
+  # -N does not install the minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -N
 
   # Install salt-api
   #
@@ -144,6 +146,13 @@ EOF
   SYSTEMD_LOG_LEVEL=notice systemctl enable salt-api
   systemctl start salt-api
 
+fi
+
+if ! which salt-minion >/dev/null 2>&1; then
+
+  # Install Salt minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
+  
 else
   # Only run highstate when updating the config.  In the first-run case, Salt is
   # set up to run highstate as new minions join for the first time.
