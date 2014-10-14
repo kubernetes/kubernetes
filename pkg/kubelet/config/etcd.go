@@ -34,7 +34,7 @@ import (
 )
 
 func EtcdKeyForHost(hostname string) string {
-	return path.Join("/", "registry", "hosts", hostname, "kubelet")
+	return path.Join("/", "registry", "nodes", hostname, "boundpods")
 }
 
 type SourceEtcd struct {
@@ -110,8 +110,4 @@ func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
 	}
 
 	return pods, nil
-}
-
-func makeContainerKey(machine string) string {
-	return "/registry/hosts/" + machine + "/kubelet"
 }
