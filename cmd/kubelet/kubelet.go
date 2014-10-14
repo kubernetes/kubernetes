@@ -141,6 +141,9 @@ func main() {
 	if err := os.MkdirAll(*rootDirectory, 0750); err != nil {
 		glog.Warningf("Error creating root directory: %v", err)
 	}
+	if err := os.Chdir(*rootDirectory); err != nil {
+		glog.Warningf("Error changing working directory to %s: %v", *rootDirectory, err)
+	}
 
 	// source of all configuration
 	cfg := kconfig.NewPodConfig(kconfig.PodConfigNotificationSnapshotAndUpdates)
