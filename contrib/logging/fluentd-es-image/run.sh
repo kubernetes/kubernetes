@@ -20,8 +20,10 @@
 # service IPs are done.
 OUTER_HOST=`tail -n 1 /outerhost | awk '{print $3}'`
 
-# Copy the Fluentd config file and patch it to refer to the
-# name of the host machine for ES_HOST. HACK!
-cp td-agent.conf /etc/td-agent
+# WARNING! HORRIBLE HACK! We expect /outerhost to be mapped to
+# the enclosing /etc/host file so we can determine the name of
+# the host machine (super fragile). This is a temporary hack until
+# service IPs are done.
+# Adjust the name of the host machine for ES_HOST. HACK!
 sed -i -e "s/ES_HOST/${OUTER_HOST}/" /etc/td-agent/td-agent.conf
 /usr/sbin/td-agent
