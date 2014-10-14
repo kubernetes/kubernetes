@@ -1,6 +1,8 @@
 # CoreOS Quick Start Guide
 
-The following steps will setup a single node Kubernetes cluster. For a more robust setup using cloud-config see the [Installation Guide](docs/installation.md).
+The following steps will setup a single node Kubernetes cluster. For a more robust setup using cloud-config see the 
+[Installation Guide](coreos_cloud_config.md) which automates the entire set-up. Those not installing via cloud-config 
+need to define the required network configuration from in the [Network Guide](networking.md).
 
 ### Install Kubernetes binaries
 
