@@ -31,7 +31,7 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
 
 verify-prereqs
-kube-up
+kube-up "$@"
 
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
 
