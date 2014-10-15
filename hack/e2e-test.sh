@@ -16,6 +16,11 @@
 
 # Starts a Kubernetes cluster, runs the e2e test suite, and shuts it
 # down.
+#
+# Environment flags:
+#   TEST_PATTERN: A pattern to match test filenames against.
+#     Example: "TEST_PATTERN=up" would match tests named "update.sh" and
+#              "hiccup.sh".
 
 set -o errexit
 set -o nounset
@@ -64,8 +69,18 @@ if [[ ${LEAVE_UP} -ne 1 ]]; then
   trap test-teardown EXIT
 fi
 
+TEST_PATTERN="${TEST_PATTERN:-}"
 any_failed=0
 for test_file in $(ls "${KUBE_ROOT}/hack/e2e-suite/"); do
+  if [[ "${TEST_PATTERN}" != "" ]]; then
+    check=".*${TEST_PATTERN}.*"
+    if [[ ! "$test_file" =~ $check ]]; then
+        echo "skipping $test_file"
+        continue
+    fi
+  fi
+
+  echo "running $test_file"
   "${KUBE_ROOT}/hack/e2e-suite/${test_file}"
   result="$?"
   if [[ "${result}" -eq "0" ]]; then
