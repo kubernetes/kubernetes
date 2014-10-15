@@ -46,9 +46,34 @@ function validate() {
     num_running=0
     for id in "${pod_id_list[@]+${pod_id_list[@]}}"; do
       local template_string current_status current_image host_ip
+
+      # NB: This template string is a little subtle.
+      #
+      # Notes:
+      #
+      # The 'and' operator will return blank if any of the inputs are non-
+      # nil/false.  If they are all set, then it'll return the last one.
+      #
+      # The container is name has a dash in it and so we can't use the simple
+      # syntax.  Instead we need to quote that and use the 'index' operator.
+      #
+      # The value here is a structure with just a Time member.  This is
+      # currently always set to a zero time.
+      #
+      # You can read about the syntax here: http://golang.org/pkg/text/template/
       template_string="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
-      current_status=$($KUBECFG -template="${template_string}" get "pods/$id")
-      if [ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]; then
+      current_status=$($KUBECFG -template="${template_string}" get "pods/$id") || {
+        if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
+          echo "  $id no longer exists"
+          continue
+        else
+          echo "  kubecfg failed with error:"
+          echo $current_status
+          exit -1
+        fi
+      }
+
+      if [[ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]]; then
         echo "  $id is created but not running"
         continue
       fi
