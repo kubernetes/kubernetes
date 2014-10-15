@@ -30,7 +30,6 @@ func main() {
                 fmt.Println("Size: ", img.Size)
                 fmt.Println("VirtualSize: ", img.VirtualSize)
                 fmt.Println("ParentId: ", img.ParentId)
-                fmt.Println("Repository: ", img.Repository)
         }
 }
 ```

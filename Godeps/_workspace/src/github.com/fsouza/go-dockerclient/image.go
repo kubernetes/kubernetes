@@ -42,6 +42,16 @@ type Image struct {
 	Size            int64     `json:"Size,omitempty" yaml:"Size,omitempty"`
 }
 
+// ImageHistory represent a layer in an image's history returned by the
+// ImageHistory call.
+type ImageHistory struct {
+	ID        string   `json:"Id" yaml:"Id"`
+	Tags      []string `json:"Tags,omitempty" yaml:"Tags,omitempty"`
+	Created   int64    `json:"Created,omitempty" yaml:"Created,omitempty"`
+	CreatedBy string   `json:"CreatedBy,omitempty" yaml:"CreatedBy,omitempty"`
+	Size      int64    `json:"Size,omitempty" yaml:"Size,omitempty"`
+}
+
 type ImagePre012 struct {
 	ID              string    `json:"id"`
 	Parent          string    `json:"parent,omitempty"`
@@ -71,7 +81,7 @@ var (
 
 // ListImages returns the list of available images in the server.
 //
-// See http://goo.gl/dkMrwP for more details.
+// See http://goo.gl/VmcR6v for more details.
 func (c *Client) ListImages(all bool) ([]APIImages, error) {
 	path := "/images/json?all="
 	if all {
@@ -91,9 +101,28 @@ func (c *Client) ListImages(all bool) ([]APIImages, error) {
 	return images, nil
 }
 
+// ImageHistory returns the history of the image by its name or ID.
+//
+// See http://goo.gl/2oJmNs for more details.
+func (c *Client) ImageHistory(name string) ([]ImageHistory, error) {
+	body, status, err := c.do("GET", "/images/"+name+"/history", nil)
+	if status == http.StatusNotFound {
+		return nil, ErrNoSuchImage
+	}
+	if err != nil {
+		return nil, err
+	}
+	var history []ImageHistory
+	err = json.Unmarshal(body, &history)
+	if err != nil {
+		return nil, err
+	}
+	return history, nil
+}
+
 // RemoveImage removes an image by its name or ID.
 //
-// See http://goo.gl/7hjHHy for more details.
+// See http://goo.gl/znj0wM for more details.
 func (c *Client) RemoveImage(name string) error {
 	_, status, err := c.do("DELETE", "/images/"+name, nil)
 	if status == http.StatusNotFound {
@@ -104,7 +133,7 @@ func (c *Client) RemoveImage(name string) error {
 
 // InspectImage returns an image by its name or ID.
 //
-// See http://goo.gl/pHEbma for more details.
+// See http://goo.gl/Q112NY for more details.
 func (c *Client) InspectImage(name string) (*Image, error) {
 	body, status, err := c.do("GET", "/images/"+name+"/json", nil)
 	if status == http.StatusNotFound {
@@ -147,7 +176,7 @@ func (c *Client) InspectImage(name string) (*Image, error) {
 
 // PushImageOptions represents options to use in the PushImage method.
 //
-// See http://goo.gl/GBmyhc for more details.
+// See http://goo.gl/pN8A3P for more details.
 type PushImageOptions struct {
 	// Name of the image
 	Name string
@@ -158,7 +187,8 @@ type PushImageOptions struct {
 	// Registry server to push the image
 	Registry string
 
-	OutputStream io.Writer `qs:"-"`
+	OutputStream  io.Writer `qs:"-"`
+	RawJSONStream bool      `qs:"-"`
 }
 
 // AuthConfiguration represents authentication options to use in the PushImage
@@ -174,7 +204,7 @@ type AuthConfiguration struct {
 // An empty instance of AuthConfiguration may be used for unauthenticated
 // pushes.
 //
-// See http://goo.gl/GBmyhc for more details.
+// See http://goo.gl/pN8A3P for more details.
 func (c *Client) PushImage(opts PushImageOptions, auth AuthConfiguration) error {
 	if opts.Name == "" {
 		return ErrNoSuchImage
@@ -188,13 +218,13 @@ func (c *Client) PushImage(opts PushImageOptions, auth AuthConfiguration) error 
 
 	headers["X-Registry-Auth"] = base64.URLEncoding.EncodeToString(buf.Bytes())
 
-	return c.stream("POST", path, true, false, headers, nil, opts.OutputStream, nil)
+	return c.stream("POST", path, true, opts.RawJSONStream, headers, nil, opts.OutputStream, nil)
 }
 
 // PullImageOptions present the set of options available for pulling an image
 // from a registry.
 //
-// See http://goo.gl/PhBKnS for more details.
+// See http://goo.gl/ACyYNS for more details.
 type PullImageOptions struct {
 	Repository    string `qs:"fromImage"`
 	Registry      string
@@ -205,7 +235,7 @@ type PullImageOptions struct {
 
 // PullImage pulls an image from a remote registry, logging progress to w.
 //
-// See http://goo.gl/PhBKnS for more details.
+// See http://goo.gl/ACyYNS for more details.
 func (c *Client) PullImage(opts PullImageOptions, auth AuthConfiguration) error {
 	if opts.Repository == "" {
 		return ErrNoSuchImage
@@ -288,9 +318,11 @@ func (c *Client) ImportImage(opts ImportImageOptions) error {
 	return c.createImage(queryString(&opts), nil, opts.InputStream, opts.OutputStream, false)
 }
 
-// BuildImageOptions present the set of informations available for building
-// an image from a tarfile with a Dockerfile in it,the details about Dockerfile
-// see http://docs.docker.io/en/latest/reference/builder/
+// BuildImageOptions present the set of informations available for building an
+// image from a tarfile with a Dockerfile in it.
+//
+// For more details about the Docker building process, see
+// http://goo.gl/tlPXPu.
 type BuildImageOptions struct {
 	Name                string    `qs:"t"`
 	NoCache             bool      `qs:"nocache"`
@@ -299,11 +331,14 @@ type BuildImageOptions struct {
 	ForceRmTmpContainer bool      `qs:"forcerm"`
 	InputStream         io.Reader `qs:"-"`
 	OutputStream        io.Writer `qs:"-"`
+	RawJSONStream       bool      `qs:"-"`
 	Remote              string    `qs:"remote"`
 }
 
 // BuildImage builds an image from a tarball's url or a Dockerfile in the input
 // stream.
+//
+// See http://goo.gl/wRsW76 for more details.
 func (c *Client) BuildImage(opts BuildImageOptions) error {
 	if opts.OutputStream == nil {
 		return ErrMissingOutputStream
@@ -318,17 +353,21 @@ func (c *Client) BuildImage(opts BuildImageOptions) error {
 		return ErrMissingRepo
 	}
 	return c.stream("POST", fmt.Sprintf("/build?%s",
-		queryString(&opts)), true, false, headers, opts.InputStream, opts.OutputStream, nil)
+		queryString(&opts)), true, opts.RawJSONStream, headers, opts.InputStream, opts.OutputStream, nil)
 }
 
-// TagImageOptions present the set of options to tag an image
+// TagImageOptions present the set of options to tag an image.
+//
+// See http://goo.gl/5g6qFy for more details.
 type TagImageOptions struct {
 	Repo  string
 	Tag   string
 	Force bool
 }
 
-// TagImage adds a tag to the image 'name'
+// TagImage adds a tag to the image identified by the given name.
+//
+// See http://goo.gl/5g6qFy for more details.
 func (c *Client) TagImage(name string, opts TagImageOptions) error {
 	if name == "" {
 		return ErrNoSuchImage
@@ -348,4 +387,31 @@ func isURL(u string) bool {
 		return false
 	}
 	return p.Scheme == "http" || p.Scheme == "https"
+}
+
+// APIImageSearch reflect the result of a search on the dockerHub
+//
+// See http://goo.gl/xI5lLZ for more details.
+type APIImageSearch struct {
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	IsOfficial  bool   `json:"is_official,omitempty" yaml:"is_official,omitempty"`
+	IsAutomated bool   `json:"is_automated,omitempty" yaml:"is_automated,omitempty"`
+	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
+	StarCount   int    `json:"star_count,omitempty" yaml:"star_count,omitempty"`
+}
+
+// SearchImages search the docker hub with a specific given term.
+//
+// See http://goo.gl/xI5lLZ for more details.
+func (c *Client) SearchImages(term string) ([]APIImageSearch, error) {
+	body, _, err := c.do("GET", "/images/search?term="+term, nil)
+	if err != nil {
+		return nil, err
+	}
+	var searchResult []APIImageSearch
+	err = json.Unmarshal(body, &searchResult)
+	if err != nil {
+		return nil, err
+	}
+	return searchResult, nil
 }
