@@ -28,10 +28,6 @@ grains:
   cloud: gce
 EOF
 
-cat <<EOF >/srv/pillar/cluster-params.sls
-node_instance_prefix: $NODE_INSTANCE_PREFIX
-EOF
-
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
 cat <<EOF >/etc/salt/master.d/auto-accept.conf
@@ -45,9 +41,6 @@ reactor:
     - /srv/reactor/start.sls
 EOF
 
-mkdir -p /srv/salt/nginx
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
-
 # Install Salt
 #
 # We specify -X to avoid a race condition that can cause minion failure to
@@ -57,5 +50,3 @@ echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 set +x
 curl -L --connect-timeout 20 --retry 6 --retry-delay 10 http://bootstrap.saltstack.com | sh -s -- -M -X
 set -x
-
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
