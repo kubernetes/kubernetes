@@ -147,7 +147,22 @@ redis-master-pod  gurpartap/redis       kubernetes-minion-3.c.briandpe-api.inter
 
 You will see a single redis master pod, two redis slaves, and three guestbook pods.
 
-To play with the service itself, find the name of a guestbook, grab the external IP of that host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:3000`.
+### Step Six: Create the guestbook service.
+
+Just like for redis, we want to have a service to proxy connections to the guestboook. The service specification for the guestbook is in `examples/guestbook-go/guestbook-service.json`
+
+This time the selector for the service is `name=guestbook`. As for the port, we decide to export the internal `http-server` port to port `3000`.
+
+Now that you have created the service specification, create it in your cluster with the `kubecfg` CLI:
+
+```shell
+$ cluster/kubecfg.sh -c examples/guestbook-go/guestbook-service.json create services
+  ID         Labels            Selector               Port
+----------   ----------        ----------             ----------
+guestbook                      name=guestbook         3000
+```
+
+To play with the service itself, grab the external IP of any Kubernetes host from the [Google Cloud Console][cloud-console] or the `gcutil` tool, and visit `http://<host-ip>:3000`.
 
 ```shell
 $ gcutil listinstances
@@ -165,7 +180,7 @@ For details about limiting traffic to specific sources, see the [gcutil document
 [cloud-console]: https://console.developer.google.com
 [gcutil-docs]: https://developers.google.com/compute/docs/gcutil/reference/firewall#addfirewall
 
-### Step Six: Cleanup
+### Step Seven: Cleanup
 
 To turn down a Kubernetes cluster:
 
