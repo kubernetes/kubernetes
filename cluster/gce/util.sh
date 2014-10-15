@@ -209,6 +209,41 @@ EOF
 #   KUBE_ROOT
 #   <Various vars set in config file>
 function kube-up {
+  # Check command line arguments. Make it possible to specify
+  # multiple logging options.
+  # TODO(satnam6502): Perhaps consider the use of getopt or getopts although
+  # this will do while the options are simple.
+  readonly USAGE="Usage: $0 [-h|--help] [--fluentd-es] [--fluentd-gcp]"
+  local FLUENTD_ELASTICSEARCH=""
+  local FLUENTD_GCP=""
+  while test $# -gt 0
+  do
+    case "$1" in
+      -h|--help)
+        echo $USAGE
+        exit 0
+        ;;
+      --fluentd-es)
+        local FLUENTD_ELASTICSEARCH=1
+        shift
+        ;;
+      --fluentd-gcp)
+        local FLUENTD_GCP=1
+        shift
+        ;;
+      *)
+        echo "Unknown command line option: $1" >&2
+        echo $USAGE
+        exit 2
+    esac
+  done
+  if [ $FLUENTD_ELASTICSEARCH ]; then
+    echo "+++ Logging with fluentd and Elasticsearch"
+  fi
+  if [ $FLUENTD_GCP ]; then
+    echo "+++ Logging with fluentd and GCP"
+  fi
+
   # Detect the project into $PROJECT if it isn't set
   detect-project
 
