@@ -24,6 +24,6 @@ OUTER_HOST=`tail -n 1 /outerhost | awk '{print $3}'`
 # the enclosing /etc/host file so we can determine the name of
 # the host machine (super fragile). This is a temporary hack until
 # service IPs are done.
-# Adjust the name of the host machine for ES_HOST. HACK!
-sed -i -e "s/ES_HOST/${OUTER_HOST}/" /etc/td-agent/td-agent.conf
-/usr/sbin/td-agent
+# Adjust the name of the host machine for %ES_HOST%. HACK!
+sed -i -e "s/\%ES_HOST\%/${OUTER_HOST}/" /etc/td-agent/td-agent.conf
+/usr/sbin/td-agent $@
