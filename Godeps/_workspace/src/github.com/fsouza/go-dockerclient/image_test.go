@@ -122,6 +122,48 @@ func TestListImagesParameters(t *testing.T) {
 	}
 }
 
+func TestImageHistory(t *testing.T) {
+	body := `[
+	{
+		"Id": "25daec02219d2d852f7526137213a9b199926b4b24e732eab5b8bc6c49bd470e",
+		"Tags": [
+			"debian:7.6",
+			"debian:latest",
+			"debian:7",
+			"debian:wheezy"
+		],
+		"Created": 1409856216,
+		"CreatedBy": "/bin/sh -c #(nop) CMD [/bin/bash]"
+	},
+	{
+		"Id": "41026a5347fb5be6ed16115bf22df8569697139f246186de9ae8d4f67c335dce",
+		"Created": 1409856213,
+		"CreatedBy": "/bin/sh -c #(nop) ADD file:1ee9e97209d00e3416a4543b23574cc7259684741a46bbcbc755909b8a053a38 in /",
+		"Size": 85178663
+	},
+	{
+		"Id": "511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158",
+		"Tags": [
+			"scratch:latest"
+		],
+		"Created": 1371157430
+	}
+]`
+	var expected []ImageHistory
+	err := json.Unmarshal([]byte(body), &expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := newTestClient(&FakeRoundTripper{message: body, status: http.StatusOK})
+	history, err := client.ImageHistory("debian:latest")
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(history, expected) {
+		t.Errorf("ImageHistory: Wrong return value. Want %#v. Got %#v.", expected, history)
+	}
+}
+
 func TestRemoveImage(t *testing.T) {
 	name := "test"
 	fakeRT := &FakeRoundTripper{message: "", status: http.StatusNoContent}
@@ -221,6 +263,35 @@ func TestPushImage(t *testing.T) {
 	if strings.TrimSpace(string(auth)) != "{}" {
 		t.Errorf("PushImage: wrong body. Want %q. Got %q.",
 			base64.URLEncoding.EncodeToString([]byte("{}")), req.Header.Get("X-Registry-Auth"))
+	}
+}
+
+func TestPushImageWithRawJSON(t *testing.T) {
+	body := `
+	{"status":"Pushing..."}
+	{"status":"Pushing", "progress":"1/? (n/a)", "progressDetail":{"current":1}}}
+	{"status":"Image successfully pushed"}
+	`
+	fakeRT := &FakeRoundTripper{
+		message: body,
+		status:  http.StatusOK,
+		header: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}
+	client := newTestClient(fakeRT)
+	var buf bytes.Buffer
+
+	err := client.PushImage(PushImageOptions{
+		Name:          "test",
+		OutputStream:  &buf,
+		RawJSONStream: true,
+	}, AuthConfiguration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != body {
+		t.Errorf("PushImage: Wrong raw output. Want %q. Got %q.", body, buf.String())
 	}
 }
 
@@ -579,7 +650,7 @@ func TestBuildImageParametersForRemoteBuild(t *testing.T) {
 	expected := map[string][]string{"t": {opts.Name}, "remote": {opts.Remote}, "q": {"1"}}
 	got := map[string][]string(req.URL.Query())
 	if !reflect.DeepEqual(got, expected) {
-		t.Errorf("ImportImage: wrong query string. Want %#v. Got %#v.", expected, got)
+		t.Errorf("BuildImage: wrong query string. Want %#v. Got %#v.", expected, got)
 	}
 }
 
@@ -605,6 +676,44 @@ func TestBuildImageMissingOutputStream(t *testing.T) {
 	err := client.BuildImage(opts)
 	if err != ErrMissingOutputStream {
 		t.Errorf("BuildImage: wrong error returned. Want %#v. Got %#v.", ErrMissingOutputStream, err)
+	}
+}
+
+func TestBuildImageWithRawJSON(t *testing.T) {
+	body := `
+	{"stream":"Step 0 : FROM ubuntu:latest\n"}
+	{"stream":" ---\u003e 4300eb9d3c8d\n"}
+	{"stream":"Step 1 : MAINTAINER docker <eng@docker.com>\n"}
+	{"stream":" ---\u003e Using cache\n"}
+	{"stream":" ---\u003e 3a3ed758c370\n"}
+	{"stream":"Step 2 : CMD /usr/bin/top\n"}
+	{"stream":" ---\u003e Running in 36b1479cc2e4\n"}
+	{"stream":" ---\u003e 4b6188aebe39\n"}
+	{"stream":"Removing intermediate container 36b1479cc2e4\n"}
+	{"stream":"Successfully built 4b6188aebe39\n"}
+    `
+	fakeRT := &FakeRoundTripper{
+		message: body,
+		status:  http.StatusOK,
+		header: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}
+	client := newTestClient(fakeRT)
+	var buf bytes.Buffer
+	opts := BuildImageOptions{
+		Name:           "testImage",
+		RmTmpContainer: true,
+		InputStream:    &buf,
+		OutputStream:   &buf,
+		RawJSONStream:  true,
+	}
+	err := client.BuildImage(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != body {
+		t.Errorf("BuildImage: Wrong raw output. Want %q. Got %q.", body, buf.String())
 	}
 }
 
@@ -708,5 +817,45 @@ func TestExportImage(t *testing.T) {
 	expectedPath := "/images/testimage/get"
 	if req.URL.Path != expectedPath {
 		t.Errorf("ExportIMage: wrong path. Expected %q. Got %q.", expectedPath, req.URL.Path)
+	}
+}
+
+func TestSearchImages(t *testing.T) {
+	body := `[
+	{
+		"description":"A container with Cassandra 2.0.3",
+		"is_official":true,
+		"is_automated":true,
+		"name":"poklet/cassandra",
+		"star_count":17
+	},
+	{
+		"description":"A container with Cassandra 2.0.3",
+		"is_official":true,
+		"is_automated":false,
+		"name":"poklet/cassandra",
+		"star_count":17
+	}
+	,
+	{
+		"description":"A container with Cassandra 2.0.3",
+		"is_official":false,
+		"is_automated":true,
+		"name":"poklet/cassandra",
+		"star_count":17
+	}
+]`
+	var expected []APIImageSearch
+	err := json.Unmarshal([]byte(body), &expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := newTestClient(&FakeRoundTripper{message: body, status: http.StatusOK})
+	result, err := client.SearchImages("cassandra")
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(result, expected) {
+		t.Errorf("SearchImages: Wrong return value. Want %#v. Got %#v.", expected, result)
 	}
 }
