@@ -3,6 +3,8 @@
 This guide demostrates a network setup that will work for environments with access to layer 2 networking 
 (bare metal, vmware, etc). The following steps are not required when following the [Installation Guide](coreos_cloud_config.md).
 
+Please note: With some hypervisors, you may have to enable special settings on the virtual network cards for bridging to work (for example, you need to allow 'MAC address spoofing' in Microsoft Hyper-V).
+
 ## Hostnames
 
 On each node ensure the hostname is set.
