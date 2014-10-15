@@ -257,7 +257,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
 		} else if ctr.Privileged && !capabilities.AllowPrivileged {
-			cErrs = append(cErrs, errs.NewFieldInvalid("privileged", ctr.Privileged))
+			cErrs = append(cErrs, errs.NewFieldForbidden("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
