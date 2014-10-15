@@ -51,9 +51,9 @@ API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 GO_OUT=${KUBE_TARGET}/bin
 
-# Check kubecfg
-out=$("${GO_OUT}/kubecfg" -version)
-echo kubecfg: $out
+# Check kubectl
+out=$("${GO_OUT}/kubectl")
+echo kubectl: $out
 
 # Start kubelet
 ${GO_OUT}/kubelet \
@@ -76,19 +76,20 @@ APISERVER_PID=$!
 
 wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
-KUBE_CMD="${GO_OUT}/kubecfg -h http://127.0.0.1:${API_PORT} -expect_version_match"
+KUBE_CMD="${GO_OUT}/kubectl"
+KUBE_FLAGS="-s http://127.0.0.1:${API_PORT} --match-server-version"
 
-${KUBE_CMD} list pods
-echo "kubecfg(pods): ok"
+${KUBE_CMD} get pods ${KUBE_FLAGS}
+echo "kubectl(pods): ok"
 
-${KUBE_CMD} list services
-${KUBE_CMD} -c examples/guestbook/frontend-service.json create services
-${KUBE_CMD} delete services/frontend
-echo "kubecfg(services): ok"
+${KUBE_CMD} get services ${KUBE_FLAGS}
+${KUBE_CMD} create -f examples/guestbook/frontend-service.json ${KUBE_FLAGS}
+${KUBE_CMD} delete service frontend ${KUBE_FLAGS}
+echo "kubectl(services): ok"
 
-${KUBE_CMD} list minions
-${KUBE_CMD} get minions/127.0.0.1
-echo "kubecfg(minions): ok"
+${KUBE_CMD} get minions ${KUBE_FLAGS}
+${KUBE_CMD} get minions 127.0.0.1 ${KUBE_FLAGS}
+echo "kubectl(minions): ok"
 
 # Start controller manager
 #${GO_OUT}/controller-manager \
