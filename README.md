@@ -46,7 +46,7 @@ Check out examples of Kubernetes in action, and community projects in the larger
 * [Example of dynamic updates](examples/update-demo/README.md)
 * [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
 * [Community projects](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Kubernetes-Community)
-* [Development guide](docs/development.md)
+* [Development guide](docs/devel/development.md)
 
 Or fork and start hacking!
 
