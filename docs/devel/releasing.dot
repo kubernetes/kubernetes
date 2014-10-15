@@ -1,0 +1,113 @@
+// Build it with:
+//   $ dot -Tsvg releasing.dot >releasing.svg
+
+digraph tagged_release {
+  size = "5,5"
+  // Arrows go up.
+  rankdir = BT
+  subgraph left {
+    // Group the left nodes together.
+    ci012abc -> pr101 -> ci345cde -> pr102
+    style = invis
+  }
+  subgraph right {
+    // Group the right nodes together.
+    version_commit -> dev_commit
+    style = invis
+  }
+  { // Align the version commit and the info about it.
+    rank = same
+    // Align them with pr101
+    pr101
+    version_commit
+    // release_info shows the change in the commit.
+    release_info
+  }
+  { // Align the dev commit and the info about it.
+    rank = same
+    // Align them with 345cde
+    ci345cde
+    dev_commit
+    dev_info
+  }
+  // Join the nodes from subgraph left.
+  pr99 -> ci012abc
+  pr102 -> pr100
+  // Do the version node.
+  pr99 -> version_commit
+  dev_commit -> pr100
+  tag -> version_commit
+  pr99 [
+    label = "Merge PR #99"
+    shape = box
+    fillcolor = "#ccccff"
+    style = "filled"
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+  ci012abc [
+    label = "012abc"
+    shape = circle
+    fillcolor = "#ffffcc"
+    style = "filled"
+    fontname = "Consolas, Liberation Mono, Menlo, Courier, monospace"
+  ];
+  pr101 [
+    label = "Merge PR #101"
+    shape = box
+    fillcolor = "#ccccff"
+    style = "filled"
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+  ci345cde [
+    label = "345cde"
+    shape = circle
+    fillcolor = "#ffffcc"
+    style = "filled"
+    fontname = "Consolas, Liberation Mono, Menlo, Courier, monospace"
+  ];
+  pr102 [
+    label = "Merge PR #102"
+    shape = box
+    fillcolor = "#ccccff"
+    style = "filled"
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+  version_commit [
+    label = "678fed"
+    shape = circle
+    fillcolor = "#ccffcc"
+    style = "filled"
+    fontname = "Consolas, Liberation Mono, Menlo, Courier, monospace"
+  ];
+  dev_commit [
+    label = "456dcb"
+    shape = circle
+    fillcolor = "#ffffcc"
+    style = "filled"
+    fontname = "Consolas, Liberation Mono, Menlo, Courier, monospace"
+  ];
+  pr100 [
+    label = "Merge PR #100"
+    shape = box
+    fillcolor = "#ccccff"
+    style = "filled"
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+  release_info [
+    label = "pkg/version/base.go:\ngitVersion = \"v0.5\";"
+    shape = none
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+  dev_info [
+    label = "pkg/version/base.go:\ngitVersion = \"v0.5-dev\";"
+    shape = none
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+  tag [
+    label = "$ git tag -a v0.5"
+    fillcolor = "#ffcccc"
+    style = "filled"
+    fontname = "Helvetica Neue, Helvetica, Segoe UI, Arial, freesans, sans-serif"
+  ];
+}
+
