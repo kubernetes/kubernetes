@@ -87,12 +87,15 @@ for test_file in $(ls "${KUBE_ROOT}/hack/e2e-suite/"); do
     echo "${test_file} returned ${result}; passed!"
   else
     echo "${test_file} returned ${result}; FAIL!"
-    any_failed=1
+    any_failed=$((any_failed+1))
   fi
 done
 
-if [[ ${any_failed} -ne 0 ]]; then
-  echo "At least one test failed."
+echo
+if [[ ${any_failed} -eq 0 ]]; then
+  echo "Final: All tests passed."
+else
+  echo "Final: ${any_failed} tests failed."
 fi
 
 exit ${any_failed}
