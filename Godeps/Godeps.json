@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.3.1",
 	"Packages": [
 		"./..."
 	],
@@ -82,12 +82,30 @@
 			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
 		},
 		{
+			"ImportPath": "github.com/kr/text",
+			"Rev": "6807e777504f54ad073ecef66747de158294b639"
+		},
+		{
 			"ImportPath": "github.com/mitchellh/goamz/aws",
 			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/ec2",
 			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
+		},
+		{
+			"ImportPath": "github.com/racker/perigee",
+			"Comment": "v0.0.0-18-g0c00cb0",
+			"Rev": "0c00cb0a026b71034ebc8205263c77dad3577db5"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud",
+			"Comment": "v0.1.0-31-ge13cda2",
+			"Rev": "e13cda260ce48d63ce816f4fa72b6c6cd096596d"
 		},
 		{
 			"ImportPath": "github.com/skratchdot/open-golang/open",
@@ -104,6 +122,11 @@
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
 			"Rev": "37614ac27794505bf7867ca93aac883cadb6a5f7"
+		},
+		{
+			"ImportPath": "github.com/tonnerre/golang-pretty",
+			"Comment": "debian/0.0_git20130613-1-1-ge7fccc0",
+			"Rev": "e7fccc03e91bad289b96c21aa3312a220689bdd7"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",
