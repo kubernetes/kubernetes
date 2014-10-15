@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Launches an nginx container and verifies it can be reached. Assumes that
+# Launches a container and verifies it can be reached. Assumes that
 # we're being called by hack/e2e-test.sh (we use some env vars it sets up).
 
 set -o errexit
@@ -25,38 +25,40 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-# Launch a container
-$KUBECFG -p 8080:80 run dockerfile/nginx 2 myNginx
-
-function remove-quotes() {
-  local in=$1
-  stripped="${in%\"}"
-  stripped="${stripped#\"}"
-  echo $stripped
-}
+# Launch some pods.
+num_pods=2
+$KUBECFG -p 8080:9376 run kubernetes/serve_hostname ${num_pods} my-hostname
 
 function teardown() {
   echo "Cleaning up test artifacts"
-  $KUBECFG stop myNginx
-  $KUBECFG rm myNginx
+  $KUBECFG stop my-hostname
+  $KUBECFG rm my-hostname
 }
 
 trap "teardown" EXIT
 
-pod_id_list=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=myNginx list pods)
-# Container turn up on a clean cluster can take a while for the docker image pull.
+pod_id_list=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=my-hostname list pods)
+# Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
-while [[ $all_running -ne 1 ]]; do
-  echo "Waiting for all containers in pod to come up."
+for i in $(seq 1 24); do
+  echo "Waiting for pods to come up."
   sleep 5
   all_running=1
   for id in $pod_id_list; do
-    current_status=$($KUBECFG -template '{{and .CurrentState.Info.mynginx.State.Running .CurrentState.Info.net.State.Running}}' get pods/$id) || true
-    if [[ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]]; then
+    current_status=$($KUBECFG -template '{{.CurrentState.Status}}' get pods/$id) || true
+    if [[ "$current_status" != "Running" ]]; then
       all_running=0
+      break
     fi
   done
+  if [[ "${all_running}" == 1 ]]; then
+    break
+  fi
 done
+if [[ "${all_running}" == 0 ]]; then
+  echo "Pods did not come up in time"
+  exit 1
+fi
 
 # Get minion IP addresses
 detect-minions
@@ -65,11 +67,15 @@ detect-minions
 echo "Letting images stabilize"
 sleep 5
 
-# Verify that something is listening (nginx should give us a 404)
-for (( i=0; i<${#KUBE_MINION_IP_ADDRESSES[@]}; i++)); do
-  ip_address=${KUBE_MINION_IP_ADDRESSES[$i]}
-  echo "Trying to reach nginx instance that should be running at ${ip_address}:8080..."
-  curl "http://${ip_address}:8080"
+# Verify that something is listening.
+for id in ${pod_id_list}; do
+  ip=$($KUBECFG -template '{{.CurrentState.HostIP}}' get pods/$id)
+  echo "Trying to reach server that should be running at ${ip}:8080..."
+  ok=0
+  for i in $(seq 1 5); do
+    curl --connect-timeout 1 "http://${ip}:8080" >/dev/null 2>&1 && ok=1 && break
+    sleep 2
+  done
 done
 
 exit 0
