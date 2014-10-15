@@ -213,7 +213,7 @@ func (s *storeToMinionLister) GetNodeInfo(id string) (*api.Minion, error) {
 	if minion, ok := s.Get(id); ok {
 		return minion.(*api.Minion), nil
 	}
-	return nil, fmt.Errorf("minion '%v' is not in cache")
+	return nil, fmt.Errorf("minion '%v' is not in cache", id)
 }
 
 // storeToPodLister turns a store into a pod lister. The store must contain (only) pods.

@@ -76,7 +76,7 @@ func (fakePodInfoGetter) GetPodInfo(host, podNamespace, podID string) (api.PodIn
 			Port:   10251,
 		}
 	default:
-		glog.Fatalf("Can't get info for: '%v', '%v'", host, podNamespace, podID)
+		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
 	}
 	return c.GetPodInfo("localhost", podNamespace, podID)
 }

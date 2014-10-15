@@ -139,7 +139,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if version != "10" {
-		t.Errorf("unexpected version %d", version)
+		t.Errorf("unexpected version %v", version)
 	}
 }
 

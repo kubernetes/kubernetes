@@ -46,6 +46,7 @@ var (
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
 	config        = flag.String("c", "", "Path or URL to the config file, or '-' to read from STDIN")
 	selector      = flag.String("l", "", "Selector (label query) to use for listing")
+	fieldSelector = flag.String("fields", "", "Selector (field query) to use for listing")
 	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
 	portSpec      = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort   = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
@@ -375,6 +376,9 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 	r := c.Verb(verb).Path(path)
 	if len(*selector) > 0 {
 		r.ParseSelectorParam("labels", *selector)
+	}
+	if len(*fieldSelector) > 0 {
+		r.ParseSelectorParam("fields", *fieldSelector)
 	}
 	if setBody {
 		if len(version) > 0 {
