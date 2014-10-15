@@ -72,6 +72,8 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 			algorithm.PodFitsPorts,
 			// Fit is determined by resource availability
 			algorithm.NewResourceFitPredicate(minionLister),
+			// Fit is determined by non-conflicting disk volumes
+			algorithm.NoDiskConflict,
 		},
 		// Prioritize nodes by least requested utilization.
 		algorithm.LeastRequestedPriority,
