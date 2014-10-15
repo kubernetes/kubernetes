@@ -23,6 +23,19 @@ cd "${KUBE_ROOT}"
 readonly KUBE_TARGET="${KUBE_ROOT}/_output/build"
 readonly KUBE_GO_PACKAGE=github.com/GoogleCloudPlatform/kubernetes
 
+server_targets=(
+  cmd/proxy
+  cmd/apiserver
+  cmd/controller-manager
+  cmd/kubelet
+  plugin/cmd/scheduler
+)
+
+client_targets=(
+  cmd/kubecfg
+  cmd/kubectl
+)
+
 mkdir -p "${KUBE_TARGET}"
 
 if [[ ! -f "/kube-build-image" ]]; then
@@ -46,19 +59,11 @@ function kube::build::make_binary() {
 }
 
 function kube::build::make_binaries() {
-  local -a targets=(
-    cmd/proxy
-    cmd/apiserver
-    cmd/controller-manager
-    cmd/kubelet
-    cmd/kubecfg
-    plugin/cmd/scheduler
-  )
+  [[ $# -gt 0 ]] || {
+    echo "!!! Internal error. kube::build::make_binaries called with no targets."
+  }
 
-  if [[ -n "${1-}" ]]; then
-    targets=("$1")
-  fi
-
+  local -a targets=("$@")
   local -a binaries=()
   local target
   for target in "${targets[@]}"; do

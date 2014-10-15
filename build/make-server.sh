@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries.
+# Make all of the Kubernetes server binaries.
 #
 # This makes the docker build image, builds the binaries and copies them out
 # of the docker container.
@@ -27,5 +27,5 @@ source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command build/build-image/make-binaries.sh "$@"
+kube::build::run_build_command build/build-image/make-server.sh "$@"
 kube::build::copy_output

@@ -18,10 +18,10 @@ There is also early support for building Docker "run" containers
 
 ## Key scripts
 
-* `make-binaries.sh`: This will compile all of the Kubernetes binaries
+* `make-server.sh`: This will compile all of the Kubernetes server binaries for linux/amd64
+* `make-client.sh`: This will make all cross-compiled client binaries
 * `run-tests.sh`: This will run the Kubernetes unit tests
 * `run-integration.sh`: This will build and run the integration test
-* `make-cross.sh`: This will make all cross-compiled binaries (currently just `kubecfg`)
 * `copy-output.sh`: This will copy the contents of `_output/build` from any remote Docker container to the local `_output/build`.  Right now this is only necessary on Mac OS X with `boot2docker`.
 * `make-clean.sh`: Clean out the contents of `_output/build` and remove any local built container images.
 * `shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.

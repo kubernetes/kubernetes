@@ -63,6 +63,7 @@ readonly DOCKER_MOUNT_ARGS=(--volume "${LOCAL_OUTPUT_BUILD}:${REMOTE_OUTPUT_DIR}
 
 readonly KUBE_CLIENT_BINARIES=(
   kubecfg
+  kubectl
 )
 
 readonly KUBE_SERVER_BINARIES=(
