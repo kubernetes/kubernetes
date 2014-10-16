@@ -167,8 +167,8 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 	}
 	// this code needs to go through the API server in the future, this is one big hack
 	if response.Node.Dir == true {
-		retServices := make([]api.Service, 100)
-		retEndpoints := make([]api.Endpoints, 100)
+		var retServices []api.Service
+		var retEndpoints []api.Endpoints
 		return s.decodeServices(response.Node, retServices, retEndpoints)
 	}
 	return nil, nil, fmt.Errorf("did not get the root of the registry %s", registryRoot)
