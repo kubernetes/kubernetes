@@ -210,7 +210,10 @@ func (s ConfigSourceEtcd) WatchForChanges() {
 		if !ok {
 			break
 		}
-		s.ProcessChange(watchResponse)
+		// only listen for non directory changes
+		if watchResponse.Node.Dir == false {
+			s.ProcessChange(watchResponse)
+		}
 	}
 }
 
