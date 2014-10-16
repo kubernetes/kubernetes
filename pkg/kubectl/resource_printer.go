@@ -34,7 +34,7 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-func getPrinter(format, templateFile string) (ResourcePrinter, error) {
+func getPrinter(format, templateFile string, noHeaders bool) (ResourcePrinter, error) {
 	var printer ResourcePrinter
 	switch format {
 	case "json":
@@ -60,7 +60,7 @@ func getPrinter(format, templateFile string) (ResourcePrinter, error) {
 			Template: tmpl,
 		}
 	default:
-		printer = NewHumanReadablePrinter()
+		printer = NewHumanReadablePrinter(noHeaders)
 	}
 	return printer, nil
 }
@@ -105,11 +105,15 @@ type handlerEntry struct {
 // HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide more elegant output.
 type HumanReadablePrinter struct {
 	handlerMap map[reflect.Type]*handlerEntry
+	noHeaders  bool
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
-func NewHumanReadablePrinter() *HumanReadablePrinter {
-	printer := &HumanReadablePrinter{make(map[reflect.Type]*handlerEntry)}
+func NewHumanReadablePrinter(noHeaders bool) *HumanReadablePrinter {
+	printer := &HumanReadablePrinter{
+		handlerMap: make(map[reflect.Type]*handlerEntry),
+		noHeaders:  noHeaders,
+	}
 	printer.addDefaultHandlers()
 	return printer
 }
@@ -260,7 +264,9 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()
 	if handler := h.handlerMap[reflect.TypeOf(obj)]; handler != nil {
-		h.printHeader(handler.columns, w)
+		if !h.noHeaders {
+			h.printHeader(handler.columns, w)
+		}
 		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w)}
 		resultValue := handler.printFunc.Call(args)[0]
 		if resultValue.IsNil() {
