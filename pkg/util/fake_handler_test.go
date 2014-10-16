@@ -72,6 +72,8 @@ func (f *fakeError) Errorf(format string, args ...interface{}) {
 	f.errors = append(f.errors, format)
 }
 
+func (f *fakeError) Logf(format string, args ...interface{}) {}
+
 func TestFakeHandlerWrongPath(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
