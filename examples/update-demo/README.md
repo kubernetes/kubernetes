@@ -88,7 +88,7 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ ./4-rolling-update
+$ ./4-rolling-update.sh
 ```
 The rollingUpdate command in kubecfg will do 2 things:
 
