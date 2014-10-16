@@ -823,3 +823,21 @@ func TestValidateReplicationController(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateBoundPodNoName(t *testing.T) {
+	errorCases := map[string]api.BoundPod{
+		// manifest is tested in api/validation_test.go, ensure it is invoked
+		"empty version": {TypeMeta: api.TypeMeta{ID: "test"}, Spec: api.PodSpec{Containers: []api.Container{{Name: ""}}}},
+
+		// Name
+		"zero-length name":         {TypeMeta: api.TypeMeta{ID: ""}},
+		"name > 255 characters":    {TypeMeta: api.TypeMeta{ID: strings.Repeat("a", 256)}},
+		"name not a DNS subdomain": {TypeMeta: api.TypeMeta{ID: "a.b.c."}},
+		"name with underscore":     {TypeMeta: api.TypeMeta{ID: "a_b_c"}},
+	}
+	for k, v := range errorCases {
+		if errs := ValidateBoundPod(&v); len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+	}
+}

@@ -21,53 +21,52 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func TestEventToPods(t *testing.T) {
 	tests := []struct {
 		input watch.Event
-		pods  []kubelet.Pod
+		pods  []api.BoundPod
 		fail  bool
 	}{
 		{
 			input: watch.Event{Object: nil},
-			pods:  []kubelet.Pod{},
+			pods:  []api.BoundPod{},
 			fail:  true,
 		},
 		{
-			input: watch.Event{Object: &api.ContainerManifestList{}},
-			pods:  []kubelet.Pod{},
+			input: watch.Event{Object: &api.BoundPods{}},
+			pods:  []api.BoundPod{},
 			fail:  false,
 		},
 		{
 			input: watch.Event{
-				Object: &api.ContainerManifestList{
-					Items: []api.ContainerManifest{
-						{ID: "foo"},
-						{ID: "bar"},
+				Object: &api.BoundPods{
+					Items: []api.BoundPod{
+						{TypeMeta: api.TypeMeta{ID: "foo"}},
+						{TypeMeta: api.TypeMeta{ID: "bar"}},
 					},
 				},
 			},
-			pods: []kubelet.Pod{
-				{Name: "foo", Manifest: api.ContainerManifest{ID: "foo"}},
-				{Name: "bar", Manifest: api.ContainerManifest{ID: "bar"}},
+			pods: []api.BoundPod{
+				{TypeMeta: api.TypeMeta{ID: "foo", Namespace: "default"}, Spec: api.PodSpec{}},
+				{TypeMeta: api.TypeMeta{ID: "bar", Namespace: "default"}, Spec: api.PodSpec{}},
 			},
 			fail: false,
 		},
 		{
 			input: watch.Event{
-				Object: &api.ContainerManifestList{
-					Items: []api.ContainerManifest{
-						{ID: ""},
-						{ID: ""},
+				Object: &api.BoundPods{
+					Items: []api.BoundPod{
+						{TypeMeta: api.TypeMeta{ID: "1"}},
+						{TypeMeta: api.TypeMeta{ID: "2", Namespace: "foo"}},
 					},
 				},
 			},
-			pods: []kubelet.Pod{
-				{Name: "1", Manifest: api.ContainerManifest{ID: ""}},
-				{Name: "2", Manifest: api.ContainerManifest{ID: ""}},
+			pods: []api.BoundPod{
+				{TypeMeta: api.TypeMeta{ID: "1", Namespace: "default"}, Spec: api.PodSpec{}},
+				{TypeMeta: api.TypeMeta{ID: "2", Namespace: "foo"}, Spec: api.PodSpec{}},
 			},
 			fail: false,
 		},

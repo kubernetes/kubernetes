@@ -33,10 +33,12 @@ import (
 )
 
 func NewTestEtcdRegistry(client tools.EtcdClient) *etcdregistry.Registry {
-	registry := etcdregistry.NewRegistry(tools.EtcdHelper{client, latest.Codec, tools.RuntimeVersionAdapter{latest.ResourceVersioner}},
-		&pod.BasicManifestFactory{
+	registry := etcdregistry.NewRegistry(
+		tools.EtcdHelper{client, latest.Codec, tools.RuntimeVersionAdapter{latest.ResourceVersioner}},
+		&pod.BasicBoundPodFactory{
 			ServiceRegistry: &registrytest.ServiceRegistry{},
-		})
+		},
+	)
 	return registry
 }
 

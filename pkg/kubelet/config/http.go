@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"github.com/golang/glog"
 	"gopkg.in/v1/yaml"
 )
@@ -79,6 +80,7 @@ func (s *SourceURL) extractFromURL() error {
 
 	// First try as if it's a single manifest
 	var manifest api.ContainerManifest
+	// TODO: should be api.Scheme.Decode
 	singleErr := yaml.Unmarshal(data, &manifest)
 	if singleErr == nil {
 		if errs := validation.ValidateManifest(&manifest); len(errs) > 0 {
@@ -86,16 +88,23 @@ func (s *SourceURL) extractFromURL() error {
 		}
 	}
 	if singleErr == nil {
-		pod := kubelet.Pod{Name: manifest.ID, Manifest: manifest}
-		if pod.Name == "" {
-			pod.Name = "1"
+		pod := api.BoundPod{}
+		if err := api.Scheme.Convert(&manifest, &pod); err != nil {
+			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]kubelet.Pod{pod}, kubelet.SET}
+		if len(pod.ID) == 0 {
+			pod.ID = "1"
+		}
+		if len(pod.Namespace) == 0 {
+			pod.Namespace = api.NamespaceDefault
+		}
+		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET}
 		return nil
 	}
 
 	// That didn't work, so try an array of manifests.
 	var manifests []api.ContainerManifest
+	// TODO: should be api.Scheme.Decode
 	multiErr := yaml.Unmarshal(data, &manifests)
 	// We're not sure if the person reading the logs is going to care about the single or
 	// multiple manifest unmarshalling attempt, so we need to put both in the logs, as is
@@ -113,18 +122,24 @@ func (s *SourceURL) extractFromURL() error {
 		// array of manifests (and no error) when unmarshaled as such.  In that case,
 		// if the single manifest at least had a Version, we return the single-manifest
 		// error (if any).
-		if len(manifests) == 0 && manifest.Version != "" {
+		if len(manifests) == 0 && len(manifest.Version) != 0 {
 			return singleErr
 		}
-		pods := []kubelet.Pod{}
-		for i, manifest := range manifests {
-			pod := kubelet.Pod{Name: manifest.ID, Manifest: manifest}
-			if pod.Name == "" {
-				pod.Name = fmt.Sprintf("%d", i+1)
-			}
-			pods = append(pods, pod)
+		list := api.ContainerManifestList{Items: manifests}
+		boundPods := &api.BoundPods{}
+		if err := api.Scheme.Convert(&list, boundPods); err != nil {
+			return err
 		}
-		s.updates <- kubelet.PodUpdate{pods, kubelet.SET}
+		for i := range boundPods.Items {
+			pod := &boundPods.Items[i]
+			if len(pod.ID) == 0 {
+				pod.ID = fmt.Sprintf("%d", i+1)
+			}
+			if len(pod.Namespace) == 0 {
+				pod.Namespace = api.NamespaceDefault
+			}
+		}
+		s.updates <- kubelet.PodUpdate{boundPods.Items, kubelet.SET}
 		return nil
 	}
 

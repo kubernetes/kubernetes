@@ -22,13 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// Pod represents the structure of a pod on the Kubelet, distinct from the apiserver
-// representation of a Pod.
-type Pod struct {
-	Namespace string
-	Name      string
-	Manifest  api.ContainerManifest
-}
+const ConfigSourceAnnotationKey = "kubernetes/config.source"
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
@@ -48,13 +42,13 @@ const (
 // sending an array of size one and Op == ADD|REMOVE (with REMOVE, only the ID is required).
 // For setting the state of the system to a given state for this source configuration, set
 // Pods as desired and Op to SET, which will reset the system state to that specified in this
-// operation for this source channel. To remove all pods, set Pods to empty array and Op to SET.
+// operation for this source channel. To remove all pods, set Pods to empty object and Op to SET.
 type PodUpdate struct {
-	Pods []Pod
+	Pods []api.BoundPod
 	Op   PodOperation
 }
 
-// GetPodFullName returns a name that full identifies a pod across all config sources.
-func GetPodFullName(pod *Pod) string {
-	return fmt.Sprintf("%s.%s", pod.Name, pod.Namespace)
+// GetPodFullName returns a name that uniquely identifies a pod across all config sources.
+func GetPodFullName(pod *api.BoundPod) string {
+	return fmt.Sprintf("%s.%s.%s", pod.ID, pod.Namespace, pod.Annotations[ConfigSourceAnnotationKey])
 }

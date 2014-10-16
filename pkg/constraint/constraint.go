@@ -20,8 +20,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// Allowed returns true if manifests is a collection of manifests
+// Allowed returns true if pods is a collection of bound pods
 // which can run without conflict on a single minion.
-func Allowed(manifests []api.ContainerManifest) bool {
-	return !PortsConflict(manifests)
+func Allowed(pods []api.BoundPod) bool {
+	return !PortsConflict(pods)
 }

@@ -89,15 +89,15 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHe
 func New(c *Config) *Master {
 	minionRegistry := makeMinionRegistry(c)
 	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
-	manifestFactory := &pod.BasicManifestFactory{
+	boundPodFactory := &pod.BasicBoundPodFactory{
 		ServiceRegistry: serviceRegistry,
 	}
 	m := &Master{
-		podRegistry:        etcd.NewRegistry(c.EtcdHelper, manifestFactory),
+		podRegistry:        etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		controllerRegistry: etcd.NewRegistry(c.EtcdHelper, nil),
 		serviceRegistry:    serviceRegistry,
 		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper, nil),
-		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper, manifestFactory),
+		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		eventRegistry:      event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,

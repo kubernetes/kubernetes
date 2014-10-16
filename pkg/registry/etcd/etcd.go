@@ -51,15 +51,15 @@ const (
 // Registry implements PodRegistry, ControllerRegistry, ServiceRegistry and MinionRegistry, backed by etcd.
 type Registry struct {
 	tools.EtcdHelper
-	manifestFactory pod.ManifestFactory
+	boundPodFactory pod.BoundPodFactory
 }
 
 // NewRegistry creates an etcd registry.
-func NewRegistry(helper tools.EtcdHelper, manifestFactory pod.ManifestFactory) *Registry {
+func NewRegistry(helper tools.EtcdHelper, boundPodFactory pod.BoundPodFactory) *Registry {
 	registry := &Registry{
 		EtcdHelper: helper,
 	}
-	registry.manifestFactory = manifestFactory
+	registry.boundPodFactory = boundPodFactory
 	return registry
 }
 
@@ -177,7 +177,7 @@ func (r *Registry) GetPod(ctx api.Context, id string) (*api.Pod, error) {
 }
 
 func makeContainerKey(machine string) string {
-	return "/registry/hosts/" + machine + "/kubelet"
+	return "/registry/nodes/" + machine + "/boundpods"
 }
 
 // CreatePod creates a pod based on a specification.
@@ -230,18 +230,18 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 		return err
 	}
 	// TODO: move this to a watch/rectification loop.
-	manifest, err := r.manifestFactory.MakeManifest(machine, *finalPod)
+	pod, err := r.boundPodFactory.MakeBoundPod(machine, finalPod)
 	if err != nil {
 		return err
 	}
 	contKey := makeContainerKey(machine)
-	err = r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in runtime.Object) (runtime.Object, error) {
-		manifests := *in.(*api.ContainerManifestList)
-		manifests.Items = append(manifests.Items, manifest)
-		if !constraint.Allowed(manifests.Items) {
+	err = r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
+		pods := *in.(*api.BoundPods)
+		pods.Items = append(pods.Items, *pod)
+		if !constraint.Allowed(pods.Items) {
 			return nil, fmt.Errorf("The assignment would cause a constraint violation")
 		}
-		return &manifests, nil
+		return &pods, nil
 	})
 	if err != nil {
 		// Put the pod's host back the way it was. This is a terrible hack that
@@ -321,13 +321,13 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 	}
 	// Next, remove the pod from the machine atomically.
 	contKey := makeContainerKey(machine)
-	return r.AtomicUpdate(contKey, &api.ContainerManifestList{}, func(in runtime.Object) (runtime.Object, error) {
-		manifests := in.(*api.ContainerManifestList)
-		newManifests := make([]api.ContainerManifest, 0, len(manifests.Items))
+	return r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
+		pods := in.(*api.BoundPods)
+		newPods := make([]api.BoundPod, 0, len(pods.Items))
 		found := false
-		for _, manifest := range manifests.Items {
-			if manifest.ID != podID {
-				newManifests = append(newManifests, manifest)
+		for _, pod := range pods.Items {
+			if pod.ID != podID {
+				newPods = append(newPods, pod)
 			} else {
 				found = true
 			}
@@ -336,10 +336,10 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 			// This really shouldn't happen, it indicates something is broken, and likely
 			// there is a lost pod somewhere.
 			// However it is "deleted" so log it and move on
-			glog.Warningf("Couldn't find: %s in %#v", podID, manifests)
+			glog.Warningf("Couldn't find: %s in %#v", podID, pods)
 		}
-		manifests.Items = newManifests
-		return manifests, nil
+		pods.Items = newPods
+		return pods, nil
 	})
 }
 
