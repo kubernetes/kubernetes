@@ -152,7 +152,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 
 var podColumns = []string{"ID", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
 var replicationControllerColumns = []string{"ID", "IMAGE(S)", "SELECTOR", "REPLICAS"}
-var serviceColumns = []string{"ID", "LABELS", "SELECTOR", "PORT"}
+var serviceColumns = []string{"ID", "LABELS", "SELECTOR", "IP", "PORT"}
 var minionColumns = []string{"ID"}
 var statusColumns = []string{"STATUS"}
 
@@ -222,8 +222,8 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printService(svc *api.Service, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", svc.ID, labels.Set(svc.Labels),
-		labels.Set(svc.Selector), svc.Port)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", svc.ID, labels.Set(svc.Labels),
+		labels.Set(svc.Selector), svc.PortalIP, svc.Port)
 	return err
 }
 

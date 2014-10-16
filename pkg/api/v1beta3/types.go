@@ -570,6 +570,11 @@ type ReplicationControllerList struct {
 
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct {
+	// PortalIP is assigned by the master.
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
+
+	// ProxyPort is assigned by the master.  If 0, the proxy will choose an ephemeral port.
+	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty"`
 }
 
 // ServiceSpec describes the attributes that a user creates on a service

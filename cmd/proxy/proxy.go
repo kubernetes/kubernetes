@@ -25,6 +25,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -40,7 +42,7 @@ var (
 func init() {
 	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional). Mutually exclusive with -etcd_config")
-	flag.Var(&bindAddress, "bind_address", "The address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
+	flag.Var(&bindAddress, "bind_address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 }
 
 func main() {
@@ -97,12 +99,12 @@ func main() {
 	}
 
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress))
+	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress), iptables.New(exec.New()))
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services
 	endpointsConfig.RegisterHandler(loadBalancer)
 
 	// Just loop forever for now...
-	select {}
+	proxier.SyncLoop()
 }

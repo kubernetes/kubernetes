@@ -263,6 +263,7 @@ function kube-up {
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
+    echo "readonly PORTAL_NET='${PORTAL_NET}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
@@ -529,4 +530,16 @@ function test-teardown {
     --force \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true > /dev/null
   "${KUBE_ROOT}/cluster/kube-down.sh" > /dev/null
+}
+
+# SSH to a node by name ($1) and run a command ($2).
+function ssh-to-node {
+  local node="$1"
+  local cmd="$2"
+  gcutil --log_level=WARNING ssh --ssh_arg "-o LogLevel=quiet" "${node}" "${cmd}"
+}
+
+# Restart the kube-proxy on a node ($1)
+function restart-kube-proxy {
+  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }

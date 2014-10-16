@@ -70,9 +70,11 @@ rax-boot-master() {
   grep -v "^#" $(dirname $0)/templates/download-release.sh
   ) > ${KUBE_TEMP}/masterStart.sh
 
-# Copy cloud-config to KUBE_TEMP and work some sed magic
-  sed -e "s/KUBE_MASTER/$MASTER_NAME/g" \
-      -e "s/MASTER_HTPASSWD/$HTPASSWD/" \
+# Copy cloud-config to KUBE_TEMP and work some sed magic.  Some vars can have
+# '/' embedded, so don't use that for sed.
+  sed -e "s|KUBE_MASTER|$MASTER_NAME|g" \
+      -e "s|MASTER_HTPASSWD|$HTPASSWD|" \
+      -e "s|PORTAL_NET|$PORTAL_NET|" \
       $(dirname $0)/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
 

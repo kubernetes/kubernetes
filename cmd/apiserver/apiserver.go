@@ -64,6 +64,7 @@ var (
 	machineList           util.StringList
 	corsAllowedOriginList util.StringList
 	allowPrivileged       = flag.Bool("allow_privileged", false, "If true, allow privileged containers.")
+	portalNet             util.IPNet // TODO: make this a list
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	nodeMilliCPU      = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
 	nodeMemory        = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
@@ -75,6 +76,7 @@ func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 	flag.Var(&corsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
+	flag.Var(&portalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
 }
 
 func verifyMinionFlags() {
@@ -86,6 +88,13 @@ func verifyMinionFlags() {
 	}
 	if len(machineList) != 0 {
 		glog.Info("-machines is overwritten by -minion_regexp")
+	}
+}
+
+// TODO: Longer term we should read this from some config store, rather than a flag.
+func verifyPortalFlags() {
+	if portalNet.IP == nil {
+		glog.Fatal("No -portal_net specified")
 	}
 }
 
@@ -141,6 +150,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 	verifyMinionFlags()
+	verifyPortalFlags()
 
 	if (*etcdConfigFile != "" && len(etcdServerList) != 0) || (*etcdConfigFile == "" && len(etcdServerList) == 0) {
 		glog.Fatalf("specify either -etcd_servers or -etcd_config")
@@ -172,6 +182,7 @@ func main() {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
 	}
 
+	n := net.IPNet(portalNet)
 	m := master.New(&master.Config{
 		Client:             client,
 		Cloud:              cloud,
@@ -188,6 +199,7 @@ func main() {
 				resources.Memory: util.NewIntOrStringFromInt(*nodeMemory),
 			},
 		},
+		PortalNet: &n,
 	})
 
 	mux := http.NewServeMux()

@@ -48,10 +48,8 @@ func TestMakeManifestNoServices(t *testing.T) {
 	}
 
 	container := manifest.Containers[0]
-	if len(container.Env) != 1 ||
-		container.Env[0].Name != "SERVICE_HOST" ||
-		container.Env[0].Value != "machine" {
-		t.Errorf("Expected one env vars, got: %#v", manifest)
+	if len(container.Env) != 0 {
+		t.Errorf("Expected zero env vars, got: %#v", manifest)
 	}
 	if manifest.ID != "foobar" {
 		t.Errorf("Failed to assign ID to manifest: %#v", manifest.ID)
@@ -69,6 +67,7 @@ func TestMakeManifestServices(t *testing.T) {
 						Kind:   util.IntstrInt,
 						IntVal: 900,
 					},
+					PortalIP: "1.2.3.4",
 				},
 			},
 		},
@@ -96,7 +95,7 @@ func TestMakeManifestServices(t *testing.T) {
 	envs := []api.EnvVar{
 		{
 			Name:  "TEST_SERVICE_HOST",
-			Value: "machine",
+			Value: "1.2.3.4",
 		},
 		{
 			Name:  "TEST_SERVICE_PORT",
@@ -104,11 +103,11 @@ func TestMakeManifestServices(t *testing.T) {
 		},
 		{
 			Name:  "TEST_PORT",
-			Value: "tcp://machine:8080",
+			Value: "tcp://1.2.3.4:8080",
 		},
 		{
 			Name:  "TEST_PORT_8080_TCP",
-			Value: "tcp://machine:8080",
+			Value: "tcp://1.2.3.4:8080",
 		},
 		{
 			Name:  "TEST_PORT_8080_TCP_PROTO",
@@ -120,11 +119,7 @@ func TestMakeManifestServices(t *testing.T) {
 		},
 		{
 			Name:  "TEST_PORT_8080_TCP_ADDR",
-			Value: "machine",
-		},
-		{
-			Name:  "SERVICE_HOST",
-			Value: "machine",
+			Value: "1.2.3.4",
 		},
 	}
 	if len(container.Env) != len(envs) {
@@ -149,6 +144,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 						Kind:   util.IntstrInt,
 						IntVal: 900,
 					},
+					PortalIP: "1.2.3.4",
 				},
 			},
 		},
@@ -186,7 +182,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		},
 		{
 			Name:  "TEST_SERVICE_HOST",
-			Value: "machine",
+			Value: "1.2.3.4",
 		},
 		{
 			Name:  "TEST_SERVICE_PORT",
@@ -194,11 +190,11 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		},
 		{
 			Name:  "TEST_PORT",
-			Value: "tcp://machine:8080",
+			Value: "tcp://1.2.3.4:8080",
 		},
 		{
 			Name:  "TEST_PORT_8080_TCP",
-			Value: "tcp://machine:8080",
+			Value: "tcp://1.2.3.4:8080",
 		},
 		{
 			Name:  "TEST_PORT_8080_TCP_PROTO",
@@ -210,11 +206,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 		},
 		{
 			Name:  "TEST_PORT_8080_TCP_ADDR",
-			Value: "machine",
-		},
-		{
-			Name:  "SERVICE_HOST",
-			Value: "machine",
+			Value: "1.2.3.4",
 		},
 	}
 	if len(container.Env) != len(envs) {

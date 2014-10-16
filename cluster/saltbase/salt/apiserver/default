@@ -55,5 +55,8 @@
   {%- set minion_regexp = "" %}
 {% endif %}
 {% endif %}
+{% if pillar['portal_net'] is defined %}
+  {% set portal_net = "-portal_net=" + pillar['portal_net'] %}
+{% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{ minion_regexp }} {{ cloud_provider }} --allow_privileged={{pillar['allow_privileged']}}"
+DAEMON_ARGS="{{daemon_args}} {{address}} {{machines}} {{etcd_servers}} {{ minion_regexp }} {{ cloud_provider }} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}}"

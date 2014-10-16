@@ -40,7 +40,7 @@ key1 exists
 LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter: `?labels=key1%3Dvalue1,key2%3Dvalue2,...`. We may extend such filtering to DELETE operations in the future.
 
 Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
-- `service`: A service is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
+- `service`: A [service](services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
 - `replicationController`: A [replication controller](replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.  If there are too many, it'll kill some.  If there are too few, it'll start more.
 
 The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. 
