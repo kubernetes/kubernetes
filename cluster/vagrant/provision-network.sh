@@ -96,7 +96,7 @@ ip link set dev ${DOCKER_BRIDGE} up
 ovs-vsctl set Bridge ${OVS_SWITCH} stp_enable=true
 
 # modify the docker service file such that it uses the kube docker bridge and not its own
-sed -ie "s/ExecStart=\/usr\/bin\/docker -d/ExecStart=\/usr\/bin\/docker -d -b=${DOCKER_BRIDGE} --iptables=false/g" /usr/lib/systemd/system/docker.service
+sed -ie "s/ExecStart=\/usr\/bin\/docker -d/ExecStart=\/usr\/bin\/docker -d -b=${DOCKER_BRIDGE} --iptables=false --ip-masq=false/g" /usr/lib/systemd/system/docker.service
 systemctl daemon-reload
 systemctl restart docker.service
 
