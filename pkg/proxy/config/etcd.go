@@ -35,6 +35,7 @@ package config
 
 import (
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -160,7 +161,7 @@ func (s ConfigSourceEtcd) GetServices() ([]api.Service, []api.Endpoints, error) 
 
 // GetEndpoints finds the list of endpoints of the service from etcd.
 func (s ConfigSourceEtcd) GetEndpoints(service string) (api.Endpoints, error) {
-	key := fmt.Sprintf(registryRoot + "/endpoints/" + service)
+	key := path.Join(registryRoot, "endpoints", service)
 	response, err := s.client.Get(key, true, false)
 	if err != nil {
 		glog.Errorf("Failed to get the key: %s %v", key, err)
