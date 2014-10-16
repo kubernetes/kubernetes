@@ -44,6 +44,7 @@ func TestClient(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
+		AuthorizationMode: "AlwaysAllow",
 	})
 
 	s := httptest.NewServer(m.Handler)

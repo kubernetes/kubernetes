@@ -146,6 +146,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		KubeletClient:     fakeKubeletClient{},
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
+		AuthorizationMode: "AlwaysAllow",
 
 		ReadWritePort: portNumber,
 		ReadOnlyPort:  portNumber,
