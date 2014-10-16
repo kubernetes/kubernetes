@@ -70,3 +70,9 @@ func badGatewayError(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusBadGateway)
 	fmt.Fprintf(w, "Bad Gateway: %#v", req.RequestURI)
 }
+
+// forbidden renders a simple forbidden error
+func forbidden(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(http.StatusForbidden)
+	fmt.Fprintf(w, "Forbidden: %#v", req.RequestURI)
+}
