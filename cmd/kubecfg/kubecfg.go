@@ -61,6 +61,8 @@ var (
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
 	clientConfig  = &client.Config{}
 	openBrowser   = flag.Bool("open_browser", true, "If true, and -proxy is specified, open a browser pointed at the Kubernetes UX. Default true.")
+	ns            = flag.String("ns", "", "If present, the namespace scope for this request.")
+	nsFile        = flag.String("ns_file", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace file")
 )
 
 func init() {
@@ -96,6 +98,9 @@ Launch a simple ReplicationController with a single container based
 on the given image:
 
   kubecfg [OPTIONS] [-p <port spec>] run <image> <replicas> <controller>
+
+Manage namespace:
+	kubecfg [OPTIONS] ns [<namespace>]
 
 Options:
 `, prettyWireStorage())
@@ -178,8 +183,18 @@ func main() {
 		clientConfig.Host = os.Getenv("KUBERNETES_MASTER")
 	}
 
-	// TODO: get the namespace context when kubecfg ns is completed
-	ctx := api.NewContext()
+	// Load namespace information for requests
+	// Check if the namespace was overriden by the -ns argument
+	ctx := api.NewDefaultContext()
+	if len(*ns) > 0 {
+		ctx = api.WithNamespace(ctx, *ns)
+	} else {
+		nsInfo, err := kubecfg.LoadNamespaceInfo(*nsFile)
+		if err != nil {
+			glog.Fatalf("Error loading current namespace: %v", err)
+		}
+		ctx = api.WithNamespace(ctx, nsInfo.Namespace)
+	}
 
 	if clientConfig.Host == "" {
 		// TODO: eventually apiserver should start on 443 and be secure by default
@@ -255,7 +270,7 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(ctx, method, kubeClient) || executeControllerRequest(ctx, method, kubeClient)
+	matchFound := executeAPIRequest(ctx, method, kubeClient) || executeControllerRequest(ctx, method, kubeClient) || executeNamespaceRequest(method, kubeClient)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
@@ -347,7 +362,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>", method, prettyWireStorage())
 		}
 	case "update":
-		obj, err := c.Verb("GET").Path(path).Do().Get()
+		obj, err := c.Verb("GET").Namespace(api.Namespace(ctx)).Path(path).Do().Get()
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
@@ -373,7 +388,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		return false
 	}
 
-	r := c.Verb(verb).Path(path)
+	r := c.Verb(verb).Namespace(api.Namespace(ctx)).Path(path)
 	if len(*selector) > 0 {
 		r.ParseSelectorParam("labels", *selector)
 	}
@@ -461,6 +476,32 @@ func executeControllerRequest(ctx api.Context, method string, c *client.Client) 
 	if err != nil {
 		glog.Fatalf("Error: %v", err)
 	}
+	return true
+}
+
+// executeNamespaceRequest handles client operations for namespaces
+func executeNamespaceRequest(method string, c *client.Client) bool {
+	var err error
+	var ns *kubecfg.NamespaceInfo
+	switch method {
+	case "ns":
+		args := flag.Args()
+		switch len(args) {
+		case 1:
+			ns, err = kubecfg.LoadNamespaceInfo(*nsFile)
+		case 2:
+			ns = &kubecfg.NamespaceInfo{Namespace: args[1]}
+			err = kubecfg.SaveNamespaceInfo(*nsFile, ns)
+		default:
+			glog.Fatalf("usage: kubecfg ns [<namespace>]")
+		}
+	default:
+		return false
+	}
+	if err != nil {
+		glog.Fatalf("Error: %v", err)
+	}
+	fmt.Printf("Using namespace %s\n", ns.Namespace)
 	return true
 }
 

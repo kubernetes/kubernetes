@@ -108,6 +108,104 @@ func TestExtractToList(t *testing.T) {
 	}
 }
 
+// TestExtractToListAcrossDirectories ensures that the client excludes directories and flattens tree-response - simulates cross-namespace query
+func TestExtractToListAcrossDirectories(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+		R: &etcd.Response{
+			EtcdIndex: 10,
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value: `{"id": "directory1"}`,
+						Dir:   true,
+						Nodes: []*etcd.Node{
+							{
+								Value:         `{"id":"foo"}`,
+								ModifiedIndex: 1,
+							},
+						},
+					},
+					{
+						Value: `{"id": "directory2"}`,
+						Dir:   true,
+						Nodes: []*etcd.Node{
+							{
+								Value:         `{"id":"bar"}`,
+								ModifiedIndex: 2,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	expect := api.PodList{
+		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
+		Items: []api.Pod{
+			{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"}},
+			{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}},
+		},
+	}
+
+	var got api.PodList
+	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	err := helper.ExtractToList("/some/key", &got)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+func TestExtractToListExcludesDirectories(t *testing.T) {
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.Data["/some/key"] = EtcdResponseWithError{
+		R: &etcd.Response{
+			EtcdIndex: 10,
+			Node: &etcd.Node{
+				Nodes: []*etcd.Node{
+					{
+						Value:         `{"id":"foo"}`,
+						ModifiedIndex: 1,
+					},
+					{
+						Value:         `{"id":"bar"}`,
+						ModifiedIndex: 2,
+					},
+					{
+						Value:         `{"id":"baz"}`,
+						ModifiedIndex: 3,
+					},
+					{
+						Value: `{"id": "directory"}`,
+						Dir:   true,
+					},
+				},
+			},
+		},
+	}
+	expect := api.PodList{
+		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
+		Items: []api.Pod{
+			{TypeMeta: api.TypeMeta{ID: "foo", ResourceVersion: "1"}},
+			{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}},
+			{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: "3"}},
+		},
+	}
+
+	var got api.PodList
+	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	err := helper.ExtractToList("/some/key", &got)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
 func TestExtractObj(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	expect := api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}

@@ -59,4 +59,10 @@ func TestValidNamespace(t *testing.T) {
 	if api.ValidNamespace(ctx, &resource.TypeMeta) {
 		t.Errorf("Expected error that resource and context errors do not match since context has no namespace")
 	}
+
+	ctx = api.NewContext()
+	ns := api.Namespace(ctx)
+	if ns != "" {
+		t.Errorf("Expected the empty string")
+	}
 }
