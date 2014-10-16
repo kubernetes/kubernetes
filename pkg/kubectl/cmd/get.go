@@ -57,13 +57,14 @@ Examples:
 			outputFormat := getFlagString(cmd, "output")
 			templateFile := getFlagString(cmd, "template")
 			selector := getFlagString(cmd, "selector")
-			err := kubectl.Get(out, getKubeClient(cmd).RESTClient, resource, id, selector, outputFormat, templateFile)
+			err := kubectl.Get(out, getKubeClient(cmd).RESTClient, resource, id, selector, outputFormat, getFlagBool(cmd, "no-headers"), templateFile)
 			checkErr(err)
 		},
 	}
 	// TODO Add an --output-version lock which can ensure that regardless of the
 	// server version, the client output stays the same.
 	cmd.Flags().StringP("output", "o", "console", "Output format: console|json|yaml|template")
+	cmd.Flags().Bool("no-headers", false, "When output format is console, don't print headers")
 	cmd.Flags().StringP("template", "t", "", "Path to template file to use when --output=template")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd

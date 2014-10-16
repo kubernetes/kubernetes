@@ -23,7 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-func Get(w io.Writer, c *client.RESTClient, resource, id, selector, format, templateFile string) error {
+func Get(w io.Writer, c *client.RESTClient, resource string, id string, selector string, format string, noHeaders bool, templateFile string) error {
 	path, err := resolveResource(resolveToPath, resource)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func Get(w io.Writer, c *client.RESTClient, resource, id, selector, format, temp
 		return err
 	}
 
-	printer, err := getPrinter(format, templateFile)
+	printer, err := getPrinter(format, templateFile, noHeaders)
 	if err != nil {
 		return err
 	}
