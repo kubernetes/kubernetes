@@ -21,16 +21,19 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/build/build-image/common.sh"
 
-readonly CROSS_BINARIES=(
-  ./cmd/kubecfg
-  )
+platforms=(linux/amd64 $KUBE_CROSSPLATFORMS)
+targets=("${client_targets[@]}")
 
-for platform in ${KUBE_CROSSPLATFORMS}; do
+if [[ $# -gt 0 ]]; then
+  targets=("$@")
+fi
+
+for platform in "${platforms[@]}"; do
   (
+    # Subshell to contain these exports
     export GOOS=${platform%/*}
     export GOARCH=${platform##*/}
-    for binary in "${CROSS_BINARIES[@]}"; do
-      kube::build::make_binaries "${binary}"
-    done
+
+    kube::build::make_binaries "${targets[@]}"
   )
 done

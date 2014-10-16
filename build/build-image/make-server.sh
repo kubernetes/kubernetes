@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,19 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes binaries for cross compile targets
-#
-# This makes the docker build image, builds the cross binaries and copies them
-# out of the docker container.
-
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/build/build-image/common.sh"
 
-kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command build/build-image/make-cross.sh
-kube::build::copy_output
+targets=("${server_targets[@]}")
+if [[ $# -gt 0 ]]; then
+  targets=("$@")
+fi
+
+kube::build::make_binaries "${targets[@]}"
