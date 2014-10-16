@@ -125,24 +125,24 @@ func (s *endpointsStore) Merge(source string, change interface{}) error {
 	update := change.(EndpointsUpdate)
 	switch update.Op {
 	case ADD:
-		glog.Infof("Adding new endpoint from source %s : %v", source, update.Endpoints)
+		glog.V(4).Infof("Adding new endpoint from source %s : %v", source, update.Endpoints)
 		for _, value := range update.Endpoints {
 			endpoints[value.ID] = value
 		}
 	case REMOVE:
-		glog.Infof("Removing an endpoint %v", update)
+		glog.V(4).Infof("Removing an endpoint %v", update)
 		for _, value := range update.Endpoints {
 			delete(endpoints, value.ID)
 		}
 	case SET:
-		glog.Infof("Setting endpoints %v", update)
+		glog.V(4).Infof("Setting endpoints %v", update)
 		// Clear the old map entries by just creating a new map
 		endpoints = make(map[string]api.Endpoints)
 		for _, value := range update.Endpoints {
 			endpoints[value.ID] = value
 		}
 	default:
-		glog.Infof("Received invalid update type: %v", update)
+		glog.V(4).Infof("Received invalid update type: %v", update)
 	}
 	s.endpoints[source] = endpoints
 	s.endpointLock.Unlock()
@@ -220,24 +220,24 @@ func (s *serviceStore) Merge(source string, change interface{}) error {
 	update := change.(ServiceUpdate)
 	switch update.Op {
 	case ADD:
-		glog.Infof("Adding new service from source %s : %v", source, update.Services)
+		glog.V(4).Infof("Adding new service from source %s : %v", source, update.Services)
 		for _, value := range update.Services {
 			services[value.ID] = value
 		}
 	case REMOVE:
-		glog.Infof("Removing a service %v", update)
+		glog.V(4).Infof("Removing a service %v", update)
 		for _, value := range update.Services {
 			delete(services, value.ID)
 		}
 	case SET:
-		glog.Infof("Setting services %v", update)
+		glog.V(4).Infof("Setting services %v", update)
 		// Clear the old map entries by just creating a new map
 		services = make(map[string]api.Service)
 		for _, value := range update.Services {
 			services[value.ID] = value
 		}
 	default:
-		glog.Infof("Received invalid update type: %v", update)
+		glog.V(4).Infof("Received invalid update type: %v", update)
 	}
 	s.services[source] = services
 	s.serviceLock.Unlock()

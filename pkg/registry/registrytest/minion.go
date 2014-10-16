@@ -16,55 +16,70 @@ limitations under the License.
 
 package registrytest
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
 
 type MinionRegistry struct {
 	Err     error
 	Minion  string
-	Minions []string
+	Minions api.MinionList
 	sync.Mutex
 }
 
-func NewMinionRegistry(minions []string) *MinionRegistry {
+func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.MinionList {
+	list := api.MinionList{
+		Items: make([]api.Minion, len(minions)),
+	}
+	for i := range minions {
+		list.Items[i].ID = minions[i]
+		list.Items[i].NodeResources = nodeResources
+	}
+	return &list
+}
+
+func NewMinionRegistry(minions []string, nodeResources api.NodeResources) *MinionRegistry {
 	return &MinionRegistry{
-		Minions: minions,
+		Minions: *MakeMinionList(minions, nodeResources),
 	}
 }
 
-func (r *MinionRegistry) List() ([]string, error) {
+func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Minions, r.Err
+	return &r.Minions, r.Err
 }
 
-func (r *MinionRegistry) Insert(minion string) error {
+func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	r.Lock()
 	defer r.Unlock()
-	r.Minion = minion
-	r.Minions = append(r.Minions, minion)
+	r.Minion = minion.ID
+	r.Minions.Items = append(r.Minions.Items, *minion)
 	return r.Err
 }
 
-func (r *MinionRegistry) Contains(minion string) (bool, error) {
+func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
 	r.Lock()
 	defer r.Unlock()
-	for _, name := range r.Minions {
-		if name == minion {
-			return true, r.Err
+	for _, node := range r.Minions.Items {
+		if node.ID == minionID {
+			return &node, r.Err
 		}
 	}
-	return false, r.Err
+	return nil, r.Err
 }
 
-func (r *MinionRegistry) Delete(minion string) error {
+func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	r.Lock()
 	defer r.Unlock()
-	var newList []string
-	for _, name := range r.Minions {
-		if name != minion {
-			newList = append(newList, name)
+	var newList []api.Minion
+	for _, node := range r.Minions.Items {
+		if node.ID != minionID {
+			newList = append(newList, api.Minion{TypeMeta: api.TypeMeta{ID: node.ID}})
 		}
 	}
-	r.Minions = newList
+	r.Minions.Items = newList
 	return r.Err
 }

@@ -23,6 +23,9 @@ import (
 
 // Labels allows you to present labels independently from their storage.
 type Labels interface {
+	// Has returns whether the provided label exists.
+	Has(label string) (exists bool)
+
 	// Get returns the value for the provided label.
 	Get(label string) (value string)
 }
@@ -40,6 +43,12 @@ func (ls Set) String() string {
 	// Sort for determinism.
 	sort.StringSlice(selector).Sort()
 	return strings.Join(selector, ",")
+}
+
+// Has returns whether the provided label exists in the map.
+func (ls Set) Has(label string) bool {
+	_, exists := ls[label]
+	return exists
 }
 
 // Get returns the value in the map for the provided label.

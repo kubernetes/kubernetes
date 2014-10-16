@@ -18,9 +18,9 @@ package main
 
 import (
 	"flag"
+	"net"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
@@ -31,14 +31,16 @@ import (
 )
 
 var (
-	configFile     = flag.String("configfile", "/tmp/proxy_config", "Configuration file for the proxy")
-	master         = flag.String("master", "", "The address of the Kubernetes API server (optional)")
 	etcdServerList util.StringList
-	bindAddress    = flag.String("bindaddress", "0.0.0.0", "The address for the proxy server to serve on (set to 0.0.0.0 or \"\" for all interfaces)")
+	etcdConfigFile = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers")
+	bindAddress    = util.IP(net.ParseIP("0.0.0.0"))
+	clientConfig   = &client.Config{}
 )
 
 func init() {
-	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional)")
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated (optional). Mutually exclusive with -etcd_config")
+	flag.Var(&bindAddress, "bind_address", "The address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
 }
 
 func main() {
@@ -52,12 +54,11 @@ func main() {
 	endpointsConfig := config.NewEndpointsConfig()
 
 	// define api config source
-	if *master != "" {
-		glog.Infof("Using api calls to get config %v", *master)
-		//TODO: add auth info
-		client, err := client.New(*master, latest.OldestVersion, nil)
+	if clientConfig.Host != "" {
+		glog.Infof("Using api calls to get config %v", clientConfig.Host)
+		client, err := client.New(clientConfig)
 		if err != nil {
-			glog.Fatalf("Invalid -master: %v", err)
+			glog.Fatalf("Invalid API configuration: %v", err)
 		}
 		config.NewSourceAPI(
 			client,
@@ -65,28 +66,38 @@ func main() {
 			serviceConfig.Channel("api"),
 			endpointsConfig.Channel("api"),
 		)
+	} else {
+
+		var etcdClient *etcd.Client
+
+		// Set up etcd client
+		if len(etcdServerList) > 0 {
+			// Set up logger for etcd client
+			etcd.SetLogger(util.NewLogger("etcd "))
+			etcdClient = etcd.NewClient(etcdServerList)
+		} else if *etcdConfigFile != "" {
+			// Set up logger for etcd client
+			etcd.SetLogger(util.NewLogger("etcd "))
+			var err error
+			etcdClient, err = etcd.NewClientFromFile(*etcdConfigFile)
+
+			if err != nil {
+				glog.Fatalf("Error with etcd config file: %v", err)
+			}
+		}
+
+		// Create a configuration source that handles configuration from etcd.
+		if etcdClient != nil {
+			glog.Infof("Using etcd servers %v", etcdClient.GetCluster())
+
+			config.NewConfigSourceEtcd(etcdClient,
+				serviceConfig.Channel("etcd"),
+				endpointsConfig.Channel("etcd"))
+		}
 	}
-
-	// Create a configuration source that handles configuration from etcd.
-	if len(etcdServerList) > 0 && *master == "" {
-		glog.Infof("Using etcd servers %v", etcdServerList)
-
-		// Set up logger for etcd client
-		etcd.SetLogger(util.NewLogger("etcd "))
-		etcdClient := etcd.NewClient(etcdServerList)
-		config.NewConfigSourceEtcd(etcdClient,
-			serviceConfig.Channel("etcd"),
-			endpointsConfig.Channel("etcd"))
-	}
-
-	// And create a configuration source that reads from a local file
-	config.NewConfigSourceFile(*configFile,
-		serviceConfig.Channel("file"),
-		endpointsConfig.Channel("file"))
-	glog.Infof("Using configuration file %s", *configFile)
 
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, *bindAddress)
+	proxier := proxy.NewProxier(loadBalancer, net.IP(bindAddress))
 	// Wire proxier to handle changes to services
 	serviceConfig.RegisterHandler(proxier)
 	// And wire loadBalancer to handle changes to endpoints to services

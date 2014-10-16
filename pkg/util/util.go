@@ -144,28 +144,8 @@ func (intstr IntOrString) MarshalJSON() ([]byte, error) {
 	}
 }
 
-// StringDiff diffs a and b and returns a human readable diff.
-func StringDiff(a, b string) string {
-	ba := []byte(a)
-	bb := []byte(b)
-	out := []byte{}
-	i := 0
-	for ; i < len(ba) && i < len(bb); i++ {
-		if ba[i] != bb[i] {
-			break
-		}
-		out = append(out, ba[i])
-	}
-	out = append(out, []byte("\n\nA: ")...)
-	out = append(out, ba[i:]...)
-	out = append(out, []byte("\n\nB: ")...)
-	out = append(out, bb[i:]...)
-	out = append(out, []byte("\n\n")...)
-	return string(out)
-}
-
 // Takes a list of strings and compiles them into a list of regular expressions
-func CompileRegexps(regexpStrings StringList) ([]*regexp.Regexp, error) {
+func CompileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
 	regexps := []*regexp.Regexp{}
 	for _, regexpStr := range regexpStrings {
 		r, err := regexp.Compile(regexpStr)

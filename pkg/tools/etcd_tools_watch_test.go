@@ -32,9 +32,9 @@ import (
 func TestWatchInterpretations(t *testing.T) {
 	codec := latest.Codec
 	// Declare some pods to make the test cases compact.
-	podFoo := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
-	podBar := &api.Pod{JSONBase: api.JSONBase{ID: "bar"}}
-	podBaz := &api.Pod{JSONBase: api.JSONBase{ID: "baz"}}
+	podFoo := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
+	podBar := &api.Pod{TypeMeta: api.TypeMeta{ID: "bar"}}
+	podBaz := &api.Pod{TypeMeta: api.TypeMeta{ID: "baz"}}
 	firstLetterIsB := func(obj runtime.Object) bool {
 		return obj.(*api.Pod).ID[0] == 'b'
 	}
@@ -198,16 +198,36 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	}
 }
 
+func TestWatchEtcdError(t *testing.T) {
+	codec := latest.Codec
+	fakeClient := NewFakeEtcdClient(t)
+	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
+	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
+	h := EtcdHelper{fakeClient, codec, versioner}
+
+	got := <-h.Watch("/some/key", 4).ResultChan()
+	if got.Type != watch.Error {
+		t.Fatalf("Unexpected non-error")
+	}
+	status, ok := got.Object.(*api.Status)
+	if !ok {
+		t.Fatalf("Unexpected non-error object type")
+	}
+	if status.Message != "immediate error" {
+		t.Errorf("Unexpected wrong error")
+	}
+	if status.Status != api.StatusFailure {
+		t.Errorf("Unexpected wrong error status")
+	}
+}
+
 func TestWatch(t *testing.T) {
 	codec := latest.Codec
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	watching := h.Watch("/some/key", 0)
 
 	fakeClient.WaitForWatchCompletion()
 	// when server returns not found, the watch index starts at the next value (1)
@@ -216,7 +236,7 @@ func TestWatch(t *testing.T) {
 	}
 
 	// Test normal case
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	pod := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
 	podBytes, _ := codec.Encode(pod)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "set",
@@ -235,6 +255,17 @@ func TestWatch(t *testing.T) {
 
 	// Test error case
 	fakeClient.WatchInjectError <- fmt.Errorf("Injected error")
+
+	if errEvent, ok := <-watching.ResultChan(); !ok {
+		t.Errorf("no error result?")
+	} else {
+		if e, a := watch.Error, errEvent.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := "Injected error", errEvent.Object.(*api.Status).Message; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
 
 	// Did everything shut down?
 	if _, open := <-fakeClient.WatchResponse; open {
@@ -263,7 +294,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{ID: "foo"}, Endpoints: []string{}})),
 					},
 				},
 			},
@@ -277,12 +308,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -299,7 +330,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{ID: "foo"}, Endpoints: []string{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -312,12 +343,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{ID: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{JSONBase: api.JSONBase{ID: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{ID: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -336,11 +367,7 @@ func TestWatchEtcdState(t *testing.T) {
 			fakeClient.Data[key] = value
 		}
 		h := EtcdHelper{fakeClient, codec, versioner}
-		watching, err := h.Watch("/somekey/foo", testCase.From)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", k, err)
-			continue
-		}
+		watching := h.Watch("/somekey/foo", testCase.From)
 		fakeClient.WaitForWatchCompletion()
 
 		t.Logf("Testing %v", k)
@@ -364,11 +391,11 @@ func TestWatchEtcdState(t *testing.T) {
 
 func TestWatchFromZeroIndex(t *testing.T) {
 	codec := latest.Codec
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	pod := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
 
 	testCases := map[string]struct {
 		Response        EtcdResponseWithError
-		ExpectedVersion uint64
+		ExpectedVersion string
 		ExpectedType    watch.EventType
 	}{
 		"get value created": {
@@ -383,7 +410,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 					EtcdIndex: 2,
 				},
 			},
-			1,
+			"1",
 			watch.Added,
 		},
 		"get value modified": {
@@ -398,7 +425,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 					EtcdIndex: 3,
 				},
 			},
-			2,
+			"2",
 			watch.Modified,
 		},
 	}
@@ -408,10 +435,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		fakeClient.Data["/some/key"] = testCase.Response
 		h := EtcdHelper{fakeClient, codec, versioner}
 
-		watching, err := h.Watch("/some/key", 0)
-		if err != nil {
-			t.Fatalf("%s: unexpected error: %v", k, err)
-		}
+		watching := h.Watch("/some/key", 0)
 
 		fakeClient.WaitForWatchCompletion()
 		if e, a := testCase.Response.R.EtcdIndex+1, fakeClient.WatchIndex; e != a {
@@ -428,7 +452,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 			t.Fatalf("%s: expected a pod, got %#v", k, event.Object)
 		}
 		if actualPod.ResourceVersion != testCase.ExpectedVersion {
-			t.Errorf("%s: expected pod with resource version %d, Got %#v", k, testCase.ExpectedVersion, actualPod)
+			t.Errorf("%s: expected pod with resource version %v, Got %#v", k, testCase.ExpectedVersion, actualPod)
 		}
 		pod.ResourceVersion = testCase.ExpectedVersion
 		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
@@ -440,7 +464,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 
 func TestWatchListFromZeroIndex(t *testing.T) {
 	codec := latest.Codec
-	pod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	pod := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
 
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
@@ -486,10 +510,10 @@ func TestWatchListFromZeroIndex(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected a pod, got %#v", event.Object)
 		}
-		if actualPod.ResourceVersion != 1 {
+		if actualPod.ResourceVersion != "1" {
 			t.Errorf("Expected pod with resource version %d, Got %#v", 1, actualPod)
 		}
-		pod.ResourceVersion = 1
+		pod.ResourceVersion = "1"
 		if e, a := pod, event.Object; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -512,10 +536,7 @@ func TestWatchFromNotFound(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	watching := h.Watch("/some/key", 0)
 
 	fakeClient.WaitForWatchCompletion()
 	if fakeClient.WatchIndex != 3 {
@@ -538,9 +559,14 @@ func TestWatchFromOtherError(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	watching := h.Watch("/some/key", 0)
+
+	errEvent := <-watching.ResultChan()
+	if e, a := watch.Error, errEvent.Type; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+	if e, a := "101:  () [2]", errEvent.Object.(*api.Status).Message; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
 	}
 
 	select {
@@ -563,10 +589,7 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 
 	// Test purposeful shutdown
-	watching, err := h.Watch("/some/key", 0)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	watching := h.Watch("/some/key", 0)
 	fakeClient.WaitForWatchCompletion()
 	watching.Stop()
 

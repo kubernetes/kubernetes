@@ -20,26 +20,26 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	cloudcontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-
-	goetcd "github.com/coreos/go-etcd/etcd"
-	"github.com/golang/glog"
 )
 
 // Config is a structure used to configure a Master.
@@ -50,8 +50,10 @@ type Config struct {
 	HealthCheckMinions bool
 	Minions            []string
 	MinionCacheTTL     time.Duration
+	EventTTL           time.Duration
 	MinionRegexp       string
 	PodInfoGetter      client.PodInfoGetter
+	NodeResources      api.NodeResources
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -62,85 +64,83 @@ type Master struct {
 	endpointRegistry   endpoint.Registry
 	minionRegistry     minion.Registry
 	bindingRegistry    binding.Registry
+	eventRegistry      generic.Registry
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
 // is incorrect.
-func NewEtcdHelper(etcdServers []string, version string) (helper tools.EtcdHelper, err error) {
-	client := goetcd.NewClient(etcdServers)
+func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHelper, err error) {
 	if version == "" {
 		version = latest.Version
 	}
-	codec, versioner, err := latest.InterfacesFor(version)
+	versionInterfaces, err := latest.InterfacesFor(version)
 	if err != nil {
 		return helper, err
 	}
-	return tools.EtcdHelper{client, codec, versioner}, nil
+	return tools.EtcdHelper{client, versionInterfaces.Codec, tools.RuntimeVersionAdapter{versionInterfaces.ResourceVersioner}}, nil
 }
 
 // New returns a new instance of Master connected to the given etcd server.
 func New(c *Config) *Master {
 	minionRegistry := makeMinionRegistry(c)
+	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
+	manifestFactory := &pod.BasicManifestFactory{
+		ServiceRegistry: serviceRegistry,
+	}
 	m := &Master{
-		podRegistry:        etcd.NewRegistry(c.EtcdHelper),
-		controllerRegistry: etcd.NewRegistry(c.EtcdHelper),
-		serviceRegistry:    etcd.NewRegistry(c.EtcdHelper),
-		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper),
-		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper),
+		podRegistry:        etcd.NewRegistry(c.EtcdHelper, manifestFactory),
+		controllerRegistry: etcd.NewRegistry(c.EtcdHelper, nil),
+		serviceRegistry:    serviceRegistry,
+		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper, nil),
+		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper, manifestFactory),
+		eventRegistry:      event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 	}
-	m.init(c.Cloud, c.PodInfoGetter)
+	m.init(c)
 	return m
 }
 
 func makeMinionRegistry(c *Config) minion.Registry {
-	var minionRegistry minion.Registry
-	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
-		var err error
-		minionRegistry, err = minion.NewCloudRegistry(c.Cloud, c.MinionRegexp)
-		if err != nil {
-			glog.Errorf("Failed to initalize cloud minion registry reverting to static registry (%#v)", err)
-		}
-	}
-	if minionRegistry == nil {
-		minionRegistry = minion.NewRegistry(c.Minions)
-	}
+	var minionRegistry minion.Registry = etcd.NewRegistry(c.EtcdHelper, nil)
 	if c.HealthCheckMinions {
 		minionRegistry = minion.NewHealthyRegistry(minionRegistry, &http.Client{})
-	}
-	if c.MinionCacheTTL > 0 {
-		cachingMinionRegistry, err := minion.NewCachingRegistry(minionRegistry, c.MinionCacheTTL)
-		if err != nil {
-			glog.Errorf("Failed to initialize caching layer, ignoring cache.")
-		} else {
-			minionRegistry = cachingMinionRegistry
-		}
 	}
 	return minionRegistry
 }
 
-func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInfoGetter) {
-	podCache := NewPodCache(podInfoGetter, m.podRegistry)
+// init initializes master.
+func (m *Master) init(c *Config) {
+	podCache := NewPodCache(c.PodInfoGetter, m.podRegistry)
 	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
 
-	endpoints := servicecontroller.NewEndpointController(m.serviceRegistry, m.client)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
+		// TODO: Move minion controller to its own code.
+		cloudcontroller.NewMinionController(c.Cloud, c.MinionRegexp, &c.NodeResources, m.minionRegistry, c.MinionCacheTTL).Run()
+	} else {
+		for _, minionID := range c.Minions {
+			m.minionRegistry.CreateMinion(nil, &api.Minion{
+				TypeMeta:      api.TypeMeta{ID: minionID},
+				NodeResources: c.NodeResources,
+			})
+		}
+	}
 
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewREST(&pod.RESTConfig{
-			CloudProvider: cloud,
+			CloudProvider: c.Cloud,
 			PodCache:      podCache,
-			PodInfoGetter: podInfoGetter,
+			PodInfoGetter: c.PodInfoGetter,
 			Registry:      m.podRegistry,
 			Minions:       m.client,
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, cloud, m.minionRegistry),
+		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry),
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                minion.NewREST(m.minionRegistry),
+		"events":                 event.NewREST(m.eventRegistry),
 
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
@@ -148,19 +148,19 @@ func (m *Master) init(cloud cloudprovider.Interface, podInfoGetter client.PodInf
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec) {
+func (m *Master) API_v1beta1() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta1.Codec
+	return storage, v1beta1.Codec, "/api/v1beta1", latest.SelfLinker
 }
 
 // API_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec) {
+func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec, string, runtime.SelfLinker) {
 	storage := make(map[string]apiserver.RESTStorage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta2.Codec
+	return storage, v1beta2.Codec, "/api/v1beta1", latest.SelfLinker
 }

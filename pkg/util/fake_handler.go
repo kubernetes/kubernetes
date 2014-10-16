@@ -65,6 +65,10 @@ func (f FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMeth
 	if err != nil {
 		t.Errorf("Couldn't parse %v as a URL.", expectedPath)
 	}
+	if f.RequestReceived == nil {
+		t.Errorf("Unexpected nil request received for %s", expectedPath)
+		return
+	}
 	if f.RequestReceived.URL.Path != expectURL.Path {
 		t.Errorf("Unexpected request path for request %#v, received: %q, expected: %q", f.RequestReceived, f.RequestReceived.URL.Path, expectURL.Path)
 	}

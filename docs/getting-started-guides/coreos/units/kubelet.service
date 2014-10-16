@@ -1,0 +1,17 @@
+[Unit]
+ConditionFileIsExecutable=/opt/bin/kubelet
+Description=Kubernetes Kubelet
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+ExecStart=/opt/bin/kubelet \
+--address=127.0.0.1 \
+--port=10250 \
+--hostname_override=127.0.0.1 \
+--etcd_servers=http://127.0.0.1:4001 \
+--logtostderr=true
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

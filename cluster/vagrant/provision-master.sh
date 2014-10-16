@@ -16,17 +16,48 @@
 
 # exit on any error
 set -e
-source $(dirname $0)/provision-config.sh
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
+
+function release_not_found() {
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  exit 1
+}
+
+# Look for our precompiled binary releases.  When running from a source repo,
+# these are generated under _output.  When running from an release tarball these
+# are under ./server.
+server_binary_tar="/vagrant/server/kubernetes-server-linux-amd64.tar.gz"
+if [[ ! -f "$server_binary_tar" ]]; then
+  server_binary_tar="/vagrant/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+fi
+if [[ ! -f "$server_binary_tar" ]]; then
+  release_not_found
+fi
+
+salt_tar="/vagrant/server/kubernetes-salt.tar.gz"
+if [[ ! -f "$salt_tar" ]]; then
+  salt_tar="/vagrant/_output/release-tars/kubernetes-salt.tar.gz"
+fi
+if [[ ! -f "$salt_tar" ]]; then
+  release_not_found
+fi
+
 
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
 minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   minion=${MINION_NAMES[$i]}
-  ip=${minion_ip_array[$i]}  
+  ip=${minion_ip_array[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
-  fi  
+  fi
 done
 
 # Update salt configuration
@@ -66,14 +97,22 @@ state_output: mixed
 EOF
 
 # Configure nginx authorization
-mkdir -p $KUBE_TEMP
-mkdir -p /srv/salt/nginx
-echo "Using password: $MASTER_USER:$MASTER_PASSWD"
-python $(dirname $0)/../../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $MASTER_USER $MASTER_PASSWD
-MASTER_HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
+mkdir -p "$KUBE_TEMP"
+mkdir -p /srv/salt-overlay/salt/nginx
+python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpasswd" "$MASTER_USER" "$MASTER_PASSWD"
+MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
+echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
 
-# we will run provision to update code each time we test, so we do not want to do salt install each time
+echo "Running release install script"
+rm -rf /kube-install
+mkdir -p /kube-install
+pushd /kube-install
+  tar xzf "$salt_tar"
+  cp "$server_binary_tar" .
+  ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
+popd
+
+# we will run provision to update code each time we test, so we do not want to do salt installs each time
 if ! which salt-master >/dev/null 2>&1; then
 
   # Configure the salt-api
@@ -90,10 +129,12 @@ rest_cherrypy:
   webhook_disable_auth: True
 EOF
 
-  # Install Salt
+
+  # Install Salt Master
   #
   # -M installs the master
-  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M
+  # -N does not install the minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -N
 
   # Install salt-api
   #
@@ -106,17 +147,15 @@ EOF
 
 fi
 
-# Build release
-echo "Building release"
-pushd /vagrant
-  ./release/build-release.sh kubernetes
-popd
+if ! which salt-minion >/dev/null 2>&1; then
 
-echo "Running release install script"
-pushd /vagrant/_output/release/master-release/src/scripts
-  ./master-release-install.sh
-popd
+  # Install Salt minion
+  curl -sS -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s
 
-echo "Executing configuration"
-salt '*' mine.update
-salt --force-color '*' state.highstate
+else
+  # Only run highstate when updating the config.  In the first-run case, Salt is
+  # set up to run highstate as new minions join for the first time.
+  echo "Executing configuration"
+  salt '*' mine.update
+  salt --force-color '*' state.highstate
+fi

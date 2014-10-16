@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	// TODO: move everything from pkg/scheduler into this package. Remove references from registry.
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -67,6 +68,7 @@ func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
+		record.Eventf(pod, "", string(api.PodWaiting), "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -75,6 +77,9 @@ func (s *Scheduler) scheduleOne() {
 		Host:  dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
+		record.Eventf(pod, "", string(api.PodWaiting), "failedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
+		return
 	}
+	record.Eventf(pod, "", string(api.PodWaiting), "scheduled", "Successfully assigned %v to %v", pod.ID, dest)
 }

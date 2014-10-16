@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -28,22 +29,27 @@ import (
 // CauseType in api/types.go.
 type ValidationErrorType string
 
+// TODO: These values are duplicated in api/types.go, but there's a circular dep.  Fix it.
 const (
 	// ValidationErrorTypeNotFound is used to report failure to find a requested value
 	// (e.g. looking up an ID).
-	ValidationErrorTypeNotFound ValidationErrorType = "fieldValueNotFound"
+	ValidationErrorTypeNotFound ValidationErrorType = "FieldValueNotFound"
 	// ValidationErrorTypeRequired is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).
-	ValidationErrorTypeRequired ValidationErrorType = "fieldValueRequired"
+	ValidationErrorTypeRequired ValidationErrorType = "FieldValueRequired"
 	// ValidationErrorTypeDuplicate is used to report collisions of values that must be
 	// unique (e.g. unique IDs).
-	ValidationErrorTypeDuplicate ValidationErrorType = "fieldValueDuplicate"
+	ValidationErrorTypeDuplicate ValidationErrorType = "FieldValueDuplicate"
 	// ValidationErrorTypeInvalid is used to report malformed values (e.g. failed regex
 	// match).
-	ValidationErrorTypeInvalid ValidationErrorType = "fieldValueInvalid"
+	ValidationErrorTypeInvalid ValidationErrorType = "FieldValueInvalid"
 	// ValidationErrorTypeNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
-	ValidationErrorTypeNotSupported ValidationErrorType = "fieldValueNotSupported"
+	ValidationErrorTypeNotSupported ValidationErrorType = "FieldValueNotSupported"
+	// ValidationErrorTypeForbidden is used to report valid (as per formatting rules)
+	// values which would be accepted by some api instances, but which would invoke behavior
+	// not permitted by this api instance (such as due to stricter security policy).
+	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
 )
 
 func ValueOf(t ValidationErrorType) string {
@@ -58,6 +64,8 @@ func ValueOf(t ValidationErrorType) string {
 		return "invalid value"
 	case ValidationErrorTypeNotSupported:
 		return "unsupported value"
+	case ValidationErrorTypeForbidden:
+		return "forbidden"
 	default:
 		glog.Errorf("unrecognized validation type: %#v", t)
 		return ""
@@ -90,6 +98,11 @@ func NewFieldNotSupported(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeNotSupported, field, value}
 }
 
+// NewFieldForbidden returns a ValidationError indicating "forbidden"
+func NewFieldForbidden(field string, value interface{}) ValidationError {
+	return ValidationError{ValidationErrorTypeForbidden, field, value}
+}
+
 // NewFieldDuplicate returns a ValidationError indicating "duplicate value"
 func NewFieldDuplicate(field string, value interface{}) ValidationError {
 	return ValidationError{ValidationErrorTypeDuplicate, field, value}
@@ -104,30 +117,11 @@ func NewFieldNotFound(field string, value interface{}) ValidationError {
 // interface to avoid confusion where an empty ErrorList would still be an
 // error (non-nil).  To produce a single error instance from an ErrorList, use
 // the ToError() method, which will return nil for an empty ErrorList.
-type ErrorList []error
-
-// This helper implements the error interface for ErrorList, but prevents
-// accidental conversion of ErrorList to error.
-type errorListInternal ErrorList
-
-// Error is part of the error interface.
-func (list errorListInternal) Error() string {
-	if len(list) == 0 {
-		return ""
-	}
-	sl := make([]string, len(list))
-	for i := range list {
-		sl[i] = list[i].Error()
-	}
-	return strings.Join(sl, "; ")
-}
+type ErrorList util.ErrorList
 
 // ToError converts an ErrorList into a "normal" error, or nil if the list is empty.
 func (list ErrorList) ToError() error {
-	if len(list) == 0 {
-		return nil
-	}
-	return errorListInternal(list)
+	return util.ErrorList(list).ToError()
 }
 
 // Prefix adds a prefix to the Field of every ValidationError in the list. Returns

@@ -51,7 +51,6 @@ func TestGetURLParts(t *testing.T) {
 			Ports: []api.Port{{Name: "found", HostPort: 93}},
 			LivenessProbe: &api.LivenessProbe{
 				HTTPGet: test.probe,
-				Type:    "http",
 			},
 		}
 		host, port, path, err := getURLParts(state, container)
@@ -117,7 +116,6 @@ func TestHTTPHealthChecker(t *testing.T) {
 		container := api.Container{
 			LivenessProbe: &api.LivenessProbe{
 				HTTPGet: test.probe,
-				Type:    "http",
 			},
 		}
 		params := container.LivenessProbe.HTTPGet
@@ -125,7 +123,7 @@ func TestHTTPHealthChecker(t *testing.T) {
 			params.Port = util.NewIntOrStringFromString(port)
 			params.Host = host
 		}
-		health, err := hc.HealthCheck("test", api.PodState{PodIP: host}, container)
+		health, err := hc.HealthCheck("test", "", api.PodState{PodIP: host}, container)
 		if test.health == Unknown && err == nil {
 			t.Errorf("Expected error")
 		}

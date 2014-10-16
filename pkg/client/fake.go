@@ -38,101 +38,107 @@ type Fake struct {
 	ServiceList   api.ServiceList
 	EndpointsList api.EndpointsList
 	Minions       api.MinionList
+	Events        api.EventList
 	Err           error
 	Watch         watch.Interface
 }
 
-func (c *Fake) ListPods(selector labels.Selector) (*api.PodList, error) {
+func (c *Fake) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-pods"})
 	return api.Scheme.CopyOrDie(&c.Pods).(*api.PodList), nil
 }
 
-func (c *Fake) GetPod(name string) (*api.Pod, error) {
+func (c *Fake) GetPod(ctx api.Context, name string) (*api.Pod, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-pod", Value: name})
 	return &api.Pod{}, nil
 }
 
-func (c *Fake) DeletePod(name string) error {
+func (c *Fake) DeletePod(ctx api.Context, name string) error {
 	c.Actions = append(c.Actions, FakeAction{Action: "delete-pod", Value: name})
 	return nil
 }
 
-func (c *Fake) CreatePod(pod *api.Pod) (*api.Pod, error) {
+func (c *Fake) CreatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "create-pod"})
 	return &api.Pod{}, nil
 }
 
-func (c *Fake) UpdatePod(pod *api.Pod) (*api.Pod, error) {
+func (c *Fake) UpdatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "update-pod", Value: pod.ID})
 	return &api.Pod{}, nil
 }
 
-func (c *Fake) ListReplicationControllers(selector labels.Selector) (*api.ReplicationControllerList, error) {
+func (c *Fake) ListReplicationControllers(ctx api.Context, selector labels.Selector) (*api.ReplicationControllerList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-controllers"})
 	return &api.ReplicationControllerList{}, nil
 }
 
-func (c *Fake) GetReplicationController(name string) (*api.ReplicationController, error) {
+func (c *Fake) GetReplicationController(ctx api.Context, name string) (*api.ReplicationController, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-controller", Value: name})
 	return api.Scheme.CopyOrDie(&c.Ctrl).(*api.ReplicationController), nil
 }
 
-func (c *Fake) CreateReplicationController(controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (c *Fake) CreateReplicationController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "create-controller", Value: controller})
 	return &api.ReplicationController{}, nil
 }
 
-func (c *Fake) UpdateReplicationController(controller *api.ReplicationController) (*api.ReplicationController, error) {
+func (c *Fake) UpdateReplicationController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "update-controller", Value: controller})
 	return &api.ReplicationController{}, nil
 }
 
-func (c *Fake) DeleteReplicationController(controller string) error {
+func (c *Fake) DeleteReplicationController(ctx api.Context, controller string) error {
 	c.Actions = append(c.Actions, FakeAction{Action: "delete-controller", Value: controller})
 	return nil
 }
 
-func (c *Fake) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Fake) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-controllers", Value: resourceVersion})
 	return c.Watch, nil
 }
 
-func (c *Fake) ListServices(selector labels.Selector) (*api.ServiceList, error) {
+func (c *Fake) ListServices(ctx api.Context, selector labels.Selector) (*api.ServiceList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-services"})
 	return &c.ServiceList, c.Err
 }
 
-func (c *Fake) GetService(name string) (*api.Service, error) {
+func (c *Fake) GetService(ctx api.Context, name string) (*api.Service, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-service", Value: name})
 	return &api.Service{}, nil
 }
 
-func (c *Fake) CreateService(service *api.Service) (*api.Service, error) {
+func (c *Fake) CreateService(ctx api.Context, service *api.Service) (*api.Service, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "create-service", Value: service})
 	return &api.Service{}, nil
 }
 
-func (c *Fake) UpdateService(service *api.Service) (*api.Service, error) {
+func (c *Fake) UpdateService(ctx api.Context, service *api.Service) (*api.Service, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "update-service", Value: service})
 	return &api.Service{}, nil
 }
 
-func (c *Fake) DeleteService(service string) error {
+func (c *Fake) DeleteService(ctx api.Context, service string) error {
 	c.Actions = append(c.Actions, FakeAction{Action: "delete-service", Value: service})
 	return nil
 }
 
-func (c *Fake) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Fake) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-services", Value: resourceVersion})
 	return c.Watch, c.Err
 }
 
-func (c *Fake) ListEndpoints(selector labels.Selector) (*api.EndpointsList, error) {
+func (c *Fake) ListEndpoints(ctx api.Context, selector labels.Selector) (*api.EndpointsList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-endpoints"})
 	return api.Scheme.CopyOrDie(&c.EndpointsList).(*api.EndpointsList), c.Err
 }
 
-func (c *Fake) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Fake) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-endpoints"})
+	return &api.Endpoints{}, nil
+}
+
+func (c *Fake) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
 	return c.Watch, c.Err
 }
@@ -146,4 +152,28 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 func (c *Fake) ListMinions() (*api.MinionList, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "list-minions", Value: nil})
 	return &c.Minions, nil
+}
+
+// CreateEvent makes a new event. Returns the copy of the event the server returns, or an error.
+func (c *Fake) CreateEvent(event *api.Event) (*api.Event, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-event", Value: event.ID})
+	return &api.Event{}, nil
+}
+
+// ListEvents returns a list of events matching the selectors.
+func (c *Fake) ListEvents(label, field labels.Selector) (*api.EventList, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "list-events"})
+	return &c.Events, nil
+}
+
+// GetEvent returns the given event, or an error.
+func (c *Fake) GetEvent(id string) (*api.Event, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "get-event", Value: id})
+	return &api.Event{}, nil
+}
+
+// WatchEvents starts watching for events matching the given selectors.
+func (c *Fake) WatchEvents(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "watch-events", Value: resourceVersion})
+	return c.Watch, c.Err
 }

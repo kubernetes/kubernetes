@@ -16,23 +16,32 @@
 
 # Starts a Kubernetes cluster, runs the e2e test suite, and shuts it
 # down.
+#
+# Environment flags:
+#   TEST_PATTERN: A pattern to match test filenames against.
+#     Example: "TEST_PATTERN=up" would match tests named "update.sh" and
+#              "hiccup.sh".
 
-source $(dirname $0)/../cluster/kube-env.sh
-source $(dirname $0)/../cluster/$KUBERNETES_PROVIDER/util.sh
+set -o errexit
+set -o nounset
+set -o pipefail
+
+# Use testing config
+export KUBE_CONFIG_FILE="config-test.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+# TODO(jbeda): This will break on usage if there is a space in
+# ${KUBE_ROOT}.  Covert to an array?  Or an exported function?
+export KUBECFG="${KUBE_ROOT}/cluster/kubecfg.sh -expect_version_match"
+
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 # For debugging of this test's components, it's helpful to leave the test
 # cluster running.
 ALREADY_UP=${1:-0}
 LEAVE_UP=${2:-0}
 TEAR_DOWN=${3:-0}
-
-# Exit on error
-set -e
-
-# Use testing config
-export KUBE_CONFIG_FILE="config-test.sh"
-export KUBE_REPO_ROOT="$(dirname $0)/.."
-export KUBECFG="${KUBE_REPO_ROOT}/cluster/kubecfg.sh -expect_version_match"
 
 if [[ $TEAR_DOWN -ne 0 ]]; then
   detect-project
@@ -45,10 +54,10 @@ test-build-release
 
 if [[ ${ALREADY_UP} -ne 1 ]]; then
   # Now bring a test cluster up with that release.
-  $(dirname $0)/../cluster/kube-up.sh
+  "${KUBE_ROOT}/cluster/kube-up.sh"
 else
   # Just push instead
-  $(dirname $0)/../cluster/kube-push.sh
+  "${KUBE_ROOT}/cluster/kube-push.sh"
 fi
 
 # Perform any required setup of the cluster
@@ -60,20 +69,33 @@ if [[ ${LEAVE_UP} -ne 1 ]]; then
   trap test-teardown EXIT
 fi
 
+TEST_PATTERN="${TEST_PATTERN:-}"
 any_failed=0
-for test_file in $(ls $(dirname $0)/e2e-suite/); do
-  "$(dirname $0)/e2e-suite/${test_file}"
+for test_file in $(ls "${KUBE_ROOT}/hack/e2e-suite/"); do
+  if [[ "${TEST_PATTERN}" != "" ]]; then
+    check=".*${TEST_PATTERN}.*"
+    if [[ ! "$test_file" =~ $check ]]; then
+        echo "skipping $test_file"
+        continue
+    fi
+  fi
+
+  echo "running $test_file"
+  "${KUBE_ROOT}/hack/e2e-suite/${test_file}"
   result="$?"
   if [[ "${result}" -eq "0" ]]; then
     echo "${test_file} returned ${result}; passed!"
   else
     echo "${test_file} returned ${result}; FAIL!"
-    any_failed=1
+    any_failed=$((any_failed+1))
   fi
 done
 
-if [[ ${any_failed} -ne 0 ]]; then
-  echo "At least one test failed."
+echo
+if [[ ${any_failed} -eq 0 ]]; then
+  echo "Final: All tests passed."
+else
+  echo "Final: ${any_failed} tests failed."
 fi
 
 exit ${any_failed}

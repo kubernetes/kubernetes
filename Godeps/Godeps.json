@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.3.1",
 	"Packages": [
 		"./..."
 	],
@@ -13,6 +13,11 @@
 			"ImportPath": "code.google.com/p/go-uuid/uuid",
 			"Comment": "null-12",
 			"Rev": "7dda39b2e7d5e265014674c5af696ba4186679e9"
+		},
+		{
+			"ImportPath": "code.google.com/p/go.net/context",
+			"Comment": "null-144",
+			"Rev": "ad01a6fcc8a19d3a4478c836895ffe883bd2ceab"
 		},
 		{
 			"ImportPath": "code.google.com/p/go.net/html",
@@ -50,9 +55,13 @@
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
 		},
 		{
+			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
+			"Rev": "ae4665cf2d188c65764c73fe4af5378acc549510"
+		},
+		{
 			"ImportPath": "github.com/fsouza/go-dockerclient",
-			"Comment": "0.2.1-241-g0dbb508",
-			"Rev": "0dbb508e94dd899a6743d035d8f249c7634d26da"
+			"Comment": "0.2.1-267-g15d2c6e",
+			"Rev": "15d2c6e3eb670c545d0af0604d7f9aff3871af04"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
@@ -60,17 +69,21 @@
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
-			"Comment": "0.2.0-27-g17b0ec5",
-			"Rev": "17b0ec576bcbeb321c133e4378dee1e500c9850d"
+			"Comment": "0.4.0",
+			"Rev": "5a6d06c02600b1e57e55a9d9f71dbac1bfc9fe6c"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/info",
-			"Comment": "0.2.0-27-g17b0ec5",
-			"Rev": "17b0ec576bcbeb321c133e4378dee1e500c9850d"
+			"Comment": "0.4.0",
+			"Rev": "5a6d06c02600b1e57e55a9d9f71dbac1bfc9fe6c"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "aef70dacbc78771e35beb261bb3a72986adf7906"
+		},
+		{
+			"ImportPath": "github.com/kr/text",
+			"Rev": "6807e777504f54ad073ecef66747de158294b639"
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/aws",
@@ -79,6 +92,32 @@
 		{
 			"ImportPath": "github.com/mitchellh/goamz/ec2",
 			"Rev": "9cad7da945e699385c1a3e115aa255211921c9bb"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/mapstructure",
+			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
+		},
+		{
+			"ImportPath": "github.com/racker/perigee",
+			"Comment": "v0.0.0-18-g0c00cb0",
+			"Rev": "0c00cb0a026b71034ebc8205263c77dad3577db5"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud",
+			"Comment": "v0.1.0-31-ge13cda2",
+			"Rev": "e13cda260ce48d63ce816f4fa72b6c6cd096596d"
+		},
+		{
+			"ImportPath": "github.com/skratchdot/open-golang/open",
+			"Rev": "ba570a111973b539baf23c918213059543b5bb6e"
+		},
+		{
+			"ImportPath": "github.com/spf13/cobra",
+			"Rev": "b1e90a7943957b51bb96a13b44b844475bcf95c0"
+		},
+		{
+			"ImportPath": "github.com/spf13/pflag",
+			"Rev": "463bdc838f2b35e9307e91d480878bda5fff7232"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
@@ -91,6 +130,11 @@
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
 			"Rev": "37614ac27794505bf7867ca93aac883cadb6a5f7"
+		},
+		{
+			"ImportPath": "github.com/tonnerre/golang-pretty",
+			"Comment": "debian/0.0_git20130613-1-1-ge7fccc0",
+			"Rev": "e7fccc03e91bad289b96c21aa3312a220689bdd7"
 		},
 		{
 			"ImportPath": "github.com/vaughan0/go-ini",

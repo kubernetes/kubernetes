@@ -15,10 +15,12 @@
 # limitations under the License.
 
 # Clean out the output directory on the docker host.
+set -o errexit
+set -o nounset
+set -o pipefail
 
-set -e
-
-source $(dirname $0)/common.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$KUBE_ROOT/build/common.sh"
 
 kube::build::verify_prereqs
 kube::build::clean_output

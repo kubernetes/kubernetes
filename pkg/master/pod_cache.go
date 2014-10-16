@@ -46,39 +46,48 @@ func NewPodCache(info client.PodInfoGetter, pods pod.Registry) *PodCache {
 	}
 }
 
+// makePodCacheKey constructs a key for use in a map to address a pod with specified namespace and id
+func makePodCacheKey(podNamespace, podID string) string {
+	return podNamespace + "." + podID
+}
+
 // GetPodInfo implements the PodInfoGetter.GetPodInfo.
 // The returned value should be treated as read-only.
 // TODO: Remove the host from this call, it's totally unnecessary.
-func (p *PodCache) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (p *PodCache) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	value, ok := p.podInfo[podID]
+	value, ok := p.podInfo[makePodCacheKey(podNamespace, podID)]
 	if !ok {
 		return nil, client.ErrPodInfoNotAvailable
 	}
 	return value, nil
 }
 
-func (p *PodCache) updatePodInfo(host, id string) error {
-	info, err := p.containerInfo.GetPodInfo(host, id)
+func (p *PodCache) updatePodInfo(host, podNamespace, podID string) error {
+	info, err := p.containerInfo.GetPodInfo(host, podNamespace, podID)
 	if err != nil {
 		return err
 	}
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	p.podInfo[id] = info
+	p.podInfo[makePodCacheKey(podNamespace, podID)] = info
 	return nil
 }
 
 // UpdateAllContainers updates information about all containers.  Either called by Loop() below, or one-off.
 func (p *PodCache) UpdateAllContainers() {
-	pods, err := p.pods.ListPods(labels.Everything())
+	ctx := api.NewContext()
+	pods, err := p.pods.ListPods(ctx, labels.Everything())
 	if err != nil {
 		glog.Errorf("Error synchronizing container list: %v", err)
 		return
 	}
 	for _, pod := range pods.Items {
-		err := p.updatePodInfo(pod.CurrentState.Host, pod.ID)
+		if pod.CurrentState.Host == "" {
+			continue
+		}
+		err := p.updatePodInfo(pod.CurrentState.Host, pod.Namespace, pod.ID)
 		if err != nil && err != client.ErrPodInfoNotAvailable {
 			glog.Errorf("Error synchronizing container: %v", err)
 		}

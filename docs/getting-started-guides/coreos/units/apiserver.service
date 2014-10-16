@@ -1,0 +1,17 @@
+[Unit]
+ConditionFileIsExecutable=/opt/bin/apiserver
+Description=Kubernetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+ExecStart=/opt/bin/apiserver \
+--address=127.0.0.1 \
+--port=8080 \
+--etcd_servers=http://127.0.0.1:4001 \
+--machines=127.0.0.1 \
+--logtostderr=true
+Restart=on-failure
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

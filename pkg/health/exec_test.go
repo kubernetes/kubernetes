@@ -49,22 +49,19 @@ func TestExec(t *testing.T) {
 	checker := ExecHealthChecker{&fake}
 	tests := []healthCheckTest{
 		// Missing parameters
-		{Unknown, &api.LivenessProbe{Type: "exec"}, true, nil, nil},
+		{Unknown, &api.LivenessProbe{}, true, nil, nil},
 		// Ok
 		{Healthy, &api.LivenessProbe{
-			Type: "exec",
 			Exec: &api.ExecAction{Command: []string{"ls", "-l"}},
 		}, false, []byte("OK"), nil},
 		// Run returns error
 		{Unknown, &api.LivenessProbe{
-			Type: "exec",
 			Exec: &api.ExecAction{
 				Command: []string{"ls", "-l"},
 			},
 		}, true, []byte("OK, NOT"), fmt.Errorf("test error")},
 		// Command error
 		{Unhealthy, &api.LivenessProbe{
-			Type: "exec",
 			Exec: &api.ExecAction{
 				Command: []string{"ls", "-l"},
 			},
@@ -73,7 +70,7 @@ func TestExec(t *testing.T) {
 	for _, test := range tests {
 		fake.out = test.output
 		fake.err = test.err
-		status, err := checker.HealthCheck("test", api.PodState{}, api.Container{LivenessProbe: test.probe})
+		status, err := checker.HealthCheck("test", "", api.PodState{}, api.Container{LivenessProbe: test.probe})
 		if status != test.expectedStatus {
 			t.Errorf("expected %v, got %v", test.expectedStatus, status)
 		}

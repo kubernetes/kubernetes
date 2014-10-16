@@ -38,28 +38,31 @@ func init() {
 }
 
 func TestClient(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient().GetCluster(), "v1beta1")
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	m := master.New(&master.Config{
 		EtcdHelper: helper,
 	})
-	s1, c1 := m.API_v1beta1()
-	s2, c2 := m.API_v1beta2()
+	s1, c1, loc1, sl1 := m.API_v1beta1()
+	s2, c2, loc2, sl2 := m.API_v1beta2()
 
 	testCases := map[string]struct {
-		Storage map[string]apiserver.RESTStorage
-		Codec   runtime.Codec
+		Storage    map[string]apiserver.RESTStorage
+		Codec      runtime.Codec
+		location   string
+		selfLinker runtime.SelfLinker
 	}{
-		"v1beta1": {s1, c1},
-		"v1beta2": {s2, c2},
+		"v1beta1": {s1, c1, loc1, sl1},
+		"v1beta2": {s2, c2, loc2, sl2},
 	}
 
 	for apiVersion, values := range testCases {
+		ctx := api.NewDefaultContext()
 		deleteAllEtcdKeys()
-		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion)))
-		client := client.NewOrDie(s.URL, apiVersion, nil)
+		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion), values.selfLinker))
+		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
 
 		info, err := client.ServerVersion()
 		if err != nil {
@@ -69,7 +72,7 @@ func TestClient(t *testing.T) {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
 
-		pods, err := client.ListPods(labels.Everything())
+		pods, err := client.ListPods(ctx, labels.Everything())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -90,14 +93,14 @@ func TestClient(t *testing.T) {
 				},
 			},
 		}
-		got, err := client.CreatePod(pod)
+		got, err := client.CreatePod(ctx, pod)
 		if err == nil {
 			t.Fatalf("unexpected non-error: %v", err)
 		}
 
 		// get a created pod
 		pod.DesiredState.Manifest.Containers[0].Image = "an-image"
-		got, err = client.CreatePod(pod)
+		got, err = client.CreatePod(ctx, pod)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -106,7 +109,7 @@ func TestClient(t *testing.T) {
 		}
 
 		// pod is shown, but not scheduled
-		pods, err = client.ListPods(labels.Everything())
+		pods, err = client.ListPods(ctx, labels.Everything())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

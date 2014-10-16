@@ -26,6 +26,7 @@ import (
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/ec2"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
@@ -178,4 +179,8 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 func (aws *AWSCloud) List(filter string) ([]string, error) {
 	// TODO: Should really use tag query. No need to go regexp.
 	return aws.getInstancesByRegex(filter)
+}
+
+func (v *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	return nil, nil
 }

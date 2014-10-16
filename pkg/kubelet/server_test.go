@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/info"
 )
 
@@ -41,6 +41,7 @@ type fakeKubelet struct {
 	machineInfoFunc   func() (*info.MachineInfo, error)
 	logFunc           func(w http.ResponseWriter, req *http.Request)
 	runFunc           func(podFullName, uuid, containerName string, cmd []string) ([]byte, error)
+	containerLogsFunc func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 }
 
 func (fk *fakeKubelet) GetPodInfo(name, uuid string) (api.PodInfo, error) {
@@ -63,6 +64,10 @@ func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
 }
 
+func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+	return fk.containerLogsFunc(podFullName, containerName, tail, follow, stdout, stderr)
+}
+
 func (fk *fakeKubelet) RunInContainer(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uuid, containerName, cmd)
 }
@@ -81,7 +86,7 @@ func newServerTest() *serverTestFramework {
 	}
 	fw.updateReader = startReading(fw.updateChan)
 	fw.fakeKubelet = &fakeKubelet{}
-	server := NewServer(fw.fakeKubelet, fw.updateChan)
+	server := NewServer(fw.fakeKubelet, fw.updateChan, true)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -140,7 +145,9 @@ func TestContainers(t *testing.T) {
 
 func TestPodInfo(t *testing.T) {
 	fw := newServerTest()
-	expected := api.PodInfo{"goodpod": docker.Container{ID: "myContainerID"}}
+	expected := api.PodInfo{
+		"goodpod": api.ContainerStatus{},
+	}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
 		if name == "goodpod.etcd" {
 			return expected, nil
@@ -166,22 +173,9 @@ func TestPodInfo(t *testing.T) {
 
 func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &info.ContainerInfo{
-		StatsPercentiles: &info.ContainerStatsPercentiles{
-			MaxMemoryUsage: 1024001,
-			CpuUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-			MemoryUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-		},
-	}
-	expectedPodID := "somepod"
+	expectedInfo := &info.ContainerInfo{}
+	podID := "somepod"
+	expectedPodID := "somepod" + ".etcd"
 	expectedContainerName := "goodcontainer"
 	fw.fakeKubelet.containerInfoFunc = func(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
@@ -190,7 +184,7 @@ func TestContainerInfo(t *testing.T) {
 		return expectedInfo, nil
 	}
 
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v", expectedPodID, expectedContainerName))
+	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v", podID, expectedContainerName))
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
 	}
@@ -207,21 +201,7 @@ func TestContainerInfo(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &info.ContainerInfo{
-		StatsPercentiles: &info.ContainerStatsPercentiles{
-			MaxMemoryUsage: 1024001,
-			CpuUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-			MemoryUsagePercentiles: []info.Percentile{
-				{50, 150},
-				{80, 180},
-				{90, 190},
-			},
-		},
-	}
+	expectedInfo := &info.ContainerInfo{}
 	fw.fakeKubelet.rootInfoFunc = func(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		return expectedInfo, nil
 	}
@@ -373,5 +353,122 @@ func TestServeRunInContainerWithUUID(t *testing.T) {
 	result := string(body)
 	if result != output {
 		t.Errorf("expected %s, got %s", output, result)
+	}
+}
+
+func TestContainerLogs(t *testing.T) {
+	fw := newServerTest()
+	output := "foo bar"
+	podName := "foo"
+	expectedPodName := podName + ".etcd"
+	expectedContainerName := "baz"
+	expectedTail := ""
+	expectedFollow := false
+	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+		if podFullName != expectedPodName {
+			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+		}
+		if containerName != expectedContainerName {
+			t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+		}
+		if tail != expectedTail {
+			t.Errorf("expected %s, got %s", expectedTail, tail)
+		}
+		if follow != expectedFollow {
+			t.Errorf("expected %t, got %t", expectedFollow, follow)
+		}
+		return nil
+	}
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podName + "/" + expectedContainerName)
+	if err != nil {
+		t.Errorf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("Error reading container logs: %v", err)
+	}
+	result := string(body)
+	if result != string(body) {
+		t.Errorf("Expected: '%v', got: '%v'", output, result)
+	}
+}
+
+func TestContainerLogsWithTail(t *testing.T) {
+	fw := newServerTest()
+	output := "foo bar"
+	podName := "foo"
+	expectedPodName := podName + ".etcd"
+	expectedContainerName := "baz"
+	expectedTail := "5"
+	expectedFollow := false
+	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+		if podFullName != expectedPodName {
+			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+		}
+		if containerName != expectedContainerName {
+			t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+		}
+		if tail != expectedTail {
+			t.Errorf("expected %s, got %s", expectedTail, tail)
+		}
+		if follow != expectedFollow {
+			t.Errorf("expected %t, got %t", expectedFollow, follow)
+		}
+		return nil
+	}
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podName + "/" + expectedContainerName + "?tail=5")
+	if err != nil {
+		t.Errorf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("Error reading container logs: %v", err)
+	}
+	result := string(body)
+	if result != string(body) {
+		t.Errorf("Expected: '%v', got: '%v'", output, result)
+	}
+}
+
+func TestContainerLogsWithFollow(t *testing.T) {
+	fw := newServerTest()
+	output := "foo bar"
+	podName := "foo"
+	expectedPodName := podName + ".etcd"
+	expectedContainerName := "baz"
+	expectedTail := ""
+	expectedFollow := true
+	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+		if podFullName != expectedPodName {
+			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
+		}
+		if containerName != expectedContainerName {
+			t.Errorf("expected %s, got %s", expectedContainerName, containerName)
+		}
+		if tail != expectedTail {
+			t.Errorf("expected %s, got %s", expectedTail, tail)
+		}
+		if follow != expectedFollow {
+			t.Errorf("expected %t, got %t", expectedFollow, follow)
+		}
+		return nil
+	}
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podName + "/" + expectedContainerName + "?follow=1")
+	if err != nil {
+		t.Errorf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("Error reading container logs: %v", err)
+	}
+	result := string(body)
+	if result != string(body) {
+		t.Errorf("Expected: '%v', got: '%v'", output, result)
 	}
 }

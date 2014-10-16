@@ -38,12 +38,12 @@ func TestUpdateWithPods(t *testing.T) {
 	fakeClient := client.Fake{
 		Pods: api.PodList{
 			Items: []api.Pod{
-				{JSONBase: api.JSONBase{ID: "pod-1"}},
-				{JSONBase: api.JSONBase{ID: "pod-2"}},
+				{TypeMeta: api.TypeMeta{ID: "pod-1"}},
+				{TypeMeta: api.TypeMeta{ID: "pod-2"}},
 			},
 		},
 	}
-	Update("foo", &fakeClient, 0, "")
+	Update(api.NewDefaultContext(), "foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 5 {
 		t.Fatalf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -57,7 +57,7 @@ func TestUpdateWithPods(t *testing.T) {
 
 func TestUpdateNoPods(t *testing.T) {
 	fakeClient := client.Fake{}
-	Update("foo", &fakeClient, 0, "")
+	Update(api.NewDefaultContext(), "foo", &fakeClient, 0, "")
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -69,8 +69,8 @@ func TestUpdateWithNewImage(t *testing.T) {
 	fakeClient := client.Fake{
 		Pods: api.PodList{
 			Items: []api.Pod{
-				{JSONBase: api.JSONBase{ID: "pod-1"}},
-				{JSONBase: api.JSONBase{ID: "pod-2"}},
+				{TypeMeta: api.TypeMeta{ID: "pod-1"}},
+				{TypeMeta: api.TypeMeta{ID: "pod-2"}},
 			},
 		},
 		Ctrl: api.ReplicationController{
@@ -87,7 +87,7 @@ func TestUpdateWithNewImage(t *testing.T) {
 			},
 		},
 	}
-	Update("foo", &fakeClient, 0, "fooImage:2")
+	Update(api.NewDefaultContext(), "foo", &fakeClient, 0, "fooImage:2")
 	if len(fakeClient.Actions) != 6 {
 		t.Errorf("Unexpected action list %#v", fakeClient.Actions)
 	}
@@ -109,7 +109,28 @@ func TestRunController(t *testing.T) {
 	name := "name"
 	image := "foo/bar"
 	replicas := 3
-	RunController(image, name, replicas, &fakeClient, "8080:80", -1)
+	RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "8080:80", -1)
+	if len(fakeClient.Actions) != 1 || fakeClient.Actions[0].Action != "create-controller" {
+		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
+	}
+	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
+	if controller.ID != name ||
+		controller.DesiredState.Replicas != replicas ||
+		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
+		t.Errorf("Unexpected controller: %#v", controller)
+	}
+}
+
+func TestRunControllerWithWrongArgs(t *testing.T) {
+	fakeClient := client.Fake{}
+	name := "name"
+	image := "foo/bar"
+	replicas := 3
+	err := RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "8080:", -1)
+	if err == nil {
+		t.Errorf("Unexpected non-error: %#v", fakeClient.Actions)
+	}
+	RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "8080:80", -1)
 	if len(fakeClient.Actions) != 1 || fakeClient.Actions[0].Action != "create-controller" {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -126,7 +147,7 @@ func TestRunControllerWithService(t *testing.T) {
 	name := "name"
 	image := "foo/bar"
 	replicas := 3
-	RunController(image, name, replicas, &fakeClient, "", 8000)
+	RunController(api.NewDefaultContext(), image, name, replicas, &fakeClient, "", 8000)
 	if len(fakeClient.Actions) != 2 ||
 		fakeClient.Actions[0].Action != "create-controller" ||
 		fakeClient.Actions[1].Action != "create-service" {
@@ -143,7 +164,7 @@ func TestRunControllerWithService(t *testing.T) {
 func TestStopController(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
-	StopController(name, &fakeClient)
+	StopController(api.NewDefaultContext(), name, &fakeClient)
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -162,7 +183,7 @@ func TestResizeController(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
 	replicas := 17
-	ResizeController(name, replicas, &fakeClient)
+	ResizeController(api.NewDefaultContext(), name, replicas, &fakeClient)
 	if len(fakeClient.Actions) != 2 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -180,7 +201,7 @@ func TestResizeController(t *testing.T) {
 func TestCloudCfgDeleteController(t *testing.T) {
 	fakeClient := client.Fake{}
 	name := "name"
-	err := DeleteController(name, &fakeClient)
+	err := DeleteController(api.NewDefaultContext(), name, &fakeClient)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -206,7 +227,7 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 		},
 	}
 	name := "name"
-	err := DeleteController(name, &fakeClient)
+	err := DeleteController(api.NewDefaultContext(), name, &fakeClient)
 	if len(fakeClient.Actions) != 1 {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
@@ -222,12 +243,12 @@ func TestCloudCfgDeleteControllerWithReplicas(t *testing.T) {
 func TestLoadAuthInfo(t *testing.T) {
 	loadAuthInfoTests := []struct {
 		authData string
-		authInfo *client.AuthInfo
+		authInfo *AuthInfo
 		r        io.Reader
 	}{
 		{
 			`{"user": "user", "password": "pass"}`,
-			&client.AuthInfo{User: "user", Password: "pass"},
+			&AuthInfo{User: "user", Password: "pass"},
 			nil,
 		},
 		{
@@ -235,7 +256,7 @@ func TestLoadAuthInfo(t *testing.T) {
 		},
 		{
 			"missing",
-			&client.AuthInfo{User: "user", Password: "pass"},
+			&AuthInfo{User: "user", Password: "pass"},
 			bytes.NewBufferString("user\npass"),
 		},
 	}
@@ -273,7 +294,7 @@ func TestLoadAuthInfo(t *testing.T) {
 }
 
 func TestMakePorts(t *testing.T) {
-	var testCases = []struct {
+	var successTestCases = []struct {
 		spec  string
 		ports []api.Port
 	}{
@@ -285,11 +306,32 @@ func TestMakePorts(t *testing.T) {
 				{HostPort: 443, ContainerPort: 444},
 			},
 		},
+		{
+			"",
+			[]api.Port{},
+		},
 	}
-	for _, tt := range testCases {
-		ports := portsFromString(tt.spec)
+	for _, tt := range successTestCases {
+		ports, err := portsFromString(tt.spec)
 		if !reflect.DeepEqual(ports, tt.ports) {
 			t.Errorf("Expected %#v, got %#v", tt.ports, ports)
+		}
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	var failTestCases = []struct {
+		spec string
+	}{
+		{"8080:"},
+		{":80"},
+		{":"},
+	}
+	for _, tt := range failTestCases {
+		_, err := portsFromString(tt.spec)
+		if err == nil {
+			t.Errorf("Unexpected non-error")
 		}
 	}
 }

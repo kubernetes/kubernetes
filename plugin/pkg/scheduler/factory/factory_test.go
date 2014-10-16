@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -39,7 +40,7 @@ func TestCreate(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
-	client := client.NewOrDie(server.URL, "", nil)
+	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 	factory := ConfigFactory{client}
 	factory.Create()
 }
@@ -52,17 +53,17 @@ func TestCreateLists(t *testing.T) {
 	}{
 		// Minion
 		{
-			location: "/api/v1beta1/minions?fields=",
+			location: "/api/" + testapi.Version() + "/minions?fields=",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod
 		{
-			location: "/api/v1beta1/pods?fields=DesiredState.Host!%3D",
+			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host!%3D",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod
 		{
-			location: "/api/v1beta1/pods?fields=DesiredState.Host%3D",
+			location: "/api/" + testapi.Version() + "/pods?fields=DesiredState.Host%3D",
 			factory:  factory.createUnassignedPodLW,
 		},
 	}
@@ -74,7 +75,7 @@ func TestCreateLists(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.NewOrDie(server.URL, latest.OldestVersion, nil)
+		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		// This test merely tests that the correct request is made.
 		item.factory().List()
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -84,38 +85,42 @@ func TestCreateLists(t *testing.T) {
 func TestCreateWatches(t *testing.T) {
 	factory := ConfigFactory{nil}
 	table := []struct {
-		rv       uint64
+		rv       string
 		location string
 		factory  func() *listWatch
 	}{
 		// Minion watch
 		{
-			rv:       0,
-			location: "/api/v1beta1/watch/minions?fields=&resourceVersion=0",
+			rv:       "",
+			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=",
 			factory:  factory.createMinionLW,
 		}, {
-			rv:       42,
-			location: "/api/v1beta1/watch/minions?fields=&resourceVersion=42",
+			rv:       "0",
+			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=0",
+			factory:  factory.createMinionLW,
+		}, {
+			rv:       "42",
+			location: "/api/" + testapi.Version() + "/watch/minions?fields=&resourceVersion=42",
 			factory:  factory.createMinionLW,
 		},
 		// Assigned pod watches
 		{
-			rv:       0,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=0",
+			rv:       "",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=",
 			factory:  factory.createAssignedPodLW,
 		}, {
-			rv:       42,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
+			rv:       "42",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host!%3D&resourceVersion=42",
 			factory:  factory.createAssignedPodLW,
 		},
 		// Unassigned pod watches
 		{
-			rv:       0,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=0",
+			rv:       "",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=",
 			factory:  factory.createUnassignedPodLW,
 		}, {
-			rv:       42,
-			location: "/api/v1beta1/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
+			rv:       "42",
+			location: "/api/" + testapi.Version() + "/watch/pods?fields=DesiredState.Host%3D&resourceVersion=42",
 			factory:  factory.createUnassignedPodLW,
 		},
 	}
@@ -127,7 +132,7 @@ func TestCreateWatches(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		factory.Client = client.NewOrDie(server.URL, "v1beta1", nil)
+		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		// This test merely tests that the correct request is made.
 		item.factory().Watch(item.rv)
 		handler.ValidateRequest(t, item.location, "GET", nil)
@@ -140,8 +145,8 @@ func TestPollMinions(t *testing.T) {
 	}{
 		{
 			minions: []api.Minion{
-				{JSONBase: api.JSONBase{ID: "foo"}},
-				{JSONBase: api.JSONBase{ID: "bar"}},
+				{TypeMeta: api.TypeMeta{ID: "foo"}},
+				{TypeMeta: api.TypeMeta{ID: "bar"}},
 			},
 		},
 	}
@@ -155,9 +160,9 @@ func TestPollMinions(t *testing.T) {
 		}
 		mux := http.NewServeMux()
 		// FakeHandler musn't be sent requests other than the one you want to test.
-		mux.Handle("/api/v1beta1/minions", &handler)
+		mux.Handle("/api/"+testapi.Version()+"/minions", &handler)
 		server := httptest.NewServer(mux)
-		client := client.NewOrDie(server.URL, "v1beta1", nil)
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		cf := ConfigFactory{client}
 
 		ce, err := cf.pollMinions()
@@ -165,7 +170,7 @@ func TestPollMinions(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		handler.ValidateRequest(t, "/api/v1beta1/minions", "GET", nil)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/minions", "GET", nil)
 
 		if e, a := len(item.minions), ce.Len(); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
@@ -174,7 +179,7 @@ func TestPollMinions(t *testing.T) {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}
+	testPod := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
 	handler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
@@ -182,11 +187,15 @@ func TestDefaultErrorFunc(t *testing.T) {
 	}
 	mux := http.NewServeMux()
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle("/api/v1beta1/pods/foo", &handler)
+	mux.Handle("/api/"+testapi.Version()+"/pods/foo", &handler)
 	server := httptest.NewServer(mux)
-	factory := ConfigFactory{client.NewOrDie(server.URL, "", nil)}
+	factory := ConfigFactory{client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})}
 	queue := cache.NewFIFO()
-	errFunc := factory.makeDefaultErrorFunc(queue)
+	podBackoff := podBackoff{
+		perPodBackoff: map[string]*backoffEntry{},
+		clock:         &fakeClock{},
+	}
+	errFunc := factory.makeDefaultErrorFunc(&podBackoff, queue)
 
 	errFunc(testPod, nil)
 	for {
@@ -198,7 +207,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, "/api/v1beta1/pods/foo", "GET", nil)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/pods/foo", "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -210,13 +219,17 @@ func TestStoreToMinionLister(t *testing.T) {
 	store := cache.NewStore()
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(id, &api.Minion{JSONBase: api.JSONBase{ID: id}})
+		store.Add(id, &api.Minion{TypeMeta: api.TypeMeta{ID: id}})
 	}
 	sml := storeToMinionLister{store}
 
-	got, err := sml.List()
+	gotNodes, err := sml.List()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+	got := make([]string, len(gotNodes.Items))
+	for ix := range gotNodes.Items {
+		got[ix] = gotNodes.Items[ix].ID
 	}
 	if !ids.HasAll(got...) || len(got) != len(ids) {
 		t.Errorf("Expected %v, got %v", ids, got)
@@ -228,7 +241,7 @@ func TestStoreToPodLister(t *testing.T) {
 	ids := []string{"foo", "bar", "baz"}
 	for _, id := range ids {
 		store.Add(id, &api.Pod{
-			JSONBase: api.JSONBase{ID: id},
+			TypeMeta: api.TypeMeta{ID: id},
 			Labels:   map[string]string{"name": id},
 		})
 	}
@@ -254,9 +267,9 @@ func TestStoreToPodLister(t *testing.T) {
 func TestMinionEnumerator(t *testing.T) {
 	testList := &api.MinionList{
 		Items: []api.Minion{
-			{JSONBase: api.JSONBase{ID: "foo"}},
-			{JSONBase: api.JSONBase{ID: "bar"}},
-			{JSONBase: api.JSONBase{ID: "baz"}},
+			{TypeMeta: api.TypeMeta{ID: "foo"}},
+			{TypeMeta: api.TypeMeta{ID: "bar"}},
+			{TypeMeta: api.TypeMeta{ID: "baz"}},
 		},
 	}
 	me := minionEnumerator{testList}
@@ -275,6 +288,14 @@ func TestMinionEnumerator(t *testing.T) {
 	}
 }
 
+type fakeClock struct {
+	t time.Time
+}
+
+func (f *fakeClock) Now() time.Time {
+	return f.t
+}
+
 func TestBind(t *testing.T) {
 	table := []struct {
 		binding *api.Binding
@@ -289,14 +310,66 @@ func TestBind(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
-		client := client.NewOrDie(server.URL, "", nil)
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		b := binder{client}
 
 		if err := b.Bind(item.binding); err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		expectedBody := runtime.EncodeOrDie(latest.Codec, item.binding)
-		handler.ValidateRequest(t, "/api/v1beta1/bindings", "POST", &expectedBody)
+		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
+		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings", "POST", &expectedBody)
+	}
+}
+
+func TestBackoff(t *testing.T) {
+	clock := fakeClock{}
+	backoff := podBackoff{
+		perPodBackoff: map[string]*backoffEntry{},
+		clock:         &clock,
+	}
+
+	tests := []struct {
+		podID            string
+		expectedDuration time.Duration
+		advanceClock     time.Duration
+	}{
+		{
+			podID:            "foo",
+			expectedDuration: 1 * time.Second,
+		},
+		{
+			podID:            "foo",
+			expectedDuration: 2 * time.Second,
+		},
+		{
+			podID:            "foo",
+			expectedDuration: 4 * time.Second,
+		},
+		{
+			podID:            "bar",
+			expectedDuration: 1 * time.Second,
+			advanceClock:     120 * time.Second,
+		},
+		// 'foo' should have been gc'd here.
+		{
+			podID:            "foo",
+			expectedDuration: 1 * time.Second,
+		},
+	}
+
+	for _, test := range tests {
+		duration := backoff.getBackoff(test.podID)
+		if duration != test.expectedDuration {
+			t.Errorf("expected: %s, got %s for %s", test.expectedDuration.String(), duration.String(), test.podID)
+		}
+		clock.t = clock.t.Add(test.advanceClock)
+		backoff.gc()
+	}
+
+	backoff.perPodBackoff["foo"].backoff = 60 * time.Second
+	duration := backoff.getBackoff("foo")
+	if duration != 60*time.Second {
+		t.Errorf("expected: 60, got %s", duration.String())
 	}
 }

@@ -25,6 +25,6 @@ type MockRegistry struct {
 	OnApplyBinding func(binding *api.Binding) error
 }
 
-func (mr MockRegistry) ApplyBinding(binding *api.Binding) error {
+func (mr MockRegistry) ApplyBinding(ctx api.Context, binding *api.Binding) error {
 	return mr.OnApplyBinding(binding)
 }

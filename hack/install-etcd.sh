@@ -14,9 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 cd third_party
 git clone https://github.com/coreos/etcd.git
 cd etcd
-git checkout ab4bcc18694644d12f0c038339d8d039072502b1 
+git checkout ab4bcc18694644d12f0c038339d8d039072502b1
 ./build
 

@@ -21,6 +21,7 @@ import (
 	"flag"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -40,8 +41,8 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 	func(j *runtime.PluginBase, c fuzz.Continue) {
 		// Do nothing; this struct has only a Kind field and it must stay blank in memory.
 	},
-	func(j *runtime.JSONBase, c fuzz.Continue) {
-		// We have to customize the randomization of JSONBases because their
+	func(j *runtime.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
@@ -49,7 +50,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
@@ -57,8 +58,8 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		c.Fuzz(&nsec)
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
 	},
-	func(j *api.JSONBase, c fuzz.Continue) {
-		// We have to customize the randomization of JSONBases because their
+	func(j *api.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
@@ -66,7 +67,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
@@ -110,7 +111,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
-	j, err := runtime.FindJSONBase(source)
+	j, err := runtime.FindTypeMeta(source)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, source)
 	}
@@ -129,7 +130,7 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj2) {
-			t.Errorf("1: %v: diff: %v", name, runtime.ObjectDiff(source, obj2))
+			t.Errorf("1: %v: diff: %v", name, util.ObjectDiff(source, obj2))
 			return
 		}
 	}
@@ -140,32 +141,35 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 		return
 	} else {
 		if !reflect.DeepEqual(source, obj3) {
-			t.Errorf("3: %v: diff: %v", name, runtime.ObjectDiff(source, obj3))
+			t.Errorf("3: %v: diff: %v", name, util.ObjectDiff(source, obj3))
 			return
 		}
 	}
 }
 
-func TestTypes(t *testing.T) {
-	table := []runtime.Object{
-		&api.PodList{},
-		&api.Pod{},
-		&api.ServiceList{},
-		&api.Service{},
-		&api.ReplicationControllerList{},
-		&api.ReplicationController{},
-		&api.MinionList{},
-		&api.Minion{},
-		&api.Status{},
-		&api.ServerOpList{},
-		&api.ServerOp{},
-		&api.ContainerManifestList{},
-		&api.Endpoints{},
-		&api.Binding{},
+// For debugging problems
+func TestSpecificKind(t *testing.T) {
+	api.Scheme.Log(t)
+	kind := "PodList"
+	item, err := api.Scheme.New("", kind)
+	if err != nil {
+		t.Errorf("Couldn't make a %v? %v", kind, err)
+		return
 	}
-	for _, item := range table {
+	runTest(t, v1beta1.Codec, item)
+	runTest(t, v1beta2.Codec, item)
+	api.Scheme.Log(nil)
+}
+
+func TestTypes(t *testing.T) {
+	for kind := range api.Scheme.KnownTypes("") {
 		// Try a few times, since runTest uses random values.
 		for i := 0; i < *fuzzIters; i++ {
+			item, err := api.Scheme.New("", kind)
+			if err != nil {
+				t.Errorf("Couldn't make a %v? %v", kind, err)
+				continue
+			}
 			runTest(t, v1beta1.Codec, item)
 			runTest(t, v1beta2.Codec, item)
 			runTest(t, api.Codec, item)

@@ -149,7 +149,7 @@ redisSlaveController   brendanburns/redis-slave   name=redisslave     2
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment.  In particular, the redis slave is started with the following command:
 
 ```shell
-redis-server --slaveof $SERVICE_HOST $REDISMASTER_SERVICE_PORT
+redis-server --slaveof ${REDISMASTER_SERVICE_HOST:-$SERVICE_HOST} $REDISMASTER_SERVICE_PORT
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
@@ -270,7 +270,7 @@ if (isset($_GET['cmd']) === true) {
   if ($_GET['cmd'] == 'set') {
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => getenv('SERVICE_HOST'),
+      'host'   => getenv('REDISMASTER_SERVICE_HOST') ?: getenv('SERVICE_HOST'),
       'port'   => getenv('REDISMASTER_SERVICE_PORT'),
     ]);
     $client->set($_GET['key'], $_GET['value']);
@@ -283,7 +283,7 @@ if (isset($_GET['cmd']) === true) {
     }
     $client = new Predis\Client([
       'scheme' => 'tcp',
-      'host'   => getenv('SERVICE_HOST'),
+      'host'   => getenv('REDISMASTER_SERVICE_HOST') ?: getenv('SERVICE_HOST'),
       'port'   => $read_port,
     ]);
 

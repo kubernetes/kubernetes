@@ -47,11 +47,11 @@ type Server struct {
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address string, port uint) {
-	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, updates)
+func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{}, address net.IP, port uint, enableDebuggingHandlers bool) {
+	glog.V(1).Infof("Starting to listen on %s:%d", address, port)
+	handler := NewServer(host, updates, enableDebuggingHandlers)
 	s := &http.Server{
-		Addr:           net.JoinHostPort(address, strconv.FormatUint(uint64(port), 10)),
+		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
@@ -68,30 +68,41 @@ type HostInterface interface {
 	GetMachineInfo() (*info.MachineInfo, error)
 	GetPodInfo(name, uuid string) (api.PodInfo, error)
 	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
+	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, updates chan<- interface{}) Server {
+func NewServer(host HostInterface, updates chan<- interface{}, enableDebuggingHandlers bool) Server {
 	server := Server{
 		host:    host,
 		updates: updates,
 		mux:     http.NewServeMux(),
 	}
 	server.InstallDefaultHandlers()
+	if enableDebuggingHandlers {
+		server.InstallDebuggingHandlers()
+	}
 	return server
 }
 
-// InstallDefaultHandlers registers the set of supported HTTP request patterns with the mux.
+// InstallDefaultHandlers registers the default set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.mux)
-	s.mux.HandleFunc("/container", s.handleContainer)
-	s.mux.HandleFunc("/containers", s.handleContainers)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfo)
 	s.mux.HandleFunc("/stats/", s.handleStats)
-	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
+}
+
+// InstallDeguggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
+func (s *Server) InstallDebuggingHandlers() {
+	// ToDo: /container, /run, and /containers aren't debugging options, should probably be handled separately
+	s.mux.HandleFunc("/container", s.handleContainer)
+	s.mux.HandleFunc("/containers", s.handleContainers)
 	s.mux.HandleFunc("/run/", s.handleRun)
+
+	s.mux.HandleFunc("/logs/", s.handleLogs)
+	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
 }
 
 // error serializes an error object into an HTTP response.
@@ -143,7 +154,54 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 
 }
 
-// handlePodInfo handles podInfo requests against the Kubelet.
+// handleContainerLogs handles containerLogs request against the Kubelet
+func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+	u, err := url.ParseRequestURI(req.RequestURI)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	parts := strings.Split(u.Path, "/")
+
+	var podID, containerName string
+	if len(parts) == 4 {
+		podID = parts[2]
+		containerName = parts[3]
+	} else {
+		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
+		return
+	}
+
+	if len(podID) == 0 {
+		http.Error(w, `{"message": "Missing podID."}`, http.StatusBadRequest)
+		return
+	}
+	if len(containerName) == 0 {
+		http.Error(w, `{"message": "Missing container name."}`, http.StatusBadRequest)
+		return
+	}
+
+	uriValues := u.Query()
+	follow, _ := strconv.ParseBool(uriValues.Get("follow"))
+	tail := uriValues.Get("tail")
+
+	podFullName := GetPodFullName(&Pod{Name: podID, Namespace: "etcd"})
+
+	fw := FlushWriter{writer: w}
+	if flusher, ok := w.(http.Flusher); ok {
+		fw.flusher = flusher
+	}
+	w.Header().Set("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusOK)
+	err = s.host.GetKubeletContainerLogs(podFullName, containerName, tail, follow, &fw, &fw)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+}
+
+// handlePodInfo handles podInfo requests against the Kubelet
 func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
 	if err != nil {
@@ -269,9 +327,11 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		errors.New("pod level status currently unimplemented")
 	case 3:
 		// Backward compatibility without uuid information
-		stats, err = s.host.GetContainerInfo(components[1], "", components[2], &query)
+		podFullName := GetPodFullName(&Pod{Name: components[1], Namespace: "etcd"})
+		stats, err = s.host.GetContainerInfo(podFullName, "", components[2], &query)
 	case 4:
-		stats, err = s.host.GetContainerInfo(components[1], components[2], components[2], &query)
+		podFullName := GetPodFullName(&Pod{Name: components[1], Namespace: "etcd"})
+		stats, err = s.host.GetContainerInfo(podFullName, components[2], components[2], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return

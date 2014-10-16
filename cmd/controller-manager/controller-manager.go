@@ -27,21 +27,26 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	masterPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
 )
 
 var (
-	master  = flag.String("master", "", "The address of the Kubernetes API server")
-	port    = flag.Int("port", masterPkg.ControllerManagerPort, "The port that the controller-manager's http service runs on")
-	address = flag.String("address", "127.0.0.1", "The address to serve from")
+	port         = flag.Int("port", masterPkg.ControllerManagerPort, "The port that the controller-manager's http service runs on")
+	address      = util.IP(net.ParseIP("127.0.0.1"))
+	clientConfig = &client.Config{}
 )
+
+func init() {
+	flag.Var(&address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+}
 
 func main() {
 	flag.Parse()
@@ -50,18 +55,22 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if len(*master) == 0 {
+	if len(clientConfig.Host) == 0 {
 		glog.Fatal("usage: controller-manager -master <master>")
 	}
 
-	kubeClient, err := client.New(*master, latest.OldestVersion, nil)
+	kubeClient, err := client.New(clientConfig)
 	if err != nil {
-		glog.Fatalf("Invalid -master: %v", err)
+		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	go http.ListenAndServe(net.JoinHostPort(*address, strconv.Itoa(*port)), nil)
+	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
+
+	endpoints := service.NewEndpointController(kubeClient)
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	controllerManager := controller.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
+
 	select {}
 }

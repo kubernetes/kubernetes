@@ -16,11 +16,11 @@
 
 # A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
 
-source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/vagrant/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 function detect-master () {
-  echo "KUBE_MASTER_IP: $KUBE_MASTER_IP"
-  echo "KUBE_MASTER: $KUBE_MASTER"
+  echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}"
 }
 
 # Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
@@ -31,7 +31,7 @@ function detect-minions {
 # Verify prereqs on host machine
 function verify-prereqs {
   for x in vagrant virtualbox; do
-    if [ "$(which $x)" == "" ]; then
+    if ! which "$x" >/dev/null; then
       echo "Can't find $x in PATH, please fix and retry."
       exit 1
     fi
@@ -39,8 +39,7 @@ function verify-prereqs {
 }
 
 # Instantiate a kubernetes cluster
-function kube-up {		
-
+function kube-up {
   get-password
   vagrant up
 
@@ -51,47 +50,66 @@ function kube-up {
 
   # verify master has all required daemons
   echo "Validating master"
-  MACHINE="master"
-  REQUIRED_DAEMON=("salt-master" "salt-minion" "apiserver" "nginx" "controller-manager" "scheduler")
-  VALIDATED="1"
-  until [ "$VALIDATED" -eq "0" ]; do
-    VALIDATED="0"
-    for daemon in ${REQUIRED_DAEMON[@]}; do
-      vagrant ssh $MACHINE -c "which $daemon" >/dev/null 2>&1 || { printf "."; VALIDATED="1"; sleep 2; }
+  local machine="master"
+  local -a required_daemon=("salt-master" "salt-minion" "apiserver" "nginx" "controller-manager" "scheduler")
+  local validated="1"
+  until [[ "$validated" == "0" ]]; do
+    validated="0"
+    local daemon
+    for daemon in "${required_daemon[@]}"; do
+      vagrant ssh "$machine" -c "which '${daemon}'" >/dev/null 2>&1 || {
+        printf "."
+        validated="1"
+        sleep 2
+      }
     done
   done
 
   # verify each minion has all required daemons
+  local i
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Validating ${VAGRANT_MINION_NAMES[$i]}"
-    MACHINE=${VAGRANT_MINION_NAMES[$i]}
-    REQUIRED_DAEMON=("salt-minion" "kubelet" "docker")
-    VALIDATED="1"
-    until [ "$VALIDATED" -eq "0" ]; do
-      VALIDATED="0"
-      for daemon in ${REQUIRED_DAEMON[@]}; do
-        vagrant ssh $MACHINE -c "which $daemon" >/dev/null 2>&1 || { printf "."; VALIDATED="1"; sleep 2; }
+    local machine=${VAGRANT_MINION_NAMES[$i]}
+    local -a required_daemon=("salt-minion" "kubelet" "docker")
+    local validated="1"
+    until [[ "$validated" == "0" ]]; do
+      validated="0"
+      local daemon
+      for daemon in "${required_daemon[@]}"; do
+        vagrant ssh "$machine" -c "which $daemon" >/dev/null 2>&1 || {
+          printf "."
+          validated="1"
+          sleep 2
+        }
       done
     done
   done
-  
+
   echo
   echo "Waiting for each minion to be registered with cloud provider"
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    MACHINE="${MINION_NAMES[$i]}"
-    COUNT="0"
-    until [ "$COUNT" -eq "1" ]; do
-      $(dirname $0)/kubecfg.sh -template '{{range.Items}}{{.ID}}:{{end}}' list minions > /tmp/minions
-      COUNT=$(grep -c ${MINION_NAMES[i]} /tmp/minions) || { printf "."; sleep 2; COUNT="0"; }
+    local machine="${MINION_NAMES[$i]}"
+    local count="0"
+    until [[ "$count" == "1" ]]; do
+      local minions
+      minions=$("${KUBE_ROOT}/cluster/kubecfg.sh" -template '{{range.Items}}{{.ID}}:{{end}}' list minions)
+      count=$(echo $minions | grep -c "${MINION_NAMES[i]}") || {
+        printf "."
+        sleep 2
+        count="0"
+      }
     done
   done
-	
+
   echo
   echo "Kubernetes cluster created."
   echo
-  echo "Kubernetes cluster is running.  Access the master at:"
+  echo "Kubernetes cluster is running.  The master is running at:"
   echo
-  echo "  https://${user}:${passwd}@${KUBE_MASTER_IP}"
+  echo "  https://${KUBE_MASTER_IP}"
+  echo
+  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo
 }
 
 # Delete a kubernetes cluster
@@ -121,8 +139,7 @@ function test-teardown {
 
 # Set the {user} and {password} environment values required to interact with provider
 function get-password {
-  export user=vagrant
-  export passwd=vagrant
-  echo "Using credentials: $user:$passwd"
+  export KUBE_USER=vagrant
+  export KUBE_PASSWORD=vagrant
+  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD"
 }
-

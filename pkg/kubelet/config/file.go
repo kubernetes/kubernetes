@@ -45,7 +45,7 @@ func NewSourceFile(path string, period time.Duration, updates chan<- interface{}
 		path:    path,
 		updates: updates,
 	}
-	glog.Infof("Watching file %s", path)
+	glog.V(1).Infof("Watching file %s", path)
 	go util.Forever(config.run, period)
 	return config
 }

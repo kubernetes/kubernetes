@@ -1,0 +1,134 @@
+#cloud-config
+
+hostname: standalone
+coreos:
+  units:
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
+    - name: download-kubernetes.service
+      command: start
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=apiserver.service
+        Before=controller-manager.service
+        Before=kubelet.service
+        Before=proxy.service
+        Description=Download Kubernetes Binaries
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=network-online.target
+
+        [Service]
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/apiserver
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/controller-manager
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kubecfg
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kubelet
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/proxy
+        ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/scheduler
+        ExecStart=/usr/bin/chmod +x /opt/bin/apiserver
+        ExecStart=/usr/bin/chmod +x /opt/bin/controller-manager
+        ExecStart=/usr/bin/chmod +x /opt/bin/kubecfg
+        ExecStart=/usr/bin/chmod +x /opt/bin/kubelet
+        ExecStart=/usr/bin/chmod +x /opt/bin/proxy
+        ExecStart=/usr/bin/chmod +x /opt/bin/scheduler
+        RemainAfterExit=yes
+        Type=oneshot
+    - name: apiserver.service
+      command: start
+      content: |
+        [Unit]
+        ConditionFileIsExecutable=/opt/bin/apiserver
+        Description=Kubernetes API Server
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+        [Service]
+        ExecStart=/opt/bin/apiserver \
+        --address=127.0.0.1 \
+        --port=8080 \
+        --etcd_servers=http://127.0.0.1:4001 \
+        --machines=127.0.0.1 \
+        --logtostderr=true
+        Restart=on-failure
+        RestartSec=1
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: scheduler.service
+      command: start
+      content: |
+        [Unit]
+        After=apiserver.service
+        After=download-kubernetes.service
+        ConditionFileIsExecutable=/opt/bin/scheduler
+        Description=Kubernetes Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=apiserver.service
+
+        [Service]
+        ExecStart=/opt/bin/scheduler \
+        --logtostderr=true \
+        --master=127.0.0.1:8080
+        Restart=always
+        RestartSec=10
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: controller-manager.service
+      command: start
+      content: |
+        [Unit]
+        ConditionFileIsExecutable=/opt/bin/controller-manager
+        Description=Kubernetes Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+        [Service]
+        ExecStart=/opt/bin/controller-manager \
+        --master=127.0.0.1:8080 \
+        --logtostderr=true
+        Restart=on-failure
+        RestartSec=1
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        ConditionFileIsExecutable=/opt/bin/kubelet
+        Description=Kubernetes Kubelet
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+        [Service]
+        ExecStart=/opt/bin/kubelet \
+        --address=127.0.0.1 \
+        --port=10250 \
+        --hostname_override=127.0.0.1 \
+        --etcd_servers=http://127.0.0.1:4001 \
+        --logtostderr=true
+        Restart=on-failure
+        RestartSec=1
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: proxy.service
+      command: start
+      content: |
+        [Unit]
+        ConditionFileIsExecutable=/opt/bin/proxy
+        Description=Kubernetes Proxy
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+        [Service]
+        ExecStart=/opt/bin/proxy --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
+        Restart=on-failure
+        RestartSec=1
+
+        [Install]
+        WantedBy=multi-user.target
+  update:
+    group: alpha
+    reboot-strategy: etcd-lock
+ssh_authorized_keys:
+  - <ssh_public_key> 

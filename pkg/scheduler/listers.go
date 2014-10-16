@@ -23,15 +23,15 @@ import (
 
 // MinionLister interface represents anything that can list minions for a scheduler.
 type MinionLister interface {
-	List() (machines []string, err error)
+	List() (list api.MinionList, err error)
 }
 
 // FakeMinionLister implements MinionLister on a []string for test purposes.
-type FakeMinionLister []string
+type FakeMinionLister api.MinionList
 
 // List returns minions as a []string.
-func (f FakeMinionLister) List() ([]string, error) {
-	return []string(f), nil
+func (f FakeMinionLister) List() (api.MinionList, error) {
+	return api.MinionList(f), nil
 }
 
 // PodLister interface represents anything that can list pods for a scheduler.

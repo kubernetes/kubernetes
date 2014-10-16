@@ -51,9 +51,18 @@ func promptForString(field string, r io.Reader) string {
 	return result
 }
 
+type AuthInfo struct {
+	User     string
+	Password string
+	CAFile   string
+	CertFile string
+	KeyFile  string
+	Insecure *bool
+}
+
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
-func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
-	var auth client.AuthInfo
+func LoadAuthInfo(path string, r io.Reader) (*AuthInfo, error) {
+	var auth AuthInfo
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		auth.User = promptForString("Username", r)
 		auth.Password = promptForString("Password", r)
@@ -83,15 +92,15 @@ func LoadAuthInfo(path string, r io.Reader) (*client.AuthInfo, error) {
 //     with the first container in the pod.  There is no support yet for
 //     updating more complex replication controllers.  If this is blank then no
 //     update of the image is performed.
-func Update(name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
-	controller, err := client.GetReplicationController(name)
+func Update(ctx api.Context, name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
+	controller, err := client.GetReplicationController(ctx, name)
 	if err != nil {
 		return err
 	}
 
 	if len(imageName) != 0 {
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = imageName
-		controller, err = client.UpdateReplicationController(controller)
+		controller, err = client.UpdateReplicationController(ctx, controller)
 		if err != nil {
 			return err
 		}
@@ -99,7 +108,7 @@ func Update(name string, client client.Interface, updatePeriod time.Duration, im
 
 	s := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 
-	podList, err := client.ListPods(s)
+	podList, err := client.ListPods(ctx, s)
 	if err != nil {
 		return err
 	}
@@ -110,14 +119,14 @@ func Update(name string, client client.Interface, updatePeriod time.Duration, im
 	for _, pod := range podList.Items {
 		// We delete the pod here, the controller will recreate it.  This will result in pulling
 		// a new Docker image.  This isn't a full "update" but it's what we support for now.
-		err = client.DeletePod(pod.ID)
+		err = client.DeletePod(ctx, pod.ID)
 		if err != nil {
 			return err
 		}
 		time.Sleep(updatePeriod)
 	}
 	return wait.Poll(time.Second*5, time.Second*300, func() (bool, error) {
-		podList, err := client.ListPods(s)
+		podList, err := client.ListPods(ctx, s)
 		if err != nil {
 			return false, err
 		}
@@ -126,18 +135,18 @@ func Update(name string, client client.Interface, updatePeriod time.Duration, im
 }
 
 // StopController stops a controller named 'name' by setting replicas to zero.
-func StopController(name string, client client.Interface) error {
-	return ResizeController(name, 0, client)
+func StopController(ctx api.Context, name string, client client.Interface) error {
+	return ResizeController(ctx, name, 0, client)
 }
 
 // ResizeController resizes a controller named 'name' by setting replicas to 'replicas'.
-func ResizeController(name string, replicas int, client client.Interface) error {
-	controller, err := client.GetReplicationController(name)
+func ResizeController(ctx api.Context, name string, replicas int, client client.Interface) error {
+	controller, err := client.GetReplicationController(ctx, name)
 	if err != nil {
 		return err
 	}
 	controller.DesiredState.Replicas = replicas
-	controllerOut, err := client.UpdateReplicationController(controller)
+	controllerOut, err := client.UpdateReplicationController(ctx, controller)
 	if err != nil {
 		return err
 	}
@@ -149,43 +158,66 @@ func ResizeController(name string, replicas int, client client.Interface) error 
 	return nil
 }
 
-func portsFromString(spec string) []api.Port {
+func portsFromString(spec string) ([]api.Port, error) {
+	if spec == "" {
+		return []api.Port{}, nil
+	}
 	parts := strings.Split(spec, ",")
 	var result []api.Port
 	for _, part := range parts {
 		pieces := strings.Split(part, ":")
-		if len(pieces) != 2 {
+		if len(pieces) < 1 || len(pieces) > 2 {
 			glog.Infof("Bad port spec: %s", part)
-			continue
+			return nil, fmt.Errorf("Bad port spec: %s", part)
 		}
-		host, err := strconv.Atoi(pieces[0])
-		if err != nil {
-			glog.Errorf("Host part is not integer: %s %v", pieces[0], err)
-			continue
+		host := 0
+		container := 0
+		var err error
+		if len(pieces) == 1 {
+			container, err = strconv.Atoi(pieces[0])
+			if err != nil {
+				glog.Errorf("Container port is not integer: %s %v", pieces[0], err)
+				return nil, err
+			}
+		} else {
+			host, err = strconv.Atoi(pieces[0])
+			if err != nil {
+				glog.Errorf("Host port is not integer: %s %v", pieces[0], err)
+				return nil, err
+			}
+			container, err = strconv.Atoi(pieces[1])
+			if err != nil {
+				glog.Errorf("Container port is not integer: %s %v", pieces[1], err)
+				return nil, err
+			}
 		}
-		container, err := strconv.Atoi(pieces[1])
-		if err != nil {
-			glog.Errorf("Container part is not integer: %s %v", pieces[1], err)
-			continue
+		if container < 1 {
+			glog.Errorf("Container port is not valid: %d", container)
+			return nil, err
 		}
+
 		result = append(result, api.Port{ContainerPort: container, HostPort: host})
 	}
-	return result
+	return result, nil
 }
 
 // RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'.
-func RunController(image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
+func RunController(ctx api.Context, image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
 	if servicePort > 0 && !util.IsDNSLabel(name) {
 		return fmt.Errorf("Service creation requested, but an invalid name for a service was provided (%s). Service names must be valid DNS labels.", name)
 	}
+	ports, err := portsFromString(portSpec)
+	if err != nil {
+		return err
+	}
 	controller := &api.ReplicationController{
-		JSONBase: api.JSONBase{
+		TypeMeta: api.TypeMeta{
 			ID: name,
 		},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
 			ReplicaSelector: map[string]string{
-				"replicationController": name,
+				"simpleService": name,
 			},
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
@@ -195,19 +227,19 @@ func RunController(image, name string, replicas int, client client.Interface, po
 							{
 								Name:  strings.ToLower(name),
 								Image: image,
-								Ports: portsFromString(portSpec),
+								Ports: ports,
 							},
 						},
 					},
 				},
 				Labels: map[string]string{
-					"replicationController": name,
+					"simpleService": name,
 				},
 			},
 		},
 	}
 
-	controllerOut, err := client.CreateReplicationController(controller)
+	controllerOut, err := client.CreateReplicationController(ctx, controller)
 	if err != nil {
 		return err
 	}
@@ -218,7 +250,7 @@ func RunController(image, name string, replicas int, client client.Interface, po
 	fmt.Print(string(data))
 
 	if servicePort > 0 {
-		svc, err := createService(name, servicePort, client)
+		svc, err := createService(ctx, name, servicePort, client)
 		if err != nil {
 			return err
 		}
@@ -231,30 +263,30 @@ func RunController(image, name string, replicas int, client client.Interface, po
 	return nil
 }
 
-func createService(name string, port int, client client.Interface) (*api.Service, error) {
+func createService(ctx api.Context, name string, port int, client client.Interface) (*api.Service, error) {
 	svc := &api.Service{
-		JSONBase: api.JSONBase{ID: name},
+		TypeMeta: api.TypeMeta{ID: name},
 		Port:     port,
 		Labels: map[string]string{
-			"name": name,
+			"simpleService": name,
 		},
 		Selector: map[string]string{
-			"name": name,
+			"simpleService": name,
 		},
 	}
-	svc, err := client.CreateService(svc)
+	svc, err := client.CreateService(ctx, svc)
 	return svc, err
 }
 
 // DeleteController deletes a replication controller named 'name', requires that the controller
 // already be stopped.
-func DeleteController(name string, client client.Interface) error {
-	controller, err := client.GetReplicationController(name)
+func DeleteController(ctx api.Context, name string, client client.Interface) error {
+	controller, err := client.GetReplicationController(ctx, name)
 	if err != nil {
 		return err
 	}
 	if controller.DesiredState.Replicas != 0 {
 		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.DesiredState.Replicas)
 	}
-	return client.DeleteReplicationController(name)
+	return client.DeleteReplicationController(ctx, name)
 }

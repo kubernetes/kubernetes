@@ -14,4 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-./controller-manager -etcd_servers="${ETCD_SERVERS}" -master="${API_SERVER}"
+./controller-manager -master="${API_SERVER}"

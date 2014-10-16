@@ -18,12 +18,15 @@
 # works. Assumes that we're being called by hack/e2e-test.sh (we use some env
 # vars it sets up).
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
-source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
-GUESTBOOK="${KUBE_REPO_ROOT}/examples/guestbook"
+GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
 # Launch the guestbook example
 $KUBECFG -c "${GUESTBOOK}/redis-master.json" create /pods

@@ -17,11 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"code.google.com/p/go.net/websocket"
@@ -30,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
 
 type WatchHandler struct {
@@ -37,7 +36,7 @@ type WatchHandler struct {
 	codec   runtime.Codec
 }
 
-func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion uint64) {
+func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string) {
 	if s, err := labels.ParseSelector(query.Get("labels")); err != nil {
 		label = labels.Everything()
 	} else {
@@ -48,10 +47,8 @@ func getWatchParams(query url.Values) (label, field labels.Selector, resourceVer
 	} else {
 		field = s
 	}
-	if rv, err := strconv.ParseUint(query.Get("resourceVersion"), 10, 64); err == nil {
-		resourceVersion = rv
-	}
-	return label, field, resourceVersion
+	resourceVersion = query.Get("resourceVersion")
+	return
 }
 
 var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
@@ -62,6 +59,7 @@ func isWebsocketRequest(req *http.Request) bool {
 
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := api.NewContext()
 	parts := splitPath(req.URL.Path)
 	if len(parts) < 1 || req.Method != "GET" {
 		notFound(w, req)
@@ -74,7 +72,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	if watcher, ok := storage.(ResourceWatcher); ok {
 		label, field, resourceVersion := getWatchParams(req.URL.Query())
-		watching, err := watcher.Watch(label, field, resourceVersion)
+		watching, err := watcher.Watch(ctx, label, field, resourceVersion)
 		if err != nil {
 			errorJSON(err, h.codec, w)
 			return
@@ -120,7 +118,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			obj, err := api.NewJSONWatchEvent(w.codec, event)
+			obj, err := watchjson.Object(w.codec, &event)
 			if err != nil {
 				// Client disconnect.
 				w.watching.Stop()
@@ -158,7 +156,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	encoder := json.NewEncoder(w)
+	encoder := watchjson.NewEncoder(w, self.codec)
 	for {
 		select {
 		case <-cn.CloseNotify():
@@ -169,13 +167,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
-			obj, err := api.NewJSONWatchEvent(self.codec, event)
-			if err != nil {
-				// Client disconnect.
-				self.watching.Stop()
-				return
-			}
-			if err := encoder.Encode(obj); err != nil {
+			if err := encoder.Encode(&event); err != nil {
 				// Client disconnect.
 				self.watching.Stop()
 				return

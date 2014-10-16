@@ -1,29 +1,8 @@
-{% set root = '/var/src/kubelet' %}
-{% set package = 'github.com/GoogleCloudPlatform/kubernetes' %}
-{% set package_dir = root + '/src/' + package %}
-{% set go_opt = pillar['go_opt'] %}
 {% if grains['os_family'] == 'RedHat' %}
 {% set environment_file = '/etc/sysconfig/kubelet' %}
 {% else %}
 {% set environment_file = '/etc/default/kubelet' %}
 {% endif %}
-
-{{ package_dir }}:
-  file.recurse:
-    - source: salt://kubelet/go
-    - user: root
-    {% if grains['os_family'] == 'RedHat' %}
-    - group: root
-    {% else %}
-    - group: staff
-    {% endif %}
-    - dir_mode: 775
-    - file_mode: 664
-    - makedirs: True
-    - recurse:
-      - user
-      - group
-      - mode
 
 {{ environment_file}}:
   file.managed:
@@ -33,22 +12,12 @@
     - group: root
     - mode: 644
 
-kubelet-build:
-  cmd.run:
-    - cwd: {{ root }}
-    - names:
-      - go build {{ go_opt }} {{ package }}/cmd/kubelet
-    - env:
-      - PATH: {{ grains['path'] }}:/usr/local/bin
-      - GOPATH: {{ root }}:{{ package_dir }}/Godeps/_workspace
-    - require:
-      - file: {{ package_dir }}
-
 /usr/local/bin/kubelet:
-  file.symlink:
-    - target: {{ root }}/kubelet
-    - watch:
-      - cmd: kubelet-build
+  file.managed:
+    - source: salt://kube-bins/kubelet
+    - user: root
+    - group: root
+    - mode: 755
 
 {% if grains['os_family'] == 'RedHat' %}
 
@@ -84,7 +53,6 @@ kubelet:
   service.running:
     - enable: True
     - watch:
-      - cmd: kubelet-build
       - file: /usr/local/bin/kubelet
 {% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/kubelet

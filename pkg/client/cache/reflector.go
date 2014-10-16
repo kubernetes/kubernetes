@@ -17,10 +17,12 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
+	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -33,7 +35,7 @@ type ListerWatcher interface {
 	// ResourceVersion field will be used to start the watch in the right place.
 	List() (runtime.Object, error)
 	// Watch should begin a watch at the specified version.
-	Watch(resourceVersion uint64) (watch.Interface, error)
+	Watch(resourceVersion string) (watch.Interface, error)
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
@@ -69,14 +71,14 @@ func (r *Reflector) Run() {
 }
 
 func (r *Reflector) listAndWatch() {
-	var resourceVersion uint64
+	var resourceVersion string
 
 	list, err := r.listerWatcher.List()
 	if err != nil {
 		glog.Errorf("Failed to list %v: %v", r.expectedType, err)
 		return
 	}
-	jsonBase, err := runtime.FindJSONBase(list)
+	jsonBase, err := runtime.FindTypeMeta(list)
 	if err != nil {
 		glog.Errorf("Unable to understand list result %#v", list)
 		return
@@ -99,7 +101,10 @@ func (r *Reflector) listAndWatch() {
 			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
 			return
 		}
-		r.watchHandler(w, &resourceVersion)
+		if err := r.watchHandler(w, &resourceVersion); err != nil {
+			glog.Errorf("watch of %v ended with error: %v", r.expectedType, err)
+			return
+		}
 	}
 }
 
@@ -107,7 +112,7 @@ func (r *Reflector) listAndWatch() {
 func (r *Reflector) syncWith(items []runtime.Object) error {
 	found := map[string]interface{}{}
 	for _, item := range items {
-		jsonBase, err := runtime.FindJSONBase(item)
+		jsonBase, err := runtime.FindTypeMeta(item)
 		if err != nil {
 			return fmt.Errorf("unexpected item in list: %v", err)
 		}
@@ -119,18 +124,22 @@ func (r *Reflector) syncWith(items []runtime.Object) error {
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) error {
+	start := time.Now()
+	eventCount := 0
 	for {
 		event, ok := <-w.ResultChan()
 		if !ok {
-			glog.Errorf("unexpected watch close")
-			return
+			break
+		}
+		if event.Type == watch.Error {
+			return apierrs.FromObject(event.Object)
 		}
 		if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
 			continue
 		}
-		jsonBase, err := runtime.FindJSONBase(event.Object)
+		jsonBase, err := runtime.FindTypeMeta(event.Object)
 		if err != nil {
 			glog.Errorf("unable to understand watch event %#v", event)
 			continue
@@ -148,6 +157,15 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *uint64) {
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}
-		*resourceVersion = jsonBase.ResourceVersion() + 1
+		*resourceVersion = jsonBase.ResourceVersion()
+		eventCount++
 	}
+
+	watchDuration := time.Now().Sub(start)
+	if watchDuration < 1*time.Second && eventCount == 0 {
+		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
+		return errors.New("very short watch")
+	}
+	glog.V(4).Infof("watch close - %v total items received", eventCount)
+	return nil
 }

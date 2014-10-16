@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -27,39 +28,56 @@ import (
 
 type testLW struct {
 	ListFunc  func() (runtime.Object, error)
-	WatchFunc func(resourceVersion uint64) (watch.Interface, error)
+	WatchFunc func(resourceVersion string) (watch.Interface, error)
 }
 
 func (t *testLW) List() (runtime.Object, error) { return t.ListFunc() }
-func (t *testLW) Watch(resourceVersion uint64) (watch.Interface, error) {
+func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
 	return t.WatchFunc(resourceVersion)
+}
+
+func TestReflector_watchHandlerError(t *testing.T) {
+	s := NewStore()
+	g := NewReflector(&testLW{}, &api.Pod{}, s)
+	fw := watch.NewFake()
+	go func() {
+		fw.Stop()
+	}()
+	var resumeRV string
+	err := g.watchHandler(fw, &resumeRV)
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
 }
 
 func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore()
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
 	fw := watch.NewFake()
-	s.Add("foo", &api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
-	s.Add("bar", &api.Pod{JSONBase: api.JSONBase{ID: "bar"}})
+	s.Add("foo", &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}})
+	s.Add("bar", &api.Pod{TypeMeta: api.TypeMeta{ID: "bar"}})
 	go func() {
-		fw.Add(&api.Service{JSONBase: api.JSONBase{ID: "rejected"}})
-		fw.Delete(&api.Pod{JSONBase: api.JSONBase{ID: "foo"}})
-		fw.Modify(&api.Pod{JSONBase: api.JSONBase{ID: "bar", ResourceVersion: 55}})
-		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: "baz", ResourceVersion: 32}})
+		fw.Add(&api.Service{TypeMeta: api.TypeMeta{ID: "rejected"}})
+		fw.Delete(&api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}})
+		fw.Modify(&api.Pod{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "55"}})
+		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
-	var resumeRV uint64
-	g.watchHandler(fw, &resumeRV)
+	var resumeRV string
+	err := g.watchHandler(fw, &resumeRV)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
 
 	table := []struct {
 		ID     string
-		RV     uint64
+		RV     string
 		exists bool
 	}{
-		{"foo", 0, false},
-		{"rejected", 0, false},
-		{"bar", 55, true},
-		{"baz", 32, true},
+		{"foo", "", false},
+		{"rejected", "", false},
+		{"bar", "55", true},
+		{"baz", "32", true},
 	}
 	for _, item := range table {
 		obj, exists := s.Get(item.ID)
@@ -74,8 +92,8 @@ func TestReflector_watchHandler(t *testing.T) {
 		}
 	}
 
-	// RV should stay 1 higher than the last id we see.
-	if e, a := uint64(33), resumeRV; e != a {
+	// RV should send the last version we see.
+	if e, a := "32", resumeRV; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
@@ -84,11 +102,11 @@ func TestReflector_listAndWatch(t *testing.T) {
 	createdFakes := make(chan *watch.FakeWatcher)
 
 	// The ListFunc says that it's at revision 1. Therefore, we expect our WatchFunc
-	// to get called at the beginning of the watch with 1, and again with 4 when we
-	// inject an error at 3.
-	expectedRVs := []uint64{1, 4}
+	// to get called at the beginning of the watch with 1, and again with 3 when we
+	// inject an error.
+	expectedRVs := []string{"1", "3"}
 	lw := &testLW{
-		WatchFunc: func(rv uint64) (watch.Interface, error) {
+		WatchFunc: func(rv string) (watch.Interface, error) {
 			fw := watch.NewFake()
 			if e, a := expectedRVs[0], rv; e != a {
 				t.Errorf("Expected rv %v, but got %v", e, a)
@@ -100,7 +118,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{JSONBase: api.JSONBase{ResourceVersion: 1}}, nil
+			return &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	s := NewFIFO()
@@ -113,9 +131,9 @@ func TestReflector_listAndWatch(t *testing.T) {
 		if fw == nil {
 			fw = <-createdFakes
 		}
-		sendingRV := uint64(i + 2)
-		fw.Add(&api.Pod{JSONBase: api.JSONBase{ID: id, ResourceVersion: sendingRV}})
-		if sendingRV == 3 {
+		sendingRV := strconv.FormatUint(uint64(i+2), 10)
+		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{ID: id, ResourceVersion: sendingRV}})
+		if sendingRV == "3" {
 			// Inject a failure.
 			fw.Stop()
 			fw = nil
@@ -128,7 +146,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 		if e, a := id, pod.ID; e != a {
 			t.Errorf("%v: Expected %v, got %v", i, e, a)
 		}
-		if e, a := uint64(i+2), pod.ResourceVersion; e != a {
+		if e, a := strconv.FormatUint(uint64(i+2), 10), pod.ResourceVersion; e != a {
 			t.Errorf("%v: Expected %v, got %v", i, e, a)
 		}
 	}
@@ -139,11 +157,11 @@ func TestReflector_listAndWatch(t *testing.T) {
 }
 
 func TestReflector_listAndWatchWithErrors(t *testing.T) {
-	mkPod := func(id string, rv uint64) *api.Pod {
-		return &api.Pod{JSONBase: api.JSONBase{ID: id, ResourceVersion: rv}}
+	mkPod := func(id string, rv string) *api.Pod {
+		return &api.Pod{TypeMeta: api.TypeMeta{ID: id, ResourceVersion: rv}}
 	}
-	mkList := func(rv uint64, pods ...*api.Pod) *api.PodList {
-		list := &api.PodList{JSONBase: api.JSONBase{ResourceVersion: rv}}
+	mkList := func(rv string, pods ...*api.Pod) *api.PodList {
+		list := &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: rv}}
 		for _, pod := range pods {
 			list.Items = append(list.Items, *pod)
 		}
@@ -156,29 +174,29 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 		watchErr error
 	}{
 		{
-			list: mkList(1),
+			list: mkList("1"),
 			events: []watch.Event{
-				{watch.Added, mkPod("foo", 2)},
-				{watch.Added, mkPod("bar", 3)},
+				{watch.Added, mkPod("foo", "2")},
+				{watch.Added, mkPod("bar", "3")},
 			},
 		}, {
-			list: mkList(3, mkPod("foo", 2), mkPod("bar", 3)),
+			list: mkList("3", mkPod("foo", "2"), mkPod("bar", "3")),
 			events: []watch.Event{
-				{watch.Deleted, mkPod("foo", 4)},
-				{watch.Added, mkPod("qux", 5)},
+				{watch.Deleted, mkPod("foo", "4")},
+				{watch.Added, mkPod("qux", "5")},
 			},
 		}, {
 			listErr: fmt.Errorf("a list error"),
 		}, {
-			list:     mkList(5, mkPod("bar", 3), mkPod("qux", 5)),
+			list:     mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
 			watchErr: fmt.Errorf("a watch error"),
 		}, {
-			list: mkList(5, mkPod("bar", 3), mkPod("qux", 5)),
+			list: mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
 			events: []watch.Event{
-				{watch.Added, mkPod("baz", 6)},
+				{watch.Added, mkPod("baz", "6")},
 			},
 		}, {
-			list: mkList(6, mkPod("bar", 3), mkPod("qux", 5), mkPod("baz", 6)),
+			list: mkList("6", mkPod("bar", "3"), mkPod("qux", "5"), mkPod("baz", "6")),
 		},
 	}
 
@@ -187,7 +205,7 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 		if item.list != nil {
 			// Test that the list is what currently exists in the store.
 			current := s.List()
-			checkMap := map[string]uint64{}
+			checkMap := map[string]string{}
 			for _, item := range current {
 				pod := item.(*api.Pod)
 				checkMap[pod.ID] = pod.ResourceVersion
@@ -203,7 +221,7 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 		}
 		watchRet, watchErr := item.events, item.watchErr
 		lw := &testLW{
-			WatchFunc: func(rv uint64) (watch.Interface, error) {
+			WatchFunc: func(rv string) (watch.Interface, error) {
 				if watchErr != nil {
 					return nil, watchErr
 				}

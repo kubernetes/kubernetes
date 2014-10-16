@@ -2,7 +2,7 @@
 
 ## Model and motivation
 
-Kubernetes deviates from the default Docker networking model.  The goal is for each [pod](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) to have an IP in a flat shared networking namespace that has full communication with other physical computers and containers across the network.  IP-per-pod creates a clean, backward-compatible model where pods can be treated much like VMs or physical hosts from the perspectives of port allocation, networking, naming, service discovery, load balancing, application configuration, and migration.
+Kubernetes deviates from the default Docker networking model.  The goal is for each [pod](docs/pods.md) to have an IP in a flat shared networking namespace that has full communication with other physical computers and containers across the network.  IP-per-pod creates a clean, backward-compatible model where pods can be treated much like VMs or physical hosts from the perspectives of port allocation, networking, naming, service discovery, load balancing, application configuration, and migration.
 
 OTOH, dynamic port allocation requires supporting both static ports (e.g., for externally accessible services) and dynamically allocated ports, requires partitioning centrally allocated and locally acquired dynamic ports, complicates scheduling (since ports are a scarce resource), is inconvenient for users, complicates application configuration, is plagued by port conflicts and reuse and exhaustion, requires non-standard approaches to naming (e.g., etcd rather than DNS), requires proxies and/or redirection for programs using standard naming/addressing mechanisms (e.g., web browsers), requires watching and cache invalidation for address/port changes for instances in addition to watching group membership changes, and obstructs container/pod migration (e.g., using CRIU). NAT introduces additional complexity by fragmenting the addressing space, which breaks self-registration mechanisms, among other problems.
 
@@ -27,7 +27,7 @@ Ports mapped in from the 'main IP' (and hence the internet if the right firewall
 We start Docker with:
     DOCKER_OPTS="--bridge cbr0 --iptables=false"
 
-We set up this bridge on each node with SaltStack, in [container_bridge.py](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/cluster/saltbase/salt/_states/container_bridge.py).
+We set up this bridge on each node with SaltStack, in [container_bridge.py](cluster/saltbase/salt/_states/container_bridge.py).
 
     cbr0:
       container_bridge.ensure:
@@ -65,7 +65,7 @@ Docker allocates IP addresses from a bridge we create on each node, using its â€
 
 ### Other networking implementation examples
 With the primary aim of providing IP-per-pod-model, other implementations exist to serve the purpose outside of GCE.
-  - [OpenVSwitch with GRE/VxLAN](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/ovs-networking.md)
+  - [OpenVSwitch with GRE/VxLAN](docs/ovs-networking.md)
   - [Flannel](https://github.com/coreos/flannel#flannel)
 
 ## Challenges and future work
@@ -105,4 +105,3 @@ Another approach could be to create a new host interface alias for each pod, if 
 ### IPv6
 
 IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)
-

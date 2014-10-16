@@ -49,6 +49,7 @@ type FakeEtcdClient struct {
 	Ix          int
 	TestIndex   bool
 	ChangeIndex uint64
+	LastSetTTL  uint64
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -57,6 +58,8 @@ type FakeEtcdClient struct {
 	// Write to this to prematurely stop a Watch that is running in a goroutine.
 	WatchInjectError chan<- error
 	WatchStop        chan<- bool
+	// If non-nil, will be returned immediately when Watch is called.
+	WatchImmediateError error
 }
 
 func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
@@ -133,6 +136,7 @@ func (f *FakeEtcdClient) nodeExists(key string) bool {
 }
 
 func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Response, error) {
+	f.LastSetTTL = ttl
 	if f.Err != nil {
 		return nil, f.Err
 	}
@@ -163,6 +167,7 @@ func (f *FakeEtcdClient) setLocked(key, value string, ttl uint64) (*etcd.Respons
 				Value:         value,
 				CreatedIndex:  i,
 				ModifiedIndex: i,
+				TTL:           int64(ttl),
 			},
 		},
 	}
@@ -250,6 +255,9 @@ func (f *FakeEtcdClient) WaitForWatchCompletion() {
 }
 
 func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error) {
+	if f.WatchImmediateError != nil {
+		return nil, f.WatchImmediateError
+	}
 	f.WatchResponse = receiver
 	f.WatchStop = stop
 	f.WatchIndex = waitIndex

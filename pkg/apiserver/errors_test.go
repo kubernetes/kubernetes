@@ -39,7 +39,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 		errors.NewAlreadyExists("foo", "bar"): {
 			Status:  api.StatusFailure,
 			Code:    http.StatusConflict,
-			Reason:  "already_exists",
+			Reason:  "AlreadyExists",
 			Message: "foo \"bar\" already exists",
 			Details: &api.StatusDetails{
 				Kind: "foo",
@@ -49,7 +49,7 @@ func TestErrorsToAPIStatus(t *testing.T) {
 		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
 			Status:  api.StatusFailure,
 			Code:    http.StatusConflict,
-			Reason:  "conflict",
+			Reason:  "Conflict",
 			Message: "foo \"bar\" cannot be updated: failure",
 			Details: &api.StatusDetails{
 				Kind: "foo",

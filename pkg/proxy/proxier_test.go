@@ -139,12 +139,12 @@ func TestTCPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -157,12 +157,12 @@ func TestUDPProxy(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -171,16 +171,25 @@ func TestUDPProxy(t *testing.T) {
 	testEchoUDP(t, "127.0.0.1", proxyPort)
 }
 
+// Helper: Stops the proxy for the named service.
+func stopProxyByName(proxier *Proxier, service string) error {
+	info, found := proxier.getServiceInfo(service)
+	if !found {
+		return fmt.Errorf("unknown service: %s", service)
+	}
+	return proxier.stopProxy(service, info)
+}
+
 func TestTCPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -192,7 +201,7 @@ func TestTCPProxyStop(t *testing.T) {
 	}
 	conn.Close()
 
-	p.StopProxy("echo")
+	stopProxyByName(p, "echo")
 	// Wait for the port to really close.
 	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
@@ -203,12 +212,12 @@ func TestUDPProxyStop(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -220,7 +229,7 @@ func TestUDPProxyStop(t *testing.T) {
 	}
 	conn.Close()
 
-	p.StopProxy("echo")
+	stopProxyByName(p, "echo")
 	// Wait for the port to really close.
 	if err := waitForClosedPortUDP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
@@ -231,12 +240,12 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -258,12 +267,12 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -285,12 +294,12 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -308,7 +317,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	proxyPortNum, _ := strconv.Atoi(proxyPort)
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum, Protocol: "TCP"},
+		{TypeMeta: api.TypeMeta{ID: "echo"}, Port: proxyPortNum, Protocol: "TCP"},
 	})
 	testEchoTCP(t, "127.0.0.1", proxyPort)
 }
@@ -317,12 +326,12 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -340,7 +349,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	}
 	proxyPortNum, _ := strconv.Atoi(proxyPort)
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: proxyPortNum, Protocol: "UDP"},
+		{TypeMeta: api.TypeMeta{ID: "echo"}, Port: proxyPortNum, Protocol: "UDP"},
 	})
 	testEchoUDP(t, "127.0.0.1", proxyPort)
 }
@@ -349,12 +358,12 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "TCP", 0)
 	if err != nil {
@@ -375,7 +384,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: newPortNum, Protocol: "TCP"},
+		{TypeMeta: api.TypeMeta{ID: "echo"}, Port: newPortNum, Protocol: "TCP"},
 	})
 	if err := waitForClosedPortTCP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())
@@ -394,12 +403,12 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	lb := NewLoadBalancerRR()
 	lb.OnUpdate([]api.Endpoints{
 		{
-			JSONBase:  api.JSONBase{ID: "echo"},
+			TypeMeta:  api.TypeMeta{ID: "echo"},
 			Endpoints: []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
 		},
 	})
 
-	p := NewProxier(lb, "127.0.0.1")
+	p := NewProxier(lb, net.ParseIP("127.0.0.1"))
 
 	proxyPort, err := p.addServiceOnUnusedPort("echo", "UDP", time.Second)
 	if err != nil {
@@ -420,7 +429,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		t.Errorf("expected difference, got %s %s", newPort, proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{JSONBase: api.JSONBase{ID: "echo"}, Port: newPortNum, Protocol: "UDP"},
+		{TypeMeta: api.TypeMeta{ID: "echo"}, Port: newPortNum, Protocol: "UDP"},
 	})
 	if err := waitForClosedPortUDP(p, proxyPort); err != nil {
 		t.Fatalf(err.Error())

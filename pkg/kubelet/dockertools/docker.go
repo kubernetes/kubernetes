@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/adler32"
+	"io"
 	"math/rand"
 	"os/exec"
 	"sort"
@@ -27,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 )
@@ -45,7 +47,9 @@ type DockerInterface interface {
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
+	InspectImage(image string) (*docker.Image, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
+	Logs(opts docker.LogsOptions) error
 }
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
@@ -54,6 +58,7 @@ type DockerID string
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string) error
+	IsImagePresent(image string) (bool, error)
 }
 
 // dockerPuller is the default implementation of DockerPuller.
@@ -62,8 +67,13 @@ type dockerPuller struct {
 	keyring *dockerKeyring
 }
 
+type throttledDockerPuller struct {
+	puller  dockerPuller
+	limiter util.RateLimiter
+}
+
 // NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client DockerInterface) DockerPuller {
+func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
 		keyring: newDockerKeyring(),
@@ -73,14 +83,19 @@ func NewDockerPuller(client DockerInterface) DockerPuller {
 	if err == nil {
 		cfg.addToKeyring(dp.keyring)
 	} else {
-		glog.Errorf("Unable to parse docker config file: %v", err)
+		glog.Errorf("Unable to parse Docker config file: %v", err)
 	}
 
 	if dp.keyring.count() == 0 {
-		glog.Infof("Continuing with empty docker keyring")
+		glog.V(1).Infof("Continuing with empty Docker keyring")
 	}
-
-	return dp
+	if qps == 0.0 {
+		return dp
+	}
+	return &throttledDockerPuller{
+		puller:  dp,
+		limiter: util.NewTokenBucketRateLimiter(qps, burst),
+	}
 }
 
 type dockerContainerCommandRunner struct{}
@@ -128,11 +143,37 @@ func (p dockerPuller) Pull(image string) error {
 	return p.client.PullImage(opts, creds)
 }
 
+func (p throttledDockerPuller) Pull(image string) error {
+	if p.limiter.CanAccept() {
+		return p.puller.Pull(image)
+	}
+	return fmt.Errorf("pull QPS exceeded.")
+}
+
+func (p dockerPuller) IsImagePresent(name string) (bool, error) {
+	image, _ := parseImageName(name)
+	_, err := p.client.InspectImage(image)
+	if err == nil {
+		return true, nil
+	}
+	// This is super brittle, but its the best we got.
+	// TODO: Land code in the docker client to use docker.Error here instead.
+	if err.Error() == "no such image" {
+		return false, nil
+	}
+	return false, err
+}
+
+func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
+	return p.puller.IsImagePresent(name)
+}
+
 // DockerContainers is a map of containers
 type DockerContainers map[DockerID]*docker.APIContainers
 
 func (c DockerContainers) FindPodContainer(podFullName, uuid, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
+		// TODO(proppy): build the docker container name and do a map lookup instead?
 		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
 		if dockerManifestID == podFullName &&
 			(uuid == "" || dockerUUID == uuid) &&
@@ -156,10 +197,11 @@ func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[st
 	return containers
 }
 
-// GetKubeletDockerContainers returns a map of docker containers that we manage. The map key is the docker container ID
-func GetKubeletDockerContainers(client DockerInterface) (DockerContainers, error) {
+// GetKubeletDockerContainers takes client and boolean whether to list all container or just the running ones.
+// Returns a map of docker containers that we manage. The map key is the docker container ID
+func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (DockerContainers, error) {
 	result := make(DockerContainers)
-	containers, err := client.ListContainers(docker.ListContainersOptions{})
+	containers, err := client.ListContainers(docker.ListContainersOptions{All: allContainers})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +209,10 @@ func GetKubeletDockerContainers(client DockerInterface) (DockerContainers, error
 		container := &containers[i]
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
-		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
+		// TODO(dchen1107): Remove the old separator "--" by end of Oct
+		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") &&
+			!strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
+			glog.Infof("Docker Container:%s is not managed by kubelet.", container.Names[0])
 			continue
 		}
 		result[DockerID(container.ID)] = container
@@ -202,11 +247,90 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 	return result, nil
 }
 
-// ErrNoContainersInPod is returned when there are no containers for a given pod
-var ErrNoContainersInPod = errors.New("no containers exist for this pod")
+// GetKubeletDockerContainerLogs returns logs of specific container
+// By default the function will return snapshot of the container log
+// Log streaming is possible if 'follow' param is set to true
+// Log tailing is possible when number of tailed lines are set and only if 'follow' is false
+func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+	opts := docker.LogsOptions{
+		Container:    containerID,
+		Stdout:       true,
+		Stderr:       true,
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		Timestamps:   true,
+		RawTerminal:  true,
+		Follow:       follow,
+	}
+
+	if !follow {
+		opts.Tail = tail
+	}
+
+	err = client.Logs(opts)
+	return
+}
+
+var (
+	// ErrNoContainersInPod is returned when there are no containers for a given pod
+	ErrNoContainersInPod = errors.New("no containers exist for this pod")
+
+	// ErrNoNetworkContainerInPod is returned when there is no network container for a given pod
+	ErrNoNetworkContainerInPod = errors.New("No network container exists for this pod")
+
+	// ErrContainerCannotRun is returned when a container is created, but cannot run properly
+	ErrContainerCannotRun = errors.New("Container cannot run")
+)
+
+func inspectContainer(client DockerInterface, dockerID, containerName string) (*api.ContainerStatus, error) {
+	inspectResult, err := client.InspectContainer(dockerID)
+	if err != nil {
+		return nil, err
+	}
+	if inspectResult == nil {
+		// Why did we not get an error?
+		return &api.ContainerStatus{}, nil
+	}
+
+	glog.V(3).Infof("Container: %s [%s] inspect result %+v", *inspectResult)
+	containerStatus := api.ContainerStatus{
+		Image: inspectResult.Config.Image,
+	}
+
+	waiting := true
+	if inspectResult.State.Running {
+		containerStatus.State.Running = &api.ContainerStateRunning{
+			StartedAt: inspectResult.State.StartedAt,
+		}
+		if containerName == "net" && inspectResult.NetworkSettings != nil {
+			containerStatus.PodIP = inspectResult.NetworkSettings.IPAddress
+		}
+		waiting = false
+	} else if !inspectResult.State.FinishedAt.IsZero() {
+		// TODO(dchen1107): Integrate with event to provide a better reason
+		containerStatus.State.Termination = &api.ContainerStateTerminated{
+			ExitCode:   inspectResult.State.ExitCode,
+			Reason:     "",
+			StartedAt:  inspectResult.State.StartedAt,
+			FinishedAt: inspectResult.State.FinishedAt,
+		}
+		waiting = false
+	}
+
+	if waiting {
+		// TODO(dchen1107): Separate issue docker/docker#8294 was filed
+		// TODO(dchen1107): Need to figure out why we are still waiting
+		// Check any issue to run container
+		containerStatus.State.Waiting = &api.ContainerStateWaiting{
+			Reason: ErrContainerCannotRun.Error(),
+		}
+	}
+
+	return &containerStatus, nil
+}
 
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
-func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.PodInfo, error) {
+func GetDockerPodInfo(client DockerInterface, manifest api.ContainerManifest, podFullName, uuid string) (api.PodInfo, error) {
 	info := api.PodInfo{}
 
 	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
@@ -223,40 +347,60 @@ func GetDockerPodInfo(client DockerInterface, podFullName, uuid string) (api.Pod
 			continue
 		}
 		// We assume docker return us a list of containers in time order
-		if _, ok := info[dockerContainerName]; ok {
+		if containerStatus, found := info[dockerContainerName]; found {
+			containerStatus.RestartCount += 1
+			info[dockerContainerName] = containerStatus
 			continue
 		}
 
-		inspectResult, err := client.InspectContainer(value.ID)
+		containerStatus, err := inspectContainer(client, value.ID, dockerContainerName)
 		if err != nil {
 			return nil, err
 		}
-		if inspectResult == nil {
-			// Why did we not get an error?
-			info[dockerContainerName] = docker.Container{}
-		} else {
-			info[dockerContainerName] = *inspectResult
-		}
+		info[dockerContainerName] = *containerStatus
 	}
+
 	if len(info) == 0 {
 		return nil, ErrNoContainersInPod
 	}
 
+	// First make sure we are not missing network container
+	if _, found := info["net"]; !found {
+		return nil, ErrNoNetworkContainerInPod
+	}
+
+	if len(info) < (len(manifest.Containers) + 1) {
+		var containerStatus api.ContainerStatus
+		// Not all containers expected are created, verify if there are
+		// image related issues
+		for _, container := range manifest.Containers {
+			if _, found := info[container.Name]; found {
+				continue
+			}
+
+			image := container.Image
+			// Check image is ready on the node or not
+			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
+			_, err := client.InspectImage(image)
+			if err == nil {
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{
+					Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
+				}
+			} else if err == docker.ErrNoSuchImage {
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{
+					Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
+				}
+			} else {
+				containerStatus.State.Waiting = &api.ContainerStateWaiting{
+					Reason: err.Error(),
+				}
+			}
+
+			info[container.Name] = containerStatus
+		}
+	}
+
 	return info, nil
-}
-
-// Converts "-" to "_-_" and "_" to "___" so that we can use "--" to meaningfully separate parts of a docker name.
-func escapeDash(in string) (out string) {
-	out = strings.Replace(in, "_", "___", -1)
-	out = strings.Replace(out, "-", "_-_", -1)
-	return
-}
-
-// Reverses the transformation of escapeDash.
-func unescapeDash(in string) (out string) {
-	out = strings.Replace(in, "_-_", "-", -1)
-	out = strings.Replace(out, "___", "_", -1)
-	return
 }
 
 const containerNamePrefix = "k8s"
@@ -269,52 +413,52 @@ func HashContainer(container *api.Container) uint64 {
 
 // Creates a name which can be reversed to identify both full pod name and container name.
 func BuildDockerName(manifestUUID, podFullName string, container *api.Container) string {
-	containerName := escapeDash(container.Name) + "." + strconv.FormatUint(HashContainer(container), 16)
+	containerName := container.Name + "." + strconv.FormatUint(HashContainer(container), 16)
 	// Note, manifest.ID could be blank.
 	if len(manifestUUID) == 0 {
-		return fmt.Sprintf("%s--%s--%s--%08x",
+		return fmt.Sprintf("%s_%s_%s_%08x",
 			containerNamePrefix,
 			containerName,
-			escapeDash(podFullName),
+			podFullName,
 			rand.Uint32())
 	} else {
-		return fmt.Sprintf("%s--%s--%s--%s--%08x",
+		return fmt.Sprintf("%s_%s_%s_%s_%08x",
 			containerNamePrefix,
 			containerName,
-			escapeDash(podFullName),
-			escapeDash(manifestUUID),
+			podFullName,
+			manifestUUID,
 			rand.Uint32())
 	}
 }
 
-// Upacks a container name, returning the pod full name and container name we would have used to
-// construct the docker name. If the docker name isn't one we created, we may return empty strings.
+// Unpacks a container name, returning the pod full name and container name we would have used to
+// construct the docker name. If the docker name isn't the one we created, we may return empty strings.
 func ParseDockerName(name string) (podFullName, uuid, containerName string, hash uint64) {
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
 	if name[0] == '/' {
 		name = name[1:]
 	}
-	parts := strings.Split(name, "--")
+	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
 		return
 	}
 	if len(parts) > 1 {
 		pieces := strings.Split(parts[1], ".")
-		containerName = unescapeDash(pieces[0])
+		containerName = pieces[0]
 		if len(pieces) > 1 {
 			var err error
 			hash, err = strconv.ParseUint(pieces[1], 16, 32)
 			if err != nil {
-				glog.Infof("invalid container hash: %s", pieces[1])
+				glog.Warningf("invalid container hash: %s", pieces[1])
 			}
 		}
 	}
 	if len(parts) > 2 {
-		podFullName = unescapeDash(parts[2])
+		podFullName = parts[2]
 	}
 	if len(parts) > 4 {
-		uuid = unescapeDash(parts[3])
+		uuid = parts[3]
 	}
 	return
 }

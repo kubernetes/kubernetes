@@ -143,6 +143,7 @@ var replicationControllerColumns = []string{"ID", "Image(s)", "Selector", "Repli
 var serviceColumns = []string{"ID", "Labels", "Selector", "Port"}
 var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
+var eventColumns = []string{"Name", "Kind", "Status", "Reason", "Message"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -155,6 +156,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(minionColumns, printMinion)
 	h.Handler(minionColumns, printMinionList)
 	h.Handler(statusColumns, printStatus)
+	h.Handler(eventColumns, printEvent)
+	h.Handler(eventColumns, printEventList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -182,10 +185,17 @@ func makeImageList(manifest api.ContainerManifest) string {
 	return strings.Join(images, ",")
 }
 
+func podHostString(host, ip string) string {
+	if host == "" && ip == "" {
+		return "<unassigned>"
+	}
+	return host + "/" + ip
+}
+
 func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 		pod.ID, makeImageList(pod.DesiredState.Manifest),
-		pod.CurrentState.Host+"/"+pod.CurrentState.HostIP,
+		podHostString(pod.CurrentState.Host, pod.CurrentState.HostIP),
 		labels.Set(pod.Labels), pod.CurrentState.Status)
 	return err
 }
@@ -247,6 +257,27 @@ func printMinionList(list *api.MinionList, w io.Writer) error {
 func printStatus(status *api.Status, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%v\n", status.Status)
 	return err
+}
+
+func printEvent(event *api.Event, w io.Writer) error {
+	_, err := fmt.Fprintf(
+		w, "%s\t%s\t%s\t%s\t%s\n",
+		event.InvolvedObject.Name,
+		event.InvolvedObject.Kind,
+		event.Status,
+		event.Reason,
+		event.Message,
+	)
+	return err
+}
+
+func printEventList(list *api.EventList, w io.Writer) error {
+	for i := range list.Items {
+		if err := printEvent(&list.Items[i], w); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Print parses the data as JSON, then prints the parsed data in a human-friendly

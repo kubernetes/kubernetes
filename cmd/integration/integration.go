@@ -21,15 +21,19 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
@@ -38,6 +42,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -47,13 +52,15 @@ import (
 	"github.com/golang/glog"
 )
 
+const testRootDir = "/tmp/kubelet"
+
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
 )
 
 type fakePodInfoGetter struct{}
 
-func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
+func (fakePodInfoGetter) GetPodInfo(host, podNamespace, podID string) (api.PodInfo, error) {
 	// This is a horrible hack to get around the fact that we can't provide
 	// different port numbers per kubelet...
 	var c client.PodInfoGetter
@@ -69,9 +76,9 @@ func (fakePodInfoGetter) GetPodInfo(host, podID string) (api.PodInfo, error) {
 			Port:   10251,
 		}
 	default:
-		glog.Fatalf("Can't get info for: '%v', '%v'", host, podID)
+		glog.Fatalf("Can't get info for: '%v', '%v - %v'", host, podNamespace, podID)
 	}
-	return c.GetPodInfo("localhost", podID)
+	return c.GetPodInfo("localhost", podNamespace, podID)
 }
 
 type delegateHandler struct {
@@ -106,11 +113,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		}
 	}
 
-	cl := client.NewOrDie(apiServer.URL, "", nil)
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
 	cl.PollPeriod = time.Second * 1
 	cl.Sync = true
 
-	helper, err := master.NewEtcdHelper(servers, "")
+	helper, err := master.NewEtcdHelper(etcdClient, "")
 	if err != nil {
 		glog.Fatalf("Unable to get etcd helper: %v", err)
 	}
@@ -129,7 +136,12 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	handler.delegate = mux
 
 	// Scheduler
-	scheduler.New((&factory.ConfigFactory{cl}).Create()).Run()
+	schedulerConfigFactory := &factory.ConfigFactory{cl}
+	schedulerConfig := schedulerConfigFactory.Create()
+	scheduler.New(schedulerConfig).Run()
+
+	endpoints := service.NewEndpointController(cl)
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	controllerManager := controller.NewReplicationManager(cl)
 
@@ -138,13 +150,14 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	controllerManager.Run(10 * time.Minute)
 
 	// Kubelet (localhost)
+	os.MkdirAll(testRootDir, 0750)
 	cfg1 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[0]), etcdClient, cfg1.Channel("etcd"))
 	config.NewSourceURL(manifestURL, 5*time.Second, cfg1.Channel("url"))
-	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], &fakeDocker1)
+	myKubelet := kubelet.NewIntegrationTestKubelet(machineList[0], testRootDir, &fakeDocker1)
 	go util.Forever(func() { myKubelet.Run(cfg1.Updates()) }, 0)
 	go util.Forever(func() {
-		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), "localhost", 10250)
+		kubelet.ListenAndServeKubeletServer(myKubelet, cfg1.Channel("http"), net.ParseIP("127.0.0.1"), 10250, true)
 	}, 0)
 
 	// Kubelet (machine)
@@ -152,10 +165,10 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	// have a place they can schedule.
 	cfg2 := config.NewPodConfig(config.PodConfigNotificationSnapshotAndUpdates)
 	config.NewSourceEtcd(config.EtcdKeyForHost(machineList[1]), etcdClient, cfg2.Channel("etcd"))
-	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], &fakeDocker2)
+	otherKubelet := kubelet.NewIntegrationTestKubelet(machineList[1], testRootDir, &fakeDocker2)
 	go util.Forever(func() { otherKubelet.Run(cfg2.Updates()) }, 0)
 	go util.Forever(func() {
-		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), "localhost", 10251)
+		kubelet.ListenAndServeKubeletServer(otherKubelet, cfg2.Channel("http"), net.ParseIP("127.0.0.1"), 10251, true)
 	}, 0)
 
 	return apiServer.URL
@@ -166,11 +179,11 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	podInfo := fakePodInfoGetter{}
 	return func() (bool, error) {
 		for i := range pods.Items {
-			host, id := pods.Items[i].CurrentState.Host, pods.Items[i].ID
+			host, id, namespace := pods.Items[i].CurrentState.Host, pods.Items[i].ID, pods.Items[i].Namespace
 			if len(host) == 0 {
 				return false, nil
 			}
-			if _, err := podInfo.GetPodInfo(host, id); err != nil {
+			if _, err := podInfo.GetPodInfo(host, namespace, id); err != nil {
 				return false, nil
 			}
 		}
@@ -178,7 +191,25 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	}
 }
 
+func endpointsSet(c *client.Client, ctx api.Context, serviceID string, endpointCount int) wait.ConditionFunc {
+	return func() (bool, error) {
+		endpoints, err := c.GetEndpoints(ctx, serviceID)
+		if err != nil {
+			return false, nil
+		}
+		return len(endpoints.Endpoints) == endpointCount, nil
+	}
+}
+
+func podExists(c *client.Client, ctx api.Context, podID string) wait.ConditionFunc {
+	return func() (bool, error) {
+		_, err := c.GetPod(ctx, podID)
+		return err == nil, nil
+	}
+}
+
 func runReplicationControllerTest(c *client.Client) {
+	ctx := api.NewDefaultContext()
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
@@ -189,22 +220,22 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := c.CreateReplicationController(&controllerRequest); err != nil {
+	if _, err := c.CreateReplicationController(ctx, &controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
 
 	// Give the controllers some time to actually create the pods
-	if err := wait.Poll(time.Second, time.Second*10, c.ControllerHasDesiredReplicas(controllerRequest)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, c.ControllerHasDesiredReplicas(controllerRequest)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
 	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.ListPods(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	pods, err := c.ListPods(ctx, labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}
-	if err := wait.Poll(time.Second, time.Second*10, podsOnMinions(c, *pods)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, podsOnMinions(c, *pods)); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 
@@ -215,7 +246,7 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			JSONBase: api.JSONBase{ID: "atomicservice", APIVersion: latest.Version},
+			TypeMeta: api.TypeMeta{ID: "atomicservice", APIVersion: latest.Version},
 			Port:     12345,
 			Labels: map[string]string{
 				"name": "atomicService",
@@ -262,12 +293,10 @@ func runAtomicPutTest(c *client.Client) {
 				glog.Infof("Posting update (%s, %s)", l, v)
 				err = c.Put().Path("services").Path(svc.ID).Body(&tmpSvc).Do().Error()
 				if err != nil {
-					if se, ok := err.(*client.StatusErr); ok {
-						if se.Status.Code == http.StatusConflict {
-							glog.Infof("Conflict: (%s, %s)", l, v)
-							// This is what we expect.
-							continue
-						}
+					if errors.IsConflict(err) {
+						glog.Infof("Conflict: (%s, %s)", l, v)
+						// This is what we expect.
+						continue
 					}
 					glog.Errorf("Unexpected error putting atomicService: %v", err)
 					continue
@@ -286,6 +315,55 @@ func runAtomicPutTest(c *client.Client) {
 		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Selector)
 	}
 	glog.Info("Atomic PUTs work.")
+}
+
+func runServiceTest(client *client.Client) {
+	ctx := api.NewDefaultContext()
+	pod := api.Pod{
+		TypeMeta: api.TypeMeta{ID: "foo"},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "foo",
+						Ports: []api.Port{
+							{ContainerPort: 1234},
+						},
+					},
+				},
+			},
+		},
+		CurrentState: api.PodState{
+			PodIP: "1.2.3.4",
+		},
+		Labels: map[string]string{
+			"name": "thisisalonglabel",
+		},
+	}
+	_, err := client.CreatePod(ctx, &pod)
+	if err != nil {
+		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*20, podExists(client, ctx, pod.ID)); err != nil {
+		glog.Fatalf("FAILED: pod never started running %v", err)
+	}
+	svc := api.Service{
+		TypeMeta: api.TypeMeta{ID: "service1"},
+		Selector: map[string]string{
+			"name": "thisisalonglabel",
+		},
+		Port: 8080,
+	}
+	_, err = client.CreateService(ctx, &svc)
+	if err != nil {
+		glog.Fatalf("Failed to create service: %v, %v", svc, err)
+	}
+	if err := wait.Poll(time.Second, time.Second*10, endpointsSet(client, ctx, svc.ID, 1)); err != nil {
+		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
+	}
+	glog.Info("Service test passed.")
 }
 
 type testFunc func(*client.Client)
@@ -311,12 +389,13 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(apiServerURL, "", nil)
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
 		runReplicationControllerTest,
 		runAtomicPutTest,
+		runServiceTest,
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
@@ -346,8 +425,9 @@ func main() {
 		}
 	}
 	// We expect 5: 2 net containers + 2 pods from the replication controller +
-	//              1 net container + 2 pods from the URL.
-	if len(createdPods) != 7 {
+	//              1 net container + 2 pods from the URL +
+	//              1 net container + 1 pod from the service test.
+	if len(createdPods) != 9 {
 		glog.Fatalf("Unexpected list of created pods:\n\n%#v\n\n%#v\n\n%#v\n\n", createdPods.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created pods: %#v", createdPods.List())

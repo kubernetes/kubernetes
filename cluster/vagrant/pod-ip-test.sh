@@ -53,7 +53,8 @@ while [[ $# > 0 ]]; do
        esac
 done
 
-cd $(dirname ${BASH_SOURCE})/../../
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+cd "${KUBE_ROOT}"
 
 echo All verbose output will be redirected to $logfile, use --logfile option to change.
 

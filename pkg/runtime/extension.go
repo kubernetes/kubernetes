@@ -17,11 +17,16 @@ limitations under the License.
 package runtime
 
 import (
+	"errors"
+
 	"gopkg.in/v1/yaml"
 )
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
-	re.RawJSON = in
+	if re == nil {
+		return errors.New("runtime.RawExtension: UnmarshalJSON on nil pointer")
+	}
+	re.RawJSON = append(re.RawJSON[0:0], in...)
 	return nil
 }
 

@@ -62,7 +62,7 @@ function test-teardown {
 	echo "TODO"
 }
 
-# Set the {user} and {password} environment values required to interact with provider
+# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
 function get-password {
 	echo "TODO"
 }

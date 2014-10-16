@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
@@ -62,12 +63,43 @@ type EtcdGetSet interface {
 	Watch(prefix string, waitIndex uint64, recursive bool, receiver chan *etcd.Response, stop chan bool) (*etcd.Response, error)
 }
 
+type EtcdResourceVersioner interface {
+	SetResourceVersion(obj runtime.Object, version uint64) error
+	ResourceVersion(obj runtime.Object) (uint64, error)
+}
+
+// RuntimeVersionAdapter converts a string based versioner to EtcdResourceVersioner
+type RuntimeVersionAdapter struct {
+	Versioner runtime.ResourceVersioner
+}
+
+// SetResourceVersion implements EtcdResourceVersioner
+func (a RuntimeVersionAdapter) SetResourceVersion(obj runtime.Object, version uint64) error {
+	if version == 0 {
+		return a.Versioner.SetResourceVersion(obj, "")
+	}
+	s := strconv.FormatUint(version, 10)
+	return a.Versioner.SetResourceVersion(obj, s)
+}
+
+// SetResourceVersion implements EtcdResourceVersioner
+func (a RuntimeVersionAdapter) ResourceVersion(obj runtime.Object) (uint64, error) {
+	version, err := a.Versioner.ResourceVersion(obj)
+	if err != nil {
+		return 0, err
+	}
+	if version == "" {
+		return 0, nil
+	}
+	return strconv.ParseUint(version, 10, 64)
+}
+
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
 	Client EtcdGetSet
 	Codec  runtime.Codec
 	// optional, no atomic operations can be performed without this interface
-	ResourceVersioner runtime.ResourceVersioner
+	ResourceVersioner EtcdResourceVersioner
 }
 
 // IsEtcdNotFound returns true iff err is an etcd not found error.
@@ -123,6 +155,7 @@ func (h *EtcdHelper) listEtcdNode(key string) ([]*etcd.Node, uint64, error) {
 }
 
 // ExtractList extracts a go object per etcd node into a slice with the resource version.
+// DEPRECATED: Use ExtractToList instead, it's more convenient.
 func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersion *uint64) error {
 	nodes, index, err := h.listEtcdNode(key)
 	if resourceVersion != nil {
@@ -148,6 +181,27 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 			return err
 		}
 		v.Set(reflect.Append(v, obj.Elem()))
+	}
+	return nil
+}
+
+// ExtractToList is just like ExtractList, but it works on a ThingyList api object.
+// extracts a go object per etcd node into a slice with the resource version.
+func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
+	var resourceVersion uint64
+	listPtr, err := runtime.GetItemsPtr(listObj)
+	if err != nil {
+		return err
+	}
+	err = h.ExtractList(key, listPtr, &resourceVersion)
+	if err != nil {
+		return err
+	}
+	if h.ResourceVersioner != nil {
+		err = h.ResourceVersioner.SetResourceVersion(listObj, resourceVersion)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -185,8 +239,9 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignore
 	return body, response.Node.ModifiedIndex, err
 }
 
-// CreateObj adds a new object at a key unless it already exists.
-func (h *EtcdHelper) CreateObj(key string, obj runtime.Object) error {
+// CreateObj adds a new object at a key unless it already exists. 'ttl' is time-to-live in seconds,
+// and 0 means forever.
+func (h *EtcdHelper) CreateObj(key string, obj runtime.Object, ttl uint64) error {
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
@@ -197,7 +252,7 @@ func (h *EtcdHelper) CreateObj(key string, obj runtime.Object) error {
 		}
 	}
 
-	_, err = h.Client.Create(key, string(data), 0)
+	_, err = h.Client.Create(key, string(data), ttl)
 	return err
 }
 

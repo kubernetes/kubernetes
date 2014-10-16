@@ -19,6 +19,7 @@ limitations under the License.
 package integration
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -92,19 +93,16 @@ func TestExtractObj(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	client := newEtcdClient()
-	helper := tools.EtcdHelper{Client: client, Codec: latest.Codec, ResourceVersioner: latest.ResourceVersioner}
+	helper := tools.EtcdHelper{Client: client, Codec: latest.Codec, ResourceVersioner: tools.RuntimeVersionAdapter{latest.ResourceVersioner}}
 	withEtcdKey(func(key string) {
-		resp, err := client.Set(key, runtime.EncodeOrDie(v1beta1.Codec, &api.Pod{JSONBase: api.JSONBase{ID: "foo"}}), 0)
+		resp, err := client.Set(key, runtime.EncodeOrDie(v1beta1.Codec, &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}), 0)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		expectedVersion := resp.Node.ModifiedIndex
 
 		// watch should load the object at the current index
-		w, err := helper.Watch(key, 0)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		w := helper.Watch(key, 0)
 		event := <-w.ResultChan()
 		if event.Type != watch.Added || event.Object == nil {
 			t.Fatalf("expected first value to be set to ADDED, got %#v", event)
@@ -112,7 +110,7 @@ func TestWatch(t *testing.T) {
 
 		// version should match what we set
 		pod := event.Object.(*api.Pod)
-		if pod.ResourceVersion != expectedVersion {
+		if pod.ResourceVersion != strconv.FormatUint(expectedVersion, 10) {
 			t.Errorf("expected version %d, got %#v", expectedVersion, pod)
 		}
 
@@ -137,7 +135,7 @@ func TestWatch(t *testing.T) {
 			t.Errorf("expected deleted event %#v", event)
 		}
 		pod = event.Object.(*api.Pod)
-		if pod.ResourceVersion != expectedVersion {
+		if pod.ResourceVersion != strconv.FormatUint(expectedVersion, 10) {
 			t.Errorf("expected version %d, got %#v", expectedVersion, pod)
 		}
 	})

@@ -38,14 +38,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/golang/glog"
+	"github.com/skratchdot/open-golang/open"
 )
 
 var (
 	serverVersion = verflag.Version("server_version", verflag.VersionFalse, "Print the server's version information and quit")
 	preventSkew   = flag.Bool("expect_version_match", false, "Fail if server's version doesn't match own version.")
-	httpServer    = flag.String("h", "", "The host to connect to.")
-	config        = flag.String("c", "", "Path or URL to the config file.")
+	config        = flag.String("c", "", "Path or URL to the config file, or '-' to read from STDIN")
 	selector      = flag.String("l", "", "Selector (label query) to use for listing")
+	fieldSelector = flag.String("fields", "", "Selector (field query) to use for listing")
 	updatePeriod  = flag.Duration("u", 60*time.Second, "Update interval period")
 	portSpec      = flag.String("p", "", "The port spec, comma-separated list of <external>:<internal>,...")
 	servicePort   = flag.Int("s", -1, "If positive, create and run a corresponding service on this port, only used with 'run'")
@@ -58,11 +59,18 @@ var (
 	templateFile  = flag.String("template_file", "", "If present, load this file as a golang template and use it for output printing")
 	templateStr   = flag.String("template", "", "If present, parse this string as a golang template and use it for output printing")
 	imageName     = flag.String("image", "", "Image used when updating a replicationController.  Will apply to the first container in the pod template.")
-	apiVersion    = flag.String("api_version", latest.Version, "The version of the API to use against this server.")
-	caFile        = flag.String("certificate_authority", "", "Path to a cert. file for the certificate authority")
-	certFile      = flag.String("client_certificate", "", "Path to a client certificate for TLS.")
-	keyFile       = flag.String("client_key", "", "Path to a client key file for TLS.")
+	clientConfig  = &client.Config{}
+	openBrowser   = flag.Bool("open_browser", true, "If true, and -proxy is specified, open a browser pointed at the Kubernetes UX. Default true.")
 )
+
+func init() {
+	flag.StringVar(&clientConfig.Host, "h", "", "The host to connect to.")
+	flag.StringVar(&clientConfig.Version, "api_version", latest.Version, "The version of the API to use against this server.")
+	flag.StringVar(&clientConfig.CAFile, "certificate_authority", "", "Path to a cert. file for the certificate authority")
+	flag.StringVar(&clientConfig.CertFile, "client_certificate", "", "Path to a client certificate for TLS.")
+	flag.StringVar(&clientConfig.KeyFile, "client_key", "", "Path to a client key file for TLS.")
+	flag.BoolVar(&clientConfig.Insecure, "insecure_skip_tls_verify", clientConfig.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
+}
 
 var parser = kubecfg.NewParser(map[string]runtime.Object{
 	"pods":                   &api.Pod{},
@@ -72,7 +80,7 @@ var parser = kubecfg.NewParser(map[string]runtime.Object{
 })
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `Usage: kubecfg -h [-c config/file.json] <method>
+	fmt.Fprintf(os.Stderr, `Usage: kubecfg -h [-c config/file.json|url|-] <method>
 
 Kubernetes REST API:
 
@@ -103,6 +111,15 @@ func prettyWireStorage() string {
 
 // readConfigData reads the bytes from the specified filesytem or network location associated with the *config flag
 func readConfigData() []byte {
+	// read from STDIN
+	if *config == "-" {
+		data, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			glog.Fatalf("Unable to read from STDIN: %v\n", err)
+		}
+		return data
+	}
+
 	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
 	if strings.Index(*config, "http://") == 0 || strings.Index(*config, "https://") == 0 {
 		resp, err := http.Get(*config)
@@ -118,13 +135,13 @@ func readConfigData() []byte {
 			glog.Fatalf("Unable to read URL %v: %v\n", *config, err)
 		}
 		return data
-	} else {
-		data, err := ioutil.ReadFile(*config)
-		if err != nil {
-			glog.Fatalf("Unable to read %v: %v\n", *config, err)
-		}
-		return data
 	}
+
+	data, err := ioutil.ReadFile(*config)
+	if err != nil {
+		glog.Fatalf("Unable to read %v: %v\n", *config, err)
+	}
+	return data
 }
 
 // readConfig reads and parses pod, replicationController, and service
@@ -156,39 +173,41 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	var masterServer string
-	if len(*httpServer) > 0 {
-		masterServer = *httpServer
-	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
-		masterServer = os.Getenv("KUBERNETES_MASTER")
-	} else {
-		masterServer = "http://localhost:8080"
-	}
-	kubeClient, err := client.New(masterServer, *apiVersion, nil)
-	if err != nil {
-		glog.Fatalf("Can't configure client: %v", err)
+	// Initialize the client
+	if clientConfig.Host == "" {
+		clientConfig.Host = os.Getenv("KUBERNETES_MASTER")
 	}
 
-	// TODO: this won't work if TLS is enabled with client cert auth, but no
-	// passwords are required. Refactor when we address client auth abstraction.
-	if kubeClient.Secure() {
+	// TODO: get the namespace context when kubecfg ns is completed
+	ctx := api.NewContext()
+
+	if clientConfig.Host == "" {
+		// TODO: eventually apiserver should start on 443 and be secure by default
+		clientConfig.Host = "http://localhost:8080"
+	}
+	if client.IsConfigTransportSecure(clientConfig) {
 		auth, err := kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
 		}
-		if *caFile != "" {
-			auth.CAFile = *caFile
+		clientConfig.Username = auth.User
+		clientConfig.Password = auth.Password
+		if auth.CAFile != "" {
+			clientConfig.CAFile = auth.CAFile
 		}
-		if *certFile != "" {
-			auth.CertFile = *certFile
+		if auth.CertFile != "" {
+			clientConfig.CertFile = auth.CertFile
 		}
-		if *keyFile != "" {
-			auth.KeyFile = *keyFile
+		if auth.KeyFile != "" {
+			clientConfig.KeyFile = auth.KeyFile
 		}
-		kubeClient, err = client.New(masterServer, *apiVersion, auth)
-		if err != nil {
-			glog.Fatalf("Can't configure client: %v", err)
+		if auth.Insecure != nil {
+			clientConfig.Insecure = *auth.Insecure
 		}
+	}
+	kubeClient, err := client.New(clientConfig)
+	if err != nil {
+		glog.Fatalf("Can't configure client: %v", err)
 	}
 
 	if *serverVersion != verflag.VersionFalse {
@@ -220,6 +239,12 @@ func main() {
 
 	if *proxy {
 		glog.Info("Starting to serve on localhost:8001")
+		if *openBrowser {
+			go func() {
+				time.Sleep(2 * time.Second)
+				open.Start("http://localhost:8001/static/")
+			}()
+		}
 		server := kubecfg.NewProxyServer(*www, kubeClient)
 		glog.Fatal(server.Serve())
 	}
@@ -230,7 +255,7 @@ func main() {
 	}
 	method := flag.Arg(0)
 
-	matchFound := executeAPIRequest(method, kubeClient) || executeControllerRequest(method, kubeClient)
+	matchFound := executeAPIRequest(ctx, method, kubeClient) || executeControllerRequest(ctx, method, kubeClient)
 	if matchFound == false {
 		glog.Fatalf("Unknown command %s", method)
 	}
@@ -257,12 +282,48 @@ func checkStorage(storage string) bool {
 	return false
 }
 
-func executeAPIRequest(method string, c *client.Client) bool {
+func getPrinter() kubecfg.ResourcePrinter {
+	var printer kubecfg.ResourcePrinter
+	switch {
+	case *json:
+		printer = &kubecfg.IdentityPrinter{}
+	case *yaml:
+		printer = &kubecfg.YAMLPrinter{}
+	case len(*templateFile) > 0 || len(*templateStr) > 0:
+		var data []byte
+		if len(*templateFile) > 0 {
+			var err error
+			data, err = ioutil.ReadFile(*templateFile)
+			if err != nil {
+				glog.Fatalf("Error reading template %s, %v\n", *templateFile, err)
+				return nil
+			}
+		} else {
+			data = []byte(*templateStr)
+		}
+		tmpl, err := template.New("output").Parse(string(data))
+		if err != nil {
+			glog.Fatalf("Error parsing template %s, %v\n", string(data), err)
+			return nil
+		}
+		printer = &kubecfg.TemplatePrinter{
+			Template: tmpl,
+		}
+	default:
+		printer = humanReadablePrinter()
+	}
+	return printer
+}
+
+func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 	storage, path, hasSuffix := storagePathFromArg(flag.Arg(1))
 	validStorage := checkStorage(storage)
 	verb := ""
 	setBody := false
-	var version uint64
+	var version string
+
+	printer := getPrinter()
+
 	switch method {
 	case "get":
 		verb = "GET"
@@ -290,7 +351,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
-		jsonBase, err := runtime.FindJSONBase(obj)
+		jsonBase, err := runtime.FindTypeMeta(obj)
 		if err != nil {
 			glog.Fatalf("error finding json base for update: %v", err)
 		}
@@ -300,21 +361,33 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		if !validStorage || !hasSuffix {
 			glog.Fatalf("usage: kubecfg [OPTIONS] %s <%s>/<id>", method, prettyWireStorage())
 		}
+	case "print":
+		data := readConfig(storage, c.RESTClient.Codec)
+		obj, err := latest.Codec.Decode(data)
+		if err != nil {
+			glog.Fatalf("error setting resource version: %v", err)
+		}
+		printer.PrintObj(obj, os.Stdout)
+		return true
 	default:
 		return false
 	}
 
-	r := c.Verb(verb).
-		Path(path).
-		ParseSelectorParam("labels", *selector)
+	r := c.Verb(verb).Path(path)
+	if len(*selector) > 0 {
+		r.ParseSelectorParam("labels", *selector)
+	}
+	if len(*fieldSelector) > 0 {
+		r.ParseSelectorParam("fields", *fieldSelector)
+	}
 	if setBody {
-		if version != 0 {
+		if len(version) > 0 {
 			data := readConfig(storage, c.RESTClient.Codec)
 			obj, err := latest.Codec.Decode(data)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
-			jsonBase, err := runtime.FindJSONBase(obj)
+			jsonBase, err := runtime.FindTypeMeta(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
@@ -335,36 +408,6 @@ func executeAPIRequest(method string, c *client.Client) bool {
 		return false
 	}
 
-	var printer kubecfg.ResourcePrinter
-	switch {
-	case *json:
-		printer = &kubecfg.IdentityPrinter{}
-	case *yaml:
-		printer = &kubecfg.YAMLPrinter{}
-	case len(*templateFile) > 0 || len(*templateStr) > 0:
-		var data []byte
-		if len(*templateFile) > 0 {
-			var err error
-			data, err = ioutil.ReadFile(*templateFile)
-			if err != nil {
-				glog.Fatalf("Error reading template %s, %v\n", *templateFile, err)
-				return false
-			}
-		} else {
-			data = []byte(*templateStr)
-		}
-		tmpl, err := template.New("output").Parse(string(data))
-		if err != nil {
-			glog.Fatalf("Error parsing template %s, %v\n", string(data), err)
-			return false
-		}
-		printer = &kubecfg.TemplatePrinter{
-			Template: tmpl,
-		}
-	default:
-		printer = humanReadablePrinter()
-	}
-
 	if err = printer.PrintObj(obj, os.Stdout); err != nil {
 		body, _ := result.Raw()
 		glog.Fatalf("Failed to print: %v\nRaw received object:\n%#v\n\nBody received: %v", err, obj, string(body))
@@ -374,7 +417,7 @@ func executeAPIRequest(method string, c *client.Client) bool {
 	return true
 }
 
-func executeControllerRequest(method string, c *client.Client) bool {
+func executeControllerRequest(ctx api.Context, method string, c *client.Client) bool {
 	parseController := func() string {
 		if len(flag.Args()) != 2 {
 			glog.Fatal("usage: kubecfg [OPTIONS] stop|rm|rollingupdate <controller>")
@@ -385,11 +428,11 @@ func executeControllerRequest(method string, c *client.Client) bool {
 	var err error
 	switch method {
 	case "stop":
-		err = kubecfg.StopController(parseController(), c)
+		err = kubecfg.StopController(ctx, parseController(), c)
 	case "rm":
-		err = kubecfg.DeleteController(parseController(), c)
+		err = kubecfg.DeleteController(ctx, parseController(), c)
 	case "rollingupdate":
-		err = kubecfg.Update(parseController(), c, *updatePeriod, *imageName)
+		err = kubecfg.Update(ctx, parseController(), c, *updatePeriod, *imageName)
 	case "run":
 		if len(flag.Args()) != 4 {
 			glog.Fatal("usage: kubecfg [OPTIONS] run <image> <replicas> <controller>")
@@ -400,7 +443,7 @@ func executeControllerRequest(method string, c *client.Client) bool {
 			glog.Fatalf("Error parsing replicas: %v", err2)
 		}
 		name := flag.Arg(3)
-		err = kubecfg.RunController(image, name, replicas, c, *portSpec, *servicePort)
+		err = kubecfg.RunController(ctx, image, name, replicas, c, *portSpec, *servicePort)
 	case "resize":
 		args := flag.Args()
 		if len(args) < 3 {
@@ -411,7 +454,7 @@ func executeControllerRequest(method string, c *client.Client) bool {
 		if err2 != nil {
 			glog.Fatalf("Error parsing replicas: %v", err2)
 		}
-		err = kubecfg.ResizeController(name, replicas, c)
+		err = kubecfg.ResizeController(ctx, name, replicas, c)
 	default:
 		return false
 	}

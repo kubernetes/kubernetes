@@ -18,6 +18,8 @@ package cloudprovider
 
 import (
 	"net"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // Interface is an abstract, pluggable interface for cloud providers.
@@ -49,6 +51,8 @@ type Instances interface {
 	IPAddress(name string) (net.IP, error)
 	// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
 	List(filter string) ([]string, error)
+	// GetNodeResources gets the resources for a particular node
+	GetNodeResources(name string) (*api.NodeResources, error)
 }
 
 // Zone represents the location of a particular machine.

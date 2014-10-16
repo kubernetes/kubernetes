@@ -4,7 +4,7 @@
 
 // Package docker provides a client for the Docker remote API.
 //
-// See http://goo.gl/mxyql for more details on the remote API.
+// See http://goo.gl/G3plxW for more details on the remote API.
 package docker
 
 import (
@@ -356,20 +356,30 @@ func (c *Client) stream(method, path string, setRawTerminal, rawJSONStream bool,
 	return nil
 }
 
-func (c *Client) hijack(method, path string, success chan struct{}, setRawTerminal bool, in io.Reader, stderr, stdout io.Writer) error {
+func (c *Client) hijack(method, path string, success chan struct{}, setRawTerminal bool, in io.Reader, stderr, stdout io.Writer, data interface{}) error {
 	if path != "/version" && !c.SkipServerVersionCheck && c.expectedApiVersion == nil {
 		err := c.checkApiVersion()
 		if err != nil {
 			return err
 		}
 	}
+
+	var params io.Reader
+	if data != nil {
+		buf, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		params = bytes.NewBuffer(buf)
+	}
+
 	if stdout == nil {
 		stdout = ioutil.Discard
 	}
 	if stderr == nil {
 		stderr = ioutil.Discard
 	}
-	req, err := http.NewRequest(method, c.getURL(path), nil)
+	req, err := http.NewRequest(method, c.getURL(path), params)
 	if err != nil {
 		return err
 	}

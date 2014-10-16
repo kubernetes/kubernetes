@@ -17,7 +17,6 @@ limitations under the License.
 package errors
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -61,44 +60,6 @@ func TestValidationError(t *testing.T) {
 	s := NewFieldInvalid("foo", "bar").Error()
 	if !strings.Contains(s, "foo") || !strings.Contains(s, "bar") || !strings.Contains(s, ValueOf(ValidationErrorTypeInvalid)) {
 		t.Errorf("error message did not contain expected values, got %s", s)
-	}
-}
-
-func TestErrorList(t *testing.T) {
-	errList := ErrorList{}
-	if a := errList.ToError(); a != nil {
-		t.Errorf("unexpected non-nil error for empty list: %v", a)
-	}
-	if a := errorListInternal(errList).Error(); a != "" {
-		t.Errorf("expected empty string, got %v", a)
-	}
-	errList = append(errList, NewFieldInvalid("field", "value"))
-	// The fact that this compiles is the test.
-}
-
-func TestErrorListToError(t *testing.T) {
-	errList := ErrorList{}
-	err := errList.ToError()
-	if err != nil {
-		t.Errorf("expected nil, got %v", err)
-	}
-
-	testCases := []struct {
-		errs     ErrorList
-		expected string
-	}{
-		{ErrorList{fmt.Errorf("abc")}, "abc"},
-		{ErrorList{fmt.Errorf("abc"), fmt.Errorf("123")}, "abc; 123"},
-	}
-	for _, testCase := range testCases {
-		err := testCase.errs.ToError()
-		if err == nil {
-			t.Errorf("expected an error, got nil: ErrorList=%v", testCase)
-			continue
-		}
-		if err.Error() != testCase.expected {
-			t.Errorf("expected %q, got %q", testCase.expected, err.Error())
-		}
 	}
 }
 

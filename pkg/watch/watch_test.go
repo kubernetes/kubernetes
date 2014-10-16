@@ -35,6 +35,7 @@ func TestFake(t *testing.T) {
 		{Modified, testType("qux")},
 		{Modified, testType("bar")},
 		{Deleted, testType("bar")},
+		{Error, testType("error: blah")},
 	}
 
 	// Prove that f implements Interface by phrasing this as a function.
@@ -62,6 +63,7 @@ func TestFake(t *testing.T) {
 		f.Action(Modified, testType("qux"))
 		f.Modify(testType("bar"))
 		f.Delete(testType("bar"))
+		f.Error(testType("error: blah"))
 		f.Stop()
 	}
 

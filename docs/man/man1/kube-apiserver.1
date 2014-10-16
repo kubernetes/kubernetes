@@ -1,0 +1,149 @@
+.TH "KUBERNETES" "1" " kubernetes User Manuals" "Scott Collier" "October 2014"  ""
+
+.SH NAME
+.PP
+kube\-apiserver \- Provides the API for kubernetes orchestration.
+
+.SH SYNOPSIS
+.PP
+\fBkube\-apiserver\fP [OPTIONS]
+
+.SH DESCRIPTION
+.PP
+The \fBkubernetes\fP API server validates and configures data for 3 types of objects: pods, services, and replicationControllers. Beyond just servicing REST operations, the API Server does two other things as well: 1. Schedules pods to worker nodes. Right now the scheduler is very simple. 2. Synchronize pod information (where they are, what ports they are exposing) with the service configuration.
+
+.PP
+The the kube\-apiserver several options.
+
+.SH OPTIONS
+.PP
+\fB\-address\fP=""
+    The address on the local server to listen to. Default 127.0.0.1
+
+.PP
+\fB\-allow\_privileged\fP=""
+    If true, allow privileged containers.
+
+.PP
+\fB\-alsologtostderr\fP=
+    log to standard error as well as files. Default is false.
+
+.PP
+\fB\-api\_prefix\fP="/api"
+    The prefix for API requests on the server. Default '/api'
+
+.PP
+\fB\-cloud\_config\fP=""
+    The path to the cloud provider configuration file. Empty string for no configuration file.
+
+.PP
+\fB\-cloud\_provider\fP=""
+    The provider for cloud services. Empty string for no provider.
+
+.PP
+\fB\-cors\_allowed\_origins\fP=[]
+    List of allowed origins for CORS, comma separated. An allowed origin can be a regular expression to support subdomain matching. If this list is empty CORS will not be enabled.
+
+.PP
+\fB\-etcd\_servers\fP=[]
+    List of etcd servers to watch (
+\[la]http://ip:port\[ra]), comma separated
+
+.PP
+\fB\-health\_check\_minions\fP=
+    If true, health check minions and filter unhealthy ones. Default true.
+
+.PP
+\fB\-log\_backtrace\_at=\fP:0
+    when logging hits line file:N, emit a stack trace
+
+.PP
+\fB\-log\_dir\fP=""
+    If non\-empty, write log files in this directory
+
+.PP
+\fB\-log\_flush\_frequency\fP=5s
+    Maximum number of seconds between log flushes. Default is 5 seconds.
+
+.PP
+\fB\-logtostderr\fP=
+    log to standard error instead of files. Default is false.
+
+.PP
+\fB\-machines\fP=[]
+    List of machines to schedule onto, comma separated.
+
+.PP
+\fB\-minion\_cache\_ttl\fP=30s
+    Duration of time to cache minion information. Default 30 seconds.
+
+.PP
+\fB\-minion\_port\fP=10250
+    The port at which kubelet will be listening on the minions. Default is 10250.
+
+.PP
+\fB\-minion\_regexp\fP=""
+    If non empty, and \-cloud\_provider is specified, a regular expression for matching minion VMs.
+
+.PP
+\fB\-port\fP=8080
+    The port to listen on. Default is 8080.
+
+.PP
+\fB\-stderrthreshold\fP=0
+    logs at or above this threshold go to stderr. Default is 0.
+
+.PP
+\fB\-storage\_version\fP=""
+    The version to store resources with. Defaults to server preferred.
+
+.PP
+\fB\-v\fP=0
+    Log level for V logs.
+
+.PP
+\fB\-version\fP=false
+    Print version information and quit. Default is false.
+
+.PP
+\fB\-vmodule\fP=
+    comma\-separated list of pattern=N settings for file\-filtered logging
+
+.SH EXAMPLES
+.PP
+The kube\-apiserver can be called manually or from systemd. An example unit file looks as such:
+
+.PP
+.RS
+
+.nf
+[Unit]
+Description=Kubernetes API Server
+
+[Service]
+EnvironmentFile=/etc/kubernetes/config
+EnvironmentFile=/etc/kubernetes/apiserver
+User=kube
+ExecStart=/usr/bin/kube\-apiserver \\
+        \-\-logtostderr=\$\{KUBE\_LOGTOSTDERR\} \\
+        \-\-v=\$\{KUBE\_LOG\_LEVEL\} \\
+        \-\-etcd\_servers=\$\{KUBE\_ETCD\_SERVERS\} \\
+        \-\-address=\$\{KUBE\_API\_ADDRESS\} \\
+        \-\-port=\$\{KUBE\_API\_PORT\} \\
+        \-\-machines=\$\{MINION\_ADDRESSES\} \\
+        \-\-minion\_port=\$\{MINION\_PORT\} \\
+        \-\-allow\_privileged=\$\{KUBE\_ALLOW\_PRIV\}
+Restart=on\-failure
+
+[Install]
+WantedBy=multi\-user.target
+
+.fi
+
+.PP
+Where the variables are stored in the /etc/kubernetes/ environment files.
+
+.SH HISTORY
+.PP
+October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
+ on the kubernetes source material and internal work.

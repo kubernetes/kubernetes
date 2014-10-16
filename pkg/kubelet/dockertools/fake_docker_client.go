@@ -29,6 +29,7 @@ type FakeDockerClient struct {
 	sync.Mutex
 	ContainerList []docker.APIContainers
 	Container     *docker.Container
+	Image         *docker.Image
 	Err           error
 	called        []string
 	Stopped       []string
@@ -67,8 +68,17 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error) {
 	f.Lock()
 	defer f.Unlock()
-	f.called = append(f.called, "inspect")
+	f.called = append(f.called, "inspect_container")
 	return f.Container, f.Err
+}
+
+// InspectImage is a test-spy implementation of DockerInterface.InspectImage.
+// It adds an entry "inspect" to the internal method call record.
+func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "inspect_image")
+	return f.Image, f.Err
 }
 
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
@@ -81,7 +91,7 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	// This is not a very good fake. We'll just add this container's name to the list.
 	// Docker likes to add a '/', so copy that behavior.
 	name := "/" + c.Name
-	f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}})
+	f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}, Image: c.Config.Image})
 	return &docker.Container{ID: name}, nil
 }
 
@@ -111,6 +121,15 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	return f.Err
 }
 
+// Logs is a test-spy implementation of DockerInterface.Logs.
+// It adds an entry "logs" to the internal method call record.
+func (f *FakeDockerClient) Logs(opts docker.LogsOptions) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "logs")
+	return f.Err
+}
+
 // PullImage is a test-spy implementation of DockerInterface.StopContainer.
 // It adds an entry "pull" to the internal method call record.
 func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
@@ -125,6 +144,7 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 type FakeDockerPuller struct {
 	sync.Mutex
 
+	HasImages    []string
 	ImagesPulled []string
 
 	// Every pull will return the first error here, and then reslice
@@ -143,4 +163,18 @@ func (f *FakeDockerPuller) Pull(image string) (err error) {
 		f.ErrorsToInject = f.ErrorsToInject[1:]
 	}
 	return err
+}
+
+func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
+	f.Lock()
+	defer f.Unlock()
+	if f.HasImages == nil {
+		return true, nil
+	}
+	for _, s := range f.HasImages {
+		if s == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }

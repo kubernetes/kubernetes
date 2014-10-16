@@ -12,8 +12,8 @@ bridge-utils:
 docker-repo:
   pkgrepo.managed:
     - humanname: Docker Repo
-    - name: deb https://get.docker.io/ubuntu docker main
-    - key_url: https://get.docker.io/gpg
+    - name: deb https://get.docker.com/ubuntu docker main
+    - key_url: https://get.docker.com/gpg
     - require:
       - pkg: pkg-core
 

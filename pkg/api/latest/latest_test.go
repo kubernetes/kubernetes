@@ -19,12 +19,12 @@ package latest
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"testing"
 
 	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/gofuzz"
@@ -32,8 +32,8 @@ import (
 
 // apiObjectFuzzer can randomly populate api objects.
 var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
-	func(j *internal.JSONBase, c fuzz.Continue) {
-		// We have to customize the randomization of JSONBases because their
+	func(j *internal.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
@@ -41,13 +41,26 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
 		// only when all 8 bytes are set.
-		j.ResourceVersion = c.RandUint64() >> 8
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
 
 		var sec, nsec int64
 		c.Fuzz(&sec)
 		c.Fuzz(&nsec)
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+	},
+	func(j *internal.ObjectReference, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
+		// APIVersion and Kind must remain blank in memory.
+		j.APIVersion = c.RandString()
+		j.Kind = c.RandString()
+		j.Namespace = c.RandString()
+		j.Name = c.RandString()
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.FieldPath = c.RandString()
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
@@ -85,7 +98,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 func TestInternalRoundTrip(t *testing.T) {
 	latest := "v1beta2"
 
-	for k, _ := range internal.Scheme.KnownTypes("") {
+	for k := range internal.Scheme.KnownTypes("") {
 		obj, err := internal.Scheme.New("", k)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
@@ -114,19 +127,19 @@ func TestInternalRoundTrip(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(obj, actual) {
-			t.Errorf("%s: diff %s", k, runtime.ObjectDiff(obj, actual))
+			t.Errorf("%s: diff %s", k, util.ObjectDiff(obj, actual))
 		}
 	}
 }
 
 func TestResourceVersioner(t *testing.T) {
-	pod := internal.Pod{JSONBase: internal.JSONBase{ResourceVersion: 10}}
+	pod := internal.Pod{TypeMeta: internal.TypeMeta{ResourceVersion: "10"}}
 	version, err := ResourceVersioner.ResourceVersion(&pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if version != 10 {
-		t.Errorf("unexpected version %d", version)
+	if version != "10" {
+		t.Errorf("unexpected version %v", version)
 	}
 }
 
@@ -146,11 +159,11 @@ func TestCodec(t *testing.T) {
 }
 
 func TestInterfacesFor(t *testing.T) {
-	if _, _, err := InterfacesFor(""); err == nil {
+	if _, err := InterfacesFor(""); err == nil {
 		t.Fatalf("unexpected non-error: %v", err)
 	}
 	for i, version := range append([]string{Version, OldestVersion}, Versions...) {
-		if codec, versioner, err := InterfacesFor(version); err != nil || codec == nil || versioner == nil {
+		if vi, err := InterfacesFor(version); err != nil || vi == nil {
 			t.Fatalf("%d: unexpected result: %v", i, err)
 		}
 	}

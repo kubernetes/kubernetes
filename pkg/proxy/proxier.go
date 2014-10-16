@@ -32,7 +32,7 @@ import (
 
 type serviceInfo struct {
 	port     int
-	protocol string
+	protocol api.Protocol
 	socket   proxySocket
 	timeout  time.Duration
 	mu       sync.Mutex // protects active
@@ -90,14 +90,14 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 			glog.Errorf("Accept failed: %v", err)
 			continue
 		}
-		glog.Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
+		glog.V(2).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, inConn.RemoteAddr())
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s %v", service, err)
 			inConn.Close()
 			continue
 		}
-		glog.Infof("Mapped service %s to endpoint %s", service, endpoint)
+		glog.V(3).Infof("Mapped service %s to endpoint %s", service, endpoint)
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
 		outConn, err := net.DialTimeout("tcp", endpoint, endpointDialTimeout)
@@ -116,13 +116,24 @@ func (tcp *tcpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 func proxyTCP(in, out *net.TCPConn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
-	glog.Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
+	glog.V(4).Infof("Creating proxy between %v <-> %v <-> %v <-> %v",
 		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
 	go copyBytes(in, out, &wg)
 	go copyBytes(out, in, &wg)
 	wg.Wait()
 	in.Close()
 	out.Close()
+}
+
+func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
+	defer wg.Done()
+	glog.V(4).Infof("Copying from %v <-> %v <-> %v <-> %v",
+		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
+	if _, err := io.Copy(in, out); err != nil {
+		glog.Errorf("I/O error: %v", err)
+	}
+	in.CloseRead()
+	out.CloseWrite()
 }
 
 // udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
@@ -165,7 +176,7 @@ func (udp *udpProxySocket) ProxyLoop(service string, proxier *Proxier) {
 		if err != nil {
 			if e, ok := err.(net.Error); ok {
 				if e.Temporary() {
-					glog.Infof("ReadFrom had a temporary failure: %v", err)
+					glog.V(1).Infof("ReadFrom had a temporary failure: %v", err)
 					continue
 				}
 			}
@@ -203,13 +214,13 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 	if !found {
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
-		glog.Infof("New UDP connection from %s", cliAddr)
+		glog.V(2).Infof("New UDP connection from %s", cliAddr)
 		endpoint, err := proxier.loadBalancer.NextEndpoint(service, cliAddr)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s %v", service, err)
 			return nil, err
 		}
-		glog.Infof("Mapped service %s to endpoint %s", service, endpoint)
+		glog.V(4).Infof("Mapped service %s to endpoint %s", service, endpoint)
 		svrConn, err = net.DialTimeout("udp", endpoint, endpointDialTimeout)
 		if err != nil {
 			// TODO: Try another endpoint?
@@ -258,15 +269,16 @@ func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activ
 func logTimeout(err error) bool {
 	if e, ok := err.(net.Error); ok {
 		if e.Timeout() {
-			glog.Infof("connection to endpoint closed due to inactivity")
+			glog.V(1).Infof("connection to endpoint closed due to inactivity")
 			return true
 		}
 	}
 	return false
 }
 
-func newProxySocket(protocol string, host string, port int) (proxySocket, error) {
-	switch strings.ToUpper(protocol) {
+func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
+	host := ip.String()
+	switch strings.ToUpper(string(protocol)) {
 	case "TCP":
 		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 		if err != nil {
@@ -293,12 +305,12 @@ type Proxier struct {
 	loadBalancer LoadBalancer
 	mu           sync.Mutex // protects serviceMap
 	serviceMap   map[string]*serviceInfo
-	address      string
+	address      net.IP
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an
 // address on which to listen
-func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, address net.IP) *Proxier {
 	return &Proxier{
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[string]*serviceInfo),
@@ -306,32 +318,20 @@ func NewProxier(loadBalancer LoadBalancer, address string) *Proxier {
 	}
 }
 
-func copyBytes(in, out *net.TCPConn, wg *sync.WaitGroup) {
-	defer wg.Done()
-	glog.Infof("Copying from %v <-> %v <-> %v <-> %v",
-		in.RemoteAddr(), in.LocalAddr(), out.LocalAddr(), out.RemoteAddr())
-	if _, err := io.Copy(in, out); err != nil {
-		glog.Errorf("I/O error: %v", err)
-	}
-	in.CloseRead()
-	out.CloseWrite()
-}
-
-// StopProxy stops the proxy for the named service.
-func (proxier *Proxier) StopProxy(service string) error {
-	// TODO: delete from map here?
-	info, found := proxier.getServiceInfo(service)
-	if !found {
-		return fmt.Errorf("unknown service: %s", service)
-	}
+// This assumes proxier.mu is not locked.
+func (proxier *Proxier) stopProxy(service string, info *serviceInfo) error {
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
+// This assumes proxier.mu is locked.
 func (proxier *Proxier) stopProxyInternal(service string, info *serviceInfo) error {
 	if !info.setActive(false) {
 		return nil
 	}
-	glog.Infof("Removing service: %s", service)
+	glog.V(3).Infof("Removing service: %s", service)
+	delete(proxier.serviceMap, service)
 	return info.socket.Close()
 }
 
@@ -348,15 +348,10 @@ func (proxier *Proxier) setServiceInfo(service string, info *serviceInfo) {
 	proxier.serviceMap[service] = info
 }
 
-// used to globally lock around unused ports. Only used in testing.
-var unusedPortLock sync.Mutex
-
 // addServiceOnUnusedPort starts listening for a new service, returning the
 // port it's using.  For testing on a system with unknown ports used.  The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnUnusedPort(service, protocol string, timeout time.Duration) (string, error) {
-	unusedPortLock.Lock()
-	defer unusedPortLock.Unlock()
+func (proxier *Proxier) addServiceOnUnusedPort(service string, protocol api.Protocol, timeout time.Duration) (string, error) {
 	sock, err := newProxySocket(protocol, proxier.address, 0)
 	if err != nil {
 		return "", err
@@ -381,7 +376,7 @@ func (proxier *Proxier) addServiceOnUnusedPort(service, protocol string, timeout
 }
 
 func (proxier *Proxier) startAccepting(service string, sock proxySocket) {
-	glog.Infof("Listening for %s on %s:%s", service, sock.Addr().Network(), sock.Addr().String())
+	glog.V(1).Infof("Listening for %s on %s:%s", service, sock.Addr().Network(), sock.Addr().String())
 	go func(service string, proxier *Proxier) {
 		defer util.HandleCrash()
 		sock.ProxyLoop(service, proxier)
@@ -395,7 +390,7 @@ const udpIdleTimeout = 1 * time.Minute
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
 func (proxier *Proxier) OnUpdate(services []api.Service) {
-	glog.Infof("Received update notice: %+v", services)
+	glog.V(4).Infof("Received update notice: %+v", services)
 	activeServices := util.StringSet{}
 	for _, service := range services {
 		activeServices.Insert(service.ID)
@@ -405,12 +400,12 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			continue
 		}
 		if exists && info.port != service.Port {
-			err := proxier.stopProxyInternal(service.ID, info)
+			err := proxier.stopProxy(service.ID, info)
 			if err != nil {
 				glog.Errorf("error stopping %s: %v", service.ID, err)
 			}
 		}
-		glog.Infof("Adding a new service %s on %s port %d", service.ID, service.Protocol, service.Port)
+		glog.V(3).Infof("Adding a new service %s on %s port %d", service.ID, service.Protocol, service.Port)
 		sock, err := newProxySocket(service.Protocol, proxier.address, service.Port)
 		if err != nil {
 			glog.Errorf("Failed to get a socket for %s: %+v", service.ID, err)

@@ -1,0 +1,23 @@
+[Unit]
+After=network-online.target
+Before=apiserver.service
+Before=controller-manager.service
+Before=kubelet.service
+Before=proxy.service
+Description=Download Kubernetes Binaries
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+Requires=network-online.target
+
+[Service]
+ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/apiserver
+ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/controller-manager
+ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kubecfg
+ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kubelet
+ExecStart=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/proxy
+ExecStart=/usr/bin/chmod +x /opt/bin/apiserver
+ExecStart=/usr/bin/chmod +x /opt/bin/controller-manager
+ExecStart=/usr/bin/chmod +x /opt/bin/kubecfg
+ExecStart=/usr/bin/chmod +x /opt/bin/kubelet
+ExecStart=/usr/bin/chmod +x /opt/bin/proxy
+RemainAfterExit=yes
+Type=oneshot

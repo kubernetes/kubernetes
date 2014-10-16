@@ -17,13 +17,48 @@ limitations under the License.
 package v1beta1
 
 import (
+	"strconv"
+
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func init() {
 	newer.Scheme.AddConversionFuncs(
+		// TypeMeta has changed type of ResourceVersion internally
+		func(in *newer.TypeMeta, out *TypeMeta, s conversion.Scope) error {
+			out.APIVersion = in.APIVersion
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.ID = in.ID
+			out.CreationTimestamp = in.CreationTimestamp
+			out.SelfLink = in.SelfLink
+			out.Annotations = in.Annotations
+
+			if len(in.ResourceVersion) > 0 {
+				v, err := strconv.ParseUint(in.ResourceVersion, 10, 64)
+				if err != nil {
+					return err
+				}
+				out.ResourceVersion = v
+			}
+			return nil
+		},
+		func(in *TypeMeta, out *newer.TypeMeta, s conversion.Scope) error {
+			out.APIVersion = in.APIVersion
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.ID = in.ID
+			out.CreationTimestamp = in.CreationTimestamp
+			out.SelfLink = in.SelfLink
+			out.Annotations = in.Annotations
+
+			if in.ResourceVersion != 0 {
+				out.ResourceVersion = strconv.FormatUint(in.ResourceVersion, 10)
+			}
+			return nil
+		},
+
 		// EnvVar's Key is deprecated in favor of Name.
 		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
 			out.Value = in.Value
@@ -63,13 +98,13 @@ func init() {
 
 		// MinionList.Items had a wrong name in v1beta1
 		func(in *newer.MinionList, out *MinionList, s conversion.Scope) error {
-			s.Convert(&in.JSONBase, &out.JSONBase, 0)
+			s.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			s.Convert(&in.Items, &out.Items, 0)
 			out.Minions = out.Items
 			return nil
 		},
 		func(in *MinionList, out *newer.MinionList, s conversion.Scope) error {
-			s.Convert(&in.JSONBase, &out.JSONBase, 0)
+			s.Convert(&in.TypeMeta, &out.TypeMeta, 0)
 			if len(in.Items) == 0 {
 				s.Convert(&in.Minions, &out.Items, 0)
 			} else {
@@ -79,34 +114,4 @@ func init() {
 		},
 	)
 
-}
-
-// EmbeddedObject implements a Codec specific version of an
-// embedded object.
-type EmbeddedObject struct {
-	runtime.Object
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface.
-func (a *EmbeddedObject) UnmarshalJSON(b []byte) error {
-	obj, err := runtime.CodecUnmarshalJSON(Codec, b)
-	a.Object = obj
-	return err
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (a EmbeddedObject) MarshalJSON() ([]byte, error) {
-	return runtime.CodecMarshalJSON(Codec, a.Object)
-}
-
-// SetYAML implements the yaml.Setter interface.
-func (a *EmbeddedObject) SetYAML(tag string, value interface{}) bool {
-	obj, ok := runtime.CodecSetYAML(Codec, tag, value)
-	a.Object = obj
-	return ok
-}
-
-// GetYAML implements the yaml.Getter interface.
-func (a EmbeddedObject) GetYAML() (tag string, value interface{}) {
-	return runtime.CodecGetYAML(Codec, a.Object)
 }

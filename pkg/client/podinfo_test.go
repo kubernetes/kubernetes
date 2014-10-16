@@ -27,12 +27,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
 )
 
 func TestHTTPPodInfoGetter(t *testing.T) {
 	expectObj := api.PodInfo{
-		"myID": docker.Container{ID: "myID"},
+		"myID": api.ContainerStatus{},
 	}
 	body, err := json.Marshal(expectObj)
 	if err != nil {
@@ -61,20 +60,20 @@ func TestHTTPPodInfoGetter(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	gotObj, err := podInfoGetter.GetPodInfo(parts[0], "foo")
+	gotObj, err := podInfoGetter.GetPodInfo(parts[0], api.NamespaceDefault, "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// reflect.DeepEqual(expectObj, gotObj) doesn't handle blank times well
-	if len(gotObj) != len(expectObj) || expectObj["myID"].ID != gotObj["myID"].ID {
+	if len(gotObj) != len(expectObj) {
 		t.Errorf("Unexpected response.  Expected: %#v, received %#v", expectObj, gotObj)
 	}
 }
 
 func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 	expectObj := api.PodInfo{
-		"myID": docker.Container{ID: "myID"},
+		"myID": api.ContainerStatus{},
 	}
 	_, err := json.Marshal(expectObj)
 	if err != nil {
@@ -103,7 +102,7 @@ func TestHTTPPodInfoGetterNotFound(t *testing.T) {
 		Client: http.DefaultClient,
 		Port:   uint(port),
 	}
-	_, err = podInfoGetter.GetPodInfo(parts[0], "foo")
+	_, err = podInfoGetter.GetPodInfo(parts[0], api.NamespaceDefault, "foo")
 	if err != ErrPodInfoNotAvailable {
 		t.Errorf("Expected %#v, Got %#v", ErrPodInfoNotAvailable, err)
 	}

@@ -191,64 +191,108 @@ func TestRequiresExactMatch(t *testing.T) {
 	for k, v := range testCases {
 		value, found := v.S.RequiresExactMatch(v.Label)
 		if value != v.Value {
-			t.Errorf("%s: expected value %s, got %s", k, v.Value, value)
+			t.Errorf("%s: expected value %v, got %s", k, v.Value, value)
 		}
 		if found != v.Found {
-			t.Errorf("%s: expected found %s, got %s", k, v.Found, found)
+			t.Errorf("%s: expected found %v, got %s", k, v.Found, found)
 		}
 	}
 }
 
-func expectMatchRequirement(t *testing.T, req Requirement, ls Set) {
-	if !req.Matches(ls) {
-		t.Errorf("Wanted '%+v' to match '%s', but it did not.\n", req, ls)
+func TestRequirementConstructor(t *testing.T) {
+	requirementConstructorTests := []struct {
+		Key     string
+		Op      Operator
+		Vals    util.StringSet
+		Success bool
+	}{
+		{"x", 8, util.NewStringSet("foo"), false},
+		{"x", In, nil, false},
+		{"x", NotIn, util.NewStringSet(), false},
+		{"x", In, util.NewStringSet("foo"), true},
+		{"x", NotIn, util.NewStringSet("foo"), true},
+		{"x", Exists, nil, true},
+	}
+	for _, rc := range requirementConstructorTests {
+		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals); err == nil && !rc.Success {
+			t.Errorf("expected error with key:%#v op:%v vals:%v, got no error", rc.Key, rc.Op, rc.Vals)
+		} else if err != nil && rc.Success {
+			t.Errorf("expected no error with key:%#v op:%v vals:%v, got:%v", rc.Key, rc.Op, rc.Vals, err)
+		}
 	}
 }
 
-func expectNoMatchRequirement(t *testing.T, req Requirement, ls Set) {
-	if req.Matches(ls) {
-		t.Errorf("Wanted '%+v' to not match '%s', but it did.", req, ls)
+func TestToString(t *testing.T) {
+	var req Requirement
+	toStringTests := []struct {
+		In    *LabelSelector
+		Out   string
+		Valid bool
+	}{
+		{&LabelSelector{Requirements: []Requirement{
+			getRequirement("x", In, util.NewStringSet("abc", "def"), t),
+			getRequirement("y", NotIn, util.NewStringSet("jkl"), t),
+			getRequirement("z", Exists, nil, t),
+		}}, "x in (abc,def),y not in (jkl),z", true},
+		{&LabelSelector{Requirements: []Requirement{
+			getRequirement("x", In, util.NewStringSet("abc", "def"), t),
+			req,
+		}}, "", false},
+		{&LabelSelector{Requirements: []Requirement{
+			getRequirement("x", NotIn, util.NewStringSet("abc"), t),
+			getRequirement("y", In, util.NewStringSet("jkl", "mno"), t),
+			getRequirement("z", NotIn, util.NewStringSet(""), t),
+		}}, "x not in (abc),y in (jkl,mno),z not in ()", true},
+	}
+	for _, ts := range toStringTests {
+		if out, err := ts.In.String(); err != nil && ts.Valid {
+			t.Errorf("%+v.String() => %v, expected no error", ts.In, err)
+		} else if out != ts.Out {
+			t.Errorf("%+v.String() => %v, want %v", ts.In, out, ts.Out)
+		}
 	}
 }
 
-func TestRequirementMatches(t *testing.T) {
-	s := Set{"x": "foo", "y": "baz"}
-	a := Requirement{key: "x", operator: IN, strValues: util.NewStringSet("foo")}
-	b := Requirement{key: "x", operator: NOT_IN, strValues: util.NewStringSet("beta")}
-	c := Requirement{key: "y", operator: IN, strValues: nil}
-	d := Requirement{key: "y", strValues: util.NewStringSet("foo")}
-	expectMatchRequirement(t, a, s)
-	expectMatchRequirement(t, b, s)
-	expectNoMatchRequirement(t, c, s)
-	expectNoMatchRequirement(t, d, s)
-}
-
-func expectMatchLabSelector(t *testing.T, lsel LabelSelector, s Set) {
-	if !lsel.Matches(s) {
-		t.Errorf("Wanted '%+v' to match '%s', but it did not.\n", lsel, s)
+func TestRequirementLabelSelectorMatching(t *testing.T) {
+	var req Requirement
+	labelSelectorMatchingTests := []struct {
+		Set   Set
+		Sel   *LabelSelector
+		Match bool
+		Valid bool
+	}{
+		{Set{"x": "foo", "y": "baz"}, &LabelSelector{Requirements: []Requirement{
+			req,
+		}}, false, false},
+		{Set{"x": "foo", "y": "baz"}, &LabelSelector{Requirements: []Requirement{
+			getRequirement("x", In, util.NewStringSet("foo"), t),
+			getRequirement("y", NotIn, util.NewStringSet("alpha"), t),
+		}}, true, true},
+		{Set{"x": "foo", "y": "baz"}, &LabelSelector{Requirements: []Requirement{
+			getRequirement("x", In, util.NewStringSet("foo"), t),
+			getRequirement("y", In, util.NewStringSet("alpha"), t),
+		}}, false, true},
+		{Set{"y": ""}, &LabelSelector{Requirements: []Requirement{
+			getRequirement("x", NotIn, util.NewStringSet(""), t),
+			getRequirement("y", Exists, nil, t),
+		}}, true, true},
+		{Set{"y": "baz"}, &LabelSelector{Requirements: []Requirement{
+			getRequirement("x", In, util.NewStringSet(""), t),
+		}}, false, true},
+	}
+	for _, lsm := range labelSelectorMatchingTests {
+		if match, err := lsm.Sel.Matches(lsm.Set); err != nil && lsm.Valid {
+			t.Errorf("%+v.Matches(%#v) => %v, expected no error", lsm.Sel, lsm.Set, err)
+		} else if match != lsm.Match {
+			t.Errorf("%+v.Matches(%#v) => %v, want %v", lsm.Sel, lsm.Set, match, lsm.Match)
+		}
 	}
 }
 
-func expectNoMatchLabSelector(t *testing.T, lsel LabelSelector, s Set) {
-	if lsel.Matches(s) {
-		t.Errorf("Wanted '%+v' to not match '%s', but it did.\n", lsel, s)
+func getRequirement(key string, op Operator, vals util.StringSet, t *testing.T) Requirement {
+	req, err := NewRequirement(key, op, vals)
+	if err != nil {
+		t.Errorf("NewRequirement(%v, %v, %v) resulted in error:%v", key, op, vals, err)
 	}
-}
-
-func TestLabelSelectorMatches(t *testing.T) {
-	s := Set{"x": "foo", "y": "baz"}
-	allMatch := LabelSelector{
-		Requirements: []Requirement{
-			{key: "x", operator: IN, strValues: util.NewStringSet("foo")},
-			{key: "y", operator: NOT_IN, strValues: util.NewStringSet("alpha")},
-		},
-	}
-	singleNonMatch := LabelSelector{
-		Requirements: []Requirement{
-			{key: "x", operator: IN, strValues: util.NewStringSet("foo")},
-			{key: "y", operator: IN, strValues: util.NewStringSet("alpha")},
-		},
-	}
-	expectMatchLabSelector(t, allMatch, s)
-	expectNoMatchLabSelector(t, singleNonMatch, s)
+	return *req
 }

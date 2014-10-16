@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -33,10 +34,13 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 	for i := range volumes {
 		vol := &volumes[i] // so we can set default values
 		el := errs.ErrorList{}
-		// TODO(thockin) enforce that a source is set once we deprecate the implied form.
-		if vol.Source != nil {
-			el = validateSource(vol.Source).Prefix("source")
+		if vol.Source == nil {
+			// TODO: Enforce that a source is set once we deprecate the implied form.
+			vol.Source = &api.VolumeSource{
+				EmptyDir: &api.EmptyDir{},
+			}
 		}
+		el = validateSource(vol.Source).Prefix("source")
 		if len(vol.Name) == 0 {
 			el = append(el, errs.NewFieldRequired("name", vol.Name))
 		} else if !util.IsDNSLabel(vol.Name) {
@@ -56,13 +60,17 @@ func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ErrorList) {
 func validateSource(source *api.VolumeSource) errs.ErrorList {
 	numVolumes := 0
 	allErrs := errs.ErrorList{}
-	if source.HostDirectory != nil {
+	if source.HostDir != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateHostDir(source.HostDirectory).Prefix("hostDirectory")...)
+		allErrs = append(allErrs, validateHostDir(source.HostDir).Prefix("hostDirectory")...)
 	}
-	if source.EmptyDirectory != nil {
+	if source.EmptyDir != nil {
 		numVolumes++
 		//EmptyDirs have nothing to validate
+	}
+	if source.GCEPersistentDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateGCEPersistentDisk(source.GCEPersistentDisk)...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source))
@@ -70,7 +78,7 @@ func validateSource(source *api.VolumeSource) errs.ErrorList {
 	return allErrs
 }
 
-func validateHostDir(hostDir *api.HostDirectory) errs.ErrorList {
+func validateHostDir(hostDir *api.HostDir) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 	if hostDir.Path == "" {
 		allErrs = append(allErrs, errs.NewNotFound("path", hostDir.Path))
@@ -78,7 +86,21 @@ func validateHostDir(hostDir *api.HostDirectory) errs.ErrorList {
 	return allErrs
 }
 
-var supportedPortProtocols = util.NewStringSet("TCP", "UDP")
+var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
+
+func validateGCEPersistentDisk(PD *api.GCEPersistentDisk) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	if PD.PDName == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("PD.PDName", PD.PDName))
+	}
+	if PD.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("PD.FSType", PD.FSType))
+	}
+	if PD.Partition < 0 || PD.Partition > 255 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("PD.Partition", PD.Partition))
+	}
+	return allErrs
+}
 
 func validatePorts(ports []api.Port) errs.ErrorList {
 	allErrs := errs.ErrorList{}
@@ -106,7 +128,7 @@ func validatePorts(ports []api.Port) errs.ErrorList {
 		}
 		if len(port.Protocol) == 0 {
 			port.Protocol = "TCP"
-		} else if !supportedPortProtocols.Has(strings.ToUpper(port.Protocol)) {
+		} else if !supportedPortProtocols.Has(strings.ToUpper(string(port.Protocol))) {
 			pErrs = append(pErrs, errs.NewFieldNotSupported("protocol", port.Protocol))
 		}
 		allErrs = append(allErrs, pErrs.PrefixIndex(i)...)
@@ -164,7 +186,7 @@ func AccumulateUniquePorts(containers []api.Container, accumulator map[int]bool,
 				continue
 			}
 			if accumulator[port] {
-				cErrs = append(cErrs, errs.NewFieldDuplicate("Port", port))
+				cErrs = append(cErrs, errs.NewFieldDuplicate("port", port))
 			} else {
 				accumulator[port] = true
 			}
@@ -235,7 +257,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
 		} else if ctr.Privileged && !capabilities.AllowPrivileged {
-			cErrs = append(cErrs, errs.NewFieldInvalid("privileged", ctr.Privileged))
+			cErrs = append(cErrs, errs.NewFieldForbidden("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
@@ -313,7 +335,38 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 	if len(pod.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
 	}
+	if !util.IsDNSSubdomain(pod.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
+	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
+	return allErrs
+}
+
+// ValidatePodUpdate tests to see if the update is legal
+func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+
+	if newPod.ID != oldPod.ID {
+		allErrs = append(allErrs, errs.NewFieldInvalid("ID", newPod.ID))
+	}
+
+	if len(newPod.DesiredState.Manifest.Containers) != len(oldPod.DesiredState.Manifest.Containers) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
+		return allErrs
+	}
+	pod := *newPod
+	pod.Labels = oldPod.Labels
+	pod.TypeMeta.ResourceVersion = oldPod.TypeMeta.ResourceVersion
+	// Tricky, we need to copy the container list so that we don't overwrite the update
+	var newContainers []api.Container
+	for ix, container := range pod.DesiredState.Manifest.Containers {
+		container.Image = oldPod.DesiredState.Manifest.Containers[ix].Image
+		newContainers = append(newContainers, container)
+	}
+	pod.DesiredState.Manifest.Containers = newContainers
+	if !reflect.DeepEqual(pod.DesiredState.Manifest, oldPod.DesiredState.Manifest) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("DesiredState.Manifest.Containers", newPod.DesiredState.Manifest.Containers))
+	}
 	return allErrs
 }
 
@@ -325,12 +378,15 @@ func ValidateService(service *api.Service) errs.ErrorList {
 	} else if !util.IsDNS952Label(service.ID) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
 	}
+	if !util.IsDNSSubdomain(service.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace))
+	}
 	if !util.IsValidPortNum(service.Port) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("Service.Port", service.Port))
+		allErrs = append(allErrs, errs.NewFieldInvalid("port", service.Port))
 	}
 	if len(service.Protocol) == 0 {
 		service.Protocol = "TCP"
-	} else if !supportedPortProtocols.Has(strings.ToUpper(service.Protocol)) {
+	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Protocol))) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", service.Protocol))
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
@@ -344,6 +400,9 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.E
 	allErrs := errs.ErrorList{}
 	if len(controller.ID) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
+	}
+	if !util.IsDNSSubdomain(controller.Namespace) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
 	return allErrs
@@ -364,5 +423,17 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
 	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
+	allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(state.PodTemplate.DesiredState.Manifest.Volumes).Prefix("podTemplate.desiredState.manifest")...)
+	return allErrs
+}
+func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ErrorList {
+	allErrs := errs.ErrorList{}
+	for _, vol := range volumes {
+		if vol.Source.GCEPersistentDisk != nil {
+			if vol.Source.GCEPersistentDisk.ReadOnly == false {
+				allErrs = append(allErrs, errs.NewFieldInvalid("GCEPersistentDisk.ReadOnly", false))
+			}
+		}
+	}
 	return allErrs
 }

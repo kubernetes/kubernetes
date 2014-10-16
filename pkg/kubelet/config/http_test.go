@@ -79,7 +79,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 			desc: "Unspecified container name",
 			manifests: []api.ContainerManifest{
 				{
-					Version: "v1beta1",
+					Version:    "v1beta1",
 					Containers: []api.Container{{Name: ""}},
 				},
 			},
@@ -88,7 +88,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 			desc: "Invalid container name",
 			manifests: []api.ContainerManifest{
 				{
-					Version: "v1beta1",
+					Version:    "v1beta1",
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
 			},

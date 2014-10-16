@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
@@ -33,8 +34,21 @@ const (
 )
 
 func readDockerConfigFile() (cfg dockerConfig, err error) {
-	contents, err := ioutil.ReadFile(dockerConfigFileLocation)
-	err = json.Unmarshal(contents, &cfg)
+	absDockerConfigFileLocation, err := filepath.Abs(dockerConfigFileLocation)
+	if err != nil {
+		glog.Errorf("while trying to canonicalize %s: %v", dockerConfigFileLocation, err)
+	}
+	absDockerConfigFileLocation, err = filepath.Abs(dockerConfigFileLocation)
+	glog.V(2).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
+	contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+	if err != nil {
+		glog.Errorf("while trying to read %s: %v", absDockerConfigFileLocation, err)
+		return nil, err
+	}
+	if err = json.Unmarshal(contents, &cfg); err != nil {
+		glog.Errorf("while trying to parse %s: %v", absDockerConfigFileLocation, err)
+		return nil, err
+	}
 	return
 }
 

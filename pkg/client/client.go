@@ -17,20 +17,11 @@ limitations under the License.
 package client
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -48,37 +39,46 @@ type Interface interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	ListPods(selector labels.Selector) (*api.PodList, error)
-	GetPod(id string) (*api.Pod, error)
-	DeletePod(id string) error
-	CreatePod(*api.Pod) (*api.Pod, error)
-	UpdatePod(*api.Pod) (*api.Pod, error)
+	ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error)
+	GetPod(ctx api.Context, id string) (*api.Pod, error)
+	DeletePod(ctx api.Context, id string) error
+	CreatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error)
+	UpdatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error)
 }
 
 // ReplicationControllerInterface has methods to work with ReplicationController resources.
 type ReplicationControllerInterface interface {
-	ListReplicationControllers(selector labels.Selector) (*api.ReplicationControllerList, error)
-	GetReplicationController(id string) (*api.ReplicationController, error)
-	CreateReplicationController(*api.ReplicationController) (*api.ReplicationController, error)
-	UpdateReplicationController(*api.ReplicationController) (*api.ReplicationController, error)
-	DeleteReplicationController(string) error
-	WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListReplicationControllers(ctx api.Context, selector labels.Selector) (*api.ReplicationControllerList, error)
+	GetReplicationController(ctx api.Context, id string) (*api.ReplicationController, error)
+	CreateReplicationController(ctx api.Context, ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateReplicationController(ctx api.Context, ctrl *api.ReplicationController) (*api.ReplicationController, error)
+	DeleteReplicationController(ctx api.Context, id string) error
+	WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // ServiceInterface has methods to work with Service resources.
 type ServiceInterface interface {
-	ListServices(selector labels.Selector) (*api.ServiceList, error)
-	GetService(id string) (*api.Service, error)
-	CreateService(*api.Service) (*api.Service, error)
-	UpdateService(*api.Service) (*api.Service, error)
-	DeleteService(string) error
-	WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListServices(ctx api.Context, selector labels.Selector) (*api.ServiceList, error)
+	GetService(ctx api.Context, id string) (*api.Service, error)
+	CreateService(ctx api.Context, srv *api.Service) (*api.Service, error)
+	UpdateService(ctx api.Context, srv *api.Service) (*api.Service, error)
+	DeleteService(ctx api.Context, id string) error
+	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // EndpointsInterface has methods to work with Endpoints resources
 type EndpointsInterface interface {
-	ListEndpoints(selector labels.Selector) (*api.EndpointsList, error)
-	WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error)
+	ListEndpoints(ctx api.Context, selector labels.Selector) (*api.EndpointsList, error)
+	GetEndpoints(ctx api.Context, id string) (*api.Endpoints, error)
+	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+}
+
+// EventInterface has methods to work with Event resources
+type EventInterface interface {
+	CreateEvent(event *api.Event) (*api.Event, error)
+	ListEvents(selector labels.Selector) (*api.EventList, error)
+	GetEvent(id string) (*api.Event, error)
+	WatchEvents(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // VersionInterface has a method to retrieve the server version.
@@ -90,235 +90,47 @@ type MinionInterface interface {
 	ListMinions() (*api.MinionList, error)
 }
 
-// Client is the actual implementation of a Kubernetes client.
+// APIStatus is exposed by errors that can be converted to an api.Status object
+// for finer grained details.
+type APIStatus interface {
+	Status() api.Status
+}
+
+// Client is the implementation of a Kubernetes client.
 type Client struct {
 	*RESTClient
 }
 
-// New creates a Kubernetes client. This client works with pods, replication controllers
-// and services. It allows operations such as list, get, update and delete on these objects.
-// host must be a host string, a host:port combo, or an http or https URL.  Passing a prefix
-// to a URL will prepend the server path. The API version to use may be specified or left
-// empty to use the client preferred version. Returns an error if host cannot be converted to
-// a valid URL.
-func New(host, version string, auth *AuthInfo) (*Client, error) {
-	if version == "" {
-		// Clients default to the preferred code API version
-		// TODO: implement version negotation (highest version supported by server)
-		version = latest.Version
-	}
-	serverCodec, _, err := latest.InterfacesFor(version)
-	if err != nil {
-		return nil, fmt.Errorf("API version '%s' is not recognized (valid values: %s)", version, strings.Join(latest.Versions, ", "))
-	}
-	prefix := fmt.Sprintf("/api/%s/", version)
-	restClient, err := NewRESTClient(host, auth, prefix, serverCodec)
-	if err != nil {
-		return nil, fmt.Errorf("API URL '%s' is not valid: %v", host, err)
-	}
-	return &Client{restClient}, nil
-}
-
-// NewOrDie creates a Kubernetes client and panics if the provided host is invalid.
-func NewOrDie(host, version string, auth *AuthInfo) *Client {
-	client, err := New(host, version, auth)
-	if err != nil {
-		panic(err)
-	}
-	return client
-}
-
-// StatusErr might get returned from an api call if your request is still being processed
-// and hence the expected return data is not available yet.
-type StatusErr struct {
-	Status api.Status
-}
-
-func (s *StatusErr) Error() string {
-	return fmt.Sprintf("Status: %v (%#v)", s.Status.Status, s.Status)
-}
-
-// AuthInfo is used to store authorization information.
-type AuthInfo struct {
-	User     string
-	Password string
-	CAFile   string
-	CertFile string
-	KeyFile  string
-}
-
-// RESTClient holds common code used to work with API resources that follow the
-// Kubernetes API pattern.
-// Host is the http://... base for the URL
-type RESTClient struct {
-	host       string
-	prefix     string
-	secure     bool
-	auth       *AuthInfo
-	httpClient *http.Client
-	Sync       bool
-	PollPeriod time.Duration
-	Timeout    time.Duration
-	Codec      runtime.Codec
-}
-
-// NewRESTClient creates a new RESTClient. This client performs generic REST functions
-// such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(host string, auth *AuthInfo, path string, c runtime.Codec) (*RESTClient, error) {
-	prefix, err := normalizePrefix(host, path)
-	if err != nil {
-		return nil, err
-	}
-	base := *prefix
-	base.Path = ""
-	base.RawQuery = ""
-	base.Fragment = ""
-
-	var config *tls.Config
-	if auth != nil && len(auth.CertFile) != 0 {
-		cert, err := tls.LoadX509KeyPair(auth.CertFile, auth.KeyFile)
-		if err != nil {
-			return nil, err
-		}
-		data, err := ioutil.ReadFile(auth.CAFile)
-		if err != nil {
-			return nil, err
-		}
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM(data)
-		config = &tls.Config{
-			Certificates: []tls.Certificate{
-				cert,
-			},
-			RootCAs:    certPool,
-			ClientCAs:  certPool,
-			ClientAuth: tls.RequireAndVerifyClientCert,
-		}
-	} else {
-		config = &tls.Config{
-			InsecureSkipVerify: true,
-		}
-	}
-
-	return &RESTClient{
-		host:   base.String(),
-		prefix: prefix.Path,
-		secure: prefix.Scheme == "https",
-		auth:   auth,
-		httpClient: &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: config,
-			},
-		},
-		Sync:       false,
-		PollPeriod: time.Second * 2,
-		Timeout:    time.Second * 20,
-		Codec:      c,
-	}, nil
-}
-
-// normalizePrefix ensures the passed initial value is valid.
-func normalizePrefix(host, prefix string) (*url.URL, error) {
-	if host == "" {
-		return nil, fmt.Errorf("host must be a URL or a host:port pair")
-	}
-	base := host
-	hostURL, err := url.Parse(base)
-	if err != nil {
-		return nil, err
-	}
-	if hostURL.Scheme == "" {
-		hostURL, err = url.Parse("http://" + base)
-		if err != nil {
-			return nil, err
-		}
-		if hostURL.Path != "" && hostURL.Path != "/" {
-			return nil, fmt.Errorf("host must be a URL or a host:port pair: %s", base)
-		}
-	}
-	hostURL.Path += prefix
-
-	return hostURL, nil
-}
-
-// Secure returns true if the client is configured for secure connections.
-func (c *RESTClient) Secure() bool {
-	return c.secure
-}
-
-// doRequest executes a request, adds authentication (if auth != nil), and HTTPS
-// cert ignoring.
-func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
-	if c.auth != nil {
-		request.SetBasicAuth(c.auth.User, c.auth.Password)
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return body, err
-	}
-
-	// Did the server give us a status response?
-	isStatusResponse := false
-	var status api.Status
-	if err := latest.Codec.DecodeInto(body, &status); err == nil && status.Status != "" {
-		isStatusResponse = true
-	}
-
-	switch {
-	case response.StatusCode == http.StatusConflict:
-		// Return error given by server, if there was one.
-		if isStatusResponse {
-			return nil, &StatusErr{status}
-		}
-		fallthrough
-	case response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent:
-		return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
-	}
-
-	// If the server gave us a status back, look at what it was.
-	if isStatusResponse && status.Status != api.StatusSuccess {
-		// "Working" requests need to be handled specially.
-		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return nil, &StatusErr{status}
-	}
-	return body, err
-}
-
 // ListPods takes a selector, and returns the list of pods that match that selector.
-func (c *Client) ListPods(selector labels.Selector) (result *api.PodList, err error) {
+func (c *Client) ListPods(ctx api.Context, selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
 	err = c.Get().Path("pods").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetPod takes the id of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (c *Client) GetPod(id string) (result *api.Pod, err error) {
+func (c *Client) GetPod(ctx api.Context, id string) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.Get().Path("pods").Path(id).Do().Into(result)
 	return
 }
 
 // DeletePod takes the id of the pod, and returns an error if one occurs
-func (c *Client) DeletePod(id string) error {
+func (c *Client) DeletePod(ctx api.Context, id string) error {
 	return c.Delete().Path("pods").Path(id).Do().Error()
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *Client) CreatePod(pod *api.Pod) (result *api.Pod, err error) {
+func (c *Client) CreatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.Post().Path("pods").Body(pod).Do().Into(result)
 	return
 }
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *Client) UpdatePod(pod *api.Pod) (result *api.Pod, err error) {
+func (c *Client) UpdatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
-	if pod.ResourceVersion == 0 {
+	if len(pod.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
 		return
 	}
@@ -327,30 +139,30 @@ func (c *Client) UpdatePod(pod *api.Pod) (result *api.Pod, err error) {
 }
 
 // ListReplicationControllers takes a selector, and returns the list of replication controllers that match that selector.
-func (c *Client) ListReplicationControllers(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
+func (c *Client) ListReplicationControllers(ctx api.Context, selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.Get().Path("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetReplicationController returns information about a particular replication controller.
-func (c *Client) GetReplicationController(id string) (result *api.ReplicationController, err error) {
+func (c *Client) GetReplicationController(ctx api.Context, id string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.Get().Path("replicationControllers").Path(id).Do().Into(result)
 	return
 }
 
 // CreateReplicationController creates a new replication controller.
-func (c *Client) CreateReplicationController(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+func (c *Client) CreateReplicationController(ctx api.Context, controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.Post().Path("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
 // UpdateReplicationController updates an existing replication controller.
-func (c *Client) UpdateReplicationController(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+func (c *Client) UpdateReplicationController(ctx api.Context, controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	if controller.ResourceVersion == 0 {
+	if len(controller.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
 		return
 	}
@@ -359,46 +171,46 @@ func (c *Client) UpdateReplicationController(controller *api.ReplicationControll
 }
 
 // DeleteReplicationController deletes an existing replication controller.
-func (c *Client) DeleteReplicationController(id string) error {
+func (c *Client) DeleteReplicationController(ctx api.Context, id string) error {
 	return c.Delete().Path("replicationControllers").Path(id).Do().Error()
 }
 
 // WatchReplicationControllers returns a watch.Interface that watches the requested controllers.
-func (c *Client) WatchReplicationControllers(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchReplicationControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("replicationControllers").
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
 }
 
 // ListServices takes a selector, and returns the list of services that match that selector
-func (c *Client) ListServices(selector labels.Selector) (result *api.ServiceList, err error) {
+func (c *Client) ListServices(ctx api.Context, selector labels.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.Get().Path("services").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetService returns information about a particular service.
-func (c *Client) GetService(id string) (result *api.Service, err error) {
+func (c *Client) GetService(ctx api.Context, id string) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.Get().Path("services").Path(id).Do().Into(result)
 	return
 }
 
 // CreateService creates a new service.
-func (c *Client) CreateService(svc *api.Service) (result *api.Service, err error) {
+func (c *Client) CreateService(ctx api.Context, svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.Post().Path("services").Body(svc).Do().Into(result)
 	return
 }
 
 // UpdateService updates an existing service.
-func (c *Client) UpdateService(svc *api.Service) (result *api.Service, err error) {
+func (c *Client) UpdateService(ctx api.Context, svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	if svc.ResourceVersion == 0 {
+	if len(svc.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
@@ -407,37 +219,64 @@ func (c *Client) UpdateService(svc *api.Service) (result *api.Service, err error
 }
 
 // DeleteService deletes an existing service.
-func (c *Client) DeleteService(id string) error {
+func (c *Client) DeleteService(ctx api.Context, id string) error {
 	return c.Delete().Path("services").Path(id).Do().Error()
 }
 
 // WatchServices returns a watch.Interface that watches the requested services.
-func (c *Client) WatchServices(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("services").
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
 }
 
 // ListEndpoints takes a selector, and returns the list of endpoints that match that selector
-func (c *Client) ListEndpoints(selector labels.Selector) (result *api.EndpointsList, err error) {
+func (c *Client) ListEndpoints(ctx api.Context, selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.Get().Path("endpoints").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
+// GetEndpoints returns information about the endpoints for a particular service.
+func (c *Client) GetEndpoints(ctx api.Context, id string) (result *api.Endpoints, err error) {
+	result = &api.Endpoints{}
+	err = c.Get().Path("endpoints").Path(id).Do().Into(result)
+	return
+}
+
 // WatchEndpoints returns a watch.Interface that watches the requested endpoints for a service.
-func (c *Client) WatchEndpoints(label, field labels.Selector, resourceVersion uint64) (watch.Interface, error) {
+func (c *Client) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.Get().
 		Path("watch").
 		Path("endpoints").
-		UintParam("resourceVersion", resourceVersion).
+		Param("resourceVersion", resourceVersion).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
+}
+
+func (c *Client) CreateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
+	result := &api.Endpoints{}
+	err := c.Post().Path("endpoints").Body(endpoints).Do().Into(result)
+	return result, err
+}
+
+func (c *Client) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
+	result := &api.Endpoints{}
+	if len(endpoints.ResourceVersion) == 0 {
+		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)
+	}
+	err := c.Put().
+		Path("endpoints").
+		Path(endpoints.ID).
+		Body(endpoints).
+		Do().
+		Into(result)
+	return result, err
 }
 
 // ServerVersion retrieves and parses the server's version.
@@ -459,4 +298,47 @@ func (c *Client) ListMinions() (result *api.MinionList, err error) {
 	result = &api.MinionList{}
 	err = c.Get().Path("minions").Do().Into(result)
 	return
+}
+
+func (c *Client) GetMinion(id string) (result *api.Minion, err error) {
+	result = &api.Minion{}
+	err = c.Get().Path("minions").Path(id).Do().Into(result)
+	return
+}
+
+// CreateEvent makes a new event. Returns the copy of the event the server returns, or an error.
+func (c *Client) CreateEvent(event *api.Event) (*api.Event, error) {
+	result := &api.Event{}
+	err := c.Post().Path("events").Body(event).Do().Into(result)
+	return result, err
+}
+
+// ListEvents returns a list of events matching the selectors.
+func (c *Client) ListEvents(label, field labels.Selector) (*api.EventList, error) {
+	result := &api.EventList{}
+	err := c.Get().
+		Path("events").
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Do().
+		Into(result)
+	return result, err
+}
+
+// GetEvent returns the given event, or an error.
+func (c *Client) GetEvent(id string) (*api.Event, error) {
+	result := &api.Event{}
+	err := c.Get().Path("events").Path(id).Do().Into(result)
+	return result, err
+}
+
+// WatchEvents starts watching for events matching the given selectors.
+func (c *Client) WatchEvents(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.Get().
+		Path("watch").
+		Path("events").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
 }

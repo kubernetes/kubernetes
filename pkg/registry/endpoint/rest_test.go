@@ -29,12 +29,13 @@ import (
 func TestGetEndpoints(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
-			JSONBase:  api.JSONBase{ID: "foo"},
+			TypeMeta:  api.TypeMeta{ID: "foo"},
 			Endpoints: []string{"127.0.0.1:9000"},
 		},
 	}
 	storage := NewREST(registry)
-	obj, err := storage.Get("foo")
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -48,9 +49,9 @@ func TestGetEndpointsMissingService(t *testing.T) {
 		Err: errors.NewNotFound("service", "foo"),
 	}
 	storage := NewREST(registry)
-
+	ctx := api.NewContext()
 	// returns service not found
-	_, err := storage.Get("foo")
+	_, err := storage.Get(ctx, "foo")
 	if !errors.IsNotFound(err) || !reflect.DeepEqual(err, errors.NewNotFound("service", "foo")) {
 		t.Errorf("expected NotFound error, got %#v", err)
 	}
@@ -58,9 +59,9 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	// returns empty endpoints
 	registry.Err = nil
 	registry.Service = &api.Service{
-		JSONBase: api.JSONBase{ID: "foo"},
+		TypeMeta: api.TypeMeta{ID: "foo"},
 	}
-	obj, err := storage.Get("foo")
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,13 +74,14 @@ func TestEndpointsRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	storage := NewREST(registry)
 	registry.EndpointsList = api.EndpointsList{
-		JSONBase: api.JSONBase{ResourceVersion: 1},
+		TypeMeta: api.TypeMeta{ResourceVersion: "1"},
 		Items: []api.Endpoints{
-			{JSONBase: api.JSONBase{ID: "foo"}},
-			{JSONBase: api.JSONBase{ID: "bar"}},
+			{TypeMeta: api.TypeMeta{ID: "foo"}},
+			{TypeMeta: api.TypeMeta{ID: "bar"}},
 		},
 	}
-	s, _ := storage.List(labels.Everything(), labels.Everything())
+	ctx := api.NewContext()
+	s, _ := storage.List(ctx, labels.Everything(), labels.Everything())
 	sl := s.(*api.EndpointsList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))
@@ -90,7 +92,7 @@ func TestEndpointsRegistryList(t *testing.T) {
 	if e, a := "bar", sl.Items[1].ID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
-	if sl.ResourceVersion != 1 {
+	if sl.ResourceVersion != "1" {
 		t.Errorf("Unexpected resource version: %#v", sl)
 	}
 }

@@ -19,68 +19,112 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x
 
-source "${KUBE_REPO_ROOT}/cluster/kube-env.sh"
-source "${KUBE_REPO_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 
 CONTROLLER_NAME=update-demo
 
 function validate() {
-  NUM_REPLICAS=$1
-  CONTAINER_IMAGE_VERSION=$2
-  POD_ID_LIST=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=${CONTROLLER_NAME} list pods)
+  local num_replicas=$1
+  local container_image_version=$2
+
   # Container turn up on a clean cluster can take a while for the docker image pull.
-  ALL_RUNNING=0
-  while [ $ALL_RUNNING -ne 1 ]; do
-    echo "Waiting for all containers in pod to come up."
-    sleep 5
-    ALL_RUNNING=1
-    for id in $POD_ID_LIST; do
-      TEMPLATE_STRING="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
-      CURRENT_STATUS=$($KUBECFG -template "${TEMPLATE_STRING}" get pods/$id)
-      if [ "$CURRENT_STATUS" != "true" ]; then
-        ALL_RUNNING=0
-      else
-        CURRENT_IMAGE=$($KUBECFG -template "{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Config.Image}}" get pods/$id)
-        if [ "$CURRENT_IMAGE" != "${DOCKER_HUB_USER}/update-demo:${CONTAINER_IMAGE_VERSION}" ]; then
-          ALL_RUNNING=0
+  local num_running=0
+  while [[ $num_running -ne $num_replicas ]]; do
+    echo "Waiting for all containers in pod to come up. Currently: ${num_running}/${num_replicas}"
+    sleep 2
+
+    local pod_id_list
+    pod_id_list=($($KUBECFG -template='{{range.Items}}{{.ID}} {{end}}' -l simpleService="${CONTROLLER_NAME}" list pods))
+
+    echo "  ${#pod_id_list[@]} out of ${num_replicas} created"
+
+    local id
+    num_running=0
+    for id in "${pod_id_list[@]+${pod_id_list[@]}}"; do
+      local template_string current_status current_image host_ip
+
+      # NB: This template string is a little subtle.
+      #
+      # Notes:
+      #
+      # The 'and' operator will return blank if any of the inputs are non-
+      # nil/false.  If they are all set, then it'll return the last one.
+      #
+      # The container is name has a dash in it and so we can't use the simple
+      # syntax.  Instead we need to quote that and use the 'index' operator.
+      #
+      # The value here is a structure with just a Time member.  This is
+      # currently always set to a zero time.
+      #
+      # You can read about the syntax here: http://golang.org/pkg/text/template/
+      template_string="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
+      current_status=$($KUBECFG -template="${template_string}" get "pods/$id") || {
+        if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
+          echo "  $id no longer exists"
+          continue
+        else
+          echo "  kubecfg failed with error:"
+          echo $current_status
+          exit -1
         fi
+      }
+
+      if [[ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]]; then
+        echo "  $id is created but not running"
+        continue
       fi
+
+      template_string="{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Image}}"
+      current_image=$($KUBECFG -template="${template_string}" get "pods/$id")
+      if [[ "$current_image" != "${DOCKER_HUB_USER}/update-demo:${container_image_version}" ]]; then
+        echo "  ${id} is created but running wrong image"
+        continue
+      fi
+
+
+      host_ip=$($KUBECFG -template='{{.CurrentState.HostIP}}' get pods/$id)
+      curl -s --max-time 5 --fail http://${host_ip}:8080/data.json \
+          | grep -q ${container_image_version} || {
+        echo "  ${id} is running the right image but curl to contents failed or returned wrong info"
+        continue
+
+      }
+
+      echo "  ${id} is verified up and running"
+
+      ((num_running++)) || true
     done
   done
-
-  ids=($POD_ID_LIST)
-  if [ ${#ids[@]} -ne $NUM_REPLICAS ]; then
-    echo "Unexpected number of pods: ${#ids[@]}.  Expected $NUM_REPLICAS"
-    exit 1
-  fi
+  return 0
 }
 
 export DOCKER_HUB_USER=jbeda
 
 # Launch a container
-${KUBE_REPO_ROOT}/examples/update-demo/2-create-replication-controller.sh
+${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh
 
 function teardown() {
   echo "Cleaning up test artifacts"
-  ${KUBE_REPO_ROOT}/examples/update-demo/5-down.sh
+  ${KUBE_ROOT}/examples/update-demo/5-down.sh
 }
 
 trap "teardown" EXIT
 
 validate 2 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/3-scale.sh 1
+${KUBE_ROOT}/examples/update-demo/3-scale.sh 1
 sleep 2
 validate 1 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/3-scale.sh 2
+${KUBE_ROOT}/examples/update-demo/3-scale.sh 2
 sleep 2
 validate 2 nautilus
 
-${KUBE_REPO_ROOT}/examples/update-demo/4-rolling-update.sh kitten 1s
+${KUBE_ROOT}/examples/update-demo/4-rolling-update.sh kitten 1s
 sleep 2
 validate 2 kitten
 
