@@ -42,7 +42,9 @@ func init() {
 		&ServerOpList{},
 		&Event{},
 		&EventList{},
+		&ContainerManifest{},
 		&ContainerManifestList{},
+		&BoundPod{},
 		&BoundPods{},
 	)
 }
@@ -63,5 +65,7 @@ func (*ServerOp) IsAnAPIObject()                  {}
 func (*ServerOpList) IsAnAPIObject()              {}
 func (*Event) IsAnAPIObject()                     {}
 func (*EventList) IsAnAPIObject()                 {}
+func (*ContainerManifest) IsAnAPIObject()         {}
 func (*ContainerManifestList) IsAnAPIObject()     {}
+func (*BoundPod) IsAnAPIObject()                  {}
 func (*BoundPods) IsAnAPIObject()                 {}

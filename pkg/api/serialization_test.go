@@ -170,6 +170,10 @@ func TestTypes(t *testing.T) {
 				t.Errorf("Couldn't make a %v? %v", kind, err)
 				continue
 			}
+			if _, err := runtime.FindTypeMeta(item); err != nil {
+				t.Logf("%s is not a TypeMeta and cannot be round tripped: %v", kind, err)
+				continue
+			}
 			runTest(t, v1beta1.Codec, item)
 			runTest(t, v1beta2.Codec, item)
 			runTest(t, api.Codec, item)

@@ -22,10 +22,10 @@ import (
 
 // PortsConflict returns true iff two containers attempt to expose
 // the same host port.
-func PortsConflict(manifests []api.ContainerManifest) bool {
+func PortsConflict(pods []api.BoundPod) bool {
 	hostPorts := map[int]struct{}{}
-	for _, manifest := range manifests {
-		for _, container := range manifest.Containers {
+	for _, pod := range pods {
+		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.HostPort == 0 {
 					continue

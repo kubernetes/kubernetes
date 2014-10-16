@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -33,7 +34,7 @@ import (
 )
 
 func EtcdKeyForHost(hostname string) string {
-	return path.Join("/", "registry", "hosts", hostname, "kubelet")
+	return path.Join("/", "registry", "nodes", hostname, "boundpods")
 }
 
 type SourceEtcd struct {
@@ -86,26 +87,27 @@ func (s *SourceEtcd) run() {
 
 // eventToPods takes a watch.Event object, and turns it into a structured list of pods.
 // It returns a list of containers, or an error if one occurs.
-func eventToPods(ev watch.Event) ([]kubelet.Pod, error) {
-	pods := []kubelet.Pod{}
-	manifests, ok := ev.Object.(*api.ContainerManifestList)
+func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
+	pods := []api.BoundPod{}
+	boundPods, ok := ev.Object.(*api.BoundPods)
 	if !ok {
-		return pods, errors.New("unable to parse response as ContainerManifestList")
+		return pods, errors.New("unable to parse response as BoundPods")
 	}
 
-	for i, manifest := range manifests.Items {
-		name := manifest.ID
-		if name == "" {
-			name = fmt.Sprintf("%d", i+1)
+	for i, pod := range boundPods.Items {
+		if len(pod.ID) == 0 {
+			pod.ID = fmt.Sprintf("%d", i+1)
 		}
-		pods = append(pods, kubelet.Pod{
-			Name:     name,
-			Manifest: manifest})
+		// TODO: generate random UID if not present
+		if pod.UID == "" && !pod.CreationTimestamp.IsZero() {
+			pod.UID = strconv.FormatInt(pod.CreationTimestamp.Unix(), 10)
+		}
+		// Backwards compatibility with old api servers
+		if len(pod.Namespace) == 0 {
+			pod.Namespace = api.NamespaceDefault
+		}
+		pods = append(pods, pod)
 	}
 
 	return pods, nil
-}
-
-func makeContainerKey(machine string) string {
-	return "/registry/hosts/" + machine + "/kubelet"
 }

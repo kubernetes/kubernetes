@@ -101,7 +101,23 @@ func readResp(resp *http.Response) (string, error) {
 func TestContainer(t *testing.T) {
 	fw := newServerTest()
 	expected := []api.ContainerManifest{
-		{ID: "test_manifest"},
+		{
+			ID:   "test_manifest",
+			UUID: "value",
+			Containers: []api.Container{
+				{
+					Name: "container",
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "test",
+				},
+			},
+			RestartPolicy: api.RestartPolicy{
+				Never: &api.RestartPolicyNever{},
+			},
+		},
 	}
 	body := bytes.NewBuffer([]byte(util.EncodeJSON(expected[0]))) // Only send a single ContainerManifest
 	resp, err := http.Post(fw.testHTTPServer.URL+"/container", "application/json", body)
@@ -114,7 +130,29 @@ func TestContainer(t *testing.T) {
 	if len(received) != 1 {
 		t.Errorf("Expected 1 manifest, but got %v", len(received))
 	}
-	expectedPods := []Pod{{Name: "1", Manifest: expected[0]}}
+	expectedPods := []api.BoundPod{
+		{
+			TypeMeta: api.TypeMeta{
+				ID:  "test_manifest",
+				UID: "value",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "container",
+					},
+				},
+				Volumes: []api.Volume{
+					{
+						Name: "test",
+					},
+				},
+				RestartPolicy: api.RestartPolicy{
+					Never: &api.RestartPolicyNever{},
+				},
+			},
+		},
+	}
 	if !reflect.DeepEqual(expectedPods, received[0]) {
 		t.Errorf("Expected %#v, but got %#v", expectedPods, received[0])
 	}
@@ -123,8 +161,38 @@ func TestContainer(t *testing.T) {
 func TestContainers(t *testing.T) {
 	fw := newServerTest()
 	expected := []api.ContainerManifest{
-		{ID: "test_manifest_1"},
-		{ID: "test_manifest_2"},
+		{
+			ID: "test_manifest_1",
+			Containers: []api.Container{
+				{
+					Name: "container",
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "test",
+				},
+			},
+			RestartPolicy: api.RestartPolicy{
+				Never: &api.RestartPolicyNever{},
+			},
+		},
+		{
+			ID: "test_manifest_2",
+			Containers: []api.Container{
+				{
+					Name: "container2",
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "test2",
+				},
+			},
+			RestartPolicy: api.RestartPolicy{
+				Never: &api.RestartPolicyNever{},
+			},
+		},
 	}
 	body := bytes.NewBuffer([]byte(util.EncodeJSON(expected)))
 	resp, err := http.Post(fw.testHTTPServer.URL+"/containers", "application/json", body)
@@ -137,7 +205,48 @@ func TestContainers(t *testing.T) {
 	if len(received) != 1 {
 		t.Errorf("Expected 1 update, but got %v", len(received))
 	}
-	expectedPods := []Pod{{Name: "1", Manifest: expected[0]}, {Name: "2", Manifest: expected[1]}}
+	expectedPods := []api.BoundPod{
+		{
+			TypeMeta: api.TypeMeta{
+				ID: "1",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "container",
+					},
+				},
+				Volumes: []api.Volume{
+					{
+						Name: "test",
+					},
+				},
+				RestartPolicy: api.RestartPolicy{
+					Never: &api.RestartPolicyNever{},
+				},
+			},
+		},
+		{
+			TypeMeta: api.TypeMeta{
+				ID: "2",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "container2",
+					},
+				},
+				Volumes: []api.Volume{
+					{
+						Name: "test2",
+					},
+				},
+				RestartPolicy: api.RestartPolicy{
+					Never: &api.RestartPolicyNever{},
+				},
+			},
+		},
+	}
 	if !reflect.DeepEqual(expectedPods, received[0]) {
 		t.Errorf("Expected %#v, but got %#v", expectedPods, received[0])
 	}
@@ -149,7 +258,7 @@ func TestPodInfo(t *testing.T) {
 		"goodpod": api.ContainerStatus{},
 	}
 	fw.fakeKubelet.infoFunc = func(name string) (api.PodInfo, error) {
-		if name == "goodpod.etcd" {
+		if name == "goodpod.default.etcd" {
 			return expected, nil
 		}
 		return nil, fmt.Errorf("bad pod %s", name)
@@ -175,7 +284,7 @@ func TestContainerInfo(t *testing.T) {
 	fw := newServerTest()
 	expectedInfo := &info.ContainerInfo{}
 	podID := "somepod"
-	expectedPodID := "somepod" + ".etcd"
+	expectedPodID := "somepod" + ".default.etcd"
 	expectedContainerName := "goodcontainer"
 	fw.fakeKubelet.containerInfoFunc = func(podID, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
 		if podID != expectedPodID || containerName != expectedContainerName {
@@ -278,7 +387,7 @@ func TestServeRunInContainer(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
 	podName := "foo"
-	expectedPodName := podName + ".etcd"
+	expectedPodName := podName + ".default.etcd"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
 	fw.fakeKubelet.runFunc = func(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {
@@ -317,7 +426,7 @@ func TestServeRunInContainerWithUUID(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
 	podName := "foo"
-	expectedPodName := podName + ".etcd"
+	expectedPodName := podName + ".default.etcd"
 	expectedUuid := "7e00838d_-_3523_-_11e4_-_8421_-_42010af0a720"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
@@ -360,7 +469,7 @@ func TestContainerLogs(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
 	podName := "foo"
-	expectedPodName := podName + ".etcd"
+	expectedPodName := podName + ".default.etcd"
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := false
@@ -399,7 +508,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
 	podName := "foo"
-	expectedPodName := podName + ".etcd"
+	expectedPodName := podName + ".default.etcd"
 	expectedContainerName := "baz"
 	expectedTail := "5"
 	expectedFollow := false
@@ -438,7 +547,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
 	podName := "foo"
-	expectedPodName := podName + ".etcd"
+	expectedPodName := podName + ".default.etcd"
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := true

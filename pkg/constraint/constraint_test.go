@@ -30,27 +30,27 @@ func containerWithHostPorts(ports ...int) api.Container {
 	return c
 }
 
-func manifestWithContainers(containers ...api.Container) api.ContainerManifest {
-	m := api.ContainerManifest{}
+func podWithContainers(containers ...api.Container) api.BoundPod {
+	m := api.BoundPod{}
 	for _, c := range containers {
-		m.Containers = append(m.Containers, c)
+		m.Spec.Containers = append(m.Spec.Containers, c)
 	}
 	return m
 }
 
 func TestAllowed(t *testing.T) {
 	table := []struct {
-		allowed   bool
-		manifests []api.ContainerManifest
+		allowed bool
+		pods    []api.BoundPod
 	}{
 		{
 			allowed: true,
-			manifests: []api.ContainerManifest{
-				manifestWithContainers(
+			pods: []api.BoundPod{
+				podWithContainers(
 					containerWithHostPorts(1, 2, 3),
 					containerWithHostPorts(4, 5, 6),
 				),
-				manifestWithContainers(
+				podWithContainers(
 					containerWithHostPorts(7, 8, 9),
 					containerWithHostPorts(10, 11, 12),
 				),
@@ -58,12 +58,12 @@ func TestAllowed(t *testing.T) {
 		},
 		{
 			allowed: true,
-			manifests: []api.ContainerManifest{
-				manifestWithContainers(
+			pods: []api.BoundPod{
+				podWithContainers(
 					containerWithHostPorts(0, 0),
 					containerWithHostPorts(0, 0),
 				),
-				manifestWithContainers(
+				podWithContainers(
 					containerWithHostPorts(0, 0),
 					containerWithHostPorts(0, 0),
 				),
@@ -71,19 +71,19 @@ func TestAllowed(t *testing.T) {
 		},
 		{
 			allowed: false,
-			manifests: []api.ContainerManifest{
-				manifestWithContainers(
+			pods: []api.BoundPod{
+				podWithContainers(
 					containerWithHostPorts(3, 3),
 				),
 			},
 		},
 		{
 			allowed: false,
-			manifests: []api.ContainerManifest{
-				manifestWithContainers(
+			pods: []api.BoundPod{
+				podWithContainers(
 					containerWithHostPorts(6),
 				),
-				manifestWithContainers(
+				podWithContainers(
 					containerWithHostPorts(6),
 				),
 			},
@@ -91,8 +91,8 @@ func TestAllowed(t *testing.T) {
 	}
 
 	for _, item := range table {
-		if e, a := item.allowed, Allowed(item.manifests); e != a {
-			t.Errorf("Expected %v, got %v: \n%v\v", e, a, item.manifests)
+		if e, a := item.allowed, Allowed(item.pods); e != a {
+			t.Errorf("Expected %v, got %v: \n%v\v", e, a, item.pods)
 		}
 	}
 }

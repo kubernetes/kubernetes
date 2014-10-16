@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -122,11 +123,12 @@ func TestExtractFromHTTP(t *testing.T) {
 			desc:      "Single manifest",
 			manifests: api.ContainerManifest{Version: "v1beta1", ID: "foo"},
 			expected: CreatePodUpdate(kubelet.SET,
-				kubelet.Pod{
-					Name: "foo",
-					Manifest: api.ContainerManifest{
-						Version:       "v1beta1",
-						ID:            "foo",
+				api.BoundPod{
+					TypeMeta: api.TypeMeta{
+						ID:        "foo",
+						Namespace: "default",
+					},
+					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicy{Always: &api.RestartPolicyAlways{}},
 					},
 				}),
@@ -138,13 +140,19 @@ func TestExtractFromHTTP(t *testing.T) {
 				{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
 			},
 			expected: CreatePodUpdate(kubelet.SET,
-				kubelet.Pod{
-					Name:     "1",
-					Manifest: api.ContainerManifest{Version: "v1beta1", ID: "", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				api.BoundPod{
+					TypeMeta: api.TypeMeta{
+						ID:        "1",
+						Namespace: "default",
+					},
+					Spec: api.PodSpec{Containers: []api.Container{{Name: "1", Image: "foo"}}},
 				},
-				kubelet.Pod{
-					Name:     "bar",
-					Manifest: api.ContainerManifest{Version: "v1beta1", ID: "bar", Containers: []api.Container{{Name: "1", Image: "foo"}}},
+				api.BoundPod{
+					TypeMeta: api.TypeMeta{
+						ID:        "bar",
+						Namespace: "default",
+					},
+					Spec: api.PodSpec{Containers: []api.Container{{Name: "1", Image: "foo"}}},
 				}),
 		},
 		{
@@ -167,13 +175,14 @@ func TestExtractFromHTTP(t *testing.T) {
 		c := SourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
+			continue
 		}
 		update := (<-ch).(kubelet.PodUpdate)
 		if !reflect.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
 		for i := range update.Pods {
-			if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+			if errs := validation.ValidateBoundPod(&update.Pods[i]); len(errs) != 0 {
 				t.Errorf("%s: Expected no validation errors on %#v, Got %#v", testCase.desc, update.Pods[i], errs)
 			}
 		}

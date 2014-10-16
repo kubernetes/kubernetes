@@ -26,9 +26,56 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+
 	"gopkg.in/v1/yaml"
 )
+
+func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
+	manifest := api.ContainerManifest{
+		ID:   id,
+		UUID: "uid",
+		Containers: []api.Container{
+			{
+				Name:  "c" + id,
+				Image: "foo",
+			},
+		},
+		Volumes: []api.Volume{
+			{
+				Name: "host-dir",
+				Source: &api.VolumeSource{
+					HostDir: &api.HostDir{"/dir/path"},
+				},
+			},
+		},
+	}
+	expectedPod := api.BoundPod{
+		TypeMeta: api.TypeMeta{
+			ID:        id,
+			UID:       "uid",
+			Namespace: "default",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "c" + id,
+					Image: "foo",
+				},
+			},
+			Volumes: []api.Volume{
+				{
+					Name: "host-dir",
+					Source: &api.VolumeSource{
+						HostDir: &api.HostDir{"/dir/path"},
+					},
+				},
+			},
+		},
+	}
+	return manifest, expectedPod
+}
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
@@ -70,16 +117,18 @@ func TestReadFromFile(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{
-			Name: "test",
-			Manifest: api.ContainerManifest{
-				ID:         "test",
-				Version:    "v1beta1",
+		expected := CreatePodUpdate(kubelet.SET, api.BoundPod{
+			TypeMeta: api.TypeMeta{
+				ID:        simpleSubdomainSafeHash(file.Name()),
+				UID:       simpleSubdomainSafeHash(file.Name()),
+				Namespace: "default",
+			},
+			Spec: api.PodSpec{
 				Containers: []api.Container{{Image: "test/image"}},
 			},
 		})
 		if !reflect.DeepEqual(expected, update) {
-			t.Errorf("Expected %#v, Got %#v", expected, update)
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
 	case <-time.After(2 * time.Millisecond):
@@ -95,29 +144,31 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	c := SourceFile{file.Name(), ch}
 	err := c.extractFromPath()
 	if err == nil {
-		t.Errorf("Expected error")
+		t.Fatalf("Expected error")
 	}
 	expectEmptyChannel(t, ch)
 }
 
 func TestExtractFromValidDataFile(t *testing.T) {
-	manifest := api.ContainerManifest{ID: ""}
+	manifest, expectedPod := ExampleManifestAndPod("id")
 
 	text, err := json.Marshal(manifest)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
 	defer os.Remove(file.Name())
+
+	expectedPod.ID = simpleSubdomainSafeHash(file.Name())
 
 	ch := make(chan interface{}, 1)
 	c := SourceFile{file.Name(), ch}
 	err = c.extractFromPath()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.Pod{Name: simpleSubdomainSafeHash(file.Name()), Manifest: manifest})
+	expected := CreatePodUpdate(kubelet.SET, expectedPod)
 	if !reflect.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
@@ -126,7 +177,7 @@ func TestExtractFromValidDataFile(t *testing.T) {
 func TestExtractFromEmptyDir(t *testing.T) {
 	dirName, err := ioutil.TempDir("", "foo")
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	defer os.RemoveAll(dirName)
 
@@ -134,7 +185,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	c := SourceFile{dirName, ch}
 	err = c.extractFromPath()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	update := (<-ch).(kubelet.PodUpdate)
@@ -145,54 +196,55 @@ func TestExtractFromEmptyDir(t *testing.T) {
 }
 
 func TestExtractFromDir(t *testing.T) {
-	manifests := []api.ContainerManifest{
-		{Version: "v1beta1", Containers: []api.Container{{Name: "1", Image: "foo"}}},
-		{Version: "v1beta1", Containers: []api.Container{{Name: "2", Image: "bar"}}},
-	}
+	manifest, expectedPod := ExampleManifestAndPod("1")
+	manifest2, expectedPod2 := ExampleManifestAndPod("2")
+
+	manifests := []api.ContainerManifest{manifest, manifest2}
+	pods := []api.BoundPod{expectedPod, expectedPod2}
 	files := make([]*os.File, len(manifests))
 
 	dirName, err := ioutil.TempDir("", "foo")
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	for i, manifest := range manifests {
 		data, err := json.Marshal(manifest)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
+			continue
 		}
 		file, err := ioutil.TempFile(dirName, manifest.ID)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
+			continue
 		}
 		name := file.Name()
 		if err := file.Close(); err != nil {
 			t.Errorf("Unexpected error: %v", err)
+			continue
 		}
 		ioutil.WriteFile(name, data, 0755)
 		files[i] = file
+		pods[i].ID = simpleSubdomainSafeHash(name)
 	}
 
 	ch := make(chan interface{}, 1)
 	c := SourceFile{dirName, ch}
 	err = c.extractFromPath()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(
-		kubelet.SET,
-		kubelet.Pod{Name: simpleSubdomainSafeHash(files[0].Name()), Manifest: manifests[0]},
-		kubelet.Pod{Name: simpleSubdomainSafeHash(files[1].Name()), Manifest: manifests[1]},
-	)
+	expected := CreatePodUpdate(kubelet.SET, pods...)
 	sort.Sort(sortedPods(update.Pods))
 	sort.Sort(sortedPods(expected.Pods))
 	if !reflect.DeepEqual(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
+		t.Fatalf("Expected %#v, Got %#v", expected, update)
 	}
 	for i := range update.Pods {
-		if errs := kubelet.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+		if errs := validation.ValidateBoundPod(&update.Pods[i]); len(errs) != 0 {
 			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
 		}
 	}
