@@ -111,6 +111,7 @@
 			"ImportPath": "github.com/skratchdot/open-golang/open",
 			"Rev": "ba570a111973b539baf23c918213059543b5bb6e"
 		},
+		{
 			"ImportPath": "github.com/spf13/cobra",
 			"Rev": "b1e90a7943957b51bb96a13b44b844475bcf95c0"
 		},
