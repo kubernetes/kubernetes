@@ -70,7 +70,7 @@ if [[ ${LEAVE_UP} -ne 1 ]]; then
 fi
 
 TEST_PATTERN="${TEST_PATTERN:-}"
-any_failed=0
+failed=()
 for test_file in $(ls "${KUBE_ROOT}/hack/e2e-suite/"); do
   if [[ "${TEST_PATTERN}" != "" ]]; then
     check=".*${TEST_PATTERN}.*"
@@ -81,21 +81,21 @@ for test_file in $(ls "${KUBE_ROOT}/hack/e2e-suite/"); do
   fi
 
   echo "running $test_file"
-  "${KUBE_ROOT}/hack/e2e-suite/${test_file}"
-  result="$?"
+  result=0
+  "${KUBE_ROOT}/hack/e2e-suite/${test_file}" || result="$?"
   if [[ "${result}" -eq "0" ]]; then
     echo "${test_file} returned ${result}; passed!"
   else
     echo "${test_file} returned ${result}; FAIL!"
-    any_failed=$((any_failed+1))
+    failed+=(${test_file})
   fi
 done
 
 echo
-if [[ ${any_failed} -eq 0 ]]; then
+if [[ "${#failed[*]}" -eq 0 ]]; then
   echo "Final: All tests passed."
 else
-  echo "Final: ${any_failed} tests failed."
+  echo "Final: ${#failed[@]} tests failed: ${failed[@]}."
 fi
 
-exit ${any_failed}
+exit "${#failed[@]}"
