@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"errors"
 	"fmt"
 
 	"gopkg.in/v1/yaml"
@@ -73,6 +74,12 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 // If obj's version doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
 func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
+	if len(data) == 0 {
+		// This is valid YAML, but it's a bad idea not to return an error
+		// for an empty string-- that's almost certainly not what the caller
+		// was expecting.
+		return errors.New("empty input")
+	}
 	dataVersion, dataKind, err := s.DataVersionAndKind(data)
 	if err != nil {
 		return err

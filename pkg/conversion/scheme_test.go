@@ -290,6 +290,9 @@ func TestBadJSONRejection(t *testing.T) {
 	if err := s.DecodeInto(badJSONKindMismatch, &TestType1{}); err == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}
+	if err := s.DecodeInto([]byte(``), &TestType1{}); err == nil {
+		t.Errorf("Did not give error for empty data")
+	}
 }
 
 func TestBadJSONRejectionForSetInternalVersion(t *testing.T) {
