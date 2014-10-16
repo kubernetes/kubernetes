@@ -1,26 +1,12 @@
-Logging Conventions
-===================
+# Logging
 
-The following conventions for the glog levels to use.  glog is globally prefered to "log" for better runtime control.
+## Logging by Kubernetes Components
+Kubernetes components, such as kubelet and apiserver, use the [glog](https://godoc.org/github.com/golang/glog) logging library.  Developer conventions for logging severity are described in [devel/logging.md](devel/logging.md).
 
-* glog.Errorf() - Always an error
-* glog.Warningf() - Something unexpected, but probably not an error
-* glog.Infof() has multiple levels:
-  * glog.V(0) - Generally useful for this to ALWAYS be visible to an operator
-    * Programmer errors
-    * Logging extra info about a panic
-    * CLI argument handling
-  * glog.V(1) - A reasonable default log level if you don't want verbosity.
-    * Information about config (listening on X, watching Y)
-    * Errors that repeat frequently that relate to conditions that can be corrected (pod detected as unhealthy)
-  * glog.V(2) - Useful steady state information about the service and important log messages that may correlate to significant changes in the system.  This is the recommended default log level for most systems.
-    * Logging HTTP requests and their exit code
-    * System state changing (killing pod)
-    * Controller state change events (starting pods)
-    * Scheduler log messages
-  * glog.V(3) - Extended information about changes
-    * More info about system state changes
-  * glog.V(4) - Debug level verbosity (for now)
-    * Logging in particularly thorny parts of code where you may want to come back later and check it
+## Logging in Containers
+There are no Kubernetes-specific requirements for logging from within containers.  A
+[search](https://www.google.com/?q=docker+container+logging) will turn up any number of articles about logging and
+Docker containers.  However, we do provide an example of how to collect, index, and view pod logs [using Elasicsearch and Kibana](./getting-started-guides/logging.md)
 
-As per the comments, the practical default level is V(2).  Developers and QE environments may wish to run at V(3) or V(4). If you wish to change the log level, you can pass in `-v=X` where X is the desired maximum level to log.
+
+
