@@ -386,8 +386,9 @@ func TestServeLogs(t *testing.T) {
 func TestServeRunInContainer(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
+	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".default.etcd"
+	expectedPodName := podName + "." + podNamespace + ".etcd"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
 	fw.fakeKubelet.runFunc = func(podFullName, uuid, containerName string, cmd []string) ([]byte, error) {
@@ -404,7 +405,7 @@ func TestServeRunInContainer(t *testing.T) {
 		return []byte(output), nil
 	}
 
-	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podName + "/" + expectedContainerName + "?cmd=ls%20-a")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?cmd=ls%20-a")
 
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
@@ -425,8 +426,9 @@ func TestServeRunInContainer(t *testing.T) {
 func TestServeRunInContainerWithUUID(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
+	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".default.etcd"
+	expectedPodName := podName + "." + podNamespace + ".etcd"
 	expectedUuid := "7e00838d_-_3523_-_11e4_-_8421_-_42010af0a720"
 	expectedContainerName := "baz"
 	expectedCommand := "ls -a"
@@ -447,7 +449,7 @@ func TestServeRunInContainerWithUUID(t *testing.T) {
 		return []byte(output), nil
 	}
 
-	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podName + "/" + expectedUuid + "/" + expectedContainerName + "?cmd=ls%20-a")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/run/" + podNamespace + "/" + podName + "/" + expectedUuid + "/" + expectedContainerName + "?cmd=ls%20-a")
 
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)

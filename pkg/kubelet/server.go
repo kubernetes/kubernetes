@@ -301,23 +301,24 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	parts := strings.Split(u.Path, "/")
-	var podID, uuid, container string
-	if len(parts) == 4 {
-		podID = parts[2]
-		container = parts[3]
-	} else if len(parts) == 5 {
-		podID = parts[2]
-		uuid = parts[3]
+	var podNamespace, podID, uuid, container string
+	if len(parts) == 5 {
+		podNamespace = parts[2]
+		podID = parts[3]
 		container = parts[4]
+	} else if len(parts) == 6 {
+		podNamespace = parts[2]
+		podID = parts[3]
+		uuid = parts[4]
+		container = parts[5]
 	} else {
 		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
 		return
 	}
 	podFullName := GetPodFullName(&api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID: podID,
-			// TODO: I am broken
-			Namespace:   api.NamespaceDefault,
+			ID:          podID,
+			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 		},
 	})
