@@ -190,7 +190,7 @@ func resolveResource(target, resource string) (string, error) {
 		}
 	default:
 		// It might be a GUID, but we don't know how to handle those for now.
-		err = fmt.Errorf("Resource %s not recognized; need pods, replicationContollers, services or minions.", resource)
+		err = fmt.Errorf("Resource %s not recognized; need pods, replicationControllers, services or minions.", resource)
 	}
 	return resolved, err
 }
