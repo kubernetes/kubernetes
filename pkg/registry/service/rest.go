@@ -245,7 +245,9 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 	if len(e.Endpoints) == 0 {
 		return "", fmt.Errorf("no endpoints available for %v", id)
 	}
-	return "http://" + e.Endpoints[rand.Intn(len(e.Endpoints))], nil
+	// We leave off the scheme ('http://') because we have no idea what sort of server
+	// is listening at this endpoint.
+	return e.Endpoints[rand.Intn(len(e.Endpoints))], nil
 }
 
 func (rs *REST) deleteExternalLoadBalancer(service *api.Service) error {

@@ -360,7 +360,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if e, a := "http://foo:80", location; e != a {
+	if e, a := "foo:80", location; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 	if e, a := "foo", registry.GottenID; e != a {
