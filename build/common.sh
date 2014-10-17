@@ -667,14 +667,18 @@ function kube::release::gcs::copy_release_tarballs() {
 # ---------------------------------------------------------------------------
 # Rackspace Release
 
+function kube::release::rackspace::set_vars() {
+
+  CLOUDFILES_CONTAINER="kubernetes-releases-${OS_USERNAME}"
+  KUBE_RACKSPACE_RELEASE_BUCKET=${CLOUDFILES_CONTAINER}
+  KUBE_RACKSPACE_RELEASE_PREFIX=${KUBE_RACKSPACE_RELEASE_PREFIX-devel/}
+}
+
 function kube::release::rackspace::release() {
 
   [[ ${KUBE_RACKSPACE_UPLOAD_RELEASE-y} =~ ^[yY]$ ]] || return 0
   
-  CLOUDFILES_CONTAINER="kubernetes-releases-${OS_USERNAME}"
-  KUBE_RACKSPACE_RELEASE_BUCKET=${KUBE_RACKSPACE_RELEASE_BUCKET-kubernetes-releases-${OS_USERNAME}}
-  KUBE_RACKSPACE_RELEASE_PREFIX=${KUBE_RACKSPACE_RELEASE_PREFIX-devel/}
-
+  kube::release::rackspace::set_vars
   kube::release::rackspace::verify_prereqs
   kube::release::rackspace::ensure_release_container
   kube::release::rackspace::copy_release_tarballs
@@ -713,9 +717,9 @@ function kube::release::rackspace::ensure_release_container() {
 
   SWIFTLY_CMD="swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD}"
 
-  if ! ${SWIFTLY_CMD} get ${CLOUDFILES_CONTAINER} > /dev/null 2>&1 ; then
-    echo "build/common.sh: Container doesn't exist. Creating container ${CLOUDFILES_CONTAINER}"
-    ${SWIFTLY_CMD} put ${CLOUDFILES_CONTAINER} > /dev/null 2>&1
+  if ! ${SWIFTLY_CMD} get ${KUBE_RACKSPACE_RELEASE_BUCKET} > /dev/null 2>&1 ; then
+    echo "build/common.sh: Container doesn't exist. Creating container ${KUBE_RACKSPACE_RELEASE_BUCKET}"
+    ${SWIFTLY_CMD} put ${KUBE_RACKSPACE_RELEASE_BUCKET} > /dev/null 2>&1
   fi
 }
 
@@ -723,7 +727,8 @@ function kube::release::rackspace::ensure_release_container() {
 function kube::release::rackspace::copy_release_tarballs() {
 
   echo "build/common.sh: Uploading to Cloud Files"
-  ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz ${CLOUDFILES_CONTAINER}/devel/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
+  ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz \
+  ${KUBE_RACKSPACE_RELEASE_BUCKET}/${KUBE_RACKSPACE_RELEASE_PREFIX}/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
   
   echo "Release pushed."
 }
