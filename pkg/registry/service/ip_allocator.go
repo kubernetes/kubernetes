@@ -103,8 +103,9 @@ func ffs(val byte) (uint, error) {
 // Add an offset to an IP address - used for joining network addr and host addr parts.
 func ipAdd(ip net.IP, offset int) net.IP {
 	for i := 0; offset > 0; i++ {
-		add := offset % 256
-		ip[len(ip)-1-i] += byte(add)
+		b := &ip[len(ip)-1-i]
+		offset += int(*b)
+		*b = byte(offset % 256)
 		offset >>= 8
 	}
 	return ip
