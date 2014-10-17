@@ -15,7 +15,7 @@
     "namespace": {
       "type": "string",
       "required": false
-    },    
+    },
     "creationTimestamp": {
       "type": "string",
       "required": false
@@ -41,6 +41,10 @@
       "required": false
     },
     "selector": {
+      "type": "object",
+      "required": false
+    },
+    "annotations": {
       "type": "object",
       "required": false
     }
