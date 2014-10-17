@@ -719,15 +719,10 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		select {
 		case u := <-updates:
 			switch u.Op {
-			case SET:
+			case SET, UPDATE:
 				glog.V(3).Infof("Containers changed [%s]", kl.hostname)
 				kl.pods = u.Pods
 				kl.pods = filterHostPortConflicts(kl.pods)
-
-			case UPDATE:
-				//TODO: implement updates of containers
-				glog.Warningf("Containers updated, not implemented [%s]", kl.hostname)
-				continue
 
 			default:
 				panic("syncLoop does not support incremental changes")
