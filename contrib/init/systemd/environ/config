@@ -1,0 +1,23 @@
+###
+# kubernetes system config
+#
+# The following values are used to configure various aspects of all
+# kubernetes services, including
+#
+#   kubernetes-apiserver.service
+#   kubernetes-controller-manager.service
+#   kubernetes-scheduler.service
+#   kubelet.service
+#   kubernetes-proxy.service
+
+# Comma seperated list of nodes in the etcd cluster
+KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
+
+# logging to stderr means we get it in the systemd journal
+KUBE_LOGTOSTDERR="--logtostderr=true"
+
+# journal message level, 0 is debug
+KUBE_LOG_LEVEL="--v=0"
+
+# Should this cluster be allowed to run privleged docker containers
+KUBE_ALLOW_PRIV="--allow_privileged=false"

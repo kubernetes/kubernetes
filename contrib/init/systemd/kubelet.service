@@ -1,0 +1,22 @@
+[Unit]
+Description=Kubernetes Kubelet Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=docker.socket cadvisor.service
+Requires=docker.socket
+
+[Service]
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/kubelet
+ExecStart=/usr/bin/kubelet \
+	    ${KUBE_LOGTOSTDERR} \
+	    ${KUBE_LOG_LEVEL} \
+	    ${KUBE_ETCD_SERVERS} \
+	    ${MINION_ADDRESS} \
+	    ${MINION_PORT} \
+	    ${MINION_HOSTNAME} \
+	    ${KUBE_ALLOW_PRIV} \
+	    ${MINION_ARGS}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
