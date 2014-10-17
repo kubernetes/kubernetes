@@ -468,8 +468,9 @@ func TestServeRunInContainerWithUUID(t *testing.T) {
 func TestContainerLogs(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
+	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".default.etcd"
+	expectedPodName := podName + ".other.etcd"
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := false
@@ -488,7 +489,7 @@ func TestContainerLogs(t *testing.T) {
 		}
 		return nil
 	}
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podName + "/" + expectedContainerName)
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName)
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
 	}
@@ -507,8 +508,9 @@ func TestContainerLogs(t *testing.T) {
 func TestContainerLogsWithTail(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
+	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".default.etcd"
+	expectedPodName := podName + ".other.etcd"
 	expectedContainerName := "baz"
 	expectedTail := "5"
 	expectedFollow := false
@@ -527,7 +529,7 @@ func TestContainerLogsWithTail(t *testing.T) {
 		}
 		return nil
 	}
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podName + "/" + expectedContainerName + "?tail=5")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=5")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
 	}
@@ -546,8 +548,9 @@ func TestContainerLogsWithTail(t *testing.T) {
 func TestContainerLogsWithFollow(t *testing.T) {
 	fw := newServerTest()
 	output := "foo bar"
+	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := podName + ".default.etcd"
+	expectedPodName := podName + ".other.etcd"
 	expectedContainerName := "baz"
 	expectedTail := ""
 	expectedFollow := true
@@ -566,7 +569,7 @@ func TestContainerLogsWithFollow(t *testing.T) {
 		}
 		return nil
 	}
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podName + "/" + expectedContainerName + "?follow=1")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?follow=1")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
 	}
