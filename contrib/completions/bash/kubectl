@@ -1,0 +1,305 @@
+#!bash
+#
+# bash completion file for core kubectl commands
+#
+# This script provides completion of non replication controller options
+#
+# To enable the completions either:
+#  - place this file in /etc/bash_completion.d
+#  or
+#  - copy this file and add the line below to your .bashrc after
+#    bash completion features are loaded
+#     . kubectl
+#
+# Note:
+# Currently, the completions will not work if the apiserver daemon is not
+# running on localhost on the standard port 8080
+
+__contains_word()
+{
+    local w word=$1; shift
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+    done
+    return 1
+}
+
+__has_resource()
+{
+    local all_resources=(pod pods service services minion minions replicationController replicationControllers)
+    local i
+    for ((i=command_word; i < cword; i++)); do
+        local word=${words[i]}
+        if __contains_word "${word}" "${all_resources[@]}"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# call kubectl get $1,
+# exclude blank lines
+# skip the header stuff kubectl prints on the first 2 lines
+# append $1/ to the first column and use that in compgen
+__kubectl_parse_get()
+{
+    local kubectl_output out
+    if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
+        out=($(echo "${kubectl_output}" | awk '{print $1}'))
+        COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
+    fi
+}
+
+__kubectl_pre_command()
+{
+    local flags=(
+            --api-version=
+            -a
+            --auth-path=
+            --certificate-authority=
+            --client-certificate=
+            --client-key=
+            --insecure-skip-tls-verify=
+            --match-server-version=
+            -s
+            --server=
+    )
+    local api_versions=(v1beta1 v1beta2 v1beta3)
+
+    case $prev in
+        --api-version)
+            COMPREPLY=( $(compgen -W "${api_versions[*]}" -- "$cur") )
+            return 0
+            ;;
+        -a | --auth-path | --certificate-authority | --client-certificate | --client-key)
+            _filedir
+            return 0
+            ;;
+        --insecure-skip-tls-verify | --match-server-version)
+            COMPREPLY=( $(compgen -W "true false" -- "$cur") )
+            return 0
+            ;;
+        -s | --server)
+            return 0
+            ;;
+        *)
+            ;;
+    esac
+
+    if [[ "$cur" = -* ]]; then
+        compopt -o nospace
+        COMPREPLY=( $(compgen -W "${flags[*]}" -- "$cur") )
+        [[ $COMPREPLY == *= ]] || compopt +o nospace
+        return 0
+    fi
+
+    COMPREPLY=( $( compgen -W "${commands[*]}" -- "$cur" ) )
+    return 0
+}
+
+__kubectl_require_file()
+{
+    local i
+    local flags=(-f)
+    for ((i=command_word; i < cword; i++)); do
+        local word=${words[i]}
+        if [[ "${word}" == "-f" ]]; then
+            flags=()
+        fi
+    done
+
+    case $prev in 
+        -f)
+            _filedir '@(json|yml|yaml)'
+            return 0;
+            ;;
+    esac
+    COMPREPLY=( $( compgen -W "${flags[*]}" -- "$cur" ) )
+}
+
+__kubectl_handle_flags_resources()
+{
+    case $prev in
+        pod | pods)
+            __kubectl_parse_get pods
+            return 0
+            ;;
+        replicationController | replicationControllers)
+            __kubectl_parse_get replicationControllers
+            return 0
+            ;;
+        service | services)
+            __kubectl_parse_get services
+            return 0
+            ;;
+        minion | minions)
+            __kubectl_parse_get minions
+            return 0
+            ;;
+    esac
+
+    case $cur in
+        -*)
+            compopt -o nospace
+            COMPREPLY=( $(compgen -W "${flags[*]}" -- "$cur") )
+            [[ $COMPREPLY == *= ]] || compopt +o nospace
+            return 0;
+            ;;
+    esac
+
+    COMPREPLY=( $(compgen -W "${resources[*]}" -- "$cur") )
+}
+
+__kubectl_get()
+{
+    local resources=()
+    local flags=(-o --output=)
+
+    if __has_resource; then
+        resource=()
+    else
+        resources=(pods minions services replicationControllers)
+    fi
+
+    for ((i=command_word; i < cword; i++)); do
+        local word=${words[i]}
+        local next=$(( $i + 1 ))
+        case $word in
+            -o | --output)
+                if [[ $next -lt $(( $cword )) ]] &&
+                   [[ ${words[$next]} == "template" ]]; then
+                    resources+=(-t --template=)
+                    flags=(-t --template=)
+                else
+                    flags=()
+                fi
+                ;;
+            -t | --templtate)
+                resources=(${resources[@]/--template=})
+                resources=(${resources[@]/-t})
+                flags=()
+                ;;
+        esac
+    done
+
+    case $prev in
+        -o | --output)
+            COMPREPLY=( $(compgen -W "table json yaml template" -- "$cur") )
+            return 0
+            ;;
+        -t | --template)
+            _filedir
+            return 0
+            ;;
+    esac
+    __kubectl_handle_flags_resources
+}
+
+__kubectl_describe()
+{
+    local resources=()
+    local flags=()
+
+    if __has_resource; then
+        resource=()
+    else
+        resources=(pods minions services replicationControllers)
+    fi
+    local resources=(pods minions services replicationControllers)
+
+    __kubectl_handle_flags_resources
+}
+
+__kubectl_delete()
+{
+    local resources=()
+    local flags=()
+
+    if __has_resource; then
+        resource=()
+        flags=()
+    else
+        resources=(pods minions services replicationControllers -f)
+        flags=(-f)
+    fi
+
+    for ((i=command_word; i < cword; i++)); do
+        local word=${words[i]}
+        if [[ "${word}" == "-f" ]]; then
+            resources=()
+            flags=()
+        fi
+    done
+
+    case $prev in
+        -f)
+            _filedir '@(json|yml|yaml)'
+            return 0
+            ;;
+    esac
+    __kubectl_handle_flags_resources
+}
+
+__kubectl_post_command()
+{
+    case $command in
+        create | update)
+            __kubectl_require_file
+            return 0
+            ;;
+        get)
+            __kubectl_get
+            return 0
+            ;;
+        describe)
+            __kubectl_describe
+            return 0
+            ;;
+        delete)
+            __kubectl_delete
+            return 0
+            ;;
+        *)
+            ;;
+    esac
+}
+
+_kubectl()
+{
+    local command command_word
+    local cur prev words cword split
+    _init_completion -s -n : || return 0
+    _expand || return 0
+    COMPREPLY=()
+
+    local commands=(version proxy get describe create update delete help)
+    local two_word_flags=(
+            -a
+            -s
+    )
+
+    # figure out which command they are running, remembering that arguments to
+    # options don't count as the command!  So a hostname named 'create' won't
+    # trip things up
+    local i
+    for ((i=0; i < cword; i++)); do
+        if __contains_word "${words[i]}" "${commands[@]}" &&
+           ! __contains_word "${words[i-1]}" "${two_word_flags[@]}"; then
+            command=${words[i]}
+            command_word=$i
+            break
+        fi
+    done
+
+    if [[ -z $command ]]; then
+        __kubectl_pre_command
+        return 0
+    fi
+
+    __kubectl_post_command
+
+    return 0
+}
+
+complete -F _kubectl kubectl
+# ex: ts=4 sw=4 et filetype=sh
