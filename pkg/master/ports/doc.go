@@ -14,16 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
-
-const (
-	// KubeletPort is the default port for the kubelet status server on each host machine.
-	// May be overridden by a flag at startup.
-	KubeletPort = 10250
-	// SchedulerPort is the default port for the scheduler status server.
-	// May be overridden by a flag at startup.
-	SchedulerPort = 10251
-	// ControllerManagerPort is the default port for the controller manager status server.
-	// May be overridden by a flag at startup.
-	ControllerManagerPort = 10252
-)
+// Package ports defines ports used by various pieces of the kubernetes
+// infrastructure.
+package ports

@@ -36,7 +36,7 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	kconfig "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/coreos/go-etcd/etcd"
@@ -55,7 +55,7 @@ var (
 	manifestURL             = flag.String("manifest_url", "", "URL for accessing the container manifest")
 	enableServer            = flag.Bool("enable_server", true, "Enable the info server")
 	address                 = util.IP(net.ParseIP("127.0.0.1"))
-	port                    = flag.Uint("port", master.KubeletPort, "The port for the info server to serve on")
+	port                    = flag.Uint("port", ports.KubeletPort, "The port for the info server to serve on")
 	hostnameOverride        = flag.String("hostname_override", "", "If non-empty, will use this string as identification instead of the actual hostname.")
 	networkContainerImage   = flag.String("network_container_image", kubelet.NetworkContainerImage, "The image that network containers in each pod will use.")
 	dockerEndpoint          = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
