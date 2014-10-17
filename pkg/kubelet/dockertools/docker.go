@@ -22,6 +22,7 @@ import (
 	"hash/adler32"
 	"io"
 	"math/rand"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -82,8 +83,8 @@ func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	cfg, err := readDockerConfigFile()
 	if err == nil {
 		cfg.addToKeyring(dp.keyring)
-	} else {
-		glog.Errorf("Unable to parse Docker config file: %v", err)
+	} else if !os.IsNotExist(err) {
+		glog.V(1).Infof("Unable to parse Docker config file: %v", err)
 	}
 
 	if dp.keyring.count() == 0 {

@@ -75,7 +75,7 @@ func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.Mini
 	for _, minion := range list.Items {
 		status, err := health.DoHTTPCheck(r.makeMinionURL(minion.ID), r.client)
 		if err != nil {
-			glog.Errorf("%#v failed health check with error: %s", minion, err)
+			glog.V(1).Infof("%#v failed health check with error: %s", minion, err)
 			continue
 		}
 		if status == health.Healthy {
