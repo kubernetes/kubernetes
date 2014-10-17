@@ -15,7 +15,7 @@
     "namespace": {
       "type": "string",
       "required": false
-    },    
+    },
     "creationTimestamp": {
       "type": "string",
       "required": false
@@ -84,6 +84,10 @@
       }
     },
     "labels": {
+      "type": "object",
+      "required": false
+    },
+    "annotations": {
       "type": "object",
       "required": false
     }
