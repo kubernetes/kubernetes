@@ -263,7 +263,7 @@ func TestPodInfo(t *testing.T) {
 		}
 		return nil, fmt.Errorf("bad pod %s", name)
 	}
-	resp, err := http.Get(fw.testHTTPServer.URL + "/podInfo?podID=goodpod")
+	resp, err := http.Get(fw.testHTTPServer.URL + "/podInfo?podID=goodpod&podNamespace=default")
 	if err != nil {
 		t.Errorf("Got error GETing: %v", err)
 	}
