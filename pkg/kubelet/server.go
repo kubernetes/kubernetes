@@ -228,17 +228,22 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	}
 	podID := u.Query().Get("podID")
 	podUUID := u.Query().Get("UUID")
+	podNamespace := u.Query().Get("podNamespace")
 	if len(podID) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
 		return
 	}
+	if len(podNamespace) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "Missing 'podNamespace=' query entry.", http.StatusBadRequest)
+		return
+	}
 	// TODO: backwards compatibility with existing API, needs API change
 	podFullName := GetPodFullName(&api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID: podID,
-			// TODO: I am broken
-			Namespace:   api.NamespaceDefault,
+			ID:          podID,
+			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 		},
 	})
