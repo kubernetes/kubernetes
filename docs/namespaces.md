@@ -116,6 +116,8 @@ The k8s API server will associate a resource with a *Namespace* if not populated
 of the incoming request.  If the *Namespace* of the resource being created, or updated does not match the *Namespace* on the request,
 then the k8s API server will reject the request.
 
+TODO: Update to discuss k8s api server proxy patterns
+
 ## k8s storage
 
 A namespace provides a unique identifier space and therefore must be in the storage path of a resource.
