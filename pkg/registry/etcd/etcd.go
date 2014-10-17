@@ -78,10 +78,10 @@ func MakeEtcdItemKey(ctx api.Context, prefix string, id string) (string, error) 
 	key := MakeEtcdListKey(ctx, prefix)
 	ns, ok := api.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
-		return "", fmt.Errorf("Invalid request.  Unable to address and item without a namespace on context")
+		return "", fmt.Errorf("Invalid request.  Namespace parameter required.")
 	}
 	if len(id) == 0 {
-		return "", fmt.Errorf("Invalid request.  Id parameter required")
+		return "", fmt.Errorf("Invalid request.  Id parameter required.")
 	}
 	key = key + "/" + id
 	return key, nil
