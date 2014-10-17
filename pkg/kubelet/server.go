@@ -175,10 +175,12 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	}
 	parts := strings.Split(u.Path, "/")
 
-	var podID, containerName string
-	if len(parts) == 4 {
-		podID = parts[2]
-		containerName = parts[3]
+	// req URI: /containerLogs/<podNamespace>/<podID>/<containerName>
+	var podNamespace, podID, containerName string
+	if len(parts) == 5 {
+		podNamespace = parts[2]
+		podID = parts[3]
+		containerName = parts[4]
 	} else {
 		http.Error(w, "Unexpected path for command running", http.StatusBadRequest)
 		return
@@ -192,6 +194,10 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, `{"message": "Missing container name."}`, http.StatusBadRequest)
 		return
 	}
+	if len(podNamespace) == 0 {
+		http.Error(w, `{"message": "Missing podNamespace."}`, http.StatusBadRequest)
+		return
+	}
 
 	uriValues := u.Query()
 	follow, _ := strconv.ParseBool(uriValues.Get("follow"))
@@ -199,9 +205,8 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 
 	podFullName := GetPodFullName(&api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID: podID,
-			// TODO: I am broken
-			Namespace:   api.NamespaceDefault,
+			ID:          podID,
+			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 		},
 	})
