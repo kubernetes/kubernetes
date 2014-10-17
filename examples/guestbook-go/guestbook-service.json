@@ -4,5 +4,6 @@
   "id": "guestbook",
   "port": 3000,
   "containerPort": "http-server",
-  "selector": { "name": "guestbook" }
+  "selector": { "name": "guestbook" },
+  "createExternalLoadBalancer": true
 }
