@@ -382,13 +382,25 @@ function kube::build::copy_output() {
     #
     # The easiest thing I (jbeda) could figure out was to launch another
     # container pointed at the same volume, tar the output directory and ship
-    # that tar over stdou.
+    # that tar over stdout.
     local -ra docker_cmd=(
       docker run -a stdout "--name=${KUBE_BUILD_CONTAINER_NAME}"
       "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
 
     # Kill any leftover container
     docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+
+    # If boot2docker VM is configured to mirror output dir,
+    # the hack is not needed.
+    rm -f "${LOCAL_OUTPUT_BUILD}/test_mapping"
+    "${docker_cmd[@]}" touch "${REMOTE_OUTPUT_DIR}/test_mapping"
+    [[ -e "${LOCAL_OUTPUT_BUILD}/test_mapping" ]]
+    local -r boot2docker_mirrored=$?
+    docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    if [ "${boot2docker_mirrored}" -eq 0 ]; then
+      echo "+++ boot2docker is configured to mirror output dir. Skipping sync."
+      return 0
+    fi
 
     echo "+++ Syncing back _output directory from boot2docker VM"
     rm -rf "${LOCAL_OUTPUT_BUILD}"
@@ -429,7 +441,7 @@ function kube::release::package_tarballs() {
 function kube::release::package_client_tarballs() {
    # Find all of the built kubecfg binaries
   local platform platforms
-  platforms=($(cd "${LOCAL_OUTPUT_ROOT}/build" ; echo */*))
+  platforms=($(cd "${LOCAL_OUTPUT_BUILD}" && echo */*))
   for platform in "${platforms[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     echo "+++ Building tarball: client $platform_tag"
