@@ -229,8 +229,9 @@ func TestEtcdCreatePodFailsWithoutNamespace(t *testing.T) {
 			},
 		},
 	})
-	if err == nil || !strings.Contains(err.Error(), "namespace") {
-		t.Fatalf("expected error that namespace was missing from context")
+	// Accept "namespace" or "Namespace".
+	if err == nil || !strings.Contains(err.Error(), "amespace") {
+		t.Fatalf("expected error that namespace was missing from context, got: %v", err)
 	}
 }
 
