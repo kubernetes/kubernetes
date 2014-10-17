@@ -34,7 +34,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 			if x := recover(); x != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, "apis panic. Look in log for details.")
-				glog.Infof("APIServer panic'd on %v %v: %#v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
+				glog.Infof("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 			}
 		}()
 		defer httplog.NewLogged(req, &w).StacktraceWhen(
