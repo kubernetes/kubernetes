@@ -121,7 +121,6 @@ func (g *APIGroup) InstallREST(mux mux, paths ...string) {
 // InstallSupport registers the APIServer support functions into a mux.
 func InstallSupport(mux mux) {
 	healthz.InstallHandler(mux)
-	mux.Handle("/proxy/minion/", http.StripPrefix("/proxy/minion", http.HandlerFunc(handleProxyMinion)))
 	mux.HandleFunc("/version", handleVersion)
 	mux.HandleFunc("/", handleIndex)
 }
