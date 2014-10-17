@@ -166,5 +166,5 @@ func (m *Master) API_v1beta2() (map[string]apiserver.RESTStorage, runtime.Codec,
 	for k, v := range m.storage {
 		storage[k] = v
 	}
-	return storage, v1beta2.Codec, "/api/v1beta1", latest.SelfLinker
+	return storage, v1beta2.Codec, "/api/v1beta2", latest.SelfLinker
 }
