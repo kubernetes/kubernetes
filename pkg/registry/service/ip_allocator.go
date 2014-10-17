@@ -38,7 +38,12 @@ func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 	}
 
 	ones, bits := subnet.Mask.Size()
+	// TODO: some settings with IPv6 address could cause this to take
+	// an excessive amount of memory.
 	numIps := 1 << uint(bits-ones)
+	if numIps < 8 {
+		return nil
+	}
 	ipa := &ipAllocator{
 		subnet: subnet,
 		used:   make([]byte, numIps/8),
@@ -82,7 +87,7 @@ func (ipa *ipAllocator) AllocateNext() (net.IP, error) {
 			}
 			ipa.used[i] |= 1 << nextBit
 			offset := (i * 8) + int(nextBit)
-			ip := ipAdd(copyIP(ipa.subnet.IP), offset)
+			ip := ipAdd(ipa.subnet.IP, offset)
 			return ip, nil
 		}
 	}
@@ -102,13 +107,14 @@ func ffs(val byte) (uint, error) {
 
 // Add an offset to an IP address - used for joining network addr and host addr parts.
 func ipAdd(ip net.IP, offset int) net.IP {
+	out := copyIP(ip)
 	for i := 0; offset > 0; i++ {
-		b := &ip[len(ip)-1-i]
+		b := &out[len(ip)-1-i]
 		offset += int(*b)
 		*b = byte(offset % 256)
 		offset >>= 8
 	}
-	return ip
+	return out
 }
 
 // Subtract two IPs, returning the difference as an offset - used or splitting an IP into
