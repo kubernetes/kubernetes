@@ -77,7 +77,7 @@ coreos:
         [Service]
         EnvironmentFile=-/run/apiserver/minions.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/apiserver /opt/bin/apiserver
-        ExecStart=/opt/bin/apiserver --address=127.0.0.1 --port=8080 --machines=${MINIONS} --etcd_servers=http://127.0.0.1:4001 --portal_net="PORTAL_NET" --logtostderr=true
+        ExecStart=/opt/bin/apiserver --address=127.0.0.1 --port=8080 --machines=${MINIONS} --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true
         Restart=always
         RestartSec=2
     - name: master-apiserver-sighup.path

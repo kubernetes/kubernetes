@@ -20,6 +20,7 @@
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
+source $KUBE_ROOT/build/common.sh
 
 verify-prereqs() {
   # Make sure that prerequisites are installed.
@@ -86,7 +87,9 @@ find-release-tars() {
 # Retrieves a tempurl from cloudfiles to make the release object publicly accessible for 6 hours.
 find-object-url() {
 
-  RELEASE=kubernetes-releases-${OS_USERNAME}/devel/kubernetes-server-linux-amd64.tar.gz
+  kube::release::rackspace::set_vars
+
+  RELEASE=${KUBE_RACKSPACE_RELEASE_BUCKET}/${KUBE_RACKSPACE_RELEASE_PREFIX}/kubernetes-server-linux-amd64.tar.gz
 
   RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${RELEASE})
   echo "cluster/rackspace/util.sh: Object temp URL:"
