@@ -575,11 +575,7 @@ func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector,
 		return r.Watch(key, version), nil
 	}
 	if field.Empty() {
-		key, err := makeServiceEndpointsKey(ctx, "")
-		if err != nil {
-			return nil, err
-		}
-		return r.WatchList(key, version, tools.Everything)
+		return r.WatchList(makeServiceEndpointsListKey(ctx), version, tools.Everything)
 	}
 	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
 }
