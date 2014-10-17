@@ -371,42 +371,38 @@ function kube::build::run_build_command() {
   docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
 }
 
+# Test if the output directory is remote (and can only be accessed through
+# docker) or if it is "local" and we can access the output without going through
+# docker.
+function kube::build::is_output_remote() {
+  rm -f "${LOCAL_OUTPUT_BUILD}/test_for_remote"
+  kube::build::run_build_command touch "${REMOTE_OUTPUT_DIR}/test_for_remote"
+
+  [[ ! -e "${LOCAL_OUTPUT_BUILD}/test_for_remote" ]]
+}
+
 # If the Docker server is remote, copy the results back out.
 function kube::build::copy_output() {
-  if kube::build::is_osx; then
-    # Docker 1.3 on OS X handles this properly, so bail.
-    docker_version=$(docker version 2> /dev/null | sed -n 1p | awk '{ print $3 }')
-    # TODO: this will start breaking with Docker 1.4, but at that point we should
-    #  just delete this whole function and force people to upgrade.
-    if [[ "$docker_version" == "1.3."* ]]; then
-      return
-    fi
-    # When we are on the Mac with boot2docker we need to copy the results back
-    # out.  Ideally we would leave the container around and use 'docker cp' to
-    # copy the results out.  However, that doesn't work for mounted volumes
-    # currently (https://github.com/dotcloud/docker/issues/1992).  And it is
-    # just plain broken (https://github.com/dotcloud/docker/issues/6483).
+  if kube::build::is_output_remote; then
+    # When we are on the Mac with boot2docker (or to a remote Docker in any
+    # other situation) we need to copy the results back out.  Ideally we would
+    # leave the container around and use 'docker cp' to copy the results out.
+    # However, that doesn't work for mounted volumes currently
+    # (https://github.com/dotcloud/docker/issues/1992).  And it is just plain
+    # broken (https://github.com/dotcloud/docker/issues/6483).
     #
     # The easiest thing I (jbeda) could figure out was to launch another
     # container pointed at the same volume, tar the output directory and ship
-    # that tar over stdou.
-    local -ra docker_cmd=(
-      docker run -a stdout "--name=${KUBE_BUILD_CONTAINER_NAME}"
-      "${DOCKER_MOUNT_ARGS[@]}" "${KUBE_BUILD_IMAGE}")
-
-    # Kill any leftover container
-    docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    # that tar over stdout.
 
     echo "+++ Syncing back _output directory from boot2docker VM"
     rm -rf "${LOCAL_OUTPUT_BUILD}"
     mkdir -p "${LOCAL_OUTPUT_BUILD}"
-    "${docker_cmd[@]}" sh -c "tar c -C ${REMOTE_OUTPUT_DIR} . ; sleep 1"  \
-      | tar xv -C "${LOCAL_OUTPUT_BUILD}"
 
-    # Remove the container after we run.  '--rm' might be appropriate but it
-    # appears that sometimes it fails. See
-    # https://github.com/docker/docker/issues/3968
-    docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    # The '</dev/null' here makes us run docker in a "non-interactive" mode. Not
+    # doing this corrupts the output stream.
+    kube::build::run_build_command sh -c "tar c -C ${REMOTE_OUTPUT_DIR} . ; sleep 1" </dev/null \
+      | tar xv -C "${LOCAL_OUTPUT_BUILD}"
 
     # I (jbeda) also tried getting rsync working using 'docker run' as the
     # 'remote shell'.  This mostly worked but there was a hang when
@@ -415,6 +411,8 @@ function kube::build::copy_output() {
     # local DOCKER="docker run -i --rm --name=${KUBE_BUILD_CONTAINER_NAME} ${DOCKER_MOUNT} ${KUBE_BUILD_IMAGE}"
     # DOCKER+=" bash -c 'shift ; exec \"\$@\"' --"
     # rsync --blocking-io -av -e "${DOCKER}" foo:${REMOTE_OUTPUT_DIR}/ ${LOCAL_OUTPUT_BUILD}
+  else
+    echo "+++ Output directory is local.  No need to copy results out."
   fi
 }
 
