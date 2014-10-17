@@ -17,7 +17,7 @@ $ echo $GOPATH
 /home/user/goproj
 $ mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform/
 $ cd $GOPATH/src/github.com/GoogleCloudPlatform/
-$ git clone git@github.com:GoogleCloudPlatform/kubernetes.git
+$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 ```
 
 The commands above will not work if there are more than one directory in ``$GOPATH``.
