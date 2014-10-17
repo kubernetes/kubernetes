@@ -83,13 +83,14 @@ find-release-tars() {
   fi
 }
 
+# Retrieves a tempurl from cloudfiles to make the release object publicly accessible for 6 hours.
 find-object-url() {
 
   RELEASE=kubernetes-releases-${OS_USERNAME}/devel/kubernetes-server-linux-amd64.tar.gz
 
-  TEMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET $RELEASE)
+  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${RELEASE})
   echo "cluster/rackspace/util.sh: Object temp URL:"
-  echo -e "\t${TEMP_URL}"
+  echo -e "\t${RELEASE_TMP_URL}"
 
 }
 
@@ -99,19 +100,16 @@ rax-boot-master() {
   DISCOVERY_ID=$(echo "${DISCOVERY_URL}" | cut -f 4 -d /)
   echo "cluster/rackspace/util.sh: etcd discovery URL: ${DISCOVERY_URL}"
 
-  get-password
-  find-object-url
-
 # Copy cloud-config to KUBE_TEMP and work some sed magic
   sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
-      -e "s|CLOUD_FILES_URL|${TEMP_URL}|" \
+      -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\&}|" \
       -e "s|KUBE_USER|${KUBE_USER}|" \
       -e "s|KUBE_PASSWORD|${KUBE_PASSWORD}|" \
       -e "s|PORTAL_NET|${PORTAL_NET}|" \
       $(dirname $0)/rackspace/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
 
-  MASTER_BOOT_CMD="nova boot \
+  MASTER_BOOT_CMD="nova boot
 --key-name ${SSH_KEY_NAME} \
 --flavor ${KUBE_MASTER_FLAVOR} \
 --image ${KUBE_IMAGE} \
@@ -136,7 +134,7 @@ rax-boot-minions() {
 
     sed -e "s|DISCOVERY_ID|${DISCOVERY_ID}|" \
         -e "s|INDEX|$((i + 1))|g" \
-        -e "s|CLOUD_FILES_URL|${TEMP_URL}|" \
+        -e "s|CLOUD_FILES_URL|${RELEASE_TMP_URL//&/\&}|" \
     $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
 
 
@@ -204,7 +202,7 @@ kube-up() {
   # Find the release to use.  Generally it will be passed when doing a 'prod'
   # install and will default to the release/config.sh version when doing a
   # developer up.
-  #find-object-url $CONTAINER output/release/$TAR_FILE
+  find-object-url
 
   # Create a temp directory to hold scripts that will be uploaded to master/minions
   KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)

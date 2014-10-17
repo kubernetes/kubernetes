@@ -16,9 +16,9 @@ write_files:
     permissions: 0755
     content: |
       #!/bin/bash
-      OBJECT_URL="http://storage.googleapis.com/kubernetes-releases-56726/devel/kubernetes.tar.gz"
+      OBJECT_URL="CLOUD_FILES_URL"
       echo "Downloading release ($OBJECT_URL)"
-      wget $OBJECT_URL -O /opt/kubernetes.tar.gz
+      wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
       echo "Unpacking release"
       rm -rf /opt/kubernetes || false
       tar xzf /opt/kubernetes.tar.gz -C /opt/
@@ -102,7 +102,7 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/platforms/linux/amd64/kubelet /opt/bin/kubelet
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
         ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --config=/opt/kubernetes-manifests
         Restart=always
         RestartSec=2
@@ -119,7 +119,7 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/platforms/linux/amd64/proxy /opt/bin/proxy
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/proxy /opt/bin/proxy
         ExecStart=/opt/bin/proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
         Restart=always
         RestartSec=2
