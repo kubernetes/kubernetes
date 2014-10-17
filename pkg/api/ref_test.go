@@ -80,6 +80,11 @@ func TestGetReference(t *testing.T) {
 			ref:       nil,
 			shouldErr: true,
 		},
+		"errorNil": {
+			obj:       nil,
+			ref:       nil,
+			shouldErr: true,
+		},
 	}
 
 	for name, item := range table {

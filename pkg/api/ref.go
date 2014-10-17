@@ -17,11 +17,14 @@ limitations under the License.
 package api
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
+
+var ErrNilObject = errors.New("Can't reference a nil object")
 
 var versionFromSelfLink = regexp.MustCompile("/api/([^/]*)/")
 
@@ -29,6 +32,9 @@ var versionFromSelfLink = regexp.MustCompile("/api/([^/]*)/")
 // object, or an error if the object doesn't follow the conventions
 // that would allow this.
 func GetReference(obj runtime.Object) (*ObjectReference, error) {
+	if obj == nil {
+		return nil, ErrNilObject
+	}
 	jsonBase, err := runtime.FindTypeMeta(obj)
 	if err != nil {
 		return nil, err
