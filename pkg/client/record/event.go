@@ -99,7 +99,7 @@ var events = watch.NewMux(queueLen)
 func Event(object runtime.Object, fieldPath, status, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
-		glog.Errorf("Could not construct reference to: %#v", object)
+		glog.Errorf("Could not construct reference to: %#v due to: %v", object, err)
 		return
 	}
 	ref.FieldPath = fieldPath
