@@ -374,6 +374,13 @@ function kube::build::run_build_command() {
 # If the Docker server is remote, copy the results back out.
 function kube::build::copy_output() {
   if kube::build::is_osx; then
+    # Docker 1.3 on OS X handles this properly, so bail.
+    docker_version=$(docker version 2> /dev/null | sed -n 1p | awk '{ print $3 }')
+    # TODO: this will start breaking with Docker 1.4, but at that point we should
+    #  just delete this whole function and force people to upgrade.
+    if [[ "$docker_version" == "1.3."* ]]; then
+      return
+    fi
     # When we are on the Mac with boot2docker we need to copy the results back
     # out.  Ideally we would leave the container around and use 'docker cp' to
     # copy the results out.  However, that doesn't work for mounted volumes
