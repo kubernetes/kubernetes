@@ -31,6 +31,9 @@ type ipAllocator struct {
 	used []byte     // a bitmap of allocated IPs
 }
 
+// The smallest number of IPs we accept.
+const minIPSpace = 8
+
 // newIPAllocator creates and intializes a new ipAllocator object.
 func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 	if subnet == nil || subnet.IP == nil || subnet.Mask == nil {
@@ -38,7 +41,13 @@ func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 	}
 
 	ones, bits := subnet.Mask.Size()
+	// TODO: some settings with IPv6 address could cause this to take
+	// an excessive amount of memory.
 	numIps := 1 << uint(bits-ones)
+	if numIps < minIPSpace {
+		glog.Errorf("IPAllocator requires at least %d IPs", minIPSpace)
+		return nil
+	}
 	ipa := &ipAllocator{
 		subnet: subnet,
 		used:   make([]byte, numIps/8),
@@ -82,7 +91,7 @@ func (ipa *ipAllocator) AllocateNext() (net.IP, error) {
 			}
 			ipa.used[i] |= 1 << nextBit
 			offset := (i * 8) + int(nextBit)
-			ip := ipAdd(copyIP(ipa.subnet.IP), offset)
+			ip := ipAdd(ipa.subnet.IP, offset)
 			return ip, nil
 		}
 	}
@@ -102,12 +111,16 @@ func ffs(val byte) (uint, error) {
 
 // Add an offset to an IP address - used for joining network addr and host addr parts.
 func ipAdd(ip net.IP, offset int) net.IP {
-	for i := 0; offset > 0; i++ {
+	out := copyIP(simplifyIP(ip))
+	// Loop from least-significant to most.
+	for i := len(out) - 1; i >= 0 && offset > 0; i-- {
 		add := offset % 256
-		ip[len(ip)-1-i] += byte(add)
+		result := int(out[i]) + add
+		out[i] = byte(result % 256)
 		offset >>= 8
+		offset += result / 256 // carry
 	}
-	return ip
+	return out
 }
 
 // Subtract two IPs, returning the difference as an offset - used or splitting an IP into
@@ -115,16 +128,35 @@ func ipAdd(ip net.IP, offset int) net.IP {
 func ipSub(lhs, rhs net.IP) int {
 	// If they are not the same length, normalize them.  Make copies because net.IP is
 	// a slice underneath. Sneaky sneaky.
+	lhs = simplifyIP(lhs)
+	rhs = simplifyIP(rhs)
 	if len(lhs) != len(rhs) {
 		lhs = copyIP(lhs).To16()
 		rhs = copyIP(rhs).To16()
 	}
 	offset := 0
+	borrow := 0
+	// Loop from most-significant to least.
 	for i := range lhs {
-		offset *= 256
-		offset += int(lhs[i] - rhs[i])
+		offset <<= 8
+		result := (int(lhs[i]) - borrow) - int(rhs[i])
+		if result < 0 {
+			borrow = 1
+		} else {
+			borrow = 0
+		}
+		offset += result
 	}
 	return offset
+}
+
+// Get the optimal slice for an IP. IPv4 addresses will come back in a 4 byte slice. IPv6
+// addresses will come back in a 16 byte slice. Non-IP arguments will produce nil.
+func simplifyIP(in net.IP) net.IP {
+	if ip4 := in.To4(); ip4 != nil {
+		return ip4
+	}
+	return in.To16()
 }
 
 // Make a copy of a net.IP.  It appears to be a value type, but it is actually defined as a
