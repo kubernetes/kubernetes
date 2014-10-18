@@ -206,10 +206,14 @@ func TestIPAdd(t *testing.T) {
 		{"1.2.3.0", 0, "1.2.3.0"},
 		{"1.2.3.0", 1, "1.2.3.1"},
 		{"1.2.3.0", 255, "1.2.3.255"},
+		{"1.2.3.1", 255, "1.2.4.0"},
+		{"1.2.3.2", 255, "1.2.4.1"},
 		{"1.2.3.0", 256, "1.2.4.0"},
 		{"1.2.3.0", 257, "1.2.4.1"},
 		{"1.2.3.0", 65536, "1.3.3.0"},
 		{"1.2.3.4", 1, "1.2.3.5"},
+		{"255.255.255.255", 1, "0.0.0.0"},
+		{"255.255.255.255", 2, "0.0.0.1"},
 	}
 	for _, tc := range testCases {
 		r := ipAdd(net.ParseIP(tc.ip), tc.offset)
@@ -229,9 +233,12 @@ func TestIPSub(t *testing.T) {
 		{"1.2.3.1", "1.2.3.0", 1},
 		{"1.2.3.255", "1.2.3.0", 255},
 		{"1.2.4.0", "1.2.3.0", 256},
+		{"1.2.4.0", "1.2.3.255", 1},
 		{"1.2.4.1", "1.2.3.0", 257},
 		{"1.3.3.0", "1.2.3.0", 65536},
 		{"1.2.3.5", "1.2.3.4", 1},
+		{"0.0.0.0", "0.0.0.1", -1},
+		{"0.0.1.0", "0.0.0.1", 255},
 	}
 	for _, tc := range testCases {
 		r := ipSub(net.ParseIP(tc.lhs), net.ParseIP(tc.rhs))
@@ -247,5 +254,25 @@ func TestCopyIP(t *testing.T) {
 	ip2[0]++
 	if ip1[0] == ip2[0] {
 		t.Errorf("copyIP did not copy")
+	}
+}
+
+func TestSimplifyIP(t *testing.T) {
+	ip4 := net.ParseIP("1.2.3.4")
+	if len(ip4) != 16 {
+		t.Errorf("expected 16 bytes")
+	}
+	if len(simplifyIP(ip4)) != 4 {
+		t.Errorf("expected 4 bytes")
+	}
+	ip6 := net.ParseIP("::1.2.3.4")
+	if len(ip6) != 16 {
+		t.Errorf("expected 16 bytes")
+	}
+	if len(simplifyIP(ip6)) != 16 {
+		t.Errorf("expected 16 bytes")
+	}
+	if simplifyIP([]byte{0, 0}) != nil {
+		t.Errorf("expected nil")
 	}
 }
