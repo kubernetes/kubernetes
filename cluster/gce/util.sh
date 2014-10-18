@@ -259,6 +259,7 @@ function kube-up {
     echo "mkdir -p /var/cache/kubernetes-install"
     echo "cd /var/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
@@ -268,6 +269,14 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
+
+  gcutil addfirewall "${MASTER_NAME}-all" \
+    --project "${PROJECT}" \
+    --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+    --network "${NETWORK}" \
+    --allowed_ip_sources "${MASTER_IP_RANGE}" \
+    --allowed "tcp,udp,icmp,esp,ah,sctp" &
 
   gcutil addinstance "${MASTER_NAME}" \
     --project "${PROJECT}" \
@@ -281,6 +290,13 @@ function kube-up {
     --service_account_scopes="storage-ro,compute-rw" \
     --automatic_restart \
     --metadata_from_file "startup-script:${KUBE_TEMP}/master-start.sh" &
+
+  gcutil addroute "${MASTER_NAME}" "${MASTER_IP_RANGE}" \
+    --project "${PROJECT}" \
+    --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+    --network "${NETWORK}" \
+    --next_hop_instance "${ZONE}/instances/${MASTER_NAME}" &
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (

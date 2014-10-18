@@ -8,9 +8,9 @@ base:
     - kubelet
     - kube-proxy
     - cadvisor
+    - logrotate
     # We need a binary release of nsinit
     # - nsinit
-    - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn-client
 {% else %}
@@ -25,6 +25,11 @@ base:
     - scheduler
     - nginx
     - logrotate
+    - docker
+    - kubelet
+    - kube-proxy
+    - cadvisor
+    - skydns
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}
