@@ -20,16 +20,33 @@
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
-source $KUBE_ROOT/build/common.sh
 
 verify-prereqs() {
   # Make sure that prerequisites are installed.
-  for x in nova; do
+  for x in nova swiftly; do
     if [ "$(which $x)" == "" ]; then
       echo "cluster/rackspace/util.sh:  Can't find $x in PATH, please fix and retry."
       exit 1
     fi
   done
+
+  if [[ -z "${OS_AUTH_URL-}" ]]; then
+    echo "build/common.sh: OS_AUTH_URL not set."
+    echo -e "\texport OS_AUTH_URL=https://identity.api.rackspacecloud.com/v2.0/"
+    return 1
+  fi
+
+  if [[ -z "${OS_USERNAME-}" ]]; then
+    echo "build/common.sh: OS_USERNAME not set."
+    echo -e "\texport OS_USERNAME=myusername"
+    return 1
+  fi
+
+  if [[ -z "${OS_PASSWORD-}" ]]; then
+    echo "build/common.sh: OS_PASSWORD not set."
+    echo -e "\texport OS_PASSWORD=myapikey"
+    return 1
+  fi
 }
 
 # Ensure that we have a password created for validating to the master.  Will
@@ -75,8 +92,10 @@ rax-ssh-key() {
 
 find-release-tars() {
   SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  RELEASE_DIR="${KUBE_ROOT}/server/"
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
     SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+    RELEASE_DIR="${KUBE_ROOT}/_output/release-tars/"
   fi
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
     echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
@@ -84,17 +103,44 @@ find-release-tars() {
   fi
 }
 
-# Retrieves a tempurl from cloudfiles to make the release object publicly accessible for 6 hours.
+rackspace-set-vars() {
+
+  CLOUDFILES_CONTAINER="kubernetes-releases-${OS_USERNAME}"
+  CONTAINER_PREFIX=${CONTAINER_PREFIX-devel/}
+  find-release-tars
+}
+
+# Retrieves a tempurl from cloudfiles to make the release object publicly accessible temporarily.
 find-object-url() {
 
-  kube::release::rackspace::set_vars
+  rackspace-set-vars
 
-  RELEASE=${KUBE_RACKSPACE_RELEASE_BUCKET}/${KUBE_RACKSPACE_RELEASE_PREFIX}/kubernetes-server-linux-amd64.tar.gz
+  KUBE_TAR=${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz
 
-  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${RELEASE})
+  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${KUBE_TAR})
   echo "cluster/rackspace/util.sh: Object temp URL:"
   echo -e "\t${RELEASE_TMP_URL}"
 
+}
+
+ensure_dev_container() {
+
+  SWIFTLY_CMD="swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD}"
+
+  if ! ${SWIFTLY_CMD} get ${CLOUDFILES_CONTAINER} > /dev/null 2>&1 ; then
+    echo "cluster/rackspace/util.sh: Container doesn't exist. Creating container ${KUBE_RACKSPACE_RELEASE_BUCKET}"
+    ${SWIFTLY_CMD} put ${CLOUDFILES_CONTAINER} > /dev/null 2>&1
+  fi
+}
+
+# Copy kubernetes-server-linux-amd64.tar.gz to cloud files object store
+copy_dev_tarballs() {
+
+  echo "cluster/rackspace/util.sh: Uploading to Cloud Files"
+  ${SWIFTLY_CMD} put -i ${RELEASE_DIR}/kubernetes-server-linux-amd64.tar.gz \
+  ${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz > /dev/null 2>&1
+  
+  echo "Release pushed."
 }
 
 rax-boot-master() {
@@ -112,7 +158,7 @@ rax-boot-master() {
       $(dirname $0)/rackspace/cloud-config/master-cloud-config.yaml > $KUBE_TEMP/master-cloud-config.yaml
 
 
-  MASTER_BOOT_CMD="nova boot
+  MASTER_BOOT_CMD="nova boot \
 --key-name ${SSH_KEY_NAME} \
 --flavor ${KUBE_MASTER_FLAVOR} \
 --image ${KUBE_IMAGE} \
@@ -202,6 +248,11 @@ detect-master-nova-net() {
 kube-up() {
 
   SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
+
+  rackspace-set-vars
+  ensure_dev_container
+  copy_dev_tarballs
+
   # Find the release to use.  Generally it will be passed when doing a 'prod'
   # install and will default to the release/config.sh version when doing a
   # developer up.
