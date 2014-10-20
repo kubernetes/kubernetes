@@ -31,19 +31,19 @@ verify-prereqs() {
   done
 
   if [[ -z "${OS_AUTH_URL-}" ]]; then
-    echo "build/common.sh: OS_AUTH_URL not set."
+    echo "cluster/rackspace/util.sh: OS_AUTH_URL not set."
     echo -e "\texport OS_AUTH_URL=https://identity.api.rackspacecloud.com/v2.0/"
     return 1
   fi
 
   if [[ -z "${OS_USERNAME-}" ]]; then
-    echo "build/common.sh: OS_USERNAME not set."
+    echo "cluster/rackspace/util.sh: OS_USERNAME not set."
     echo -e "\texport OS_USERNAME=myusername"
     return 1
   fi
 
   if [[ -z "${OS_PASSWORD-}" ]]; then
-    echo "build/common.sh: OS_PASSWORD not set."
+    echo "cluster/rackspace/util.sh: OS_PASSWORD not set."
     echo -e "\texport OS_PASSWORD=myapikey"
     return 1
   fi
