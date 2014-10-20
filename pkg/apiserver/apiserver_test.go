@@ -206,7 +206,7 @@ func TestNotFound(t *testing.T) {
 	for k, v := range cases {
 		request, err := http.NewRequest(v.Method, server.URL+v.Path, nil)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
 
 		response, err := client.Do(request)
