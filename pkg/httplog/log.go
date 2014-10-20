@@ -161,6 +161,16 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 	return rl.w.Write(b)
 }
 
+// Flush implements http.Flusher even if the underlying http.Writer doesn't implement it.
+// Flush is used for streaming purposes and allows to flush buffered data to the client.
+func (rl *respLogger) Flush() {
+	if flusher, ok := rl.w.(http.Flusher); ok {
+		flusher.Flush()
+	} else {
+		glog.V(2).Infof("Unable to convert %v into http.Flusher", rl.w)
+	}
+}
+
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
 	rl.status = status
