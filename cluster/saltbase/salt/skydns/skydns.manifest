@@ -1,0 +1,11 @@
+version: v1beta2
+id: skydns
+containers:
+  - name: skydns
+    image: skynetservices/skydns
+    #FIXME: run --net=host?  Or find the master somehow.
+    command: [ "-kubernetes=true", "-master=http://kubernetes-master:8080", "-machines=http://kubernetes-master:4001" ]
+    ports:
+      - name: dns
+        containerPort: 53
+        hostPort: 53

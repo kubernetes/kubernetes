@@ -24,6 +24,7 @@ IMAGE=backports-debian-7-wheezy
 NETWORK=default
 INSTANCE_PREFIX=kubernetes
 MASTER_NAME="${INSTANCE_PREFIX}-master"
+MASTER_IP_RANGE="10.244.0.0/24"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
 MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
