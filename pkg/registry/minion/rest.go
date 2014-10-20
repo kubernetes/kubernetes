@@ -17,11 +17,15 @@ limitations under the License.
 package minion
 
 import (
+	"errors"
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -38,8 +42,8 @@ func NewREST(m Registry) *REST {
 	}
 }
 
-var ErrDoesNotExist = fmt.Errorf("The requested resource does not exist.")
-var ErrNotHealty = fmt.Errorf("The requested minion is not healthy.")
+var ErrDoesNotExist = errors.New("The requested resource does not exist.")
+var ErrNotHealty = errors.New("The requested minion is not healthy.")
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	minion, ok := obj.(*api.Minion)
@@ -103,4 +107,18 @@ func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.O
 
 func (rs *REST) toApiMinion(name string) *api.Minion {
 	return &api.Minion{TypeMeta: api.TypeMeta{ID: name}}
+}
+
+// ResourceLocation returns a URL to which one can send traffic for the specified minion.
+func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
+	minion, err := rs.registry.GetMinion(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	host := minion.HostIP
+	if host == "" {
+		host = minion.ID
+	}
+	// TODO: Minion webservers should be secure!
+	return "http://" + net.JoinHostPort(host, strconv.Itoa(ports.KubeletPort)), nil
 }
