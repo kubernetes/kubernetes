@@ -662,12 +662,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	}
 
 	// Kill any containers we don't need.
-	existingContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
-	if err != nil {
-		glog.Errorf("Error listing containers: %s", err)
-		return err
-	}
-	for _, container := range existingContainers {
+	for _, container := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
 		podFullName, uuid, containerName, _ := dockertools.ParseDockerName(container.Names[0])
 		pc := podContainer{podFullName, uuid, containerName}
