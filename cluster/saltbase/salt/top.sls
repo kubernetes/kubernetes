@@ -8,6 +8,9 @@ base:
     - kubelet
     - kube-proxy
     - cadvisor
+{% if pillar['use-fluentd-es'] is defined and pillar['use-fluentd-es'] %}
+    - fluentd-es
+{% endif %}
     # We need a binary release of nsinit
     # - nsinit
     - logrotate
@@ -36,4 +39,3 @@ base:
   'roles:kubernetes-pool-vagrant':
     - match: grain
     - vagrant
-
