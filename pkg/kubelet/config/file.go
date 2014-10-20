@@ -47,14 +47,14 @@ func NewSourceFile(path string, period time.Duration, updates chan<- interface{}
 		path:    path,
 		updates: updates,
 	}
-	glog.V(1).Infof("Watching file %s", path)
+	glog.V(1).Infof("Watching path %q", path)
 	go util.Forever(config.run, period)
 	return config
 }
 
 func (s *SourceFile) run() {
 	if err := s.extractFromPath(); err != nil {
-		glog.Errorf("Unable to read config file: %s", err)
+		glog.Errorf("Unable to read config path %q: %v", s.path, err)
 	}
 }
 
@@ -63,9 +63,9 @@ func (s *SourceFile) extractFromPath() error {
 	statInfo, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("unable to access path: %s", err)
+			return err
 		}
-		return fmt.Errorf("path does not exist: %s", path)
+		return fmt.Errorf("path does not exist, ignoring")
 	}
 
 	switch {
@@ -90,31 +90,49 @@ func (s *SourceFile) extractFromPath() error {
 	return nil
 }
 
+// Get as many pod configs as we can from a directory.  Return an error iff something
+// prevented us from reading anything at all.  Do not return an error if only some files
+// were problematic.
 func extractFromDir(name string) ([]api.BoundPod, error) {
-	files, err := filepath.Glob(filepath.Join(name, "[^.]*"))
+	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("glob failed: %v", err)
 	}
-	if len(files) == 0 {
+	if len(dirents) == 0 {
 		return nil, nil
 	}
 
-	sort.Strings(files)
+	sort.Strings(dirents)
 	pods := []api.BoundPod{}
-	for _, file := range files {
-		pod, err := extractFromFile(file)
+	for _, path := range dirents {
+		statInfo, err := os.Stat(path)
 		if err != nil {
-			return nil, err
+			glog.V(1).Infof("Can't get metadata for %q: %v", path, err)
+			continue
 		}
-		pods = append(pods, pod)
+
+		switch {
+		case statInfo.Mode().IsDir():
+			glog.V(1).Infof("Not recursing into config path %q", path)
+		case statInfo.Mode().IsRegular():
+			pod, err := extractFromFile(path)
+			if err != nil {
+				glog.V(1).Infof("Can't process config file %q: %v", path, err)
+			} else {
+				pods = append(pods, pod)
+			}
+		default:
+			glog.V(1).Infof("Config path %q is not a directory or file: %v", path, statInfo.Mode())
+		}
 	}
 	return pods, nil
 }
 
-func extractFromFile(name string) (api.BoundPod, error) {
+func extractFromFile(filename string) (api.BoundPod, error) {
 	var pod api.BoundPod
 
-	file, err := os.Open(name)
+	glog.V(3).Infof("Reading config file %q", filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		return pod, err
 	}
@@ -122,28 +140,32 @@ func extractFromFile(name string) (api.BoundPod, error) {
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		glog.Errorf("Couldn't read from file: %v", err)
 		return pod, err
 	}
 
 	manifest := &api.ContainerManifest{}
 	// TODO: use api.Scheme.DecodeInto
 	if err := yaml.Unmarshal(data, manifest); err != nil {
-		return pod, err
+		return pod, fmt.Errorf("can't unmarshal file %q: %v", filename, err)
 	}
 
 	if err := api.Scheme.Convert(manifest, &pod); err != nil {
-		return pod, err
+		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
 	}
 
-	pod.ID = simpleSubdomainSafeHash(name)
+	pod.ID = simpleSubdomainSafeHash(filename)
 	if len(pod.UID) == 0 {
-		pod.UID = simpleSubdomainSafeHash(name)
+		pod.UID = simpleSubdomainSafeHash(filename)
 	}
 	if len(pod.Namespace) == 0 {
 		pod.Namespace = api.NamespaceDefault
 	}
 
+	if glog.V(4) {
+		glog.Infof("Got pod from file %q: %#v", filename, pod)
+	} else {
+		glog.V(1).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.ID, pod.UID)
+	}
 	return pod, nil
 }
 
