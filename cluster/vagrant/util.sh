@@ -144,11 +144,26 @@ function get-password {
   echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD"
 }
 
+# Find the minion name based on the IP address
+function find-minion-by-ip {
+  local ip="$1"
+  local ip_pattern="${MINION_IP_BASE}(.*)"
+
+  # This is subtle.  We map 10.245.2.2 -> minion-1.  We do this by matching a
+  # regexp and using the capture to construct the name.
+  [[ $ip =~ $ip_pattern ]] || {
+    return 1
+  }
+
+  echo "minion-$((${BASH_REMATCH[1]} - 1))"
+}
+
 # SSH to a node by name ($1) and run a command ($2).
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
-  local machine="${VAGRANT_MINION_NAMES_BY_IP[${node}]}"
+  local machine
+  machine=$(find-minion-by-ip $node)
   vagrant ssh "${machine}" -c "${cmd}" | grep -v "Connection to.*closed"
 }
 
