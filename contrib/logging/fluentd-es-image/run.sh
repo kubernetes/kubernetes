@@ -26,4 +26,4 @@ OUTER_HOST=`tail -n 1 /outerhost | awk '{print $3}'`
 # service IPs are done.
 # Adjust the name of the host machine for %ES_HOST%. HACK!
 sed -i -e "s/\%ES_HOST\%/${OUTER_HOST}/" /etc/td-agent/td-agent.conf
-/usr/sbin/td-agent $@
+/usr/sbin/td-agent "$@"
