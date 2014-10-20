@@ -9,6 +9,7 @@ ExecStart=/opt/bin/apiserver \
 --port=8080 \
 --etcd_servers=http://127.0.0.1:4001 \
 --machines=127.0.0.1 \
+--portal_net=10.0.0.0/24 \
 --logtostderr=true
 Restart=on-failure
 RestartSec=1
