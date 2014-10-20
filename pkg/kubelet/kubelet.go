@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,7 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
-	"github.com/google/cadvisor/info"
 )
 
 const defaultChanSize = 1024
@@ -46,12 +44,6 @@ const defaultChanSize = 1024
 const minShares = 2
 const sharesPerCPU = 1024
 const milliCPUToCPU = 1000
-
-// CadvisorInterface is an abstract interface for testability.  It abstracts the interface of "github.com/google/cadvisor/client".Client.
-type CadvisorInterface interface {
-	ContainerInfo(name string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
-	MachineInfo() (*info.MachineInfo, error)
-}
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
@@ -131,19 +123,19 @@ type Kubelet struct {
 	pullBurst int
 
 	// Optional, no statistics will be available if omitted
-	cadvisorClient CadvisorInterface
+	cadvisorClient cadvisorInterface
 	cadvisorLock   sync.RWMutex
 }
 
 // SetCadvisorClient sets the cadvisor client in a thread-safe way.
-func (kl *Kubelet) SetCadvisorClient(c CadvisorInterface) {
+func (kl *Kubelet) SetCadvisorClient(c cadvisorInterface) {
 	kl.cadvisorLock.Lock()
 	defer kl.cadvisorLock.Unlock()
 	kl.cadvisorClient = c
 }
 
 // GetCadvisorClient gets the cadvisor client.
-func (kl *Kubelet) GetCadvisorClient() CadvisorInterface {
+func (kl *Kubelet) GetCadvisorClient() cadvisorInterface {
 	kl.cadvisorLock.RLock()
 	defer kl.cadvisorLock.RUnlock()
 	return kl.cadvisorClient
@@ -740,25 +732,6 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
-func getCadvisorContainerInfoRequest(req *info.ContainerInfoRequest) *info.ContainerInfoRequest {
-	ret := &info.ContainerInfoRequest{
-		NumStats: req.NumStats,
-	}
-	return ret
-}
-
-// This method takes a container's absolute path and returns the stats for the
-// container.  The container's absolute path refers to its hierarchy in the
-// cgroup file system. e.g. The root container, which represents the whole
-// machine, has path "/"; all docker containers have path "/docker/<docker id>"
-func (kl *Kubelet) statsFromContainerPath(cc CadvisorInterface, containerPath string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
-	cinfo, err := cc.ContainerInfo(containerPath, getCadvisorContainerInfoRequest(req))
-	if err != nil {
-		return nil, err
-	}
-	return cinfo, nil
-}
-
 // GetKubeletContainerLogs returns logs from the container
 // The second parameter of GetPodInfo and FindPodContainer methods represents pod UUID, which is allowed to be blank
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
@@ -787,40 +760,6 @@ func (kl *Kubelet) GetPodInfo(podFullName, uuid string) (api.PodInfo, error) {
 		}
 	}
 	return dockertools.GetDockerPodInfo(kl.dockerClient, manifest, podFullName, uuid)
-}
-
-// GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName, uuid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
-	cc := kl.GetCadvisorClient()
-	if cc == nil {
-		return nil, nil
-	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
-	if err != nil {
-		return nil, err
-	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, containerName)
-	if !found {
-		return nil, errors.New("couldn't find container")
-	}
-	return kl.statsFromContainerPath(cc, fmt.Sprintf("/docker/%s", dockerContainer.ID), req)
-}
-
-// GetRootInfo returns stats (from Cadvisor) of current machine (root container).
-func (kl *Kubelet) GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
-	cc := kl.GetCadvisorClient()
-	if cc == nil {
-		return nil, fmt.Errorf("no cadvisor connection")
-	}
-	return kl.statsFromContainerPath(cc, "/", req)
-}
-
-func (kl *Kubelet) GetMachineInfo() (*info.MachineInfo, error) {
-	cc := kl.GetCadvisorClient()
-	if cc == nil {
-		return nil, fmt.Errorf("no cadvisor connection")
-	}
-	return cc.MachineInfo()
 }
 
 func (kl *Kubelet) healthy(podFullName, podUUID string, currentState api.PodState, container api.Container, dockerContainer *docker.APIContainers) (health.Status, error) {

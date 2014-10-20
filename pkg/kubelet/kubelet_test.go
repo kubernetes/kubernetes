@@ -847,8 +847,7 @@ func TestGetContainerInfo(t *testing.T) {
 	}
 
 	mockCadvisor := &mockCadvisorClient{}
-	req := &info.ContainerInfoRequest{}
-	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet, _, fakeDocker := newTestKubelet(t)
@@ -862,7 +861,7 @@ func TestGetContainerInfo(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -882,8 +881,7 @@ func TestGetRootInfo(t *testing.T) {
 	fakeDocker := dockertools.FakeDockerClient{}
 
 	mockCadvisor := &mockCadvisorClient{}
-	req := &info.ContainerInfoRequest{}
-	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
@@ -894,7 +892,7 @@ func TestGetRootInfo(t *testing.T) {
 	}
 
 	// If the container name is an empty string, then it means the root container.
-	_, err := kubelet.GetRootInfo(req)
+	_, err := kubelet.GetRootInfo(cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -925,8 +923,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 
 	containerInfo := &info.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
-	req := &info.ContainerInfoRequest{}
-	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	cadvisorReq := &info.ContainerInfoRequest{}
 	expectedErr := fmt.Errorf("some error")
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, expectedErr)
 
@@ -941,7 +938,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", cadvisorReq)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
