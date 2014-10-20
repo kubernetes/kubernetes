@@ -241,6 +241,8 @@ kube-up() {
 
   detect-minions
 
+  # TODO: write .kubernetes_auth file with user/pass/certs/key
+
   echo "All minions may not be online yet, this is okay."
   echo
   echo "Kubernetes cluster is running.  The master is running at:"

@@ -41,15 +41,6 @@ function get-password {
     fi
     user=admin
     passwd=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-    # Store password for reuse.
-    cat << EOF > ~/.kubernetes_auth
-{
-  "User": "$user",
-  "Password": "$passwd"
-}
-EOF
-    chmod 0600 ~/.kubernetes_auth
 }
 
 # Verify prereqs
@@ -199,6 +190,8 @@ function kube-up {
             exit 1
         fi
     done
+
+    # TODO: write .kubernetes_auth file with user/pass/certs/key
 
     echo
     echo "Kubernetes cluster is running.  The master is running at:"
