@@ -216,6 +216,9 @@ func main() {
 		if auth.KeyFile != "" {
 			clientConfig.KeyFile = auth.KeyFile
 		}
+		if auth.BearerToken != "" {
+			clientConfig.BearerToken = auth.BearerToken
+		}
 		if auth.Insecure != nil {
 			clientConfig.Insecure = *auth.Insecure
 		}
