@@ -630,13 +630,13 @@ func (kl *Kubelet) reconcileVolumes(pods []api.BoundPod) error {
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
-	glog.V(4).Infof("Desired [%s]: %+v", kl.hostname, pods)
+	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
 	desiredContainers := make(map[podContainer]empty)
 
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
 	if err != nil {
-		glog.Errorf("Error listing containers %#v", dockerContainers)
+		glog.Errorf("Error listing containers: %#v", dockerContainers)
 		return err
 	}
 
@@ -656,24 +656,26 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		kl.podWorkers.Run(podFullName, func() {
 			err := kl.syncPod(pod, dockerContainers)
 			if err != nil {
-				glog.Errorf("Error syncing pod: %v skipping.", err)
+				glog.Errorf("Error syncing pod, skipping: %s", err)
 			}
 		})
 	}
 
-	// Kill any containers we don't need
+	// Kill any containers we don't need.
 	existingContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
 	if err != nil {
-		glog.Errorf("Error listing containers: %v", err)
+		glog.Errorf("Error listing containers: %s", err)
 		return err
 	}
 	for _, container := range existingContainers {
 		// Don't kill containers that are in the desired pods.
 		podFullName, uuid, containerName, _ := dockertools.ParseDockerName(container.Names[0])
-		if _, ok := desiredContainers[podContainer{podFullName, uuid, containerName}]; !ok {
+		pc := podContainer{podFullName, uuid, containerName}
+		if _, ok := desiredContainers[pc]; !ok {
+			glog.V(1).Infof("Killing unwanted container %+v", pc)
 			err = kl.killContainer(container)
 			if err != nil {
-				glog.Errorf("Error killing container: %v", err)
+				glog.Errorf("Error killing container %+v: %s", pc, err)
 			}
 		}
 	}
@@ -692,7 +694,7 @@ func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	for i := range pods {
 		pod := &pods[i]
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {
-			glog.Warningf("Pod %s has conflicting ports, ignoring: %v", GetPodFullName(pod), errs)
+			glog.Warningf("Pod %s: HostPort is already allocated, ignoring: %s", GetPodFullName(pod), errs)
 			continue
 		}
 		filtered = append(filtered, *pod)
@@ -712,7 +714,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		case u := <-updates:
 			switch u.Op {
 			case SET, UPDATE:
-				glog.V(3).Infof("Containers changed [%s]", kl.hostname)
+				glog.V(3).Infof("Containers changed")
 				kl.pods = u.Pods
 				kl.pods = filterHostPortConflicts(kl.pods)
 
@@ -720,6 +722,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 				panic("syncLoop does not support incremental changes")
 			}
 		case <-time.After(kl.resyncInterval):
+			glog.V(4).Infof("Periodic sync")
 			if kl.pods == nil {
 				continue
 			}
@@ -727,7 +730,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 
 		err := handler.SyncPods(kl.pods)
 		if err != nil {
-			glog.Errorf("Couldn't sync containers : %v", err)
+			glog.Errorf("Couldn't sync containers: %s", err)
 		}
 	}
 }
