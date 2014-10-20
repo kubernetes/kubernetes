@@ -16,8 +16,8 @@
 
 # TODO(jbeda): Provide a way to override project
 ZONE=us-central1-b
-MASTER_SIZE=g1-small
-MINION_SIZE=g1-small
+MASTER_SIZE=n1-standard-1
+MINION_SIZE=n1-standard-1
 NUM_MINIONS=4
 # gcloud/gcutil will expand this to the latest supported image.
 IMAGE=backports-debian-7-wheezy
