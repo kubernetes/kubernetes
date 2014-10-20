@@ -83,6 +83,7 @@ type SimpleRESTStorage struct {
 	// The id requested, and location to return for ResourceLocation
 	requestedResourceLocationID string
 	resourceLocation            string
+	expectedResourceNamespace   string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
 	// obj receives the original input to the update, delete, or create call.
@@ -157,6 +158,11 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Sel
 
 // Implement Redirector.
 func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (string, error) {
+	// validate that the namespace context on the request matches the expected input
+	requestedResourceNamespace := api.Namespace(ctx)
+	if storage.expectedResourceNamespace != requestedResourceNamespace {
+		return "", fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, requestedResourceNamespace)
+	}
 	storage.requestedResourceLocationID = id
 	if err := storage.errors["resourceLocation"]; err != nil {
 		return "", err
