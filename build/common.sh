@@ -579,8 +579,8 @@ function kube::release::gcs::ensure_release_bucket() {
   KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg/}
 
   if ! gsutil ls "gs://${KUBE_GCS_RELEASE_BUCKET}" >/dev/null 2>&1 ; then
-    echo "Creating Google Cloud Storage bucket: $RELEASE_BUCKET"
-    gsutil mb "gs://${KUBE_GCS_RELEASE_BUCKET}"
+    echo "Creating Google Cloud Storage bucket: $KUBE_GCS_RELEASE_BUCKET"
+    gsutil mb -p "${GCLOUD_PROJECT}" "gs://${KUBE_GCS_RELEASE_BUCKET}"
   fi
 }
 
@@ -655,7 +655,12 @@ function kube::release::gcs::copy_release_tarballs() {
   gsutil -q rm -f -R "${gcs_destination}" >/dev/null 2>&1 || true
 
   # Now upload everything in release directory
-  gsutil -m "${gcs_options[@]-}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}" >/dev/null 2>&1
+  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
+
+  # TODO(jbeda): Generate an HTML page with links for this release so it is easy
+  # to see it.  For extra credit, generate a dynamic page that builds up the
+  # release list using the GCS JSON API.  Use Angular and Bootstrap for extra
+  # extra credit.
 
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
     gsutil acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
