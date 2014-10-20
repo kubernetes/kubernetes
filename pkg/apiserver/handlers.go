@@ -24,8 +24,33 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
+
+// ReadOnly passes all GET requests on to handler, and returns an error on all other requests.
+func ReadOnly(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == "GET" {
+			handler.ServeHTTP(w, req)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, "This is a read-only endpoint.")
+	})
+}
+
+// RateLimit uses rl to rate limit accepting requests to 'handler'.
+func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if rl.CanAccept() {
+			handler.ServeHTTP(w, req)
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, "Rate limit exceeded.")
+	})
+}
 
 // RecoverPanics wraps an http Handler to recover and log panics.
 func RecoverPanics(handler http.Handler) http.Handler {

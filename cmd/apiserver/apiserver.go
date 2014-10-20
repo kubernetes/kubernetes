@@ -49,6 +49,7 @@ import (
 var (
 	port                  = flag.Uint("port", 8080, "The port to listen on. Default 8080")
 	address               = util.IP(net.ParseIP("127.0.0.1"))
+	readOnlyPort          = flag.Uint("read_only_port", 7080, "The port from which to serve read-only resources. If 0, don't serve on a read-only address.")
 	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
 	storageVersion        = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
 	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
@@ -230,11 +231,25 @@ func main() {
 		handler = handlers.NewRequestAuthenticator(userContexts, bearertoken.New(auth), handlers.Unauthorized, handler)
 	}
 
-	handler = apiserver.RecoverPanics(handler)
+	if *readOnlyPort != 0 {
+		// Allow 1 read-only request per second, allow up to 20 in a burst before enforcing.
+		rl := util.NewTokenBucketRateLimiter(1.0, 20)
+		readOnlyServer := &http.Server{
+			Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*readOnlyPort))),
+			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, handler))),
+			ReadTimeout:    5 * time.Minute,
+			WriteTimeout:   5 * time.Minute,
+			MaxHeaderBytes: 1 << 20,
+		}
+		go func() {
+			defer util.HandleCrash()
+			glog.Fatal(readOnlyServer.ListenAndServe())
+		}()
+	}
 
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*port))),
-		Handler:        handler,
+		Handler:        apiserver.RecoverPanics(handler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
