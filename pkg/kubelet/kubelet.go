@@ -99,7 +99,7 @@ func NewIntegrationTestKubelet(hn string, rd string, dc dockertools.DockerInterf
 	}
 }
 
-type httpGetInterface interface {
+type httpGetter interface {
 	Get(url string) (*http.Response, error)
 }
 
@@ -124,7 +124,7 @@ type Kubelet struct {
 	// Optional, defaults to simple Docker implementation
 	runner dockertools.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
-	httpClient httpGetInterface
+	httpClient httpGetter
 	// Optional, maximum pull QPS from the docker registry, 0.0 means unlimited.
 	pullQPS float32
 	// Optional, maximum burst QPS from the docker registry, must be positive if QPS is > 0.0

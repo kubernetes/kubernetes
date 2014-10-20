@@ -39,7 +39,7 @@ func (e *execActionHandler) Run(podFullName, uuid string, container *api.Contain
 
 type httpActionHandler struct {
 	kubelet *Kubelet
-	client  httpGetInterface
+	client  httpGetter
 }
 
 // ResolvePort attempts to turn a IntOrString port reference into a concrete port number.
