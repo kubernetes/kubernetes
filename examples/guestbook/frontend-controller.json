@@ -19,7 +19,10 @@
            }]
          }
        },
-       "labels": {"name": "frontend"}
+       "labels": {
+         "name": "frontend",
+         "uses": "redisslave,redis-master"
+       }
       }},
   "labels": {"name": "frontend"}
 }
