@@ -109,6 +109,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/walkthrough": {
 			"pod1": &api.Pod{},
 			"pod2": &api.Pod{},
+			"pod-with-http-healthcheck": &api.Pod{},
+			"service":                   &api.Service{},
+			"replication-controller":    &api.ReplicationController{},
 		},
 	}
 
