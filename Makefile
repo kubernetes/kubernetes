@@ -92,3 +92,12 @@ vet:
 release:
 	build/release.sh
 .PHONY: release
+
+# Build a release, but skip tests
+# 
+# Example:
+#   make release-skip-tests
+release-skip-tests:
+	KUBE_RELEASE_RUN_TESTS=n build/release.sh
+.PHONY: release-skip-tests
+
