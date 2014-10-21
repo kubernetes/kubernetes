@@ -107,3 +107,31 @@ func TestFIFO_addReplace(t *testing.T) {
 		t.Errorf("item did not get removed")
 	}
 }
+
+func TestFIFO_detectLineJumpers(t *testing.T) {
+	f := NewFIFO()
+
+	f.Add("foo", 10)
+	f.Add("bar", 1)
+	f.Add("foo", 11)
+	f.Add("foo", 13)
+	f.Add("zab", 30)
+
+	if e, a := 13, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+
+	f.Add("foo", 14) // ensure foo doesn't jump back in line
+
+	if e, a := 1, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+
+	if e, a := 30, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+
+	if e, a := 14, f.Pop().(int); a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+}
