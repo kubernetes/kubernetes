@@ -287,7 +287,7 @@ function kube-up {
   ) > "${KUBE_TEMP}/master-start.sh"
 
   # For logging to GCP we need to enable some minion scopes.
-  if [ $FLUENTD_GCP == "true" ]; then
+  if [ -n "$FLUENTD_GCP" ] && [ "$FLUENTD_GCP" = "true" ]; then
      MINION_SCOPES="${MINION_SCOPES}, https://www.googleapis.com/auth/logging.write"
   fi
 
