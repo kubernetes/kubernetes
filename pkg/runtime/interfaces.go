@@ -45,7 +45,7 @@ type SelfLinker interface {
 	SetSelfLink(obj Object, selfLink string) error
 	SelfLink(obj Object) (string, error)
 
-	// Knowing ID is sometimes necssary to use a SelfLinker.
+	// Knowing ID is sometimes necessary to use a SelfLinker.
 	ID(obj Object) (string, error)
 }
 
