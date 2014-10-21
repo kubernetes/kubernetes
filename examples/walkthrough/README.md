@@ -120,4 +120,5 @@ Finally, we have also introduced an environment variable to the ```git-monitor``
 
 
 ### What's next?
-For a complete application see the [guestbook example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook)
+Continue on to [Kubernetes 201](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough/k8s201.md) or
+for a complete application see the [guestbook example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook/README.md)
