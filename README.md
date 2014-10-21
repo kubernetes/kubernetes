@@ -42,6 +42,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 Check out examples of Kubernetes in action, and community projects in the larger ecosystem:
 
 * [Kubernetes 101](examples/walkthrough/README.md)
+* [Kubernetes 201](examples/walkthrough/k8s201.md)
 * [Detailed example application](examples/guestbook/README.md)
 * [Example of dynamic updates](examples/update-demo/README.md)
 * [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
