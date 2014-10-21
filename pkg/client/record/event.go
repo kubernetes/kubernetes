@@ -30,7 +30,7 @@ import (
 
 // EventRecorder knows how to store events (client.Client implements it.)
 type EventRecorder interface {
-	CreateEvent(event *api.Event) (*api.Event, error)
+	Create(event *api.Event) (*api.Event, error)
 }
 
 // StartRecording starts sending events to recorder. Call once while initializing
@@ -44,7 +44,7 @@ func StartRecording(recorder EventRecorder, sourceName string) watch.Interface {
 		event = &eventCopy
 		event.Source = sourceName
 		for {
-			_, err := recorder.CreateEvent(event)
+			_, err := recorder.Create(event)
 			if err == nil {
 				break
 			}

@@ -273,7 +273,7 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 		return api.PodWaiting, nil
 	}
 	if minions != nil {
-		res, err := minions.ListMinions()
+		res, err := minions.List()
 		if err != nil {
 			glog.Errorf("Error listing minions: %v", err)
 			return "", err

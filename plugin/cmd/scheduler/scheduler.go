@@ -56,7 +56,7 @@ func main() {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	record.StartRecording(kubeClient, "scheduler")
+	record.StartRecording(kubeClient.Events(), "scheduler")
 
 	go http.ListenAndServe(net.JoinHostPort(address.String(), strconv.Itoa(*port)), nil)
 

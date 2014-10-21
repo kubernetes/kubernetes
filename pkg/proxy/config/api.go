@@ -27,18 +27,24 @@ import (
 	"github.com/golang/glog"
 )
 
-// Watcher is the interface needed to receive changes to services and endpoints.
-type Watcher interface {
-	ListServices(ctx api.Context, label labels.Selector) (*api.ServiceList, error)
-	ListEndpoints(ctx api.Context, label labels.Selector) (*api.EndpointsList, error)
-	WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
-	WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+// ServicesWatcher is capable of listing and watching for changes to services across ALL namespaces
+type ServicesWatcher interface {
+	List(label labels.Selector) (*api.ServiceList, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+}
+
+// EndpointsWatcher is capable of listing and watching for changes to endpoints across ALL namespaces
+type EndpointsWatcher interface {
+	List(label labels.Selector) (*api.EndpointsList, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // SourceAPI implements a configuration source for services and endpoints that
 // uses the client watch API to efficiently detect changes.
 type SourceAPI struct {
-	client    Watcher
+	servicesWatcher  ServicesWatcher
+	endpointsWatcher EndpointsWatcher
+
 	services  chan<- ServiceUpdate
 	endpoints chan<- EndpointsUpdate
 
@@ -47,11 +53,12 @@ type SourceAPI struct {
 }
 
 // NewSourceAPI creates a config source that watches for changes to the services and endpoints.
-func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceUpdate, endpoints chan<- EndpointsUpdate) *SourceAPI {
+func NewSourceAPI(servicesWatcher ServicesWatcher, endpointsWatcher EndpointsWatcher, period time.Duration, services chan<- ServiceUpdate, endpoints chan<- EndpointsUpdate) *SourceAPI {
 	config := &SourceAPI{
-		client:    client,
-		services:  services,
-		endpoints: endpoints,
+		servicesWatcher:  servicesWatcher,
+		endpointsWatcher: endpointsWatcher,
+		services:         services,
+		endpoints:        endpoints,
 
 		waitDuration: period,
 		// prevent hot loops if the server starts to misbehave
@@ -72,9 +79,8 @@ func NewSourceAPI(client Watcher, period time.Duration, services chan<- ServiceU
 
 // runServices loops forever looking for changes to services.
 func (s *SourceAPI) runServices(resourceVersion *string) {
-	ctx := api.NewContext()
 	if len(*resourceVersion) == 0 {
-		services, err := s.client.ListServices(ctx, labels.Everything())
+		services, err := s.servicesWatcher.List(labels.Everything())
 		if err != nil {
 			glog.Errorf("Unable to load services: %v", err)
 			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
@@ -84,7 +90,7 @@ func (s *SourceAPI) runServices(resourceVersion *string) {
 		s.services <- ServiceUpdate{Op: SET, Services: services.Items}
 	}
 
-	watcher, err := s.client.WatchServices(ctx, labels.Everything(), labels.Everything(), *resourceVersion)
+	watcher, err := s.servicesWatcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for services changes: %v", err)
 		time.Sleep(wait.Jitter(s.waitDuration, 0.0))
@@ -122,9 +128,8 @@ func handleServicesWatch(resourceVersion *string, ch <-chan watch.Event, updates
 
 // runEndpoints loops forever looking for changes to endpoints.
 func (s *SourceAPI) runEndpoints(resourceVersion *string) {
-	ctx := api.NewContext()
 	if len(*resourceVersion) == 0 {
-		endpoints, err := s.client.ListEndpoints(ctx, labels.Everything())
+		endpoints, err := s.endpointsWatcher.List(labels.Everything())
 		if err != nil {
 			glog.Errorf("Unable to load endpoints: %v", err)
 			time.Sleep(wait.Jitter(s.waitDuration, 0.0))
@@ -134,7 +139,7 @@ func (s *SourceAPI) runEndpoints(resourceVersion *string) {
 		s.endpoints <- EndpointsUpdate{Op: SET, Endpoints: endpoints.Items}
 	}
 
-	watcher, err := s.client.WatchEndpoints(ctx, labels.Everything(), labels.Everything(), *resourceVersion)
+	watcher, err := s.endpointsWatcher.Watch(labels.Everything(), labels.Everything(), *resourceVersion)
 	if err != nil {
 		glog.Errorf("Unable to watch for endpoints changes: %v", err)
 		time.Sleep(wait.Jitter(s.waitDuration, 0.0))

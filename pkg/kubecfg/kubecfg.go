@@ -127,14 +127,15 @@ func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
 //     updating more complex replication controllers.  If this is blank then no
 //     update of the image is performed.
 func Update(ctx api.Context, name string, client client.Interface, updatePeriod time.Duration, imageName string) error {
-	controller, err := client.GetReplicationController(ctx, name)
+	// TODO ctx is not needed as input to this function, should just be 'namespace'
+	controller, err := client.ReplicationControllers(api.Namespace(ctx)).Get(name)
 	if err != nil {
 		return err
 	}
 
 	if len(imageName) != 0 {
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image = imageName
-		controller, err = client.UpdateReplicationController(ctx, controller)
+		controller, err = client.ReplicationControllers(controller.Namespace).Update(controller)
 		if err != nil {
 			return err
 		}
@@ -142,7 +143,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 
 	s := labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()
 
-	podList, err := client.ListPods(ctx, s)
+	podList, err := client.Pods(api.Namespace(ctx)).List(s)
 	if err != nil {
 		return err
 	}
@@ -153,14 +154,14 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 	for _, pod := range podList.Items {
 		// We delete the pod here, the controller will recreate it.  This will result in pulling
 		// a new Docker image.  This isn't a full "update" but it's what we support for now.
-		err = client.DeletePod(ctx, pod.Name)
+		err = client.Pods(pod.Namespace).Delete(pod.Name)
 		if err != nil {
 			return err
 		}
 		time.Sleep(updatePeriod)
 	}
 	return wait.Poll(time.Second*5, time.Second*300, func() (bool, error) {
-		podList, err := client.ListPods(ctx, s)
+		podList, err := client.Pods(api.Namespace(ctx)).List(s)
 		if err != nil {
 			return false, err
 		}
@@ -175,12 +176,13 @@ func StopController(ctx api.Context, name string, client client.Interface) error
 
 // ResizeController resizes a controller named 'name' by setting replicas to 'replicas'.
 func ResizeController(ctx api.Context, name string, replicas int, client client.Interface) error {
-	controller, err := client.GetReplicationController(ctx, name)
+	// TODO ctx is not needed, and should just be a namespace
+	controller, err := client.ReplicationControllers(api.Namespace(ctx)).Get(name)
 	if err != nil {
 		return err
 	}
 	controller.DesiredState.Replicas = replicas
-	controllerOut, err := client.UpdateReplicationController(ctx, controller)
+	controllerOut, err := client.ReplicationControllers(api.Namespace(ctx)).Update(controller)
 	if err != nil {
 		return err
 	}
@@ -237,6 +239,7 @@ func portsFromString(spec string) ([]api.Port, error) {
 
 // RunController creates a new replication controller named 'name' which creates 'replicas' pods running 'image'.
 func RunController(ctx api.Context, image, name string, replicas int, client client.Interface, portSpec string, servicePort int) error {
+	// TODO replace ctx with a namespace string
 	if servicePort > 0 && !util.IsDNSLabel(name) {
 		return fmt.Errorf("Service creation requested, but an invalid name for a service was provided (%s). Service names must be valid DNS labels.", name)
 	}
@@ -273,7 +276,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 		},
 	}
 
-	controllerOut, err := client.CreateReplicationController(ctx, controller)
+	controllerOut, err := client.ReplicationControllers(api.Namespace(ctx)).Create(controller)
 	if err != nil {
 		return err
 	}
@@ -298,6 +301,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 }
 
 func createService(ctx api.Context, name string, port int, client client.Interface) (*api.Service, error) {
+	// TODO remove context in favor of just namespace string
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
@@ -310,19 +314,20 @@ func createService(ctx api.Context, name string, port int, client client.Interfa
 			"simpleService": name,
 		},
 	}
-	svc, err := client.CreateService(ctx, svc)
+	svc, err := client.Services(api.Namespace(ctx)).Create(svc)
 	return svc, err
 }
 
 // DeleteController deletes a replication controller named 'name', requires that the controller
 // already be stopped.
 func DeleteController(ctx api.Context, name string, client client.Interface) error {
-	controller, err := client.GetReplicationController(ctx, name)
+	// TODO remove ctx in favor of just namespace string
+	controller, err := client.ReplicationControllers(api.Namespace(ctx)).Get(name)
 	if err != nil {
 		return err
 	}
 	if controller.DesiredState.Replicas != 0 {
 		return fmt.Errorf("controller has non-zero replicas (%d), please stop it first", controller.DesiredState.Replicas)
 	}
-	return client.DeleteReplicationController(ctx, name)
+	return client.ReplicationControllers(api.Namespace(ctx)).Delete(name)
 }

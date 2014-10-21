@@ -40,9 +40,8 @@ var (
 
 func waitForPodRunning(c *client.Client, id string) {
 	for {
-		ctx := api.NewContext()
 		time.Sleep(5 * time.Second)
-		pod, err := c.GetPod(ctx, id)
+		pod, err := c.Pods(api.NamespaceDefault).Get(id)
 		if err != nil {
 			glog.Warningf("Get pod failed: %v", err)
 			continue
@@ -100,26 +99,26 @@ func loadClientOrDie() *client.Client {
 }
 
 func TestPodUpdate(c *client.Client) bool {
-	ctx := api.NewContext()
+	podClient := c.Pods(api.NamespaceDefault)
 
 	pod := loadPodOrDie("./api/examples/pod.json")
 	value := strconv.Itoa(time.Now().Nanosecond())
 	pod.Labels["time"] = value
 
-	_, err := c.CreatePod(ctx, pod)
+	_, err := podClient.Create(pod)
 	if err != nil {
 		glog.Errorf("Failed to create pod: %v", err)
 		return false
 	}
-	defer c.DeletePod(ctx, pod.Name)
+	defer podClient.Delete(pod.Name)
 	waitForPodRunning(c, pod.Name)
-	pods, err := c.ListPods(ctx, labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+	pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 	if len(pods.Items) != 1 {
 		glog.Errorf("Failed to find the correct pod")
 		return false
 	}
 
-	podOut, err := c.GetPod(ctx, pod.Name)
+	podOut, err := podClient.Get(pod.Name)
 	if err != nil {
 		glog.Errorf("Failed to get pod: %v", err)
 		return false
@@ -128,13 +127,13 @@ func TestPodUpdate(c *client.Client) bool {
 	pod.Labels["time"] = value
 	pod.ResourceVersion = podOut.ResourceVersion
 	pod.DesiredState.Manifest.UUID = podOut.DesiredState.Manifest.UUID
-	pod, err = c.UpdatePod(ctx, pod)
+	pod, err = podClient.Update(pod)
 	if err != nil {
 		glog.Errorf("Failed to update pod: %v", err)
 		return false
 	}
 	waitForPodRunning(c, pod.Name)
-	pods, err = c.ListPods(ctx, labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+	pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 	if len(pods.Items) != 1 {
 		glog.Errorf("Failed to find the correct pod after update.")
 		return false

@@ -137,7 +137,7 @@ func (m *Master) init(c *Config) {
 			PodCache:      podCache,
 			PodInfoGetter: c.KubeletClient,
 			Registry:      m.podRegistry,
-			Minions:       m.client,
+			Minions:       m.client.Minions(),
 		}),
 		"replicationControllers": controller.NewREST(m.controllerRegistry, m.podRegistry),
 		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.minionRegistry, m.portalNet),
