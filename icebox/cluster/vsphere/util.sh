@@ -217,6 +217,7 @@ function kube-up {
       fi
   done
 
+  # TODO: write .kubernetes_auth file with user/pass/certs/key
   echo
   echo "Kubernetes cluster is running. The master is running at:"
   echo
