@@ -16,3 +16,8 @@ be targetted at an [Elasticsearch](http://www.elasticsearch.org/) instance assum
 local node and accepting log information on port 9200. This can be accomplished
 by writing a pod specification and service sepecificaiton to define an
 Elasticsearch service (more informaiton to follow shortly in the contrib directory).
+
+### Logging with Fluentd and Google Compute Platform
+
+To enable logging of Docker contains in a cluster using Google Compute
+Platfrom set the shell environment variable ``FLUENTD_GCP`` to ``true``.

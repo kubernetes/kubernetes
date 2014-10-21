@@ -265,10 +265,16 @@ function kube-up {
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly FLUENTD_ELASTICSEARCH='${FLUENTD_ELASTICSEARCH:-false}'"
+    echo "readonly FLUENTD_GCP='${FLUENTD_GCP:-false}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
+
+  # For logging to GCP we need to enable some minion scopes.
+  if [ $FLUENTD_GCP == "true" ]; then
+     MINION_SCOPES="${MINION_SCOPES}, https://www.googleapis.com/auth/logging.write"
+  fi
 
   gcutil addinstance "${MASTER_NAME}" \
     --project "${PROJECT}" \
