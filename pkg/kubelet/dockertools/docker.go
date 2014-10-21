@@ -17,6 +17,8 @@ limitations under the License.
 package dockertools
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"hash/adler32"
@@ -51,6 +53,9 @@ type DockerInterface interface {
 	InspectImage(image string) (*docker.Image, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	Logs(opts docker.LogsOptions) error
+	Version() (*docker.Env, error)
+	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
+	StartExec(string, docker.StartExecOptions) error
 }
 
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
@@ -99,7 +104,51 @@ func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPulle
 	}
 }
 
-type dockerContainerCommandRunner struct{}
+type dockerContainerCommandRunner struct {
+	client DockerInterface
+}
+
+// The first version of docker that supports exec natively is 1.1.3
+var dockerVersionWithExec = []uint{1, 1, 3}
+
+// Returns the major and minor version numbers of docker server.
+func (d *dockerContainerCommandRunner) getDockerServerVersion() ([]uint, error) {
+	env, err := d.client.Version()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker server version - %s", err)
+	}
+	version := []uint{}
+	for _, entry := range *env {
+		if strings.Contains(strings.ToLower(entry), "server version") {
+			elems := strings.Split(strings.Split(entry, "=")[1], ".")
+			for _, elem := range elems {
+				val, err := strconv.ParseUint(elem, 10, 32)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse docker server version (%s) - %s", entry, err)
+				}
+				version = append(version, uint(val))
+			}
+			return version, nil
+		}
+	}
+	return nil, fmt.Errorf("docker server version missing from server version output - %+v", env)
+}
+
+func (d *dockerContainerCommandRunner) nativeExecSupportExists() (bool, error) {
+	version, err := d.getDockerServerVersion()
+	if err != nil {
+		return false, err
+	}
+	if len(dockerVersionWithExec) != len(version) {
+		return false, fmt.Errorf("unexpected docker version format. Expecting %v format, got %v", dockerVersionWithExec, version)
+	}
+	for idx, val := range dockerVersionWithExec {
+		if version[idx] < val {
+			return false, nil
+		}
+	}
+	return true, nil
+}
 
 func (d *dockerContainerCommandRunner) getRunInContainerCommand(containerID string, cmd []string) (*exec.Cmd, error) {
 	args := append([]string{"exec"}, cmd...)
@@ -108,13 +157,51 @@ func (d *dockerContainerCommandRunner) getRunInContainerCommand(containerID stri
 	return command, nil
 }
 
-// RunInContainer uses nsinit to run the command inside the container identified by containerID
-func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+func (d *dockerContainerCommandRunner) runInContainerUsingNsinit(containerID string, cmd []string) ([]byte, error) {
 	c, err := d.getRunInContainerCommand(containerID, cmd)
 	if err != nil {
 		return nil, err
 	}
 	return c.CombinedOutput()
+}
+
+// RunInContainer uses nsinit to run the command inside the container identified by containerID
+func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+	// If native exec support does not exist in the local docker daemon use nsinit.
+	useNativeExec, err := d.nativeExecSupportExists()
+	if err != nil {
+		return nil, err
+	}
+	if !useNativeExec {
+		return d.runInContainerUsingNsinit(containerID, cmd)
+	}
+	createOpts := docker.CreateExecOptions{
+		Container:    containerID,
+		Cmd:          cmd,
+		AttachStdin:  false,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+	}
+	execObj, err := d.client.CreateExec(createOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %s", err)
+	}
+	var buf bytes.Buffer
+	wrBuf := bufio.NewWriter(&buf)
+	startOpts := docker.StartExecOptions{
+		Detach:       false,
+		Tty:          false,
+		OutputStream: wrBuf,
+		ErrorStream:  wrBuf,
+		RawTerminal:  false,
+	}
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- d.client.StartExec(execObj.Id, startOpts)
+	}()
+	wrBuf.Flush()
+	return buf.Bytes(), <-errChan
 }
 
 // NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
