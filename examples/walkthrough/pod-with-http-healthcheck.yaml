@@ -1,0 +1,23 @@
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: php
+    containers:
+      - name: nginx
+        image: dockerfile/nginx
+        ports:
+          - containerPort: 80
+        # defines the health checking
+        livenessProbe:
+          # turn on application health checking
+          enabled: true
+          type: http
+          # length of time to wait for a pod to initialize
+          # after pod startup, before applying health checking
+          initialDelaySeconds: 30
+          # an http probe
+          httpGet:
+            path: /_status/healthz
+            port: 8080  
