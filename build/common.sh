@@ -225,7 +225,7 @@ function kube::build::build_image_built() {
 function kube::build::ensure_golang() {
   kube::build::docker_image_exists golang 1.3 || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang:cross docker image. This image is 1.8GB."
+      echo "You don't have a local copy of the golang docker image. This image is 450GB."
       read -p "Download it now? [y/n] " -n 1 -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
