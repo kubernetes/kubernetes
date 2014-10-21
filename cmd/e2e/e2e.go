@@ -88,6 +88,7 @@ func loadClientOrDie() *client.Client {
 	config.CAFile = auth.CAFile
 	config.CertFile = auth.CertFile
 	config.KeyFile = auth.KeyFile
+	config.BearerToken = auth.BearerToken
 	if auth.Insecure != nil {
 		config.Insecure = *auth.Insecure
 	}

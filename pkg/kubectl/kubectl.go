@@ -59,12 +59,13 @@ func GetKubeClient(config *client.Config, matchVersion bool) (*client.Client, er
 }
 
 type AuthInfo struct {
-	User     string
-	Password string
-	CAFile   string
-	CertFile string
-	KeyFile  string
-	Insecure *bool
+	User        string
+	Password    string
+	CAFile      string
+	CertFile    string
+	KeyFile     string
+	BearerToken string
+	Insecure    *bool
 }
 
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.

@@ -193,7 +193,8 @@ function get-password {
   KUBE_USER=admin
   KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
 
-  # Store password for reuse.
+  # Remove this code, since in all use cases I can see, we are overwriting this
+  # at cluster creation time.
   cat << EOF > "$file"
 {
   "User": "$KUBE_USER",
@@ -201,6 +202,20 @@ function get-password {
 }
 EOF
   chmod 0600 "$file"
+}
+
+# Generate authentication token for admin user. Will
+# read from $HOME/.kubernetes_auth if available.
+#
+# Vars set:
+#   KUBE_ADMIN_TOKEN
+function get-admin-token {
+  local file="$HOME/.kubernetes_auth"
+  if [[ -r "$file" ]]; then
+    KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
+    return
+  fi
+  KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
 }
 
 # Instantiate a kubernetes cluster
@@ -382,6 +397,8 @@ function kube-up {
   local kube_key=".kubecfg.key"
   local ca_cert=".kubernetes.ca.crt"
 
+  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
+  # config file.  Distribute the same way the htpasswd is done.
   (umask 077
    gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
    gcutil ssh "${MASTER_NAME}" sudo cat /usr/share/nginx/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
@@ -393,7 +410,8 @@ function kube-up {
   "Password": "$KUBE_PASSWORD",
   "CAFile": "$HOME/$ca_cert",
   "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
+  "KeyFile": "$HOME/$kube_key",
+  "BearerToken": "$KUBE_ADMIN_TOKEN"
 }
 EOF
 

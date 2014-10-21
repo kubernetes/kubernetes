@@ -52,12 +52,13 @@ func promptForString(field string, r io.Reader) string {
 }
 
 type AuthInfo struct {
-	User     string
-	Password string
-	CAFile   string
-	CertFile string
-	KeyFile  string
-	Insecure *bool
+	User        string
+	Password    string
+	CAFile      string
+	CertFile    string
+	KeyFile     string
+	BearerToken string
+	Insecure    *bool
 }
 
 type NamespaceInfo struct {
