@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -596,5 +597,41 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	created_service := created_svc.(*api.Service)
 	if created_service.PortalIP != "1.2.3.3" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.PortalIP)
+	}
+}
+
+func TestCreateServiceWithConflictingNamespace(t *testing.T) {
+	storage := REST{}
+	service := &api.Service{
+		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+	}
+
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Create(ctx, service)
+	if channel != nil {
+		t.Error("Expected a nil channel, but we got a value")
+	}
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
+		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%v'", err.Error())
+	}
+}
+
+func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
+	storage := REST{}
+	service := &api.Service{
+		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+	}
+
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Update(ctx, service)
+	if channel != nil {
+		t.Error("Expected a nil channel, but we got a value")
+	}
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
+		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }

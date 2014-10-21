@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -361,5 +362,41 @@ func TestFillCurrentState(t *testing.T) {
 	}
 	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()) {
 		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.DesiredState.ReplicaSelector).AsSelector(), fakeLister.s)
+	}
+}
+
+func TestCreateControllerWithConflictingNamespace(t *testing.T) {
+	storage := REST{}
+	controller := &api.ReplicationController{
+		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+	}
+
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Create(ctx, controller)
+	if channel != nil {
+		t.Error("Expected a nil channel, but we got a value")
+	}
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Index(err.Error(), "Controller.Namespace does not match the provided context") == -1 {
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
+	}
+}
+
+func TestUpdateControllerWithConflictingNamespace(t *testing.T) {
+	storage := REST{}
+	controller := &api.ReplicationController{
+		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+	}
+
+	ctx := api.NewDefaultContext()
+	channel, err := storage.Update(ctx, controller)
+	if channel != nil {
+		t.Error("Expected a nil channel, but we got a value")
+	}
+	if err == nil {
+		t.Errorf("Expected an error, but we didn't get one")
+	} else if strings.Index(err.Error(), "Controller.Namespace does not match the provided context") == -1 {
+		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
 }
