@@ -11,6 +11,9 @@ base:
 {% if pillar['use-fluentd-es'] is defined and pillar['use-fluentd-es'] %}
     - fluentd-es
 {% endif %}
+{% if pillar['use-fluentd-gcp'] is defined and pillar['use-fluentd-gcp'] %}
+    - fluentd-gcp
+{% endif %}
     # We need a binary release of nsinit
     # - nsinit
     - logrotate
