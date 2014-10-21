@@ -45,7 +45,7 @@ Examples:
 			data, err := readConfigData(filename)
 			checkErr(err)
 
-			err = kubectl.Modify(out, getKubeClient(cmd).RESTClient, kubectl.ModifyCreate, data)
+			err = kubectl.Modify(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), kubectl.ModifyCreate, data)
 			checkErr(err)
 		},
 	}

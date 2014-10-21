@@ -33,6 +33,58 @@ func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T
 	}
 }
 
+func TestLoadNamespaceInfo(t *testing.T) {
+	loadNamespaceInfoTests := []struct {
+		nsData string
+		nsInfo *NamespaceInfo
+	}{
+		{
+			`{"Namespace":"test"}`,
+			&NamespaceInfo{Namespace: "test"},
+		},
+		{
+			"", nil,
+		},
+		{
+			"missing",
+			&NamespaceInfo{Namespace: "default"},
+		},
+	}
+	for _, loadNamespaceInfoTest := range loadNamespaceInfoTests {
+		tt := loadNamespaceInfoTest
+		nsfile, err := ioutil.TempFile("", "testNamespaceInfo")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if tt.nsData != "missing" {
+			defer os.Remove(nsfile.Name())
+			defer nsfile.Close()
+			_, err := nsfile.WriteString(tt.nsData)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		} else {
+			nsfile.Close()
+			os.Remove(nsfile.Name())
+		}
+		nsInfo, err := LoadNamespaceInfo(nsfile.Name())
+		if len(tt.nsData) == 0 && tt.nsData != "missing" {
+			if err == nil {
+				t.Error("LoadNamespaceInfo didn't fail on an empty file")
+			}
+			continue
+		}
+		if tt.nsData != "missing" {
+			if err != nil {
+				t.Errorf("Unexpected error: %v, %v", tt.nsData, err)
+			}
+			if !reflect.DeepEqual(nsInfo, tt.nsInfo) {
+				t.Errorf("Expected %v, got %v", tt.nsInfo, nsInfo)
+			}
+		}
+	}
+}
+
 func TestLoadAuthInfo(t *testing.T) {
 	loadAuthInfoTests := []struct {
 		authData string

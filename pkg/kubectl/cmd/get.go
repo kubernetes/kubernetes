@@ -57,7 +57,7 @@ Examples:
 			outputFormat := getFlagString(cmd, "output")
 			templateFile := getFlagString(cmd, "template")
 			selector := getFlagString(cmd, "selector")
-			err := kubectl.Get(out, getKubeClient(cmd).RESTClient, resource, id, selector, outputFormat, getFlagBool(cmd, "no-headers"), templateFile)
+			err := kubectl.Get(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), resource, id, selector, outputFormat, getFlagBool(cmd, "no-headers"), templateFile)
 			checkErr(err)
 		},
 	}

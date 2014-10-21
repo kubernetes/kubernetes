@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"gopkg.in/v1/yaml"
 )
@@ -66,6 +67,39 @@ type AuthInfo struct {
 	KeyFile     string
 	BearerToken string
 	Insecure    *bool
+}
+
+type NamespaceInfo struct {
+	Namespace string
+}
+
+// LoadNamespaceInfo parses a NamespaceInfo object from a file path. It creates a file at the specified path if it doesn't exist with the default namespace.
+func LoadNamespaceInfo(path string) (*NamespaceInfo, error) {
+	var ns NamespaceInfo
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		ns.Namespace = api.NamespaceDefault
+		err = SaveNamespaceInfo(path, &ns)
+		return &ns, err
+	}
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &ns)
+	if err != nil {
+		return nil, err
+	}
+	return &ns, err
+}
+
+// SaveNamespaceInfo saves a NamespaceInfo object at the specified file path.
+func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
+	if !util.IsDNSLabel(ns.Namespace) {
+		return fmt.Errorf("Namespace %s is not a valid DNS Label", ns.Namespace)
+	}
+	data, err := json.Marshal(ns)
+	err = ioutil.WriteFile(path, data, 0600)
+	return err
 }
 
 // LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
