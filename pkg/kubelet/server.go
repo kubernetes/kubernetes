@@ -57,7 +57,7 @@ func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{},
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	s.ListenAndServe()
+	glog.Fatal(s.ListenAndServe())
 }
 
 // HostInterface contains all the kubelet methods required by the server.
