@@ -39,7 +39,7 @@ Examples:
   <list all pods in ps output format>
 
   $ kubectl get replicationController 1234-56-7890-234234-456456
-  <list single repliaction controller in ps output format>
+  <list single replication controller in ps output format>
 
   $ kubectl get -f json pod 1234-56-7890-234234-456456
   <list single pod in json output format>`,
