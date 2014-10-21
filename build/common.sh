@@ -46,6 +46,8 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 # KUBE_BUILD_IMAGE_TAG=<hash>
 # KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
 # KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
+readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
+readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 
@@ -220,8 +222,8 @@ function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
-function kube::build::ensure_golang_cross() {
-  kube::build::docker_image_exists golang cross || {
+function kube::build::ensure_golang() {
+  kube::build::docker_image_exists golang 1.3 || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
       echo "You don't have a local copy of the golang:cross docker image. This image is 1.8GB."
       read -p "Download it now? [y/n] " -n 1 -r
@@ -232,8 +234,8 @@ function kube::build::ensure_golang_cross() {
       }
     }
 
-    echo "+++ Pulling docker image: golang:cross"
-    docker pull golang:cross
+    echo "+++ Pulling docker image: golang:1.3"
+    docker pull golang:1.3
   }
 }
 
@@ -255,7 +257,7 @@ function kube::build::build_image() {
     third_party
   )
 
-  kube::build::ensure_golang_cross
+  kube::build::build_image_cross
 
   mkdir -p "${build_context_dir}"
   tar czf "${build_context_dir}/kube-source.tar.gz" "${source[@]}"
@@ -264,6 +266,16 @@ KUBE_LD_FLAGS="$(kube::version_ldflags)"
 EOF
   cp build/build-image/Dockerfile ${build_context_dir}/Dockerfile
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${build_context_dir}"
+}
+
+# Build the kubernetes golang cross base image.
+function kube::build::build_image_cross() {
+  kube::build::ensure_golang
+
+  local -r build_context_dir="${LOCAL_OUTPUT_ROOT}/images/${KUBE_BUILD_IMAGE}/cross"
+  mkdir -p "${build_context_dir}"
+  cp build/build-image/cross/Dockerfile ${build_context_dir}/Dockerfile
+  kube::build::docker_build "${KUBE_BUILD_IMAGE_CROSS}" "${build_context_dir}"
 }
 
 # Builds the runtime image.  Assumes that the appropriate binaries are already
