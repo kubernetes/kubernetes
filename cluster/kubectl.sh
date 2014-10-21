@@ -87,8 +87,8 @@ if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
 }
 EOF
   auth_config=(
-    "-auth-path" "$HOME/.kubernetes_vagrant_auth"
-    "-insecure-skip-tls-verify"
+    "--auth-path=$HOME/.kubernetes_vagrant_auth"
+    "--insecure-skip-tls-verify=true"
   )
 else
   auth_config=()
