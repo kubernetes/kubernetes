@@ -244,7 +244,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 		}
 		args := []reflect.Value{sv.Addr(), dv.Addr(), reflect.ValueOf(scope)}
 		ret := fv.Call(args)[0].Interface()
-		// This convolution is necssary because nil interfaces won't convert
+		// This convolution is necessary because nil interfaces won't convert
 		// to errors.
 		if ret == nil {
 			return nil
