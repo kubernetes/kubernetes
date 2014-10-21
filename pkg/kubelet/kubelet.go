@@ -409,13 +409,15 @@ func (kl *Kubelet) createNetworkContainer(pod *api.BoundPod) (dockertools.Docker
 	return kl.runContainer(pod, container, nil, "")
 }
 
-// Delete all containers in a pod (except the network container) returns the number of containers deleted
-// and an error if one occurs.
-func (kl *Kubelet) deleteAllContainers(pod *api.BoundPod, podFullName string, dockerContainers dockertools.DockerContainers) (int, error) {
+// Kill all containers in a pod.  Returns the number of containers deleted and an error if one occurs.
+func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers dockertools.DockerContainers) (int, error) {
+	podFullName := GetPodFullName(pod)
+
 	count := 0
 	errs := make(chan error, len(pod.Spec.Containers))
 	wg := sync.WaitGroup{}
 	for _, container := range pod.Spec.Containers {
+		// TODO: Consider being more aggressive: kill all container with this pod UID, period.
 		if dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, pod.UID, container.Name); found {
 			count++
 			wg.Add(1)
@@ -451,22 +453,21 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	// Make sure we have a network container
 	var netID dockertools.DockerID
-	if networkDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
-		netID = dockertools.DockerID(networkDockerContainer.ID)
+	if netDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
+		netID = dockertools.DockerID(netDockerContainer.ID)
 	} else {
-		glog.V(3).Infof("Network container doesn't exist, creating")
-		count, err := kl.deleteAllContainers(pod, podFullName, dockerContainers)
+		glog.V(3).Infof("Network container doesn't exist for pod %q, creating", podFullName)
+		count, err := kl.killContainersInPod(pod, dockerContainers)
 		if err != nil {
 			return err
 		}
-		dockerNetworkID, err := kl.createNetworkContainer(pod)
+		netID, err = kl.createNetworkContainer(pod)
 		if err != nil {
 			glog.Errorf("Failed to introspect network container. (%v)  Skipping pod %s", err, podFullName)
 			return err
 		}
-		netID = dockerNetworkID
 		if count > 0 {
-			// relist everything, otherwise we'll think we're ok
+			// Re-list everything, otherwise we'll think we're ok.
 			dockerContainers, err = dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
 			if err != nil {
 				glog.Errorf("Error listing containers %#v", dockerContainers)
@@ -478,15 +479,14 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 
 	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
-		glog.Errorf("Unable to mount volumes for pod %s: (%v) Skipping pod.", podFullName, err)
+		glog.Errorf("Unable to mount volumes for pod %s: (%v), skipping pod", podFullName, err)
 		return err
 	}
 
 	podState := api.PodState{}
 	info, err := kl.GetPodInfo(podFullName, uuid)
 	if err != nil {
-		glog.Errorf("Unable to get pod with name %s and uuid %s info, health checks may be invalid.",
-			podFullName, uuid)
+		glog.Errorf("Unable to get pod with name %s and uuid %s info, health checks may be invalid", podFullName, uuid)
 	}
 	netInfo, found := info[networkContainerName]
 	if found {
