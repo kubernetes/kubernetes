@@ -36,6 +36,7 @@ type Cmd interface {
 	// CombinedOutput runs the command and returns its combined standard output
 	// and standard error.  This follows the pattern of package os/exec.
 	CombinedOutput() ([]byte, error)
+	SetDir(dir string)
 }
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
@@ -63,6 +64,10 @@ func (executor *executor) Command(cmd string, args ...string) Cmd {
 
 // Wraps exec.Cmd so we can capture errors.
 type cmdWrapper osexec.Cmd
+
+func (cmd *cmdWrapper) SetDir(dir string) {
+	cmd.Dir = dir
+}
 
 // CombinedOutput is part of the Cmd interface.
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {

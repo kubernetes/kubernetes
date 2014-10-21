@@ -93,6 +93,8 @@ type VolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDisk `yaml:"persistentDisk" json:"persistentDisk"`
+	// GitRepo represents a git repository at a particular revision.
+	GitRepo *GitRepo `json:"gitRepo" yaml:"gitRepo"`
 }
 
 // HostDir represents bare host directory volume.
@@ -131,6 +133,14 @@ type GCEPersistentDisk struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `yaml:"readOnly,omitempty" json:"readOnly,omitempty"`
+}
+
+// GitRepo represents a volume that is pulled from git when the pod is created.
+type GitRepo struct {
+	// Repository URL
+	Repository string `yaml:"repository" json:"repository"`
+	// Commit hash, this is optional
+	Revision string `yaml:"revision" json:"revision"`
 }
 
 // Port represents a network port in a single container

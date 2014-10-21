@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
 type MockDiskUtil struct{}
@@ -222,5 +223,73 @@ func TestGetActiveVolumes(t *testing.T) {
 		if _, ok := volumeMap[name]; !ok {
 			t.Errorf("Expected volume map entry not found: %v", name)
 		}
+	}
+}
+
+type fakeExec struct {
+	cmds   [][]string
+	dirs   []string
+	data   []byte
+	err    error
+	action func([]string, string)
+}
+
+func (f *fakeExec) ExecCommand(cmd []string, dir string) ([]byte, error) {
+	f.cmds = append(f.cmds, cmd)
+	f.dirs = append(f.dirs, dir)
+	f.action(cmd, dir)
+	return f.data, f.err
+}
+
+func TestGitVolume(t *testing.T) {
+	var fcmd exec.FakeCmd
+	fcmd = exec.FakeCmd{
+		CombinedOutputScript: []exec.FakeCombinedOutputAction{
+			func() ([]byte, error) {
+				os.MkdirAll(path.Join(fcmd.Dirs[0], "kubernetes"), 0750)
+				return []byte{}, nil
+			},
+			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fake := exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	dir := os.TempDir() + "/git"
+	g := GitDir{
+		Source:   "https://github.com/GoogleCloudPlatform/kubernetes.git",
+		Revision: "2a30ce65c5ab586b98916d83385c5983edd353a1",
+		PodID:    "foo",
+		RootDir:  dir,
+		Name:     "test-pod",
+		exec:     &fake,
+	}
+	err := g.SetUp()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedCmds := [][]string{
+		{"git", "clone", g.Source},
+		{"git", "checkout", g.Revision},
+		{"git", "reset", "--hard"},
+	}
+	if fake.CommandCalls != len(expectedCmds) {
+		t.Errorf("unexpected command calls: expected 3, saw: %d", fake.CommandCalls)
+	}
+	if !reflect.DeepEqual(expectedCmds, fcmd.CombinedOutputLog) {
+		t.Errorf("unexpected commands: %v, expected: %v", fcmd.CombinedOutputLog, expectedCmds)
+	}
+	expectedDirs := []string{g.GetPath(), g.GetPath() + "/kubernetes", g.GetPath() + "/kubernetes"}
+	if len(fcmd.Dirs) != 3 || !reflect.DeepEqual(expectedDirs, fcmd.Dirs) {
+		t.Errorf("unexpected directories: %v, expected: %v", fcmd.Dirs, expectedDirs)
+	}
+	err = g.TearDown()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
