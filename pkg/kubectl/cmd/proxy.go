@@ -32,7 +32,8 @@ func NewCmdProxy(out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			port := getFlagInt(cmd, "port")
 			glog.Infof("Starting to serve on localhost:%d", port)
-			server := kubectl.NewProxyServer(getFlagString(cmd, "www"), getKubeClient(cmd), port)
+			server, err := kubectl.NewProxyServer(getFlagString(cmd, "www"), getKubeConfig(cmd), port)
+			checkErr(err)
 			glog.Fatal(server.Serve())
 		},
 	}

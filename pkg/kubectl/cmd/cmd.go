@@ -138,7 +138,7 @@ func getFlagInt(cmd *cobra.Command, flag string) int {
 	return v
 }
 
-func getKubeClient(cmd *cobra.Command) *client.Client {
+func getKubeConfig(cmd *cobra.Command) *client.Config {
 	config := &client.Config{}
 
 	var host string
@@ -182,6 +182,12 @@ func getKubeClient(cmd *cobra.Command) *client.Client {
 
 	// The API version (e.g. v1beta1), not the binary version.
 	config.Version = getFlagString(cmd, "api-version")
+
+	return config
+}
+
+func getKubeClient(cmd *cobra.Command) *client.Client {
+	config := getKubeConfig(cmd)
 
 	// The binary version.
 	matchVersion := getFlagBool(cmd, "match-server-version")

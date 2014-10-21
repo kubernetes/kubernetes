@@ -271,6 +271,38 @@ func TestUnacceptableParamNames(t *testing.T) {
 	}
 }
 
+func TestBody(t *testing.T) {
+	const data = "test payload"
+
+	f, err := ioutil.TempFile("", "test_body")
+	if err != nil {
+		t.Fatalf("TempFile error: %v", err)
+	}
+	if _, err := f.WriteString(data); err != nil {
+		t.Fatalf("TempFile.WriteString error: %v", err)
+	}
+	f.Close()
+
+	c := NewOrDie(&Config{})
+	tests := []interface{}{[]byte(data), f.Name(), strings.NewReader(data)}
+	for i, tt := range tests {
+		r := c.Post().Body(tt)
+		if r.err != nil {
+			t.Errorf("%d: r.Body(%#v) error: %v", i, tt, r.err)
+			continue
+		}
+		buf := make([]byte, len(data))
+		if _, err := r.body.Read(buf); err != nil {
+			t.Errorf("%d: r.body.Read error: %v", i, err)
+			continue
+		}
+		body := string(buf)
+		if body != data {
+			t.Errorf("%d: r.body = %q; want %q", i, body, data)
+		}
+	}
+}
+
 func TestSetPollPeriod(t *testing.T) {
 	c := NewOrDie(&Config{})
 	r := c.Get()
