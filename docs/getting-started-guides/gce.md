@@ -29,7 +29,7 @@ boot2docker.
 cluster/kube-up.sh
 ```
 
-The script above relies on Google Storage to stage the kuberntes release. It
+The script above relies on Google Storage to stage the Kubernetes release. It
 then will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/gce/config-default.sh`
 
