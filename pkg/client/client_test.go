@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -543,4 +544,37 @@ func TestListMinions(t *testing.T) {
 	}
 	response, err := c.Setup().ListMinions()
 	c.Validate(t, response, err)
+}
+
+func TestCreateMinion(t *testing.T) {
+	requestMinion := &api.Minion{
+		TypeMeta: api.TypeMeta{
+			ID: "minion-1",
+		},
+		HostIP: "123.321.456.654",
+		NodeResources: api.NodeResources{
+			Capacity: api.ResourceList{
+				resources.CPU:    util.NewIntOrStringFromInt(1000),
+				resources.Memory: util.NewIntOrStringFromInt(1024 * 1024),
+			},
+		},
+	}
+	c := &testClient{
+		Request: testRequest{Method: "POST", Path: "/minions", Body: requestMinion},
+		Response: Response{
+			StatusCode: 200,
+			Body:       requestMinion,
+		},
+	}
+	receivedMinion, err := c.Setup().CreateMinion(requestMinion)
+	c.Validate(t, receivedMinion, err)
+}
+
+func TestDeleteMinion(t *testing.T) {
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: "/minions/foo"},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().DeleteMinion("foo")
+	c.Validate(t, nil, err)
 }

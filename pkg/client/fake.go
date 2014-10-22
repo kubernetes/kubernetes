@@ -154,6 +154,16 @@ func (c *Fake) ListMinions() (*api.MinionList, error) {
 	return &c.Minions, nil
 }
 
+func (c *Fake) CreateMinion(minion *api.Minion) (*api.Minion, error) {
+	c.Actions = append(c.Actions, FakeAction{Action: "create-minion", Value: minion})
+	return &api.Minion{}, nil
+}
+
+func (c *Fake) DeleteMinion(id string) error {
+	c.Actions = append(c.Actions, FakeAction{Action: "delete-minion", Value: id})
+	return nil
+}
+
 // CreateEvent makes a new event. Returns the copy of the event the server returns, or an error.
 func (c *Fake) CreateEvent(event *api.Event) (*api.Event, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-event", Value: event.ID})

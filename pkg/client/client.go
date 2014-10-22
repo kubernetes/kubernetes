@@ -87,7 +87,9 @@ type VersionInterface interface {
 }
 
 type MinionInterface interface {
+	CreateMinion(minion *api.Minion) (*api.Minion, error)
 	ListMinions() (*api.MinionList, error)
+	DeleteMinion(id string) error
 }
 
 // APIStatus is exposed by errors that can be converted to an api.Status object
@@ -262,12 +264,14 @@ func (c *Client) WatchEndpoints(ctx api.Context, label, field labels.Selector, r
 		Watch()
 }
 
+// CreateEndpoints creates a new endpoint.
 func (c *Client) CreateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
 	err := c.Post().Namespace(api.Namespace(ctx)).Path("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
+// UpdateEndpoints updates an existing endpoint.
 func (c *Client) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
 	if len(endpoints.ResourceVersion) == 0 {
@@ -297,17 +301,30 @@ func (c *Client) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
-// ListMinions lists all the minions in the cluster.
-func (c *Client) ListMinions() (result *api.MinionList, err error) {
-	result = &api.MinionList{}
-	err = c.Get().Path("minions").Do().Into(result)
-	return
+// CreateMinion creates a new minion.
+func (c *Client) CreateMinion(minion *api.Minion) (*api.Minion, error) {
+	result := &api.Minion{}
+	err := c.Post().Path("minions").Body(minion).Do().Into(result)
+	return result, err
 }
 
-func (c *Client) GetMinion(id string) (result *api.Minion, err error) {
-	result = &api.Minion{}
-	err = c.Get().Path("minions").Path(id).Do().Into(result)
-	return
+// ListMinions lists all the minions in the cluster.
+func (c *Client) ListMinions() (*api.MinionList, error) {
+	result := &api.MinionList{}
+	err := c.Get().Path("minions").Do().Into(result)
+	return result, err
+}
+
+// GetMinion returns information about a particular minion.
+func (c *Client) GetMinion(id string) (*api.Minion, error) {
+	result := &api.Minion{}
+	err := c.Get().Path("minions").Path(id).Do().Into(result)
+	return result, err
+}
+
+// DeleteMinion deletes an existing minion.
+func (c *Client) DeleteMinion(id string) error {
+	return c.Delete().Path("minions").Path(id).Do().Error()
 }
 
 // CreateEvent makes a new event. Returns the copy of the event the server returns, or an error.
