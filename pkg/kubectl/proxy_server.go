@@ -19,32 +19,37 @@ package kubectl
 import (
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
-	Client *client.Client
-	Port   int
-}
-
-func newFileHandler(prefix, base string) http.Handler {
-	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
+	httputil.ReverseProxy
+	Port int
 }
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
-func NewProxyServer(filebase string, kubeClient *client.Client, port int) *ProxyServer {
-	server := &ProxyServer{
-		Client: kubeClient,
-		Port:   port,
+func NewProxyServer(filebase string, cfg *client.Config, port int) (*ProxyServer, error) {
+	prefix := cfg.Prefix
+	if prefix == "" {
+		prefix = "/api"
 	}
-	http.Handle("/api/", server)
+	target, err := url.Parse(singleJoiningSlash(cfg.Host, prefix))
+	if err != nil {
+		return nil, err
+	}
+	proxy := newProxyServer(target)
+	if proxy.Transport, err = client.TransportFor(cfg); err != nil {
+		return nil, err
+	}
+	http.Handle("/api/", http.StripPrefix("/api/", proxy))
 	http.Handle("/static/", newFileHandler("/static/", filebase))
-	return server
+	return proxy, nil
 }
 
 // Serve starts the server (http.DefaultServeMux) on TCP port 8001, loops forever.
@@ -53,37 +58,27 @@ func (s *ProxyServer) Serve() error {
 	return http.ListenAndServe(addr, nil)
 }
 
-func (s *ProxyServer) doError(w http.ResponseWriter, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Header().Add("Content-type", "application/json")
-	data, _ := latest.Codec.Encode(&api.Status{
-		Status:  api.StatusFailure,
-		Message: fmt.Sprintf("internal error: %#v", err),
-	})
-	w.Write(data)
+func newProxyServer(target *url.URL) *ProxyServer {
+	director := func(req *http.Request) {
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.URL.Path = singleJoiningSlash(target.Path, req.URL.Path)
+	}
+	return &ProxyServer{ReverseProxy: httputil.ReverseProxy{Director: director}}
 }
 
-func (s *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	url := r.URL
-	selector := url.Query().Get("labels")
-	fieldSelector := url.Query().Get("fields")
-	result := s.Client.
-		Verb(r.Method).
-		AbsPath(r.URL.Path).
-		ParseSelectorParam("labels", selector).
-		ParseSelectorParam("fields", fieldSelector).
-		Body(r.Body).
-		Do()
-	if result.Error() != nil {
-		s.doError(w, result.Error())
-		return
+func newFileHandler(prefix, base string) http.Handler {
+	return http.StripPrefix(prefix, http.FileServer(http.Dir(base)))
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
 	}
-	data, err := result.Raw()
-	if err != nil {
-		s.doError(w, err)
-		return
-	}
-	w.Header().Add("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	return a + b
 }

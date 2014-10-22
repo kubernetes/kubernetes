@@ -263,7 +263,10 @@ func main() {
 				open.Start("http://localhost:8001/static/")
 			}()
 		}
-		server := kubecfg.NewProxyServer(*www, kubeClient)
+		server, err := kubecfg.NewProxyServer(*www, clientConfig)
+		if err != nil {
+			glog.Fatalf("Error creating proxy server: %v", err)
+		}
 		glog.Fatal(server.Serve())
 	}
 
