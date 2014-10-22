@@ -84,12 +84,18 @@ func TestEventf(t *testing.T) {
 	for _, item := range table {
 		called := make(chan struct{})
 		testEvents := testEventRecorder{
-			OnEvent: func(a *api.Event) (*api.Event, error) {
-				if e := item.expect; !reflect.DeepEqual(e, a) {
+			OnEvent: func(event *api.Event) (*api.Event, error) {
+				a := *event
+				// Just check that the timestamp was set.
+				if a.Timestamp.IsZero() {
+					t.Errorf("timestamp wasn't set")
+				}
+				a.Timestamp = item.expect.Timestamp
+				if e, a := item.expect, &a; !reflect.DeepEqual(e, a) {
 					t.Errorf("diff: %s", util.ObjectDiff(e, a))
 				}
 				called <- struct{}{}
-				return a, nil
+				return event, nil
 			},
 		}
 		recorder := record.StartRecording(&testEvents, "eventTest")

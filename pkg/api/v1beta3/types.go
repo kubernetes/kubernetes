@@ -912,6 +912,9 @@ type Event struct {
 	// Optional. The component reporting this event. Should be a short machine understandable string.
 	// TODO: provide exact specification for format.
 	Source string `json:"source,omitempty" yaml:"source,omitempty"`
+
+	// The time at which the client recorded the event. (Time of server receipt is in TypeMeta.)
+	Timestamp util.Time `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
 }
 
 // EventList is a list of events.

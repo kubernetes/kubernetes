@@ -108,6 +108,7 @@ func Event(object runtime.Object, fieldPath, status, reason, message string) {
 		Status:         status,
 		Reason:         reason,
 		Message:        message,
+		Timestamp:      util.Now(),
 	}
 
 	events.Action(watch.Added, e)
