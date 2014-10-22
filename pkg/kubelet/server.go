@@ -212,8 +212,10 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	})
 
 	fw := FlushWriter{writer: w}
-	if flusher, ok := w.(http.Flusher); ok {
+	if flusher, ok := fw.writer.(http.Flusher); ok {
 		fw.flusher = flusher
+	} else {
+		s.error(w, fmt.Errorf("Unable to convert %v into http.Flusher", fw))
 	}
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
