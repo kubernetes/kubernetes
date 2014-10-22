@@ -49,6 +49,7 @@ ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
+CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 GO_OUT=${KUBE_TARGET}/bin
 
 # Check kubectl
@@ -70,13 +71,19 @@ ${GO_OUT}/apiserver \
   --address="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
-  --machines="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --portal_net="10.0.0.0/24" 1>&2 &
-
 APISERVER_PID=$!
 
 wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
+
+# Start controller manager
+${GO_OUT}/controller-manager \
+  --machines="127.0.0.1" \
+  --master="127.0.0.1:${API_PORT}" 1>&2 &
+CTLRMGR_PID=$!
+
+wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
 
 KUBE_CMD="${GO_OUT}/kubectl"
 KUBE_FLAGS="-s http://127.0.0.1:${API_PORT} --match-server-version"
@@ -92,12 +99,6 @@ echo "kubectl(services): ok"
 ${KUBE_CMD} get minions ${KUBE_FLAGS}
 ${KUBE_CMD} get minions 127.0.0.1 ${KUBE_FLAGS}
 echo "kubectl(minions): ok"
-
-# Start controller manager
-#${GO_OUT}/controller-manager \
-#  --etcd_servers="http://127.0.0.1:${ETCD_PORT}" \
-#  --master="127.0.0.1:${API_PORT}" 1>&2 &
-#CTLRMGR_PID=$!
 
 # Start proxy
 #PROXY_LOG=/tmp/kube-proxy.log

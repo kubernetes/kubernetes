@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -31,31 +31,38 @@ type MinionController struct {
 	cloud           cloudprovider.Interface
 	matchRE         string
 	staticResources *api.NodeResources
-	registry        minion.Registry
-	period          time.Duration
+	minions         []string
+	kubeClient      client.Interface
 }
 
 // NewMinionController returns a new minion controller to sync instances from cloudprovider.
 func NewMinionController(
 	cloud cloudprovider.Interface,
 	matchRE string,
+	minions []string,
 	staticResources *api.NodeResources,
-	registry minion.Registry,
-	period time.Duration) *MinionController {
+	kubeClient client.Interface) *MinionController {
 	return &MinionController{
 		cloud:           cloud,
 		matchRE:         matchRE,
+		minions:         minions,
 		staticResources: staticResources,
-		registry:        registry,
-		period:          period,
+		kubeClient:      kubeClient,
 	}
 }
 
-// Run starts syncing instances from cloudprovider periodically.
-func (s *MinionController) Run() {
-	// Call Sync() first to warm up minion registry.
-	s.Sync()
-	go util.Forever(func() { s.Sync() }, s.period)
+// Run starts syncing instances from cloudprovider periodically, or create initial minion list.
+func (s *MinionController) Run(period time.Duration) {
+	if s.cloud != nil && len(s.matchRE) > 0 {
+		go util.Forever(func() { s.Sync() }, period)
+	} else {
+		for _, minionID := range s.minions {
+			s.kubeClient.Minions().Create(&api.Minion{
+				ObjectMeta:    api.ObjectMeta{Name: minionID},
+				NodeResources: *s.staticResources,
+			})
+		}
+	}
 }
 
 // Sync syncs list of instances from cloudprovider to master etcd registry.
@@ -64,7 +71,7 @@ func (s *MinionController) Sync() error {
 	if err != nil {
 		return err
 	}
-	minions, err := s.registry.ListMinions(nil)
+	minions, err := s.kubeClient.Minions().List()
 	if err != nil {
 		return err
 	}
@@ -77,20 +84,14 @@ func (s *MinionController) Sync() error {
 	for _, minion := range matches.Items {
 		if _, ok := minionMap[minion.Name]; !ok {
 			glog.Infof("Create minion in registry: %s", minion.Name)
-			err = s.registry.CreateMinion(nil, &minion)
-			if err != nil {
-				return err
-			}
+			s.kubeClient.Minions().Create(&minion)
 		}
 		delete(minionMap, minion.Name)
 	}
 
 	for minionID := range minionMap {
 		glog.Infof("Delete minion from registry: %s", minionID)
-		err = s.registry.DeleteMinion(nil, minionID)
-		if err != nil {
-			return err
-		}
+		s.kubeClient.Minions().Delete(minionID)
 	}
 	return nil
 }

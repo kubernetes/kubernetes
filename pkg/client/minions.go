@@ -16,9 +16,7 @@ limitations under the License.
 
 package client
 
-import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-)
+import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 
 type MinionsInterface interface {
 	Minions() MinionInterface
@@ -49,17 +47,17 @@ func (c *minions) Create(minion *api.Minion) (*api.Minion, error) {
 }
 
 // List lists all the minions in the cluster.
-func (c *minions) List() (result *api.MinionList, err error) {
-	result = &api.MinionList{}
-	err = c.r.Get().Path("minions").Do().Into(result)
-	return
+func (c *minions) List() (*api.MinionList, error) {
+	result := &api.MinionList{}
+	err := c.r.Get().Path("minions").Do().Into(result)
+	return result, err
 }
 
 // Get gets an existing minion
-func (c *minions) Get(id string) (result *api.Minion, err error) {
-	result = &api.Minion{}
-	err = c.r.Get().Path("minions").Path(id).Do().Into(result)
-	return
+func (c *minions) Get(id string) (*api.Minion, error) {
+	result := &api.Minion{}
+	err := c.r.Get().Path("minions").Path(id).Do().Into(result)
+	return result, err
 }
 
 // Delete deletes an existing minion.

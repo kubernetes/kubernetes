@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
@@ -34,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	cloudcontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
@@ -58,12 +56,9 @@ type Config struct {
 	Cloud                 cloudprovider.Interface
 	EtcdHelper            tools.EtcdHelper
 	HealthCheckMinions    bool
-	Minions               []string
-	MinionCacheTTL        time.Duration
 	EventTTL              time.Duration
 	MinionRegexp          string
 	KubeletClient         client.KubeletClient
-	NodeResources         api.NodeResources
 	PortalNet             *net.IPNet
 	Mux                   apiserver.Mux
 	EnableLogsSupport     bool
@@ -264,18 +259,6 @@ func makeMinionRegistry(c *Config) minion.Registry {
 func (m *Master) init(c *Config) {
 	podCache := NewPodCache(c.KubeletClient, m.podRegistry)
 	go util.Forever(func() { podCache.UpdateAllContainers() }, time.Second*30)
-
-	if c.Cloud != nil && len(c.MinionRegexp) > 0 {
-		// TODO: Move minion controller to its own code.
-		cloudcontroller.NewMinionController(c.Cloud, c.MinionRegexp, &c.NodeResources, m.minionRegistry, c.MinionCacheTTL).Run()
-	} else {
-		for _, minionID := range c.Minions {
-			m.minionRegistry.CreateMinion(nil, &api.Minion{
-				ObjectMeta:    api.ObjectMeta{Name: minionID},
-				NodeResources: c.NodeResources,
-			})
-		}
-	}
 
 	var userContexts = handlers.NewUserRequestContext()
 	var authenticator authenticator.Request
