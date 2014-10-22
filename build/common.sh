@@ -48,6 +48,7 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 # KUBE_BUILD_CONTAINER_NAME=kube-build-<hash>
 readonly KUBE_BUILD_IMAGE_CROSS_TAG=cross
 readonly KUBE_BUILD_IMAGE_CROSS="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_CROSS_TAG}"
+readonly KUBE_BUILD_GOLANG_VERSION=1.3
 
 readonly KUBE_GO_PACKAGE="github.com/GoogleCloudPlatform/kubernetes"
 
@@ -225,7 +226,7 @@ function kube::build::build_image_built() {
 function kube::build::ensure_golang() {
   kube::build::docker_image_exists golang 1.3 || {
     [[ ${KUBE_SKIP_CONFIRMATIONS} =~ ^[yY]$ ]] || {
-      echo "You don't have a local copy of the golang docker image. This image is 450GB."
+      echo "You don't have a local copy of the golang docker image. This image is 450MB."
       read -p "Download it now? [y/n] " -n 1 -r
       echo
       [[ $REPLY =~ ^[yY]$ ]] || {
@@ -234,8 +235,8 @@ function kube::build::ensure_golang() {
       }
     }
 
-    echo "+++ Pulling docker image: golang:1.3"
-    docker pull golang:1.3
+    echo "+++ Pulling docker image: golang:${KUBE_BUILD_GOLANG_VERSION}"
+    docker pull golang:${KUBE_BUILD_GOLANG_VERSION}
   }
 }
 
