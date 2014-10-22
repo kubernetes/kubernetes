@@ -410,8 +410,7 @@ function kube-up {
   "Password": "$KUBE_PASSWORD",
   "CAFile": "$HOME/$ca_cert",
   "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key",
-  "BearerToken": "$KUBE_ADMIN_TOKEN"
+  "KeyFile": "$HOME/$kube_key"
 }
 EOF
 
