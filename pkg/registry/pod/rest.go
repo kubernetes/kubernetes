@@ -141,7 +141,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 
 func (rs *REST) podToSelectableFields(pod *api.Pod) labels.Set {
 	return labels.Set{
-		"ID": pod.Name,
+		"name":                pod.Name,
 		"DesiredState.Status": string(pod.DesiredState.Status),
 		"DesiredState.Host":   pod.DesiredState.Host,
 	}

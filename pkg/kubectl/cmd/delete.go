@@ -50,7 +50,7 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			// If command line args are passed in, use those preferentially.
 			if len(args) > 0 && len(args) != 2 {
-				usageError(cmd, "If passing in command line parameters, must be resource and id")
+				usageError(cmd, "If passing in command line parameters, must be resource and name")
 			}
 
 			var data []byte

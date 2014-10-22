@@ -154,10 +154,10 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 	return nil
 }
 
-var podColumns = []string{"ID", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
-var replicationControllerColumns = []string{"ID", "IMAGE(S)", "SELECTOR", "REPLICAS"}
-var serviceColumns = []string{"ID", "LABELS", "SELECTOR", "IP", "PORT"}
-var minionColumns = []string{"ID"}
+var podColumns = []string{"NAME", "IMAGE(S)", "HOST", "LABELS", "STATUS"}
+var replicationControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR", "REPLICAS"}
+var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
+var minionColumns = []string{"NAME"}
 var statusColumns = []string{"STATUS"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.

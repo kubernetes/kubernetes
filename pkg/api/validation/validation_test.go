@@ -813,7 +813,7 @@ func TestValidateReplicationController(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(errors.ValidationError).Field
 			if !strings.HasPrefix(field, "desiredState.podTemplate.") &&
-				field != "id" &&
+				field != "name" &&
 				field != "namespace" &&
 				field != "desiredState.replicaSelector" &&
 				field != "GCEPersistentDisk.ReadOnly" &&

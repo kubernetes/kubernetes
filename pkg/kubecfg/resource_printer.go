@@ -138,9 +138,9 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 	return nil
 }
 
-var podColumns = []string{"ID", "Image(s)", "Host", "Labels", "Status"}
-var replicationControllerColumns = []string{"ID", "Image(s)", "Selector", "Replicas"}
-var serviceColumns = []string{"ID", "Labels", "Selector", "IP", "Port"}
+var podColumns = []string{"Name", "Image(s)", "Host", "Labels", "Status"}
+var replicationControllerColumns = []string{"Name", "Image(s)", "Selector", "Replicas"}
+var serviceColumns = []string{"Name", "Labels", "Selector", "IP", "Port"}
 var minionColumns = []string{"Minion identifier"}
 var statusColumns = []string{"Status"}
 var eventColumns = []string{"Name", "Kind", "Status", "Reason", "Message"}

@@ -522,7 +522,7 @@ func (r *Registry) WatchServices(ctx api.Context, label, field labels.Selector, 
 	if !label.Empty() {
 		return nil, fmt.Errorf("label selectors are not supported on services")
 	}
-	if value, found := field.RequiresExactMatch("ID"); found {
+	if value, found := field.RequiresExactMatch("name"); found {
 		key, err := makeServiceKey(ctx, value)
 		if err != nil {
 			return nil, err
@@ -532,7 +532,7 @@ func (r *Registry) WatchServices(ctx api.Context, label, field labels.Selector, 
 	if field.Empty() {
 		return r.WatchList(makeServiceListKey(ctx), version, tools.Everything)
 	}
-	return nil, fmt.Errorf("only the 'ID' and default (everything) field selectors are supported")
+	return nil, fmt.Errorf("only the 'name' and default (everything) field selectors are supported")
 }
 
 // ListEndpoints obtains a list of Services.
@@ -567,7 +567,7 @@ func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector,
 	if !label.Empty() {
 		return nil, fmt.Errorf("label selectors are not supported on endpoints")
 	}
-	if value, found := field.RequiresExactMatch("ID"); found {
+	if value, found := field.RequiresExactMatch("name"); found {
 		key, err := makeServiceEndpointsKey(ctx, value)
 		if err != nil {
 			return nil, err

@@ -243,7 +243,7 @@ func TestListPodListSelection(t *testing.T) {
 		{
 			expectedIDs: util.NewStringSet("foo", "bar", "baz", "qux", "zot"),
 		}, {
-			field:       "ID=zot",
+			field:       "name=zot",
 			expectedIDs: util.NewStringSet("zot"),
 		}, {
 			label:       "label=qux",

@@ -93,14 +93,14 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 	// object.
 	id, err := getIDFromObj(obj)
 	if err != nil {
-		return "", fmt.Errorf("ID not retrievable from object for update: %v", err)
+		return "", fmt.Errorf("Name not retrievable from object for update: %v", err)
 	}
 
 	// Get the object from the server to find out its current resource
 	// version to prevent race conditions in updating the object.
 	serverObj, err := c.Get().Path(resource).Path(id).Do().Get()
 	if err != nil {
-		return "", fmt.Errorf("Item ID %s does not exist for update: %v", id, err)
+		return "", fmt.Errorf("Item Name %s does not exist for update: %v", id, err)
 	}
 	version, err := getResourceVersionFromObj(serverObj)
 	if err != nil {
@@ -134,7 +134,10 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 func doDelete(c *client.RESTClient, resource string, obj runtime.Object) (string, error) {
 	id, err := getIDFromObj(obj)
 	if err != nil {
-		return "", fmt.Errorf("ID not retrievable from object for update: %v", err)
+		return "", fmt.Errorf("Name not retrievable from object for delete: %v", err)
+	}
+	if id == "" {
+		return "", fmt.Errorf("The supplied resource has no Name and cannot be deleted")
 	}
 
 	err = c.Delete().Path(resource).Path(id).Do().Error()

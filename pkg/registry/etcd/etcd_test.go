@@ -1252,7 +1252,7 @@ func TestEtcdWatchServices(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	watching, err := registry.WatchServices(ctx,
 		labels.Everything(),
-		labels.SelectorFromSet(labels.Set{"ID": "foo"}),
+		labels.SelectorFromSet(labels.Set{"name": "foo"}),
 		"1",
 	)
 	if err != nil {
@@ -1306,7 +1306,7 @@ func TestEtcdWatchEndpoints(t *testing.T) {
 	watching, err := registry.WatchEndpoints(
 		ctx,
 		labels.Everything(),
-		labels.SelectorFromSet(labels.Set{"ID": "foo"}),
+		labels.SelectorFromSet(labels.Set{"name": "foo"}),
 		"1",
 	)
 	if err != nil {
