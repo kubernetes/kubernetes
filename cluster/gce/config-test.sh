@@ -19,8 +19,10 @@ ZONE=us-central1-b
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
 NUM_MINIONS=2
-# gcloud/gcutil will expand this to the latest supported image.
-IMAGE=backports-debian-7-wheezy
+# TODO(dchen1107): Filed an internal issue to create an alias
+# for containervm image, so that gcloud/gcutil will expand this
+# to the latest supported image.
+IMAGE=container-vm-v20141016
 NETWORK=e2e
 INSTANCE_PREFIX="e2e-test-${USER}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"

@@ -239,6 +239,13 @@ function kube-up {
   local htpasswd
   htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
+  if ! gcutil getimage "${IMAGE}" > /dev/null 2>&1; then
+    echo "Adding new image: ${IMAGE}"
+    gcutil addimage "${IMAGE}" \
+      "gs://gcp-containers-images/${IMAGE}.tar.gz" \
+      --project "${PROJECT}"
+  fi
+
   if ! gcutil getnetwork "${NETWORK}" >/dev/null 2>&1; then
     echo "Creating new network for: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
