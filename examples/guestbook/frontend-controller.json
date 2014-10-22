@@ -14,7 +14,7 @@
              "name": "php-redis",
              "image": "brendanburns/php-redis",
              "cpu": 100,
-             "memory": 10000000,
+             "memory": 50000000,
              "ports": [{"containerPort": 80, "hostPort": 8000}]
            }]
          }
