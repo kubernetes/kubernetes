@@ -417,7 +417,7 @@ func (kl *Kubelet) killContainersInPod(pod *api.BoundPod, dockerContainers docke
 	errs := make(chan error, len(pod.Spec.Containers))
 	wg := sync.WaitGroup{}
 	for _, container := range pod.Spec.Containers {
-		// TODO: Consider being more aggressive: kill all container with this pod UID, period.
+		// TODO: Consider being more aggressive: kill all containers with this pod UID, period.
 		if dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, pod.UID, container.Name); found {
 			count++
 			wg.Add(1)
@@ -456,7 +456,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 	if netDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
 		netID = dockertools.DockerID(netDockerContainer.ID)
 	} else {
-		glog.V(3).Infof("Network container doesn't exist for pod %q, creating", podFullName)
+		glog.V(3).Infof("Network container doesn't exist for pod %q, re-creating the pod", podFullName)
 		count, err := kl.killContainersInPod(pod, dockerContainers)
 		if err != nil {
 			return err
@@ -578,6 +578,7 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 			_, keep := containersToKeep[id]
 			_, killed := killedContainers[id]
 			if !keep && !killed {
+				glog.V(1).Infof("Killing unwanted container in pod %q: %+v", curUUID, container)
 				err = kl.killContainer(container)
 				if err != nil {
 					glog.Errorf("Error killing container: %v", err)
@@ -633,6 +634,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
 	desiredContainers := make(map[podContainer]empty)
+	desiredPods := make(map[string]empty)
 
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
 	if err != nil {
@@ -645,6 +647,7 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 		pod := &pods[ix]
 		podFullName := GetPodFullName(pod)
 		uuid := pod.UID
+		desiredPods[uuid] = empty{}
 
 		// Add all containers (including net) to the map.
 		desiredContainers[podContainer{podFullName, uuid, networkContainerName}] = empty{}
@@ -665,6 +668,10 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	for _, container := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
 		podFullName, uuid, containerName, _ := dockertools.ParseDockerName(container.Names[0])
+		if _, found := desiredPods[uuid]; found {
+			// syncPod() will handle this one.
+			continue
+		}
 		pc := podContainer{podFullName, uuid, containerName}
 		if _, ok := desiredContainers[pc]; !ok {
 			glog.V(1).Infof("Killing unwanted container %+v", pc)
