@@ -20,6 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 GO_VERSION=($(go version))
 
@@ -28,11 +29,24 @@ if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3') ]]; then
   exit 0
 fi
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+cd "${KUBE_ROOT}"
 
-files="$(find "${KUBE_ROOT}" -type f | grep "[.]go$" | grep -v "third_party/\|release/\|_?output/\|target/\|Godeps/")"
-bad=$(gofmt -s -l ${files})
-if [[ -n "${bad}" ]]; then
-  echo "$bad"
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+bad_files=$(find_files | xargs gofmt -s -l)
+if [[ -n "${bad_files}" ]]; then
+  echo "!!! gofmt needs to be run on the following files: "
+  echo "${bad_files}"
   exit 1
 fi

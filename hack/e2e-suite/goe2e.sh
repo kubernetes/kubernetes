@@ -19,4 +19,49 @@ source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/$KUBERNETES_PROVIDER/util.sh"
 
 detect-master > /dev/null
-${KUBE_ROOT}/_output/go/bin/e2e -host="https://${KUBE_MASTER_IP-}"
+
+# Detect the OS name/arch so that we can find our binary
+case "$(uname -s)" in
+  Darwin)
+    host_os=darwin
+    ;;
+  Linux)
+    host_os=linux
+    ;;
+  *)
+    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+    exit 1
+    ;;
+esac
+
+case "$(uname -m)" in
+  x86_64*)
+    host_arch=amd64
+    ;;
+  i?86_64*)
+    host_arch=amd64
+    ;;
+  amd64*)
+    host_arch=amd64
+    ;;
+  arm*)
+    host_arch=arm
+    ;;
+  i?86*)
+    host_arch=x86
+    ;;
+  *)
+    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+    exit 1
+    ;;
+esac
+
+# Gather up the list of likely places and use ls to find the latest one.
+locations=(
+  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/e2e"
+  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/e2e"
+)
+e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+
+
+"${e2e}" -host="https://${KUBE_MASTER_IP-}"

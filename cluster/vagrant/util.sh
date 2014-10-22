@@ -124,7 +124,8 @@ function kube-push {
 
 # Execute prior to running tests to build a release if required for env
 function test-build-release {
-  echo "Vagrant provider can skip release build"
+  # Make a release
+  "${KUBE_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure

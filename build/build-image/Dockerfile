@@ -25,6 +25,10 @@ ENV GOARCH  amd64
 # Get the code coverage tool and godep
 RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
 
+# We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
+# machine vs. `install`
+RUN apt-get update && apt-get install -y rsync
+
 # Download and symlink etcd.  We need this for our integration tests.
 RUN mkdir -p /usr/local/src/etcd &&\
     cd /usr/local/src/etcd &&\
@@ -39,6 +43,10 @@ WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
 
 # Propagate the git tree version into the build image
 ADD kube-version-defs /kube-version-defs
+ENV KUBE_GIT_VERSION_FILE /kube-version-defs
+
+# Make output from the dockerized build go someplace else
+ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
 # Upload Kubernetes source
 ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes

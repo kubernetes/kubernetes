@@ -21,42 +21,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Set the environment variables required by the build.
-source "${KUBE_ROOT}/hack/config-go.sh"
-
-# Go to the top of the tree.
-cd "${KUBE_ROOT}"
-
-# Check for `go` binary and set ${GOPATH}.
-kube::setup_go_environment
-
-# Fetch the version.
-version_ldflags=$(kube::version_ldflags)
-
-# Use eval to preserve embedded quoted strings.
-eval "goflags=(${GOFLAGS:-})"
-
-targets=()
-for arg; do
-  if [[ "${arg}" == -* ]]; then
-    # Assume arguments starting with a dash are flags to pass to go.
-    goflags+=("${arg}")
-  else
-    targets+=("${arg}")
-  fi
-done
-
-if [[ ${#targets[@]} -eq 0 ]]; then
-  targets=($(kube::default_build_targets))
-fi
-
-binaries=($(kube::binaries_from_targets "${targets[@]}"))
-
-echo "Building local go components"
-# Note that the flags to 'go build' are duplicated in the dockerized build setup
-# (build/build-image/common.sh).  If we add more command line options to our
-# standard build we'll want to duplicate them there.  This needs to be fixed
-go install "${goflags[@]:+${goflags[@]}}" \
-    -ldflags "${version_ldflags}" \
-    "${binaries[@]}"
+kube::golang::build_binaries "$@"
+kube::golang::place_bins

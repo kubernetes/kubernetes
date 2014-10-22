@@ -72,9 +72,6 @@ func main() {
 	}
 
 	if *build {
-		if !run("build-local", "hack/build-go.sh") {
-			log.Fatal("Error building. Aborting.")
-		}
 		if !runBash("build-release", `test-build-release`) {
 			log.Fatal("Error building. Aborting.")
 		}

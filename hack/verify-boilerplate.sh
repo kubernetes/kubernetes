@@ -20,20 +20,33 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-result=0
+cd ${KUBE_ROOT}
 
-gofiles="$(find "${KUBE_ROOT}" -type f | grep "[.]go$" | grep -v "Godeps/\|third_party/\|release/\|_?output/|target/")"
-for file in ${gofiles}; do
+result=0
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './output' \
+        -o -wholename './_output' \
+        -o -wholename './release' \
+        -o -wholename './target' \
+        -o -wholename '*/third_party/*' \
+        -o -wholename '*/Godeps/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+for file in $(find_files); do
   if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
     echo "Boilerplate header is wrong for: ${file}"
     result=1
   fi
 done
 
-dirs=("cluster" "hack" "hooks")
+dirs=("cluster" "hack" "hooks" "build")
 
 for dir in ${dirs[@]}; do
-  for file in $(grep -r -l "" "${KUBE_ROOT}/${dir}/" | grep "[.]sh"); do
+  for file in $(find "$dir" -name '*.sh'); do
     if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
       echo "Boilerplate header is wrong for: ${file}"
       result=1

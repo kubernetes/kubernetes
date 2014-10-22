@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,18 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the Kubernetes server binaries.
-#
-# This makes the docker build image, builds the binaries and copies them out
-# of the docker container.
+# This script sets up a go workspace locally and builds all for all appropriate
+# platforms.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command build/build-image/make-server.sh "$@"
-kube::build::copy_output
+KUBE_BUILD_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
+kube::golang::build_binaries "${KUBE_SERVER_TARGETS[@]}"
+
+KUBE_BUILD_PLATFORMS=("${KUBE_CLIENT_PLATFORMS[@]}")
+kube::golang::build_binaries "${KUBE_CLIENT_TARGETS[@]}" "${KUBE_TEST_TARGETS[@]}"
+
+kube::golang::place_bins
