@@ -1,5 +1,0 @@
-#cloud-config
-
-runcmd:
- - [mkdir, -p, /etc/salt/minion.d]
- - [bash, /root/minionStart.sh]
