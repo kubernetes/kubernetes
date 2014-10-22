@@ -822,6 +822,11 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainer.ID, tail, follow, stdout, stderr)
 }
 
+// GetBoundPods returns all pods bound to the kubelet and their spec
+func (kl *Kubelet) GetBoundPods() ([]api.BoundPod, error) {
+	return kl.pods, nil
+}
+
 // GetPodInfo returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodInfo(podFullName, uuid string) (api.PodInfo, error) {
 	var manifest api.PodSpec

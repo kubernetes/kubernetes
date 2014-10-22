@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -66,6 +67,7 @@ type HostInterface interface {
 	GetContainerInfo(podFullName, uuid, containerName string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetRootInfo(req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
 	GetMachineInfo() (*info.MachineInfo, error)
+	GetBoundPods() ([]api.BoundPod, error)
 	GetPodInfo(name, uuid string) (api.PodInfo, error)
 	RunInContainer(name, uuid, container string, cmd []string) ([]byte, error)
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
@@ -90,6 +92,7 @@ func NewServer(host HostInterface, updates chan<- interface{}, enableDebuggingHa
 func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfo)
+	s.mux.HandleFunc("/boundPods", s.handleBoundPods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
 }
@@ -224,6 +227,26 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
+}
+
+// handleBoundPods returns a list of pod bound to the Kubelet and their spec
+func (s *Server) handleBoundPods(w http.ResponseWriter, req *http.Request) {
+	pods, err := s.host.GetBoundPods()
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	boundPods := &api.BoundPods{
+		Items: pods,
+	}
+	data, err := latest.Codec.Encode(boundPods)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-type", "application/json")
+	w.Write(data)
 }
 
 // handlePodInfo handles podInfo requests against the Kubelet
