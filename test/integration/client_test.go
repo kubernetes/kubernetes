@@ -104,8 +104,8 @@ func TestClient(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got.ID == "" {
-			t.Errorf("unexpected empty pod ID %v", got)
+		if got.Name == "" {
+			t.Errorf("unexpected empty pod Name %v", got)
 		}
 
 		// pod is shown, but not scheduled
@@ -117,7 +117,7 @@ func TestClient(t *testing.T) {
 			t.Errorf("expected one pod, got %#v", pods)
 		}
 		actual := pods.Items[0]
-		if actual.ID != got.ID {
+		if actual.Name != got.Name {
 			t.Errorf("expected pod %#v, got %#v", got, actual)
 		}
 		if actual.CurrentState.Host != "" {

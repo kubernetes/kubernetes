@@ -32,7 +32,7 @@ func TestMakeBoundPodNoServices(t *testing.T) {
 	}
 
 	pod, err := factory.MakeBoundPod("machine", &api.Pod{
-		TypeMeta: api.TypeMeta{ID: "foobar"},
+		TypeMeta: api.TypeMeta{Name: "foobar"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
@@ -51,8 +51,8 @@ func TestMakeBoundPodNoServices(t *testing.T) {
 	if len(container.Env) != 0 {
 		t.Errorf("Expected zero env vars, got: %#v", pod)
 	}
-	if pod.ID != "foobar" {
-		t.Errorf("Failed to assign ID to pod: %#v", pod.ID)
+	if pod.Name != "foobar" {
+		t.Errorf("Failed to assign ID to pod: %#v", pod.Name)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestMakeBoundPodServices(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					TypeMeta: api.TypeMeta{ID: "test"},
+					TypeMeta: api.TypeMeta{Name: "test"},
 					Port:     8080,
 					ContainerPort: util.IntOrString{
 						Kind:   util.IntstrInt,
@@ -137,7 +137,7 @@ func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					TypeMeta: api.TypeMeta{ID: "test"},
+					TypeMeta: api.TypeMeta{Name: "test"},
 					Port:     8080,
 					ContainerPort: util.IntOrString{
 						Kind:   util.IntstrInt,

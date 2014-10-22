@@ -43,7 +43,7 @@ func TestOperation(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		c <- &Simple{TypeMeta: api.TypeMeta{ID: "All done"}}
+		c <- &Simple{TypeMeta: api.TypeMeta{Name: "All done"}}
 	}()
 
 	if op.expired(time.Now().Add(-time.Minute)) {
@@ -96,7 +96,7 @@ func TestOperation(t *testing.T) {
 		t.Errorf("expire failed to remove the operation %#v", ops)
 	}
 
-	if op.result.(*Simple).ID != "All done" {
+	if op.result.(*Simple).Name != "All done" {
 		t.Errorf("Got unexpected result: %#v", op.result)
 	}
 }
@@ -119,7 +119,7 @@ func TestOperationsList(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{
-		Name: "foo",
+		TypeMeta: api.TypeMeta{Name: "foo"},
 	}
 	data, err := codec.Encode(simple)
 	if err != nil {
@@ -175,7 +175,7 @@ func TestOpGet(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{
-		Name: "foo",
+		TypeMeta: api.TypeMeta{Name: "foo"},
 	}
 	data, err := codec.Encode(simple)
 	t.Log(string(data))

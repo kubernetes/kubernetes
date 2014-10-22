@@ -64,7 +64,7 @@ func (c *Fake) CreatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error) {
 }
 
 func (c *Fake) UpdatePod(ctx api.Context, pod *api.Pod) (*api.Pod, error) {
-	c.Actions = append(c.Actions, FakeAction{Action: "update-pod", Value: pod.ID})
+	c.Actions = append(c.Actions, FakeAction{Action: "update-pod", Value: pod.Name})
 	return &api.Pod{}, nil
 }
 
@@ -166,7 +166,7 @@ func (c *Fake) DeleteMinion(id string) error {
 
 // CreateEvent makes a new event. Returns the copy of the event the server returns, or an error.
 func (c *Fake) CreateEvent(event *api.Event) (*api.Event, error) {
-	c.Actions = append(c.Actions, FakeAction{Action: "get-event", Value: event.ID})
+	c.Actions = append(c.Actions, FakeAction{Action: "get-event", Value: event.Name})
 	return &api.Event{}, nil
 }
 

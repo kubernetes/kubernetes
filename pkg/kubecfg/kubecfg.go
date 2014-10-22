@@ -153,7 +153,7 @@ func Update(ctx api.Context, name string, client client.Interface, updatePeriod 
 	for _, pod := range podList.Items {
 		// We delete the pod here, the controller will recreate it.  This will result in pulling
 		// a new Docker image.  This isn't a full "update" but it's what we support for now.
-		err = client.DeletePod(ctx, pod.ID)
+		err = client.DeletePod(ctx, pod.Name)
 		if err != nil {
 			return err
 		}
@@ -246,7 +246,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 	}
 	controller := &api.ReplicationController{
 		TypeMeta: api.TypeMeta{
-			ID: name,
+			Name: name,
 		},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
@@ -299,7 +299,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 
 func createService(ctx api.Context, name string, port int, client client.Interface) (*api.Service, error) {
 	svc := &api.Service{
-		TypeMeta: api.TypeMeta{ID: name},
+		TypeMeta: api.TypeMeta{Name: name},
 		Port:     port,
 		Labels: map[string]string{
 			"simpleService": name,

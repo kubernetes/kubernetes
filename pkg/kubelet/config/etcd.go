@@ -95,8 +95,8 @@ func eventToPods(ev watch.Event) ([]api.BoundPod, error) {
 	}
 
 	for i, pod := range boundPods.Items {
-		if len(pod.ID) == 0 {
-			pod.ID = fmt.Sprintf("%d", i+1)
+		if len(pod.Name) == 0 {
+			pod.Name = fmt.Sprintf("%d", i+1)
 		}
 		// TODO: generate random UID if not present
 		if pod.UID == "" && !pod.CreationTimestamp.IsZero() {

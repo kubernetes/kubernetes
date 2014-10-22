@@ -119,7 +119,7 @@ func TestMinionListConversionToNew(t *testing.T) {
 		return v1beta1.Minion{TypeMeta: v1beta1.TypeMeta{ID: id}}
 	}
 	newMinion := func(id string) newer.Minion {
-		return newer.Minion{TypeMeta: newer.TypeMeta{ID: id}}
+		return newer.Minion{TypeMeta: newer.TypeMeta{Name: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),
@@ -166,7 +166,7 @@ func TestMinionListConversionToOld(t *testing.T) {
 		return v1beta1.Minion{TypeMeta: v1beta1.TypeMeta{ID: id}}
 	}
 	newMinion := func(id string) newer.Minion {
-		return newer.Minion{TypeMeta: newer.TypeMeta{ID: id}}
+		return newer.Minion{TypeMeta: newer.TypeMeta{Name: id}}
 	}
 	oldMinions := []v1beta1.Minion{
 		oldMinion("foo"),

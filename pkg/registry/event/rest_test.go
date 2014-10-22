@@ -40,7 +40,7 @@ func NewTestREST() (testRegistry, *REST) {
 func TestRESTCreate(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Reason:   "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
@@ -55,7 +55,7 @@ func TestRESTCreate(t *testing.T) {
 func TestRESTDelete(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Reason:   "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
@@ -63,7 +63,7 @@ func TestRESTDelete(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	<-c
-	c, err = rest.Delete(api.NewContext(), eventA.ID)
+	c, err = rest.Delete(api.NewContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -75,7 +75,7 @@ func TestRESTDelete(t *testing.T) {
 func TestRESTGet(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Reason:   "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
@@ -83,7 +83,7 @@ func TestRESTGet(t *testing.T) {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	<-c
-	got, err := rest.Get(api.NewContext(), eventA.ID)
+	got, err := rest.Get(api.NewContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -131,7 +131,7 @@ func TestRESTgetAttrs(t *testing.T) {
 func TestRESTUpdate(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Reason:   "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)

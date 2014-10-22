@@ -50,7 +50,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
-	if minion.ID == "" {
+	if minion.Name == "" {
 		return nil, fmt.Errorf("ID should not be empty: %#v", minion)
 	}
 
@@ -61,7 +61,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
-		minion, err := rs.registry.GetMinion(ctx, minion.ID)
+		minion, err := rs.registry.GetMinion(ctx, minion.Name)
 		if minion == nil {
 			return nil, ErrDoesNotExist
 		}
@@ -106,7 +106,7 @@ func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.O
 }
 
 func (rs *REST) toApiMinion(name string) *api.Minion {
-	return &api.Minion{TypeMeta: api.TypeMeta{ID: name}}
+	return &api.Minion{TypeMeta: api.TypeMeta{Name: name}}
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified minion.
@@ -117,7 +117,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 	}
 	host := minion.HostIP
 	if host == "" {
-		host = minion.ID
+		host = minion.Name
 	}
 	// TODO: Minion webservers should be secure!
 	return "http://" + net.JoinHostPort(host, strconv.Itoa(ports.KubeletPort)), nil

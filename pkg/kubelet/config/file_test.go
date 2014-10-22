@@ -53,7 +53,7 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 	}
 	expectedPod := api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID:        id,
+			Name:      id,
 			UID:       "uid",
 			Namespace: "default",
 		},
@@ -119,7 +119,7 @@ func TestReadFromFile(t *testing.T) {
 		update := got.(kubelet.PodUpdate)
 		expected := CreatePodUpdate(kubelet.SET, api.BoundPod{
 			TypeMeta: api.TypeMeta{
-				ID:        simpleSubdomainSafeHash(file.Name()),
+				Name:      simpleSubdomainSafeHash(file.Name()),
 				UID:       simpleSubdomainSafeHash(file.Name()),
 				Namespace: "default",
 			},
@@ -159,7 +159,7 @@ func TestExtractFromValidDataFile(t *testing.T) {
 	file := writeTestFile(t, os.TempDir(), "test_pod_config", string(text))
 	defer os.Remove(file.Name())
 
-	expectedPod.ID = simpleSubdomainSafeHash(file.Name())
+	expectedPod.Name = simpleSubdomainSafeHash(file.Name())
 
 	ch := make(chan interface{}, 1)
 	c := SourceFile{file.Name(), ch}
@@ -226,7 +226,7 @@ func TestExtractFromDir(t *testing.T) {
 		}
 		ioutil.WriteFile(name, data, 0755)
 		files[i] = file
-		pods[i].ID = simpleSubdomainSafeHash(name)
+		pods[i].Name = simpleSubdomainSafeHash(name)
 	}
 
 	ch := make(chan interface{}, 1)

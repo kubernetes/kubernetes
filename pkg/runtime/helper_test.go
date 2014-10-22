@@ -29,9 +29,9 @@ import (
 func TestExtractList(t *testing.T) {
 	pl := &api.PodList{
 		Items: []api.Pod{
-			{TypeMeta: api.TypeMeta{ID: "1"}},
-			{TypeMeta: api.TypeMeta{ID: "2"}},
-			{TypeMeta: api.TypeMeta{ID: "3"}},
+			{TypeMeta: api.TypeMeta{Name: "1"}},
+			{TypeMeta: api.TypeMeta{Name: "2"}},
+			{TypeMeta: api.TypeMeta{Name: "3"}},
 		},
 	}
 	list, err := runtime.ExtractList(pl)
@@ -42,7 +42,7 @@ func TestExtractList(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
 	for i := range list {
-		if e, a := list[i].(*api.Pod).ID, pl.Items[i].ID; e != a {
+		if e, a := list[i].(*api.Pod).Name, pl.Items[i].Name; e != a {
 			t.Fatalf("Expected %v, got %v", e, a)
 		}
 	}
@@ -51,9 +51,9 @@ func TestExtractList(t *testing.T) {
 func TestSetList(t *testing.T) {
 	pl := &api.PodList{}
 	list := []runtime.Object{
-		&api.Pod{TypeMeta: api.TypeMeta{ID: "1"}},
-		&api.Pod{TypeMeta: api.TypeMeta{ID: "2"}},
-		&api.Pod{TypeMeta: api.TypeMeta{ID: "3"}},
+		&api.Pod{TypeMeta: api.TypeMeta{Name: "1"}},
+		&api.Pod{TypeMeta: api.TypeMeta{Name: "2"}},
+		&api.Pod{TypeMeta: api.TypeMeta{Name: "3"}},
 	}
 	err := runtime.SetList(pl, list)
 	if err != nil {
@@ -63,7 +63,7 @@ func TestSetList(t *testing.T) {
 		t.Fatalf("Expected %v, got %v", e, a)
 	}
 	for i := range list {
-		if e, a := list[i].(*api.Pod).ID, pl.Items[i].ID; e != a {
+		if e, a := list[i].(*api.Pod).Name, pl.Items[i].Name; e != a {
 			t.Fatalf("Expected %v, got %v", e, a)
 		}
 	}

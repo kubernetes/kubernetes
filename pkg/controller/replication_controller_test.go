@@ -90,7 +90,7 @@ func newPodList(count int) *api.PodList {
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
 			TypeMeta: api.TypeMeta{
-				ID: fmt.Sprintf("pod%d", i),
+				Name: fmt.Sprintf("pod%d", i),
 			},
 		})
 	}
@@ -345,7 +345,7 @@ func TestWatchControllers(t *testing.T) {
 	go manager.watchControllers(&resourceVersion)
 
 	// Test normal case
-	testControllerSpec.ID = "foo"
+	testControllerSpec.Name = "foo"
 	client.w.Add(&testControllerSpec)
 
 	select {

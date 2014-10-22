@@ -38,8 +38,8 @@ func TestUpdateWithPods(t *testing.T) {
 	fakeClient := client.Fake{
 		Pods: api.PodList{
 			Items: []api.Pod{
-				{TypeMeta: api.TypeMeta{ID: "pod-1"}},
-				{TypeMeta: api.TypeMeta{ID: "pod-2"}},
+				{TypeMeta: api.TypeMeta{Name: "pod-1"}},
+				{TypeMeta: api.TypeMeta{Name: "pod-2"}},
 			},
 		},
 	}
@@ -69,8 +69,8 @@ func TestUpdateWithNewImage(t *testing.T) {
 	fakeClient := client.Fake{
 		Pods: api.PodList{
 			Items: []api.Pod{
-				{TypeMeta: api.TypeMeta{ID: "pod-1"}},
-				{TypeMeta: api.TypeMeta{ID: "pod-2"}},
+				{TypeMeta: api.TypeMeta{Name: "pod-1"}},
+				{TypeMeta: api.TypeMeta{Name: "pod-2"}},
 			},
 		},
 		Ctrl: api.ReplicationController{
@@ -114,7 +114,7 @@ func TestRunController(t *testing.T) {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
-	if controller.ID != name ||
+	if controller.Name != name ||
 		controller.DesiredState.Replicas != replicas ||
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
@@ -135,7 +135,7 @@ func TestRunControllerWithWrongArgs(t *testing.T) {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
-	if controller.ID != name ||
+	if controller.Name != name ||
 		controller.DesiredState.Replicas != replicas ||
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)
@@ -154,7 +154,7 @@ func TestRunControllerWithService(t *testing.T) {
 		t.Errorf("Unexpected actions: %#v", fakeClient.Actions)
 	}
 	controller := fakeClient.Actions[0].Value.(*api.ReplicationController)
-	if controller.ID != name ||
+	if controller.Name != name ||
 		controller.DesiredState.Replicas != replicas ||
 		controller.DesiredState.PodTemplate.DesiredState.Manifest.Containers[0].Image != image {
 		t.Errorf("Unexpected controller: %#v", controller)

@@ -44,14 +44,14 @@ func TestEventToPods(t *testing.T) {
 			input: watch.Event{
 				Object: &api.BoundPods{
 					Items: []api.BoundPod{
-						{TypeMeta: api.TypeMeta{ID: "foo"}},
-						{TypeMeta: api.TypeMeta{ID: "bar"}},
+						{TypeMeta: api.TypeMeta{Name: "foo"}},
+						{TypeMeta: api.TypeMeta{Name: "bar"}},
 					},
 				},
 			},
 			pods: []api.BoundPod{
-				{TypeMeta: api.TypeMeta{ID: "foo", Namespace: "default"}, Spec: api.PodSpec{}},
-				{TypeMeta: api.TypeMeta{ID: "bar", Namespace: "default"}, Spec: api.PodSpec{}},
+				{TypeMeta: api.TypeMeta{Name: "foo", Namespace: "default"}, Spec: api.PodSpec{}},
+				{TypeMeta: api.TypeMeta{Name: "bar", Namespace: "default"}, Spec: api.PodSpec{}},
 			},
 			fail: false,
 		},
@@ -59,14 +59,14 @@ func TestEventToPods(t *testing.T) {
 			input: watch.Event{
 				Object: &api.BoundPods{
 					Items: []api.BoundPod{
-						{TypeMeta: api.TypeMeta{ID: "1"}},
-						{TypeMeta: api.TypeMeta{ID: "2", Namespace: "foo"}},
+						{TypeMeta: api.TypeMeta{Name: "1"}},
+						{TypeMeta: api.TypeMeta{Name: "2", Namespace: "foo"}},
 					},
 				},
 			},
 			pods: []api.BoundPod{
-				{TypeMeta: api.TypeMeta{ID: "1", Namespace: "default"}, Spec: api.PodSpec{}},
-				{TypeMeta: api.TypeMeta{ID: "2", Namespace: "foo"}, Spec: api.PodSpec{}},
+				{TypeMeta: api.TypeMeta{Name: "1", Namespace: "default"}, Spec: api.PodSpec{}},
+				{TypeMeta: api.TypeMeta{Name: "2", Namespace: "foo"}, Spec: api.PodSpec{}},
 			},
 			fail: false,
 		},

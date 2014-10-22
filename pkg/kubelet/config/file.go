@@ -153,7 +153,7 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
 	}
 
-	pod.ID = simpleSubdomainSafeHash(filename)
+	pod.Name = simpleSubdomainSafeHash(filename)
 	if len(pod.UID) == 0 {
 		pod.UID = simpleSubdomainSafeHash(filename)
 	}
@@ -164,7 +164,7 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	if glog.V(4) {
 		glog.Infof("Got pod from file %q: %#v", filename, pod)
 	} else {
-		glog.V(1).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.ID, pod.UID)
+		glog.V(1).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.Name, pod.UID)
 	}
 	return pod, nil
 }

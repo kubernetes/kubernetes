@@ -34,7 +34,7 @@ func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.Mini
 		Items: make([]api.Minion, len(minions)),
 	}
 	for i := range minions {
-		list.Items[i].ID = minions[i]
+		list.Items[i].Name = minions[i]
 		list.Items[i].NodeResources = nodeResources
 	}
 	return &list
@@ -55,7 +55,7 @@ func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.MinionList, error) {
 func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	r.Lock()
 	defer r.Unlock()
-	r.Minion = minion.ID
+	r.Minion = minion.Name
 	r.Minions.Items = append(r.Minions.Items, *minion)
 	return r.Err
 }
@@ -64,7 +64,7 @@ func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minio
 	r.Lock()
 	defer r.Unlock()
 	for _, node := range r.Minions.Items {
-		if node.ID == minionID {
+		if node.Name == minionID {
 			return &node, r.Err
 		}
 	}
@@ -76,8 +76,8 @@ func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	defer r.Unlock()
 	var newList []api.Minion
 	for _, node := range r.Minions.Items {
-		if node.ID != minionID {
-			newList = append(newList, api.Minion{TypeMeta: api.TypeMeta{ID: node.ID}})
+		if node.Name != minionID {
+			newList = append(newList, api.Minion{TypeMeta: api.TypeMeta{Name: node.Name}})
 		}
 	}
 	r.Minions.Items = newList

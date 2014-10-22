@@ -72,13 +72,13 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			}
 			endpoints = append(endpoints, net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port)))
 		}
-		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.ID)
+		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.Name)
 		if err != nil {
 			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
 					TypeMeta: api.TypeMeta{
-						ID: service.ID,
+						Name: service.Name,
 					},
 				}
 			} else {
@@ -96,7 +96,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		} else {
 			// Pre-existing
 			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(2).Infof("endpoints are equal for %s, skipping update", service.ID)
+				glog.V(2).Infof("endpoints are equal for %s, skipping update", service.Name)
 				continue
 			}
 			_, err = e.client.UpdateEndpoints(nsCtx, newEndpoints)

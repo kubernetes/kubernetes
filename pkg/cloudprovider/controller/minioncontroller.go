@@ -70,19 +70,19 @@ func (s *MinionController) Sync() error {
 	}
 	minionMap := make(map[string]*api.Minion)
 	for _, minion := range minions.Items {
-		minionMap[minion.ID] = &minion
+		minionMap[minion.Name] = &minion
 	}
 
 	// Create or delete minions from registry.
-	for _, match := range matches.Items {
-		if _, ok := minionMap[match.ID]; !ok {
-			glog.Infof("Create minion in registry: %s", match.ID)
-			err = s.registry.CreateMinion(nil, &match)
+	for _, minion := range matches.Items {
+		if _, ok := minionMap[minion.Name]; !ok {
+			glog.Infof("Create minion in registry: %s", minion.Name)
+			err = s.registry.CreateMinion(nil, &minion)
 			if err != nil {
 				return err
 			}
 		}
-		delete(minionMap, match.ID)
+		delete(minionMap, minion.Name)
 	}
 
 	for minionID := range minionMap {
@@ -109,7 +109,7 @@ func (s *MinionController) cloudMinions() (*api.MinionList, error) {
 		Items: make([]api.Minion, len(matches)),
 	}
 	for i := range matches {
-		result.Items[i].ID = matches[i]
+		result.Items[i].Name = matches[i]
 		resources, err := instances.GetNodeResources(matches[i])
 		if err != nil {
 			return nil, err

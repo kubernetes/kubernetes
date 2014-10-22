@@ -36,7 +36,7 @@ type StaticNodeInfo struct {
 
 func (nodes StaticNodeInfo) GetNodeInfo(nodeID string) (*api.Minion, error) {
 	for ix := range nodes.Items {
-		if nodes.Items[ix].ID == nodeID {
+		if nodes.Items[ix].Name == nodeID {
 			return &nodes.Items[ix], nil
 		}
 	}

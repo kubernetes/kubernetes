@@ -126,14 +126,14 @@ func (s *Server) handleContainer(w http.ResponseWriter, req *http.Request) {
 		s.error(w, err)
 		return
 	}
-	pod.ID = containerManifest.ID
+	pod.Name = containerManifest.ID
 	pod.UID = containerManifest.UUID
 	pod.Spec.Containers = containerManifest.Containers
 	pod.Spec.Volumes = containerManifest.Volumes
 	pod.Spec.RestartPolicy = containerManifest.RestartPolicy
 	//TODO: sha1 of manifest?
-	if pod.ID == "" {
-		pod.ID = "1"
+	if pod.Name == "" {
+		pod.Name = "1"
 	}
 	if pod.UID == "" {
 		pod.UID = "1"
@@ -158,7 +158,7 @@ func (s *Server) handleContainers(w http.ResponseWriter, req *http.Request) {
 	}
 	pods := make([]api.BoundPod, len(specs))
 	for i := range specs {
-		pods[i].ID = fmt.Sprintf("%d", i+1)
+		pods[i].Name = fmt.Sprintf("%d", i+1)
 		pods[i].Spec = specs[i]
 	}
 	s.updates <- PodUpdate{pods, SET}
@@ -205,7 +205,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 
 	podFullName := GetPodFullName(&api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID:          podID,
+			Name:        podID,
 			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 		},
@@ -249,7 +249,7 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	// TODO: backwards compatibility with existing API, needs API change
 	podFullName := GetPodFullName(&api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID:          podID,
+			Name:        podID,
 			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 		},
@@ -324,7 +324,7 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 	}
 	podFullName := GetPodFullName(&api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID:          podID,
+			Name:        podID,
 			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
 		},
@@ -374,7 +374,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		// Backward compatibility without uuid information
 		podFullName := GetPodFullName(&api.BoundPod{
 			TypeMeta: api.TypeMeta{
-				ID: components[1],
+				Name: components[1],
 				// TODO: I am broken
 				Namespace:   api.NamespaceDefault,
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
@@ -384,7 +384,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	case 4:
 		podFullName := GetPodFullName(&api.BoundPod{
 			TypeMeta: api.TypeMeta{
-				ID: components[1],
+				Name: components[1],
 				// TODO: I am broken
 				Namespace:   "",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},

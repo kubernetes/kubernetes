@@ -45,8 +45,8 @@ func NewTestEtcdRegistry(client tools.EtcdClient) *etcdregistry.Registry {
 func TestSyncCreateMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	m1 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "m1"}})
-	m2 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "m2"}})
+	m1 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{Name: "m1"}})
+	m2 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{Name: "m2"}})
 	fakeClient.Set("/registry/minions/m1", m1, 0)
 	fakeClient.Set("/registry/minions/m2", m2, 0)
 	fakeClient.ExpectNotFoundGet("/registry/minions/m3")
@@ -88,9 +88,9 @@ func TestSyncCreateMinion(t *testing.T) {
 func TestSyncDeleteMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	m1 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "m1"}})
-	m2 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "m2"}})
-	m3 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{ID: "m3"}})
+	m1 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{Name: "m1"}})
+	m2 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{Name: "m2"}})
+	m3 := runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{Name: "m3"}})
 	fakeClient.Set("/registry/minions/m1", m1, 0)
 	fakeClient.Set("/registry/minions/m2", m2, 0)
 	fakeClient.Set("/registry/minions/m3", m3, 0)

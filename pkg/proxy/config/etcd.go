@@ -140,15 +140,15 @@ func (s ConfigSourceEtcd) decodeServices(node *etcd.Node, retServices []api.Serv
 		// so we got a service we can handle, and now get endpoints
 		retServices = append(retServices, svc)
 		// get the endpoints
-		endpoints, err := s.GetEndpoints(svc.Namespace, svc.ID)
+		endpoints, err := s.GetEndpoints(svc.Namespace, svc.Name)
 		if err != nil {
 			if tools.IsEtcdNotFound(err) {
-				glog.V(4).Infof("Unable to get endpoints for %s %s : %v", svc.Namespace, svc.ID, err)
+				glog.V(4).Infof("Unable to get endpoints for %s %s : %v", svc.Namespace, svc.Name, err)
 			}
-			glog.Errorf("Couldn't get endpoints for %s %s : %v skipping", svc.Namespace, svc.ID, err)
+			glog.Errorf("Couldn't get endpoints for %s %s : %v skipping", svc.Namespace, svc.Name, err)
 			endpoints = api.Endpoints{}
 		} else {
-			glog.V(3).Infof("Got service: %s %s on localport %d mapping to: %s", svc.Namespace, svc.ID, svc.Port, endpoints)
+			glog.V(3).Infof("Got service: %s %s on localport %d mapping to: %s", svc.Namespace, svc.Name, svc.Port, endpoints)
 		}
 		retEndpoints = append(retEndpoints, endpoints)
 	}
@@ -243,7 +243,7 @@ func (s ConfigSourceEtcd) ProcessChange(response *etcd.Response) {
 		parts := strings.Split(response.Node.Key[1:], "/")
 		if len(parts) == 4 {
 			glog.V(4).Infof("Deleting service: %s", parts[3])
-			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{TypeMeta: api.TypeMeta{ID: parts[3]}}}}
+			serviceUpdate := ServiceUpdate{Op: REMOVE, Services: []api.Service{{TypeMeta: api.TypeMeta{Name: parts[3]}}}}
 			s.serviceChannel <- serviceUpdate
 			return
 		}

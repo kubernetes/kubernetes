@@ -47,7 +47,7 @@ func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
 	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Percentage:(%d\\%m, %d\\%)", totalCPU, totalMemory, percentageCPU, percentageMemory)
 
 	return HostPriority{
-		host:  node.ID,
+		host:  node.Name,
 		score: int((percentageCPU + percentageMemory) / 2),
 	}
 }
@@ -65,7 +65,7 @@ func LeastRequestedPriority(pod api.Pod, podLister PodLister, minionLister Minio
 
 	list := HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateOccupancy(node, podsToMachines[node.ID]))
+		list = append(list, calculateOccupancy(node, podsToMachines[node.Name]))
 	}
 	return list, nil
 }

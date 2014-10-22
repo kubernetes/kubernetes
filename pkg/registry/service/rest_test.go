@@ -46,15 +46,15 @@ func TestServiceRegistryCreate(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	svc := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx := api.NewDefaultContext()
 	c, _ := storage.Create(ctx, svc)
 	created_svc := <-c
 	created_service := created_svc.(*api.Service)
-	if created_service.ID != "foo" {
-		t.Errorf("Expected foo, but got %v", created_service.ID)
+	if created_service.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", created_service.Name)
 	}
 	if created_service.CreationTimestamp.IsZero() {
 		t.Errorf("Expected timestamp to be set, got: %v", created_service.CreationTimestamp)
@@ -68,12 +68,12 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(ctx, svc.ID)
+	srv, err := registry.GetService(ctx, svc.Name)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if srv == nil {
-		t.Errorf("Failed to find service: %s", svc.ID)
+		t.Errorf("Failed to find service: %s", svc.Name)
 	}
 }
 
@@ -83,11 +83,11 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			Port:     6502,
-			TypeMeta: api.TypeMeta{ID: ""},
+			TypeMeta: api.TypeMeta{Name: ""},
 			Selector: map[string]string{"bar": "baz"},
 		},
 		"empty selector": {
-			TypeMeta: api.TypeMeta{ID: "foo"},
+			TypeMeta: api.TypeMeta{Name: "foo"},
 			Selector: map[string]string{},
 		},
 	}
@@ -109,13 +109,13 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(ctx, &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz1"},
 	})
 	storage := NewREST(registry, nil, nil, makeIPNet(t))
 	c, err := storage.Update(ctx, &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz2"},
 	})
 	if c == nil {
@@ -126,8 +126,8 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	}
 	updated_svc := <-c
 	updated_service := updated_svc.(*api.Service)
-	if updated_service.ID != "foo" {
-		t.Errorf("Expected foo, but got %v", updated_service.ID)
+	if updated_service.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", updated_service.Name)
 	}
 	if e, a := "foo", registry.UpdatedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
@@ -139,19 +139,19 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	registry.CreateService(ctx, &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	storage := NewREST(registry, nil, nil, makeIPNet(t))
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			Port:     6502,
-			TypeMeta: api.TypeMeta{ID: ""},
+			TypeMeta: api.TypeMeta{Name: ""},
 			Selector: map[string]string{"bar": "baz"},
 		},
 		"empty selector": {
 			Port:     6502,
-			TypeMeta: api.TypeMeta{ID: "foo"},
+			TypeMeta: api.TypeMeta{Name: "foo"},
 			Selector: map[string]string{},
 		},
 	}
@@ -174,7 +174,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	svc := &api.Service{
 		Port:                       6502,
-		TypeMeta:                   api.TypeMeta{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{Name: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
@@ -183,12 +183,12 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
-	srv, err := registry.GetService(ctx, svc.ID)
+	srv, err := registry.GetService(ctx, svc.Name)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if srv == nil {
-		t.Errorf("Failed to find service: %s", svc.ID)
+		t.Errorf("Failed to find service: %s", svc.Name)
 	}
 }
 
@@ -201,7 +201,7 @@ func TestServiceRegistryExternalServiceError(t *testing.T) {
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	svc := &api.Service{
 		Port:                       6502,
-		TypeMeta:                   api.TypeMeta{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{Name: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
@@ -223,11 +223,11 @@ func TestServiceRegistryDelete(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	svc := &api.Service{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	registry.CreateService(ctx, svc)
-	c, _ := storage.Delete(ctx, svc.ID)
+	c, _ := storage.Delete(ctx, svc.Name)
 	<-c
 	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -244,12 +244,12 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	svc := &api.Service{
-		TypeMeta:                   api.TypeMeta{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{Name: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
 	registry.CreateService(ctx, svc)
-	c, _ := storage.Delete(ctx, svc.ID)
+	c, _ := storage.Delete(ctx, svc.Name)
 	<-c
 	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
@@ -265,21 +265,21 @@ func TestServiceRegistryMakeLinkVariables(t *testing.T) {
 	registry.List = api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{ID: "foo-bar"},
+				TypeMeta: api.TypeMeta{Name: "foo-bar"},
 				Selector: map[string]string{"bar": "baz"},
 				Port:     8080,
 				Protocol: "TCP",
 				PortalIP: "1.2.3.4",
 			},
 			{
-				TypeMeta: api.TypeMeta{ID: "abc-123"},
+				TypeMeta: api.TypeMeta{Name: "abc-123"},
 				Selector: map[string]string{"bar": "baz"},
 				Port:     8081,
 				Protocol: "UDP",
 				PortalIP: "5.6.7.8",
 			},
 			{
-				TypeMeta: api.TypeMeta{ID: "q-u-u-x"},
+				TypeMeta: api.TypeMeta{Name: "q-u-u-x"},
 				Selector: map[string]string{"bar": "baz"},
 				Port:     8082,
 				Protocol: "",
@@ -333,7 +333,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	registry.CreateService(ctx, &api.Service{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	storage.Get(ctx, "foo")
@@ -353,7 +353,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	registry.CreateService(ctx, &api.Service{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	redirector := apiserver.Redirector(storage)
@@ -382,11 +382,11 @@ func TestServiceRegistryList(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
 	registry.CreateService(ctx, &api.Service{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	})
 	registry.CreateService(ctx, &api.Service{
-		TypeMeta: api.TypeMeta{ID: "foo2"},
+		TypeMeta: api.TypeMeta{Name: "foo2"},
 		Selector: map[string]string{"bar2": "baz2"},
 	})
 	registry.List.ResourceVersion = "1"
@@ -398,10 +398,10 @@ func TestServiceRegistryList(t *testing.T) {
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 services, but got %v", len(sl.Items))
 	}
-	if e, a := "foo", sl.Items[0].ID; e != a {
+	if e, a := "foo", sl.Items[0].Name; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
-	if e, a := "foo2", sl.Items[1].ID; e != a {
+	if e, a := "foo2", sl.Items[1].Name; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 	if sl.ResourceVersion != "1" {
@@ -417,15 +417,15 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 
 	svc1 := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx := api.NewDefaultContext()
 	c1, _ := rest.Create(ctx, svc1)
 	created_svc1 := <-c1
 	created_service_1 := created_svc1.(*api.Service)
-	if created_service_1.ID != "foo" {
-		t.Errorf("Expected foo, but got %v", created_service_1.ID)
+	if created_service_1.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", created_service_1.Name)
 	}
 	if created_service_1.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service_1.PortalIP)
@@ -433,15 +433,15 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 
 	svc2 := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "bar"},
+		TypeMeta: api.TypeMeta{Name: "bar"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx = api.NewDefaultContext()
 	c2, _ := rest.Create(ctx, svc2)
 	created_svc2 := <-c2
 	created_service_2 := created_svc2.(*api.Service)
-	if created_service_2.ID != "bar" {
-		t.Errorf("Expected bar, but got %v", created_service_2.ID)
+	if created_service_2.Name != "bar" {
+		t.Errorf("Expected bar, but got %v", created_service_2.Name)
 	}
 	if created_service_2.PortalIP != "1.2.3.2" { // new IP
 		t.Errorf("Unexpected PortalIP: %s", created_service_2.PortalIP)
@@ -456,34 +456,34 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 
 	svc1 := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx := api.NewDefaultContext()
 	c1, _ := rest.Create(ctx, svc1)
 	created_svc1 := <-c1
 	created_service_1 := created_svc1.(*api.Service)
-	if created_service_1.ID != "foo" {
-		t.Errorf("Expected foo, but got %v", created_service_1.ID)
+	if created_service_1.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", created_service_1.Name)
 	}
 	if created_service_1.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service_1.PortalIP)
 	}
 
-	c, _ := rest.Delete(ctx, created_service_1.ID)
+	c, _ := rest.Delete(ctx, created_service_1.Name)
 	<-c
 
 	svc2 := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "bar"},
+		TypeMeta: api.TypeMeta{Name: "bar"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx = api.NewDefaultContext()
 	c2, _ := rest.Create(ctx, svc2)
 	created_svc2 := <-c2
 	created_service_2 := created_svc2.(*api.Service)
-	if created_service_2.ID != "bar" {
-		t.Errorf("Expected bar, but got %v", created_service_2.ID)
+	if created_service_2.Name != "bar" {
+		t.Errorf("Expected bar, but got %v", created_service_2.Name)
 	}
 	if created_service_2.PortalIP != "1.2.3.1" { // same IP as before
 		t.Errorf("Unexpected PortalIP: %s", created_service_2.PortalIP)
@@ -498,7 +498,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 
 	svc := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx := api.NewDefaultContext()
@@ -543,7 +543,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 
 	svc := &api.Service{
 		Port:                       6502,
-		TypeMeta:                   api.TypeMeta{ID: "foo"},
+		TypeMeta:                   api.TypeMeta{Name: "foo"},
 		Selector:                   map[string]string{"bar": "baz"},
 		CreateExternalLoadBalancer: true,
 	}
@@ -570,7 +570,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 
 	svc := &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	ctx := api.NewDefaultContext()
@@ -578,7 +578,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	<-c
 	svc = &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	c, _ = rest1.Create(ctx, svc)
@@ -589,7 +589,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 
 	svc = &api.Service{
 		Port:     6502,
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Selector: map[string]string{"bar": "baz"},
 	}
 	c, _ = rest2.Create(ctx, svc)
@@ -603,7 +603,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 func TestCreateServiceWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	service := &api.Service{
-		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+		TypeMeta: api.TypeMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := api.NewDefaultContext()
@@ -621,7 +621,7 @@ func TestCreateServiceWithConflictingNamespace(t *testing.T) {
 func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	service := &api.Service{
-		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+		TypeMeta: api.TypeMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := api.NewDefaultContext()

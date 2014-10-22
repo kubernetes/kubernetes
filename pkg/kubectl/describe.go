@@ -61,7 +61,7 @@ func describePod(w io.Writer, c client.Interface, id string) (string, error) {
 	}
 
 	return tabbedString(func(out *tabwriter.Writer) error {
-		fmt.Fprintf(out, "ID:\t%s\n", pod.ID)
+		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(pod.DesiredState.Manifest))
 		fmt.Fprintf(out, "Host:\t%s\n", pod.CurrentState.Host+"/"+pod.CurrentState.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
@@ -72,50 +72,50 @@ func describePod(w io.Writer, c client.Interface, id string) (string, error) {
 }
 
 func describeReplicationController(w io.Writer, c client.Interface, id string) (string, error) {
-	rc, err := c.GetReplicationController(api.NewDefaultContext(), id)
+	controller, err := c.GetReplicationController(api.NewDefaultContext(), id)
 	if err != nil {
 		return "", err
 	}
 
-	running, waiting, terminated, err := getPodStatusForReplicationController(c, rc)
+	running, waiting, terminated, err := getPodStatusForReplicationController(c, controller)
 	if err != nil {
 		return "", err
 	}
 
 	return tabbedString(func(out *tabwriter.Writer) error {
-		fmt.Fprintf(out, "ID:\t%s\n", rc.ID)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(rc.DesiredState.PodTemplate.DesiredState.Manifest))
-		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(rc.DesiredState.ReplicaSelector))
-		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(rc.Labels))
-		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rc.CurrentState.Replicas, rc.DesiredState.Replicas)
+		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(controller.DesiredState.PodTemplate.DesiredState.Manifest))
+		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.DesiredState.ReplicaSelector))
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
+		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.CurrentState.Replicas, controller.DesiredState.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Terminated\n", running, waiting, terminated)
 		return nil
 	})
 }
 
 func describeService(w io.Writer, c client.Interface, id string) (string, error) {
-	s, err := c.GetService(api.NewDefaultContext(), id)
+	service, err := c.GetService(api.NewDefaultContext(), id)
 	if err != nil {
 		return "", err
 	}
 
 	return tabbedString(func(out *tabwriter.Writer) error {
-		fmt.Fprintf(out, "ID:\t%s\n", s.ID)
-		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(s.Labels))
-		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(s.Selector))
-		fmt.Fprintf(out, "Port:\t%d\n", s.Port)
+		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
+		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Selector))
+		fmt.Fprintf(out, "Port:\t%d\n", service.Port)
 		return nil
 	})
 }
 
 func describeMinion(w io.Writer, c client.Interface, id string) (string, error) {
-	m, err := getMinion(c, id)
+	minion, err := getMinion(c, id)
 	if err != nil {
 		return "", err
 	}
 
 	return tabbedString(func(out *tabwriter.Writer) error {
-		fmt.Fprintf(out, "ID:\t%s\n", m.ID)
+		fmt.Fprintf(out, "Name:\t%s\n", minion.Name)
 		return nil
 	})
 }
@@ -127,9 +127,9 @@ func getMinion(c client.Interface, id string) (*api.Minion, error) {
 		glog.Fatalf("Error getting minion info: %v\n", err)
 	}
 
-	for _, m := range minionList.Items {
-		if id == m.TypeMeta.ID {
-			return &m, nil
+	for _, minion := range minionList.Items {
+		if id == minion.Name {
+			return &minion, nil
 		}
 	}
 	return nil, fmt.Errorf("Minion %s not found", id)
@@ -148,17 +148,17 @@ func getReplicationControllersForLabels(c client.Interface, labelsToMatch labels
 
 	// Find the ones that match labelsToMatch.
 	var matchingRCs []api.ReplicationController
-	for _, rc := range rcs.Items {
-		selector := labels.SelectorFromSet(rc.DesiredState.ReplicaSelector)
+	for _, controller := range rcs.Items {
+		selector := labels.SelectorFromSet(controller.DesiredState.ReplicaSelector)
 		if selector.Matches(labelsToMatch) {
-			matchingRCs = append(matchingRCs, rc)
+			matchingRCs = append(matchingRCs, controller)
 		}
 	}
 
 	// Format the matching RC's into strings.
 	var rcStrings []string
-	for _, rc := range matchingRCs {
-		rcStrings = append(rcStrings, fmt.Sprintf("%s (%d/%d replicas created)", rc.ID, rc.CurrentState.Replicas, rc.DesiredState.Replicas))
+	for _, controller := range matchingRCs {
+		rcStrings = append(rcStrings, fmt.Sprintf("%s (%d/%d replicas created)", controller.Name, controller.CurrentState.Replicas, controller.DesiredState.Replicas))
 	}
 
 	list := strings.Join(rcStrings, ", ")
@@ -168,8 +168,8 @@ func getReplicationControllersForLabels(c client.Interface, labelsToMatch labels
 	return list
 }
 
-func getPodStatusForReplicationController(kubeClient client.Interface, rc *api.ReplicationController) (running, waiting, terminated int, err error) {
-	rcPods, err := kubeClient.ListPods(api.NewDefaultContext(), labels.SelectorFromSet(rc.DesiredState.ReplicaSelector))
+func getPodStatusForReplicationController(kubeClient client.Interface, controller *api.ReplicationController) (running, waiting, terminated int, err error) {
+	rcPods, err := kubeClient.ListPods(api.NewDefaultContext(), labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
 	if err != nil {
 		return
 	}

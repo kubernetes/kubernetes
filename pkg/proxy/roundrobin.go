@@ -98,15 +98,15 @@ func (lb *LoadBalancerRR) OnUpdate(endpoints []api.Endpoints) {
 	defer lb.lock.Unlock()
 	// Update endpoints for services.
 	for _, endpoint := range endpoints {
-		existingEndpoints, exists := lb.endpointsMap[endpoint.ID]
+		existingEndpoints, exists := lb.endpointsMap[endpoint.Name]
 		validEndpoints := filterValidEndpoints(endpoint.Endpoints)
 		if !exists || !reflect.DeepEqual(existingEndpoints, validEndpoints) {
-			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.ID, endpoint.Endpoints)
-			lb.endpointsMap[endpoint.ID] = validEndpoints
+			glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", endpoint.Name, endpoint.Endpoints)
+			lb.endpointsMap[endpoint.Name] = validEndpoints
 			// Reset the round-robin index.
-			lb.rrIndex[endpoint.ID] = 0
+			lb.rrIndex[endpoint.Name] = 0
 		}
-		registeredEndpoints[endpoint.ID] = true
+		registeredEndpoints[endpoint.Name] = true
 	}
 	// Remove endpoints missing from the update.
 	for k, v := range lb.endpointsMap {

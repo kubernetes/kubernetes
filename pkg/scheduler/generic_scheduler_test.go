@@ -34,7 +34,7 @@ func truePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, erro
 }
 
 func matchesPredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	return pod.ID == node, nil
+	return pod.Name == node, nil
 }
 
 func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
@@ -46,12 +46,12 @@ func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister
 		return nil, err
 	}
 	for _, minion := range nodes.Items {
-		score, err := strconv.Atoi(minion.ID)
+		score, err := strconv.Atoi(minion.Name)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, HostPriority{
-			host:  minion.ID,
+			host:  minion.Name,
 			score: score,
 		})
 	}
@@ -63,7 +63,7 @@ func makeMinionList(nodeNames []string) api.MinionList {
 		Items: make([]api.Minion, len(nodeNames)),
 	}
 	for ix := range nodeNames {
-		result.Items[ix].ID = nodeNames[ix]
+		result.Items[ix].Name = nodeNames[ix]
 	}
 	return result
 }
@@ -95,7 +95,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   []FitPredicate{matchesPredicate},
 			prioritizer:  EqualPriority,
 			nodes:        []string{"machine1", "machine2"},
-			pod:          api.Pod{TypeMeta: api.TypeMeta{ID: "machine2"}},
+			pod:          api.Pod{TypeMeta: api.TypeMeta{Name: "machine2"}},
 			expectedHost: "machine2",
 		},
 		{
@@ -108,7 +108,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   []FitPredicate{matchesPredicate},
 			prioritizer:  numericPriority,
 			nodes:        []string{"3", "2", "1"},
-			pod:          api.Pod{TypeMeta: api.TypeMeta{ID: "2"}},
+			pod:          api.Pod{TypeMeta: api.TypeMeta{Name: "2"}},
 			expectedHost: "2",
 		},
 		{

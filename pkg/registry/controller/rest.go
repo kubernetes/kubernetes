@@ -63,13 +63,13 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 
-	if len(controller.ID) == 0 {
-		controller.ID = uuid.NewUUID().String()
+	if len(controller.Name) == 0 {
+		controller.Name = uuid.NewUUID().String()
 	}
 	// Pod Manifest ID should be assigned by the pod API
 	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
+		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
 
 	controller.CreationTimestamp = util.Now()
@@ -79,7 +79,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(ctx, controller.ID)
+		return rs.registry.GetController(ctx, controller.Name)
 	}), nil
 }
 
@@ -136,14 +136,14 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
-		return nil, errors.NewInvalid("replicationController", controller.ID, errs)
+		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.UpdateController(ctx, controller)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetController(ctx, controller.ID)
+		return rs.registry.GetController(ctx, controller.Name)
 	}), nil
 }
 

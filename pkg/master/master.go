@@ -126,7 +126,7 @@ func (m *Master) init(c *Config) {
 	} else {
 		for _, minionID := range c.Minions {
 			m.minionRegistry.CreateMinion(nil, &api.Minion{
-				TypeMeta:      api.TypeMeta{ID: minionID},
+				TypeMeta:      api.TypeMeta{Name: minionID},
 				NodeResources: c.NodeResources,
 			})
 		}
