@@ -71,8 +71,9 @@ ${GO_OUT}/apiserver \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --machines="127.0.0.1" \
-  --minion_port=${KUBELET_PORT} \
+  --kubelet_port=${KUBELET_PORT} \
   --portal_net="10.0.0.0/24" 1>&2 &
+
 APISERVER_PID=$!
 
 wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "

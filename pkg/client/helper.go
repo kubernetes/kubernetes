@@ -61,6 +61,19 @@ type Config struct {
 	Transport http.RoundTripper
 }
 
+type KubeletConfig struct {
+	// ToDo: Add support for different kubelet instances exposing different ports
+	Port        uint
+	EnableHttps bool
+
+	// TLS Configuration, only applies if EnableHttps is true.
+	CertFile string
+	// TLS Configuration, only applies if EnableHttps is true.
+	KeyFile string
+	// TLS Configuration, only applies if EnableHttps is true.
+	CAFile string
+}
+
 // New creates a Kubernetes client for the given config. This client works with pods,
 // replication controllers and services. It allows operations such as list, get, update
 // and delete on these objects. An error is returned if the provided configuration

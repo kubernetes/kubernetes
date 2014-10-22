@@ -21,6 +21,7 @@ package client
 type FlagSet interface {
 	StringVar(p *string, name, value, usage string)
 	BoolVar(p *bool, name string, value bool, usage string)
+	UintVar(p *uint, name string, value uint, usage string)
 }
 
 // BindClientConfigFlags registers a standard set of CLI flags for connecting to a Kubernetes API server.
@@ -30,5 +31,13 @@ func BindClientConfigFlags(flags FlagSet, config *Config) {
 	flags.BoolVar(&config.Insecure, "insecure_skip_tls_verify", config.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 	flags.StringVar(&config.CertFile, "client_certificate", config.CertFile, "Path to a client key file for TLS.")
 	flags.StringVar(&config.KeyFile, "client_key", config.KeyFile, "Path to a client key file for TLS.")
-	flags.StringVar(&config.CAFile, "certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority")
+	flags.StringVar(&config.CAFile, "certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority.")
+}
+
+func BindKubeletClientConfigFlags(flags FlagSet, config *KubeletConfig) {
+	flags.BoolVar(&config.EnableHttps, "kubelet_https", config.EnableHttps, "Use https for kubelet connections")
+	flags.UintVar(&config.Port, "kubelet_port", config.Port, "Kubelet port")
+	flags.StringVar(&config.CertFile, "kubelet_client_certificate", config.CertFile, "Path to a client key file for TLS.")
+	flags.StringVar(&config.KeyFile, "kubelet_client_key", config.KeyFile, "Path to a client key file for TLS.")
+	flags.StringVar(&config.CAFile, "kubelet_certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority.")
 }
