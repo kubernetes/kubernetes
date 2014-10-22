@@ -109,7 +109,7 @@ func TestRunOnce(t *testing.T) {
 	results, err := kb.runOnce([]api.BoundPod{
 		{
 			TypeMeta: api.TypeMeta{
-				ID:          "foo",
+				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
 			},
@@ -126,7 +126,7 @@ func TestRunOnce(t *testing.T) {
 	if results[0].Err != nil {
 		t.Errorf("unexpected run pod error: %v", results[0].Err)
 	}
-	if results[0].Pod.ID != "foo" {
-		t.Errorf("unexpected pod: %q", results[0].Pod.ID)
+	if results[0].Pod.Name != "foo" {
+		t.Errorf("unexpected pod: %q", results[0].Pod.Name)
 	}
 }

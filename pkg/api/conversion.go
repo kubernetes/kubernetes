@@ -32,7 +32,7 @@ func init() {
 			out.Spec.Containers = in.Containers
 			out.Spec.Volumes = in.Volumes
 			out.Spec.RestartPolicy = in.RestartPolicy
-			out.ID = in.ID
+			out.Name = in.ID
 			out.UID = in.UUID
 			return nil
 		},
@@ -41,7 +41,7 @@ func init() {
 			out.Volumes = in.Spec.Volumes
 			out.RestartPolicy = in.Spec.RestartPolicy
 			out.Version = "v1beta2"
-			out.ID = in.ID
+			out.ID = in.Name
 			out.UUID = in.UID
 			return nil
 		},
@@ -71,7 +71,7 @@ func init() {
 			// Only copy a subset of fields, and override manifest attributes with the pod
 			// metadata
 			out.UID = in.UID
-			out.ID = in.ID
+			out.Name = in.Name
 			out.Namespace = in.Namespace
 			out.CreationTimestamp = in.CreationTimestamp
 			return nil

@@ -279,7 +279,7 @@ func milliCPUToShares(milliCPU int) int {
 func (kl *Kubelet) mountExternalVolumes(pod *api.BoundPod) (volumeMap, error) {
 	podVolumes := make(volumeMap)
 	for _, vol := range pod.Spec.Volumes {
-		extVolume, err := volume.CreateVolumeBuilder(&vol, pod.ID, kl.rootDirectory)
+		extVolume, err := volume.CreateVolumeBuilder(&vol, pod.Name, kl.rootDirectory)
 		if err != nil {
 			return nil, err
 		}
@@ -334,7 +334,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 			Cmd:          container.Command,
 			Env:          envVariables,
 			ExposedPorts: exposedPorts,
-			Hostname:     pod.ID,
+			Hostname:     pod.Name,
 			Image:        container.Image,
 			Memory:       int64(container.Memory),
 			CpuShares:    int64(milliCPUToShares(container.CPU)),
@@ -609,7 +609,7 @@ func getDesiredVolumes(pods []api.BoundPod) map[string]api.Volume {
 	desiredVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Spec.Volumes {
-			identifier := path.Join(pod.ID, volume.Name)
+			identifier := path.Join(pod.Name, volume.Name)
 			desiredVolumes[identifier] = volume
 		}
 	}

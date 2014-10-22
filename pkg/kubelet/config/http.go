@@ -92,8 +92,8 @@ func (s *SourceURL) extractFromURL() error {
 		if err := api.Scheme.Convert(&manifest, &pod); err != nil {
 			return err
 		}
-		if len(pod.ID) == 0 {
-			pod.ID = "1"
+		if len(pod.Name) == 0 {
+			pod.Name = "1"
 		}
 		if len(pod.Namespace) == 0 {
 			pod.Namespace = api.NamespaceDefault
@@ -132,8 +132,8 @@ func (s *SourceURL) extractFromURL() error {
 		}
 		for i := range boundPods.Items {
 			pod := &boundPods.Items[i]
-			if len(pod.ID) == 0 {
-				pod.ID = fmt.Sprintf("%d", i+1)
+			if len(pod.Name) == 0 {
+				pod.Name = fmt.Sprintf("%d", i+1)
 			}
 			if len(pod.Namespace) == 0 {
 				pod.Namespace = api.NamespaceDefault

@@ -36,7 +36,7 @@ import (
 //
 type TypeMeta struct {
 	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+	Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 	ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`

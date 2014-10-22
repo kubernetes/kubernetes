@@ -260,7 +260,7 @@ func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.Boun
 		var errors []error
 		name := podUniqueName(&pods[i])
 		if names.Has(name) {
-			errors = append(errors, apierrs.NewFieldDuplicate("name", pods[i].ID))
+			errors = append(errors, apierrs.NewFieldDuplicate("name", pods[i].Name))
 		} else {
 			names.Insert(name)
 		}
@@ -268,7 +268,7 @@ func filterInvalidPods(pods []api.BoundPod, source string) (filtered []*api.Boun
 			errors = append(errors, errs...)
 		}
 		if len(errors) > 0 {
-			glog.Warningf("Pod %d (%s) from %s failed validation, ignoring: %v", i+1, pods[i].ID, source, errors)
+			glog.Warningf("Pod %d (%s) from %s failed validation, ignoring: %v", i+1, pods[i].Name, source, errors)
 			continue
 		}
 		filtered = append(filtered, &pods[i])
@@ -307,5 +307,5 @@ func podUniqueName(pod *api.BoundPod) string {
 	if len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	return fmt.Sprintf("%s.%s", pod.ID, namespace)
+	return fmt.Sprintf("%s.%s", pod.Name, namespace)
 }

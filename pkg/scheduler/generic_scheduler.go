@@ -72,7 +72,7 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicat
 	for _, node := range nodes.Items {
 		fits := true
 		for _, predicate := range predicates {
-			fit, err := predicate(pod, machineToPods[node.ID], node.ID)
+			fit, err := predicate(pod, machineToPods[node.Name], node.Name)
 			if err != nil {
 				return api.MinionList{}, err
 			}
@@ -111,7 +111,7 @@ func EqualPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) 
 	}
 	for _, minion := range nodes.Items {
 		result = append(result, HostPriority{
-			host:  minion.ID,
+			host:  minion.Name,
 			score: 1,
 		})
 	}

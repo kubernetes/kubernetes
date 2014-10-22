@@ -111,15 +111,15 @@ func TestPodUpdate(c *client.Client) bool {
 		glog.Errorf("Failed to create pod: %v", err)
 		return false
 	}
-	defer c.DeletePod(ctx, pod.ID)
-	waitForPodRunning(c, pod.ID)
+	defer c.DeletePod(ctx, pod.Name)
+	waitForPodRunning(c, pod.Name)
 	pods, err := c.ListPods(ctx, labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 	if len(pods.Items) != 1 {
 		glog.Errorf("Failed to find the correct pod")
 		return false
 	}
 
-	podOut, err := c.GetPod(ctx, pod.ID)
+	podOut, err := c.GetPod(ctx, pod.Name)
 	if err != nil {
 		glog.Errorf("Failed to get pod: %v", err)
 		return false
@@ -133,7 +133,7 @@ func TestPodUpdate(c *client.Client) bool {
 		glog.Errorf("Failed to update pod: %v", err)
 		return false
 	}
-	waitForPodRunning(c, pod.ID)
+	waitForPodRunning(c, pod.Name)
 	pods, err = c.ListPods(ctx, labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 	if len(pods.Items) != 1 {
 		glog.Errorf("Failed to find the correct pod after update.")

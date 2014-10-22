@@ -136,7 +136,7 @@ func (c *Client) UpdatePod(ctx api.Context, pod *api.Pod) (result *api.Pod, err 
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
 		return
 	}
-	err = c.Put().Namespace(api.Namespace(ctx)).Path("pods").Path(pod.ID).Body(pod).Do().Into(result)
+	err = c.Put().Namespace(api.Namespace(ctx)).Path("pods").Path(pod.Name).Body(pod).Do().Into(result)
 	return
 }
 
@@ -168,7 +168,7 @@ func (c *Client) UpdateReplicationController(ctx api.Context, controller *api.Re
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
 		return
 	}
-	err = c.Put().Namespace(api.Namespace(ctx)).Path("replicationControllers").Path(controller.ID).Body(controller).Do().Into(result)
+	err = c.Put().Namespace(api.Namespace(ctx)).Path("replicationControllers").Path(controller.Name).Body(controller).Do().Into(result)
 	return
 }
 
@@ -217,7 +217,7 @@ func (c *Client) UpdateService(ctx api.Context, svc *api.Service) (result *api.S
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
-	err = c.Put().Namespace(api.Namespace(ctx)).Path("services").Path(svc.ID).Body(svc).Do().Into(result)
+	err = c.Put().Namespace(api.Namespace(ctx)).Path("services").Path(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
@@ -280,7 +280,7 @@ func (c *Client) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) (*ap
 	err := c.Put().
 		Namespace(api.Namespace(ctx)).
 		Path("endpoints").
-		Path(endpoints.ID).
+		Path(endpoints.Name).
 		Body(endpoints).
 		Do().
 		Into(result)

@@ -54,7 +54,7 @@ func init() {
 
 type Simple struct {
 	api.TypeMeta `yaml:",inline" json:",inline"`
-	Name         string `yaml:"name,omitempty" json:"name,omitempty"`
+	Other        string `yaml:"other,omitempty" json:"other,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
@@ -108,7 +108,7 @@ func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan run
 	}
 	return MakeAsync(func() (runtime.Object, error) {
 		if storage.injectedFunction != nil {
-			return storage.injectedFunction(&Simple{TypeMeta: api.TypeMeta{ID: id}})
+			return storage.injectedFunction(&Simple{TypeMeta: api.TypeMeta{Name: id}})
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil
 	}), nil
@@ -295,7 +295,7 @@ func TestNonEmptyList(t *testing.T) {
 		list: []Simple{
 			{
 				TypeMeta: api.TypeMeta{Kind: "Simple"},
-				Name:     "foo",
+				Other:    "foo",
 			},
 		},
 	}
@@ -322,7 +322,7 @@ func TestNonEmptyList(t *testing.T) {
 		t.Errorf("Unexpected response: %#v", listOut)
 		return
 	}
-	if listOut.Items[0].Name != simpleStorage.list[0].Name {
+	if listOut.Items[0].Other != simpleStorage.list[0].Other {
 		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
 	}
 }
@@ -331,7 +331,7 @@ func TestGet(t *testing.T) {
 	storage := map[string]RESTStorage{}
 	simpleStorage := SimpleRESTStorage{
 		item: Simple{
-			Name: "foo",
+			Other: "foo",
 		},
 	}
 	selfLinker := &setTestSelfLinker{
@@ -431,7 +431,7 @@ func TestUpdate(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	item := &Simple{
-		Name: "bar",
+		Other: "bar",
 	}
 	body, err := codec.Encode(item)
 	if err != nil {
@@ -464,7 +464,7 @@ func TestUpdateMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 
 	item := &Simple{
-		Name: "bar",
+		Other: "bar",
 	}
 	body, err := codec.Encode(item)
 	if err != nil {
@@ -493,7 +493,7 @@ func TestCreate(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{
-		Name: "foo",
+		Other: "foo",
 	}
 	data, _ := codec.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo", bytes.NewBuffer(data))
@@ -532,7 +532,7 @@ func TestCreateNotFound(t *testing.T) {
 	server := httptest.NewServer(handler)
 	client := http.Client{}
 
-	simple := &Simple{Name: "foo"}
+	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/simple", bytes.NewBuffer(data))
 	if err != nil {
@@ -597,7 +597,7 @@ func TestSyncCreate(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{
-		Name: "bar",
+		Other: "bar",
 	}
 	data, _ := codec.Encode(simple)
 	request, err := http.NewRequest("POST", server.URL+"/prefix/version/foo?sync=true", bytes.NewBuffer(data))
@@ -691,7 +691,7 @@ func TestAsyncCreateError(t *testing.T) {
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 
-	simple := &Simple{Name: "bar"}
+	simple := &Simple{Other: "bar"}
 	data, _ := codec.Encode(simple)
 
 	status := expectApiStatus(t, "POST", fmt.Sprintf("%s/prefix/version/foo", server.URL), data, http.StatusAccepted)
@@ -787,7 +787,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
 
-	simple := &Simple{Name: "foo"}
+	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
 	itemOut := expectApiStatus(t, "POST", server.URL+"/prefix/version/foo?sync=true&timeout=4ms", data, http.StatusAccepted)
 	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {

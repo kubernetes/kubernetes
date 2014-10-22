@@ -75,12 +75,12 @@ func TestListControllerList(t *testing.T) {
 			Items: []api.ReplicationController{
 				{
 					TypeMeta: api.TypeMeta{
-						ID: "foo",
+						Name: "foo",
 					},
 				},
 				{
 					TypeMeta: api.TypeMeta{
-						ID: "bar",
+						Name: "bar",
 					},
 				},
 			},
@@ -99,10 +99,10 @@ func TestListControllerList(t *testing.T) {
 	if len(controllers.Items) != 2 {
 		t.Errorf("Unexpected controller list: %#v", controllers)
 	}
-	if controllers.Items[0].ID != "foo" {
+	if controllers.Items[0].Name != "foo" {
 		t.Errorf("Unexpected controller: %#v", controllers.Items[0])
 	}
-	if controllers.Items[1].ID != "bar" {
+	if controllers.Items[1].Name != "bar" {
 		t.Errorf("Unexpected controller: %#v", controllers.Items[1])
 	}
 }
@@ -114,7 +114,7 @@ func TestControllerDecode(t *testing.T) {
 	}
 	controller := &api.ReplicationController{
 		TypeMeta: api.TypeMeta{
-			ID: "foo",
+			Name: "foo",
 		},
 	}
 	body, err := latest.Codec.Encode(controller)
@@ -135,7 +135,7 @@ func TestControllerDecode(t *testing.T) {
 func TestControllerParsing(t *testing.T) {
 	expectedController := api.ReplicationController{
 		TypeMeta: api.TypeMeta{
-			ID: "nginxController",
+			Name: "nginxController",
 		},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
@@ -225,7 +225,7 @@ func TestCreateController(t *testing.T) {
 		Pods: &api.PodList{
 			Items: []api.Pod{
 				{
-					TypeMeta: api.TypeMeta{ID: "foo"},
+					TypeMeta: api.TypeMeta{Name: "foo"},
 					Labels:   map[string]string{"a": "b"},
 				},
 			},
@@ -237,7 +237,7 @@ func TestCreateController(t *testing.T) {
 		pollPeriod: time.Millisecond * 1,
 	}
 	controller := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{ID: "test"},
+		TypeMeta: api.TypeMeta{Name: "test"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas:        2,
 			ReplicaSelector: map[string]string{"a": "b"},
@@ -270,13 +270,13 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 	}
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
-			TypeMeta: api.TypeMeta{ID: ""},
+			TypeMeta: api.TypeMeta{Name: ""},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			TypeMeta:     api.TypeMeta{ID: "abc"},
+			TypeMeta:     api.TypeMeta{Name: "abc"},
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
@@ -301,13 +301,13 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 	}
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
-			TypeMeta: api.TypeMeta{ID: ""},
+			TypeMeta: api.TypeMeta{Name: ""},
 			DesiredState: api.ReplicationControllerState{
 				ReplicaSelector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			TypeMeta:     api.TypeMeta{ID: "abc"},
+			TypeMeta:     api.TypeMeta{Name: "abc"},
 			DesiredState: api.ReplicationControllerState{},
 		},
 	}
@@ -338,8 +338,8 @@ func TestFillCurrentState(t *testing.T) {
 	fakeLister := fakePodLister{
 		l: api.PodList{
 			Items: []api.Pod{
-				{TypeMeta: api.TypeMeta{ID: "foo"}},
-				{TypeMeta: api.TypeMeta{ID: "bar"}},
+				{TypeMeta: api.TypeMeta{Name: "foo"}},
+				{TypeMeta: api.TypeMeta{Name: "bar"}},
 			},
 		},
 	}
@@ -368,7 +368,7 @@ func TestFillCurrentState(t *testing.T) {
 func TestCreateControllerWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	controller := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+		TypeMeta: api.TypeMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := api.NewDefaultContext()
@@ -386,7 +386,7 @@ func TestCreateControllerWithConflictingNamespace(t *testing.T) {
 func TestUpdateControllerWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	controller := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{ID: "test", Namespace: "not-default"},
+		TypeMeta: api.TypeMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := api.NewDefaultContext()

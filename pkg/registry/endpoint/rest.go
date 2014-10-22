@@ -65,7 +65,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
 	}
-	if len(endpoints.ID) == 0 {
+	if len(endpoints.Name) == 0 {
 		return nil, fmt.Errorf("id is required: %#v", obj)
 	}
 	endpoints.CreationTimestamp = util.Now()
@@ -74,7 +74,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetEndpoints(ctx, endpoints.ID)
+		return rs.registry.GetEndpoints(ctx, endpoints.Name)
 	}), nil
 }
 
@@ -89,7 +89,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.GetEndpoints(ctx, endpoints.ID)
+		return rs.registry.GetEndpoints(ctx, endpoints.Name)
 	}), nil
 }
 

@@ -74,7 +74,7 @@ func (s *Scheduler) scheduleOne() {
 	}
 	b := &api.Binding{
 		TypeMeta: api.TypeMeta{Namespace: pod.Namespace},
-		PodID:    pod.ID,
+		PodID:    pod.Name,
 		Host:     dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
@@ -82,5 +82,5 @@ func (s *Scheduler) scheduleOne() {
 		s.config.Error(pod, err)
 		return
 	}
-	record.Eventf(pod, "", string(api.PodWaiting), "scheduled", "Successfully assigned %v to %v", pod.ID, dest)
+	record.Eventf(pod, "", string(api.PodWaiting), "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 }

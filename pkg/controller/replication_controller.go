@@ -56,7 +56,7 @@ func (r RealPodControl) createReplica(ctx api.Context, controllerSpec api.Replic
 	labels := controllerSpec.DesiredState.PodTemplate.Labels
 	// TODO: don't fail to set this label just because the map isn't created.
 	if labels != nil {
-		labels["replicationController"] = controllerSpec.ID
+		labels["replicationController"] = controllerSpec.Name
 	}
 	pod := &api.Pod{
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
@@ -127,7 +127,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 			*resourceVersion = rc.ResourceVersion
 			// Sync even if this is a deletion event, to ensure that we leave
 			// it in the desired state.
-			glog.V(4).Infof("About to sync from watch: %v", rc.ID)
+			glog.V(4).Infof("About to sync from watch: %v", rc.Name)
 			rm.syncHandler(*rc)
 		}
 	}
@@ -171,7 +171,7 @@ func (rm *ReplicationManager) syncReplicationController(controllerSpec api.Repli
 		for i := 0; i < diff; i++ {
 			go func(ix int) {
 				defer wait.Done()
-				rm.podControl.deletePod(ctx, filteredList[ix].ID)
+				rm.podControl.deletePod(ctx, filteredList[ix].Name)
 			}(i)
 		}
 		wait.Wait()
@@ -195,7 +195,7 @@ func (rm *ReplicationManager) synchronize() {
 	for ix := range controllerSpecs {
 		go func(ix int) {
 			defer wg.Done()
-			glog.V(4).Infof("periodic sync of %v", controllerSpecs[ix].ID)
+			glog.V(4).Infof("periodic sync of %v", controllerSpecs[ix].Name)
 			err := rm.syncHandler(controllerSpecs[ix])
 			if err != nil {
 				glog.Errorf("Error synchronizing: %#v", err)

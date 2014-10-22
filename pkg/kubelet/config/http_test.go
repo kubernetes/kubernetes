@@ -125,7 +125,7 @@ func TestExtractFromHTTP(t *testing.T) {
 			expected: CreatePodUpdate(kubelet.SET,
 				api.BoundPod{
 					TypeMeta: api.TypeMeta{
-						ID:        "foo",
+						Name:      "foo",
 						Namespace: "default",
 					},
 					Spec: api.PodSpec{
@@ -142,14 +142,14 @@ func TestExtractFromHTTP(t *testing.T) {
 			expected: CreatePodUpdate(kubelet.SET,
 				api.BoundPod{
 					TypeMeta: api.TypeMeta{
-						ID:        "1",
+						Name:      "1",
 						Namespace: "default",
 					},
 					Spec: api.PodSpec{Containers: []api.Container{{Name: "1", Image: "foo"}}},
 				},
 				api.BoundPod{
 					TypeMeta: api.TypeMeta{
-						ID:        "bar",
+						Name:      "bar",
 						Namespace: "default",
 					},
 					Spec: api.PodSpec{Containers: []api.Container{{Name: "1", Image: "foo"}}},

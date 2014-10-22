@@ -30,7 +30,7 @@ func init() {
 			out.APIVersion = in.APIVersion
 			out.Kind = in.Kind
 			out.Namespace = in.Namespace
-			out.ID = in.ID
+			out.ID = in.Name
 			out.CreationTimestamp = in.CreationTimestamp
 			out.SelfLink = in.SelfLink
 			out.Annotations = in.Annotations
@@ -48,7 +48,7 @@ func init() {
 			out.APIVersion = in.APIVersion
 			out.Kind = in.Kind
 			out.Namespace = in.Namespace
-			out.ID = in.ID
+			out.Name = in.ID
 			out.CreationTimestamp = in.CreationTimestamp
 			out.SelfLink = in.SelfLink
 			out.Annotations = in.Annotations

@@ -35,7 +35,7 @@ func newPodList(count int) api.PodList {
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
 			TypeMeta: api.TypeMeta{
-				ID:         fmt.Sprintf("pod%d", i),
+				Name:       fmt.Sprintf("pod%d", i),
 				APIVersion: testapi.Version(),
 			},
 			DesiredState: api.PodState{
@@ -181,7 +181,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{ID: "foo"},
+				TypeMeta: api.TypeMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -193,7 +193,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{
 			TypeMeta: api.TypeMeta{
-				ID:              "foo",
+				Name:            "foo",
 				ResourceVersion: "1",
 			},
 			Endpoints: []string{"6.7.8.9:1000"},
@@ -205,7 +205,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
 		TypeMeta: api.TypeMeta{
-			ID:              "foo",
+			Name:            "foo",
 			ResourceVersion: "1",
 		},
 		Endpoints: []string{"1.2.3.4:8080"},
@@ -217,7 +217,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{ID: "foo"},
+				TypeMeta: api.TypeMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -245,7 +245,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{ID: "foo"},
+				TypeMeta: api.TypeMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},

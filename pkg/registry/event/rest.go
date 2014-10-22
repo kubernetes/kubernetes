@@ -49,11 +49,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	event.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Create(ctx, event.ID, event)
+		err := rs.registry.Create(ctx, event.Name, event)
 		if err != nil {
 			return nil, err
 		}
-		return rs.registry.Get(ctx, event.ID)
+		return rs.registry.Get(ctx, event.Name)
 	}), nil
 }
 

@@ -657,7 +657,7 @@ type ResourceName string
 type ResourceList map[ResourceName]util.IntOrString
 
 // Node is a worker node in Kubernetenes.
-// The name of the node according to etcd is in TypeMeta.ID.
+// The name of the node according to etcd is in ID.
 type Node struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`

@@ -26,14 +26,14 @@ import (
 func TestGenericTypeMeta(t *testing.T) {
 	type TypeMeta struct {
 		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-		ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+		Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
 		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 		ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	}
 	j := TypeMeta{
-		ID:              "foo",
+		Name:            "foo",
 		APIVersion:      "a",
 		Kind:            "b",
 		ResourceVersion: "1",
@@ -68,7 +68,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	jbi.SetSelfLink("google.com")
 
 	// Prove that jbi changes the original object.
-	if e, a := "bar", j.ID; e != a {
+	if e, a := "bar", j.Name; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "c", j.APIVersion; e != a {

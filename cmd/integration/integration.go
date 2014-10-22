@@ -184,7 +184,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	podInfo := fakePodInfoGetter{}
 	return func() (bool, error) {
 		for i := range pods.Items {
-			host, id, namespace := pods.Items[i].CurrentState.Host, pods.Items[i].ID, pods.Items[i].Namespace
+			host, id, namespace := pods.Items[i].CurrentState.Host, pods.Items[i].Name, pods.Items[i].Namespace
 			if len(host) == 0 {
 				return false, nil
 			}
@@ -251,7 +251,7 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			TypeMeta: api.TypeMeta{ID: "atomicservice", APIVersion: latest.Version},
+			TypeMeta: api.TypeMeta{Name: "atomicservice", APIVersion: latest.Version},
 			Port:     12345,
 			Labels: map[string]string{
 				"name": "atomicService",
@@ -282,7 +282,7 @@ func runAtomicPutTest(c *client.Client) {
 				var tmpSvc api.Service
 				err := c.Get().
 					Path("services").
-					Path(svc.ID).
+					Path(svc.Name).
 					PollPeriod(100 * time.Millisecond).
 					Do().
 					Into(&tmpSvc)
@@ -296,7 +296,7 @@ func runAtomicPutTest(c *client.Client) {
 					tmpSvc.Selector[l] = v
 				}
 				glog.Infof("Posting update (%s, %s)", l, v)
-				err = c.Put().Path("services").Path(svc.ID).Body(&tmpSvc).Do().Error()
+				err = c.Put().Path("services").Path(svc.Name).Body(&tmpSvc).Do().Error()
 				if err != nil {
 					if errors.IsConflict(err) {
 						glog.Infof("Conflict: (%s, %s)", l, v)
@@ -313,7 +313,7 @@ func runAtomicPutTest(c *client.Client) {
 		}(label, value)
 	}
 	wg.Wait()
-	if err := c.Get().Path("services").Path(svc.ID).Do().Into(&svc); err != nil {
+	if err := c.Get().Path("services").Path(svc.Name).Do().Into(&svc); err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
 	if !reflect.DeepEqual(testLabels, labels.Set(svc.Selector)) {
@@ -325,7 +325,7 @@ func runAtomicPutTest(c *client.Client) {
 func runServiceTest(client *client.Client) {
 	ctx := api.NewDefaultContext()
 	pod := api.Pod{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
@@ -351,11 +351,11 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, podExists(client, ctx, pod.ID)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, podExists(client, ctx, pod.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	svc1 := api.Service{
-		TypeMeta: api.TypeMeta{ID: "service1"},
+		TypeMeta: api.TypeMeta{Name: "service1"},
 		Selector: map[string]string{
 			"name": "thisisalonglabel",
 		},
@@ -365,12 +365,12 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc1, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc1.ID, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc1.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	// A second service with the same port.
 	svc2 := api.Service{
-		TypeMeta: api.TypeMeta{ID: "service2"},
+		TypeMeta: api.TypeMeta{Name: "service2"},
 		Selector: map[string]string{
 			"name": "thisisalonglabel",
 		},
@@ -380,7 +380,7 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc2.ID, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc2.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	glog.Info("Service test passed.")

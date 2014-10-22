@@ -27,25 +27,25 @@ import (
 func TestMinionREST(t *testing.T) {
 	ms := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
-	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Minion).ID != "foo" {
+	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Minion).Name != "foo" {
 		t.Errorf("missing expected object")
 	}
-	if obj, err := ms.Get(ctx, "bar"); err != nil || obj.(*api.Minion).ID != "bar" {
+	if obj, err := ms.Get(ctx, "bar"); err != nil || obj.(*api.Minion).Name != "bar" {
 		t.Errorf("missing expected object")
 	}
 	if _, err := ms.Get(ctx, "baz"); err != ErrDoesNotExist {
 		t.Errorf("has unexpected object")
 	}
 
-	c, err := ms.Create(ctx, &api.Minion{TypeMeta: api.TypeMeta{ID: "baz"}})
+	c, err := ms.Create(ctx, &api.Minion{TypeMeta: api.TypeMeta{Name: "baz"}})
 	if err != nil {
 		t.Errorf("insert failed")
 	}
 	obj := <-c
-	if m, ok := obj.(*api.Minion); !ok || m.ID != "baz" {
+	if m, ok := obj.(*api.Minion); !ok || m.Name != "baz" {
 		t.Errorf("insert return value was weird: %#v", obj)
 	}
-	if obj, err := ms.Get(ctx, "baz"); err != nil || obj.(*api.Minion).ID != "baz" {
+	if obj, err := ms.Get(ctx, "baz"); err != nil || obj.(*api.Minion).Name != "baz" {
 		t.Errorf("insert didn't actually insert")
 	}
 
@@ -72,9 +72,9 @@ func TestMinionREST(t *testing.T) {
 	}
 	expect := []api.Minion{
 		{
-			TypeMeta: api.TypeMeta{ID: "foo"},
+			TypeMeta: api.TypeMeta{Name: "foo"},
 		}, {
-			TypeMeta: api.TypeMeta{ID: "baz"},
+			TypeMeta: api.TypeMeta{Name: "baz"},
 		},
 	}
 	nodeList := list.(*api.MinionList)
@@ -85,7 +85,7 @@ func TestMinionREST(t *testing.T) {
 
 func contains(nodes *api.MinionList, nodeID string) bool {
 	for _, node := range nodes.Items {
-		if node.ID == nodeID {
+		if node.Name == nodeID {
 			return true
 		}
 	}

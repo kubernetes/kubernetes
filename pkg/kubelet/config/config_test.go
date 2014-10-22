@@ -45,13 +45,13 @@ func (s sortedPods) Less(i, j int) bool {
 	if s[i].Namespace < s[j].Namespace {
 		return true
 	}
-	return s[i].ID < s[j].ID
+	return s[i].Name < s[j].Name
 }
 
 func CreateValidPod(name, namespace, source string) api.BoundPod {
 	return api.BoundPod{
 		TypeMeta: api.TypeMeta{
-			ID:          name,
+			Name:        name,
 			Namespace:   namespace,
 			Annotations: map[string]string{kubelet.ConfigSourceAnnotationKey: source},
 		},
@@ -158,7 +158,7 @@ func TestInvalidPodFiltered(t *testing.T) {
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.ADD, CreateValidPod("foo", "new", "test")))
 
 	// add an invalid update
-	podUpdate = CreatePodUpdate(kubelet.UPDATE, api.BoundPod{TypeMeta: api.TypeMeta{ID: "foo"}})
+	podUpdate = CreatePodUpdate(kubelet.UPDATE, api.BoundPod{TypeMeta: api.TypeMeta{Name: "foo"}})
 	channel <- podUpdate
 	expectNoPodUpdate(t, ch)
 }
@@ -217,7 +217,7 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.UPDATE, pod))
 
-	podUpdate = CreatePodUpdate(kubelet.REMOVE, api.BoundPod{TypeMeta: api.TypeMeta{ID: "foo", Namespace: "new"}})
+	podUpdate = CreatePodUpdate(kubelet.REMOVE, api.BoundPod{TypeMeta: api.TypeMeta{Name: "foo", Namespace: "new"}})
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubelet.REMOVE, pod))
 }

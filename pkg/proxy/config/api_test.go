@@ -27,7 +27,7 @@ import (
 )
 
 func TestServices(t *testing.T) {
-	service := api.Service{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}}
+	service := api.Service{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}}
 
 	fakeWatch := watch.NewFake()
 	fakeClient := &client.Fake{Watch: fakeWatch}
@@ -72,7 +72,7 @@ func TestServices(t *testing.T) {
 }
 
 func TestServicesFromZero(t *testing.T) {
-	service := api.Service{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}}
+	service := api.Service{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}}
 
 	fakeWatch := watch.NewFake()
 	fakeWatch.Stop()
@@ -152,7 +152,7 @@ func TestServicesFromZeroError(t *testing.T) {
 }
 
 func TestEndpoints(t *testing.T) {
-	endpoint := api.Endpoints{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}, Endpoints: []string{"127.0.0.1:9000"}}
+	endpoint := api.Endpoints{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}, Endpoints: []string{"127.0.0.1:9000"}}
 
 	fakeWatch := watch.NewFake()
 	fakeClient := &client.Fake{Watch: fakeWatch}
@@ -197,7 +197,7 @@ func TestEndpoints(t *testing.T) {
 }
 
 func TestEndpointsFromZero(t *testing.T) {
-	endpoint := api.Endpoints{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "2"}, Endpoints: []string{"127.0.0.1:9000"}}
+	endpoint := api.Endpoints{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}, Endpoints: []string{"127.0.0.1:9000"}}
 
 	fakeWatch := watch.NewFake()
 	fakeWatch.Stop()

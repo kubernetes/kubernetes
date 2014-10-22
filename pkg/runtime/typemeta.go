@@ -195,7 +195,7 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 // Returns an error if this isn't the case.
 func newGenericTypeMeta(v reflect.Value) (genericTypeMeta, error) {
 	g := genericTypeMeta{}
-	if err := fieldPtr(v, "ID", &g.id); err != nil {
+	if err := fieldPtr(v, "Name", &g.id); err != nil {
 		return g, err
 	}
 	if err := fieldPtr(v, "APIVersion", &g.apiVersion); err != nil {

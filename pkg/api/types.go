@@ -245,7 +245,7 @@ type Lifecycle struct {
 // TypeMeta is shared by all objects sent to, or returned from the client.
 type TypeMeta struct {
 	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
-	ID                string    `json:"id,omitempty" yaml:"id,omitempty"`
+	Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 	ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
@@ -458,7 +458,7 @@ type ResourceName string
 type ResourceList map[ResourceName]util.IntOrString
 
 // Minion is a worker node in Kubernetenes.
-// The name of the minion according to etcd is in TypeMeta.ID.
+// The name of the minion according to etcd is in ID.
 type Minion struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	// Queried from cloud provider, if available.

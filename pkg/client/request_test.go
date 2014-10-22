@@ -72,7 +72,7 @@ func TestDoRequestNewWay(t *testing.T) {
 }
 
 func TestDoRequestNewWayReader(t *testing.T) {
-	reqObj := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
+	reqObj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
 	reqBodyExpected, _ := v1beta1.Codec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
 	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
@@ -108,7 +108,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 }
 
 func TestDoRequestNewWayObj(t *testing.T) {
-	reqObj := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
+	reqObj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
 	reqBodyExpected, _ := v1beta2.Codec.Encode(reqObj)
 	expectedObj := &api.Service{Port: 12345}
 	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
@@ -143,7 +143,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 }
 
 func TestDoRequestNewWayFile(t *testing.T) {
-	reqObj := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
+	reqObj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
 	reqBodyExpected, err := v1beta1.Codec.Encode(reqObj)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -380,9 +380,9 @@ func TestWatch(t *testing.T) {
 		t   watch.EventType
 		obj runtime.Object
 	}{
-		{watch.Added, &api.Pod{TypeMeta: api.TypeMeta{ID: "first"}}},
-		{watch.Modified, &api.Pod{TypeMeta: api.TypeMeta{ID: "second"}}},
-		{watch.Deleted, &api.Pod{TypeMeta: api.TypeMeta{ID: "last"}}},
+		{watch.Added, &api.Pod{TypeMeta: api.TypeMeta{Name: "first"}}},
+		{watch.Modified, &api.Pod{TypeMeta: api.TypeMeta{Name: "second"}}},
+		{watch.Deleted, &api.Pod{TypeMeta: api.TypeMeta{Name: "last"}}},
 	}
 
 	auth := &Config{Username: "user", Password: "pass"}

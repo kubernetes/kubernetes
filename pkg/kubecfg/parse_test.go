@@ -69,7 +69,7 @@ var testParser = NewParser(map[string]runtime.Object{
 
 func TestParsePod(t *testing.T) {
 	DoParseTest(t, "pods", &api.Pod{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", ID: "test pod", Kind: "Pod"},
+		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Name: "test pod", Kind: "Pod"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "My manifest",
@@ -86,7 +86,7 @@ func TestParsePod(t *testing.T) {
 
 func TestParseService(t *testing.T) {
 	DoParseTest(t, "services", &api.Service{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", ID: "my service", Kind: "Service"},
+		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Name: "my service", Kind: "Service"},
 		Port:     8080,
 		Labels: map[string]string{
 			"area": "staging",
@@ -99,7 +99,7 @@ func TestParseService(t *testing.T) {
 
 func TestParseController(t *testing.T) {
 	DoParseTest(t, "replicationControllers", &api.ReplicationController{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", ID: "my controller", Kind: "ReplicationController"},
+		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Name: "my controller", Kind: "ReplicationController"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 9001,
 			PodTemplate: api.PodTemplate{
@@ -134,7 +134,7 @@ func TestParseCustomType(t *testing.T) {
 		"custom": &TestParseType{},
 	})
 	DoParseTest(t, "custom", &TestParseType{
-		TypeMeta: api.TypeMeta{APIVersion: "", ID: "my custom object", Kind: "TestParseType"},
+		TypeMeta: api.TypeMeta{APIVersion: "", Name: "my custom object", Kind: "TestParseType"},
 		Data:     "test data",
 	}, v1beta1.Codec, parser)
 }

@@ -133,8 +133,8 @@ func TestContainer(t *testing.T) {
 	expectedPods := []api.BoundPod{
 		{
 			TypeMeta: api.TypeMeta{
-				ID:  "test_manifest",
-				UID: "value",
+				Name: "test_manifest",
+				UID:  "value",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -208,7 +208,7 @@ func TestContainers(t *testing.T) {
 	expectedPods := []api.BoundPod{
 		{
 			TypeMeta: api.TypeMeta{
-				ID: "1",
+				Name: "1",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -228,7 +228,7 @@ func TestContainers(t *testing.T) {
 		},
 		{
 			TypeMeta: api.TypeMeta{
-				ID: "2",
+				Name: "2",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{

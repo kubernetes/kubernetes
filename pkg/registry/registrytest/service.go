@@ -82,7 +82,7 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.UpdatedID = svc.ID
+	r.UpdatedID = svc.Name
 	r.Service = svc
 	return r.Err
 }

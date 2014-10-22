@@ -39,9 +39,9 @@ var watchTestTable = []struct {
 	t   watch.EventType
 	obj runtime.Object
 }{
-	{watch.Added, &Simple{Name: "A Name"}},
-	{watch.Modified, &Simple{Name: "Another Name"}},
-	{watch.Deleted, &Simple{Name: "Another Name"}},
+	{watch.Added, &Simple{Other: "A Name"}},
+	{watch.Modified, &Simple{Other: "Another Name"}},
+	{watch.Deleted, &Simple{Other: "Another Name"}},
 }
 
 func TestWatchWebsocket(t *testing.T) {

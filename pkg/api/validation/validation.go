@@ -332,8 +332,8 @@ func ValidatePodState(podState *api.PodState) errs.ErrorList {
 // ValidatePod tests if required fields in the pod are set.
 func ValidatePod(pod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(pod.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", pod.ID))
+	if len(pod.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", pod.Name))
 	}
 	if !util.IsDNSSubdomain(pod.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
@@ -346,8 +346,8 @@ func ValidatePod(pod *api.Pod) errs.ErrorList {
 func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
 	allErrs := errs.ErrorList{}
 
-	if newPod.ID != oldPod.ID {
-		allErrs = append(allErrs, errs.NewFieldInvalid("ID", newPod.ID))
+	if newPod.Name != oldPod.Name {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", newPod.Name))
 	}
 
 	if len(newPod.DesiredState.Manifest.Containers) != len(oldPod.DesiredState.Manifest.Containers) {
@@ -373,10 +373,10 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(service.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", service.ID))
-	} else if !util.IsDNS952Label(service.ID) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("id", service.ID))
+	if len(service.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", service.Name))
+	} else if !util.IsDNS952Label(service.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", service.Name))
 	}
 	if !util.IsDNSSubdomain(service.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace))
@@ -398,8 +398,8 @@ func ValidateService(service *api.Service) errs.ErrorList {
 // ValidateReplicationController tests if required fields in the replication controller are set.
 func ValidateReplicationController(controller *api.ReplicationController) errs.ErrorList {
 	allErrs := errs.ErrorList{}
-	if len(controller.ID) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("id", controller.ID))
+	if len(controller.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", controller.Name))
 	}
 	if !util.IsDNSSubdomain(controller.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
@@ -440,15 +440,15 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ErrorList {
 
 // ValidateBoundPod tests if required fields on a bound pod are set.
 func ValidateBoundPod(pod *api.BoundPod) (errors []error) {
-	if !util.IsDNSSubdomain(pod.ID) {
-		errors = append(errors, errs.NewFieldInvalid("id", pod.ID))
+	if !util.IsDNSSubdomain(pod.Name) {
+		errors = append(errors, errs.NewFieldInvalid("name", pod.Name))
 	}
 	if !util.IsDNSSubdomain(pod.Namespace) {
 		errors = append(errors, errs.NewFieldInvalid("namespace", pod.Namespace))
 	}
 	containerManifest := &api.ContainerManifest{
 		Version:       "v1beta2",
-		ID:            pod.ID,
+		ID:            pod.Name,
 		UUID:          pod.UID,
 		Containers:    pod.Spec.Containers,
 		Volumes:       pod.Spec.Volumes,

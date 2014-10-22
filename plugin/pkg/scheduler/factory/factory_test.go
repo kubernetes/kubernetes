@@ -145,8 +145,8 @@ func TestPollMinions(t *testing.T) {
 	}{
 		{
 			minions: []api.Minion{
-				{TypeMeta: api.TypeMeta{ID: "foo"}},
-				{TypeMeta: api.TypeMeta{ID: "bar"}},
+				{TypeMeta: api.TypeMeta{Name: "foo"}},
+				{TypeMeta: api.TypeMeta{Name: "bar"}},
 			},
 		},
 	}
@@ -179,7 +179,7 @@ func TestPollMinions(t *testing.T) {
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
-	testPod := &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}}
+	testPod := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
 	handler := util.FakeHandler{
 		StatusCode:   200,
 		ResponseBody: runtime.EncodeOrDie(latest.Codec, testPod),
@@ -219,7 +219,7 @@ func TestStoreToMinionLister(t *testing.T) {
 	store := cache.NewStore()
 	ids := util.NewStringSet("foo", "bar", "baz")
 	for id := range ids {
-		store.Add(id, &api.Minion{TypeMeta: api.TypeMeta{ID: id}})
+		store.Add(id, &api.Minion{TypeMeta: api.TypeMeta{Name: id}})
 	}
 	sml := storeToMinionLister{store}
 
@@ -229,7 +229,7 @@ func TestStoreToMinionLister(t *testing.T) {
 	}
 	got := make([]string, len(gotNodes.Items))
 	for ix := range gotNodes.Items {
-		got[ix] = gotNodes.Items[ix].ID
+		got[ix] = gotNodes.Items[ix].Name
 	}
 	if !ids.HasAll(got...) || len(got) != len(ids) {
 		t.Errorf("Expected %v, got %v", ids, got)
@@ -241,7 +241,7 @@ func TestStoreToPodLister(t *testing.T) {
 	ids := []string{"foo", "bar", "baz"}
 	for _, id := range ids {
 		store.Add(id, &api.Pod{
-			TypeMeta: api.TypeMeta{ID: id},
+			TypeMeta: api.TypeMeta{Name: id},
 			Labels:   map[string]string{"name": id},
 		})
 	}
@@ -257,7 +257,7 @@ func TestStoreToPodLister(t *testing.T) {
 			t.Errorf("Expected %v, got %v", e, a)
 			continue
 		}
-		if e, a := id, got[0].ID; e != a {
+		if e, a := id, got[0].Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 			continue
 		}
@@ -267,9 +267,9 @@ func TestStoreToPodLister(t *testing.T) {
 func TestMinionEnumerator(t *testing.T) {
 	testList := &api.MinionList{
 		Items: []api.Minion{
-			{TypeMeta: api.TypeMeta{ID: "foo"}},
-			{TypeMeta: api.TypeMeta{ID: "bar"}},
-			{TypeMeta: api.TypeMeta{ID: "baz"}},
+			{TypeMeta: api.TypeMeta{Name: "foo"}},
+			{TypeMeta: api.TypeMeta{Name: "bar"}},
+			{TypeMeta: api.TypeMeta{Name: "baz"}},
 		},
 	}
 	me := minionEnumerator{testList}
@@ -279,7 +279,7 @@ func TestMinionEnumerator(t *testing.T) {
 	}
 	for i := range testList.Items {
 		gotID, gotObj := me.Get(i)
-		if e, a := testList.Items[i].ID, gotID; e != a {
+		if e, a := testList.Items[i].Name, gotID; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {

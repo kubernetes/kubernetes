@@ -484,7 +484,7 @@ type ResourceName string
 type ResourceList map[ResourceName]util.IntOrString
 
 // Minion is a worker node in Kubernetenes.
-// The name of the minion according to etcd is in TypeMeta.ID.
+// The name of the minion according to etcd is in ID.
 type Minion struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	// Queried from cloud provider, if available.

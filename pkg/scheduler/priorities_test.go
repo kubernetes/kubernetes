@@ -27,7 +27,7 @@ import (
 
 func makeMinion(node string, cpu, memory int) api.Minion {
 	return api.Minion{
-		TypeMeta: api.TypeMeta{ID: node},
+		TypeMeta: api.TypeMeta{Name: node},
 		NodeResources: api.NodeResources{
 			Capacity: api.ResourceList{
 				resources.CPU:    util.NewIntOrStringFromInt(cpu),

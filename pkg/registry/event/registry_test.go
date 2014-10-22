@@ -42,11 +42,11 @@ func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Regi
 
 func TestEventCreate(t *testing.T) {
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Reason:   "forTesting",
 	}
 	eventB := &api.Event{
-		TypeMeta: api.TypeMeta{ID: "foo"},
+		TypeMeta: api.TypeMeta{Name: "foo"},
 		Reason:   "forTesting",
 	}
 

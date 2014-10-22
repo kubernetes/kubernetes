@@ -56,7 +56,7 @@ func TestEventf(t *testing.T) {
 			obj: &api.Pod{
 				TypeMeta: api.TypeMeta{
 					SelfLink: "/api/v1beta1/pods/foo",
-					ID:       "foo",
+					Name:     "foo",
 				},
 			},
 			fieldPath:  "desiredState.manifest.containers[2]",

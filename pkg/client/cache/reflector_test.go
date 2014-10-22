@@ -54,13 +54,13 @@ func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore()
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
 	fw := watch.NewFake()
-	s.Add("foo", &api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}})
-	s.Add("bar", &api.Pod{TypeMeta: api.TypeMeta{ID: "bar"}})
+	s.Add("foo", &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}})
+	s.Add("bar", &api.Pod{TypeMeta: api.TypeMeta{Name: "bar"}})
 	go func() {
-		fw.Add(&api.Service{TypeMeta: api.TypeMeta{ID: "rejected"}})
-		fw.Delete(&api.Pod{TypeMeta: api.TypeMeta{ID: "foo"}})
-		fw.Modify(&api.Pod{TypeMeta: api.TypeMeta{ID: "bar", ResourceVersion: "55"}})
-		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{ID: "baz", ResourceVersion: "32"}})
+		fw.Add(&api.Service{TypeMeta: api.TypeMeta{Name: "rejected"}})
+		fw.Delete(&api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}})
+		fw.Modify(&api.Pod{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "55"}})
+		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
 	var resumeRV string
@@ -132,7 +132,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			fw = <-createdFakes
 		}
 		sendingRV := strconv.FormatUint(uint64(i+2), 10)
-		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{ID: id, ResourceVersion: sendingRV}})
+		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{Name: id, ResourceVersion: sendingRV}})
 		if sendingRV == "3" {
 			// Inject a failure.
 			fw.Stop()
@@ -143,7 +143,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 	// Verify we received the right ids with the right resource versions.
 	for i, id := range ids {
 		pod := s.Pop().(*api.Pod)
-		if e, a := id, pod.ID; e != a {
+		if e, a := id, pod.Name; e != a {
 			t.Errorf("%v: Expected %v, got %v", i, e, a)
 		}
 		if e, a := strconv.FormatUint(uint64(i+2), 10), pod.ResourceVersion; e != a {
@@ -158,7 +158,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 
 func TestReflector_listAndWatchWithErrors(t *testing.T) {
 	mkPod := func(id string, rv string) *api.Pod {
-		return &api.Pod{TypeMeta: api.TypeMeta{ID: id, ResourceVersion: rv}}
+		return &api.Pod{TypeMeta: api.TypeMeta{Name: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv string, pods ...*api.Pod) *api.PodList {
 		list := &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: rv}}
@@ -208,11 +208,11 @@ func TestReflector_listAndWatchWithErrors(t *testing.T) {
 			checkMap := map[string]string{}
 			for _, item := range current {
 				pod := item.(*api.Pod)
-				checkMap[pod.ID] = pod.ResourceVersion
+				checkMap[pod.Name] = pod.ResourceVersion
 			}
 			for _, pod := range item.list.Items {
-				if e, a := pod.ResourceVersion, checkMap[pod.ID]; e != a {
-					t.Errorf("%v: expected %v, got %v for pod %v", line, e, a, pod.ID)
+				if e, a := pod.ResourceVersion, checkMap[pod.Name]; e != a {
+					t.Errorf("%v: expected %v, got %v for pod %v", line, e, a, pod.Name)
 				}
 			}
 			if e, a := len(item.list.Items), len(checkMap); e != a {
