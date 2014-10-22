@@ -108,6 +108,10 @@ func init() {
 			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
 				return err
 			}
+
+			if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *Pod, out *newer.Pod, s conversion.Scope) error {
@@ -125,6 +129,10 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
 				return err
 			}
 			return nil
@@ -279,6 +287,9 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
 
 			out.HostIP = in.HostIP
 			return s.Convert(&in.NodeResources, &out.NodeResources, 0)
@@ -288,6 +299,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
 

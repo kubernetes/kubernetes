@@ -139,6 +139,29 @@ func NewResourceFitPredicate(info NodeInfo) FitPredicate {
 	return fit.PodFitsResources
 }
 
+func NewSelectorMatchPredicate(info NodeInfo) FitPredicate {
+	selector := &NodeSelector{
+		info: info,
+	}
+	return selector.PodSelectorMatches
+}
+
+type NodeSelector struct {
+	info NodeInfo
+}
+
+func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+	if len(pod.NodeSelector) == 0 {
+		return true, nil
+	}
+	selector := labels.SelectorFromSet(pod.NodeSelector)
+	minion, err := n.info.GetNodeInfo(node)
+	if err != nil {
+		return false, err
+	}
+	return selector.Matches(labels.Set(minion.Labels)), nil
+}
+
 func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	for _, scheduledPod := range existingPods {
 		for _, container := range pod.DesiredState.Manifest.Containers {
