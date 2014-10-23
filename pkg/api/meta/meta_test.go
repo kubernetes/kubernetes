@@ -46,7 +46,7 @@ func TestGenericTypeMeta(t *testing.T) {
 			SelfLink:        "some/place/only/we/know",
 		},
 	}
-	accessor, err := FindAccessor(&j)
+	accessor, err := Accessor(&j)
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestGenericObjectMeta(t *testing.T) {
 			SelfLink:        "some/place/only/we/know",
 		},
 	}
-	accessor, err := FindAccessor(&j)
+	accessor, err := Accessor(&j)
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestGenericListMeta(t *testing.T) {
 			SelfLink:        "some/place/only/we/know",
 		},
 	}
-	accessor, err := FindAccessor(&j)
+	accessor, err := Accessor(&j)
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}

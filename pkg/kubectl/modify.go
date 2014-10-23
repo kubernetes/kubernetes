@@ -110,11 +110,11 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 
 	// Update the object we are trying to send to the server with the
 	// correct resource version.
-	typeMeta, err := meta.FindAccessor(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	typeMeta.SetResourceVersion(version)
+	meta.SetResourceVersion(version)
 
 	// Convert object with updated resourceVersion to data for PUT.
 	data, err := c.Codec.Encode(obj)
@@ -150,17 +150,17 @@ func doDelete(c *client.RESTClient, resource string, obj runtime.Object) (string
 }
 
 func getIDFromObj(obj runtime.Object) (string, error) {
-	typeMeta, err := meta.FindAccessor(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return typeMeta.Name(), nil
+	return meta.Name(), nil
 }
 
 func getResourceVersionFromObj(obj runtime.Object) (string, error) {
-	typeMeta, err := meta.FindAccessor(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return typeMeta.ResourceVersion(), nil
+	return meta.ResourceVersion(), nil
 }
