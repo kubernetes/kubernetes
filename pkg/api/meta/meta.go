@@ -24,9 +24,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// FindAccessor takes an arbitary api type, returns pointer to its TypeMeta field.
-// obj must be a pointer to an api type.
-func FindAccessor(obj runtime.Object) (Accessor, error) {
+// FindAccessor takes an arbitary type and returns an Accessor interfaces.
+// obj must be a pointer to an api type. An error is returned if the minimum
+// required fields are missing.
+func FindAccessor(obj interface{}) (Accessor, error) {
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
@@ -36,27 +37,51 @@ func FindAccessor(obj runtime.Object) (Accessor, error) {
 	if v.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("expected struct, but got %v: %v (%#v)", v.Kind(), name, v.Interface())
 	}
+
 	typeMeta := v.FieldByName("TypeMeta")
 	if !typeMeta.IsValid() {
 		return nil, fmt.Errorf("struct %v lacks embedded TypeMeta type", name)
 	}
-	g, err := newGenericTypeMeta(typeMeta)
-	if err != nil {
-		return nil, err
+
+	a := &genericAccessor{}
+	if err := findTypeMeta(typeMeta, a); err != nil {
+		return nil, fmt.Errorf("unable to find type fields on %#v", typeMeta)
 	}
-	return g, nil
+
+	objectMeta := v.FieldByName("ObjectMeta")
+	if objectMeta.IsValid() {
+		// look for the ObjectMeta fields
+		if err := findObjectMeta(objectMeta, a); err != nil {
+			return nil, fmt.Errorf("unable to find object fields on %#v", objectMeta)
+		}
+	} else {
+		listMeta := v.FieldByName("ListMeta")
+		if listMeta.IsValid() {
+			// look for the ListMeta fields
+			if err := findListMeta(listMeta, a); err != nil {
+				return nil, fmt.Errorf("unable to find list fields on %#v", listMeta)
+			}
+		} else {
+			// look for the older TypeMeta with all metadata
+			if err := findObjectMeta(typeMeta, a); err != nil {
+				return nil, fmt.Errorf("unable to find object fields on %#v", typeMeta)
+			}
+		}
+	}
+
+	return a, nil
 }
 
 // NewResourceVersioner returns a ResourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from TypeMeta.
 func NewResourceVersioner() runtime.ResourceVersioner {
-	return typeMetaModifier{}
+	return resourceAccessor{}
 }
 
-// typeMetaModifier implements ResourceVersioner and SelfLinker.
-type typeMetaModifier struct{}
+// resourceAccessor implements ResourceVersioner and SelfLinker.
+type resourceAccessor struct{}
 
-func (v typeMetaModifier) ResourceVersion(obj runtime.Object) (string, error) {
+func (v resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
 	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return "", err
@@ -64,7 +89,7 @@ func (v typeMetaModifier) ResourceVersion(obj runtime.Object) (string, error) {
 	return accessor.ResourceVersion(), nil
 }
 
-func (v typeMetaModifier) SetResourceVersion(obj runtime.Object, version string) error {
+func (v resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
 	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return err
@@ -73,7 +98,7 @@ func (v typeMetaModifier) SetResourceVersion(obj runtime.Object, version string)
 	return nil
 }
 
-func (v typeMetaModifier) Name(obj runtime.Object) (string, error) {
+func (v resourceAccessor) Name(obj runtime.Object) (string, error) {
 	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return "", err
@@ -81,7 +106,7 @@ func (v typeMetaModifier) Name(obj runtime.Object) (string, error) {
 	return accessor.Name(), nil
 }
 
-func (v typeMetaModifier) SelfLink(obj runtime.Object) (string, error) {
+func (v resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return "", err
@@ -89,7 +114,7 @@ func (v typeMetaModifier) SelfLink(obj runtime.Object) (string, error) {
 	return accessor.SelfLink(), nil
 }
 
-func (v typeMetaModifier) SetSelfLink(obj runtime.Object, selfLink string) error {
+func (v resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
 	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return err
@@ -100,7 +125,7 @@ func (v typeMetaModifier) SetSelfLink(obj runtime.Object, selfLink string) error
 
 // NewSelfLinker returns a SelfLinker that works on all TypeMeta SelfLink fields.
 func NewSelfLinker() runtime.SelfLinker {
-	return typeMetaModifier{}
+	return resourceAccessor{}
 }
 
 // Accessor lets you work with object metadata from any of the versioned or
@@ -120,7 +145,9 @@ type Accessor interface {
 	SetSelfLink(selfLink string)
 }
 
-type genericTypeMeta struct {
+// genericAccessor contains pointers to strings that can modify an arbitrary
+// struct and implements the Accessor interface.
+type genericAccessor struct {
 	name            *string
 	uid             *string
 	apiVersion      *string
@@ -129,52 +156,64 @@ type genericTypeMeta struct {
 	selfLink        *string
 }
 
-func (g genericTypeMeta) Name() string {
-	return *g.name
+func (a genericAccessor) Name() string {
+	if a.name == nil {
+		return ""
+	}
+	return *a.name
 }
 
-func (g genericTypeMeta) SetName(name string) {
-	*g.name = name
+func (a genericAccessor) SetName(name string) {
+	if a.name == nil {
+		return
+	}
+	*a.name = name
 }
 
-func (g genericTypeMeta) UID() string {
-	return *g.uid
+func (a genericAccessor) UID() string {
+	if a.uid == nil {
+		return ""
+	}
+	return *a.uid
 }
 
-func (g genericTypeMeta) SetUID(uid string) {
-	*g.uid = uid
+func (a genericAccessor) SetUID(uid string) {
+	if a.uid == nil {
+		return
+	}
+	*a.uid = uid
 }
 
-func (g genericTypeMeta) APIVersion() string {
-	return *g.apiVersion
+func (a genericAccessor) APIVersion() string {
+	return *a.apiVersion
 }
 
-func (g genericTypeMeta) SetAPIVersion(version string) {
-	*g.apiVersion = version
+func (a genericAccessor) SetAPIVersion(version string) {
+	*a.apiVersion = version
 }
 
-func (g genericTypeMeta) Kind() string {
-	return *g.kind
+func (a genericAccessor) Kind() string {
+	return *a.kind
 }
 
-func (g genericTypeMeta) SetKind(kind string) {
-	*g.kind = kind
+func (a genericAccessor) SetKind(kind string) {
+	*a.kind = kind
 }
 
-func (g genericTypeMeta) ResourceVersion() string {
-	return *g.resourceVersion
+func (a genericAccessor) ResourceVersion() string {
+	return *a.resourceVersion
 }
 
-func (g genericTypeMeta) SetResourceVersion(version string) {
-	*g.resourceVersion = version
+func (a genericAccessor) SetResourceVersion(version string) {
+	*a.resourceVersion = version
 }
 
-func (g genericTypeMeta) SelfLink() string {
-	return *g.selfLink
+func (a genericAccessor) SelfLink() string {
+	return *a.selfLink
 }
 
-func (g genericTypeMeta) SetSelfLink(selfLink string) {
-	*g.selfLink = selfLink
+func (a genericAccessor) SetSelfLink(selfLink string) {
+	*a.selfLink = selfLink
 }
 
 // fieldPtr puts the address of fieldName, which must be a member of v,
@@ -202,28 +241,41 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("Couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
-// newGenericTypeMeta creates a new generic TypeMeta from v, which must be an
-// addressable/setable reflect.Value having the same fields as api.TypeMeta.
-// Returns an error if this isn't the case.
-func newGenericTypeMeta(v reflect.Value) (genericTypeMeta, error) {
-	g := genericTypeMeta{}
-	if err := fieldPtr(v, "Name", &g.name); err != nil {
-		return g, err
+// findTypeMeta extracts pointers to version and kind fields from an object
+func findTypeMeta(v reflect.Value, a *genericAccessor) error {
+	if err := fieldPtr(v, "APIVersion", &a.apiVersion); err != nil {
+		return err
 	}
-	if err := fieldPtr(v, "UID", &g.uid); err != nil {
-		return g, err
+	if err := fieldPtr(v, "Kind", &a.kind); err != nil {
+		return err
 	}
-	if err := fieldPtr(v, "APIVersion", &g.apiVersion); err != nil {
-		return g, err
+	return nil
+}
+
+// findObjectMeta extracts pointers to metadata fields from an object
+func findObjectMeta(v reflect.Value, a *genericAccessor) error {
+	if err := fieldPtr(v, "Name", &a.name); err != nil {
+		return err
 	}
-	if err := fieldPtr(v, "Kind", &g.kind); err != nil {
-		return g, err
+	if err := fieldPtr(v, "UID", &a.uid); err != nil {
+		return err
 	}
-	if err := fieldPtr(v, "ResourceVersion", &g.resourceVersion); err != nil {
-		return g, err
+	if err := fieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
+		return err
 	}
-	if err := fieldPtr(v, "SelfLink", &g.selfLink); err != nil {
-		return g, err
+	if err := fieldPtr(v, "SelfLink", &a.selfLink); err != nil {
+		return err
 	}
-	return g, nil
+	return nil
+}
+
+// findObjectMeta extracts pointers to metadata fields from a list object
+func findListMeta(v reflect.Value, a *genericAccessor) error {
+	if err := fieldPtr(v, "ResourceVersion", &a.resourceVersion); err != nil {
+		return err
+	}
+	if err := fieldPtr(v, "SelfLink", &a.selfLink); err != nil {
+		return err
+	}
+	return nil
 }

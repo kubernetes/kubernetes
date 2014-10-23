@@ -17,7 +17,6 @@ limitations under the License.
 package meta
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -34,53 +33,203 @@ func TestGenericTypeMeta(t *testing.T) {
 		ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
 		APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	}
-	j := TypeMeta{
-		Name:            "foo",
-		UID:             "uid",
-		APIVersion:      "a",
-		Kind:            "b",
-		ResourceVersion: "1",
-		SelfLink:        "some/place/only/we/know",
+	type Object struct {
+		TypeMeta `json:",inline" yaml:",inline"`
 	}
-	g, err := newGenericTypeMeta(reflect.ValueOf(&j).Elem())
+	j := Object{
+		TypeMeta{
+			Name:            "foo",
+			UID:             "uid",
+			APIVersion:      "a",
+			Kind:            "b",
+			ResourceVersion: "1",
+			SelfLink:        "some/place/only/we/know",
+		},
+	}
+	accessor, err := FindAccessor(&j)
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}
-	// Prove g supports Accessor.
-	jbi := Accessor(g)
-	if e, a := "foo", jbi.Name(); e != a {
+	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", jbi.UID(); e != a {
+	if e, a := "uid", accessor.UID(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "a", jbi.APIVersion(); e != a {
+	if e, a := "a", accessor.APIVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "b", jbi.Kind(); e != a {
+	if e, a := "b", accessor.Kind(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "1", jbi.ResourceVersion(); e != a {
+	if e, a := "1", accessor.ResourceVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "some/place/only/we/know", jbi.SelfLink(); e != a {
+	if e, a := "some/place/only/we/know", accessor.SelfLink(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	jbi.SetName("bar")
-	jbi.SetUID("other")
-	jbi.SetAPIVersion("c")
-	jbi.SetKind("d")
-	jbi.SetResourceVersion("2")
-	jbi.SetSelfLink("google.com")
+	accessor.SetName("bar")
+	accessor.SetUID("other")
+	accessor.SetAPIVersion("c")
+	accessor.SetKind("d")
+	accessor.SetResourceVersion("2")
+	accessor.SetSelfLink("google.com")
 
-	// Prove that jbi changes the original object.
+	// Prove that accessor changes the original object.
 	if e, a := "bar", j.Name; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "other", j.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+	if e, a := "c", j.APIVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "d", j.Kind; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "2", j.ResourceVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "google.com", j.SelfLink; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGenericObjectMeta(t *testing.T) {
+	type TypeMeta struct {
+		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	}
+	type ObjectMeta struct {
+		Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
+		UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
+		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+		ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	}
+	type Object struct {
+		TypeMeta   `json:",inline" yaml:",inline"`
+		ObjectMeta `json:"metadata" yaml:"metadata"`
+	}
+	j := Object{
+		TypeMeta{
+			APIVersion: "a",
+			Kind:       "b",
+		},
+		ObjectMeta{
+			Name:            "foo",
+			UID:             "uid",
+			ResourceVersion: "1",
+			SelfLink:        "some/place/only/we/know",
+		},
+	}
+	accessor, err := FindAccessor(&j)
+	if err != nil {
+		t.Fatalf("new err: %v", err)
+	}
+	if e, a := "foo", accessor.Name(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "uid", accessor.UID(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "a", accessor.APIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "b", accessor.Kind(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "1", accessor.ResourceVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "some/place/only/we/know", accessor.SelfLink(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	accessor.SetName("bar")
+	accessor.SetUID("other")
+	accessor.SetAPIVersion("c")
+	accessor.SetKind("d")
+	accessor.SetResourceVersion("2")
+	accessor.SetSelfLink("google.com")
+
+	// Prove that accessor changes the original object.
+	if e, a := "bar", j.Name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "other", j.UID; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "c", j.APIVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "d", j.Kind; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "2", j.ResourceVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "google.com", j.SelfLink; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
+func TestGenericListMeta(t *testing.T) {
+	type TypeMeta struct {
+		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	}
+	type ListMeta struct {
+		SelfLink        string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	}
+	type Object struct {
+		TypeMeta `json:",inline" yaml:",inline"`
+		ListMeta `json:"metadata" yaml:"metadata"`
+	}
+	j := Object{
+		TypeMeta{
+			APIVersion: "a",
+			Kind:       "b",
+		},
+		ListMeta{
+			ResourceVersion: "1",
+			SelfLink:        "some/place/only/we/know",
+		},
+	}
+	accessor, err := FindAccessor(&j)
+	if err != nil {
+		t.Fatalf("new err: %v", err)
+	}
+	if e, a := "", accessor.Name(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "", accessor.UID(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "a", accessor.APIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "b", accessor.Kind(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "1", accessor.ResourceVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "some/place/only/we/know", accessor.SelfLink(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	accessor.SetName("bar")
+	accessor.SetUID("other")
+	accessor.SetAPIVersion("c")
+	accessor.SetKind("d")
+	accessor.SetResourceVersion("2")
+	accessor.SetSelfLink("google.com")
+
+	// Prove that accessor changes the original object.
 	if e, a := "c", j.APIVersion; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
