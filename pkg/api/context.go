@@ -70,7 +70,7 @@ func Namespace(ctx Context) string {
 }
 
 // ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
-func ValidNamespace(ctx Context, resource *TypeMeta) bool {
+func ValidNamespace(ctx Context, resource *ObjectMeta) bool {
 	ns, ok := NamespaceFrom(ctx)
 	if len(resource.Namespace) == 0 {
 		resource.Namespace = ns

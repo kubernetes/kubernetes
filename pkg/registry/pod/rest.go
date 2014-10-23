@@ -90,7 +90,7 @@ func NewREST(config *RESTConfig) *REST {
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
-	if !api.ValidNamespace(ctx, &pod.TypeMeta) {
+	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
@@ -186,7 +186,7 @@ func (*REST) New() runtime.Object {
 
 func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
 	pod := obj.(*api.Pod)
-	if !api.ValidNamespace(ctx, &pod.TypeMeta) {
+	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
