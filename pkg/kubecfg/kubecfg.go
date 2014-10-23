@@ -245,7 +245,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 		return err
 	}
 	controller := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
 		DesiredState: api.ReplicationControllerState{
@@ -299,11 +299,13 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 
 func createService(ctx api.Context, name string, port int, client client.Interface) (*api.Service, error) {
 	svc := &api.Service{
-		TypeMeta: api.TypeMeta{Name: name},
-		Port:     port,
-		Labels: map[string]string{
-			"simpleService": name,
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"simpleService": name,
+			},
 		},
+		Port: port,
 		Selector: map[string]string{
 			"simpleService": name,
 		},

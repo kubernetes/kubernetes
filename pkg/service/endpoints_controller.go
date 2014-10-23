@@ -76,7 +76,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		if err != nil {
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
-					TypeMeta: api.TypeMeta{
+					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
 				}

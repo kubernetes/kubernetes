@@ -73,9 +73,9 @@ func (s *Scheduler) scheduleOne() {
 		return
 	}
 	b := &api.Binding{
-		TypeMeta: api.TypeMeta{Namespace: pod.Namespace},
-		PodID:    pod.Name,
-		Host:     dest,
+		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace},
+		PodID:      pod.Name,
+		Host:       dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		record.Eventf(pod, "", string(api.PodWaiting), "failedScheduling", "Binding rejected: %v", err)

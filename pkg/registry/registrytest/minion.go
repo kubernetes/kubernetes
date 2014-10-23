@@ -77,7 +77,7 @@ func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	var newList []api.Minion
 	for _, node := range r.Minions.Items {
 		if node.Name != minionID {
-			newList = append(newList, api.Minion{TypeMeta: api.TypeMeta{Name: node.Name}})
+			newList = append(newList, api.Minion{ObjectMeta: api.ObjectMeta{Name: node.Name}})
 		}
 	}
 	r.Minions.Items = newList
