@@ -57,6 +57,7 @@ func TestEventf(t *testing.T) {
 				TypeMeta: api.TypeMeta{
 					SelfLink: "/api/v1beta1/pods/foo",
 					Name:     "foo",
+					UID:      "bar",
 				},
 			},
 			fieldPath:  "desiredState.manifest.containers[2]",
@@ -68,7 +69,7 @@ func TestEventf(t *testing.T) {
 				InvolvedObject: api.ObjectReference{
 					Kind:       "Pod",
 					Name:       "foo",
-					UID:        "foo",
+					UID:        "bar",
 					APIVersion: "v1beta1",
 					FieldPath:  "desiredState.manifest.containers[2]",
 				},
@@ -77,7 +78,7 @@ func TestEventf(t *testing.T) {
 				Message: "some verbose message: 1",
 				Source:  "eventTest",
 			},
-			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"", Name:"foo", UID:"foo", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): status: 'running', reason: 'started' some verbose message: 1`,
+			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): status: 'running', reason: 'started' some verbose message: 1`,
 		},
 	}
 

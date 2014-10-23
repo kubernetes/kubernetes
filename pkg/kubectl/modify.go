@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -109,11 +110,11 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 
 	// Update the object we are trying to send to the server with the
 	// correct resource version.
-	typeMeta, err := runtime.FindTypeMeta(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	typeMeta.SetResourceVersion(version)
+	meta.SetResourceVersion(version)
 
 	// Convert object with updated resourceVersion to data for PUT.
 	data, err := c.Codec.Encode(obj)
@@ -149,17 +150,17 @@ func doDelete(c *client.RESTClient, resource string, obj runtime.Object) (string
 }
 
 func getIDFromObj(obj runtime.Object) (string, error) {
-	typeMeta, err := runtime.FindTypeMeta(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return typeMeta.ID(), nil
+	return meta.Name(), nil
 }
 
 func getResourceVersionFromObj(obj runtime.Object) (string, error) {
-	typeMeta, err := runtime.FindTypeMeta(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return typeMeta.ResourceVersion(), nil
+	return meta.ResourceVersion(), nil
 }

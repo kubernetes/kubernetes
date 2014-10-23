@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -35,7 +36,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
 	}
-	jsonBase, err := runtime.FindTypeMeta(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -43,16 +44,16 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	version := versionFromSelfLink.FindStringSubmatch(jsonBase.SelfLink())
+	version := versionFromSelfLink.FindStringSubmatch(meta.SelfLink())
 	if len(version) < 2 {
-		return nil, fmt.Errorf("unexpected self link format: %v", jsonBase.SelfLink())
+		return nil, fmt.Errorf("unexpected self link format: %v", meta.SelfLink())
 	}
 	return &ObjectReference{
 		Kind:       kind,
 		APIVersion: version[1],
 		// TODO: correct Name and UID when TypeMeta makes a distinction
-		Name:            jsonBase.ID(),
-		UID:             jsonBase.ID(),
-		ResourceVersion: jsonBase.ResourceVersion(),
+		Name:            meta.Name(),
+		UID:             meta.UID(),
+		ResourceVersion: meta.ResourceVersion(),
 	}, nil
 }

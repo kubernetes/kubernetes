@@ -564,11 +564,11 @@ func TestParseTimeout(t *testing.T) {
 type setTestSelfLinker struct {
 	t           *testing.T
 	expectedSet string
-	id          string
+	name        string
 	called      bool
 }
 
-func (s *setTestSelfLinker) ID(runtime.Object) (string, error)     { return s.id, nil }
+func (s *setTestSelfLinker) Name(runtime.Object) (string, error)   { return s.name, nil }
 func (*setTestSelfLinker) SelfLink(runtime.Object) (string, error) { return "", nil }
 func (s *setTestSelfLinker) SetSelfLink(obj runtime.Object, selfLink string) error {
 	if e, a := s.expectedSet, selfLink; e != a {
@@ -587,7 +587,7 @@ func TestSyncCreate(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		id:          "bar",
+		name:        "bar",
 		expectedSet: "/prefix/version/foo/bar",
 	}
 	handler := Handle(map[string]RESTStorage{
@@ -684,7 +684,7 @@ func TestAsyncCreateError(t *testing.T) {
 	}
 	selfLinker := &setTestSelfLinker{
 		t:           t,
-		id:          "bar",
+		name:        "bar",
 		expectedSet: "/prefix/version/foo/bar",
 	}
 	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version", selfLinker)

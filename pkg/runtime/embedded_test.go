@@ -29,12 +29,14 @@ var Codec = runtime.CodecFor(scheme, "v1test")
 
 type EmbeddedTest struct {
 	runtime.TypeMeta `yaml:",inline" json:",inline"`
+	ID               string                 `yaml:"id,omitempty" json:"id,omitempty"`
 	Object           runtime.EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
 	EmptyObject      runtime.EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 }
 
 type EmbeddedTestExternal struct {
 	runtime.TypeMeta `yaml:",inline" json:",inline"`
+	ID               string               `yaml:"id,omitempty" json:"id,omitempty"`
 	Object           runtime.RawExtension `yaml:"object,omitempty" json:"object,omitempty"`
 	EmptyObject      runtime.RawExtension `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
 }
@@ -49,9 +51,11 @@ func TestEmbeddedObject(t *testing.T) {
 
 	outer := &EmbeddedTest{
 		TypeMeta: runtime.TypeMeta{Name: "outer"},
+		ID:       "outer",
 		Object: runtime.EmbeddedObject{
 			&EmbeddedTest{
 				TypeMeta: runtime.TypeMeta{Name: "inner"},
+				ID:       "inner",
 			},
 		},
 	}

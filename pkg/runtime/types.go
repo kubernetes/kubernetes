@@ -26,8 +26,8 @@ import (
 // TypeMeta is shared by all top level objects. The proper way to use it is to inline it in your type,
 // like this:
 // type MyAwesomeAPIObject struct {
-// 	runtime.TypeMeta    `yaml:",inline" json:",inline"`
-// 	... // other fields
+//      runtime.TypeMeta    `yaml:",inline" json:",inline"`
+//      ... // other fields
 // }
 // func (*MyAwesomeAPIObject) IsAnAPIObject() {}
 //
@@ -35,12 +35,14 @@ import (
 // your own with the same fields.
 //
 type TypeMeta struct {
-	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
+
 	Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
+	UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 	ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 }
 
 // PluginBase is like TypeMeta, but it's intended for plugin objects that won't ever be encoded

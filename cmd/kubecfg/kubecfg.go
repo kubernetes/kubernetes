@@ -31,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -372,11 +373,11 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
-		jsonBase, err := runtime.FindTypeMeta(obj)
+		meta, err := meta.Accessor(obj)
 		if err != nil {
 			glog.Fatalf("error finding json base for update: %v", err)
 		}
-		version = jsonBase.ResourceVersion()
+		version = meta.ResourceVersion()
 		verb = "PUT"
 		setBody = true
 		if !validStorage || !hasSuffix {
@@ -408,7 +409,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
-			jsonBase, err := runtime.FindTypeMeta(obj)
+			jsonBase, err := meta.Accessor(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
