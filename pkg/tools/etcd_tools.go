@@ -164,8 +164,7 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 	if err != nil {
 		return err
 	}
-	h.decodeNodeList(nodes, slicePtr)
-	return nil
+	return h.decodeNodeList(nodes, slicePtr)
 }
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
@@ -178,17 +177,18 @@ func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) er
 	v := pv.Elem()
 	for _, node := range nodes {
 		if node.Dir {
-			h.decodeNodeList(node.Nodes, slicePtr)
+			if err := h.decodeNodeList(node.Nodes, slicePtr); err != nil {
+				return err
+			}
 			continue
 		}
 		obj := reflect.New(v.Type().Elem())
-		err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object))
+		if err := h.Codec.DecodeInto([]byte(node.Value), obj.Interface().(runtime.Object)); err != nil {
+			return err
+		}
 		if h.ResourceVersioner != nil {
 			_ = h.ResourceVersioner.SetResourceVersion(obj.Interface().(runtime.Object), node.ModifiedIndex)
 			// being unable to set the version does not prevent the object from being extracted
-		}
-		if err != nil {
-			return err
 		}
 		v.Set(reflect.Append(v, obj.Elem()))
 	}
@@ -203,13 +203,11 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	err = h.ExtractList(key, listPtr, &resourceVersion)
-	if err != nil {
+	if err := h.ExtractList(key, listPtr, &resourceVersion); err != nil {
 		return err
 	}
 	if h.ResourceVersioner != nil {
-		err = h.ResourceVersioner.SetResourceVersion(listObj, resourceVersion)
-		if err != nil {
+		if err := h.ResourceVersioner.SetResourceVersion(listObj, resourceVersion); err != nil {
 			return err
 		}
 	}
