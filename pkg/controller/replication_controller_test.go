@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -44,20 +43,20 @@ func makeURL(suffix string) string {
 
 type FakePodControl struct {
 	controllerSpec []api.ReplicationController
-	deletePodID    []string
+	deletePodName  []string
 	lock           sync.Mutex
 }
 
-func (f *FakePodControl) createReplica(ctx api.Context, spec api.ReplicationController) {
+func (f *FakePodControl) createReplica(namespace string, spec api.ReplicationController) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
-func (f *FakePodControl) deletePod(ctx api.Context, podID string) error {
+func (f *FakePodControl) deletePod(namespace string, podName string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.deletePodID = append(f.deletePodID, podID)
+	f.deletePodName = append(f.deletePodName, podName)
 	return nil
 }
 
@@ -102,8 +101,8 @@ func validateSyncReplication(t *testing.T, fakePodControl *FakePodControl, expec
 	if len(fakePodControl.controllerSpec) != expectedCreates {
 		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.controllerSpec))
 	}
-	if len(fakePodControl.deletePodID) != expectedDeletes {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodID))
+	if len(fakePodControl.deletePodName) != expectedDeletes {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.deletePodName))
 	}
 }
 
@@ -168,7 +167,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 }
 
 func TestCreateReplica(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ns := api.NamespaceDefault
 	body := runtime.EncodeOrDie(testapi.Codec(), &api.Pod{})
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -205,7 +204,7 @@ func TestCreateReplica(t *testing.T) {
 		},
 	}
 
-	podControl.createReplica(ctx, controllerSpec)
+	podControl.createReplica(ns, controllerSpec)
 
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -322,12 +321,9 @@ type FakeWatcher struct {
 	*client.Fake
 }
 
-func (fw FakeWatcher) WatchReplicationControllers(ctx api.Context, l, f labels.Selector, rv string) (watch.Interface, error) {
-	return fw.w, nil
-}
-
 func TestWatchControllers(t *testing.T) {
-	client := FakeWatcher{watch.NewFake(), &client.Fake{}}
+	fakeWatch := watch.NewFake()
+	client := &client.Fake{Watch: fakeWatch}
 	manager := NewReplicationManager(client)
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})
@@ -344,7 +340,8 @@ func TestWatchControllers(t *testing.T) {
 
 	// Test normal case
 	testControllerSpec.Name = "foo"
-	client.w.Add(&testControllerSpec)
+
+	fakeWatch.Add(&testControllerSpec)
 
 	select {
 	case <-received:
