@@ -518,7 +518,6 @@ function test-build-release {
 #
 # Assumed vars:
 #   PROJECT
-#   ALREADY_UP
 #   Variables from config.sh
 function test-setup {
 
@@ -526,18 +525,15 @@ function test-setup {
   # gce specific
   detect-project
 
-  if [[ ${ALREADY_UP} -ne 1 ]]; then
-    # Open up port 80 & 8080 so common containers on minions can be reached
-    gcutil addfirewall \
-      --project "${PROJECT}" \
-      --norespect_terminal_width \
-      --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
-      --target_tags "${MINION_TAG}" \
-      --allowed tcp:80,tcp:8080 \
-      --network "${NETWORK}" \
-      "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
-  fi
-
+  # Open up port 80 & 8080 so common containers on minions can be reached
+  gcutil addfirewall \
+    --project "${PROJECT}" \
+    --norespect_terminal_width \
+    --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+    --target_tags "${MINION_TAG}" \
+    --allowed tcp:80,tcp:8080 \
+    --network "${NETWORK}" \
+    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
 }
 
 # Execute after running tests to perform any required clean-up.  This is called

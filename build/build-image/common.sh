@@ -34,6 +34,7 @@ server_targets=(
 client_targets=(
   cmd/kubecfg
   cmd/kubectl
+  cmd/e2e
 )
 
 mkdir -p "${KUBE_TARGET}"
