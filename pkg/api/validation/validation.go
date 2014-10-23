@@ -356,7 +356,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ErrorList {
 	}
 	pod := *newPod
 	pod.Labels = oldPod.Labels
-	pod.TypeMeta.ResourceVersion = oldPod.TypeMeta.ResourceVersion
+	pod.ResourceVersion = oldPod.ResourceVersion
 	// Tricky, we need to copy the container list so that we don't overwrite the update
 	var newContainers []api.Container
 	for ix, container := range pod.DesiredState.Manifest.Containers {
