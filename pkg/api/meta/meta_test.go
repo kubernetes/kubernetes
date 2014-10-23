@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package meta
 
 import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -86,7 +87,7 @@ func TestGenericTypeMeta(t *testing.T) {
 }
 
 type MyAPIObject struct {
-	TypeMeta `yaml:",inline" json:",inline"`
+	runtime.TypeMeta `yaml:",inline" json:",inline"`
 }
 
 func (*MyAPIObject) IsAnAPIObject() {}
@@ -98,13 +99,13 @@ func (*MyIncorrectlyMarkedAsAPIObject) IsAnAPIObject() {}
 
 func TestResourceVersionerOfAPI(t *testing.T) {
 	type T struct {
-		Object
+		runtime.Object
 		Expected string
 	}
 	testCases := map[string]T{
 		"empty api object":                   {&MyAPIObject{}, ""},
-		"api object with version":            {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: "1"}}, "1"},
-		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: "1"}}, "1"},
+		"api object with version":            {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
 	}
 	versioning := NewTypeMetaResourceVersioner()
 	for key, testCase := range testCases {
@@ -118,7 +119,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 
 	failingCases := map[string]struct {
-		Object
+		runtime.Object
 		Expected string
 	}{
 		"not a valid object to try": {&MyIncorrectlyMarkedAsAPIObject{}, "1"},
@@ -131,10 +132,10 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 
 	setCases := map[string]struct {
-		Object
+		runtime.Object
 		Expected string
 	}{
-		"pointer to api object with version": {&MyAPIObject{TypeMeta: TypeMeta{ResourceVersion: "1"}}, "1"},
+		"pointer to api object with version": {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
 	}
 	for key, testCase := range setCases {
 		if err := versioning.SetResourceVersion(testCase.Object, "5"); err != nil {
@@ -152,13 +153,13 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 
 func TestTypeMetaSelfLinker(t *testing.T) {
 	table := map[string]struct {
-		obj     Object
+		obj     runtime.Object
 		expect  string
 		try     string
 		succeed bool
 	}{
 		"normal": {
-			obj:     &MyAPIObject{TypeMeta: TypeMeta{SelfLink: "foobar"}},
+			obj:     &MyAPIObject{TypeMeta: runtime.TypeMeta{SelfLink: "foobar"}},
 			expect:  "foobar",
 			try:     "newbar",
 			succeed: true,

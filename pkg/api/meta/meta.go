@@ -14,18 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime
+package meta
 
 import (
 	"fmt"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // FindTypeMeta takes an arbitary api type, returns pointer to its TypeMeta field.
 // obj must be a pointer to an api type.
-func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
+func FindTypeMeta(obj runtime.Object) (TypeMetaInterface, error) {
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
@@ -48,14 +49,14 @@ func FindTypeMeta(obj Object) (TypeMetaInterface, error) {
 
 // NewTypeMetaResourceVersioner returns a ResourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from TypeMeta.
-func NewTypeMetaResourceVersioner() ResourceVersioner {
+func NewTypeMetaResourceVersioner() runtime.ResourceVersioner {
 	return jsonBaseModifier{}
 }
 
 // jsonBaseModifier implements ResourceVersioner and SelfLinker.
 type jsonBaseModifier struct{}
 
-func (v jsonBaseModifier) ResourceVersion(obj Object) (string, error) {
+func (v jsonBaseModifier) ResourceVersion(obj runtime.Object) (string, error) {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return "", err
@@ -63,7 +64,7 @@ func (v jsonBaseModifier) ResourceVersion(obj Object) (string, error) {
 	return json.ResourceVersion(), nil
 }
 
-func (v jsonBaseModifier) SetResourceVersion(obj Object, version string) error {
+func (v jsonBaseModifier) SetResourceVersion(obj runtime.Object, version string) error {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return err
@@ -72,7 +73,7 @@ func (v jsonBaseModifier) SetResourceVersion(obj Object, version string) error {
 	return nil
 }
 
-func (v jsonBaseModifier) ID(obj Object) (string, error) {
+func (v jsonBaseModifier) ID(obj runtime.Object) (string, error) {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return "", err
@@ -80,7 +81,7 @@ func (v jsonBaseModifier) ID(obj Object) (string, error) {
 	return json.ID(), nil
 }
 
-func (v jsonBaseModifier) SelfLink(obj Object) (string, error) {
+func (v jsonBaseModifier) SelfLink(obj runtime.Object) (string, error) {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return "", err
@@ -88,7 +89,7 @@ func (v jsonBaseModifier) SelfLink(obj Object) (string, error) {
 	return json.SelfLink(), nil
 }
 
-func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
+func (v jsonBaseModifier) SetSelfLink(obj runtime.Object, selfLink string) error {
 	json, err := FindTypeMeta(obj)
 	if err != nil {
 		return err
@@ -98,12 +99,12 @@ func (v jsonBaseModifier) SetSelfLink(obj Object, selfLink string) error {
 }
 
 // NewTypeMetaSelfLinker returns a SelfLinker that works on all TypeMeta SelfLink fields.
-func NewTypeMetaSelfLinker() SelfLinker {
+func NewTypeMetaSelfLinker() runtime.SelfLinker {
 	return jsonBaseModifier{}
 }
 
 // TypeMetaInterface lets you work with a TypeMeta from any of the versioned or
-// internal APIObjects.
+// internal APIruntime.Objects.
 type TypeMetaInterface interface {
 	ID() string
 	SetID(ID string)

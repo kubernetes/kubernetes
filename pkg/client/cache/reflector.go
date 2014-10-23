@@ -23,6 +23,7 @@ import (
 	"time"
 
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -78,7 +79,7 @@ func (r *Reflector) listAndWatch() {
 		glog.Errorf("Failed to list %v: %v", r.expectedType, err)
 		return
 	}
-	jsonBase, err := runtime.FindTypeMeta(list)
+	jsonBase, err := meta.FindTypeMeta(list)
 	if err != nil {
 		glog.Errorf("Unable to understand list result %#v", list)
 		return
@@ -112,7 +113,7 @@ func (r *Reflector) listAndWatch() {
 func (r *Reflector) syncWith(items []runtime.Object) error {
 	found := map[string]interface{}{}
 	for _, item := range items {
-		jsonBase, err := runtime.FindTypeMeta(item)
+		jsonBase, err := meta.FindTypeMeta(item)
 		if err != nil {
 			return fmt.Errorf("unexpected item in list: %v", err)
 		}
@@ -139,7 +140,7 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) err
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
 			continue
 		}
-		jsonBase, err := runtime.FindTypeMeta(event.Object)
+		jsonBase, err := meta.FindTypeMeta(event.Object)
 		if err != nil {
 			glog.Errorf("unable to understand watch event %#v", event)
 			continue

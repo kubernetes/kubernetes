@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -35,7 +36,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
 	}
-	jsonBase, err := runtime.FindTypeMeta(obj)
+	jsonBase, err := meta.FindTypeMeta(obj)
 	if err != nil {
 		return nil, err
 	}
