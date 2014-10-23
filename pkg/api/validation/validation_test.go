@@ -421,6 +421,27 @@ func TestValidatePod(t *testing.T) {
 	if len(errs) != 1 {
 		t.Errorf("Unexpected error list: %#v", errs)
 	}
+	errs = ValidatePod(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: api.NamespaceDefault,
+			Labels: map[string]string{
+				"123cantbeginwithnumber":          "bar", //invalid
+				"NoUppercase123":                  "bar", //invalid
+				"nospecialchars^=@":               "bar", //invalid
+				"cantendwithadash-":               "bar", //invalid
+				"rfc952-mustbe24charactersorless": "bar", //invalid
+				"rfc952-dash-nodots-lower":        "bar", //good label
+				"rfc952-24chars-orless":           "bar", //good label
+			},
+		},
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{Version: "v1beta1", ID: "abc"},
+		},
+	})
+	if len(errs) != 5 {
+		t.Errorf("Unexpected non-zero error list: %#v", errs)
+	}
 }
 
 func TestValidatePodUpdate(t *testing.T) {
@@ -706,6 +727,21 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 0,
 		},
+		{
+			name: "invalid label",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "abc123",
+					Namespace: api.NamespaceDefault,
+					Labels: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
+				},
+				Port:     80,
+				Selector: map[string]string{"foo": "bar", "NoUppercaseOrSpecialCharsLike=Equals": "bar"},
+			},
+			numErrs: 2,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -746,6 +782,15 @@ func TestValidateReplicationController(t *testing.T) {
 				Volumes: []api.Volume{{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
 			},
 		},
+	}
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	invalidPodTemplate := api.PodTemplate{
+		DesiredState: api.PodState{
+			Manifest: api.ContainerManifest{
+				Version: "v1beta1",
+			},
+		},
+		Labels: invalidSelector,
 	}
 	successCases := []api.ReplicationController{
 		{
@@ -817,6 +862,31 @@ func TestValidateReplicationController(t *testing.T) {
 				ReplicaSelector: validSelector,
 			},
 		},
+		"invalid_label": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+				Labels: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+			DesiredState: api.ReplicationControllerState{
+				ReplicaSelector: validSelector,
+				PodTemplate:     validPodTemplate,
+			},
+		},
+		"invalid_label 2": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "abc-123",
+				Namespace: api.NamespaceDefault,
+				Labels: map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				},
+			},
+			DesiredState: api.ReplicationControllerState{
+				PodTemplate: invalidPodTemplate,
+			},
+		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateReplicationController(&v)
@@ -830,7 +900,9 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "namespace" &&
 				field != "desiredState.replicaSelector" &&
 				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "desiredState.replicas" {
+				field != "desiredState.replicas" &&
+				field != "desiredState.label" &&
+				field != "label" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}

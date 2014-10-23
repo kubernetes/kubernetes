@@ -18,7 +18,9 @@ Label selectors may also be used to associate policies with sets of objects.
 
 We also [plan](https://github.com/GoogleCloudPlatform/kubernetes/issues/560) to make labels available inside pods and [lifecycle hooks](container-environment.md).
 
-[Namespacing of label keys](https://github.com/GoogleCloudPlatform/kubernetes/issues/1491) and [character/syntax restrictions](https://github.com/GoogleCloudPlatform/kubernetes/issues/1297) are under discussion.
+[Namespacing of label keys](https://github.com/GoogleCloudPlatform/kubernetes/issues/1491) is under discussion.
+
+Valid labels follow a slightly modified RFC952 format:  24 characters or less, all lowercase, begins with alpha, dashes (-) are allowed, and ends with alphanumeric.
 
 ## Motivation
 

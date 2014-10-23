@@ -57,8 +57,6 @@ func (r RealPodControl) createReplica(ctx api.Context, controllerSpec api.Replic
 	for k, v := range controllerSpec.DesiredState.PodTemplate.Labels {
 		desiredLabels[k] = v
 	}
-	desiredLabels["replicationController"] = controllerSpec.Name
-
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Labels: desiredLabels,
