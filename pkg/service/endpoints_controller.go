@@ -70,7 +70,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			}
 			endpoints = append(endpoints, net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port)))
 		}
-		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Namespace)
+		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
