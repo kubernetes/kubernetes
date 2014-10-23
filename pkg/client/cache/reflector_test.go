@@ -54,13 +54,13 @@ func TestReflector_watchHandler(t *testing.T) {
 	s := NewStore()
 	g := NewReflector(&testLW{}, &api.Pod{}, s)
 	fw := watch.NewFake()
-	s.Add("foo", &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}})
-	s.Add("bar", &api.Pod{TypeMeta: api.TypeMeta{Name: "bar"}})
+	s.Add("foo", &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	s.Add("bar", &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}})
 	go func() {
-		fw.Add(&api.Service{TypeMeta: api.TypeMeta{Name: "rejected"}})
-		fw.Delete(&api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}})
-		fw.Modify(&api.Pod{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "55"}})
-		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{Name: "baz", ResourceVersion: "32"}})
+		fw.Add(&api.Service{ObjectMeta: api.ObjectMeta{Name: "rejected"}})
+		fw.Delete(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+		fw.Modify(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "55"}})
+		fw.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
 	var resumeRV string
@@ -118,7 +118,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			return fw, nil
 		},
 		ListFunc: func() (runtime.Object, error) {
-			return &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: "1"}}, nil
+			return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
 		},
 	}
 	s := NewFIFO()
@@ -132,7 +132,7 @@ func TestReflector_listAndWatch(t *testing.T) {
 			fw = <-createdFakes
 		}
 		sendingRV := strconv.FormatUint(uint64(i+2), 10)
-		fw.Add(&api.Pod{TypeMeta: api.TypeMeta{Name: id, ResourceVersion: sendingRV}})
+		fw.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: id, ResourceVersion: sendingRV}})
 		if sendingRV == "3" {
 			// Inject a failure.
 			fw.Stop()
@@ -158,10 +158,10 @@ func TestReflector_listAndWatch(t *testing.T) {
 
 func TestReflector_listAndWatchWithErrors(t *testing.T) {
 	mkPod := func(id string, rv string) *api.Pod {
-		return &api.Pod{TypeMeta: api.TypeMeta{Name: id, ResourceVersion: rv}}
+		return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, ResourceVersion: rv}}
 	}
 	mkList := func(rv string, pods ...*api.Pod) *api.PodList {
-		list := &api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: rv}}
+		list := &api.PodList{ListMeta: api.ListMeta{ResourceVersion: rv}}
 		for _, pod := range pods {
 			list.Items = append(list.Items, *pod)
 		}

@@ -166,9 +166,11 @@ func TestListPods(t *testing.T) {
 						CurrentState: api.PodState{
 							Status: "Foobar",
 						},
-						Labels: map[string]string{
-							"foo":  "bar",
-							"name": "baz",
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
 						},
 					},
 				},
@@ -197,9 +199,11 @@ func TestListPodsLabels(t *testing.T) {
 						CurrentState: api.PodState{
 							Status: "Foobar",
 						},
-						Labels: map[string]string{
-							"foo":  "bar",
-							"name": "baz",
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
 						},
 					},
 				},
@@ -223,9 +227,11 @@ func TestGetPod(t *testing.T) {
 				CurrentState: api.PodState{
 					Status: "Foobar",
 				},
-				Labels: map[string]string{
-					"foo":  "bar",
-					"name": "baz",
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
 				},
 			},
 		},
@@ -248,9 +254,11 @@ func TestCreatePod(t *testing.T) {
 		CurrentState: api.PodState{
 			Status: "Foobar",
 		},
-		Labels: map[string]string{
-			"foo":  "bar",
-			"name": "baz",
+		ObjectMeta: api.ObjectMeta{
+			Labels: map[string]string{
+				"foo":  "bar",
+				"name": "baz",
+			},
 		},
 	}
 	c := &testClient{
@@ -266,13 +274,16 @@ func TestCreatePod(t *testing.T) {
 
 func TestUpdatePod(t *testing.T) {
 	requestPod := &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo":  "bar",
+				"name": "baz",
+			},
+		},
 		CurrentState: api.PodState{
 			Status: "Foobar",
-		},
-		Labels: map[string]string{
-			"foo":  "bar",
-			"name": "baz",
 		},
 	}
 	c := &testClient{
@@ -290,13 +301,15 @@ func TestListControllers(t *testing.T) {
 			Body: &api.ReplicationControllerList{
 				Items: []api.ReplicationController{
 					{
-						TypeMeta: api.TypeMeta{Name: "foo"},
+						ObjectMeta: api.ObjectMeta{
+							Name: "foo",
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
+						},
 						DesiredState: api.ReplicationControllerState{
 							Replicas: 2,
-						},
-						Labels: map[string]string{
-							"foo":  "bar",
-							"name": "baz",
 						},
 					},
 				},
@@ -314,13 +327,15 @@ func TestGetController(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
+				},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
-				},
-				Labels: map[string]string{
-					"foo":  "bar",
-					"name": "baz",
 				},
 			},
 		},
@@ -331,20 +346,22 @@ func TestGetController(t *testing.T) {
 
 func TestUpdateController(t *testing.T) {
 	requestController := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "PUT", Path: "/replicationControllers/foo"},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
+				},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
-				},
-				Labels: map[string]string{
-					"foo":  "bar",
-					"name": "baz",
 				},
 			},
 		},
@@ -364,20 +381,22 @@ func TestDeleteController(t *testing.T) {
 
 func TestCreateController(t *testing.T) {
 	requestController := &api.ReplicationController{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	c := &testClient{
 		Request: testRequest{Method: "POST", Path: "/replicationControllers", Body: requestController},
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.ReplicationController{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+					Labels: map[string]string{
+						"foo":  "bar",
+						"name": "baz",
+					},
+				},
 				DesiredState: api.ReplicationControllerState{
 					Replicas: 2,
-				},
-				Labels: map[string]string{
-					"foo":  "bar",
-					"name": "baz",
 				},
 			},
 		},
@@ -402,10 +421,12 @@ func TestListServices(t *testing.T) {
 			Body: &api.ServiceList{
 				Items: []api.Service{
 					{
-						TypeMeta: api.TypeMeta{Name: "name"},
-						Labels: map[string]string{
-							"foo":  "bar",
-							"name": "baz",
+						ObjectMeta: api.ObjectMeta{
+							Name: "name",
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
 						},
 						Selector: map[string]string{
 							"one": "two",
@@ -416,6 +437,7 @@ func TestListServices(t *testing.T) {
 		},
 	}
 	receivedServiceList, err := c.Setup().ListServices(api.NewDefaultContext(), labels.Everything())
+	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
 
@@ -426,10 +448,12 @@ func TestListServicesLabels(t *testing.T) {
 			Body: &api.ServiceList{
 				Items: []api.Service{
 					{
-						TypeMeta: api.TypeMeta{Name: "name"},
-						Labels: map[string]string{
-							"foo":  "bar",
-							"name": "baz",
+						ObjectMeta: api.ObjectMeta{
+							Name: "name",
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
 						},
 						Selector: map[string]string{
 							"one": "two",
@@ -449,7 +473,7 @@ func TestListServicesLabels(t *testing.T) {
 func TestGetService(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/services/1"},
-		Response: Response{StatusCode: 200, Body: &api.Service{TypeMeta: api.TypeMeta{Name: "service-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
 	response, err := c.Setup().GetService(api.NewDefaultContext(), "1")
 	c.Validate(t, response, err)
@@ -457,15 +481,15 @@ func TestGetService(t *testing.T) {
 
 func TestCreateService(t *testing.T) {
 	c := &testClient{
-		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{TypeMeta: api.TypeMeta{Name: "service-1"}}},
-		Response: Response{StatusCode: 200, Body: &api.Service{TypeMeta: api.TypeMeta{Name: "service-1"}}},
+		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
-	response, err := c.Setup().CreateService(api.NewDefaultContext(), &api.Service{TypeMeta: api.TypeMeta{Name: "service-1"}})
+	response, err := c.Setup().CreateService(api.NewDefaultContext(), &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
 	c.Validate(t, response, err)
 }
 
 func TestUpdateService(t *testing.T) {
-	svc := &api.Service{TypeMeta: api.TypeMeta{Name: "service-1", ResourceVersion: "1"}}
+	svc := &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1", ResourceVersion: "1"}}
 	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: svc},
 		Response: Response{StatusCode: 200, Body: svc},
@@ -490,8 +514,8 @@ func TestListEndpooints(t *testing.T) {
 			Body: &api.EndpointsList{
 				Items: []api.Endpoints{
 					{
-						TypeMeta:  api.TypeMeta{Name: "endpoint-1"},
-						Endpoints: []string{"10.245.1.2:8080", "10.245.1.3:8080"},
+						ObjectMeta: api.ObjectMeta{Name: "endpoint-1"},
+						Endpoints:  []string{"10.245.1.2:8080", "10.245.1.3:8080"},
 					},
 				},
 			},
@@ -504,7 +528,7 @@ func TestListEndpooints(t *testing.T) {
 func TestGetEndpoints(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/endpoints/endpoint-1"},
-		Response: Response{StatusCode: 200, Body: &api.Endpoints{TypeMeta: api.TypeMeta{Name: "endpoint-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
 	response, err := c.Setup().GetEndpoints(api.NewDefaultContext(), "endpoint-1")
 	c.Validate(t, response, err)
@@ -540,7 +564,7 @@ func TestGetServerVersion(t *testing.T) {
 func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/minions"},
-		Response: Response{StatusCode: 200, Body: &api.MinionList{TypeMeta: api.TypeMeta{Name: "minion-1"}}},
+		Response: Response{StatusCode: 200, Body: &api.MinionList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
 	}
 	response, err := c.Setup().ListMinions()
 	c.Validate(t, response, err)
@@ -548,7 +572,7 @@ func TestListMinions(t *testing.T) {
 
 func TestCreateMinion(t *testing.T) {
 	requestMinion := &api.Minion{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "minion-1",
 		},
 		HostIP: "123.321.456.654",

@@ -72,11 +72,11 @@ func (EverythingMatcher) Matches(obj runtime.Object) (bool, error) {
 
 func TestEtcdList(t *testing.T) {
 	podA := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 	podB := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "bar"},
+		ObjectMeta:   api.ObjectMeta{Name: "bar"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 
@@ -154,11 +154,11 @@ func TestEtcdList(t *testing.T) {
 
 func TestEtcdCreate(t *testing.T) {
 	podA := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 	podB := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine2"},
 	}
 
@@ -217,11 +217,11 @@ func TestEtcdCreate(t *testing.T) {
 
 func TestEtcdUpdate(t *testing.T) {
 	podA := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 	podB := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		DesiredState: api.PodState{Host: "machine2"},
 	}
 
@@ -292,7 +292,7 @@ func TestEtcdUpdate(t *testing.T) {
 
 func TestEtcdGet(t *testing.T) {
 	podA := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 
@@ -348,7 +348,7 @@ func TestEtcdGet(t *testing.T) {
 
 func TestEtcdDelete(t *testing.T) {
 	podA := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 
@@ -404,7 +404,7 @@ func TestEtcdDelete(t *testing.T) {
 
 func TestEtcdWatch(t *testing.T) {
 	podA := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		DesiredState: api.PodState{Host: "machine"},
 	}
 	respWithPodA := &etcd.Response{

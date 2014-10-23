@@ -108,7 +108,7 @@ func TestRunOnce(t *testing.T) {
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
 	results, err := kb.runOnce([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},

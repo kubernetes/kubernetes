@@ -47,12 +47,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
-	},
-	func(j *api.TypeMeta, c fuzz.Continue) {
-		// We have to customize the randomization of TypeMetas because their
-		// APIVersion and Kind must remain blank in memory.
-		j.APIVersion = ""
-		j.Kind = ""
+
 		j.Name = c.RandString()
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
@@ -64,6 +59,32 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		c.Fuzz(&sec)
 		c.Fuzz(&nsec)
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+	},
+	func(j *api.TypeMeta, c fuzz.Continue) {
+		// We have to customize the randomization of TypeMetas because their
+		// APIVersion and Kind must remain blank in memory.
+		j.APIVersion = ""
+		j.Kind = ""
+	},
+	func(j *api.ObjectMeta, c fuzz.Continue) {
+		j.Name = c.RandString()
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.SelfLink = c.RandString()
+
+		var sec, nsec int64
+		c.Fuzz(&sec)
+		c.Fuzz(&nsec)
+		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+	},
+	func(j *api.ListMeta, c fuzz.Continue) {
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.SelfLink = c.RandString()
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
@@ -173,7 +194,9 @@ func TestTypes(t *testing.T) {
 
 func TestEncode_Ptr(t *testing.T) {
 	pod := &api.Pod{
-		Labels: map[string]string{"name": "foo"},
+		ObjectMeta: api.ObjectMeta{
+			Labels: map[string]string{"name": "foo"},
+		},
 	}
 	obj := runtime.Object(pod)
 	data, err := latest.Codec.Encode(obj)

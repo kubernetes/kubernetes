@@ -40,8 +40,8 @@ func NewTestREST() (testRegistry, *REST) {
 func TestRESTCreate(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{Name: "foo"},
-		Reason:   "forTesting",
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Reason:     "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
 	if err != nil {
@@ -55,8 +55,8 @@ func TestRESTCreate(t *testing.T) {
 func TestRESTDelete(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{Name: "foo"},
-		Reason:   "forTesting",
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Reason:     "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
 	if err != nil {
@@ -75,8 +75,8 @@ func TestRESTDelete(t *testing.T) {
 func TestRESTGet(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{Name: "foo"},
-		Reason:   "forTesting",
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Reason:     "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
 	if err != nil {
@@ -131,8 +131,8 @@ func TestRESTgetAttrs(t *testing.T) {
 func TestRESTUpdate(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
-		TypeMeta: api.TypeMeta{Name: "foo"},
-		Reason:   "forTesting",
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Reason:     "forTesting",
 	}
 	c, err := rest.Create(api.NewContext(), eventA)
 	if err != nil {

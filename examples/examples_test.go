@@ -41,14 +41,14 @@ func validateObject(obj runtime.Object) (errors []error) {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Service:
-		api.ValidNamespace(ctx, &t.TypeMeta)
+		api.ValidNamespace(ctx, &t.ObjectMeta)
 		errors = validation.ValidateService(t)
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Pod:
-		api.ValidNamespace(ctx, &t.TypeMeta)
+		api.ValidNamespace(ctx, &t.ObjectMeta)
 		errors = validation.ValidateManifest(&t.DesiredState.Manifest)
 	case *api.PodList:
 		for i := range t.Items {

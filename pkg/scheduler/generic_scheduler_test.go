@@ -95,7 +95,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   []FitPredicate{matchesPredicate},
 			prioritizer:  EqualPriority,
 			nodes:        []string{"machine1", "machine2"},
-			pod:          api.Pod{TypeMeta: api.TypeMeta{Name: "machine2"}},
+			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Name: "machine2"}},
 			expectedHost: "machine2",
 		},
 		{
@@ -108,7 +108,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   []FitPredicate{matchesPredicate},
 			prioritizer:  numericPriority,
 			nodes:        []string{"3", "2", "1"},
-			pod:          api.Pod{TypeMeta: api.TypeMeta{Name: "2"}},
+			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 			expectedHost: "2",
 		},
 		{

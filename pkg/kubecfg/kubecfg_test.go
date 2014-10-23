@@ -38,8 +38,8 @@ func TestUpdateWithPods(t *testing.T) {
 	fakeClient := client.Fake{
 		Pods: api.PodList{
 			Items: []api.Pod{
-				{TypeMeta: api.TypeMeta{Name: "pod-1"}},
-				{TypeMeta: api.TypeMeta{Name: "pod-2"}},
+				{ObjectMeta: api.ObjectMeta{Name: "pod-1"}},
+				{ObjectMeta: api.ObjectMeta{Name: "pod-2"}},
 			},
 		},
 	}
@@ -69,8 +69,8 @@ func TestUpdateWithNewImage(t *testing.T) {
 	fakeClient := client.Fake{
 		Pods: api.PodList{
 			Items: []api.Pod{
-				{TypeMeta: api.TypeMeta{Name: "pod-1"}},
-				{TypeMeta: api.TypeMeta{Name: "pod-2"}},
+				{ObjectMeta: api.ObjectMeta{Name: "pod-1"}},
+				{ObjectMeta: api.ObjectMeta{Name: "pod-2"}},
 			},
 		},
 		Ctrl: api.ReplicationController{

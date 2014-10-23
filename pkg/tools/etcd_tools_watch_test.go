@@ -32,9 +32,9 @@ import (
 func TestWatchInterpretations(t *testing.T) {
 	codec := latest.Codec
 	// Declare some pods to make the test cases compact.
-	podFoo := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
-	podBar := &api.Pod{TypeMeta: api.TypeMeta{Name: "bar"}}
-	podBaz := &api.Pod{TypeMeta: api.TypeMeta{Name: "baz"}}
+	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	podBaz := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "baz"}}
 	firstLetterIsB := func(obj runtime.Object) bool {
 		return obj.(*api.Pod).Name[0] == 'b'
 	}
@@ -236,7 +236,7 @@ func TestWatch(t *testing.T) {
 	}
 
 	// Test normal case
-	pod := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBytes, _ := codec.Encode(pod)
 	fakeClient.WatchResponse <- &etcd.Response{
 		Action: "set",
@@ -294,7 +294,7 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "create",
 					Node: &etcd.Node{
-						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value: string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
 					},
 				},
 			},
@@ -308,12 +308,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -330,7 +330,7 @@ func TestWatchEtcdState(t *testing.T) {
 					R: &etcd.Response{
 						Action: "get",
 						Node: &etcd.Node{
-							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{}})),
+							Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
 							CreatedIndex:  1,
 							ModifiedIndex: 1,
 						},
@@ -343,12 +343,12 @@ func TestWatchEtcdState(t *testing.T) {
 				{
 					Action: "compareAndSwap",
 					Node: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:9000"}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 2,
 					},
 					PrevNode: &etcd.Node{
-						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{}})),
+						Value:         string(runtime.EncodeOrDie(codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{}})),
 						CreatedIndex:  1,
 						ModifiedIndex: 1,
 					},
@@ -391,7 +391,7 @@ func TestWatchEtcdState(t *testing.T) {
 
 func TestWatchFromZeroIndex(t *testing.T) {
 	codec := latest.Codec
-	pod := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	testCases := map[string]struct {
 		Response        EtcdResponseWithError
@@ -464,7 +464,7 @@ func TestWatchFromZeroIndex(t *testing.T) {
 
 func TestWatchListFromZeroIndex(t *testing.T) {
 	codec := latest.Codec
-	pod := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{

@@ -32,7 +32,7 @@ func TestMakeBoundPodNoServices(t *testing.T) {
 	}
 
 	pod, err := factory.MakeBoundPod("machine", &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foobar"},
+		ObjectMeta: api.ObjectMeta{Name: "foobar"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Containers: []api.Container{
@@ -61,8 +61,8 @@ func TestMakeBoundPodServices(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					TypeMeta: api.TypeMeta{Name: "test"},
-					Port:     8080,
+					ObjectMeta: api.ObjectMeta{Name: "test"},
+					Port:       8080,
 					ContainerPort: util.IntOrString{
 						Kind:   util.IntstrInt,
 						IntVal: 900,
@@ -137,8 +137,8 @@ func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 		List: api.ServiceList{
 			Items: []api.Service{
 				{
-					TypeMeta: api.TypeMeta{Name: "test"},
-					Port:     8080,
+					ObjectMeta: api.ObjectMeta{Name: "test"},
+					Port:       8080,
 					ContainerPort: util.IntOrString{
 						Kind:   util.IntstrInt,
 						IntVal: 900,

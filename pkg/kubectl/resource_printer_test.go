@@ -69,7 +69,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 
 	obj := &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	buf.Reset()
 	printer.PrintObj(obj, buf)

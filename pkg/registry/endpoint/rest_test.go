@@ -29,8 +29,8 @@ import (
 func TestGetEndpoints(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
-			TypeMeta:  api.TypeMeta{Name: "foo"},
-			Endpoints: []string{"127.0.0.1:9000"},
+			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			Endpoints:  []string{"127.0.0.1:9000"},
 		},
 	}
 	storage := NewREST(registry)
@@ -59,7 +59,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	// returns empty endpoints
 	registry.Err = nil
 	registry.Service = &api.Service{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
@@ -74,10 +74,10 @@ func TestEndpointsRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
 	storage := NewREST(registry)
 	registry.EndpointsList = api.EndpointsList{
-		TypeMeta: api.TypeMeta{ResourceVersion: "1"},
+		ListMeta: api.ListMeta{ResourceVersion: "1"},
 		Items: []api.Endpoints{
-			{TypeMeta: api.TypeMeta{Name: "foo"}},
-			{TypeMeta: api.TypeMeta{Name: "bar"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 		},
 	}
 	ctx := api.NewContext()

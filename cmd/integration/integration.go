@@ -256,11 +256,16 @@ func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
 		&api.Service{
-			TypeMeta: api.TypeMeta{Name: "atomicservice", APIVersion: latest.Version},
-			Port:     12345,
-			Labels: map[string]string{
-				"name": "atomicService",
+			TypeMeta: api.TypeMeta{
+				APIVersion: latest.Version,
 			},
+			ObjectMeta: api.ObjectMeta{
+				Name: "atomicservice",
+				Labels: map[string]string{
+					"name": "atomicService",
+				},
+			},
+			Port: 12345,
 			// This is here because validation requires it.
 			Selector: map[string]string{
 				"foo": "bar",
@@ -330,7 +335,12 @@ func runAtomicPutTest(c *client.Client) {
 func runServiceTest(client *client.Client) {
 	ctx := api.NewDefaultContext()
 	pod := api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+			Labels: map[string]string{
+				"name": "thisisalonglabel",
+			},
+		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				Version: "v1beta1",
@@ -348,9 +358,6 @@ func runServiceTest(client *client.Client) {
 		CurrentState: api.PodState{
 			PodIP: "1.2.3.4",
 		},
-		Labels: map[string]string{
-			"name": "thisisalonglabel",
-		},
 	}
 	_, err := client.CreatePod(ctx, &pod)
 	if err != nil {
@@ -360,7 +367,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	svc1 := api.Service{
-		TypeMeta: api.TypeMeta{Name: "service1"},
+		ObjectMeta: api.ObjectMeta{Name: "service1"},
 		Selector: map[string]string{
 			"name": "thisisalonglabel",
 		},
@@ -375,7 +382,7 @@ func runServiceTest(client *client.Client) {
 	}
 	// A second service with the same port.
 	svc2 := api.Service{
-		TypeMeta: api.TypeMeta{Name: "service2"},
+		ObjectMeta: api.ObjectMeta{Name: "service2"},
 		Selector: map[string]string{
 			"name": "thisisalonglabel",
 		},

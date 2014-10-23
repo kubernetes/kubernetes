@@ -37,6 +37,8 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// APIVersion and Kind must remain blank in memory.
 		j.APIVersion = ""
 		j.Kind = ""
+	},
+	func(j *internal.ObjectMeta, c fuzz.Continue) {
 		j.Name = c.RandString()
 		// TODO: Fix JSON/YAML packages and/or write custom encoding
 		// for uint64's. Somehow the LS *byte* of this is lost, but
@@ -48,6 +50,13 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		c.Fuzz(&sec)
 		c.Fuzz(&nsec)
 		j.CreationTimestamp = util.Unix(sec, nsec).Rfc3339Copy()
+	},
+	func(j *internal.ListMeta, c fuzz.Continue) {
+		// TODO: Fix JSON/YAML packages and/or write custom encoding
+		// for uint64's. Somehow the LS *byte* of this is lost, but
+		// only when all 8 bytes are set.
+		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
+		j.SelfLink = c.RandString()
 	},
 	func(j *internal.ObjectReference, c fuzz.Continue) {
 		// We have to customize the randomization of TypeMetas because their
@@ -133,8 +142,17 @@ func TestInternalRoundTrip(t *testing.T) {
 }
 
 func TestResourceVersioner(t *testing.T) {
-	pod := internal.Pod{TypeMeta: internal.TypeMeta{ResourceVersion: "10"}}
+	pod := internal.Pod{ObjectMeta: internal.ObjectMeta{ResourceVersion: "10"}}
 	version, err := ResourceVersioner.ResourceVersion(&pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if version != "10" {
+		t.Errorf("unexpected version %v", version)
+	}
+
+	podList := internal.PodList{ListMeta: internal.ListMeta{ResourceVersion: "10"}}
+	version, err = ResourceVersioner.ResourceVersion(&podList)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

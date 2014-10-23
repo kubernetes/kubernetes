@@ -52,7 +52,7 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 		},
 	}
 	expectedPod := api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:      id,
 			UID:       "uid",
 			Namespace: "default",
@@ -118,7 +118,7 @@ func TestReadFromFile(t *testing.T) {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
 		expected := CreatePodUpdate(kubelet.SET, api.BoundPod{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:      simpleSubdomainSafeHash(file.Name()),
 				UID:       simpleSubdomainSafeHash(file.Name()),
 				Namespace: "default",
