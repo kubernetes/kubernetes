@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -55,6 +56,10 @@ type Config struct {
 	KubeletClient      client.KubeletClient
 	NodeResources      api.NodeResources
 	PortalNet          *net.IPNet
+	Mux                apiserver.Mux
+	EnableLogsSupport  bool
+	EnableUISupport    bool
+	APIPrefix          string
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -69,6 +74,10 @@ type Master struct {
 	storage            map[string]apiserver.RESTStorage
 	client             *client.Client
 	portalNet          *net.IPNet
+	mux                apiserver.Mux
+	enableLogsSupport  bool
+	enableUISupport    bool
+	apiPrefix          string
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -101,6 +110,10 @@ func New(c *Config) *Master {
 		minionRegistry:     minionRegistry,
 		client:             c.Client,
 		portalNet:          c.PortalNet,
+		mux:                c.Mux,
+		enableLogsSupport:  c.EnableLogsSupport,
+		enableUISupport:    c.EnableUISupport,
+		apiPrefix:          c.APIPrefix,
 	}
 	m.init(c)
 	return m
@@ -147,6 +160,15 @@ func (m *Master) init(c *Config) {
 
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
+	}
+	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(m.mux, c.APIPrefix+"/v1beta1")
+	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(m.mux, c.APIPrefix+"/v1beta2")
+	apiserver.InstallSupport(m.mux)
+	if c.EnableLogsSupport {
+		apiserver.InstallLogsSupport(m.mux)
+	}
+	if c.EnableUISupport {
+		ui.InstallSupport(m.mux)
 	}
 }
 

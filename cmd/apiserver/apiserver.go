@@ -38,7 +38,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
@@ -188,7 +187,8 @@ func main() {
 	}
 
 	n := net.IPNet(portalNet)
-	m := master.New(&master.Config{
+	mux := http.NewServeMux()
+	master.New(&master.Config{
 		Client:             client,
 		Cloud:              cloud,
 		EtcdHelper:         helper,
@@ -204,17 +204,12 @@ func main() {
 				resources.Memory: util.NewIntOrStringFromInt(*nodeMemory),
 			},
 		},
-		PortalNet: &n,
+		PortalNet:         &n,
+		Mux:               mux,
+		EnableLogsSupport: *enableLogsSupport,
+		EnableUISupport:   true,
+		APIPrefix:         *apiPrefix,
 	})
-
-	mux := http.NewServeMux()
-	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, *apiPrefix+"/v1beta1")
-	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(mux, *apiPrefix+"/v1beta2")
-	apiserver.InstallSupport(mux)
-	if *enableLogsSupport {
-		apiserver.InstallLogsSupport(mux)
-	}
-	ui.InstallSupport(mux)
 
 	handler := http.Handler(mux)
 
