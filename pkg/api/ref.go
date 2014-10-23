@@ -53,7 +53,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		APIVersion: version[1],
 		// TODO: correct Name and UID when TypeMeta makes a distinction
 		Name:            accessor.Name(),
-		UID:             accessor.Name(),
+		UID:             accessor.UID(),
 		ResourceVersion: accessor.ResourceVersion(),
 	}, nil
 }

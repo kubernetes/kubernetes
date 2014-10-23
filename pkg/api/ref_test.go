@@ -37,6 +37,7 @@ func TestGetReference(t *testing.T) {
 			obj: &Pod{
 				TypeMeta: TypeMeta{
 					Name:            "foo",
+					UID:             "bar",
 					ResourceVersion: "42",
 					SelfLink:        "/api/v1beta1/pods/foo",
 				},
@@ -45,7 +46,7 @@ func TestGetReference(t *testing.T) {
 				Kind:            "Pod",
 				APIVersion:      "v1beta1",
 				Name:            "foo",
-				UID:             "foo",
+				UID:             "bar",
 				ResourceVersion: "42",
 			},
 		},
@@ -53,6 +54,7 @@ func TestGetReference(t *testing.T) {
 			obj: &ServiceList{
 				TypeMeta: TypeMeta{
 					Name:            "foo",
+					UID:             "bar",
 					ResourceVersion: "42",
 					SelfLink:        "/api/v1beta2/services",
 				},
@@ -61,7 +63,7 @@ func TestGetReference(t *testing.T) {
 				Kind:            "ServiceList",
 				APIVersion:      "v1beta2",
 				Name:            "foo",
-				UID:             "foo",
+				UID:             "bar",
 				ResourceVersion: "42",
 			},
 		},

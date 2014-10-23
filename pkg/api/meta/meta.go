@@ -108,6 +108,8 @@ func NewSelfLinker() runtime.SelfLinker {
 type Accessor interface {
 	Name() string
 	SetName(name string)
+	UID() string
+	SetUID(uid string)
 	APIVersion() string
 	SetAPIVersion(version string)
 	Kind() string
@@ -120,6 +122,7 @@ type Accessor interface {
 
 type genericTypeMeta struct {
 	name            *string
+	uid             *string
 	apiVersion      *string
 	kind            *string
 	resourceVersion *string
@@ -132,6 +135,14 @@ func (g genericTypeMeta) Name() string {
 
 func (g genericTypeMeta) SetName(name string) {
 	*g.name = name
+}
+
+func (g genericTypeMeta) UID() string {
+	return *g.uid
+}
+
+func (g genericTypeMeta) SetUID(uid string) {
+	*g.uid = uid
 }
 
 func (g genericTypeMeta) APIVersion() string {
@@ -197,6 +208,9 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 func newGenericTypeMeta(v reflect.Value) (genericTypeMeta, error) {
 	g := genericTypeMeta{}
 	if err := fieldPtr(v, "Name", &g.name); err != nil {
+		return g, err
+	}
+	if err := fieldPtr(v, "UID", &g.uid); err != nil {
 		return g, err
 	}
 	if err := fieldPtr(v, "APIVersion", &g.apiVersion); err != nil {

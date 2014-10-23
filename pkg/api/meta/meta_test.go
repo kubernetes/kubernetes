@@ -28,6 +28,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	type TypeMeta struct {
 		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
 		Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
+		UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
 		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
 		SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
 		ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
@@ -35,6 +36,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	}
 	j := TypeMeta{
 		Name:            "foo",
+		UID:             "uid",
 		APIVersion:      "a",
 		Kind:            "b",
 		ResourceVersion: "1",
@@ -47,6 +49,9 @@ func TestGenericTypeMeta(t *testing.T) {
 	// Prove g supports Accessor.
 	jbi := Accessor(g)
 	if e, a := "foo", jbi.Name(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "uid", jbi.UID(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", jbi.APIVersion(); e != a {
@@ -63,6 +68,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	}
 
 	jbi.SetName("bar")
+	jbi.SetUID("other")
 	jbi.SetAPIVersion("c")
 	jbi.SetKind("d")
 	jbi.SetResourceVersion("2")
@@ -70,6 +76,9 @@ func TestGenericTypeMeta(t *testing.T) {
 
 	// Prove that jbi changes the original object.
 	if e, a := "bar", j.Name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "other", j.UID; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "c", j.APIVersion; e != a {
