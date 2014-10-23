@@ -64,14 +64,14 @@ func (h *RESTHandler) setSelfLink(obj runtime.Object, req *http.Request) error {
 	return h.selfLinker.SetSelfLink(obj, newURL.String())
 }
 
-// Like setSelfLink, but appends the object's id.
-func (h *RESTHandler) setSelfLinkAddID(obj runtime.Object, req *http.Request) error {
-	id, err := h.selfLinker.ID(obj)
+// Like setSelfLink, but appends the object's name.
+func (h *RESTHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) error {
+	name, err := h.selfLinker.Name(obj)
 	if err != nil {
 		return err
 	}
 	newURL := *req.URL
-	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, id)
+	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
 	return h.selfLinker.SetSelfLink(obj, newURL.String())
@@ -171,7 +171,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 			errorJSON(err, h.codec, w)
 			return
 		}
-		op := h.createOperation(out, sync, timeout, curry(h.setSelfLinkAddID, req))
+		op := h.createOperation(out, sync, timeout, curry(h.setSelfLinkAddName, req))
 		h.finishReq(op, req, w)
 
 	case "DELETE":

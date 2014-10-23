@@ -373,7 +373,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 		if err != nil {
 			glog.Fatalf("error obtaining resource version for update: %v", err)
 		}
-		jsonBase, err := meta.FindTypeMeta(obj)
+		jsonBase, err := meta.FindAccessor(obj)
 		if err != nil {
 			glog.Fatalf("error finding json base for update: %v", err)
 		}
@@ -409,7 +409,7 @@ func executeAPIRequest(ctx api.Context, method string, c *client.Client) bool {
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}
-			jsonBase, err := meta.FindTypeMeta(obj)
+			jsonBase, err := meta.FindAccessor(obj)
 			if err != nil {
 				glog.Fatalf("error setting resource version: %v", err)
 			}

@@ -36,7 +36,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
 	}
-	jsonBase, err := meta.FindTypeMeta(obj)
+	accessor, err := meta.FindAccessor(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -44,16 +44,16 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	version := versionFromSelfLink.FindStringSubmatch(jsonBase.SelfLink())
+	version := versionFromSelfLink.FindStringSubmatch(accessor.SelfLink())
 	if len(version) < 2 {
-		return nil, fmt.Errorf("unexpected self link format: %v", jsonBase.SelfLink())
+		return nil, fmt.Errorf("unexpected self link format: %v", accessor.SelfLink())
 	}
 	return &ObjectReference{
 		Kind:       kind,
 		APIVersion: version[1],
 		// TODO: correct Name and UID when TypeMeta makes a distinction
-		Name:            jsonBase.ID(),
-		UID:             jsonBase.ID(),
-		ResourceVersion: jsonBase.ResourceVersion(),
+		Name:            accessor.Name(),
+		UID:             accessor.Name(),
+		ResourceVersion: accessor.ResourceVersion(),
 	}, nil
 }

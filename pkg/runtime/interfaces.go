@@ -45,8 +45,8 @@ type SelfLinker interface {
 	SetSelfLink(obj Object, selfLink string) error
 	SelfLink(obj Object) (string, error)
 
-	// Knowing ID is sometimes necessary to use a SelfLinker.
-	ID(obj Object) (string, error)
+	// Knowing Name is sometimes necessary to use a SelfLinker.
+	Name(obj Object) (string, error)
 }
 
 // All api types must support the Object interface. It's deliberately tiny so that this is not an onerous

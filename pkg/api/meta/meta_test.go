@@ -44,9 +44,9 @@ func TestGenericTypeMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new err: %v", err)
 	}
-	// Prove g supports TypeMetaInterface.
-	jbi := TypeMetaInterface(g)
-	if e, a := "foo", jbi.ID(); e != a {
+	// Prove g supports Accessor.
+	jbi := Accessor(g)
+	if e, a := "foo", jbi.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", jbi.APIVersion(); e != a {
@@ -62,7 +62,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	jbi.SetID("bar")
+	jbi.SetName("bar")
 	jbi.SetAPIVersion("c")
 	jbi.SetKind("d")
 	jbi.SetResourceVersion("2")
@@ -107,7 +107,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		"api object with version":            {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
 		"pointer to api object with version": {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
 	}
-	versioning := NewTypeMetaResourceVersioner()
+	versioning := NewResourceVersioner()
 	for key, testCase := range testCases {
 		actual, err := versioning.ResourceVersion(testCase.Object)
 		if err != nil {
@@ -170,7 +170,7 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 		},
 	}
 
-	linker := NewTypeMetaSelfLinker()
+	linker := NewSelfLinker()
 	for name, item := range table {
 		got, err := linker.SelfLink(item.obj)
 		if e, a := item.succeed, err == nil; e != a {

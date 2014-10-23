@@ -79,7 +79,7 @@ func (r *Reflector) listAndWatch() {
 		glog.Errorf("Failed to list %v: %v", r.expectedType, err)
 		return
 	}
-	jsonBase, err := meta.FindTypeMeta(list)
+	jsonBase, err := meta.FindAccessor(list)
 	if err != nil {
 		glog.Errorf("Unable to understand list result %#v", list)
 		return
@@ -113,11 +113,11 @@ func (r *Reflector) listAndWatch() {
 func (r *Reflector) syncWith(items []runtime.Object) error {
 	found := map[string]interface{}{}
 	for _, item := range items {
-		jsonBase, err := meta.FindTypeMeta(item)
+		jsonBase, err := meta.FindAccessor(item)
 		if err != nil {
 			return fmt.Errorf("unexpected item in list: %v", err)
 		}
-		found[jsonBase.ID()] = item
+		found[jsonBase.Name()] = item
 	}
 
 	r.store.Replace(found)
@@ -140,21 +140,21 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) err
 			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
 			continue
 		}
-		jsonBase, err := meta.FindTypeMeta(event.Object)
+		jsonBase, err := meta.FindAccessor(event.Object)
 		if err != nil {
 			glog.Errorf("unable to understand watch event %#v", event)
 			continue
 		}
 		switch event.Type {
 		case watch.Added:
-			r.store.Add(jsonBase.ID(), event.Object)
+			r.store.Add(jsonBase.Name(), event.Object)
 		case watch.Modified:
-			r.store.Update(jsonBase.ID(), event.Object)
+			r.store.Update(jsonBase.Name(), event.Object)
 		case watch.Deleted:
 			// TODO: Will any consumers need access to the "last known
 			// state", which is passed in event.Object? If so, may need
 			// to change this.
-			r.store.Delete(jsonBase.ID())
+			r.store.Delete(jsonBase.Name())
 		default:
 			glog.Errorf("unable to understand watch event %#v", event)
 		}

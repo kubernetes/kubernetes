@@ -101,7 +101,7 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	name := reflect.TypeOf(source).Elem().Name()
 	apiObjectFuzzer.Fuzz(source)
-	j, err := meta.FindTypeMeta(source)
+	j, err := meta.FindAccessor(source)
 	if err != nil {
 		t.Fatalf("Unexpected error %v for %#v", err, source)
 	}
@@ -160,7 +160,7 @@ func TestTypes(t *testing.T) {
 				t.Errorf("Couldn't make a %v? %v", kind, err)
 				continue
 			}
-			if _, err := meta.FindTypeMeta(item); err != nil {
+			if _, err := meta.FindAccessor(item); err != nil {
 				t.Logf("%s is not a TypeMeta and cannot be round tripped: %v", kind, err)
 				continue
 			}

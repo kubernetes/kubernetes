@@ -24,9 +24,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// FindTypeMeta takes an arbitary api type, returns pointer to its TypeMeta field.
+// FindAccessor takes an arbitary api type, returns pointer to its TypeMeta field.
 // obj must be a pointer to an api type.
-func FindTypeMeta(obj runtime.Object) (TypeMetaInterface, error) {
+func FindAccessor(obj runtime.Object) (Accessor, error) {
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func FindTypeMeta(obj runtime.Object) (TypeMetaInterface, error) {
 	}
 	typeMeta := v.FieldByName("TypeMeta")
 	if !typeMeta.IsValid() {
-		return nil, fmt.Errorf("struct %v lacks embedded JSON type", name)
+		return nil, fmt.Errorf("struct %v lacks embedded TypeMeta type", name)
 	}
 	g, err := newGenericTypeMeta(typeMeta)
 	if err != nil {
@@ -47,67 +47,67 @@ func FindTypeMeta(obj runtime.Object) (TypeMetaInterface, error) {
 	return g, nil
 }
 
-// NewTypeMetaResourceVersioner returns a ResourceVersioner that can set or
+// NewResourceVersioner returns a ResourceVersioner that can set or
 // retrieve ResourceVersion on objects derived from TypeMeta.
-func NewTypeMetaResourceVersioner() runtime.ResourceVersioner {
-	return jsonBaseModifier{}
+func NewResourceVersioner() runtime.ResourceVersioner {
+	return typeMetaModifier{}
 }
 
-// jsonBaseModifier implements ResourceVersioner and SelfLinker.
-type jsonBaseModifier struct{}
+// typeMetaModifier implements ResourceVersioner and SelfLinker.
+type typeMetaModifier struct{}
 
-func (v jsonBaseModifier) ResourceVersion(obj runtime.Object) (string, error) {
-	json, err := FindTypeMeta(obj)
+func (v typeMetaModifier) ResourceVersion(obj runtime.Object) (string, error) {
+	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return json.ResourceVersion(), nil
+	return accessor.ResourceVersion(), nil
 }
 
-func (v jsonBaseModifier) SetResourceVersion(obj runtime.Object, version string) error {
-	json, err := FindTypeMeta(obj)
+func (v typeMetaModifier) SetResourceVersion(obj runtime.Object, version string) error {
+	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return err
 	}
-	json.SetResourceVersion(version)
+	accessor.SetResourceVersion(version)
 	return nil
 }
 
-func (v jsonBaseModifier) ID(obj runtime.Object) (string, error) {
-	json, err := FindTypeMeta(obj)
+func (v typeMetaModifier) Name(obj runtime.Object) (string, error) {
+	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return json.ID(), nil
+	return accessor.Name(), nil
 }
 
-func (v jsonBaseModifier) SelfLink(obj runtime.Object) (string, error) {
-	json, err := FindTypeMeta(obj)
+func (v typeMetaModifier) SelfLink(obj runtime.Object) (string, error) {
+	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return json.SelfLink(), nil
+	return accessor.SelfLink(), nil
 }
 
-func (v jsonBaseModifier) SetSelfLink(obj runtime.Object, selfLink string) error {
-	json, err := FindTypeMeta(obj)
+func (v typeMetaModifier) SetSelfLink(obj runtime.Object, selfLink string) error {
+	accessor, err := FindAccessor(obj)
 	if err != nil {
 		return err
 	}
-	json.SetSelfLink(selfLink)
+	accessor.SetSelfLink(selfLink)
 	return nil
 }
 
-// NewTypeMetaSelfLinker returns a SelfLinker that works on all TypeMeta SelfLink fields.
-func NewTypeMetaSelfLinker() runtime.SelfLinker {
-	return jsonBaseModifier{}
+// NewSelfLinker returns a SelfLinker that works on all TypeMeta SelfLink fields.
+func NewSelfLinker() runtime.SelfLinker {
+	return typeMetaModifier{}
 }
 
-// TypeMetaInterface lets you work with a TypeMeta from any of the versioned or
+// Accessor lets you work with object metadata from any of the versioned or
 // internal APIruntime.Objects.
-type TypeMetaInterface interface {
-	ID() string
-	SetID(ID string)
+type Accessor interface {
+	Name() string
+	SetName(name string)
 	APIVersion() string
 	SetAPIVersion(version string)
 	Kind() string
@@ -119,19 +119,19 @@ type TypeMetaInterface interface {
 }
 
 type genericTypeMeta struct {
-	id              *string
+	name            *string
 	apiVersion      *string
 	kind            *string
 	resourceVersion *string
 	selfLink        *string
 }
 
-func (g genericTypeMeta) ID() string {
-	return *g.id
+func (g genericTypeMeta) Name() string {
+	return *g.name
 }
 
-func (g genericTypeMeta) SetID(id string) {
-	*g.id = id
+func (g genericTypeMeta) SetName(name string) {
+	*g.name = name
 }
 
 func (g genericTypeMeta) APIVersion() string {
@@ -196,7 +196,7 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 // Returns an error if this isn't the case.
 func newGenericTypeMeta(v reflect.Value) (genericTypeMeta, error) {
 	g := genericTypeMeta{}
-	if err := fieldPtr(v, "Name", &g.id); err != nil {
+	if err := fieldPtr(v, "Name", &g.name); err != nil {
 		return g, err
 	}
 	if err := fieldPtr(v, "APIVersion", &g.apiVersion); err != nil {
