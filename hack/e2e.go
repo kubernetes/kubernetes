@@ -31,11 +31,13 @@ import (
 )
 
 var (
+	isup    = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
 	build   = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
 	up      = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
 	push    = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
 	down    = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
-	tests   = flag.String("tests", "*", "Run tests in hack/e2e-suite matching this glob.")
+	test    = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
+	tests   = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
 	root    = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose = flag.Bool("v", false, "If true, print all command output.")
 )
@@ -54,8 +56,23 @@ func main() {
 	flag.Parse()
 	signal.Notify(signals, os.Interrupt)
 
+	if *test {
+		*tests = "*"
+	}
+
+	if *isup {
+		status := 1
+		if runBash("get status", `$KUBECFG -server_version`) {
+			status = 0
+			log.Printf("Cluster is UP")
+		} else {
+			log.Printf("Cluster is DOWN")
+		}
+		os.Exit(status)
+	}
+
 	if *build {
-		if runBash("build", `test-build-release`) {
+		if !runBash("build", `test-build-release`) {
 			log.Fatal("Error building. Aborting.")
 		}
 	}
