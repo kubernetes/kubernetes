@@ -158,6 +158,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, api.ServiceList{}},
 		serverResponse{http.StatusOK, api.Endpoints{}})
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -170,6 +171,7 @@ func TestSyncEndpointsError(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusInternalServerError, api.ServiceList{}},
 		serverResponse{http.StatusOK, api.Endpoints{}})
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
 	if err := endpoints.SyncServiceEndpoints(); err == nil {
@@ -198,6 +200,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			},
 			Endpoints: []string{"6.7.8.9:1000"},
 		}})
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -233,6 +236,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			},
 			Endpoints: []string{"1.2.3.4:8080"},
 		}})
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -256,6 +260,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{}})
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
@@ -284,6 +289,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		serverResponse{http.StatusInternalServerError, api.PodList{}},
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{}})
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
 	if err := endpoints.SyncServiceEndpoints(); err == nil {
