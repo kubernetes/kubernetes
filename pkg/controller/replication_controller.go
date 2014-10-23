@@ -53,18 +53,20 @@ type RealPodControl struct {
 }
 
 func (r RealPodControl) createReplica(ctx api.Context, controllerSpec api.ReplicationController) {
-	labels := controllerSpec.DesiredState.PodTemplate.Labels
-	// TODO: don't fail to set this label just because the map isn't created.
-	if labels != nil {
-		labels["replicationController"] = controllerSpec.Name
+	desiredLabels := make(labels.Set)
+	for k, v := range controllerSpec.DesiredState.PodTemplate.Labels {
+		desiredLabels[k] = v
 	}
+	desiredLabels["replicationController"] = controllerSpec.Name
+
 	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels: desiredLabels,
+		},
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
-		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 	}
-	_, err := r.kubeClient.CreatePod(ctx, pod)
-	if err != nil {
-		glog.Errorf("%#v\n", err)
+	if _, err := r.kubeClient.CreatePod(ctx, pod); err != nil {
+		glog.Errorf("Unable to create pod replica: %v", err)
 	}
 }
 
