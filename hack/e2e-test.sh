@@ -80,7 +80,7 @@ for test_file in $(ls "${KUBE_ROOT}/hack/e2e-suite/"); do
     fi
   fi
 
-  echo "running $test_file"
+  echo "+++ Running $test_file"
   result=0
   "${KUBE_ROOT}/hack/e2e-suite/${test_file}" || result="$?"
   if [[ "${result}" -eq "0" ]]; then
