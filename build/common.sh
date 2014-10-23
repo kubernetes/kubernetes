@@ -346,7 +346,7 @@ function kube::build::clean_images() {
   done
 
   echo "+++ Cleaning all other untagged docker images"
-  docker rmi $(docker images | awk '/^<none>/ {print $3}') 2> /dev/null || true
+  docker rmi $(docker images -q --filter 'dangling=true') 2> /dev/null || true
 }
 
 # Run a command in the kube-build image.  This assumes that the image has
