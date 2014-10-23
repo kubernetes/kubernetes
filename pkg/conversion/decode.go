@@ -40,6 +40,7 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.
 	err = yaml.Unmarshal(data, obj)

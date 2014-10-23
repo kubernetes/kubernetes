@@ -74,7 +74,6 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		}
 		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.Name)
 		if err != nil {
-			// TODO this is brittle as all get out, refactor the client libraries to return a structured error.
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
 					TypeMeta: api.TypeMeta{
