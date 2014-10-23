@@ -69,7 +69,7 @@ function query_pods() {
   local i
   for i in $(seq 1 10); do
     pods_unsorted=($(${KUBECFG} \
-        '-template={{range.Items}}{{.ID}} {{end}}' \
+        '-template={{range.Items}}{{.Name}} {{end}}' \
         -l replicationController="$1" list pods))
     found="${#pods_unsorted[*]}"
     if [[ "${found}" == "$2" ]]; then

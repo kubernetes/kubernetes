@@ -37,7 +37,7 @@ function teardown() {
 
 trap "teardown" EXIT
 
-pod_id_list=$($KUBECFG '-template={{range.Items}}{{.ID}} {{end}}' -l replicationController=my-hostname list pods)
+pod_id_list=$($KUBECFG '-template={{range.Items}}{{.Name}} {{end}}' -l replicationController=my-hostname list pods)
 # Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
 for i in $(seq 1 24); do
