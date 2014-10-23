@@ -18,6 +18,7 @@ package iptables
 
 import (
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -55,6 +56,21 @@ func initFakeCmd(fake *fakeCmd, cmd string, args ...string) utilexec.Cmd {
 }
 
 type fakeCombinedOutputAction func() ([]byte, error)
+
+func (fake *fakeCmd) Start() error {
+	return nil
+}
+
+func (fake *fakeCmd) Wait() error {
+	return nil
+}
+
+func (fake *fakeCmd) StdoutPipe() (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (fake *fakeCmd) SetStdin(in io.Reader) {
+}
 
 func (fake *fakeCmd) CombinedOutput() ([]byte, error) {
 	if fake.combinedOutputCalls > len(fake.combinedOutputScript)-1 {
@@ -183,6 +199,7 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 		commandScript: []fakeCommandAction{
 			// The first Command() call is checking the rule.  Success of that exec means "done".
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
 	runner := New(&fexec)
@@ -196,7 +213,7 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 	if fcmd.combinedOutputCalls != 1 {
 		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.combinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.combinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !util.NewStringSet(fcmd.combinedOutputLog[0]...).HasAll("grep", "--", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.combinedOutputLog[0])
 	}
 }
@@ -212,7 +229,8 @@ func TestEnsureRuleNew(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Failure of that means create it.
+			// The first two Command() calls are checking the rule.  Failure of that means create it.
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -242,7 +260,8 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Failure of that means create it.
+			// The first two Command() calls are checking the rule.  Failure of that means create it.
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -267,7 +286,8 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Failure of that means create it.
+			// The first two Command() calls are checking the rule.  Failure of that means create it.
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -291,7 +311,8 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Failure of that exec means "does not exist".
+			// The first two Command() calls are checking the rule.  Failure of that exec means "does not exist".
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -303,7 +324,7 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 	if fcmd.combinedOutputCalls != 1 {
 		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.combinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.combinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+	if !util.NewStringSet(fcmd.combinedOutputLog[0]...).HasAll("grep", "--", "OUTPUT", "abc", "123") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.combinedOutputLog[0])
 	}
 }
@@ -319,7 +340,8 @@ func TestDeleteRuleNew(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Success of that means delete it.
+			// The first two Command() calls are checking the rule.  Success of that means delete it.
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -346,7 +368,8 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Failure of that means create it.
+			// The first two Command() calls are checking the rule.  Failure of that means create it.
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -371,7 +394,8 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 	}
 	fexec := fakeExec{
 		commandScript: []fakeCommandAction{
-			// The first Command() call is checking the rule.  Success of that means delete it.
+			// The first two Command() calls are checking the rule.  Success of that means delete it.
+			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) utilexec.Cmd { return initFakeCmd(&fcmd, cmd, args...) },
 		},
