@@ -147,18 +147,30 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
 func (runner *runner) checkRule(args []string) (bool, error) {
-	out, err := runner.run(opCheckRule, args)
-	if err == nil {
-		return true, nil
+	rules := runner.exec.Command("iptables-save")
+	pipe, err := rules.StdoutPipe()
+	if err != nil {
+		return false, err
 	}
-	if ee, ok := err.(utilexec.ExitError); ok {
-		// iptables uses exit(1) to indicate a failure of the operation,
-		// as compared to a malformed commandline, for example.
-		if ee.Exited() && ee.ExitStatus() == 1 {
-			return false, nil
+
+	check := runner.exec.Command("grep", append([]string{"--"}, args...)...)
+	check.SetStdin(pipe)
+
+	if err := rules.Start(); err != nil {
+		return false, err
+	}
+	if output, err := check.CombinedOutput(); err != nil {
+		if ee, ok := err.(utilexec.ExitError); ok {
+			if waitErr := rules.Wait(); waitErr != nil {
+				return false, waitErr
+			}
+			if ee.Exited() && ee.ExitStatus() == 1 {
+				return false, nil
+			}
 		}
+		return false, fmt.Errorf("error checking rule %s: %s", err, output)
 	}
-	return false, fmt.Errorf("error checking rule: %s: %s", err, out)
+	return true, nil
 }
 
 type operation string
@@ -167,7 +179,6 @@ const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
 	opAppendRule  operation = "-A"
-	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
 )
 

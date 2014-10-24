@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"io"
 	osexec "os/exec"
 	"syscall"
 )
@@ -36,6 +37,10 @@ type Cmd interface {
 	// CombinedOutput runs the command and returns its combined standard output
 	// and standard error.  This follows the pattern of package os/exec.
 	CombinedOutput() ([]byte, error)
+	SetStdin(io.Reader)
+	StdoutPipe() (io.ReadCloser, error)
+	Start() error
+	Wait() error
 }
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
@@ -77,6 +82,22 @@ func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 		return out, x
 	}
 	return out, nil
+}
+
+func (cmd *cmdWrapper) SetStdin(in io.Reader) {
+	cmd.Stdin = in
+}
+
+func (cmd *cmdWrapper) Start() error {
+	return (*osexec.Cmd)(cmd).Start()
+}
+
+func (cmd *cmdWrapper) Wait() error {
+	return (*osexec.Cmd)(cmd).Wait()
+}
+
+func (cmd *cmdWrapper) StdoutPipe() (io.ReadCloser, error) {
+	return (*osexec.Cmd)(cmd).StdoutPipe()
 }
 
 // exitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.
