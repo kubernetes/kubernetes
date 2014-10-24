@@ -60,7 +60,7 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 }
 
 // Create satisfies the RESTStorage interface.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
@@ -79,7 +79,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 }
 
 // Update satisfies the RESTStorage interface.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
@@ -94,7 +94,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 }
 
 // Delete satisfies the RESTStorage interface but is unimplemented.
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	return nil, errors.New("unimplemented")
 }
 

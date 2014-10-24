@@ -41,7 +41,7 @@ func NewREST(registry generic.Registry) *REST {
 	}
 }
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	event, ok := obj.(*api.Event)
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
@@ -57,7 +57,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	}), nil
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	obj, err := rs.registry.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -116,6 +116,6 @@ func (*REST) New() runtime.Object {
 }
 
 // Update returns an error: Events are not mutable.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	return nil, fmt.Errorf("not allowed: 'Event' objects are not mutable")
 }

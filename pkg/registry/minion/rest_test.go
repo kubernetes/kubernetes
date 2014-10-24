@@ -42,7 +42,7 @@ func TestMinionREST(t *testing.T) {
 		t.Errorf("insert failed")
 	}
 	obj := <-c
-	if m, ok := obj.(*api.Minion); !ok || m.Name != "baz" {
+	if m, ok := obj.Object.(*api.Minion); !ok || m.Name != "baz" {
 		t.Errorf("insert return value was weird: %#v", obj)
 	}
 	if obj, err := ms.Get(ctx, "baz"); err != nil || obj.(*api.Minion).Name != "baz" {
@@ -54,7 +54,7 @@ func TestMinionREST(t *testing.T) {
 		t.Errorf("delete failed")
 	}
 	obj = <-c
-	if s, ok := obj.(*api.Status); !ok || s.Status != api.StatusSuccess {
+	if s, ok := obj.Object.(*api.Status); !ok || s.Status != api.StatusSuccess {
 		t.Errorf("delete return value was weird: %#v", obj)
 	}
 	if _, err := ms.Get(ctx, "bar"); err != ErrDoesNotExist {

@@ -41,10 +41,27 @@ type RESTStorage interface {
 	// Delete finds a resource in the storage and deletes it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Delete(ctx api.Context, id string) (<-chan runtime.Object, error)
+	Delete(ctx api.Context, id string) (<-chan RESTResult, error)
 
-	Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error)
-	Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error)
+	// Create creates a new version of a resource.
+	Create(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error)
+
+	// Update finds a resource in the storage and updates it. Some implementations
+	// may allow updates creates the object - they should set the Created flag of
+	// the returned RESTResultto true. In the event of an asynchronous error returned
+	// via an api.Status object, the Created flag is ignored.
+	Update(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error)
+}
+
+// RESTResult indicates the result of a REST transformation.
+type RESTResult struct {
+	// The result of this operation. May be nil if the operation has no meaningful
+	// result (like Delete)
+	runtime.Object
+
+	// May be set true to indicate that the Update operation resulted in the object
+	// being created.
+	Created bool
 }
 
 // ResourceWatcher should be implemented by all RESTStorage objects that

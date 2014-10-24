@@ -168,13 +168,14 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	wasCreated := true
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
 		Path("baz").
 		ParseSelectorParam("labels", "name=foo").
 		Timeout(time.Second).
 		Body(file.Name()).
-		Do().Get()
+		Do().WasCreated(&wasCreated).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -184,8 +185,55 @@ func TestDoRequestNewWayFile(t *testing.T) {
 	} else if !reflect.DeepEqual(obj, expectedObj) {
 		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
 	}
+	if wasCreated {
+		t.Errorf("expected object was not created")
+	}
 	tmpStr := string(reqBodyExpected)
 	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "POST", &tmpStr)
+	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
+		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
+	}
+}
+
+func TestWasCreated(t *testing.T) {
+	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	reqBodyExpected, err := v1beta1.Codec.Encode(reqObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedObj := &api.Service{Port: 12345}
+	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   201,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
+	wasCreated := false
+	obj, err := c.Verb("PUT").
+		Path("foo/bar").
+		Path("baz").
+		ParseSelectorParam("labels", "name=foo").
+		Timeout(time.Second).
+		Body(reqBodyExpected).
+		Do().WasCreated(&wasCreated).Get()
+	if err != nil {
+		t.Errorf("Unexpected error: %v %#v", err, err)
+		return
+	}
+	if obj == nil {
+		t.Error("nil obj")
+	} else if !reflect.DeepEqual(obj, expectedObj) {
+		t.Errorf("Expected: %#v, got %#v", expectedObj, obj)
+	}
+	if !wasCreated {
+		t.Errorf("Expected object was created")
+	}
+
+	tmpStr := string(reqBodyExpected)
+	fakeHandler.ValidateRequest(t, "/api/v1beta1/foo/bar/baz?labels=name%3Dfoo", "PUT", &tmpStr)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *fakeHandler.RequestReceived)
 	}

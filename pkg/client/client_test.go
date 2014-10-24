@@ -57,6 +57,7 @@ type testClient struct {
 	Request  testRequest
 	Response Response
 	Error    bool
+	Created  bool
 	server   *httptest.Server
 	handler  *util.FakeHandler
 	// For query args, an optional function to validate the contents

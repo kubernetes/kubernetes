@@ -105,6 +105,7 @@ func TestDoRequest(t *testing.T) {
 	uri, _ := url.Parse("http://localhost")
 	testClients := []testClient{
 		{Request: testRequest{Method: "GET", Path: "good"}, Response: Response{StatusCode: 200}},
+		{Request: testRequest{Method: "GET", Path: "good"}, Response: Response{StatusCode: 201}, Created: true},
 		{Request: testRequest{Method: "GET", Path: "bad%ZZ"}, Error: true},
 		{Request: testRequest{Method: "GET", Path: "error"}, Response: Response{StatusCode: 500}, Error: true},
 		{Request: testRequest{Method: "POST", Path: "faildecode"}, Response: Response{StatusCode: 200, RawBody: &invalid}},
@@ -120,7 +121,10 @@ func TestDoRequest(t *testing.T) {
 			Header: make(http.Header),
 			URL:    &prefix,
 		}
-		response, err := client.doRequest(request)
+		response, created, err := client.doRequest(request)
+		if c.Created != created {
+			t.Errorf("expected created %f, got %f", c.Created, created)
+		}
 		//t.Logf("dorequest: %#v\n%#v\n%v", request.URL, response, err)
 		c.ValidateRaw(t, response, err)
 	}
@@ -160,18 +164,16 @@ func TestDoRequestAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.doRequest(request)
+	body, _, err := c.doRequest(request)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *request)
 	}
 	if err == nil {
-		t.Error("Unexpected non-error")
-		return
+		t.Fatalf("Unexpected non-error")
 	}
 	se, ok := err.(APIStatus)
 	if !ok {
-		t.Errorf("Unexpected kind of error: %#v", err)
-		return
+		t.Fatalf("Unexpected kind of error: %#v", err)
 	}
 	if !reflect.DeepEqual(se.Status(), *status) {
 		t.Errorf("Unexpected status: %#v %#v", se.Status(), status)
@@ -196,7 +198,7 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.doRequest(request)
+	body, _, err := c.doRequest(request)
 	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
 		t.Errorf("Request is missing authorization header: %#v", *request)
 	}
@@ -227,7 +229,7 @@ func TestDoRequestFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.doRequest(request)
+	body, _, err := c.doRequest(request)
 	if err == nil || body != nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
@@ -239,4 +241,35 @@ func TestDoRequestFailed(t *testing.T) {
 	if !reflect.DeepEqual(status, &actual) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, actual)
 	}
+}
+
+func TestDoRequestCreated(t *testing.T) {
+	status := &api.Status{Status: api.StatusSuccess}
+	expectedBody, _ := latest.Codec.Encode(status)
+	fakeHandler := util.FakeHandler{
+		StatusCode:   201,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	request, _ := http.NewRequest("GET", testServer.URL+"/foo/bar", nil)
+	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	body, created, err := c.doRequest(request)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	if !created {
+		t.Errorf("Expected object to be created")
+	}
+	statusOut, err := latest.Codec.Decode(body)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	if !reflect.DeepEqual(status, statusOut) {
+		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
+	}
+	fakeHandler.ValidateRequest(t, "/foo/bar", "GET", nil)
 }

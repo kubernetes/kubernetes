@@ -54,7 +54,7 @@ func NewREST(registry Registry, podLister PodLister) *REST {
 }
 
 // Create registers the given ReplicationController.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
@@ -84,7 +84,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 }
 
 // Delete asynchronously deletes the ReplicationController specified by its id.
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteController(ctx, id)
 	}), nil
@@ -127,7 +127,7 @@ func (*REST) New() runtime.Object {
 
 // Update replaces a given ReplicationController instance with an existing
 // instance in storage.registry.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	controller, ok := obj.(*api.ReplicationController)
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)

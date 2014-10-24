@@ -53,7 +53,8 @@ func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	obj, complete := op.StatusOrResult()
+	result, complete := op.StatusOrResult()
+	obj := result.Object
 	if complete {
 		writeJSON(http.StatusOK, h.codec, obj, w)
 	} else {
@@ -64,9 +65,9 @@ func (h *OperationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // Operation represents an ongoing action which the server is performing.
 type Operation struct {
 	ID        string
-	result    runtime.Object
-	onReceive func(runtime.Object)
-	awaiting  <-chan runtime.Object
+	result    RESTResult
+	onReceive func(RESTResult)
+	awaiting  <-chan RESTResult
 	finished  *time.Time
 	lock      sync.Mutex
 	notify    chan struct{}
@@ -93,7 +94,7 @@ func NewOperations() *Operations {
 
 // NewOperation adds a new operation. It is lock-free. 'onReceive' will be called
 // with the value read from 'from', when it is read.
-func (ops *Operations) NewOperation(from <-chan runtime.Object, onReceive func(runtime.Object)) *Operation {
+func (ops *Operations) NewOperation(from <-chan RESTResult, onReceive func(RESTResult)) *Operation {
 	id := atomic.AddInt64(&ops.lastID, 1)
 	op := &Operation{
 		ID:        strconv.FormatInt(id, 10),
@@ -192,16 +193,16 @@ func (op *Operation) expired(limitTime time.Time) bool {
 
 // StatusOrResult returns status information or the result of the operation if it is complete,
 // with a bool indicating true in the latter case.
-func (op *Operation) StatusOrResult() (description runtime.Object, finished bool) {
+func (op *Operation) StatusOrResult() (description RESTResult, finished bool) {
 	op.lock.Lock()
 	defer op.lock.Unlock()
 
 	if op.finished == nil {
-		return &api.Status{
+		return RESTResult{Object: &api.Status{
 			Status:  api.StatusWorking,
 			Reason:  api.StatusReasonWorking,
 			Details: &api.StatusDetails{ID: op.ID, Kind: "operation"},
-		}, false
+		}}, false
 	}
 	return op.result, true
 }

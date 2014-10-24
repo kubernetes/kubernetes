@@ -26,17 +26,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func expectApiStatusError(t *testing.T, ch <-chan runtime.Object, msg string) {
+func expectApiStatusError(t *testing.T, ch <-chan apiserver.RESTResult, msg string) {
 	out := <-ch
-	status, ok := out.(*api.Status)
+	status, ok := out.Object.(*api.Status)
 	if !ok {
 		t.Errorf("Expected an api.Status object, was %#v", out)
 		return
@@ -46,9 +46,9 @@ func expectApiStatusError(t *testing.T, ch <-chan runtime.Object, msg string) {
 	}
 }
 
-func expectPod(t *testing.T, ch <-chan runtime.Object) (*api.Pod, bool) {
+func expectPod(t *testing.T, ch <-chan apiserver.RESTResult) (*api.Pod, bool) {
 	out := <-ch
-	pod, ok := out.(*api.Pod)
+	pod, ok := out.Object.(*api.Pod)
 	if !ok || pod == nil {
 		t.Errorf("Expected an api.Pod object, was %#v", out)
 		return nil, false

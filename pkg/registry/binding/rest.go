@@ -51,7 +51,7 @@ func (*REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 // Delete returns an error because bindings are write-only objects.
-func (*REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
+func (*REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	return nil, errors.NewNotFound("binding", id)
 }
 
@@ -61,7 +61,7 @@ func (*REST) New() runtime.Object {
 }
 
 // Create attempts to make the assignment indicated by the binding it recieves.
-func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	binding, ok := obj.(*api.Binding)
 	if !ok {
 		return nil, fmt.Errorf("incorrect type: %#v", obj)
@@ -75,6 +75,6 @@ func (b *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Objec
 }
 
 // Update returns an error-- this object may not be updated.
-func (b *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (b *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	return nil, fmt.Errorf("Bindings may not be changed.")
 }

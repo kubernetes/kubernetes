@@ -76,7 +76,7 @@ func NewRESTClient(baseURL *url.URL, c runtime.Codec) *RESTClient {
 }
 
 // doRequest executes a request against a server
-func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
+func (c *RESTClient) doRequest(request *http.Request) ([]byte, bool, error) {
 	client := c.Client
 	if client == nil {
 		client = http.DefaultClient
@@ -84,12 +84,12 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return body, err
+		return body, false, err
 	}
 
 	// Did the server give us a status response?
@@ -102,19 +102,20 @@ func (c *RESTClient) doRequest(request *http.Request) ([]byte, error) {
 	switch {
 	case response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
-			return nil, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
+			return nil, false, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
 		}
-		return nil, errors.FromObject(&status)
+		return nil, false, errors.FromObject(&status)
 	}
 
 	// If the server gave us a status back, look at what it was.
 	if isStatusResponse && status.Status != api.StatusSuccess {
 		// "Working" requests need to be handled specially.
 		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return nil, errors.FromObject(&status)
+		return nil, false, errors.FromObject(&status)
 	}
 
-	return body, err
+	created := response.StatusCode == http.StatusCreated
+	return body, created, err
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
