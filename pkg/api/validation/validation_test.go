@@ -26,7 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func expectPrefix(t *testing.T, prefix string, errs errors.ErrorList) {
+func expectPrefix(t *testing.T, prefix string, errs errors.ValidationErrorList) {
 	for i := range errs {
 		if f, p := errs[i].(errors.ValidationError).Field, prefix; !strings.HasPrefix(f, p) {
 			t.Errorf("expected prefix '%s' for field '%s' (%v)", p, f, errs[i])

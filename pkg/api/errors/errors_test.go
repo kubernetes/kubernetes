@@ -116,7 +116,7 @@ func TestNewInvalid(t *testing.T) {
 	for i, testCase := range testCases {
 		vErr, expected := testCase.Err, testCase.Details
 		expected.Causes[0].Message = vErr.Error()
-		err := NewInvalid("kind", "name", ErrorList{vErr})
+		err := NewInvalid("kind", "name", ValidationErrorList{vErr})
 		status := err.(*statusError).Status()
 		if status.Code != 422 || status.Reason != api.StatusReasonInvalid {
 			t.Errorf("%d: unexpected status: %#v", i, status)
