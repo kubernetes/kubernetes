@@ -55,7 +55,8 @@ func Describe(w io.Writer, c client.Interface, resource, id string) error {
 }
 
 func describePod(w io.Writer, c client.Interface, id string) (string, error) {
-	pod, err := c.GetPod(api.NewDefaultContext(), id)
+	// TODO this needs proper namespace support
+	pod, err := c.Pods(api.NamespaceDefault).Get(id)
 	if err != nil {
 		return "", err
 	}
@@ -72,7 +73,8 @@ func describePod(w io.Writer, c client.Interface, id string) (string, error) {
 }
 
 func describeReplicationController(w io.Writer, c client.Interface, id string) (string, error) {
-	controller, err := c.GetReplicationController(api.NewDefaultContext(), id)
+	// TODO this needs proper namespace support
+	controller, err := c.ReplicationControllers(api.NamespaceDefault).Get(id)
 	if err != nil {
 		return "", err
 	}
@@ -94,7 +96,7 @@ func describeReplicationController(w io.Writer, c client.Interface, id string) (
 }
 
 func describeService(w io.Writer, c client.Interface, id string) (string, error) {
-	service, err := c.GetService(api.NewDefaultContext(), id)
+	service, err := c.Services(api.NamespaceDefault).Get(id)
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +124,7 @@ func describeMinion(w io.Writer, c client.Interface, id string) (string, error) 
 
 // client.Interface doesn't have GetMinion(id) yet so we hack it up.
 func getMinion(c client.Interface, id string) (*api.Minion, error) {
-	minionList, err := c.ListMinions()
+	minionList, err := c.Minions().List()
 	if err != nil {
 		glog.Fatalf("Error getting minion info: %v\n", err)
 	}
@@ -141,7 +143,8 @@ func getMinion(c client.Interface, id string) (*api.Minion, error) {
 // of getting all RC's and searching through them manually).
 func getReplicationControllersForLabels(c client.Interface, labelsToMatch labels.Labels) string {
 	// Get all replication controllers.
-	rcs, err := c.ListReplicationControllers(api.NewDefaultContext(), labels.Everything())
+	// TODO this needs a namespace scope as argument
+	rcs, err := c.ReplicationControllers(api.NamespaceDefault).List(labels.Everything())
 	if err != nil {
 		glog.Fatalf("Error getting replication controllers: %v\n", err)
 	}
@@ -169,7 +172,7 @@ func getReplicationControllersForLabels(c client.Interface, labelsToMatch labels
 }
 
 func getPodStatusForReplicationController(kubeClient client.Interface, controller *api.ReplicationController) (running, waiting, terminated int, err error) {
-	rcPods, err := kubeClient.ListPods(api.NewDefaultContext(), labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
+	rcPods, err := kubeClient.Pods(controller.Namespace).List(labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
 	if err != nil {
 		return
 	}

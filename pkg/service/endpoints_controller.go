@@ -44,16 +44,14 @@ func NewEndpointController(client *client.Client) *EndpointController {
 
 // SyncServiceEndpoints syncs service endpoints.
 func (e *EndpointController) SyncServiceEndpoints() error {
-	ctx := api.NewContext()
-	services, err := e.client.ListServices(ctx, labels.Everything())
+	services, err := e.client.Services(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		glog.Errorf("Failed to list services: %v", err)
 		return err
 	}
 	var resultErr error
 	for _, service := range services.Items {
-		nsCtx := api.WithNamespace(ctx, service.Namespace)
-		pods, err := e.client.ListPods(nsCtx, labels.Set(service.Selector).AsSelector())
+		pods, err := e.client.Pods(service.Namespace).List(labels.Set(service.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error syncing service: %#v, skipping.", service)
 			resultErr = err
@@ -72,7 +70,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			}
 			endpoints = append(endpoints, net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port)))
 		}
-		currentEndpoints, err := e.client.GetEndpoints(nsCtx, service.Name)
+		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
@@ -91,14 +89,14 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 
 		if len(currentEndpoints.ResourceVersion) == 0 {
 			// No previous endpoints, create them
-			_, err = e.client.CreateEndpoints(nsCtx, newEndpoints)
+			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
 			if endpointsEqual(currentEndpoints, endpoints) {
 				glog.V(2).Infof("endpoints are equal for %s, skipping update", service.Name)
 				continue
 			}
-			_, err = e.client.UpdateEndpoints(nsCtx, newEndpoints)
+			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 		}
 		if err != nil {
 			glog.Errorf("Error updating endpoints: %#v", err)

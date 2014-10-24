@@ -32,7 +32,7 @@ type testEventRecorder struct {
 }
 
 // CreateEvent records the event for testing.
-func (t *testEventRecorder) CreateEvent(e *api.Event) (*api.Event, error) {
+func (t *testEventRecorder) Create(e *api.Event) (*api.Event, error) {
 	if t.OnEvent != nil {
 		return t.OnEvent(e)
 	}

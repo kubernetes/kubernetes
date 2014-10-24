@@ -36,7 +36,7 @@ func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T
 
 func TestUpdateWithPods(t *testing.T) {
 	fakeClient := client.Fake{
-		Pods: api.PodList{
+		PodsList: api.PodList{
 			Items: []api.Pod{
 				{ObjectMeta: api.ObjectMeta{Name: "pod-1"}},
 				{ObjectMeta: api.ObjectMeta{Name: "pod-2"}},
@@ -67,7 +67,7 @@ func TestUpdateNoPods(t *testing.T) {
 
 func TestUpdateWithNewImage(t *testing.T) {
 	fakeClient := client.Fake{
-		Pods: api.PodList{
+		PodsList: api.PodList{
 			Items: []api.Pod{
 				{ObjectMeta: api.ObjectMeta{Name: "pod-1"}},
 				{ObjectMeta: api.ObjectMeta{Name: "pod-2"}},

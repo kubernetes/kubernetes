@@ -146,17 +146,17 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 }
 
 func TestListEmptyPods(t *testing.T) {
-	ctx := api.NewContext()
+	ns := api.NamespaceDefault
 	c := &testClient{
 		Request:  testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200, Body: &api.PodList{}},
 	}
-	podList, err := c.Setup().ListPods(ctx, labels.Everything())
+	podList, err := c.Setup().Pods(ns).List(labels.Everything())
 	c.Validate(t, podList, err)
 }
 
 func TestListPods(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ns := api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods"},
 		Response: Response{StatusCode: 200,
@@ -177,7 +177,7 @@ func TestListPods(t *testing.T) {
 			},
 		},
 	}
-	receivedPodList, err := c.Setup().ListPods(ctx, labels.Everything())
+	receivedPodList, err := c.Setup().Pods(ns).List(labels.Everything())
 	c.Validate(t, receivedPodList, err)
 }
 
@@ -188,7 +188,7 @@ func validateLabels(a, b string) bool {
 }
 
 func TestListPodsLabels(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ns := api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods", Query: url.Values{"labels": []string{"foo=bar,name=baz"}}},
 		Response: Response{
@@ -213,12 +213,12 @@ func TestListPodsLabels(t *testing.T) {
 	c.Setup()
 	c.QueryValidator["labels"] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedPodList, err := c.ListPods(ctx, selector)
+	receivedPodList, err := c.Pods(ns).List(selector)
 	c.Validate(t, receivedPodList, err)
 }
 
 func TestGetPod(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ns := api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: "/pods/foo"},
 		Response: Response{
@@ -236,7 +236,7 @@ func TestGetPod(t *testing.T) {
 			},
 		},
 	}
-	receivedPod, err := c.Setup().GetPod(ctx, "foo")
+	receivedPod, err := c.Setup().Pods(ns).Get("foo")
 	c.Validate(t, receivedPod, err)
 }
 
@@ -245,7 +245,7 @@ func TestDeletePod(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/pods/foo"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeletePod(api.NewDefaultContext(), "foo")
+	err := c.Setup().Pods(api.NamespaceDefault).Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -268,7 +268,7 @@ func TestCreatePod(t *testing.T) {
 			Body:       requestPod,
 		},
 	}
-	receivedPod, err := c.Setup().CreatePod(api.NewDefaultContext(), requestPod)
+	receivedPod, err := c.Setup().Pods(api.NamespaceDefault).Create(requestPod)
 	c.Validate(t, receivedPod, err)
 }
 
@@ -290,7 +290,7 @@ func TestUpdatePod(t *testing.T) {
 		Request:  testRequest{Method: "PUT", Path: "/pods/foo"},
 		Response: Response{StatusCode: 200, Body: requestPod},
 	}
-	receivedPod, err := c.Setup().UpdatePod(api.NewDefaultContext(), requestPod)
+	receivedPod, err := c.Setup().Pods(api.NamespaceDefault).Update(requestPod)
 	c.Validate(t, receivedPod, err)
 }
 
@@ -316,7 +316,7 @@ func TestListControllers(t *testing.T) {
 			},
 		},
 	}
-	receivedControllerList, err := c.Setup().ListReplicationControllers(api.NewContext(), labels.Everything())
+	receivedControllerList, err := c.Setup().ReplicationControllers(api.NamespaceAll).List(labels.Everything())
 	c.Validate(t, receivedControllerList, err)
 
 }
@@ -340,7 +340,7 @@ func TestGetController(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().GetReplicationController(api.NewDefaultContext(), "foo")
+	receivedController, err := c.Setup().ReplicationControllers(api.NamespaceDefault).Get("foo")
 	c.Validate(t, receivedController, err)
 }
 
@@ -366,7 +366,7 @@ func TestUpdateController(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().UpdateReplicationController(api.NewDefaultContext(), requestController)
+	receivedController, err := c.Setup().ReplicationControllers(api.NamespaceDefault).Update(requestController)
 	c.Validate(t, receivedController, err)
 }
 
@@ -375,7 +375,7 @@ func TestDeleteController(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/replicationControllers/foo"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeleteReplicationController(api.NewDefaultContext(), "foo")
+	err := c.Setup().ReplicationControllers(api.NamespaceDefault).Delete("foo")
 	c.Validate(t, nil, err)
 }
 
@@ -401,7 +401,7 @@ func TestCreateController(t *testing.T) {
 			},
 		},
 	}
-	receivedController, err := c.Setup().CreateReplicationController(api.NewDefaultContext(), requestController)
+	receivedController, err := c.Setup().ReplicationControllers(api.NamespaceDefault).Create(requestController)
 	c.Validate(t, receivedController, err)
 }
 
@@ -436,7 +436,7 @@ func TestListServices(t *testing.T) {
 			},
 		},
 	}
-	receivedServiceList, err := c.Setup().ListServices(api.NewDefaultContext(), labels.Everything())
+	receivedServiceList, err := c.Setup().Services(api.NamespaceDefault).List(labels.Everything())
 	t.Logf("received services: %v %#v", err, receivedServiceList)
 	c.Validate(t, receivedServiceList, err)
 }
@@ -466,7 +466,7 @@ func TestListServicesLabels(t *testing.T) {
 	c.Setup()
 	c.QueryValidator["labels"] = validateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedServiceList, err := c.ListServices(api.NewDefaultContext(), selector)
+	receivedServiceList, err := c.Services(api.NamespaceDefault).List(selector)
 	c.Validate(t, receivedServiceList, err)
 }
 
@@ -475,7 +475,7 @@ func TestGetService(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/services/1"},
 		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
-	response, err := c.Setup().GetService(api.NewDefaultContext(), "1")
+	response, err := c.Setup().Services(api.NamespaceDefault).Get("1")
 	c.Validate(t, response, err)
 }
 
@@ -484,7 +484,7 @@ func TestCreateService(t *testing.T) {
 		Request:  testRequest{Method: "POST", Path: "/services", Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 		Response: Response{StatusCode: 200, Body: &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}}},
 	}
-	response, err := c.Setup().CreateService(api.NewDefaultContext(), &api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
+	response, err := c.Setup().Services(api.NamespaceDefault).Create(&api.Service{ObjectMeta: api.ObjectMeta{Name: "service-1"}})
 	c.Validate(t, response, err)
 }
 
@@ -494,7 +494,7 @@ func TestUpdateService(t *testing.T) {
 		Request:  testRequest{Method: "PUT", Path: "/services/service-1", Body: svc},
 		Response: Response{StatusCode: 200, Body: svc},
 	}
-	response, err := c.Setup().UpdateService(api.NewDefaultContext(), svc)
+	response, err := c.Setup().Services(api.NamespaceDefault).Update(svc)
 	c.Validate(t, response, err)
 }
 
@@ -503,7 +503,7 @@ func TestDeleteService(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/services/1"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeleteService(api.NewDefaultContext(), "1")
+	err := c.Setup().Services(api.NamespaceDefault).Delete("1")
 	c.Validate(t, nil, err)
 }
 
@@ -521,7 +521,7 @@ func TestListEndpooints(t *testing.T) {
 			},
 		},
 	}
-	receivedEndpointsList, err := c.Setup().ListEndpoints(api.NewDefaultContext(), labels.Everything())
+	receivedEndpointsList, err := c.Setup().Endpoints(api.NamespaceDefault).List(labels.Everything())
 	c.Validate(t, receivedEndpointsList, err)
 }
 
@@ -530,7 +530,7 @@ func TestGetEndpoints(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/endpoints/endpoint-1"},
 		Response: Response{StatusCode: 200, Body: &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "endpoint-1"}}},
 	}
-	response, err := c.Setup().GetEndpoints(api.NewDefaultContext(), "endpoint-1")
+	response, err := c.Setup().Endpoints(api.NamespaceDefault).Get("endpoint-1")
 	c.Validate(t, response, err)
 }
 
@@ -566,7 +566,7 @@ func TestListMinions(t *testing.T) {
 		Request:  testRequest{Method: "GET", Path: "/minions"},
 		Response: Response{StatusCode: 200, Body: &api.MinionList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup().ListMinions()
+	response, err := c.Setup().Minions().List()
 	c.Validate(t, response, err)
 }
 
@@ -590,7 +590,7 @@ func TestCreateMinion(t *testing.T) {
 			Body:       requestMinion,
 		},
 	}
-	receivedMinion, err := c.Setup().CreateMinion(requestMinion)
+	receivedMinion, err := c.Setup().Minions().Create(requestMinion)
 	c.Validate(t, receivedMinion, err)
 }
 
@@ -599,6 +599,6 @@ func TestDeleteMinion(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: "/minions/foo"},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().DeleteMinion("foo")
+	err := c.Setup().Minions().Delete("foo")
 	c.Validate(t, nil, err)
 }

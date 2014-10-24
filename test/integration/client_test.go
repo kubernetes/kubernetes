@@ -59,7 +59,7 @@ func TestClient(t *testing.T) {
 	}
 
 	for apiVersion, values := range testCases {
-		ctx := api.NewDefaultContext()
+		ns := api.NamespaceDefault
 		deleteAllEtcdKeys()
 		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion), values.selfLinker))
 		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
@@ -72,7 +72,7 @@ func TestClient(t *testing.T) {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
 
-		pods, err := client.ListPods(ctx, labels.Everything())
+		pods, err := client.Pods(ns).List(labels.Everything())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -93,14 +93,14 @@ func TestClient(t *testing.T) {
 				},
 			},
 		}
-		got, err := client.CreatePod(ctx, pod)
+		got, err := client.Pods(ns).Create(pod)
 		if err == nil {
 			t.Fatalf("unexpected non-error: %v", err)
 		}
 
 		// get a created pod
 		pod.DesiredState.Manifest.Containers[0].Image = "an-image"
-		got, err = client.CreatePod(ctx, pod)
+		got, err = client.Pods(ns).Create(pod)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestClient(t *testing.T) {
 		}
 
 		// pod is shown, but not scheduled
-		pods, err = client.ListPods(ctx, labels.Everything())
+		pods, err = client.Pods(ns).List(labels.Everything())
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
@@ -63,7 +64,8 @@ func main() {
 			glog.Fatalf("Invalid API configuration: %v", err)
 		}
 		config.NewSourceAPI(
-			client,
+			client.Services(api.NamespaceAll),
+			client.Endpoints(api.NamespaceAll),
 			30*time.Second,
 			serviceConfig.Channel("api"),
 			endpointsConfig.Channel("api"),

@@ -201,9 +201,9 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	}
 }
 
-func endpointsSet(c *client.Client, ctx api.Context, serviceID string, endpointCount int) wait.ConditionFunc {
+func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpointCount int) wait.ConditionFunc {
 	return func() (bool, error) {
-		endpoints, err := c.GetEndpoints(ctx, serviceID)
+		endpoints, err := c.Endpoints(serviceNamespace).Get(serviceID)
 		if err != nil {
 			return false, nil
 		}
@@ -211,15 +211,14 @@ func endpointsSet(c *client.Client, ctx api.Context, serviceID string, endpointC
 	}
 }
 
-func podExists(c *client.Client, ctx api.Context, podID string) wait.ConditionFunc {
+func podExists(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
 	return func() (bool, error) {
-		_, err := c.GetPod(ctx, podID)
+		_, err := c.Pods(podNamespace).Get(podID)
 		return err == nil, nil
 	}
 }
 
 func runReplicationControllerTest(c *client.Client) {
-	ctx := api.NewDefaultContext()
 	data, err := ioutil.ReadFile("api/examples/controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
@@ -230,7 +229,7 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := c.CreateReplicationController(ctx, &controllerRequest); err != nil {
+	if _, err := c.ReplicationControllers(api.NamespaceDefault).Create(&controllerRequest); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
@@ -241,7 +240,7 @@ func runReplicationControllerTest(c *client.Client) {
 	}
 
 	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.ListPods(ctx, labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	pods, err := c.Pods(api.NamespaceDefault).List(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}
@@ -333,7 +332,6 @@ func runAtomicPutTest(c *client.Client) {
 }
 
 func runServiceTest(client *client.Client) {
-	ctx := api.NewDefaultContext()
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
@@ -359,11 +357,11 @@ func runServiceTest(client *client.Client) {
 			PodIP: "1.2.3.4",
 		},
 	}
-	_, err := client.CreatePod(ctx, &pod)
+	_, err := client.Pods(api.NamespaceDefault).Create(&pod)
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, podExists(client, ctx, pod.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, podExists(client, pod.Namespace, pod.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 	svc1 := api.Service{
@@ -373,11 +371,11 @@ func runServiceTest(client *client.Client) {
 		},
 		Port: 8080,
 	}
-	_, err = client.CreateService(ctx, &svc1)
+	_, err = client.Services(api.NamespaceDefault).Create(&svc1)
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc1, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc1.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	// A second service with the same port.
@@ -388,11 +386,11 @@ func runServiceTest(client *client.Client) {
 		},
 		Port: 8080,
 	}
-	_, err = client.CreateService(ctx, &svc2)
+	_, err = client.Services(api.NamespaceDefault).Create(&svc2)
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, ctx, svc2.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	glog.Info("Service test passed.")
