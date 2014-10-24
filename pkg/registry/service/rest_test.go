@@ -446,6 +446,20 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	if created_service_2.PortalIP != "1.2.3.2" { // new IP
 		t.Errorf("Unexpected PortalIP: %s", created_service_2.PortalIP)
 	}
+
+	svc3 := &api.Service{
+		Port:       6502,
+		ObjectMeta: api.ObjectMeta{Name: "quux"},
+		Selector:   map[string]string{"bar": "baz"},
+		PortalIP:   "1.2.3.93",
+	}
+	ctx = api.NewDefaultContext()
+	c3, _ := rest.Create(ctx, svc3)
+	created_svc3 := <-c3
+	created_service_3 := created_svc3.(*api.Service)
+	if created_service_3.PortalIP != "1.2.3.93" { // specific IP
+		t.Errorf("Unexpected PortalIP: %s", created_service_3.PortalIP)
+	}
 }
 
 func TestServiceRegistryIPReallocation(t *testing.T) {
@@ -518,8 +532,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update := new(api.Service)
 	*update = *created_service
 	update.Port = 6503
-	update.PortalIP = "8.6.7.5"
-	update.ProxyPort = 309
+	update.ProxyPort = 309 // should be ignored
 
 	c, _ = rest.Update(ctx, update)
 	updated_svc := <-c
@@ -527,11 +540,19 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	if updated_service.Port != 6503 {
 		t.Errorf("Expected port 6503, but got %v", updated_service.Port)
 	}
-	if updated_service.PortalIP != "1.2.3.1" { // unchanged, despite trying
-		t.Errorf("Unexpected PortalIP: %s", updated_service.PortalIP)
-	}
 	if updated_service.ProxyPort != 0 { // unchanged, despite trying
 		t.Errorf("Unexpected ProxyPort: %d", updated_service.ProxyPort)
+	}
+
+	*update = *created_service
+	update.Port = 6503
+	update.PortalIP = "1.2.3.76" // error
+
+	c, _ = rest.Update(ctx, update)
+	result := <-c
+	st := result.(*api.Status)
+	if st.Reason != api.StatusReasonInvalid {
+		t.Errorf("Expected to get an invalid error, got %v", st)
 	}
 }
 

@@ -572,9 +572,6 @@ type ReplicationControllerList struct {
 
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct {
-	// PortalIP is assigned by the master.
-	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
-
 	// ProxyPort is assigned by the master.  If 0, the proxy will choose an ephemeral port.
 	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty"`
 }
@@ -590,6 +587,11 @@ type ServiceSpec struct {
 
 	// This service will route traffic to pods having labels matching this selector.
 	Selector map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
+
+	// PortalIP is usually assigned by the master.  If specified by the user
+	// we will try to respect it or else fail the request.  This field can
+	// not be changed by updates.
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
 
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`

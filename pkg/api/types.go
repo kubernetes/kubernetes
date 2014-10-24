@@ -486,11 +486,13 @@ type Service struct {
 	// Optional, if unspecified use the first port on the container.
 	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
 
-	// PortalIP is assigned by the master.  If specified by the user it will be ignored.
-	// TODO: This is awkward - if we had a BoundService, it would be better factored.
+	// PortalIP is usually assigned by the master.  If specified by the user
+	// we will try to respect it or else fail the request.  This field can
+	// not be changed by updates.
 	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
 
 	// ProxyPort is assigned by the master.  If specified by the user it will be ignored.
+	// TODO: This is awkward - if we had a BoundService, it would be better factored.
 	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty"`
 }
 
