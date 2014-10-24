@@ -183,7 +183,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "list"})
+	verifyCalls(t, fakeDocker, []string{"list"})
 }
 
 // drainWorkers waits until all workers are done.  Should only used for testing.
@@ -231,7 +231,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
 
 	fakeDocker.Lock()
 
@@ -279,7 +279,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
 
 	fakeDocker.Lock()
 
@@ -324,7 +324,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "list", "create", "start"})
+		"list", "list", "inspect_container", "list", "create", "start"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -376,7 +376,7 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "list", "create", "start"})
+		"list", "list", "inspect_container", "list", "create", "start"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -418,7 +418,7 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 	kubelet.drainWorkers()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "stop", "create", "start", "list", "list", "inspect_container", "list", "create", "start"})
+		"list", "stop", "create", "start", "list", "list", "inspect_container", "list", "create", "start"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -455,7 +455,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "list", "stop", "stop"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -847,8 +847,7 @@ func TestGetContainerInfo(t *testing.T) {
 	}
 
 	mockCadvisor := &mockCadvisorClient{}
-	req := &info.ContainerInfoRequest{}
-	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet, _, fakeDocker := newTestKubelet(t)
@@ -862,7 +861,7 @@ func TestGetContainerInfo(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "", "foo", cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -882,8 +881,7 @@ func TestGetRootInfo(t *testing.T) {
 	fakeDocker := dockertools.FakeDockerClient{}
 
 	mockCadvisor := &mockCadvisorClient{}
-	req := &info.ContainerInfoRequest{}
-	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	cadvisorReq := &info.ContainerInfoRequest{}
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
 
 	kubelet := Kubelet{
@@ -894,7 +892,7 @@ func TestGetRootInfo(t *testing.T) {
 	}
 
 	// If the container name is an empty string, then it means the root container.
-	_, err := kubelet.GetRootInfo(req)
+	_, err := kubelet.GetRootInfo(cadvisorReq)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -925,8 +923,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 
 	containerInfo := &info.ContainerInfo{}
 	mockCadvisor := &mockCadvisorClient{}
-	req := &info.ContainerInfoRequest{}
-	cadvisorReq := getCadvisorContainerInfoRequest(req)
+	cadvisorReq := &info.ContainerInfoRequest{}
 	expectedErr := fmt.Errorf("some error")
 	mockCadvisor.On("ContainerInfo", containerPath, cadvisorReq).Return(containerInfo, expectedErr)
 
@@ -941,7 +938,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 		},
 	}
 
-	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", req)
+	stats, err := kubelet.GetContainerInfo("qux", "uuid", "foo", cadvisorReq)
 	if stats != nil {
 		t.Errorf("non-nil stats on error")
 	}
