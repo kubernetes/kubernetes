@@ -167,7 +167,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -213,7 +213,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -261,7 +261,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -306,7 +306,7 @@ func TestSyncPodsWithNetCreatesContainer(t *testing.T) {
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -347,7 +347,7 @@ func TestSyncPodsWithNetCreatesContainerCallsHandler(t *testing.T) {
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -400,7 +400,7 @@ func TestSyncPodsDeletesWithNoNetContainer(t *testing.T) {
 	}
 	err := kubelet.SyncPods([]api.BoundPod{
 		{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        "foo",
 				Namespace:   "new",
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -495,7 +495,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 		},
 	}
 	err := kubelet.syncPod(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        "bar",
 			Namespace:   "new",
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -544,7 +544,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		},
 	}
 	err := kubelet.syncPod(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        "foo",
 			Namespace:   "new",
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -588,7 +588,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		},
 	}
 	err := kubelet.syncPod(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        "foo",
 			Namespace:   "new",
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -648,7 +648,7 @@ func TestMakeEnvVariables(t *testing.T) {
 func TestMountExternalVolumes(t *testing.T) {
 	kubelet, _, _ := newTestKubelet(t)
 	pod := api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: "test",
 		},
@@ -703,7 +703,7 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 	}
 
 	pod := api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:      "pod",
 			Namespace: "test",
 		},
@@ -988,7 +988,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "etcd"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		GetPodFullName(&api.BoundPod{TypeMeta: api.TypeMeta{Name: podName, Namespace: podNamespace}}),
+		GetPodFullName(&api.BoundPod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"})
@@ -1020,7 +1020,7 @@ func TestRunInContainer(t *testing.T) {
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer(
 		GetPodFullName(&api.BoundPod{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:        podName,
 				Namespace:   podNamespace,
 				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
@@ -1162,7 +1162,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		},
 	}
 	err := kubelet.syncPod(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        "foo",
 			Namespace:   "new",
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},

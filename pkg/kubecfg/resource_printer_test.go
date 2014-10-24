@@ -68,7 +68,7 @@ func TestYAMLPrinterPrint(t *testing.T) {
 	}
 
 	obj := &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	buf.Reset()
 	printer.PrintObj(obj, buf)
@@ -92,7 +92,7 @@ func TestIdentityPrinter(t *testing.T) {
 	}
 
 	obj := &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	buff.Reset()
 	printer.PrintObj(obj, buff)

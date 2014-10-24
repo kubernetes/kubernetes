@@ -87,8 +87,8 @@ func TestEtcdGetPodDifferentNamespace(t *testing.T) {
 	key1, _ := makePodKey(ctx1, "foo")
 	key2, _ := makePodKey(ctx2, "foo")
 
-	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.Pod{TypeMeta: api.TypeMeta{Namespace: "default", Name: "foo"}}), 0)
-	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.Pod{TypeMeta: api.TypeMeta{Namespace: "other", Name: "foo"}}), 0)
+	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
+	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 
@@ -120,7 +120,7 @@ func TestEtcdGetPod(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key, _ := makePodKey(ctx, "foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	pod, err := registry.GetPod(ctx, "foo")
 	if err != nil {
@@ -163,7 +163,7 @@ func TestEtcdCreatePod(t *testing.T) {
 	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 		DesiredState: api.PodState{
@@ -181,7 +181,7 @@ func TestEtcdCreatePod(t *testing.T) {
 	}
 
 	// Suddenly, a wild scheduler appears:
-	err = registry.ApplyBinding(ctx, &api.Binding{PodID: "foo", Host: "machine", TypeMeta: api.TypeMeta{Namespace: api.NamespaceDefault}})
+	err = registry.ApplyBinding(ctx, &api.Binding{PodID: "foo", Host: "machine", ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestEtcdCreatePodFailsWithoutNamespace(t *testing.T) {
 	fakeClient.TestIndex = true
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(api.NewContext(), &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 		DesiredState: api.PodState{
@@ -242,14 +242,14 @@ func TestEtcdCreatePodAlreadyExisting(t *testing.T) {
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}),
+				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
 			},
 		},
 		E: nil,
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 	})
@@ -277,7 +277,7 @@ func TestEtcdCreatePodWithContainersError(t *testing.T) {
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 	})
@@ -319,7 +319,7 @@ func TestEtcdCreatePodWithContainersNotFound(t *testing.T) {
 	}
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 		DesiredState: api.PodState{
@@ -381,12 +381,12 @@ func TestEtcdCreatePodWithExistingContainers(t *testing.T) {
 	}
 	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
-			{TypeMeta: api.TypeMeta{Name: "bar"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreatePod(ctx, &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 		DesiredState: api.PodState{
@@ -448,9 +448,12 @@ func TestEtcdUpdatePodNotFound(t *testing.T) {
 
 	registry := NewTestEtcdRegistry(fakeClient)
 	podIn := api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"},
-		Labels: map[string]string{
-			"foo": "bar",
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
 		},
 	}
 	err := registry.UpdatePod(ctx, &podIn)
@@ -466,14 +469,17 @@ func TestEtcdUpdatePodNotScheduled(t *testing.T) {
 
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}), 1)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 	podIn := api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"},
-		Labels: map[string]string{
-			"foo": "bar",
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
 		},
 	}
 	err := registry.UpdatePod(ctx, &podIn)
@@ -498,7 +504,7 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{
 			Host: "machine",
 			Manifest: api.ContainerManifest{
@@ -536,7 +542,13 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 
 	registry := NewTestEtcdRegistry(fakeClient)
 	podIn := api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"},
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "foo",
@@ -546,9 +558,6 @@ func TestEtcdUpdatePodScheduled(t *testing.T) {
 					},
 				},
 			},
-		},
-		Labels: map[string]string{
-			"foo": "bar",
 		},
 	}
 	err := registry.UpdatePod(ctx, &podIn)
@@ -584,12 +593,12 @@ func TestEtcdDeletePod(t *testing.T) {
 
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
-			{TypeMeta: api.TypeMeta{Name: "foo"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
@@ -620,13 +629,13 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 	fakeClient.TestIndex = true
 	key, _ := makePodKey(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: api.PodState{Host: "machine"},
 	}), 0)
 	fakeClient.Set("/registry/nodes/machine/boundpods", runtime.EncodeOrDie(latest.Codec, &api.BoundPods{
 		Items: []api.BoundPod{
-			{TypeMeta: api.TypeMeta{Name: "foo"}},
-			{TypeMeta: api.TypeMeta{Name: "bar"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 		},
 	}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
@@ -706,13 +715,13 @@ func TestEtcdListPods(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-							TypeMeta:     api.TypeMeta{Name: "foo"},
+							ObjectMeta:   api.ObjectMeta{Name: "foo"},
 							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-							TypeMeta:     api.TypeMeta{Name: "bar"},
+							ObjectMeta:   api.ObjectMeta{Name: "bar"},
 							DesiredState: api.PodState{Host: "machine"},
 						}),
 					},
@@ -783,10 +792,10 @@ func TestEtcdListControllers(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Name: "foo"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Name: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -814,8 +823,8 @@ func TestEtcdGetControllerDifferentNamespace(t *testing.T) {
 	key1, _ := makeControllerKey(ctx1, "foo")
 	key2, _ := makeControllerKey(ctx2, "foo")
 
-	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Namespace: "default", Name: "foo"}}), 0)
-	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Namespace: "other", Name: "foo"}}), 0)
+	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
+	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 
@@ -847,7 +856,7 @@ func TestEtcdGetController(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key, _ := makeControllerKey(ctx, "foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	ctrl, err := registry.GetController(ctx, "foo")
 	if err != nil {
@@ -903,7 +912,7 @@ func TestEtcdCreateController(t *testing.T) {
 	registry := NewTestEtcdRegistry(fakeClient)
 	key, _ := makeControllerKey(ctx, "foo")
 	err := registry.CreateController(ctx, &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 	})
@@ -929,11 +938,11 @@ func TestEtcdCreateControllerAlreadyExisting(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key, _ := makeControllerKey(ctx, "foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateController(ctx, &api.ReplicationController{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 	})
@@ -947,10 +956,10 @@ func TestEtcdUpdateController(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	key, _ := makeControllerKey(ctx, "foo")
-	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.UpdateController(ctx, &api.ReplicationController{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 2,
 		},
@@ -974,10 +983,10 @@ func TestEtcdListServices(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Name: "foo"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Name: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -1000,7 +1009,7 @@ func TestEtcdCreateService(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateService(ctx, &api.Service{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1027,10 +1036,10 @@ func TestEtcdCreateServiceAlreadyExisting(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key, _ := makeServiceKey(ctx, "foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateService(ctx, &api.Service{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	})
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("expected already exists err, got %#v", err)
@@ -1047,8 +1056,8 @@ func TestEtcdGetServiceDifferentNamespace(t *testing.T) {
 	key1, _ := makeServiceKey(ctx1, "foo")
 	key2, _ := makeServiceKey(ctx2, "foo")
 
-	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Namespace: "default", Name: "foo"}}), 0)
-	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Namespace: "other", Name: "foo"}}), 0)
+	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
+	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
 
 	registry := NewTestEtcdRegistry(fakeClient)
 
@@ -1080,7 +1089,7 @@ func TestEtcdGetService(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	key, _ := makeServiceKey(ctx, "foo")
-	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	service, err := registry.GetService(ctx, "foo")
 	if err != nil {
@@ -1136,12 +1145,15 @@ func TestEtcdUpdateService(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	key, _ := makeServiceKey(ctx, "foo")
-	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	testService := api.Service{
-		TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
-		Labels: map[string]string{
-			"baz": "bar",
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10),
+			Labels: map[string]string{
+				"baz": "bar",
+			},
 		},
 		Selector: map[string]string{
 			"baz": "bar",
@@ -1174,10 +1186,10 @@ func TestEtcdListEndpoints(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:8345"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Endpoints: []string{"127.0.0.1:8345"}}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{TypeMeta: api.TypeMeta{Name: "bar"}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar"}}),
 					},
 				},
 			},
@@ -1200,8 +1212,8 @@ func TestEtcdGetEndpoints(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := &api.Endpoints{
-		TypeMeta:  api.TypeMeta{Name: "foo"},
-		Endpoints: []string{"127.0.0.1:34855"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"127.0.0.1:34855"},
 	}
 
 	key, _ := makeServiceEndpointsKey(ctx, "foo")
@@ -1223,8 +1235,8 @@ func TestEtcdUpdateEndpoints(t *testing.T) {
 	fakeClient.TestIndex = true
 	registry := NewTestEtcdRegistry(fakeClient)
 	endpoints := api.Endpoints{
-		TypeMeta:  api.TypeMeta{Name: "foo"},
-		Endpoints: []string{"baz", "bar"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Endpoints:  []string{"baz", "bar"},
 	}
 
 	key, _ := makeServiceEndpointsKey(ctx, "foo")
@@ -1392,12 +1404,12 @@ func TestEtcdListMinions(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
-							TypeMeta: api.TypeMeta{Name: "foo"},
+							ObjectMeta: api.ObjectMeta{Name: "foo"},
 						}),
 					},
 					{
 						Value: runtime.EncodeOrDie(latest.Codec, &api.Minion{
-							TypeMeta: api.TypeMeta{Name: "bar"},
+							ObjectMeta: api.ObjectMeta{Name: "bar"},
 						}),
 					},
 				},
@@ -1421,7 +1433,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 	fakeClient := tools.NewFakeEtcdClient(t)
 	registry := NewTestEtcdRegistry(fakeClient)
 	err := registry.CreateMinion(ctx, &api.Minion{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1446,7 +1458,7 @@ func TestEtcdCreateMinion(t *testing.T) {
 func TestEtcdGetMinion(t *testing.T) {
 	ctx := api.NewContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{TypeMeta: api.TypeMeta{Name: "foo"}}), 0)
+	fakeClient.Set("/registry/minions/foo", runtime.EncodeOrDie(latest.Codec, &api.Minion{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	minion, err := registry.GetMinion(ctx, "foo")
 	if err != nil {

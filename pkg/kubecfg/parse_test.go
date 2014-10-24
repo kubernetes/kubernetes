@@ -69,7 +69,8 @@ var testParser = NewParser(map[string]runtime.Object{
 
 func TestParsePod(t *testing.T) {
 	DoParseTest(t, "pods", &api.Pod{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Name: "test pod", Kind: "Pod"},
+		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Pod"},
+		ObjectMeta: api.ObjectMeta{Name: "test pod"},
 		DesiredState: api.PodState{
 			Manifest: api.ContainerManifest{
 				ID: "My manifest",
@@ -86,11 +87,14 @@ func TestParsePod(t *testing.T) {
 
 func TestParseService(t *testing.T) {
 	DoParseTest(t, "services", &api.Service{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Name: "my service", Kind: "Service"},
-		Port:     8080,
-		Labels: map[string]string{
-			"area": "staging",
+		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Kind: "Service"},
+		ObjectMeta: api.ObjectMeta{
+			Name: "my service",
+			Labels: map[string]string{
+				"area": "staging",
+			},
 		},
+		Port: 8080,
 		Selector: map[string]string{
 			"area": "staging",
 		},
@@ -99,7 +103,8 @@ func TestParseService(t *testing.T) {
 
 func TestParseController(t *testing.T) {
 	DoParseTest(t, "replicationControllers", &api.ReplicationController{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Name: "my controller", Kind: "ReplicationController"},
+		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "ReplicationController"},
+		ObjectMeta: api.ObjectMeta{Name: "my controller"},
 		DesiredState: api.ReplicationControllerState{
 			Replicas: 9001,
 			PodTemplate: api.PodTemplate{
@@ -120,8 +125,9 @@ func TestParseController(t *testing.T) {
 }
 
 type TestParseType struct {
-	api.TypeMeta `json:",inline" yaml:",inline"`
-	Data         string `json:"data" yaml:"data"`
+	api.TypeMeta   `json:",inline" yaml:",inline"`
+	api.ObjectMeta `json:"metadata" yaml:"metadata"`
+	Data           string `json:"data" yaml:"data"`
 }
 
 func (*TestParseType) IsAnAPIObject() {}
@@ -134,7 +140,8 @@ func TestParseCustomType(t *testing.T) {
 		"custom": &TestParseType{},
 	})
 	DoParseTest(t, "custom", &TestParseType{
-		TypeMeta: api.TypeMeta{APIVersion: "", Name: "my custom object", Kind: "TestParseType"},
-		Data:     "test data",
+		TypeMeta:   api.TypeMeta{APIVersion: "", Kind: "TestParseType"},
+		ObjectMeta: api.ObjectMeta{Name: "my custom object"},
+		Data:       "test data",
 	}, v1beta1.Codec, parser)
 }

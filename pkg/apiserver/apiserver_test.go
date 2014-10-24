@@ -53,14 +53,16 @@ func init() {
 }
 
 type Simple struct {
-	api.TypeMeta `yaml:",inline" json:",inline"`
-	Other        string `yaml:"other,omitempty" json:"other,omitempty"`
+	api.TypeMeta   `yaml:",inline" json:",inline"`
+	api.ObjectMeta `yaml:"metadata,inline" json:"metadata,inline"`
+	Other          string `yaml:"other,omitempty" json:"other,omitempty"`
 }
 
 func (*Simple) IsAnAPIObject() {}
 
 type SimpleList struct {
 	api.TypeMeta `yaml:",inline" json:",inline"`
+	api.ListMeta `yaml:"metadata,inline" json:"metadata,inline"`
 	Items        []Simple `yaml:"items,omitempty" json:"items,omitempty"`
 }
 
@@ -108,7 +110,7 @@ func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan run
 	}
 	return MakeAsync(func() (runtime.Object, error) {
 		if storage.injectedFunction != nil {
-			return storage.injectedFunction(&Simple{TypeMeta: api.TypeMeta{Name: id}})
+			return storage.injectedFunction(&Simple{ObjectMeta: api.ObjectMeta{Name: id}})
 		}
 		return &api.Status{Status: api.StatusSuccess}, nil
 	}), nil
@@ -310,6 +312,8 @@ func TestNonEmptyList(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
+		body, _ := ioutil.ReadAll(resp.Body)
+		t.Logf("Data: %s", string(body))
 	}
 
 	var listOut SimpleList

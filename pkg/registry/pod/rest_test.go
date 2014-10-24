@@ -144,7 +144,7 @@ func TestListPodsError(t *testing.T) {
 }
 
 func TestListEmptyPodList(t *testing.T) {
-	podRegistry := registrytest.NewPodRegistry(&api.PodList{TypeMeta: api.TypeMeta{ResourceVersion: "1"}})
+	podRegistry := registrytest.NewPodRegistry(&api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}})
 	storage := REST{
 		registry: podRegistry,
 	}
@@ -175,12 +175,12 @@ func TestListPodList(t *testing.T) {
 	podRegistry.Pods = &api.PodList{
 		Items: []api.Pod{
 			{
-				TypeMeta: api.TypeMeta{
+				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 				},
 			},
 			{
-				TypeMeta: api.TypeMeta{
+				ObjectMeta: api.ObjectMeta{
 					Name: "bar",
 				},
 			},
@@ -214,18 +214,20 @@ func TestListPodListSelection(t *testing.T) {
 	podRegistry.Pods = &api.PodList{
 		Items: []api.Pod{
 			{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
 			}, {
-				TypeMeta:     api.TypeMeta{Name: "bar"},
+				ObjectMeta:   api.ObjectMeta{Name: "bar"},
 				DesiredState: api.PodState{Host: "barhost"},
 			}, {
-				TypeMeta:     api.TypeMeta{Name: "baz"},
+				ObjectMeta:   api.ObjectMeta{Name: "baz"},
 				DesiredState: api.PodState{Status: "bazstatus"},
 			}, {
-				TypeMeta: api.TypeMeta{Name: "qux"},
-				Labels:   map[string]string{"label": "qux"},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "qux",
+					Labels: map[string]string{"label": "qux"},
+				},
 			}, {
-				TypeMeta: api.TypeMeta{Name: "zot"},
+				ObjectMeta: api.ObjectMeta{Name: "zot"},
 			},
 		},
 	}
@@ -298,7 +300,7 @@ func TestPodDecode(t *testing.T) {
 		registry: podRegistry,
 	}
 	expected := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
 	}
@@ -319,7 +321,7 @@ func TestPodDecode(t *testing.T) {
 
 func TestGetPod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	podRegistry.Pod = &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	storage := REST{
 		registry: podRegistry,
 		ipCache:  ipCache{},
@@ -340,7 +342,7 @@ func TestGetPod(t *testing.T) {
 func TestGetPodCloud(t *testing.T) {
 	fakeCloud := &fake_cloud.FakeCloud{}
 	podRegistry := registrytest.NewPodRegistry(nil)
-	podRegistry.Pod = &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}, CurrentState: api.PodState{Host: "machine"}}
+	podRegistry.Pod = &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}, CurrentState: api.PodState{Host: "machine"}}
 
 	clock := &fakeClock{t: time.Now()}
 
@@ -386,7 +388,7 @@ func TestMakePodStatus(t *testing.T) {
 		Minions: api.MinionList{
 			Items: []api.Minion{
 				{
-					TypeMeta: api.TypeMeta{Name: "machine"},
+					ObjectMeta: api.ObjectMeta{Name: "machine"},
 				},
 			},
 		},
@@ -561,7 +563,7 @@ func TestPodStorageValidatesUpdate(t *testing.T) {
 func TestCreatePod(t *testing.T) {
 	podRegistry := registrytest.NewPodRegistry(nil)
 	podRegistry.Pod = &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		CurrentState: api.PodState{
 			Host: "machine",
 		},
@@ -576,7 +578,7 @@ func TestCreatePod(t *testing.T) {
 		},
 	}
 	pod := &api.Pod{
-		TypeMeta:     api.TypeMeta{Name: "foo"},
+		ObjectMeta:   api.ObjectMeta{Name: "foo"},
 		DesiredState: desiredState,
 	}
 	ctx := api.NewDefaultContext()
@@ -656,7 +658,7 @@ func TestFillPodInfoNoData(t *testing.T) {
 func TestCreatePodWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "test", Namespace: "not-default"},
+		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := api.NewDefaultContext()
@@ -674,7 +676,7 @@ func TestCreatePodWithConflictingNamespace(t *testing.T) {
 func TestUpdatePodWithConflictingNamespace(t *testing.T) {
 	storage := REST{}
 	pod := &api.Pod{
-		TypeMeta: api.TypeMeta{Name: "test", Namespace: "not-default"},
+		ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "not-default"},
 	}
 
 	ctx := api.NewDefaultContext()

@@ -106,7 +106,7 @@ func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.O
 }
 
 func (rs *REST) toApiMinion(name string) *api.Minion {
-	return &api.Minion{TypeMeta: api.TypeMeta{Name: name}}
+	return &api.Minion{ObjectMeta: api.ObjectMeta{Name: name}}
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified minion.

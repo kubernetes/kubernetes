@@ -25,16 +25,21 @@ import (
 
 func init() {
 	newer.Scheme.AddConversionFuncs(
-		// TypeMeta has changed type of ResourceVersion internally
+		// TypeMeta must be split into two objects
 		func(in *newer.TypeMeta, out *TypeMeta, s conversion.Scope) error {
-			out.APIVersion = in.APIVersion
 			out.Kind = in.Kind
-			out.Namespace = in.Namespace
-			out.ID = in.Name
-			out.CreationTimestamp = in.CreationTimestamp
-			out.SelfLink = in.SelfLink
-			out.Annotations = in.Annotations
+			out.APIVersion = in.APIVersion
+			return nil
+		},
+		func(in *TypeMeta, out *newer.TypeMeta, s conversion.Scope) error {
+			out.Kind = in.Kind
+			out.APIVersion = in.APIVersion
+			return nil
+		},
 
+		// ListMeta must be converted to TypeMeta
+		func(in *newer.ListMeta, out *TypeMeta, s conversion.Scope) error {
+			out.SelfLink = in.SelfLink
 			if len(in.ResourceVersion) > 0 {
 				v, err := strconv.ParseUint(in.ResourceVersion, 10, 64)
 				if err != nil {
@@ -44,19 +49,516 @@ func init() {
 			}
 			return nil
 		},
-		func(in *TypeMeta, out *newer.TypeMeta, s conversion.Scope) error {
-			out.APIVersion = in.APIVersion
-			out.Kind = in.Kind
-			out.Namespace = in.Namespace
-			out.Name = in.ID
-			out.CreationTimestamp = in.CreationTimestamp
+		func(in *TypeMeta, out *newer.ListMeta, s conversion.Scope) error {
 			out.SelfLink = in.SelfLink
-			out.Annotations = in.Annotations
-
 			if in.ResourceVersion != 0 {
 				out.ResourceVersion = strconv.FormatUint(in.ResourceVersion, 10)
+			} else {
+				out.ResourceVersion = ""
 			}
 			return nil
+		},
+
+		// ObjectMeta must be converted to TypeMeta
+		func(in *newer.ObjectMeta, out *TypeMeta, s conversion.Scope) error {
+			out.Namespace = in.Namespace
+			out.ID = in.Name
+			out.UID = in.UID
+			out.CreationTimestamp = in.CreationTimestamp
+			out.SelfLink = in.SelfLink
+			if len(in.ResourceVersion) > 0 {
+				v, err := strconv.ParseUint(in.ResourceVersion, 10, 64)
+				if err != nil {
+					return err
+				}
+				out.ResourceVersion = v
+			}
+			return s.Convert(&in.Annotations, &out.Annotations, 0)
+		},
+		func(in *TypeMeta, out *newer.ObjectMeta, s conversion.Scope) error {
+			out.Namespace = in.Namespace
+			out.Name = in.ID
+			out.UID = in.UID
+			out.CreationTimestamp = in.CreationTimestamp
+			out.SelfLink = in.SelfLink
+			if in.ResourceVersion != 0 {
+				out.ResourceVersion = strconv.FormatUint(in.ResourceVersion, 10)
+			} else {
+				out.ResourceVersion = ""
+			}
+			return s.Convert(&in.Annotations, &out.Annotations, 0)
+		},
+
+		// Convert all the standard objects
+		// Convert all the standard objects
+		func(in *newer.Pod, out *Pod, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *Pod, out *newer.Pod, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.ReplicationController, out *ReplicationController, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ReplicationController, out *newer.ReplicationController, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.Service, out *Service, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			out.Port = in.Port
+			out.Protocol = Protocol(in.Protocol)
+			if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+				return err
+			}
+			out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+			out.ContainerPort = in.ContainerPort
+			out.PortalIP = in.PortalIP
+			out.ProxyPort = in.ProxyPort
+
+			return nil
+		},
+		func(in *Service, out *newer.Service, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			out.Port = in.Port
+			out.Protocol = newer.Protocol(in.Protocol)
+			if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+				return err
+			}
+			out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+			out.ContainerPort = in.ContainerPort
+			out.PortalIP = in.PortalIP
+			out.ProxyPort = in.ProxyPort
+
+			return nil
+		},
+
+		func(in *newer.Binding, out *Binding, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+
+			out.PodID = in.PodID
+			out.Host = in.Host
+
+			return nil
+		},
+		func(in *Binding, out *newer.Binding, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+
+			out.PodID = in.PodID
+			out.Host = in.Host
+
+			return nil
+		},
+
+		func(in *newer.Status, out *Status, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+
+			out.Code = in.Code
+			out.Message = in.Message
+			out.Reason = StatusReason(in.Reason)
+			out.Status = in.Status
+			return s.Convert(&in.Details, &out.Details, 0)
+		},
+		func(in *Status, out *newer.Status, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+
+			out.Code = in.Code
+			out.Message = in.Message
+			out.Reason = newer.StatusReason(in.Reason)
+			out.Status = in.Status
+			return s.Convert(&in.Details, &out.Details, 0)
+		},
+
+		func(in *newer.Minion, out *Minion, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+
+			out.HostIP = in.HostIP
+			return s.Convert(&in.NodeResources, &out.NodeResources, 0)
+		},
+		func(in *Minion, out *newer.Minion, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+
+			out.HostIP = in.HostIP
+			return s.Convert(&in.NodeResources, &out.NodeResources, 0)
+		},
+
+		func(in *newer.BoundPod, out *BoundPod, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+
+			return s.Convert(&in.Spec, &out.Spec, 0)
+		},
+		func(in *BoundPod, out *newer.BoundPod, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+
+			return s.Convert(&in.Spec, &out.Spec, 0)
+		},
+
+		func(in *newer.BoundPods, out *BoundPods, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			out.Host = in.Host
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *BoundPods, out *newer.BoundPods, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			out.Host = in.Host
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.Endpoints, out *Endpoints, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+
+			return s.Convert(&in.Endpoints, &out.Endpoints, 0)
+		},
+		func(in *Endpoints, out *newer.Endpoints, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+
+			return s.Convert(&in.Endpoints, &out.Endpoints, 0)
+		},
+
+		func(in *newer.ServerOp, out *ServerOp, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ServerOp, out *newer.ServerOp, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.Event, out *Event, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+
+			out.Message = in.Message
+			out.Reason = in.Reason
+			out.Source = in.Source
+			out.Status = in.Status
+			out.Timestamp = in.Timestamp
+			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
+		},
+		func(in *Event, out *newer.Event, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+
+			out.Message = in.Message
+			out.Reason = in.Reason
+			out.Source = in.Source
+			out.Status = in.Status
+			out.Timestamp = in.Timestamp
+			return s.Convert(&in.InvolvedObject, &out.InvolvedObject, 0)
+		},
+
+		// Convert all the standard lists
+		func(in *newer.PodList, out *PodList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *PodList, out *newer.PodList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.ReplicationControllerList, out *ReplicationControllerList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *ReplicationControllerList, out *newer.ReplicationControllerList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.ServiceList, out *ServiceList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *ServiceList, out *newer.ServiceList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.EndpointsList, out *EndpointsList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *EndpointsList, out *newer.EndpointsList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.EventList, out *EventList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *EventList, out *newer.EventList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.MinionList, out *MinionList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *MinionList, out *newer.MinionList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.ServerOpList, out *ServerOpList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *ServerOpList, out *newer.ServerOpList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+
+		func(in *newer.ContainerManifestList, out *ContainerManifestList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
+		},
+		func(in *ContainerManifestList, out *newer.ContainerManifestList, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
+				return err
+			}
+			return s.Convert(&in.Items, &out.Items, 0)
 		},
 	)
 }

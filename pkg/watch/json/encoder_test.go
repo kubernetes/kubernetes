@@ -37,17 +37,17 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 	}{
 		{
 			watch.Added,
-			&api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			v1beta1.Codec,
 		},
 		{
 			watch.Modified,
-			&api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			v1beta2.Codec,
 		},
 		{
 			watch.Deleted,
-			&api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}},
+			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
 			api.Codec,
 		},
 	}

@@ -59,7 +59,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if !api.ValidNamespace(ctx, &controller.TypeMeta) {
+	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
 		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 
@@ -132,7 +132,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("not a replication controller: %#v", obj)
 	}
-	if !api.ValidNamespace(ctx, &controller.TypeMeta) {
+	if !api.ValidNamespace(ctx, &controller.ObjectMeta) {
 		return nil, errors.NewConflict("controller", controller.Namespace, fmt.Errorf("Controller.Namespace does not match the provided context"))
 	}
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {

@@ -34,7 +34,7 @@ type fakeBinder struct {
 func (fb fakeBinder) Bind(binding *api.Binding) error { return fb.b(binding) }
 
 func podWithID(id string) *api.Pod {
-	return &api.Pod{TypeMeta: api.TypeMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)}}
+	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)}}
 }
 
 type mockScheduler struct {
@@ -88,7 +88,7 @@ func TestScheduler(t *testing.T) {
 		var gotBinding *api.Binding
 		c := &Config{
 			MinionLister: scheduler.FakeMinionLister(
-				api.MinionList{Items: []api.Minion{{TypeMeta: api.TypeMeta{Name: "machine1"}}}},
+				api.MinionList{Items: []api.Minion{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 			),
 			Algorithm: item.algo,
 			Binder: fakeBinder{func(b *api.Binding) error {

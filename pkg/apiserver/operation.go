@@ -125,7 +125,7 @@ func (ops *Operations) List() *api.ServerOpList {
 	sort.StringSlice(ids).Sort()
 	ol := &api.ServerOpList{}
 	for _, id := range ids {
-		ol.Items = append(ol.Items, api.ServerOp{TypeMeta: api.TypeMeta{Name: id}})
+		ol.Items = append(ol.Items, api.ServerOp{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
 	return ol
 }

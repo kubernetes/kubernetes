@@ -43,7 +43,7 @@ func TestOperation(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	go func() {
 		time.Sleep(500 * time.Millisecond)
-		c <- &Simple{TypeMeta: api.TypeMeta{Name: "All done"}}
+		c <- &Simple{ObjectMeta: api.ObjectMeta{Name: "All done"}}
 	}()
 
 	if op.expired(time.Now().Add(-time.Minute)) {
@@ -119,7 +119,7 @@ func TestOperationsList(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	data, err := codec.Encode(simple)
 	if err != nil {
@@ -175,7 +175,7 @@ func TestOpGet(t *testing.T) {
 	client := http.Client{}
 
 	simple := &Simple{
-		TypeMeta: api.TypeMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
 	}
 	data, err := codec.Encode(simple)
 	t.Log(string(data))

@@ -37,8 +37,9 @@ type fakeClientGetSet struct {
 }
 
 type TestResource struct {
-	api.TypeMeta `json:",inline" yaml:",inline"`
-	Value        int `json:"value" yaml:"value,omitempty"`
+	api.TypeMeta   `json:",inline" yaml:",inline"`
+	api.ObjectMeta `json:"metadata" yaml:"metadata"`
+	Value          int `json:"value" yaml:"value,omitempty"`
 }
 
 func (*TestResource) IsAnAPIObject() {}
@@ -74,15 +75,15 @@ func TestExtractToList(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value:         `{"name":"foo"}`,
+						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 1,
 					},
 					{
-						Value:         `{"name":"bar"}`,
+						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 2,
 					},
 					{
-						Value:         `{"name":"baz"}`,
+						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 3,
 					},
 				},
@@ -90,11 +91,11 @@ func TestExtractToList(t *testing.T) {
 		},
 	}
 	expect := api.PodList{
-		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
+		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"}},
-			{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}},
-			{TypeMeta: api.TypeMeta{Name: "baz", ResourceVersion: "3"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
 		},
 	}
 
@@ -122,7 +123,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 						Dir:   true,
 						Nodes: []*etcd.Node{
 							{
-								Value:         `{"name":"foo"}`,
+								Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
 								ModifiedIndex: 1,
 							},
 						},
@@ -132,7 +133,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 						Dir:   true,
 						Nodes: []*etcd.Node{
 							{
-								Value:         `{"name":"bar"}`,
+								Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
 								ModifiedIndex: 2,
 							},
 						},
@@ -142,10 +143,10 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 		},
 	}
 	expect := api.PodList{
-		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
+		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"}},
-			{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
 		},
 	}
 
@@ -168,15 +169,15 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value:         `{"name":"foo"}`,
+						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 1,
 					},
 					{
-						Value:         `{"name":"bar"}`,
+						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 2,
 					},
 					{
-						Value:         `{"name":"baz"}`,
+						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
 						ModifiedIndex: 3,
 					},
 					{
@@ -188,11 +189,11 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 		},
 	}
 	expect := api.PodList{
-		TypeMeta: api.TypeMeta{ResourceVersion: "10"},
+		ListMeta: api.ListMeta{ResourceVersion: "10"},
 		Items: []api.Pod{
-			{TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"}},
-			{TypeMeta: api.TypeMeta{Name: "bar", ResourceVersion: "2"}},
-			{TypeMeta: api.TypeMeta{Name: "baz", ResourceVersion: "3"}},
+			{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"}},
 		},
 	}
 
@@ -209,7 +210,7 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 
 func TestExtractObj(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
-	expect := api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	expect := api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient.Set("/some/key", util.EncodeJSON(expect), 0)
 	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
 	var got api.Pod
@@ -263,7 +264,7 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 }
 
 func TestCreateObj(t *testing.T) {
-	obj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
 	err := helper.CreateObj("/some/key", obj, 5)
@@ -284,7 +285,7 @@ func TestCreateObj(t *testing.T) {
 }
 
 func TestSetObj(t *testing.T) {
-	obj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
 	err := helper.SetObj("/some/key", obj)
@@ -303,7 +304,7 @@ func TestSetObj(t *testing.T) {
 }
 
 func TestSetObjWithVersion(t *testing.T) {
-	obj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo", ResourceVersion: "1"}}
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"}}
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
@@ -332,7 +333,7 @@ func TestSetObjWithVersion(t *testing.T) {
 }
 
 func TestSetObjWithoutResourceVersioner(t *testing.T) {
-	obj := &api.Pod{TypeMeta: api.TypeMeta{Name: "foo"}}
+	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
 	helper := EtcdHelper{fakeClient, latest.Codec, nil}
 	err := helper.SetObj("/some/key", obj)
@@ -357,7 +358,7 @@ func TestAtomicUpdate(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
-	obj := &TestResource{TypeMeta: api.TypeMeta{Name: "foo"}, Value: 1}
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	})
@@ -376,7 +377,7 @@ func TestAtomicUpdate(t *testing.T) {
 
 	// Update an existing node.
 	callbackCalled := false
-	objUpdate := &TestResource{TypeMeta: api.TypeMeta{Name: "foo"}, Value: 2}
+	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
 	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
 
@@ -411,7 +412,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
-	obj := &TestResource{TypeMeta: api.TypeMeta{Name: "foo"}, Value: 1}
+	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 	err := helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	})
@@ -421,7 +422,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 
 	// Update an existing node with the same data
 	callbackCalled := false
-	objUpdate := &TestResource{TypeMeta: api.TypeMeta{Name: "foo"}, Value: 1}
+	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
 	fakeClient.Err = errors.New("should not be called")
 	err = helper.AtomicUpdate("/some/key", &TestResource{}, func(in runtime.Object) (runtime.Object, error) {
 		callbackCalled = true
@@ -464,7 +465,7 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 				}
 
 				currValue := in.(*TestResource).Value
-				obj := &TestResource{TypeMeta: api.TypeMeta{Name: "foo"}, Value: currValue + 1}
+				obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: currValue + 1}
 				return obj, nil
 			})
 			if err != nil {

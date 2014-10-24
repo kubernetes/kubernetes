@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -89,7 +88,7 @@ func newPodList(count int) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name: fmt.Sprintf("pod%d", i),
 			},
 		})
@@ -183,8 +182,8 @@ func TestCreateReplica(t *testing.T) {
 	}
 
 	controllerSpec := api.ReplicationController{
-		TypeMeta: api.TypeMeta{
-			Kind: "ReplicationController",
+		ObjectMeta: api.ObjectMeta{
+			Name: "test",
 		},
 		DesiredState: api.ReplicationControllerState{
 			PodTemplate: api.PodTemplate{
@@ -198,8 +197,9 @@ func TestCreateReplica(t *testing.T) {
 					},
 				},
 				Labels: map[string]string{
-					"name": "foo",
-					"type": "production",
+					"name":                  "foo",
+					"type":                  "production",
+					"replicationController": "test",
 				},
 			},
 		},
@@ -208,21 +208,19 @@ func TestCreateReplica(t *testing.T) {
 	podControl.createReplica(ctx, controllerSpec)
 
 	expectedPod := api.Pod{
-		TypeMeta: api.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: testapi.Version(),
+		ObjectMeta: api.ObjectMeta{
+			Labels: controllerSpec.DesiredState.PodTemplate.Labels,
 		},
-		Labels:       controllerSpec.DesiredState.PodTemplate.Labels,
 		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
 	}
 	fakeHandler.ValidateRequest(t, makeURL("/pods?namespace=default"), "POST", nil)
-	actualPod := api.Pod{}
-	if err := json.Unmarshal([]byte(fakeHandler.RequestBody), &actualPod); err != nil {
+	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
+	if err != nil {
 		t.Errorf("Unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual(expectedPod, actualPod) {
+	if !reflect.DeepEqual(&expectedPod, actualPod) {
 		t.Logf("Body: %s", fakeHandler.RequestBody)
-		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", expectedPod, actualPod)
+		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
 	}
 }
 

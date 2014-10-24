@@ -54,7 +54,7 @@ func TestEventf(t *testing.T) {
 	}{
 		{
 			obj: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				ObjectMeta: api.ObjectMeta{
 					SelfLink: "/api/v1beta1/pods/foo",
 					Name:     "foo",
 					UID:      "bar",

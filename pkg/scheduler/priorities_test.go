@@ -27,7 +27,7 @@ import (
 
 func makeMinion(node string, cpu, memory int) api.Minion {
 	return api.Minion{
-		TypeMeta: api.TypeMeta{Name: node},
+		ObjectMeta: api.ObjectMeta{Name: node},
 		NodeResources: api.NodeResources{
 			Capacity: api.ResourceList{
 				resources.CPU:    util.NewIntOrStringFromInt(cpu),
@@ -87,10 +87,10 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "no resources requested",
 			pods: []api.Pod{
-				{DesiredState: machine1State, Labels: labels2},
-				{DesiredState: machine1State, Labels: labels1},
-				{DesiredState: machine2State, Labels: labels1},
-				{DesiredState: machine2State, Labels: labels1},
+				{DesiredState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{DesiredState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{DesiredState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{DesiredState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{

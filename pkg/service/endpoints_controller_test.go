@@ -34,10 +34,8 @@ func newPodList(count int) api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
-			TypeMeta: api.TypeMeta{
-				Name:       fmt.Sprintf("pod%d", i),
-				APIVersion: testapi.Version(),
-			},
+			TypeMeta:   api.TypeMeta{APIVersion: testapi.Version()},
+			ObjectMeta: api.ObjectMeta{Name: fmt.Sprintf("pod%d", i)},
 			DesiredState: api.PodState{
 				Manifest: api.ContainerManifest{
 					Containers: []api.Container{
@@ -181,7 +179,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -192,7 +190,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
@@ -204,7 +202,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
@@ -217,7 +215,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -228,7 +226,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, serviceList},
 		serverResponse{http.StatusOK, api.Endpoints{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
 			Endpoints: []string{"1.2.3.4:8080"},
@@ -245,7 +243,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				TypeMeta: api.TypeMeta{Name: "foo"},
+				ObjectMeta: api.ObjectMeta{Name: "foo"},
 				Selector: map[string]string{
 					"foo": "bar",
 				},
@@ -262,7 +260,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			ResourceVersion: "",
 		},
 		Endpoints: []string{"1.2.3.4:8080"},

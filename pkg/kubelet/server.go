@@ -204,7 +204,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	tail := uriValues.Get("tail")
 
 	podFullName := GetPodFullName(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        podID,
 			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
@@ -248,7 +248,7 @@ func (s *Server) handlePodInfo(w http.ResponseWriter, req *http.Request) {
 	}
 	// TODO: backwards compatibility with existing API, needs API change
 	podFullName := GetPodFullName(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        podID,
 			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
@@ -323,7 +323,7 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	podFullName := GetPodFullName(&api.BoundPod{
-		TypeMeta: api.TypeMeta{
+		ObjectMeta: api.ObjectMeta{
 			Name:        podID,
 			Namespace:   podNamespace,
 			Annotations: map[string]string{ConfigSourceAnnotationKey: "etcd"},
@@ -373,7 +373,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	case 3:
 		// Backward compatibility without uuid information
 		podFullName := GetPodFullName(&api.BoundPod{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name: components[1],
 				// TODO: I am broken
 				Namespace:   api.NamespaceDefault,
@@ -383,7 +383,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 		stats, err = s.host.GetContainerInfo(podFullName, "", components[2], &query)
 	case 4:
 		podFullName := GetPodFullName(&api.BoundPod{
-			TypeMeta: api.TypeMeta{
+			ObjectMeta: api.ObjectMeta{
 				Name: components[1],
 				// TODO: I am broken
 				Namespace:   "",
