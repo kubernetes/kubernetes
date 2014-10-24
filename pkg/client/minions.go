@@ -31,38 +31,38 @@ type MinionInterface interface {
 	Delete(id string) error
 }
 
-// MinionsClient implements Minions interface
-type MinionsClient struct {
+// minions implements Minions interface
+type minions struct {
 	r *Client
 }
 
-// NewMinionsClient returns a MinionsClient
-func NewMinionsClient(c *Client) *MinionsClient {
-	return &MinionsClient{c}
+// newMinions returns a minions
+func newMinions(c *Client) *minions {
+	return &minions{c}
 }
 
 // Create creates a new minion.
-func (c *MinionsClient) Create(minion *api.Minion) (*api.Minion, error) {
+func (c *minions) Create(minion *api.Minion) (*api.Minion, error) {
 	result := &api.Minion{}
 	err := c.r.Post().Path("minions").Body(minion).Do().Into(result)
 	return result, err
 }
 
 // List lists all the minions in the cluster.
-func (c *MinionsClient) List() (result *api.MinionList, err error) {
+func (c *minions) List() (result *api.MinionList, err error) {
 	result = &api.MinionList{}
 	err = c.r.Get().Path("minions").Do().Into(result)
 	return
 }
 
 // Get gets an existing minion
-func (c *MinionsClient) Get(id string) (result *api.Minion, err error) {
+func (c *minions) Get(id string) (result *api.Minion, err error) {
 	result = &api.Minion{}
 	err = c.r.Get().Path("minions").Path(id).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing minion.
-func (c *MinionsClient) Delete(id string) error {
+func (c *minions) Delete(id string) error {
 	return c.r.Delete().Path("minions").Path(id).Do().Error()
 }

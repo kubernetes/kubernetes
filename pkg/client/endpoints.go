@@ -38,40 +38,40 @@ type EndpointsInterface interface {
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// EndpointsClient implements EndpointsNamespacer interface
-type EndpointsClient struct {
+// endpoints implements EndpointsNamespacer interface
+type endpoints struct {
 	r  *Client
 	ns string
 }
 
-// NewEndpointsClient returns a EndpointsClient
-func NewEndpointsClient(c *Client, namespace string) *EndpointsClient {
-	return &EndpointsClient{c, namespace}
+// newEndpoints returns a endpoints
+func newEndpoints(c *Client, namespace string) *endpoints {
+	return &endpoints{c, namespace}
 }
 
 // Create creates a new endpoint.
-func (c *EndpointsClient) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
+func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
 	err := c.r.Post().Namespace(c.ns).Path("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
-func (c *EndpointsClient) List(selector labels.Selector) (result *api.EndpointsList, err error) {
+func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
 	err = c.r.Get().Namespace(c.ns).Path("endpoints").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // Get returns information about the endpoints for a particular service.
-func (c *EndpointsClient) Get(id string) (result *api.Endpoints, err error) {
+func (c *endpoints) Get(id string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
 	err = c.r.Get().Namespace(c.ns).Path("endpoints").Path(id).Do().Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
-func (c *EndpointsClient) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *endpoints) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Namespace(c.ns).
 		Path("watch").
@@ -82,7 +82,7 @@ func (c *EndpointsClient) Watch(label, field labels.Selector, resourceVersion st
 		Watch()
 }
 
-func (c *EndpointsClient) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
+func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
 	if len(endpoints.ResourceVersion) == 0 {
 		return nil, fmt.Errorf("invalid update object, missing resource version: %v", endpoints)

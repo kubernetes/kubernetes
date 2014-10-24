@@ -35,27 +35,27 @@ type EventInterface interface {
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// EventsClient implements Events interface
-type EventsClient struct {
+// events implements Events interface
+type events struct {
 	r *Client
 }
 
-// NewEventsClient returns a EventsClient
-func NewEventsClient(c *Client) *EventsClient {
-	return &EventsClient{
+// newEvents returns a events
+func newEvents(c *Client) *events {
+	return &events{
 		r: c,
 	}
 }
 
 // Create makes a new event. Returns the copy of the event the server returns, or an error.
-func (c *EventsClient) Create(event *api.Event) (*api.Event, error) {
+func (c *events) Create(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
 	err := c.r.Post().Path("events").Body(event).Do().Into(result)
 	return result, err
 }
 
 // List returns a list of events matching the selectors.
-func (c *EventsClient) List(label, field labels.Selector) (*api.EventList, error) {
+func (c *events) List(label, field labels.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := c.r.Get().
 		Path("events").
@@ -67,14 +67,14 @@ func (c *EventsClient) List(label, field labels.Selector) (*api.EventList, error
 }
 
 // Get returns the given event, or an error.
-func (c *EventsClient) Get(id string) (*api.Event, error) {
+func (c *events) Get(id string) (*api.Event, error) {
 	result := &api.Event{}
 	err := c.r.Get().Path("events").Path(id).Do().Into(result)
 	return result, err
 }
 
 // Watch starts watching for events matching the given selectors.
-func (c *EventsClient) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *events) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Path("watch").
 		Path("events").

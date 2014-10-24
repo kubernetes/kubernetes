@@ -36,27 +36,27 @@ type Interface interface {
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
-	return NewReplicationControllersClient(c, namespace)
+	return newReplicationControllers(c, namespace)
 }
 
 func (c *Client) Minions() MinionInterface {
-	return NewMinionsClient(c)
+	return newMinions(c)
 }
 
 func (c *Client) Events() EventInterface {
-	return NewEventsClient(c)
+	return newEvents(c)
 }
 
 func (c *Client) Endpoints(namespace string) EndpointsInterface {
-	return NewEndpointsClient(c, namespace)
+	return newEndpoints(c, namespace)
 }
 
 func (c *Client) Pods(namespace string) PodInterface {
-	return NewPodsClient(c, namespace)
+	return newPods(c, namespace)
 }
 
 func (c *Client) Services(namespace string) ServiceInterface {
-	return NewServicesClient(c, namespace)
+	return newServices(c, namespace)
 }
 
 // VersionInterface has a method to retrieve the server version.

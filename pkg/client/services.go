@@ -39,40 +39,40 @@ type ServiceInterface interface {
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// ServicesClient implements PodsNamespacer interface
-type ServicesClient struct {
+// services implements PodsNamespacer interface
+type services struct {
 	r  *Client
 	ns string
 }
 
-// NewServicesClient returns a PodsClient
-func NewServicesClient(c *Client, namespace string) *ServicesClient {
-	return &ServicesClient{c, namespace}
+// newServices returns a PodsClient
+func newServices(c *Client, namespace string) *services {
+	return &services{c, namespace}
 }
 
 // List takes a selector, and returns the list of services that match that selector
-func (c *ServicesClient) List(selector labels.Selector) (result *api.ServiceList, err error) {
+func (c *services) List(selector labels.Selector) (result *api.ServiceList, err error) {
 	result = &api.ServiceList{}
 	err = c.r.Get().Namespace(c.ns).Path("services").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular service.
-func (c *ServicesClient) Get(name string) (result *api.Service, err error) {
+func (c *services) Get(name string) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.r.Get().Namespace(c.ns).Path("services").Path(name).Do().Into(result)
 	return
 }
 
 // Create creates a new service.
-func (c *ServicesClient) Create(svc *api.Service) (result *api.Service, err error) {
+func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	err = c.r.Post().Namespace(c.ns).Path("services").Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
-func (c *ServicesClient) Update(svc *api.Service) (result *api.Service, err error) {
+func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
 	if len(svc.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
@@ -83,12 +83,12 @@ func (c *ServicesClient) Update(svc *api.Service) (result *api.Service, err erro
 }
 
 // Delete deletes an existing service.
-func (c *ServicesClient) Delete(name string) error {
+func (c *services) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Path("services").Path(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *ServicesClient) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *services) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Namespace(c.ns).
 		Path("watch").

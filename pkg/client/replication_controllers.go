@@ -39,40 +39,40 @@ type ReplicationControllerInterface interface {
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
-// ReplicationControllersClient implements ReplicationControllersNamespacer interface
-type ReplicationControllersClient struct {
+// replicationControllers implements ReplicationControllersNamespacer interface
+type replicationControllers struct {
 	r  *Client
 	ns string
 }
 
-// NewReplicationControllersClient returns a PodsClient
-func NewReplicationControllersClient(c *Client, namespace string) *ReplicationControllersClient {
-	return &ReplicationControllersClient{c, namespace}
+// newReplicationControllers returns a PodsClient
+func newReplicationControllers(c *Client, namespace string) *replicationControllers {
+	return &replicationControllers{c, namespace}
 }
 
 // List takes a selector, and returns the list of replication controllers that match that selector.
-func (c *ReplicationControllersClient) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
 	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular replication controller.
-func (c *ReplicationControllersClient) Get(name string) (result *api.ReplicationController, err error) {
+func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Into(result)
 	return
 }
 
 // Create creates a new replication controller.
-func (c *ReplicationControllersClient) Create(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+func (c *replicationControllers) Create(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	err = c.r.Post().Namespace(c.ns).Path("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
 // Update updates an existing replication controller.
-func (c *ReplicationControllersClient) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
+func (c *replicationControllers) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
 	if len(controller.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
@@ -83,12 +83,12 @@ func (c *ReplicationControllersClient) Update(controller *api.ReplicationControl
 }
 
 // Delete deletes an existing replication controller.
-func (c *ReplicationControllersClient) Delete(name string) error {
+func (c *replicationControllers) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
-func (c *ReplicationControllersClient) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *replicationControllers) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Namespace(c.ns).
 		Path("watch").

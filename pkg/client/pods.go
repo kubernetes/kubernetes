@@ -37,48 +37,48 @@ type PodInterface interface {
 	Update(pod *api.Pod) (*api.Pod, error)
 }
 
-// PodsClient implements PodsNamespacer interface
-type PodsClient struct {
+// pods implements PodsNamespacer interface
+type pods struct {
 	r  *Client
 	ns string
 }
 
-// NewPodsClient returns a PodsClient
-func NewPodsClient(c *Client, namespace string) *PodsClient {
-	return &PodsClient{
+// newPods returns a pods
+func newPods(c *Client, namespace string) *pods {
+	return &pods{
 		r:  c,
 		ns: namespace,
 	}
 }
 
 // ListPods takes a selector, and returns the list of pods that match that selector.
-func (c *PodsClient) List(selector labels.Selector) (result *api.PodList, err error) {
+func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
 	err = c.r.Get().Namespace(c.ns).Path("pods").SelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
 // GetPod takes the name of the pod, and returns the corresponding Pod object, and an error if it occurs
-func (c *PodsClient) Get(name string) (result *api.Pod, err error) {
+func (c *pods) Get(name string) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Get().Namespace(c.ns).Path("pods").Path(name).Do().Into(result)
 	return
 }
 
 // DeletePod takes the name of the pod, and returns an error if one occurs
-func (c *PodsClient) Delete(name string) error {
+func (c *pods) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Path("pods").Path(name).Do().Error()
 }
 
 // CreatePod takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *PodsClient) Create(pod *api.Pod) (result *api.Pod, err error) {
+func (c *pods) Create(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	err = c.r.Post().Namespace(c.ns).Path("pods").Body(pod).Do().Into(result)
 	return
 }
 
 // UpdatePod takes the representation of a pod to update.  Returns the server's representation of the pod, and an error, if it occurs.
-func (c *PodsClient) Update(pod *api.Pod) (result *api.Pod, err error) {
+func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	result = &api.Pod{}
 	if len(pod.ResourceVersion) == 0 {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", pod)
