@@ -82,7 +82,7 @@ func TestErrListPrefix(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errList := ErrorList{testCase.Err}
+		errList := ValidationErrorList{testCase.Err}
 		prefix := errList.Prefix("foo")
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("Prefix should return self")
@@ -112,7 +112,7 @@ func TestErrListPrefixIndex(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errList := ErrorList{testCase.Err}
+		errList := ValidationErrorList{testCase.Err}
 		prefix := errList.PrefixIndex(1)
 		if prefix == nil || len(prefix) != len(errList) {
 			t.Errorf("PrefixIndex should return self")
