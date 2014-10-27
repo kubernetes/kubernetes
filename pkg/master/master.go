@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/tokenfile"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
@@ -160,6 +161,16 @@ func (m *Master) init(c *Config) {
 		}
 	}
 
+	var userContexts = handlers.NewUserRequestContext()
+	var authenticator authenticator.Request
+	if len(c.TokenAuthFile) != 0 {
+		tokenAuthenticator, err := tokenfile.New(c.TokenAuthFile)
+		if err != nil {
+			glog.Fatalf("Unable to load the token authentication file '%s': %v", c.TokenAuthFile, err)
+		}
+		authenticator = bearertoken.New(tokenAuthenticator)
+	}
+
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewREST(&pod.RESTConfig{
 			CloudProvider: c.Cloud,
@@ -197,14 +208,11 @@ func (m *Master) init(c *Config) {
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
 
-	if len(c.TokenAuthFile) != 0 {
-		auth, err := tokenfile.New(c.TokenAuthFile)
-		if err != nil {
-			glog.Fatalf("Unable to load the token authentication file '%s': %v", c.TokenAuthFile, err)
-		}
-		userContexts := handlers.NewUserRequestContext()
-		handler = handlers.NewRequestAuthenticator(userContexts, bearertoken.New(auth), handlers.Unauthorized, handler)
+	if authenticator != nil {
+		handler = handlers.NewRequestAuthenticator(userContexts, authenticator, handlers.Unauthorized, handler)
 	}
+	m.mux.HandleFunc("/_whoami", handleWhoAmI(authenticator))
+
 	m.Handler = handler
 }
 
