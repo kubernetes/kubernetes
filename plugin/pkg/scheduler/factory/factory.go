@@ -74,6 +74,8 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 			algorithm.NewResourceFitPredicate(minionLister),
 			// Fit is determined by non-conflicting disk volumes
 			algorithm.NoDiskConflict,
+			// Fit is determined by node selector query
+			algorithm.NewSelectorMatchPredicate(minionLister),
 		},
 		// Prioritize nodes by least requested utilization.
 		algorithm.LeastRequestedPriority,
