@@ -88,6 +88,7 @@ readonly KUBE_RUN_IMAGES=(
   proxy
   scheduler
   kubelet
+  bootstrap
 )
 
 
