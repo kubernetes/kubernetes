@@ -18,6 +18,8 @@ package master
 
 import (
 	"net"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -25,6 +27,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/tokenfile"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	cloudcontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
@@ -41,43 +46,52 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
+	"github.com/golang/glog"
 )
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Client             *client.Client
-	Cloud              cloudprovider.Interface
-	EtcdHelper         tools.EtcdHelper
-	HealthCheckMinions bool
-	Minions            []string
-	MinionCacheTTL     time.Duration
-	EventTTL           time.Duration
-	MinionRegexp       string
-	KubeletClient      client.KubeletClient
-	NodeResources      api.NodeResources
-	PortalNet          *net.IPNet
-	Mux                apiserver.Mux
-	EnableLogsSupport  bool
-	EnableUISupport    bool
-	APIPrefix          string
+	Client                *client.Client
+	Cloud                 cloudprovider.Interface
+	EtcdHelper            tools.EtcdHelper
+	HealthCheckMinions    bool
+	Minions               []string
+	MinionCacheTTL        time.Duration
+	EventTTL              time.Duration
+	MinionRegexp          string
+	KubeletClient         client.KubeletClient
+	NodeResources         api.NodeResources
+	PortalNet             *net.IPNet
+	Mux                   apiserver.Mux
+	EnableLogsSupport     bool
+	EnableUISupport       bool
+	APIPrefix             string
+	CorsAllowedOriginList util.StringList
+	TokenAuthFile         string
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
-	podRegistry        pod.Registry
-	controllerRegistry controller.Registry
-	serviceRegistry    service.Registry
-	endpointRegistry   endpoint.Registry
-	minionRegistry     minion.Registry
-	bindingRegistry    binding.Registry
-	eventRegistry      generic.Registry
-	storage            map[string]apiserver.RESTStorage
-	client             *client.Client
-	portalNet          *net.IPNet
-	mux                apiserver.Mux
-	enableLogsSupport  bool
-	enableUISupport    bool
-	apiPrefix          string
+	// "Inputs", Copied from Config
+	podRegistry           pod.Registry
+	controllerRegistry    controller.Registry
+	serviceRegistry       service.Registry
+	endpointRegistry      endpoint.Registry
+	minionRegistry        minion.Registry
+	bindingRegistry       binding.Registry
+	eventRegistry         generic.Registry
+	storage               map[string]apiserver.RESTStorage
+	client                *client.Client
+	portalNet             *net.IPNet
+	mux                   apiserver.Mux
+	enableLogsSupport     bool
+	enableUISupport       bool
+	apiPrefix             string
+	corsAllowedOriginList util.StringList
+	tokenAuthFile         string
+	// "Outputs"
+	Handler http.Handler
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -101,19 +115,21 @@ func New(c *Config) *Master {
 		ServiceRegistry: serviceRegistry,
 	}
 	m := &Master{
-		podRegistry:        etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		controllerRegistry: etcd.NewRegistry(c.EtcdHelper, nil),
-		serviceRegistry:    serviceRegistry,
-		endpointRegistry:   etcd.NewRegistry(c.EtcdHelper, nil),
-		bindingRegistry:    etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
-		eventRegistry:      event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
-		minionRegistry:     minionRegistry,
-		client:             c.Client,
-		portalNet:          c.PortalNet,
-		mux:                c.Mux,
-		enableLogsSupport:  c.EnableLogsSupport,
-		enableUISupport:    c.EnableUISupport,
-		apiPrefix:          c.APIPrefix,
+		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
+		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
+		serviceRegistry:       serviceRegistry,
+		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
+		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
+		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
+		minionRegistry:        minionRegistry,
+		client:                c.Client,
+		portalNet:             c.PortalNet,
+		mux:                   c.Mux,
+		enableLogsSupport:     c.EnableLogsSupport,
+		enableUISupport:       c.EnableUISupport,
+		apiPrefix:             c.APIPrefix,
+		corsAllowedOriginList: c.CorsAllowedOriginList,
+		tokenAuthFile:         c.TokenAuthFile,
 	}
 	m.init(c)
 	return m
@@ -170,6 +186,26 @@ func (m *Master) init(c *Config) {
 	if c.EnableUISupport {
 		ui.InstallSupport(m.mux)
 	}
+
+	handler := http.Handler(m.mux.(*http.ServeMux))
+
+	if len(c.CorsAllowedOriginList) > 0 {
+		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
+		if err != nil {
+			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
+		}
+		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
+	}
+
+	if len(c.TokenAuthFile) != 0 {
+		auth, err := tokenfile.New(c.TokenAuthFile)
+		if err != nil {
+			glog.Fatalf("Unable to load the token authentication file '%s': %v", c.TokenAuthFile, err)
+		}
+		userContexts := handlers.NewUserRequestContext()
+		handler = handlers.NewRequestAuthenticator(userContexts, bearertoken.New(auth), handlers.Unauthorized, handler)
+	}
+	m.Handler = handler
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.

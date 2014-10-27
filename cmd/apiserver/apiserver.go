@@ -24,14 +24,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/tokenfile"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -188,7 +184,7 @@ func main() {
 
 	n := net.IPNet(portalNet)
 	mux := http.NewServeMux()
-	master.New(&master.Config{
+	m := master.New(&master.Config{
 		Client:             client,
 		Cloud:              cloud,
 		EtcdHelper:         helper,
@@ -204,38 +200,21 @@ func main() {
 				resources.Memory: util.NewIntOrStringFromInt(*nodeMemory),
 			},
 		},
-		PortalNet:         &n,
-		Mux:               mux,
-		EnableLogsSupport: *enableLogsSupport,
-		EnableUISupport:   true,
-		APIPrefix:         *apiPrefix,
+		PortalNet:             &n,
+		Mux:                   mux,
+		EnableLogsSupport:     *enableLogsSupport,
+		EnableUISupport:       true,
+		APIPrefix:             *apiPrefix,
+		CorsAllowedOriginList: corsAllowedOriginList,
+		TokenAuthFile:         *tokenAuthFile,
 	})
-
-	handler := http.Handler(mux)
-
-	if len(corsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(corsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(corsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	if len(*tokenAuthFile) != 0 {
-		auth, err := tokenfile.New(*tokenAuthFile)
-		if err != nil {
-			glog.Fatalf("Unable to load the token authentication file '%s': %v", *tokenAuthFile, err)
-		}
-		userContexts := handlers.NewUserRequestContext()
-		handler = handlers.NewRequestAuthenticator(userContexts, bearertoken.New(auth), handlers.Unauthorized, handler)
-	}
 
 	if *readOnlyPort != 0 {
 		// Allow 1 read-only request per second, allow up to 20 in a burst before enforcing.
 		rl := util.NewTokenBucketRateLimiter(1.0, 20)
 		readOnlyServer := &http.Server{
 			Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*readOnlyPort))),
-			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, handler))),
+			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.Handler))),
 			ReadTimeout:    5 * time.Minute,
 			WriteTimeout:   5 * time.Minute,
 			MaxHeaderBytes: 1 << 20,
@@ -248,7 +227,7 @@ func main() {
 
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*port))),
-		Handler:        apiserver.RecoverPanics(handler),
+		Handler:        apiserver.RecoverPanics(m.Handler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
