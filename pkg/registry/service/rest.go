@@ -90,10 +90,20 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 
 	service.CreationTimestamp = util.Now()
 
-	if ip, err := rs.portalMgr.AllocateNext(); err != nil {
-		return nil, err
+	if service.PortalIP == "" {
+		// Allocate next available.
+		if ip, err := rs.portalMgr.AllocateNext(); err != nil {
+			return nil, err
+		} else {
+			service.PortalIP = ip.String()
+		}
 	} else {
-		service.PortalIP = ip.String()
+		// Try to respect the requested IP.
+		if err := rs.portalMgr.Allocate(net.ParseIP(service.PortalIP)); err != nil {
+			// TODO: Differentiate "IP already allocated" from real errors.
+			el := errors.ValidationErrorList{errors.NewFieldInvalid("portalIP", service.PortalIP)}
+			return nil, errors.NewInvalid("service", service.Name, el)
+		}
 	}
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
@@ -224,8 +234,12 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 		if err != nil {
 			return nil, err
 		}
+		if service.PortalIP != cur.PortalIP {
+			// TODO: Would be nice to pass "field is immutable" to users.
+			el := errors.ValidationErrorList{errors.NewFieldInvalid("portalIP", service.PortalIP)}
+			return nil, errors.NewInvalid("service", service.Name, el)
+		}
 		// Copy over non-user fields.
-		service.PortalIP = cur.PortalIP
 		service.ProxyPort = cur.ProxyPort
 		// TODO: check to see if external load balancer status changed
 		err = rs.registry.UpdateService(ctx, service)

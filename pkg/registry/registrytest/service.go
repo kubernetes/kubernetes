@@ -56,7 +56,8 @@ func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.Service = svc
+	r.Service = new(api.Service)
+	*r.Service = *svc
 	r.List.Items = append(r.List.Items, *svc)
 	return r.Err
 }
@@ -83,7 +84,7 @@ func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) error
 	defer r.mu.Unlock()
 
 	r.UpdatedID = svc.Name
-	r.Service = svc
+	*r.Service = *svc
 	return r.Err
 }
 
