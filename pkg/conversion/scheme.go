@@ -220,7 +220,7 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) *Meta {
 }
 
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an API Object, or an error.
+// encoding of an API Object, or an error.
 func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
 	return s.MetaFactory.Interpret(data)
 }
