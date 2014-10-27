@@ -18,12 +18,14 @@ package volume
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
 )
 
@@ -82,6 +84,82 @@ func (hostVol *HostDir) GetPath() string {
 	return hostVol.Path
 }
 
+type execInterface interface {
+	ExecCommand(cmd []string, dir string) ([]byte, error)
+}
+
+type GitDir struct {
+	Source   string
+	Revision string
+	PodID    string
+	RootDir  string
+	Name     string
+	exec     exec.Interface
+}
+
+func newGitRepo(volume *api.Volume, podID, rootDir string) *GitDir {
+	return &GitDir{
+		Source:   volume.Source.GitRepo.Repository,
+		Revision: volume.Source.GitRepo.Revision,
+		PodID:    podID,
+		RootDir:  rootDir,
+		Name:     volume.Name,
+		exec:     exec.New(),
+	}
+}
+
+func (g *GitDir) ExecCommand(command string, args []string, dir string) ([]byte, error) {
+	cmd := g.exec.Command(command, args...)
+	cmd.SetDir(dir)
+	return cmd.CombinedOutput()
+}
+
+func (g *GitDir) SetUp() error {
+	volumePath := g.GetPath()
+	if err := os.MkdirAll(volumePath, 0750); err != nil {
+		return err
+	}
+	if _, err := g.ExecCommand("git", []string{"clone", g.Source}, g.GetPath()); err != nil {
+		return err
+	}
+	files, err := ioutil.ReadDir(g.GetPath())
+	if err != nil {
+		return err
+	}
+	if len(g.Revision) == 0 {
+		return nil
+	}
+
+	if len(files) != 1 {
+		return fmt.Errorf("Unexpected directory contents: %v", files)
+	}
+	dir := path.Join(g.GetPath(), files[0].Name())
+	if _, err := g.ExecCommand("git", []string{"checkout", g.Revision}, dir); err != nil {
+		return err
+	}
+	if _, err := g.ExecCommand("git", []string{"reset", "--hard"}, dir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *GitDir) GetPath() string {
+	return path.Join(g.RootDir, g.PodID, "volumes", "git", g.Name)
+}
+
+// TearDown simply deletes everything in the directory.
+func (g *GitDir) TearDown() error {
+	tmpDir, err := renameDirectory(g.GetPath(), g.Name+"~deleting")
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // EmptyDir volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
 type EmptyDir struct {
@@ -93,20 +171,15 @@ type EmptyDir struct {
 // SetUp creates new directory.
 func (emptyDir *EmptyDir) SetUp() error {
 	path := emptyDir.GetPath()
-	err := os.MkdirAll(path, 0750)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.MkdirAll(path, 0750)
 }
 
 func (emptyDir *EmptyDir) GetPath() string {
 	return path.Join(emptyDir.RootDir, emptyDir.PodID, "volumes", "empty", emptyDir.Name)
 }
 
-func (emptyDir *EmptyDir) renameDirectory() (string, error) {
-	oldPath := emptyDir.GetPath()
-	newPath, err := ioutil.TempDir(path.Dir(oldPath), emptyDir.Name+".deleting~")
+func renameDirectory(oldPath, newName string) (string, error) {
+	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
 	if err != nil {
 		return "", err
 	}
@@ -119,7 +192,7 @@ func (emptyDir *EmptyDir) renameDirectory() (string, error) {
 
 // TearDown simply deletes everything in the directory.
 func (emptyDir *EmptyDir) TearDown() error {
-	tmpDir, err := emptyDir.renameDirectory()
+	tmpDir, err := renameDirectory(emptyDir.GetPath(), emptyDir.Name+".deleting~")
 	if err != nil {
 		return err
 	}
@@ -279,6 +352,8 @@ func CreateVolumeBuilder(volume *api.Volume, podID string, rootDir string) (Buil
 		if err != nil {
 			return nil, err
 		}
+	} else if source.GitRepo != nil {
+		vol = newGitRepo(volume, podID, rootDir)
 	} else {
 		return nil, ErrUnsupportedVolumeType
 	}
@@ -297,6 +372,12 @@ func CreateVolumeCleaner(kind string, name string, podID string, rootDir string)
 			RootDir: rootDir,
 			util:    &GCEDiskUtil{},
 			mounter: &DiskMounter{}}, nil
+	case "git":
+		return &GitDir{
+			Name:    name,
+			PodID:   podID,
+			RootDir: rootDir,
+		}, nil
 	default:
 		return nil, ErrUnsupportedVolumeType
 	}
