@@ -176,7 +176,7 @@ func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
 }
 
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an API Object, or an error.
+// encoding of an API Object, or an error.
 func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
 	return s.raw.DataVersionAndKind(data)
 }

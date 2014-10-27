@@ -17,150 +17,76 @@ limitations under the License.
 package kubectl
 
 import (
-	"fmt"
-	"io"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-type ModifyAction string
+// RESTModifier provides methods for mutating a known or unknown
+// RESTful resource.
+type RESTModifier struct {
+	Resource string
+	// A RESTClient capable of mutating this resource
+	RESTClient RESTClient
+	// A codec for decoding and encoding objects of this resource type.
+	Codec runtime.Codec
+	// An interface for reading or writing the resource version of this
+	// type.
+	Versioner runtime.ResourceVersioner
+}
 
-const (
-	ModifyCreate = ModifyAction("create")
-	ModifyUpdate = ModifyAction("update")
-	ModifyDelete = ModifyAction("delete")
-)
-
-func Modify(w io.Writer, c *client.RESTClient, namespace string, action ModifyAction, data []byte) error {
-	if action != ModifyCreate && action != ModifyUpdate && action != ModifyDelete {
-		return fmt.Errorf("Action not recognized")
+// NewRESTModifier creates a RESTModifier from a RESTMapping
+func NewRESTModifier(client RESTClient, mapping *meta.RESTMapping) *RESTModifier {
+	return &RESTModifier{
+		RESTClient: client,
+		Resource:   mapping.Resource,
+		Codec:      mapping.Codec,
+		Versioner:  mapping.MetadataAccessor,
 	}
+}
 
-	// TODO Support multiple API versions.
-	version, kind, err := versionAndKind(data)
+func (m *RESTModifier) Delete(namespace, name string) error {
+	return m.RESTClient.Delete().Path(m.Resource).Path(name).Do().Error()
+}
+
+func (m *RESTModifier) Create(namespace string, data []byte) error {
+	return m.RESTClient.Post().Path(m.Resource).Body(data).Do().Error()
+}
+
+func (m *RESTModifier) Update(namespace, name string, overwrite bool, data []byte) error {
+	c := m.RESTClient
+
+	obj, err := m.Codec.Decode(data)
 	if err != nil {
-		return err
+		// We don't know how to handle this object, but update it anyway
+		return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
 	}
 
-	if version != apiVersionToUse {
-		return fmt.Errorf("Only supporting API version '%s' for now (version '%s' specified)", apiVersionToUse, version)
-	}
-
-	obj, err := dataToObject(data)
+	// Attempt to version the object based on client logic.
+	version, err := m.Versioner.ResourceVersion(obj)
 	if err != nil {
-		if err.Error() == "No type '' for version ''" {
-			return fmt.Errorf("Object could not be decoded. Make sure it has the Kind field defined.")
+		// We don't know how to version this object, so send it to the server as is
+		return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
+	}
+	if version == "" && overwrite {
+		// Retrieve the current version of the object to overwrite the server object
+		serverObj, err := c.Get().Path(m.Resource).Path(name).Do().Get()
+		if err != nil {
+			// The object does not exist, but we want it to be created
+			return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
 		}
-		return err
+		serverVersion, err := m.Versioner.ResourceVersion(serverObj)
+		if err != nil {
+			return err
+		}
+		if err := m.Versioner.SetResourceVersion(obj, serverVersion); err != nil {
+			return err
+		}
+		newData, err := m.Codec.Encode(obj)
+		if err != nil {
+			return err
+		}
+		data = newData
 	}
 
-	resource, err := resolveKindToResource(kind)
-	if err != nil {
-		return err
-	}
-
-	var id string
-	switch action {
-	case "create":
-		id, err = doCreate(c, namespace, resource, data)
-	case "update":
-		id, err = doUpdate(c, namespace, resource, obj)
-	case "delete":
-		id, err = doDelete(c, namespace, resource, obj)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(w, "%s\n", id)
-	return nil
-}
-
-// Creates the object then returns the ID of the newly created object.
-func doCreate(c *client.RESTClient, namespace string, resource string, data []byte) (string, error) {
-	obj, err := c.Post().Namespace(namespace).Path(resource).Body(data).Do().Get()
-	if err != nil {
-		return "", err
-	}
-	return getIDFromObj(obj)
-}
-
-// Creates the object then returns the ID of the newly created object.
-func doUpdate(c *client.RESTClient, namespace string, resource string, obj runtime.Object) (string, error) {
-	// Figure out the ID of the object to update by introspecting into the
-	// object.
-	id, err := getIDFromObj(obj)
-	if err != nil {
-		return "", fmt.Errorf("Name not retrievable from object for update: %v", err)
-	}
-
-	// Get the object from the server to find out its current resource
-	// version to prevent race conditions in updating the object.
-	serverObj, err := c.Get().Namespace(namespace).Path(resource).Path(id).Do().Get()
-	if err != nil {
-		return "", fmt.Errorf("Item Name %s does not exist for update: %v", id, err)
-	}
-	version, err := getResourceVersionFromObj(serverObj)
-	if err != nil {
-		return "", err
-	}
-
-	// Update the object we are trying to send to the server with the
-	// correct resource version.
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	meta.SetResourceVersion(version)
-
-	// Convert object with updated resourceVersion to data for PUT.
-	data, err := c.Codec.Encode(obj)
-	if err != nil {
-		return "", err
-	}
-
-	// Do the update.
-	err = c.Put().Namespace(namespace).Path(resource).Path(id).Body(data).Do().Error()
-	fmt.Printf("r: %q, i: %q, d: %s", resource, id, data)
-	if err != nil {
-		return "", err
-	}
-
-	return id, nil
-}
-
-func doDelete(c *client.RESTClient, namespace string, resource string, obj runtime.Object) (string, error) {
-	id, err := getIDFromObj(obj)
-	if err != nil {
-		return "", fmt.Errorf("Name not retrievable from object for delete: %v", err)
-	}
-	if id == "" {
-		return "", fmt.Errorf("The supplied resource has no Name and cannot be deleted")
-	}
-
-	err = c.Delete().Namespace(namespace).Path(resource).Path(id).Do().Error()
-	if err != nil {
-		return "", err
-	}
-
-	return id, nil
-}
-
-func getIDFromObj(obj runtime.Object) (string, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	return meta.Name(), nil
-}
-
-func getResourceVersionFromObj(obj runtime.Object) (string, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return "", err
-	}
-	return meta.ResourceVersion(), nil
+	return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
 }

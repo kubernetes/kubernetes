@@ -27,12 +27,11 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+
 	"gopkg.in/v1/yaml"
 )
 
@@ -158,21 +157,6 @@ func makeImageList(manifest api.ContainerManifest) string {
 		images = append(images, container.Image)
 	}
 	return strings.Join(images, ",")
-}
-
-// Takes input 'data' as either json or yaml and attemps to decode it into the
-// supplied object.
-func dataToObject(data []byte) (runtime.Object, error) {
-	// This seems hacky but we can't get the codec from kubeClient.
-	versionInterfaces, err := latest.InterfacesFor(apiVersionToUse)
-	if err != nil {
-		return nil, err
-	}
-	obj, err := versionInterfaces.Codec.Decode(data)
-	if err != nil {
-		return nil, err
-	}
-	return obj, nil
 }
 
 const (

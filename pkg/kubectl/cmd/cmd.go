@@ -27,11 +27,19 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
+
+type Factory struct {
+	Mapper meta.RESTMapper
+	Typer  runtime.ObjectTyper
+	Client func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error)
+}
 
 func RunKubectl(out io.Writer) {
 	// Parent command to which all subcommands are added.
@@ -42,6 +50,15 @@ func RunKubectl(out io.Writer) {
 
 Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 		Run: runHelp,
+	}
+
+	factory := &Factory{
+		Mapper: latest.NewDefaultRESTMapper(),
+		Typer:  api.Scheme,
+		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
+			// Will handle all resources defined by the command
+			return getKubeClient(cmd), nil
+		},
 	}
 
 	// Globally persistent flags across all subcommands.
@@ -63,9 +80,11 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdProxy(out))
 	cmds.AddCommand(NewCmdGet(out))
 	cmds.AddCommand(NewCmdDescribe(out))
-	cmds.AddCommand(NewCmdCreate(out))
-	cmds.AddCommand(NewCmdUpdate(out))
-	cmds.AddCommand(NewCmdDelete(out))
+
+	cmds.AddCommand(factory.NewCmdCreate(out))
+	cmds.AddCommand(factory.NewCmdUpdate(out))
+	cmds.AddCommand(factory.NewCmdDelete(out))
+
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(out))
 	cmds.AddCommand(NewCmdCreateAll(out))

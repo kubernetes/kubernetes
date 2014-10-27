@@ -17,13 +17,14 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdCreate(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create -f filename",
 		Short: "Create a resource by filename or stdin",
@@ -40,13 +41,15 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			filename := getFlagString(cmd, "filename")
 			if len(filename) == 0 {
-				usageError(cmd, "Must pass a filename to update")
+				usageError(cmd, "Must specify filename to create")
 			}
-			data, err := readConfigData(filename)
+			mapping, namespace, name, data := ResourceFromFile(filename, f.Typer, f.Mapper)
+			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			err = kubectl.Modify(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), kubectl.ModifyCreate, data)
+			err = kubectl.NewRESTModifier(client, mapping).Create(namespace, data)
 			checkErr(err)
+			fmt.Fprintf(out, "%s\n", name)
 		},
 	}
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the resource")
