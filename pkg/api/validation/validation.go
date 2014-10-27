@@ -339,6 +339,17 @@ func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", pod.Namespace))
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
+	allErrs = append(allErrs, validateLabels(pod.Labels)...)
+	return allErrs
+}
+
+func validateLabels(labels map[string]string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for k := range labels {
+		if !util.IsDNS952Label(k) {
+			allErrs = append(allErrs, errs.NewFieldNotSupported("label", k))
+		}
+	}
 	return allErrs
 }
 
@@ -392,6 +403,8 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Selector))
 	}
+	allErrs = append(allErrs, validateLabels(service.Labels)...)
+	allErrs = append(allErrs, validateLabels(service.Selector)...)
 	return allErrs
 }
 
@@ -405,6 +418,7 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.V
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
 	}
 	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
+	allErrs = append(allErrs, validateLabels(controller.Labels)...)
 	return allErrs
 }
 
@@ -419,6 +433,7 @@ func ValidateReplicationControllerState(state *api.ReplicationControllerState) e
 	if !selector.Matches(labels) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("podTemplate.labels", state.PodTemplate))
 	}
+	allErrs = append(allErrs, validateLabels(labels)...)
 	if state.Replicas < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
 	}
