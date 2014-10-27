@@ -47,8 +47,8 @@ function do_teardown() {
 #   $3: service replica count
 function start_service() {
   echo "Starting service '$1' on port $2 with $3 replicas"
-  ${KUBECFG} -s "$2" -p 9376 run kubernetes/serve_hostname "$3" "$1"
   svcs_to_clean+=("$1")
+  ${KUBECFG} -s "$2" -p 9376 run kubernetes/serve_hostname "$3" "$1"
 }
 
 # Args:
@@ -70,7 +70,7 @@ function query_pods() {
   for i in $(seq 1 10); do
     pods_unsorted=($(${KUBECFG} \
         '-template={{range.Items}}{{.Name}} {{end}}' \
-        -l replicationController="$1" list pods))
+        -l name="$1" list pods))
     found="${#pods_unsorted[*]}"
     if [[ "${found}" == "$2" ]]; then
       break
