@@ -424,6 +424,8 @@ type Pod struct {
 
 	DesiredState PodState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
 	CurrentState PodState `json:"currentState,omitempty" yaml:"currentState,omitempty"`
+	// NodeSelector is a selector which must be true for the pod to fit on a node
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 }
 
 // ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get).
@@ -531,6 +533,8 @@ type Minion struct {
 	HostIP string `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 	// Resources available on the node
 	NodeResources NodeResources `json:"resources,omitempty" yaml:"resources,omitempty"`
+	// Labels for the node
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // MinionList is a list of minions.

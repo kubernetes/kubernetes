@@ -234,3 +234,77 @@ func TestDiskConflicts(t *testing.T) {
 		}
 	}
 }
+
+func TestPodFitsSelector(t *testing.T) {
+	tests := []struct {
+		pod    api.Pod
+		labels map[string]string
+		fits   bool
+		test   string
+	}{
+		{
+			pod:  api.Pod{},
+			fits: true,
+			test: "no selector",
+		},
+		{
+			pod: api.Pod{
+				NodeSelector: map[string]string{
+					"foo": "bar",
+				},
+			},
+			fits: false,
+			test: "missing labels",
+		},
+		{
+			pod: api.Pod{
+				NodeSelector: map[string]string{
+					"foo": "bar",
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: true,
+			test: "same labels",
+		},
+		{
+			pod: api.Pod{
+				NodeSelector: map[string]string{
+					"foo": "bar",
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+				"baz": "blah",
+			},
+			fits: true,
+			test: "node labels are superset",
+		},
+		{
+			pod: api.Pod{
+				NodeSelector: map[string]string{
+					"foo": "bar",
+					"baz": "blah",
+				},
+			},
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			fits: false,
+			test: "node labels are subset",
+		},
+	}
+	for _, test := range tests {
+		node := api.Minion{Labels: test.labels}
+
+		fit := NodeSelector{FakeNodeInfo(node)}
+		fits, err := fit.PodSelectorMatches(test.pod, []api.Pod{}, "machine")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+}

@@ -79,7 +79,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 		t.Errorf("Unexpeted error: %#v", err)
 	}
 	if !reflect.DeepEqual(obj, &objOut) {
-		t.Errorf("Unexpected inequality: %#v vs %#v", obj, &objOut)
+		t.Errorf("Unexpected inequality:\n%#v \nvs\n%#v", obj, &objOut)
 	}
 }
 
