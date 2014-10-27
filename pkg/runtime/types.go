@@ -38,6 +38,7 @@ type TypeMeta struct {
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 
+	Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
 	UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`

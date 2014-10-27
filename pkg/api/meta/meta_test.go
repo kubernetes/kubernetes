@@ -26,6 +26,7 @@ import (
 func TestGenericTypeMeta(t *testing.T) {
 	type TypeMeta struct {
 		Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
+		Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 		Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
 		UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
 		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
@@ -38,6 +39,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	}
 	j := Object{
 		TypeMeta{
+			Namespace:       "bar",
 			Name:            "foo",
 			UID:             "uid",
 			APIVersion:      "a",
@@ -49,6 +51,9 @@ func TestGenericTypeMeta(t *testing.T) {
 	accessor, err := Accessor(&j)
 	if err != nil {
 		t.Fatalf("new err: %v", err)
+	}
+	if e, a := "bar", accessor.Namespace(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -69,6 +74,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	accessor.SetNamespace("baz")
 	accessor.SetName("bar")
 	accessor.SetUID("other")
 	accessor.SetAPIVersion("c")
@@ -77,6 +83,9 @@ func TestGenericTypeMeta(t *testing.T) {
 	accessor.SetSelfLink("google.com")
 
 	// Prove that accessor changes the original object.
+	if e, a := "baz", j.Namespace; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	if e, a := "bar", j.Name; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -97,12 +106,138 @@ func TestGenericTypeMeta(t *testing.T) {
 	}
 }
 
+type InternalTypeMeta struct {
+	Kind              string    `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
+	UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
+	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
+	SelfLink          string    `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
+	ResourceVersion   string    `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+	APIVersion        string    `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+}
+type InternalObject struct {
+	TypeMeta InternalTypeMeta `json:",inline" yaml:",inline"`
+}
+
+func (*InternalObject) IsAnAPIObject() {}
+
+func TestGenericTypeMetaAccessor(t *testing.T) {
+	j := &InternalObject{
+		InternalTypeMeta{
+			Namespace:       "bar",
+			Name:            "foo",
+			UID:             "uid",
+			APIVersion:      "a",
+			Kind:            "b",
+			ResourceVersion: "1",
+			SelfLink:        "some/place/only/we/know",
+		},
+	}
+	accessor := NewAccessor()
+	namespace, err := accessor.Namespace(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "bar", namespace; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	name, err := accessor.Name(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "foo", name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	uid, err := accessor.UID(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "uid", uid; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	apiVersion, err := accessor.APIVersion(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "a", apiVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	kind, err := accessor.Kind(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "b", kind; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	rv, err := accessor.ResourceVersion(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "1", rv; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	selfLink, err := accessor.SelfLink(j)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if e, a := "some/place/only/we/know", selfLink; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	if err := accessor.SetNamespace(j, "baz"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := accessor.SetName(j, "bar"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := accessor.SetUID(j, "other"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := accessor.SetAPIVersion(j, "c"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := accessor.SetKind(j, "d"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := accessor.SetResourceVersion(j, "2"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := accessor.SetSelfLink(j, "google.com"); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Prove that accessor changes the original object.
+	if e, a := "baz", j.TypeMeta.Namespace; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "bar", j.TypeMeta.Name; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "other", j.TypeMeta.UID; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "c", j.TypeMeta.APIVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "d", j.TypeMeta.Kind; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "2", j.TypeMeta.ResourceVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "google.com", j.TypeMeta.SelfLink; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+}
+
 func TestGenericObjectMeta(t *testing.T) {
 	type TypeMeta struct {
 		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
 		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	}
 	type ObjectMeta struct {
+		Namespace         string    `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 		Name              string    `json:"name,omitempty" yaml:"name,omitempty"`
 		UID               string    `json:"uid,omitempty" yaml:"uid,omitempty"`
 		CreationTimestamp util.Time `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
@@ -119,6 +254,7 @@ func TestGenericObjectMeta(t *testing.T) {
 			Kind:       "b",
 		},
 		ObjectMeta{
+			Namespace:       "bar",
 			Name:            "foo",
 			UID:             "uid",
 			ResourceVersion: "1",
@@ -128,6 +264,9 @@ func TestGenericObjectMeta(t *testing.T) {
 	accessor, err := Accessor(&j)
 	if err != nil {
 		t.Fatalf("new err: %v", err)
+	}
+	if e, a := "bar", accessor.Namespace(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
@@ -148,6 +287,7 @@ func TestGenericObjectMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	accessor.SetNamespace("baz")
 	accessor.SetName("bar")
 	accessor.SetUID("other")
 	accessor.SetAPIVersion("c")
@@ -156,6 +296,9 @@ func TestGenericObjectMeta(t *testing.T) {
 	accessor.SetSelfLink("google.com")
 
 	// Prove that accessor changes the original object.
+	if e, a := "baz", j.Namespace; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 	if e, a := "bar", j.Name; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -265,7 +408,7 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 		"api object with version":            {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
 		"pointer to api object with version": {&MyAPIObject{TypeMeta: runtime.TypeMeta{ResourceVersion: "1"}}, "1"},
 	}
-	versioning := NewResourceVersioner()
+	versioning := NewAccessor()
 	for key, testCase := range testCases {
 		actual, err := versioning.ResourceVersion(testCase.Object)
 		if err != nil {
@@ -328,7 +471,7 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 		},
 	}
 
-	linker := NewSelfLinker()
+	var linker runtime.SelfLinker = NewAccessor()
 	for name, item := range table {
 		got, err := linker.SelfLink(item.obj)
 		if e, a := item.succeed, err == nil; e != a {
