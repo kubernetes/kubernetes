@@ -306,12 +306,12 @@ func createService(ctx api.Context, name string, port int, client client.Interfa
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				"simpleService": name,
+				"name": name,
 			},
 		},
 		Port: port,
 		Selector: map[string]string{
-			"simpleService": name,
+			"name": name,
 		},
 	}
 	svc, err := client.Services(api.Namespace(ctx)).Create(svc)
