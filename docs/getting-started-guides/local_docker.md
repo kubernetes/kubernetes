@@ -38,6 +38,8 @@ docker run -v /var/run/docker.sock:/var/run/docker.sock kubernetes-bootstrap
 
 ```
 ./build/make-client.sh
+# set $host_os and $host_arch to your local host os and architecture.
+export PATH=$(readlink -f _output/build/$host_os/$host_arch):$PATH
 ```
 
 ### Manage your pods
