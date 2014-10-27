@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
@@ -132,17 +131,18 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	if err != nil {
 		glog.Fatalf("Unable to parse CIDR: %v", err)
 	}
-	m := master.New(&master.Config{
-		Client:        cl,
-		EtcdHelper:    helper,
-		Minions:       machineList,
-		KubeletClient: fakeKubeletClient{},
-		PortalNet:     portalNet,
-	})
 	mux := http.NewServeMux()
-	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, "/api/v1beta1")
-	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(mux, "/api/v1beta2")
-	apiserver.InstallSupport(mux)
+	// Create a master and install handlers into mux.
+	master.New(&master.Config{
+		Client:            cl,
+		EtcdHelper:        helper,
+		Minions:           machineList,
+		KubeletClient:     fakeKubeletClient{},
+		PortalNet:         portalNet,
+		Mux:               mux,
+		EnableLogsSupport: false,
+		APIPrefix:         "/api",
+	})
 	handler.delegate = mux
 
 	// Scheduler

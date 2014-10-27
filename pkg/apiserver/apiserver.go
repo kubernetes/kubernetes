@@ -30,7 +30,7 @@ import (
 )
 
 // mux is an object that can register http handlers.
-type mux interface {
+type Mux interface {
 	Handle(pattern string, handler http.Handler)
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
@@ -87,7 +87,7 @@ func NewAPIGroup(storage map[string]RESTStorage, codec runtime.Codec, canonicalP
 // InstallREST registers the REST handlers (storage, watch, and operations) into a mux.
 // It is expected that the provided prefix will serve all operations. Path MUST NOT end
 // in a slash.
-func (g *APIGroup) InstallREST(mux mux, paths ...string) {
+func (g *APIGroup) InstallREST(mux Mux, paths ...string) {
 	restHandler := &g.handler
 	watchHandler := &WatchHandler{g.handler.storage, g.handler.codec}
 	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
@@ -119,14 +119,14 @@ func (g *APIGroup) InstallREST(mux mux, paths ...string) {
 }
 
 // InstallSupport registers the APIServer support functions into a mux.
-func InstallSupport(mux mux) {
+func InstallSupport(mux Mux) {
 	healthz.InstallHandler(mux)
 	mux.HandleFunc("/version", handleVersion)
 	mux.HandleFunc("/", handleIndex)
 }
 
 // InstallLogsSupport registers the APIServer log support function into a mux.
-func InstallLogsSupport(mux mux) {
+func InstallLogsSupport(mux Mux) {
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
 }
 

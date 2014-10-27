@@ -19,17 +19,15 @@ limitations under the License.
 package integration
 
 import (
-	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
@@ -42,26 +40,24 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	m := master.New(&master.Config{
-		EtcdHelper: helper,
+	mux := http.NewServeMux()
+	master.New(&master.Config{
+		EtcdHelper:        helper,
+		Mux:               mux,
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
 	})
-	s1, c1, loc1, sl1 := m.API_v1beta1()
-	s2, c2, loc2, sl2 := m.API_v1beta2()
 
-	testCases := map[string]struct {
-		Storage    map[string]apiserver.RESTStorage
-		Codec      runtime.Codec
-		location   string
-		selfLinker runtime.SelfLinker
-	}{
-		"v1beta1": {s1, c1, loc1, sl1},
-		"v1beta2": {s2, c2, loc2, sl2},
+	s := httptest.NewServer(mux)
+
+	testCases := []string{
+		"v1beta1",
+		"v1beta2",
 	}
-
-	for apiVersion, values := range testCases {
+	for _, apiVersion := range testCases {
 		ns := api.NamespaceDefault
 		deleteAllEtcdKeys()
-		s := httptest.NewServer(apiserver.Handle(values.Storage, values.Codec, fmt.Sprintf("/api/%s/", apiVersion), values.selfLinker))
 		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
 
 		info, err := client.ServerVersion()
