@@ -22,6 +22,8 @@ import (
 	// TODO: move everything from pkg/scheduler into this package. Remove references from registry.
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
+	"github.com/golang/glog"
 )
 
 // Binder knows how to write a binding.
@@ -66,8 +68,10 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
+	glog.V(3).Infof("Attempting to schedule: %v", pod)
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
+		glog.V(1).Infof("Failed to schedule: %v", pod)
 		record.Eventf(pod, string(api.PodPending), "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
@@ -78,6 +82,7 @@ func (s *Scheduler) scheduleOne() {
 		Host:       dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
+		glog.V(1).Infof("Failed to bind pod: %v", err)
 		record.Eventf(pod, string(api.PodPending), "failedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return

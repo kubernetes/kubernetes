@@ -126,7 +126,9 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 			// Sync even if this is a deletion event, to ensure that we leave
 			// it in the desired state.
 			glog.V(4).Infof("About to sync from watch: %v", rc.Name)
-			rm.syncHandler(*rc)
+			if err := rm.syncHandler(*rc); err != nil {
+				glog.Errorf("unexpected sync. error: %v", err)
+			}
 		}
 	}
 }
