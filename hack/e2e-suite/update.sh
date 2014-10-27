@@ -38,7 +38,7 @@ function validate() {
     sleep 2
 
     local pod_id_list
-    pod_id_list=($($KUBECFG -template='{{range.Items}}{{.Name}} {{end}}' -l simpleService="${CONTROLLER_NAME}" list pods))
+    pod_id_list=($($KUBECFG -template='{{range.Items}}{{.Name}} {{end}}' -l name="${CONTROLLER_NAME}" list pods))
 
     echo "  ${#pod_id_list[@]} out of ${num_replicas} created"
 

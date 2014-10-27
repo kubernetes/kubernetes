@@ -254,7 +254,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
 			ReplicaSelector: map[string]string{
-				"simpleService": name,
+				"name": name,
 			},
 			PodTemplate: api.PodTemplate{
 				DesiredState: api.PodState{
@@ -270,7 +270,7 @@ func RunController(ctx api.Context, image, name string, replicas int, client cli
 					},
 				},
 				Labels: map[string]string{
-					"simpleService": name,
+					"name": name,
 				},
 			},
 		},
