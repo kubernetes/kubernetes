@@ -118,5 +118,8 @@ func EnforcePtr(obj interface{}) (reflect.Value, error) {
 		}
 		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v type", v.Type().Name())
 	}
+	if v.IsNil() {
+		return reflect.Value{}, fmt.Errorf("expected pointer, but got nil")
+	}
 	return v.Elem(), nil
 }

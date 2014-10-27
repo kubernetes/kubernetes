@@ -253,3 +253,11 @@ func TestInvalidPtrValueKind(t *testing.T) {
 		}
 	}
 }
+
+func TestEnforceNilPtr(t *testing.T) {
+	var nilPtr *struct{}
+	_, err := EnforcePtr(nilPtr)
+	if err == nil {
+		t.Errorf("Expected error on nil pointer")
+	}
+}
