@@ -123,6 +123,20 @@ func TestScheme(t *testing.T) {
 	}
 }
 
+func TestInvalidObjectValueKind(t *testing.T) {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
+
+	embedded := &runtime.EmbeddedObject{}
+	switch obj := embedded.Object.(type) {
+	default:
+		_, _, err := scheme.ObjectVersionAndKind(obj)
+		if err == nil {
+			t.Errorf("Expected error on invalid kind")
+		}
+	}
+}
+
 func TestBadJSONRejection(t *testing.T) {
 	scheme := runtime.NewScheme()
 	badJSONMissingKind := []byte(`{ }`)

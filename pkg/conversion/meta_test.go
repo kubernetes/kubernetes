@@ -242,3 +242,14 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
+
+func TestInvalidPtrValueKind(t *testing.T) {
+	var simple interface{}
+	switch obj := simple.(type) {
+	default:
+		_, err := EnforcePtr(obj)
+		if err == nil {
+			t.Errorf("Expected error on invalid kind")
+		}
+	}
+}
