@@ -23,5 +23,5 @@ import (
 )
 
 func main() {
-	cmd.RunKubectl(os.Stdout)
+	cmd.NewFactory().Run(os.Stdout)
 }

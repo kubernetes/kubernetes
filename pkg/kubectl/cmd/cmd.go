@@ -35,13 +35,38 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Factory provides abstractions that allow the Kubectl command to be extended across multiple types
+// of resources and different API sets.
 type Factory struct {
-	Mapper meta.RESTMapper
-	Typer  runtime.ObjectTyper
-	Client func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error)
+	Mapper    meta.RESTMapper
+	Typer     runtime.ObjectTyper
+	Client    func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error)
+	Describer func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error)
+	Printer   func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
 }
 
-func RunKubectl(out io.Writer) {
+// NewFactory creates a factory with the default Kubernetes resources defined
+func NewFactory() *Factory {
+	return &Factory{
+		Mapper: latest.RESTMapper,
+		Typer:  api.Scheme,
+		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
+			return getKubeClient(cmd), nil
+		},
+		Describer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
+			describer, ok := kubectl.DescriberFor(mapping.Kind, getKubeClient(cmd))
+			if !ok {
+				return nil, fmt.Errorf("No description has been implemented for %q", mapping.Kind)
+			}
+			return describer, nil
+		},
+		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		},
+	}
+}
+
+func (f *Factory) Run(out io.Writer) {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -50,15 +75,6 @@ func RunKubectl(out io.Writer) {
 
 Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 		Run: runHelp,
-	}
-
-	factory := &Factory{
-		Mapper: latest.NewDefaultRESTMapper(),
-		Typer:  api.Scheme,
-		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
-			// Will handle all resources defined by the command
-			return getKubeClient(cmd), nil
-		},
 	}
 
 	// Globally persistent flags across all subcommands.
@@ -78,12 +94,12 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdProxy(out))
-	cmds.AddCommand(NewCmdGet(out))
-	cmds.AddCommand(NewCmdDescribe(out))
 
-	cmds.AddCommand(factory.NewCmdCreate(out))
-	cmds.AddCommand(factory.NewCmdUpdate(out))
-	cmds.AddCommand(factory.NewCmdDelete(out))
+	cmds.AddCommand(f.NewCmdGet(out))
+	cmds.AddCommand(f.NewCmdDescribe(out))
+	cmds.AddCommand(f.NewCmdCreate(out))
+	cmds.AddCommand(f.NewCmdUpdate(out))
+	cmds.AddCommand(f.NewCmdDelete(out))
 
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(out))

@@ -31,8 +31,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
-
-	"gopkg.in/v1/yaml"
 )
 
 var apiVersionToUse = "v1beta1"
@@ -132,16 +130,6 @@ func promptForString(field string, r io.Reader) string {
 	return result
 }
 
-func CreateResource(resource, id string) ([]byte, error) {
-	kind, err := resolveResource(resolveToKind, resource)
-	if err != nil {
-		return nil, err
-	}
-
-	s := fmt.Sprintf(`{"kind": "%s", "apiVersion": "%s", "id": "%s"}`, kind, apiVersionToUse, id)
-	return []byte(s), nil
-}
-
 // TODO Move to labels package.
 func formatLabels(labelMap map[string]string) string {
 	l := labels.Set(labelMap).String()
@@ -157,91 +145,4 @@ func makeImageList(manifest api.ContainerManifest) string {
 		images = append(images, container.Image)
 	}
 	return strings.Join(images, ",")
-}
-
-const (
-	resolveToPath = "path"
-	resolveToKind = "kind"
-)
-
-// Takes a human-friendly reference to a resource and converts it to either a
-// resource path for an API call or to a Kind to construct a JSON definition.
-// See usages of the function for more context.
-//
-// target is one of the above constants ("path" or "kind") to determine what to
-// resolve the resource to.
-//
-// resource is the human-friendly reference to the resource you want to
-// convert.
-func resolveResource(target, resource string) (string, error) {
-	if target != resolveToPath && target != resolveToKind {
-		return "", fmt.Errorf("Unrecognized target to convert to: %s", target)
-	}
-
-	var resolved string
-	var err error
-	// Caseless comparison.
-	resource = strings.ToLower(resource)
-	switch resource {
-	case "pods", "pod", "po":
-		if target == resolveToPath {
-			resolved = "pods"
-		} else {
-			resolved = "Pod"
-		}
-	case "replicationcontrollers", "replicationcontroller", "rc":
-		if target == resolveToPath {
-			resolved = "replicationControllers"
-		} else {
-			resolved = "ReplicationController"
-		}
-	case "services", "service", "se":
-		if target == resolveToPath {
-			resolved = "services"
-		} else {
-			resolved = "Service"
-		}
-	case "minions", "minion", "mi":
-		if target == resolveToPath {
-			resolved = "minions"
-		} else {
-			resolved = "Minion"
-		}
-	default:
-		// It might be a GUID, but we don't know how to handle those for now.
-		err = fmt.Errorf("Resource %s not recognized; need pods, replicationControllers, services or minions.", resource)
-	}
-	return resolved, err
-}
-
-func resolveKindToResource(kind string) (resource string, err error) {
-	// Determine the REST resource according to the type in data.
-	switch kind {
-	case "Pod":
-		resource = "pods"
-	case "ReplicationController":
-		resource = "replicationControllers"
-	case "Service":
-		resource = "services"
-	default:
-		err = fmt.Errorf("Object %s not recognized", kind)
-	}
-	return
-}
-
-// versionAndKind will return the APIVersion and Kind of the given wire-format
-// enconding of an APIObject, or an error. This is hacked in until the
-// migration to v1beta3.
-func versionAndKind(data []byte) (version, kind string, err error) {
-	findKind := struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	}{}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, &findKind)
-	if err != nil {
-		return "", "", fmt.Errorf("couldn't get version/kind: %v", err)
-	}
-	return findKind.APIVersion, findKind.Kind, nil
 }

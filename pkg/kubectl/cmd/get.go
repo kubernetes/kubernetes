@@ -20,12 +20,13 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdGet(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get [(-o|--output=)table|json|yaml|template] [-t <file>|--template=<file>] <resource> [<id>]",
+		Use:   "get [(-o|--output=)console|json|yaml|...] <resource> [<id>]",
 		Short: "Display one or many resources",
 		Long: `Display one or many resources.
 
@@ -44,20 +45,24 @@ Examples:
   $ kubectl get -f json pod 1234-56-7890-234234-456456
   <list single pod in json output format>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			var resource, id string
-			if len(args) == 0 {
-				usageError(cmd, "Need to supply a resource.")
-			}
-			if len(args) >= 1 {
-				resource = args[0]
-			}
-			if len(args) >= 2 {
-				id = args[1]
-			}
+			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, f.Mapper)
+
+			selector := getFlagString(cmd, "selector")
+			labels, err := labels.ParseSelector(selector)
+			checkErr(err)
+
+			client, err := f.Client(cmd, mapping)
+			checkErr(err)
+
+			obj, err := kubectl.NewRESTHelper(client, mapping).Get(namespace, name, labels)
+			checkErr(err)
+
 			outputFormat := getFlagString(cmd, "output")
 			templateFile := getFlagString(cmd, "template")
-			selector := getFlagString(cmd, "selector")
-			err := kubectl.Get(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), resource, id, selector, outputFormat, getFlagBool(cmd, "no-headers"), templateFile)
+			defaultPrinter, err := f.Printer(cmd, mapping, getFlagBool(cmd, "no-headers"))
+			checkErr(err)
+
+			err = kubectl.Print(out, obj, outputFormat, templateFile, defaultPrinter)
 			checkErr(err)
 		},
 	}

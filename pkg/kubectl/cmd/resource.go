@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -37,7 +36,7 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 
 	if len(args) == 2 {
 		resource := args[0]
-		namespace = api.NamespaceDefault
+		namespace = getKubeNamespace(cmd)
 		name = args[1]
 		if len(name) == 0 || len(resource) == 0 {
 			usageError(cmd, "Must specify filename or command line params")
@@ -63,6 +62,62 @@ func ResourceFromArgsOrFile(cmd *cobra.Command, args []string, filename string, 
 	return
 }
 
+// ResourceFromArgs expects two arguments with a given type, and extracts the fields necessary
+// to uniquely locate a resource. Displays a usageError if that contract is not satisfied, or
+// a generic error if any other problems occur.
+func ResourceFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string) {
+	if len(args) != 2 {
+		usageError(cmd, "Must provide resource and name command line params")
+	}
+
+	resource := args[0]
+	namespace = getKubeNamespace(cmd)
+	name = args[1]
+	if len(name) == 0 || len(resource) == 0 {
+		usageError(cmd, "Must provide resource and name command line params")
+	}
+
+	version, kind, err := mapper.VersionAndKindForResource(resource)
+	checkErr(err)
+
+	mapping, err = mapper.RESTMapping(version, kind)
+	checkErr(err)
+	return
+}
+
+// ResourceFromArgs expects two arguments with a given type, and extracts the fields necessary
+// to uniquely locate a resource. Displays a usageError if that contract is not satisfied, or
+// a generic error if any other problems occur.
+func ResourceOrTypeFromArgs(cmd *cobra.Command, args []string, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string) {
+	if len(args) == 0 || len(args) > 2 {
+		usageError(cmd, "Must provide resource or a resource and name as command line params")
+	}
+
+	resource := args[0]
+	if len(resource) == 0 {
+		usageError(cmd, "Must provide resource or a resource and name as command line params")
+	}
+
+	namespace = getKubeNamespace(cmd)
+	if len(args) == 2 {
+		name = args[1]
+		if len(name) == 0 {
+			usageError(cmd, "Must provide resource or a resource and name as command line params")
+		}
+	}
+
+	version, kind, err := mapper.VersionAndKindForResource(resource)
+	checkErr(err)
+
+	mapping, err = mapper.RESTMapping(version, kind)
+	checkErr(err)
+
+	return
+}
+
+// ResourceFromFile retrieves the name and namespace from a valid file. If the file does not
+// resolve to a known type an error is returned. The returned mapping can be used to determine
+// the correct REST endpoint to modify this resource with.
 func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RESTMapper) (mapping *meta.RESTMapping, namespace, name string, data []byte) {
 	configData, err := readConfigData(filename)
 	checkErr(err)

@@ -17,13 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdDescribe(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdDescribe(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "describe <resource> <id>",
 		Short: "Show details of a specific resource",
@@ -32,13 +32,14 @@ func NewCmdDescribe(out io.Writer) *cobra.Command {
 This command joins many API calls together to form a detailed description of a
 given resource.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) < 2 {
-				usageError(cmd, "Need to supply a resource and an ID")
-			}
-			resource := args[0]
-			id := args[1]
-			err := kubectl.Describe(out, getKubeClient(cmd), resource, id)
+			mapping, namespace, name := ResourceFromArgs(cmd, args, f.Mapper)
+
+			describer, err := f.Describer(cmd, mapping)
 			checkErr(err)
+
+			s, err := describer.Describe(namespace, name)
+			checkErr(err)
+			fmt.Fprintf(out, "%s\n", s)
 		},
 	}
 	return cmd

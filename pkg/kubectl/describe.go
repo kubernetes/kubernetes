@@ -18,7 +18,6 @@ package kubectl
 
 import (
 	"fmt"
-	"io"
 	"strings"
 	"text/tabwriter"
 
@@ -28,35 +27,62 @@ import (
 	"github.com/golang/glog"
 )
 
-func Describe(w io.Writer, c client.Interface, resource, id string) error {
-	var str string
-	var err error
-	path, err := resolveResource(resolveToPath, resource)
-	if err != nil {
-		return err
-	}
-	switch path {
-	case "pods":
-		str, err = describePod(w, c, id)
-	case "replicationControllers":
-		str, err = describeReplicationController(w, c, id)
-	case "services":
-		str, err = describeService(w, c, id)
-	case "minions":
-		str, err = describeMinion(w, c, id)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	_, err = fmt.Fprintf(w, str)
-	return err
+// Describer generates output for the named resource or an error
+// if the output could not be generated.
+type Describer interface {
+	Describe(namespace, name string) (output string, err error)
 }
 
-func describePod(w io.Writer, c client.Interface, id string) (string, error) {
-	// TODO this needs proper namespace support
-	pod, err := c.Pods(api.NamespaceDefault).Get(id)
+// Describer returns the default describe functions for each of the standard
+// Kubernetes types.
+func DescriberFor(kind string, c *client.Client) (Describer, bool) {
+	switch kind {
+	case "Pod":
+		return &PodDescriber{
+			PodClient: func(namespace string) (client.PodInterface, error) {
+				return c.Pods(namespace), nil
+			},
+			ReplicationControllerClient: func(namespace string) (client.ReplicationControllerInterface, error) {
+				return c.ReplicationControllers(namespace), nil
+			},
+		}, true
+	case "ReplicationController":
+		return &ReplicationControllerDescriber{
+			PodClient: func(namespace string) (client.PodInterface, error) {
+				return c.Pods(namespace), nil
+			},
+			ReplicationControllerClient: func(namespace string) (client.ReplicationControllerInterface, error) {
+				return c.ReplicationControllers(namespace), nil
+			},
+		}, true
+	case "Service":
+		return &ServiceDescriber{
+			ServiceClient: func(namespace string) (client.ServiceInterface, error) {
+				return c.Services(namespace), nil
+			},
+		}, true
+	}
+	return nil, false
+}
+
+// PodDescriber generates information about a pod and the replication controllers that
+// create it.
+type PodDescriber struct {
+	PodClient                   func(namespace string) (client.PodInterface, error)
+	ReplicationControllerClient func(namespace string) (client.ReplicationControllerInterface, error)
+}
+
+func (d *PodDescriber) Describe(namespace, name string) (string, error) {
+	rc, err := d.ReplicationControllerClient(namespace)
+	if err != nil {
+		return "", err
+	}
+	pc, err := d.PodClient(namespace)
+	if err != nil {
+		return "", err
+	}
+
+	pod, err := pc.Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -67,19 +93,34 @@ func describePod(w io.Writer, c client.Interface, id string) (string, error) {
 		fmt.Fprintf(out, "Host:\t%s\n", pod.CurrentState.Host+"/"+pod.CurrentState.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.CurrentState.Status))
-		fmt.Fprintf(out, "Replication Controllers:\t%s\n", getReplicationControllersForLabels(c, labels.Set(pod.Labels)))
+		fmt.Fprintf(out, "Replication Controllers:\t%s\n", getReplicationControllersForLabels(rc, labels.Set(pod.Labels)))
 		return nil
 	})
 }
 
-func describeReplicationController(w io.Writer, c client.Interface, id string) (string, error) {
-	// TODO this needs proper namespace support
-	controller, err := c.ReplicationControllers(api.NamespaceDefault).Get(id)
+// ReplicationControllerDescriber generates information about a replication controller
+// and the pods it has created.
+type ReplicationControllerDescriber struct {
+	ReplicationControllerClient func(namespace string) (client.ReplicationControllerInterface, error)
+	PodClient                   func(namespace string) (client.PodInterface, error)
+}
+
+func (d *ReplicationControllerDescriber) Describe(namespace, name string) (string, error) {
+	rc, err := d.ReplicationControllerClient(namespace)
+	if err != nil {
+		return "", err
+	}
+	pc, err := d.PodClient(namespace)
 	if err != nil {
 		return "", err
 	}
 
-	running, waiting, terminated, err := getPodStatusForReplicationController(c, controller)
+	controller, err := rc.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	running, waiting, terminated, err := getPodStatusForReplicationController(pc, controller)
 	if err != nil {
 		return "", err
 	}
@@ -95,8 +136,18 @@ func describeReplicationController(w io.Writer, c client.Interface, id string) (
 	})
 }
 
-func describeService(w io.Writer, c client.Interface, id string) (string, error) {
-	service, err := c.Services(api.NamespaceDefault).Get(id)
+// ServiceDescriber generates information about a service.
+type ServiceDescriber struct {
+	ServiceClient func(namespace string) (client.ServiceInterface, error)
+}
+
+func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
+	c, err := d.ServiceClient(namespace)
+	if err != nil {
+		return "", err
+	}
+
+	service, err := c.Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -110,8 +161,17 @@ func describeService(w io.Writer, c client.Interface, id string) (string, error)
 	})
 }
 
-func describeMinion(w io.Writer, c client.Interface, id string) (string, error) {
-	minion, err := getMinion(c, id)
+// MinionDescriber generates information about a minion.
+type MinionDescriber struct {
+	MinionClient func() (client.MinionInterface, error)
+}
+
+func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
+	mc, err := d.MinionClient()
+	if err != nil {
+		return "", err
+	}
+	minion, err := mc.Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -122,29 +182,14 @@ func describeMinion(w io.Writer, c client.Interface, id string) (string, error) 
 	})
 }
 
-// client.Interface doesn't have GetMinion(id) yet so we hack it up.
-func getMinion(c client.Interface, id string) (*api.Minion, error) {
-	minionList, err := c.Minions().List()
-	if err != nil {
-		glog.Fatalf("Error getting minion info: %v\n", err)
-	}
-
-	for _, minion := range minionList.Items {
-		if id == minion.Name {
-			return &minion, nil
-		}
-	}
-	return nil, fmt.Errorf("Minion %s not found", id)
-}
-
 // Get all replication controllers whose selectors would match a given set of
 // labels.
 // TODO Move this to pkg/client and ideally implement it server-side (instead
 // of getting all RC's and searching through them manually).
-func getReplicationControllersForLabels(c client.Interface, labelsToMatch labels.Labels) string {
+func getReplicationControllersForLabels(c client.ReplicationControllerInterface, labelsToMatch labels.Labels) string {
 	// Get all replication controllers.
 	// TODO this needs a namespace scope as argument
-	rcs, err := c.ReplicationControllers(api.NamespaceDefault).List(labels.Everything())
+	rcs, err := c.List(labels.Everything())
 	if err != nil {
 		glog.Fatalf("Error getting replication controllers: %v\n", err)
 	}
@@ -171,8 +216,8 @@ func getReplicationControllersForLabels(c client.Interface, labelsToMatch labels
 	return list
 }
 
-func getPodStatusForReplicationController(kubeClient client.Interface, controller *api.ReplicationController) (running, waiting, terminated int, err error) {
-	rcPods, err := kubeClient.Pods(controller.Namespace).List(labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
+func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, terminated int, err error) {
+	rcPods, err := c.List(labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
 	if err != nil {
 		return
 	}

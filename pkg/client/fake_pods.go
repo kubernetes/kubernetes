@@ -35,7 +35,7 @@ func (c *FakePods) List(selector labels.Selector) (*api.PodList, error) {
 
 func (c *FakePods) Get(name string) (*api.Pod, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-pod", Value: name})
-	return &api.Pod{}, nil
+	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
 }
 
 func (c *FakePods) Delete(name string) error {

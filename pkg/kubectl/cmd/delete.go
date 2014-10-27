@@ -54,7 +54,7 @@ Examples:
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			err = kubectl.NewRESTModifier(client, mapping).Delete(namespace, name)
+			err = kubectl.NewRESTHelper(client, mapping).Delete(namespace, name)
 			checkErr(err)
 			fmt.Fprintf(out, "%s\n", name)
 		},

@@ -34,7 +34,20 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-func getPrinter(format, templateFile string, noHeaders bool) (ResourcePrinter, error) {
+// Print outputs a runtime.Object to an io.Writer in the given format
+func Print(w io.Writer, obj runtime.Object, format string, templateFile string, defaultPrinter ResourcePrinter) error {
+	printer, err := getPrinter(format, templateFile, defaultPrinter)
+	if err != nil {
+		return err
+	}
+
+	if err := printer.PrintObj(obj, w); err != nil {
+		return fmt.Errorf("Failed to print: %v\nRaw received object:\n%#v", err, obj)
+	}
+	return nil
+}
+
+func getPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (ResourcePrinter, error) {
 	var printer ResourcePrinter
 	switch format {
 	case "json":
@@ -60,7 +73,7 @@ func getPrinter(format, templateFile string, noHeaders bool) (ResourcePrinter, e
 			Template: tmpl,
 		}
 	default:
-		printer = NewHumanReadablePrinter(noHeaders)
+		printer = defaultPrinter
 	}
 	return printer, nil
 }

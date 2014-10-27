@@ -18,12 +18,13 @@ package kubectl
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// RESTModifier provides methods for mutating a known or unknown
-// RESTful resource.
-type RESTModifier struct {
+// RESTHelper provides methods for retrieving or mutating a RESTful
+// resource.
+type RESTHelper struct {
 	Resource string
 	// A RESTClient capable of mutating this resource
 	RESTClient RESTClient
@@ -34,9 +35,9 @@ type RESTModifier struct {
 	Versioner runtime.ResourceVersioner
 }
 
-// NewRESTModifier creates a RESTModifier from a RESTMapping
-func NewRESTModifier(client RESTClient, mapping *meta.RESTMapping) *RESTModifier {
-	return &RESTModifier{
+// NewRESTHelper creates a RESTHelper from a ResourceMapping
+func NewRESTHelper(client RESTClient, mapping *meta.RESTMapping) *RESTHelper {
+	return &RESTHelper{
 		RESTClient: client,
 		Resource:   mapping.Resource,
 		Codec:      mapping.Codec,
@@ -44,35 +45,39 @@ func NewRESTModifier(client RESTClient, mapping *meta.RESTMapping) *RESTModifier
 	}
 }
 
-func (m *RESTModifier) Delete(namespace, name string) error {
-	return m.RESTClient.Delete().Path(m.Resource).Path(name).Do().Error()
+func (m *RESTHelper) Get(namespace, name string, selector labels.Selector) (runtime.Object, error) {
+	return m.RESTClient.Get().Path(m.Resource).Namespace(namespace).Path(name).SelectorParam("labels", selector).Do().Get()
 }
 
-func (m *RESTModifier) Create(namespace string, data []byte) error {
-	return m.RESTClient.Post().Path(m.Resource).Body(data).Do().Error()
+func (m *RESTHelper) Delete(namespace, name string) error {
+	return m.RESTClient.Delete().Path(m.Resource).Namespace(namespace).Path(name).Do().Error()
 }
 
-func (m *RESTModifier) Update(namespace, name string, overwrite bool, data []byte) error {
+func (m *RESTHelper) Create(namespace string, data []byte) error {
+	return m.RESTClient.Post().Path(m.Resource).Namespace(namespace).Body(data).Do().Error()
+}
+
+func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte) error {
 	c := m.RESTClient
 
 	obj, err := m.Codec.Decode(data)
 	if err != nil {
 		// We don't know how to handle this object, but update it anyway
-		return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
+		return updateResource(c, m.Resource, namespace, name, data)
 	}
 
 	// Attempt to version the object based on client logic.
 	version, err := m.Versioner.ResourceVersion(obj)
 	if err != nil {
 		// We don't know how to version this object, so send it to the server as is
-		return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
+		return updateResource(c, m.Resource, namespace, name, data)
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
 		serverObj, err := c.Get().Path(m.Resource).Path(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
-			return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
+			return updateResource(c, m.Resource, namespace, name, data)
 		}
 		serverVersion, err := m.Versioner.ResourceVersion(serverObj)
 		if err != nil {
@@ -88,5 +93,9 @@ func (m *RESTModifier) Update(namespace, name string, overwrite bool, data []byt
 		data = newData
 	}
 
-	return c.Put().Path(m.Resource).Path(name).Body(data).Do().Error()
+	return updateResource(c, m.Resource, namespace, name, data)
+}
+
+func updateResource(c RESTClient, resourcePath, namespace, name string, data []byte) error {
+	return c.Put().Path(resourcePath).Namespace(namespace).Path(name).Body(data).Do().Error()
 }
