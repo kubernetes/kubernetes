@@ -1,6 +1,10 @@
 ##Getting started on [Fedora](http://fedoraproject.org)
 
-This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...  The guide is broken into 2 sections:
+This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
+
+This guide will only get ONE minion working.  Multiple minions requires a functional [networking configuration](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+
+The guide is broken into 3 sections:
 
 1. Prepare the hosts.
 2. Configuring the two hosts, a master and a minion.
@@ -213,6 +217,7 @@ kubectl get minions
                     "ports": [
                         {
                             "containerPort": 80,
+                            "hostPort": 80,
                             "protocol": "TCP"
                         }
                     ],
