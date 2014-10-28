@@ -244,6 +244,9 @@ function kube-up {
     # The network needs to be created synchronously or we have a race. The
     # firewalls can be added concurrent with instance creation.
     gcutil addnetwork "${NETWORK}" --range "10.240.0.0/16"
+  fi
+
+  if ! gcutil getfirewall "${NETWORK}-default-internal" >/dev/null 2>&1; then
     gcutil addfirewall "${NETWORK}-default-internal" \
       --project "${PROJECT}" \
       --norespect_terminal_width \
@@ -251,6 +254,9 @@ function kube-up {
       --network "${NETWORK}" \
       --allowed_ip_sources "10.0.0.0/8" \
       --allowed "tcp:1-65535,udp:1-65535,icmp" &
+  fi
+
+  if ! gcutil getfirewall "${NETWORK}-default-ssh" >/dev/null 2>&1; then
     gcutil addfirewall "${NETWORK}-default-ssh" \
       --project "${PROJECT}" \
       --norespect_terminal_width \
