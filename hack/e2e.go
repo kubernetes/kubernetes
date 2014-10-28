@@ -72,7 +72,10 @@ func main() {
 	}
 
 	if *build {
-		if !runBash("build", `test-build-release`) {
+		if !run("build-local", "hack/build-go.sh") {
+			log.Fatal("Error building. Aborting.")
+		}
+		if !runBash("build-release", `test-build-release`) {
 			log.Fatal("Error building. Aborting.")
 		}
 	}
@@ -157,9 +160,17 @@ func Test() (failed, passed []string) {
 // All nonsense below is temporary until we have go versions of these things.
 
 func runBash(stepName, bashFragment string) bool {
-	log.Printf("Running: %v", stepName)
 	cmd := exec.Command("bash", "-s")
 	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
+	return finishRunning(stepName, cmd)
+}
+
+func run(stepName, cmdPath string) bool {
+	return finishRunning(stepName, exec.Command(filepath.Join(*root, cmdPath)))
+}
+
+func finishRunning(stepName string, cmd *exec.Cmd) bool {
+	log.Printf("Running: %v", stepName)
 	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
 	if *verbose {
 		cmd.Stdout = os.Stdout
