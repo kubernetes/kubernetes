@@ -113,8 +113,14 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	location, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
+		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
+		return
+	}
+	if location == "" {
+		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned ''", id)
+		notFound(w, req)
 		return
 	}
 
@@ -124,11 +130,19 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		writeJSON(status.Code, r.codec, status, w)
 		return
 	}
+	if destURL.Scheme == "" {
+		// If no scheme was present in location, url.Parse sometimes mistakes
+		// hosts for paths.
+		destURL.Host = location
+	}
 	destURL.Path = rest
 	destURL.RawQuery = req.URL.RawQuery
 	newReq, err := http.NewRequest(req.Method, destURL.String(), req.Body)
 	if err != nil {
-		glog.Errorf("Failed to create request: %s", err)
+		status := errToAPIStatus(err)
+		writeJSON(status.Code, r.codec, status, w)
+		notFound(w, req)
+		return
 	}
 	newReq.Header = req.Header
 
