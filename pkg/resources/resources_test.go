@@ -130,7 +130,7 @@ func TestGetFloat(t *testing.T) {
 	for _, test := range tests {
 		val := GetFloatResource(test.res, test.name, test.def)
 		if val != test.expected {
-			t.Errorf("%expected: %d found %d", test.expected, val)
+			t.Errorf("expected: %d found %d", test.expected, val)
 		}
 	}
 }

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -169,12 +170,11 @@ func (h *EtcdHelper) ExtractList(key string, slicePtr interface{}, resourceVersi
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
 func (h *EtcdHelper) decodeNodeList(nodes []*etcd.Node, slicePtr interface{}) error {
-	pv := reflect.ValueOf(slicePtr)
-	if pv.Type().Kind() != reflect.Ptr || pv.Type().Elem().Kind() != reflect.Slice {
+	v, err := conversion.EnforcePtr(slicePtr)
+	if err != nil || v.Kind() != reflect.Slice {
 		// This should not happen at runtime.
 		panic("need ptr to slice")
 	}
-	v := pv.Elem()
 	for _, node := range nodes {
 		if node.Dir {
 			if err := h.decodeNodeList(node.Nodes, slicePtr); err != nil {
@@ -230,8 +230,11 @@ func (h *EtcdHelper) bodyAndExtractObj(key string, objPtr runtime.Object, ignore
 	}
 	if err != nil || response.Node == nil || len(response.Node.Value) == 0 {
 		if ignoreNotFound {
-			pv := reflect.ValueOf(objPtr)
-			pv.Elem().Set(reflect.Zero(pv.Type().Elem()))
+			v, err := conversion.EnforcePtr(objPtr)
+			if err != nil {
+				return "", 0, err
+			}
+			v.Set(reflect.Zero(v.Type()))
 			return "", 0, nil
 		} else if err != nil {
 			return "", 0, err
@@ -313,13 +316,13 @@ type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, err error
 // })
 //
 func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, tryUpdate EtcdUpdateFunc) error {
-	pt := reflect.TypeOf(ptrToType)
-	if pt.Kind() != reflect.Ptr {
+	v, err := conversion.EnforcePtr(ptrToType)
+	if err != nil {
 		// Panic is appropriate, because this is a programming error.
 		panic("need ptr to type")
 	}
 	for {
-		obj := reflect.New(pt.Elem()).Interface().(runtime.Object)
+		obj := reflect.New(v.Type()).Interface().(runtime.Object)
 		origBody, index, err := h.bodyAndExtractObj(key, obj, true)
 		if err != nil {
 			return err

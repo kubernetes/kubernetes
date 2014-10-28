@@ -19,6 +19,8 @@ package runtime
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 // GetItemsPtr returns a pointer to the list object's Items member.
@@ -26,11 +28,11 @@ import (
 // and an error will be returned.
 // This function will either return a pointer to a slice, or an error, but not both.
 func GetItemsPtr(list Object) (interface{}, error) {
-	v := reflect.ValueOf(list)
-	if !v.IsValid() {
-		return nil, fmt.Errorf("nil list object")
+	v, err := conversion.EnforcePtr(list)
+	if err != nil {
+		return nil, err
 	}
-	items := v.Elem().FieldByName("Items")
+	items := v.FieldByName("Items")
 	if !items.IsValid() {
 		return nil, fmt.Errorf("no Items field in %#v", list)
 	}
@@ -47,13 +49,16 @@ func ExtractList(obj Object) ([]Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	items := reflect.ValueOf(itemsPtr).Elem()
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return nil, err
+	}
 	list := make([]Object, items.Len())
 	for i := range list {
 		raw := items.Index(i)
 		item, ok := raw.Addr().Interface().(Object)
 		if !ok {
-			return nil, fmt.Errorf("item in index %v isn't an object: %#v", i, raw.Interface())
+			return nil, fmt.Errorf("item[%v]: Expected object, got %#v", i, raw.Interface())
 		}
 		list[i] = item
 	}
@@ -69,21 +74,23 @@ func SetList(list Object, objects []Object) error {
 	if err != nil {
 		return err
 	}
-	items := reflect.ValueOf(itemsPtr).Elem()
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return err
+	}
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
-		src := reflect.ValueOf(objects[i])
-		if !src.IsValid() || src.IsNil() {
-			return fmt.Errorf("an object was nil")
+		src, err := conversion.EnforcePtr(objects[i])
+		if err != nil {
+			return err
 		}
-		src = src.Elem() // Object is a pointer, but the items in slice are not.
 		if src.Type().AssignableTo(dest.Type()) {
 			dest.Set(src)
 		} else if src.Type().ConvertibleTo(dest.Type()) {
 			dest.Set(src.Convert(dest.Type()))
 		} else {
-			return fmt.Errorf("wrong type: need %v, got %v", dest.Type(), src.Type())
+			return fmt.Errorf("item[%v]: Type mismatch: Expected %v, got %v", dest.Type(), src.Type())
 		}
 	}
 	items.Set(slice)
