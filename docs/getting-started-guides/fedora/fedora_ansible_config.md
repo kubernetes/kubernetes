@@ -4,49 +4,39 @@ Configuring kubernetes on Fedora via Ansible offers a simple way to quickly crea
 
 Requirements:
 
-1. Host running Ansible with the following repo cloned: [kubernetes-ansible](https://github.com/eparis/kubernetes-ansible)
-2. A Fedora 20 or greater host to act as cluster master
-3. As many Fedora 20 hosts as you would like, that act as cluster minions
+1. Host able to run ansible and able to clone the following repo: [kubernetes-ansible](https://github.com/eparis/kubernetes-ansible)
+2. A Fedora 20+ or RHEL7 host to act as cluster master
+3. As many Fedora 20+ or RHEL7 hosts as you would like, that act as cluster minions
 
-The hosts can be virtual or bare metal.  It's your choice. Ansible will take care of the rest of the configuration for you - configuring networking, installing packages, handling the firewall, etc... This example will use one master and two minions.
+The hosts can be virtual or bare metal.  The only requirement to make the ansible network setup work is that all of the machines are connected via the same layer 2 network.
 
-**System Information:**
+Ansible will take care of the rest of the configuration for you - configuring networking, installing packages, handling the firewall, etc... This example will use one master and two minions.
+
+## Configuring cluster information:
 
 Hosts:
 ```
 fed1 (master) = 192.168.121.205
 fed2 (minion) = 192.168.121.84
-fed2 (minion)= 192.168.121.116
+fed3 (minion) = 192.168.121.116
 ```
 
-Versions:
+**Make sure your local machine has ansible installed**
 
 ```
-Fedora release 20 (Heisenbug)
-
-etcd-0.4.6-3.fc20.x86_64
-kubernetes-0.2-0.4.gitcc7999c.fc20.x86_64
+yum install -y ansible
 ```
 
-
-Now, let's get started with the configuration.
-
-* Show Ansible on the host running Ansible.
-
-```
-rpm -ql ansible | grep bin
-cat /etc/fedora-release
-```
-
-* Clone the kubernetes-ansible repo on the host running Ansible.
+**Clone the kubernetes-ansible repo on the host running Ansible.**
 
 ```
 git clone https://github.com/eparis/kubernetes-ansible.git
 cd kubernetes-ansible
-
 ```
 
-* Get IP addresses from master and minion, add to inventory file at the root of the repo on the host running Ansible.
+**Tell ansible about each machine and its role in your cluster.**
+
+Get the IP addresses from the master and minions.  Add those to the inventory file at the root of the repo on the host running Ansible.  Ignore the kube_ip_addr= option for a moment.
 
 ```
 [masters]
@@ -56,60 +46,100 @@ cd kubernetes-ansible
 192.168.121.205
 
 [minions]
-192.168.121.84  kube_ip_addr=10.0.1.1
-192.168.121.116 kube_ip_addr=10.0.2.1
+192.168.121.84  kube_ip_addr=[ignored]
+192.168.121.116 kube_ip_addr=[ignored]
 ```
 
-* Explore the playbooks and the Ansible files.
+**Tell ansible which user has ssh access (and sudo access to root)**
+
+edit: group_vars/all.yml
 
 ```
-tree roles/
-cat keys.yml
-cat setup.yml
+ansible_ssh_user: root
 ```
 
-* Create a password file.  Hopefully you don't use the password below.
+## Configuring ssh access to the cluster
+
+If you already have ssh access to every machine using ssh public keys you may skip to [configuring the network](#configuring-the-network)
+
+**Create a password file.**
+
+The password file should contain the root password for every machine in the cluster.  It will be used in order to lay down your ssh public key.
 
 ```
 echo "password" > ~/rootpassword
 ```
 
-* Set root password on all atomic hosts to match the password in the _rootpassword_ file.  Ansible will use the ansible_ssh_pass method to parse the file and gain access all the hosts.
-
-* Ping the hosts.
+**Agree to accept each machine's ssh public key**
 
 ```
 ansible-playbook -i inventory ping.yml # This will look like it fails, that's ok
 ```
 
-* Configure the SSH keys.
+**Push your ssh public key to every machine**
 
 ```
 ansible-playbook -i inventory keys.yml
 ```
 
-* Run the playbook
+## Configuring the network
+
+If you already have configured your network and docker will use it correctly, skip to [setting up the cluster](#setting-up-the-cluster)
+
+The ansible scripts are quite hacky configuring the network, see the README
+
+**Configure the ip addresses which should be used to run pods on each machine**
+
+The IP address pool used to assign addresses to pods for each minion is the kube_ip_addr= option.  Choose a /24 to use for each minion and add that to you inventory file.
+
+```
+[minions]
+192.168.121.84  kube_ip_addr=10.0.1.0
+192.168.121.116 kube_ip_addr=10.0.2.0
+```
+
+**Run the network setup playbook**
+
+```
+ansible-playbook -i inventory hack-network.yml
+```
+
+## Setting up the cluster
+
+**Configure the IP addresses used for services**
+
+Each kubernetes service gets its own IP address.  These are not real IPs.  You need only select a range of IPs which are not in use elsewhere in your environment.  This must be done even if you do not use the network setup provided by the ansible scripts.
+
+edit: group_vars/all.yml
+
+```
+kube_service_addresses: 10.254.0.0/16
+```
+
+**Tell ansible to get to work!**
 
 ```
 ansible-playbook -i inventory setup.yml
 ```
 
+## Testing and using your new cluster
+
 That's all there is to it.  It's really that easy.  At this point you should have a functioning kubernetes cluster.  
 
 
-* Show services running on masters and minions.
+**Show services running on masters and minions.**
 
 ```
 systemctl | grep -i kube
 ```
 
-* Show firewall rules on the masters and minions.
+**Show firewall rules on the masters and minions.**
 
 ```
 iptables -nvL
 ```
 
-* Create the following apache.json file and deploy pod to minion.
+**Create the following apache.json file and deploy pod to minion.**
 
 ```
 cat ~/apache.json
@@ -136,19 +166,24 @@ cat ~/apache.json
   }
 }
 
-/bin/kubecfg -c apache.json create pods
+/usr/bin/kubectl create -f apache.json
 ```
 
-* Check Docker status on minion.
+**Check where the pod was created**
+
+```
+/usr/bin/kubectl get pod fedoraapache
+```
+
+**Check Docker status on minion.**
 
 ```
 docker ps
 docker images
 ```
 
-* Check web server access on a minion.
+**After the pod is 'Running' Check web server access on the minion**
 
 ```
 curl http://localhost
 ```
-
