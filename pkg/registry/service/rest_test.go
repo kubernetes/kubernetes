@@ -456,7 +456,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	ctx = api.NewDefaultContext()
 	c3, _ := rest.Create(ctx, svc3)
 	created_svc3 := <-c3
-	created_service_3 := created_svc3.(*api.Service)
+	created_service_3 := created_svc3.Object.(*api.Service)
 	if created_service_3.PortalIP != "1.2.3.93" { // specific IP
 		t.Errorf("Unexpected PortalIP: %s", created_service_3.PortalIP)
 	}
@@ -550,7 +550,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 
 	c, _ = rest.Update(ctx, update)
 	result := <-c
-	st := result.(*api.Status)
+	st := result.Object.(*api.Status)
 	if st.Reason != api.StatusReasonInvalid {
 		t.Errorf("Expected to get an invalid error, got %v", st)
 	}
