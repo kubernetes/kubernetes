@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -137,6 +138,16 @@ func (t andTerm) String() string {
 	return strings.Join(terms, ",")
 }
 
+// TODO Support forward and reverse indexing (#1183, #1348). Eliminate uses of Selector.RequiresExactMatch.
+// TODO rename to Selector after Selector interface above removed
+type SetBasedSelector interface {
+	// Matches returns true if this selector matches the given set of labels.
+	Matches(Labels) (bool, error)
+
+	// String returns a human-readable string that represents this selector.
+	String() (string, error)
+}
+
 // Operator represents a key's relationship
 // to a set of values in a Requirement.
 type Operator int
@@ -171,13 +182,18 @@ type Requirement struct {
 }
 
 // NewRequirement is the constructor for a Requirement.
-// If either of these rules is violated, an error is returned:
+// If any of these rules is violated, an error is returned:
 // (1) The operator can only be In, NotIn or Exists.
 // (2) If the operator is In or NotIn, the values set must
 //     be non-empty.
+// (3) The key is invalid due to its length, or sequence
+//     of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
 func NewRequirement(key string, op Operator, vals util.StringSet) (*Requirement, error) {
+	if err := validateLabelKey(key); err != nil {
+		return nil, err
+	}
 	switch op {
 	case In, NotIn:
 		if len(vals) == 0 {
@@ -281,16 +297,142 @@ func (lsel *LabelSelector) String() (string, error) {
 	return strings.Join(reqs, ","), nil
 }
 
-// TODO: Parse takes a string representing a selector and returns
-// a selector, or an error. A well-formed input string follows
-// the syntax of that which is returned by LabelSelector.String
-// and therefore is largely controlled by that which is returned
-// by Requirement.String. The returned selector object's type
-// should be an interface implemented by LabelSelector. Note that
-// this parsing function is different than ParseSelector since
-// they parse different selectors with different syntaxes.
-// See comments above for LabelSelector and Requirement struct
-// definition for more details.
+// Parse takes a string representing a selector and returns a selector
+// object, or an error. This parsing function differs from ParseSelector
+// as they parse different selectors with different syntaxes.
+// The input will cause an error if it does not follow this form:
+//
+//     <selector-syntax> ::= <requirement> | <requirement> "," <selector-syntax>
+//         <requirement> ::= KEY <set-restriction>
+//     <set-restriction> ::= "" | <inclusion-exclusion> <value-set>
+// <inclusion-exclusion> ::= " in " | " not in "
+//           <value-set> ::= "(" <values> ")"
+//              <values> ::= VALUE | VALUE "," <values>
+//
+// KEY is a sequence of one or more characters that does not contain ',' or ' '
+//      [^, ]+
+// VALUE is a sequence of zero or more characters that does not contain ',', ' ' or ')'
+//      [^, )]*
+//
+// Example of valid syntax:
+//  "x in (foo,,baz),y,z not in ()"
+//
+// Note:
+//  (1) Inclusion - " in " - denotes that the KEY is equal to any of the
+//      VALUEs in its requirement
+//  (2) Exclusion - " not in " - denotes that the KEY is not equal to any
+//      of the VALUEs in its requirement
+//  (3) The empty string is a valid VALUE
+//  (4) A requirement with just a KEY - as in "y" above - denotes that
+//      the KEY exists and can be any VALUE.
+//
+// TODO: value validation possibly including duplicate value check, restricting certain characters
+func Parse(selector string) (SetBasedSelector, error) {
+	var items []Requirement
+	var key string
+	var op Operator
+	var vals util.StringSet
+	const (
+		startReq int = iota
+		inKey
+		waitOp
+		inVals
+	)
+	const inPre = "in ("
+	const notInPre = "not in ("
+	const pos = "position %d:%s"
+
+	state := startReq
+	strStart := 0
+	for i := 0; i < len(selector); i++ {
+		switch state {
+		case startReq:
+			switch selector[i] {
+			case ',':
+				return nil, fmt.Errorf("a requirement can't be empty. "+pos, i, selector)
+			case ' ':
+				return nil, fmt.Errorf("white space not allowed before key. "+pos, i, selector)
+			default:
+				state = inKey
+				strStart = i
+			}
+		case inKey:
+			switch selector[i] {
+			case ',':
+				state = startReq
+				if req, err := NewRequirement(selector[strStart:i], Exists, nil); err != nil {
+					return nil, err
+				} else {
+					items = append(items, *req)
+				}
+			case ' ':
+				state = waitOp
+				key = selector[strStart:i]
+			}
+		case waitOp:
+			if len(selector)-i >= len(inPre) && selector[i:len(inPre)+i] == inPre {
+				op = In
+				i += len(inPre) - 1
+			} else if len(selector)-i >= len(notInPre) && selector[i:len(notInPre)+i] == notInPre {
+				op = NotIn
+				i += len(notInPre) - 1
+			} else {
+				return nil, fmt.Errorf("expected \" in (\"/\" not in (\" after key. "+pos, i, selector)
+			}
+			state = inVals
+			vals = util.NewStringSet()
+			strStart = i + 1
+		case inVals:
+			switch selector[i] {
+			case ',':
+				vals.Insert(selector[strStart:i])
+				strStart = i + 1
+			case ' ':
+				return nil, fmt.Errorf("white space not allowed in set strings. "+pos, i, selector)
+			case ')':
+				if i+1 == len(selector)-1 && selector[i+1] == ',' {
+					return nil, fmt.Errorf("expected requirement after comma. "+pos, i+1, selector)
+				}
+				if i+1 < len(selector) && selector[i+1] != ',' {
+					return nil, fmt.Errorf("requirements must be comma-separated. "+pos, i+1, selector)
+				}
+				state = startReq
+				vals.Insert(selector[strStart:i])
+				if req, err := NewRequirement(key, op, vals); err != nil {
+					return nil, err
+				} else {
+					items = append(items, *req)
+				}
+				if i+1 < len(selector) {
+					i += 1 //advance past comma
+				}
+			}
+		}
+	}
+
+	switch state {
+	case inKey:
+		if req, err := NewRequirement(selector[strStart:], Exists, nil); err != nil {
+			return nil, err
+		} else {
+			items = append(items, *req)
+		}
+	case waitOp:
+		return nil, fmt.Errorf("input terminated while waiting for operator \"in \"/\"not in \":%s", selector)
+	case inVals:
+		return nil, fmt.Errorf("input terminated while waiting for value set:%s", selector)
+	}
+
+	return &LabelSelector{Requirements: items}, nil
+}
+
+// TODO: unify with validation.validateLabels
+func validateLabelKey(k string) error {
+	if !util.IsDNS952Label(k) {
+		return errors.NewFieldNotSupported("key", k)
+	}
+	return nil
+}
 
 func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
 	pieces := strings.Split(selectorPiece, op)
