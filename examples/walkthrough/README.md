@@ -1,7 +1,7 @@
 # Kubernetes 101 - Walkthrough
 
 ## Pods
-The first atom of Kubernetes is a _pod_.  A pod is a collection of containers that are symbiotically group.
+The first atom of Kubernetes is a _pod_.  A pod is a collection of containers that are symbiotically grouped.
 
 See [pods](../../docs/pods.md) for more details.
 
