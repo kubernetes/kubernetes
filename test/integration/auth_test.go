@@ -63,18 +63,16 @@ xyz987,bob,2
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	mux := http.NewServeMux()
 
-	master.New(&master.Config{
+	m := master.New(&master.Config{
 		EtcdHelper:        helper,
-		Mux:               mux,
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		TokenAuthFile:     f.Name(),
 	})
 
-	s := httptest.NewServer(mux)
+	s := httptest.NewServer(m.Handler)
 	defer s.Close()
 
 	// TODO: also test TLS, using e.g NewUnsafeTLSTransport() and NewClientCertTLSTransport() (see pkg/client/helper.go)
@@ -84,10 +82,11 @@ xyz987,bob,2
 		name     string
 		token    string
 		expected string
+		succeeds bool
 	}{
-		{"Valid token", "abc123", "AUTHENTICATED AS alice"},
-		{"Unknown token", "456jkl", "NOT AUTHENTICATED"},
-		{"Empty token", "", "NOT AUTHENTICATED"},
+		{"Valid token", "abc123", "AUTHENTICATED AS alice", true},
+		{"Unknown token", "456jkl", "", false},
+		{"No token", "", "", false},
 	}
 	for _, tc := range testCases {
 		req, err := http.NewRequest("GET", s.URL+"/_whoami", nil)
@@ -101,14 +100,21 @@ xyz987,bob,2
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		if tc.succeeds {
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
-		actual := string(body)
-		if tc.expected != actual {
-			t.Errorf("case: %s expected: %v got: %v", tc.name, tc.expected, actual)
+			actual := string(body)
+			if tc.expected != actual {
+				t.Errorf("case: %s expected: %v got: %v", tc.name, tc.expected, actual)
+			}
+		} else {
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Errorf("case: %s expected Unauthorized, got: %v", tc.name, resp.StatusCode)
+			}
+
 		}
 	}
 }

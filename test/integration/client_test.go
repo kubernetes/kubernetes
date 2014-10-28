@@ -19,7 +19,6 @@ limitations under the License.
 package integration
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
@@ -40,17 +39,14 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	mux := http.NewServeMux()
-
-	master.New(&master.Config{
+	m := master.New(&master.Config{
 		EtcdHelper:        helper,
-		Mux:               mux,
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 	})
 
-	s := httptest.NewServer(mux)
+	s := httptest.NewServer(m.Handler)
 
 	testCases := []string{
 		"v1beta1",

@@ -137,14 +137,12 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	if err != nil {
 		glog.Fatalf("Nonnumeric port? %v", err)
 	}
-	mux := http.NewServeMux()
 	// Create a master and install handlers into mux.
-	master.New(&master.Config{
+	m := master.New(&master.Config{
 		Client:            cl,
 		EtcdHelper:        helper,
 		Minions:           machineList,
 		KubeletClient:     fakeKubeletClient{},
-		Mux:               mux,
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
 
@@ -152,7 +150,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		ReadOnlyPort:  portNumber,
 		PublicAddress: host,
 	})
-	handler.delegate = mux
+	handler.delegate = m.Handler
 
 	// Scheduler
 	schedulerConfigFactory := &factory.ConfigFactory{cl}
