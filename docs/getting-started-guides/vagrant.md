@@ -169,7 +169,7 @@ ID                  Image(s)            Selector            Replicas
 Start a container running nginx with a replication controller and three replicas:
 
 ```
-$cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
+$ cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
@@ -226,7 +226,7 @@ myNginx             dockerfile/nginx    replicationController=myNginx   3
 ```
 
 We did not start any services, hence there is none listed. But we see three replicas displayed properly.
-Check the [guestbook](examples/guestbook/README.md) application to learn how to create a service.
+Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
 You can already play with resizing the replicas with:
 
 ```
