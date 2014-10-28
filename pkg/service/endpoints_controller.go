@@ -51,6 +51,12 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	}
 	var resultErr error
 	for _, service := range services.Items {
+		if service.Name == "kubernetes" || service.Name == "kubernetes-ro" {
+			// This is a temporary hack for supporting the master services
+			// until we actually start running apiserver in a pod.
+			continue
+		}
+		glog.Infof("About to update endpoints for service %v", service.Name)
 		pods, err := e.client.Pods(service.Namespace).List(labels.Set(service.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error syncing service: %#v, skipping.", service)

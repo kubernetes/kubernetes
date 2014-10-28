@@ -48,6 +48,9 @@ type REST struct {
 func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
+	if ipa == nil {
+		glog.Fatalf("Failed to create an IP allocator. Is subnet '%v' valid?", portalNet)
+	}
 	reloadIPsFromStorage(ipa, registry)
 
 	return &REST{
