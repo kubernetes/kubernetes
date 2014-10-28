@@ -62,9 +62,9 @@ Before committing any changes, please link/copy these hooks into your .git
 directory. This will keep you from accidentally committing non-gofmt'd go code.
 
 ```
-cd kubernetes
-ln -s hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
-ln -s hooks/commit-msg .git/hooks/commit-msg
+cd kubernetes/.git/hooks/
+ln -s ../../hooks/prepare-commit-msg .
+ln -s ../../hooks/commit-msg .
 ```
 
 ## Unit tests
