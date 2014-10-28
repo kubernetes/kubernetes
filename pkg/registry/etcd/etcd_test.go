@@ -56,7 +56,7 @@ func TestEtcdParseWatchResourceVersion(t *testing.T) {
 		{Version: "10", ExpectVersion: 11},
 	}
 	for _, testCase := range testCases {
-		version, err := parseWatchResourceVersion(testCase.Version, testCase.Kind)
+		version, err := ParseWatchResourceVersion(testCase.Version, testCase.Kind)
 		switch {
 		case testCase.Err:
 			if err == nil {
