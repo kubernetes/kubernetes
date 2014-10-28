@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// RESTHandler implements HTTP verbs on a set of RESTful resources identified by name.
 type RESTHandler struct {
 	storage         map[string]RESTStorage
 	codec           runtime.Codec
@@ -78,9 +79,9 @@ func (h *RESTHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) 
 }
 
 // curry adapts either of the self link setting functions into a function appropriate for operation's hook.
-func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(runtime.Object) {
-	return func(obj runtime.Object) {
-		if err := f(obj, req); err != nil {
+func curry(f func(runtime.Object, *http.Request) error, req *http.Request) func(RESTResult) {
+	return func(obj RESTResult) {
+		if err := f(obj.Object, req); err != nil {
 			glog.Errorf("unable to set self link for %#v: %v", obj, err)
 		}
 	}
@@ -217,7 +218,7 @@ func (h *RESTHandler) handleRESTStorage(parts []string, req *http.Request, w htt
 }
 
 // createOperation creates an operation to process a channel response.
-func (h *RESTHandler) createOperation(out <-chan runtime.Object, sync bool, timeout time.Duration, onReceive func(runtime.Object)) *Operation {
+func (h *RESTHandler) createOperation(out <-chan RESTResult, sync bool, timeout time.Duration, onReceive func(RESTResult)) *Operation {
 	op := h.ops.NewOperation(out, onReceive)
 	if sync {
 		op.WaitFor(timeout)
@@ -230,9 +231,13 @@ func (h *RESTHandler) createOperation(out <-chan runtime.Object, sync bool, time
 // finishReq finishes up a request, waiting until the operation finishes or, after a timeout, creating an
 // Operation to receive the result and returning its ID down the writer.
 func (h *RESTHandler) finishReq(op *Operation, req *http.Request, w http.ResponseWriter) {
-	obj, complete := op.StatusOrResult()
+	result, complete := op.StatusOrResult()
+	obj := result.Object
 	if complete {
 		status := http.StatusOK
+		if result.Created {
+			status = http.StatusCreated
+		}
 		switch stat := obj.(type) {
 		case *api.Status:
 			if stat.Code != 0 {

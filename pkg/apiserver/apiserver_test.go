@@ -103,7 +103,7 @@ func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Objec
 	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string) (<-chan RESTResult, error) {
 	storage.deleted = id
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
@@ -120,7 +120,7 @@ func (storage *SimpleRESTStorage) New() runtime.Object {
 	return &Simple{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error) {
 	storage.created = obj.(*Simple)
 	if err := storage.errors["create"]; err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ func (storage *SimpleRESTStorage) Create(ctx api.Context, obj runtime.Object) (<
 	}), nil
 }
 
-func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (storage *SimpleRESTStorage) Update(ctx api.Context, obj runtime.Object) (<-chan RESTResult, error) {
 	storage.updated = obj.(*Simple)
 	if err := storage.errors["update"]; err != nil {
 		return nil, err

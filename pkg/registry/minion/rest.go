@@ -45,7 +45,7 @@ func NewREST(m Registry) *REST {
 var ErrDoesNotExist = errors.New("The requested resource does not exist.")
 var ErrNotHealty = errors.New("The requested minion is not healthy.")
 
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
 	minion, ok := obj.(*api.Minion)
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
@@ -72,7 +72,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan runtime.Obje
 	}), nil
 }
 
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan runtime.Object, error) {
+func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
 	minion, err := rs.registry.GetMinion(ctx, id)
 	if minion == nil {
 		return nil, ErrDoesNotExist
@@ -101,7 +101,7 @@ func (rs *REST) New() runtime.Object {
 	return &api.Minion{}
 }
 
-func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan runtime.Object, error) {
+func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan apiserver.RESTResult, error) {
 	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
 }
 

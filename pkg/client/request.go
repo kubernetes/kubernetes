@@ -272,7 +272,7 @@ func (r *Request) Do() Result {
 		if err != nil {
 			return Result{err: err}
 		}
-		respBody, err := r.c.doRequest(req)
+		respBody, created, err := r.c.doRequest(req)
 		if err != nil {
 			if s, ok := err.(APIStatus); ok {
 				status := s.Status()
@@ -292,14 +292,16 @@ func (r *Request) Do() Result {
 				}
 			}
 		}
-		return Result{respBody, err, r.c.Codec}
+		return Result{respBody, created, err, r.c.Codec}
 	}
 }
 
 // Result contains the result of calling Request.Do().
 type Result struct {
-	body  []byte
-	err   error
+	body    []byte
+	created bool
+	err     error
+
 	codec runtime.Codec
 }
 
@@ -322,6 +324,13 @@ func (r Result) Into(obj runtime.Object) error {
 		return r.err
 	}
 	return r.codec.DecodeInto(r.body, obj)
+}
+
+// WasCreated updates the provided bool pointer to whether the server returned
+// 201 created or a different response.
+func (r Result) WasCreated(wasCreated *bool) Result {
+	*wasCreated = r.created
+	return r
 }
 
 // Error returns the error executing the request, nil if no error occurred.

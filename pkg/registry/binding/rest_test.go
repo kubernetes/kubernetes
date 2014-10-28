@@ -111,7 +111,7 @@ func TestRESTPost(t *testing.T) {
 				Message: item.err.Error(),
 			}
 		}
-		if e, a := expect, <-resultChan; !reflect.DeepEqual(e, a) {
+		if e, a := expect, (<-resultChan).Object; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: expected %#v, got %#v", i, e, a)
 		}
 	}

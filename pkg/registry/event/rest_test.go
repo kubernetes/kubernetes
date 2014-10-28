@@ -47,7 +47,7 @@ func TestRESTCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	if e, a := eventA, <-c; !reflect.DeepEqual(e, a) {
+	if e, a := eventA, (<-c).Object; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 }
@@ -67,7 +67,7 @@ func TestRESTDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	if stat := (<-c).(*api.Status); stat.Status != api.StatusSuccess {
+	if stat := (<-c).Object.(*api.Status); stat.Status != api.StatusSuccess {
 		t.Errorf("unexpected status: %v", stat)
 	}
 }
