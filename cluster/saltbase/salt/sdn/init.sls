@@ -8,7 +8,7 @@ openvswitch:
 
 sdn:
   cmd.wait:
-    - name: /vagrant/network_closure.sh
+    - name: /kubernetes-vagrant/network_closure.sh
     - watch:
       - pkg: docker-io
       - pkg: openvswitch

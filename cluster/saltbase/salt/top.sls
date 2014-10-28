@@ -1,6 +1,7 @@
 base:
   '*':
     - base
+    - debian-auto-upgrades
 
   'roles:kubernetes-pool':
     - match: grain

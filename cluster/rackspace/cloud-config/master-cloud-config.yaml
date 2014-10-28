@@ -1,0 +1,152 @@
+#cloud-config
+
+write_files:
+  - path: /opt/bin/regen-minion-list.sh
+    permissions: 0755
+    content: |
+      #!/bin/sh
+      m=$(echo $(etcdctl ls --recursive /corekube/minions | cut -d/ -f4 | sort) | tr ' ' ,)
+      echo "Found $m"
+      mkdir -p /run/apiserver
+      echo "MINIONS=$m" > /run/apiserver/minions.env
+  - path: /opt/bin/git-kubernetes-nginx.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      git clone https://github.com/doublerr/kubernetes_nginx /opt/kubernetes_nginx
+      /usr/bin/cp /opt/.kubernetes_auth /opt/kubernetes_nginx/.kubernetes_auth
+      docker build -t kubernetes_nginx:latest /opt/kubernetes_nginx
+  - path: /opt/bin/download-release.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      OBJECT_URL="CLOUD_FILES_URL"
+      echo "Downloading release ($OBJECT_URL)"
+      wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
+      echo "Unpacking release"
+      rm -rf /opt/kubernetes || false
+      tar xzf /opt/kubernetes.tar.gz -C /opt/
+  - path: /opt/.kubernetes_auth
+    permissions: 0600
+    content: |
+      KUBE_USER:KUBE_PASSWORD
+
+coreos:
+  etcd:
+    name: kubernetes-master
+    discovery: https://discovery.etcd.io/DISCOVERY_ID
+    addr: $private_ipv4:4001
+    peer-addr: $private_ipv4:7001
+    peer-bind-addr: $private_ipv4:7001
+
+  fleet:
+    public-ip: $private_ipv4
+    metadata: kubernetes_role=master
+
+  update:
+    reboot-strategy: etcd-lock
+
+  units:
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
+    - name: download-release.service
+      command: start
+      content: |
+        [Unit]
+        Description=Downloads Kubernetes Release
+        After=network-online.target
+        Requires=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/bash /opt/bin/download-release.sh
+    - name: master-apiserver.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes API Server
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        After=network-online.target
+        Requires=network-online.target
+        After=minion-finder.service
+        Requires=minion-finder.service
+        After=download-release.service
+        Requires=download-release.service
+        [Service]
+        EnvironmentFile=-/run/apiserver/minions.env
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/apiserver /opt/bin/apiserver
+        ExecStart=/opt/bin/apiserver --address=127.0.0.1 --port=8080 --machines=${MINIONS} --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true
+        Restart=always
+        RestartSec=2
+    - name: master-apiserver-sighup.path
+      command: start
+      content: |
+        [Path]
+        PathChanged=/run/apiserver/minions.env
+    - name: master-apiserver-sighup.service
+      command: start
+      content: |
+        [Service]
+        ExecStart=/usr/bin/pkill -SIGHUP -f apiserver
+    - name: minion-finder.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Minion finder
+        After=network-online.target
+        Requires=network-online.target
+        After=etcd.service
+        Requires=etcd.service
+        [Service]
+        ExecStartPre=/opt/bin/regen-minion-list.sh
+        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/minions -- /opt/bin/regen-minion-list.sh
+        Restart=always
+        RestartSec=30
+    - name: master-controller-manager.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        After=network-online.target
+        Requires=network-online.target
+        After=master-apiserver.service
+        Requires=master-apiserver.service
+        [Service]
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/controller-manager /opt/bin/controller-manager
+        ExecStart=/opt/bin/controller-manager --master=127.0.0.1:8080 --logtostderr=true
+        Restart=always
+        RestartSec=2
+    - name: master-scheduler.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        After=network-online.target
+        Requires=network-online.target
+        After=master-apiserver.service
+        Requires=master-apiserver.service
+        [Service]
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/scheduler /opt/bin/scheduler
+        ExecStart=/opt/bin/scheduler --master=127.0.0.1:8080 --logtostderr=true
+        Restart=always
+        RestartSec=10
+    #Running nginx service with --net="host" is a necessary evil until running all k8s services in docker.
+    - name: kubernetes-nginx.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Nginx Service
+        After=network-online.target
+        Requires=network-online.target
+        After=docker.service
+        Requires=docker.service
+        [Service]
+        ExecStartPre=/opt/bin/git-kubernetes-nginx.sh
+        ExecStart=/usr/bin/docker run --rm --net="host" -p "443:443" -t --name "kubernetes_nginx" kubernetes_nginx
+        ExecStop=/usr/bin/docker stop kubernetes_nginx
+        Restart=always
+        RestartSec=15

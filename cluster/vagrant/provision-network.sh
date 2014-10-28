@@ -29,7 +29,11 @@ BRIDGE_ADDRESS=${BRIDGE_BASE}.${MINION_ID}.1
 BRIDGE_NETWORK=${BRIDGE_ADDRESS}/24
 BRIDGE_NETMASK=255.255.255.0
 NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-POST_NETWORK_SCRIPT=/vagrant/network_closure.sh
+POST_NETWORK_SCRIPT_DIR=/kubernetes-vagrant
+POST_NETWORK_SCRIPT=${POST_NETWORK_SCRIPT_DIR}/network_closure.sh
+
+# ensure location of POST_NETWORK_SCRIPT exists
+mkdir -p $POST_NETWORK_SCRIPT_DIR
 
 # add docker bridge ifcfg file
 cat <<EOF > ${NETWORK_CONF_PATH}ifcfg-${DOCKER_BRIDGE}
@@ -106,8 +110,6 @@ iptables -t nat -A POSTROUTING -s ${BRIDGE_BASE}.0.0/16 ! -d ${BRIDGE_BASE}.0.0/
 # persist please
 iptables-save >& /etc/sysconfig/iptables
 
-# self-destruct after doing the job
-#rm -f ${POST_NETWORK_SCRIPT}
 EOF
 
 chmod +x ${POST_NETWORK_SCRIPT}
