@@ -30,7 +30,11 @@ type RedirectHandler struct {
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := api.NewContext()
+	ctx := api.NewDefaultContext()
+	namespace := req.URL.Query().Get("namespace")
+	if len(namespace) > 0 {
+		ctx = api.WithNamespace(ctx, namespace)
+	}
 	parts := splitPath(req.URL.Path)
 	if len(parts) != 2 || req.Method != "GET" {
 		notFound(w, req)

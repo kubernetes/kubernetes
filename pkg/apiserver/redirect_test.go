@@ -27,6 +27,7 @@ import (
 func TestRedirect(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{
 		errors: map[string]error{},
+		expectedResourceNamespace: "default",
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
