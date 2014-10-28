@@ -67,6 +67,8 @@ var (
 	registryBurst           = flag.Int("registry_burst", 10, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
 	runonce                 = flag.Bool("runonce", false, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --etcd_servers and --enable-server")
 	enableDebuggingHandlers = flag.Bool("enable_debugging_handlers", true, "Enables server endpoints for log collection and local running of containers and commands")
+	minimumGCAge            = flag.Duration("minimum_container_ttl_duration", 0, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
+	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
 )
 
 func init() {
@@ -183,7 +185,17 @@ func main() {
 		*networkContainerImage,
 		*syncFrequency,
 		float32(*registryPullQPS),
-		*registryBurst)
+		*registryBurst,
+		*minimumGCAge,
+		*maxContainerCount)
+	go func() {
+		util.Forever(func() {
+			err := k.GarbageCollectContainers()
+			if err != nil {
+				glog.Errorf("Garbage collect failed: %v", err)
+			}
+		}, time.Minute*1)
+	}()
 
 	go func() {
 		defer util.HandleCrash()

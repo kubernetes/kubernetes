@@ -409,8 +409,10 @@ type ContainerState struct {
 type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
-	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
-	RestartCount int            `json:"restartCount" yaml:"restartCount"`
+	State ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
+	// Note that this is calculated from dead containers.  But those containers are subject to
+	// garbage collection.  This value will get capped at 5 by GC.
+	RestartCount int `json:"restartCount" yaml:"restartCount"`
 	// TODO(dchen1107): Introduce our own NetworkSettings struct here?
 	// TODO(dchen1107): Which image the container is running with?
 	// TODO(dchen1107): Once we have done with integration with cadvisor, resource

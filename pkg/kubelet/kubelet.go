@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -61,7 +62,9 @@ func NewMainKubelet(
 	ni string,
 	ri time.Duration,
 	pullQPS float32,
-	pullBurst int) *Kubelet {
+	pullBurst int,
+	minimumGCAge time.Duration,
+	maxContainerCount int) *Kubelet {
 	return &Kubelet{
 		hostname:              hn,
 		dockerClient:          dc,
@@ -74,6 +77,8 @@ func NewMainKubelet(
 		httpClient:            &http.Client{},
 		pullQPS:               pullQPS,
 		pullBurst:             pullBurst,
+		minimumGCAge:          minimumGCAge,
+		maxContainerCount:     maxContainerCount,
 	}
 }
 
@@ -125,6 +130,68 @@ type Kubelet struct {
 	// Optional, no statistics will be available if omitted
 	cadvisorClient cadvisorInterface
 	cadvisorLock   sync.RWMutex
+
+	// Optional, minimum age required for garbage collection.  If zero, no limit.
+	minimumGCAge      time.Duration
+	maxContainerCount int
+}
+
+type ByCreated []*docker.Container
+
+func (a ByCreated) Len() int           { return len(a) }
+func (a ByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByCreated) Less(i, j int) bool { return a[i].Created.After(a[j].Created) }
+
+// TODO: these removals are racy, we should make dockerclient threadsafe across List/Inspect transactions.
+func (kl *Kubelet) purgeOldest(ids []string) error {
+	dockerData := []*docker.Container{}
+	for _, id := range ids {
+		data, err := kl.dockerClient.InspectContainer(id)
+		if err != nil {
+			return err
+		}
+		if !data.State.Running && (kl.minimumGCAge == 0 || time.Now().Sub(data.State.FinishedAt) > kl.minimumGCAge) {
+			dockerData = append(dockerData, data)
+		}
+	}
+	sort.Sort(ByCreated(dockerData))
+	if len(dockerData) <= kl.maxContainerCount {
+		return nil
+	}
+	dockerData = dockerData[kl.maxContainerCount:]
+	for _, data := range dockerData {
+		if err := kl.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: data.ID}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// TODO: Also enforce a maximum total number of containers.
+func (kl *Kubelet) GarbageCollectContainers() error {
+	if kl.maxContainerCount == 0 {
+		return nil
+	}
+	containers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, true)
+	if err != nil {
+		return err
+	}
+	uuidToIDMap := map[string][]string{}
+	for _, container := range containers {
+		_, uuid, name, _ := dockertools.ParseDockerName(container.ID)
+		uuidName := uuid + "." + name
+		uuidToIDMap[uuidName] = append(uuidToIDMap[uuidName], container.ID)
+	}
+	for _, list := range uuidToIDMap {
+		if len(list) <= kl.maxContainerCount {
+			continue
+		}
+		if err := kl.purgeOldest(list); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetCadvisorClient sets the cadvisor client in a thread-safe way.

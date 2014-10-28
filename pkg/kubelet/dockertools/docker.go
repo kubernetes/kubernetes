@@ -50,6 +50,7 @@ type DockerInterface interface {
 	CreateContainer(docker.CreateContainerOptions) (*docker.Container, error)
 	StartContainer(id string, hostConfig *docker.HostConfig) error
 	StopContainer(id string, timeout uint) error
+	RemoveContainer(opts docker.RemoveContainerOptions) error
 	InspectImage(image string) (*docker.Image, error)
 	PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error
 	Logs(opts docker.LogsOptions) error

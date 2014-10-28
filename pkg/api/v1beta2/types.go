@@ -310,8 +310,10 @@ type ContainerState struct {
 type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
-	State        ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
-	RestartCount int            `json:"restartCount" yaml:"restartCount"`
+	State ContainerState `json:"state,omitempty" yaml:"state,omitempty"`
+	// Note that this is calculated from dead containers.  But those containers are subject to
+	// garbage collection.  This value will get capped at 5 by GC.
+	RestartCount int `json:"restartCount" yaml:"restartCount"`
 	// TODO(dchen1107): Deprecated this soon once we pull entire PodStatus from node,
 	// not just PodInfo. Now we need this to remove docker.Container from API
 	PodIP string `json:"podIP,omitempty" yaml:"podIP,omitempty"`
