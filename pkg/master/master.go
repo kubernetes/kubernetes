@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -36,7 +35,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	cloudcontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/election"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
@@ -74,6 +72,10 @@ type Config struct {
 	CorsAllowedOriginList util.StringList
 	TokenAuthFile         string
 
+	// Number of masters running; all masters must be started with the
+	// same value for this field. (Numbers > 1 currently untested.)
+	MasterCount int
+
 	// The port on PublicAddress where a read-only server will be installed.
 	// Defaults to 7080 if not set.
 	ReadOnlyPort int
@@ -104,18 +106,14 @@ type Master struct {
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
 	tokenAuthFile         string
+	masterCount           int
 
 	// "Outputs"
 	Handler http.Handler
 
-	elector               election.MasterElector
-	readOnlyServer        string
-	readWriteServer       string
-	electedMasterServices *util.Runner
-
-	// lock must be held when accessing the below read-write members.
-	lock          sync.RWMutex
-	electedMaster election.Master
+	readOnlyServer  string
+	readWriteServer string
+	masterServices  *util.Runner
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -133,6 +131,10 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHe
 
 // setDefaults fills in any fields not set that are required to have valid data.
 func setDefaults(c *Config) {
+	if c.MasterCount == 0 {
+		// Clearly, there will be at least one master.
+		c.MasterCount = 1
+	}
 	if c.ReadOnlyPort == 0 {
 		c.ReadOnlyPort = 7080
 	}
@@ -140,6 +142,9 @@ func setDefaults(c *Config) {
 		c.ReadWritePort = 443
 	}
 	if c.PublicAddress == "" {
+		// Find and use the first non-loopback address.
+		// TODO: potentially it'd be useful to skip the docker interface if it
+		// somehow is first in the list.
 		addrs, err := net.InterfaceAddrs()
 		if err != nil {
 			glog.Fatalf("Unable to get network interfaces: error='%v'", err)
@@ -190,11 +195,11 @@ func New(c *Config) *Master {
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		tokenAuthFile:         c.TokenAuthFile,
-		elector:               election.NewEtcdMasterElector(c.EtcdHelper.Client),
+		masterCount:           c.MasterCount,
 		readOnlyServer:        net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
 		readWriteServer:       net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
 	}
-	m.electedMasterServices = util.NewRunner(m.serviceWriterLoop, m.electionAnnounce)
+	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
 	m.init(c)
 	return m
 }
@@ -281,18 +286,8 @@ func (m *Master) init(c *Config) {
 
 	m.Handler = handler
 
-	if m.readWriteServer != "" {
-		glog.Infof("Starting election services as %v", m.readWriteServer)
-		go election.Notify(m.elector, "/registry/elections/k8smaster", m.readWriteServer, m.electedMasterServices)
-	}
-
-	// TODO: start a goroutine to report ourselves to the elected master.
-}
-
-func (m *Master) electionAnnounce(stop chan struct{}) {
-	glog.Infof("Elected as master")
-	<-stop
-	glog.Info("Lost election for master")
+	// TODO: Attempt clean shutdown?
+	m.masterServices.Start()
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.

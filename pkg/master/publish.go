@@ -35,21 +35,31 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 			if err := m.createMasterServiceIfNeeded("kubernetes", 443); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
-			if err := m.setEndpoints("kubernetes", []string{m.readWriteServer}); err != nil {
+			if err := m.ensureEndpointsContain("kubernetes", m.readWriteServer); err != nil {
 				glog.Errorf("Can't create rw endpoints: %v", err)
 			}
-		} else {
-			m.deleteMasterService("kubernetes")
 		}
+
+		select {
+		case <-stop:
+			return
+		case <-time.After(10 * time.Second):
+		}
+	}
+}
+
+func (m *Master) roServiceWriterLoop(stop chan struct{}) {
+	for {
+		// Update service & endpoint records.
+		// TODO: when it becomes possible to change this stuff,
+		// stop polling and start watching.
 		if m.readOnlyServer != "" {
 			if err := m.createMasterServiceIfNeeded("kubernetes-ro", 80); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
-			if err := m.setEndpoints("kubernetes-ro", []string{m.readOnlyServer}); err != nil {
-				glog.Errorf("Can't create rw endpoints: %v", err)
+			if err := m.ensureEndpointsContain("kubernetes-ro", m.readOnlyServer); err != nil {
+				glog.Errorf("Can't create ro endpoints: %v", err)
 			}
-		} else {
-			m.deleteMasterService("kubernetes-ro")
 		}
 
 		select {
@@ -86,20 +96,18 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 		return err
 	}
 	resp := <-c
-	if _, ok := resp.(*api.Service); ok {
+	if _, ok := resp.Object.(*api.Service); ok {
 		// If all worked, we get back an *api.Service object.
 		return nil
 	}
 	return fmt.Errorf("Unexpected response: %#v", resp)
 }
 
-func (m *Master) deleteMasterService(serviceName string) {
-	ctx := api.NewDefaultContext()
-	m.serviceRegistry.DeleteService(ctx, serviceName)
-}
-
-// setEndpoints sets the endpoints for the given service.
-func (m *Master) setEndpoints(serviceName string, endpoints []string) error {
+// ensureEndpointsContain sets the endpoints for the given service. Also removes
+// excess endpoints (as determined by m.masterCount). Extra endpoints could appear
+// in the list if, for example, the master starts running on a different machine,
+// changing IP addresses.
+func (m *Master) ensureEndpointsContain(serviceName string, endpoint string) error {
 	ctx := api.NewDefaultContext()
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
@@ -108,6 +116,23 @@ func (m *Master) setEndpoints(serviceName string, endpoints []string) error {
 		e.ObjectMeta.Name = serviceName
 		e.ObjectMeta.Namespace = "default"
 	}
-	e.Endpoints = endpoints
+	found := false
+	for i := range e.Endpoints {
+		if e.Endpoints[i] == endpoint {
+			found = true
+			break
+		}
+	}
+	if !found {
+		e.Endpoints = append(e.Endpoints, endpoint)
+	}
+	if len(e.Endpoints) > m.masterCount {
+		// We append to the end and remove from the beginning, so this should
+		// converge rapidly with all masters performing this operation.
+		e.Endpoints = e.Endpoints[len(e.Endpoints)-m.masterCount:]
+	} else if found {
+		// We didn't make any changes, no need to actually call update.
+		return nil
+	}
 	return m.endpointRegistry.UpdateEndpoints(ctx, e)
 }

@@ -44,7 +44,7 @@ import (
 var (
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	port = flag.Uint("port", 8080, ""+
+	port = flag.Int("port", 8080, ""+
 		"The port to listen on. Default 8080. It is assumed that firewall rules are "+
 		"set up such that this port is not reachable from outside of the cluster. It is "+
 		"further assumed that port 443 on the cluster's public address is proxied to this "+
@@ -55,7 +55,7 @@ var (
 		"and it is assumed that port 443 at this address will be proxied/redirected "+
 		"to '-address':'-port'. If blank, the address in the first listed interface "+
 		"will be used.")
-	readOnlyPort = flag.Uint("read_only_port", 7080, ""+
+	readOnlyPort = flag.Int("read_only_port", 7080, ""+
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
 		"read-only address. It is assumed that firewall rules are set up such that "+
 		"this port is not reachable from outside of the cluster.")
@@ -222,8 +222,8 @@ func main() {
 		CorsAllowedOriginList: corsAllowedOriginList,
 		TokenAuthFile:         *tokenAuthFile,
 
-		ReadOnlyPort:  int(*readOnlyPort),
-		ReadWritePort: int(*port),
+		ReadOnlyPort:  *readOnlyPort,
+		ReadWritePort: *port,
 		PublicAddress: *publicAddressOverride,
 	}
 	m := master.New(config)
