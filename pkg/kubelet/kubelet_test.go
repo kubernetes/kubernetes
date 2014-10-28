@@ -1193,3 +1193,297 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 }
+
+func TestKubeletGarbageCollection(t *testing.T) {
+	tests := []struct {
+		containers       []docker.APIContainers
+		containerDetails map[string]*docker.Container
+		expectedRemoved  []string
+	}{
+		{
+			containers: []docker.APIContainers{
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "1876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "2876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "3876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "4876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "5876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "6876",
+				},
+			},
+			containerDetails: map[string]*docker.Container{
+				"1876": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1876",
+					Created: time.Now(),
+				},
+			},
+			expectedRemoved: []string{"1876"},
+		},
+		{
+			containers: []docker.APIContainers{
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "1876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "2876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "3876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "4876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "5876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "6876",
+				},
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "7876",
+				},
+			},
+			containerDetails: map[string]*docker.Container{
+				"1876": {
+					State: docker.State{
+						Running: true,
+					},
+					ID:      "1876",
+					Created: time.Now(),
+				},
+				"2876": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2876",
+					Created: time.Now(),
+				},
+			},
+			expectedRemoved: []string{"2876"},
+		},
+		{
+			containers: []docker.APIContainers{
+				{
+					// network container
+					Names: []string{"/k8s_net_foo.new.test_.deadbeef"},
+					ID:    "1876",
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		kubelet, _, fakeDocker := newTestKubelet(t)
+		kubelet.maxContainerCount = 5
+		fakeDocker.ContainerList = test.containers
+		fakeDocker.ContainerMap = test.containerDetails
+		fakeDocker.Container = &docker.Container{ID: "error", Created: time.Now()}
+		err := kubelet.GarbageCollectContainers()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(fakeDocker.Removed, test.expectedRemoved) {
+			t.Errorf("expected: %v, got: %v", test.expectedRemoved, fakeDocker.Removed)
+		}
+	}
+}
+
+func TestPurgeOldest(t *testing.T) {
+	created := time.Now()
+	tests := []struct {
+		ids              []string
+		containerDetails map[string]*docker.Container
+		expectedRemoved  []string
+	}{
+		{
+			ids: []string{"1", "2", "3", "4", "5"},
+			containerDetails: map[string]*docker.Container{
+				"1": {
+					State: docker.State{
+						Running: true,
+					},
+					ID:      "1",
+					Created: created,
+				},
+				"2": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2",
+					Created: created.Add(time.Second),
+				},
+				"3": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "3",
+					Created: created.Add(time.Second),
+				},
+				"4": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "4",
+					Created: created.Add(time.Second),
+				},
+				"5": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "5",
+					Created: created.Add(time.Second),
+				},
+			},
+		},
+		{
+			ids: []string{"1", "2", "3", "4", "5", "6"},
+			containerDetails: map[string]*docker.Container{
+				"1": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1",
+					Created: created.Add(time.Second),
+				},
+				"2": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2",
+					Created: created.Add(time.Millisecond),
+				},
+				"3": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "3",
+					Created: created.Add(time.Second),
+				},
+				"4": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "4",
+					Created: created.Add(time.Second),
+				},
+				"5": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "5",
+					Created: created.Add(time.Second),
+				},
+				"6": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "6",
+					Created: created.Add(time.Second),
+				},
+			},
+			expectedRemoved: []string{"2"},
+		},
+		{
+			ids: []string{"1", "2", "3", "4", "5", "6", "7"},
+			containerDetails: map[string]*docker.Container{
+				"1": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "1",
+					Created: created.Add(time.Second),
+				},
+				"2": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "2",
+					Created: created.Add(time.Millisecond),
+				},
+				"3": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "3",
+					Created: created.Add(time.Second),
+				},
+				"4": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "4",
+					Created: created.Add(time.Second),
+				},
+				"5": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "5",
+					Created: created.Add(time.Second),
+				},
+				"6": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "6",
+					Created: created.Add(time.Microsecond),
+				},
+				"7": {
+					State: docker.State{
+						Running: false,
+					},
+					ID:      "7",
+					Created: created.Add(time.Second),
+				},
+			},
+			expectedRemoved: []string{"2", "6"},
+		},
+	}
+	for _, test := range tests {
+		kubelet, _, fakeDocker := newTestKubelet(t)
+		kubelet.maxContainerCount = 5
+		fakeDocker.ContainerMap = test.containerDetails
+		kubelet.purgeOldest(test.ids)
+		if !reflect.DeepEqual(fakeDocker.Removed, test.expectedRemoved) {
+			t.Errorf("expected: %v, got: %v", test.expectedRemoved, fakeDocker.Removed)
+		}
+	}
+}

@@ -29,12 +29,14 @@ type FakeDockerClient struct {
 	sync.Mutex
 	ContainerList []docker.APIContainers
 	Container     *docker.Container
+	ContainerMap  map[string]*docker.Container
 	Image         *docker.Image
 	Err           error
 	called        []string
 	Stopped       []string
 	pulled        []string
 	Created       []string
+	Removed       []string
 	VersionInfo   docker.Env
 }
 
@@ -70,6 +72,11 @@ func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_container")
+	if f.ContainerMap != nil {
+		if container, ok := f.ContainerMap[id]; ok {
+			return container, f.Err
+		}
+	}
 	return f.Container, f.Err
 }
 
@@ -119,6 +126,14 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		}
 	}
 	f.ContainerList = newList
+	return f.Err
+}
+
+func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, "remove")
+	f.Removed = append(f.Removed, opts.ID)
 	return f.Err
 }
 
