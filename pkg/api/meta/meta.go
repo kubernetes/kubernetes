@@ -224,11 +224,10 @@ func fieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	if !field.IsValid() {
 		return fmt.Errorf("Couldn't find %v field in %#v", fieldName, v.Interface())
 	}
-	v = reflect.ValueOf(dest)
-	if v.Kind() != reflect.Ptr {
-		return fmt.Errorf("dest should be ptr")
+	v, err := conversion.EnforcePtr(dest)
+	if err != nil {
+		return err
 	}
-	v = v.Elem()
 	field = field.Addr()
 	if field.Type().AssignableTo(v.Type()) {
 		v.Set(field)
