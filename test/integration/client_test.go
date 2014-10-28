@@ -19,6 +19,7 @@ limitations under the License.
 package integration
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -29,6 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+
+	"github.com/golang/glog"
 )
 
 func init() {
@@ -41,8 +44,14 @@ func TestClient(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	mux := http.NewServeMux()
+
+	_, portalNet, err := net.ParseCIDR("10.0.0.0/24")
+	if err != nil {
+		glog.Fatalf("Unable to parse CIDR: %v", err)
+	}
 	master.New(&master.Config{
 		EtcdHelper:        helper,
+		PortalNet:         portalNet,
 		Mux:               mux,
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
