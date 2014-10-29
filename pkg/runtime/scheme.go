@@ -174,6 +174,12 @@ func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
 	return s.raw.KnownTypes(version)
 }
 
+// DataVersionAndKind will return the APIVersion and Kind of the given wire-format
+// enconding of an API Object, or an error.
+func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
+	return s.raw.DataVersionAndKind(data)
+}
+
 // ObjectVersionAndKind returns the version and kind of the given Object.
 func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
 	return s.raw.ObjectVersionAndKind(obj)

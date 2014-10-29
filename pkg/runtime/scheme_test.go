@@ -47,6 +47,9 @@ func TestScheme(t *testing.T) {
 	scheme.AddKnownTypeWithName("", "Simple", &InternalSimple{})
 	scheme.AddKnownTypeWithName("externalVersion", "Simple", &ExternalSimple{})
 
+	// test that scheme is an ObjectTyper
+	var _ runtime.ObjectTyper = scheme
+
 	internalToExternalCalls := 0
 	externalToInternalCalls := 0
 
