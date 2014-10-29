@@ -131,6 +131,15 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHe
 
 // setDefaults fills in any fields not set that are required to have valid data.
 func setDefaults(c *Config) {
+	if c.PortalNet == nil {
+		defaultNet := "10.0.0.0/24"
+		glog.Warningf("Portal net unspecified. Defaulting to %v.", defaultNet)
+		_, portalNet, err := net.ParseCIDR(defaultNet)
+		if err != nil {
+			glog.Fatalf("Unable to parse CIDR: %v", err)
+		}
+		c.PortalNet = portalNet
+	}
 	if c.MasterCount == 0 {
 		// Clearly, there will be at least one master.
 		c.MasterCount = 1

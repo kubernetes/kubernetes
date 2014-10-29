@@ -129,12 +129,6 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	}
 
 	// Master
-	_, portalNet, err := net.ParseCIDR("10.0.0.0/24")
-	if err != nil {
-		glog.Fatalf("Unable to parse CIDR: %v", err)
-	}
-	glog.Infof("Using portalNet '%v'", portalNet)
-
 	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
 	if err != nil {
 		glog.Fatalf("Unable to parse URL '%v': %v", apiServer.URL, err)
@@ -150,7 +144,6 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		EtcdHelper:        helper,
 		Minions:           machineList,
 		KubeletClient:     fakeKubeletClient{},
-		PortalNet:         portalNet,
 		Mux:               mux,
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
