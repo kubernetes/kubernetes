@@ -14,10 +14,10 @@ KUBE_API_PORT="--port=8080"
 KUBE_MASTER="--master=127.0.0.1:8080"
 
 # Comma seperated list of minions
-MINION_ADDRESSES="--machines=127.0.0.1"
+KUBELET_ADDRESSES="--machines=127.0.0.1"
 
 # Port minions listen on
-MINION_PORT="--kubelet_port=10250"
+KUBELET_PORT="--kubelet_port=10250"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
