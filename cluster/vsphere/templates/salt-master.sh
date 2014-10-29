@@ -28,11 +28,6 @@ grains:
   cloud: vsphere
 EOF
 
-cat <<EOF >/srv/pillar/cluster-params.sls
-node_instance_prefix: $NODE_INSTANCE_PREFIX
-portal_net: $PORTAL_NET
-EOF
-
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
 cat <<EOF >/etc/salt/master.d/auto-accept.conf
@@ -47,9 +42,6 @@ reactor:
     - /srv/reactor/highstate-masters.sls
     - /srv/reactor/highstate-minions.sls
 EOF
-
-mkdir -p /srv/salt/nginx
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
 # Install Salt
 #
