@@ -60,10 +60,6 @@ func TestToAuthOptions(t *testing.T) {
 // standard OS_* OpenStack client environment variables.
 func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.AuthUrl = os.Getenv("OS_AUTH_URL")
-	// gophercloud wants "provider" to point specifically at tokens URL
-	if !strings.HasSuffix(cfg.Global.AuthUrl, "/tokens") {
-		cfg.Global.AuthUrl += "/tokens"
-	}
 
 	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
 	// Rax/nova _insists_ that we don't specify both tenant ID and name
@@ -75,11 +71,14 @@ func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
 	cfg.Global.ApiKey = os.Getenv("OS_API_KEY")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
+	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
+	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
 
 	ok = (cfg.Global.AuthUrl != "" &&
 		cfg.Global.Username != "" &&
 		(cfg.Global.Password != "" || cfg.Global.ApiKey != "") &&
-		(cfg.Global.TenantId != "" || cfg.Global.TenantName != ""))
+		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
+			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
 
 	return
 }

@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/url"
 	"regexp"
 
 	"code.google.com/p/gcfg"
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/flavors"
+	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+	"github.com/rackspace/gophercloud/pagination"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -35,21 +38,23 @@ import (
 var ErrServerNotFound = errors.New("Server not found")
 var ErrMultipleServersFound = errors.New("Multiple servers matched query")
 var ErrFlavorNotFound = errors.New("Flavor not found")
+var ErrNoAddressFound = errors.New("No address found for host")
+var ErrInvalidAddress = errors.New("Invalid address")
+var ErrAttrNotFound = errors.New("Expected attribute not found")
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
-	provider string
-	authOpt  gophercloud.AuthOptions
+	provider *gophercloud.ProviderClient
 	region   string
-	access   *gophercloud.Access
 }
 
 type Config struct {
 	Global struct {
 		AuthUrl              string
-		Username, Password   string
-		ApiKey               string
+		Username, UserId     string
+		Password, ApiKey     string
 		TenantId, TenantName string
+		DomainId, DomainName string
 		Region               string
 	}
 }
@@ -66,11 +71,13 @@ func init() {
 
 func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 	return gophercloud.AuthOptions{
-		Username:   cfg.Global.Username,
-		Password:   cfg.Global.Password,
-		ApiKey:     cfg.Global.ApiKey,
-		TenantId:   cfg.Global.TenantId,
-		TenantName: cfg.Global.TenantName,
+		IdentityEndpoint: cfg.Global.AuthUrl,
+		Username:         cfg.Global.Username,
+		UserID:           cfg.Global.UserId,
+		Password:         cfg.Global.Password,
+		APIKey:           cfg.Global.ApiKey,
+		TenantID:         cfg.Global.TenantId,
+		TenantName:       cfg.Global.TenantName,
 
 		// Persistent service, so we need to be able to renew tokens
 		AllowReauth: true,
@@ -89,118 +96,184 @@ func readConfig(config io.Reader) (Config, error) {
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
-	os := OpenStack{
-		provider: cfg.Global.AuthUrl,
-		authOpt:  cfg.toAuthOptions(),
-		region:   cfg.Global.Region,
+	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
+	if err != nil {
+		return nil, err
 	}
 
-	access, err := gophercloud.Authenticate(os.provider, os.authOpt)
-	os.access = access
-
-	return &os, err
+	os := OpenStack{
+		provider: provider,
+		region:   cfg.Global.Region,
+	}
+	return &os, nil
 }
 
 type Instances struct {
-	servers            gophercloud.CloudServersProvider
+	compute            *gophercloud.ServiceClient
 	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
 }
 
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
-	servers, err := gophercloud.ServersApi(os.access, gophercloud.ApiCriteria{
-		Type:      "compute",
-		UrlChoice: gophercloud.PublicURL,
-		Region:    os.region,
+	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
 	})
-
 	if err != nil {
 		return nil, false
 	}
 
-	flavors, err := servers.ListFlavors()
-	if err != nil {
-		return nil, false
-	}
-	flavor_to_resource := make(map[string]*api.NodeResources, len(flavors))
-	for _, flavor := range flavors {
-		rsrc := api.NodeResources{
-			Capacity: api.ResourceList{
-				"cpu":                      util.NewIntOrStringFromInt(flavor.VCpus),
-				"memory":                   util.NewIntOrStringFromString(fmt.Sprintf("%dMiB", flavor.Ram)),
-				"openstack.org/disk":       util.NewIntOrStringFromString(fmt.Sprintf("%dGB", flavor.Disk)),
-				"openstack.org/rxTxFactor": util.NewIntOrStringFromInt(int(flavor.RxTxFactor * 1000)),
-				"openstack.org/swap":       util.NewIntOrStringFromString(fmt.Sprintf("%dMiB", flavor.Swap)),
-			},
+	pager := flavors.ListDetail(compute, nil)
+
+	flavor_to_resource := make(map[string]*api.NodeResources)
+	err = pager.EachPage(func(page pagination.Page) (bool, error) {
+		flavorList, err := flavors.ExtractFlavors(page)
+		if err != nil {
+			return false, err
 		}
-		flavor_to_resource[flavor.Id] = &rsrc
+		for _, flavor := range flavorList {
+			rsrc := api.NodeResources{
+				Capacity: api.ResourceList{
+					"cpu":                      util.NewIntOrStringFromInt(flavor.VCPUs),
+					"memory":                   util.NewIntOrStringFromString(fmt.Sprintf("%dMiB", flavor.RAM)),
+					"openstack.org/disk":       util.NewIntOrStringFromString(fmt.Sprintf("%dGB", flavor.Disk)),
+					"openstack.org/rxTxFactor": util.NewIntOrStringFromInt(int(flavor.RxTxFactor * 1000)),
+					"openstack.org/swap":       util.NewIntOrStringFromString(fmt.Sprintf("%dMiB", flavor.Swap)),
+				},
+			}
+			flavor_to_resource[flavor.ID] = &rsrc
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, false
 	}
 
-	return &Instances{servers, flavor_to_resource}, true
+	return &Instances{compute, flavor_to_resource}, true
 }
 
 func (i *Instances) List(name_filter string) ([]string, error) {
-	filter := url.Values{}
-	filter.Set("name", name_filter)
-	filter.Set("status", "ACTIVE")
+	opts := servers.ListOpts{
+		Name:   name_filter,
+		Status: "ACTIVE",
+	}
+	pager := servers.List(i.compute, opts)
 
-	servers, err := i.servers.ListServersByFilter(filter)
+	ret := make([]string, 0)
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		sList, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		for _, server := range sList {
+			ret = append(ret, server.Name)
+		}
+		return true, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	ret := make([]string, len(servers))
-	for idx, srv := range servers {
-		ret[idx] = srv.Name
-	}
 	return ret, nil
 }
 
-func getServerByName(api gophercloud.CloudServersProvider, name string) (*gophercloud.Server, error) {
-	filter := url.Values{}
-	filter.Set("name", fmt.Sprintf("^%s$", regexp.QuoteMeta(name)))
-	filter.Set("status", "ACTIVE")
+func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.Server, error) {
+	opts := servers.ListOpts{
+		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
+		Status: "ACTIVE",
+	}
+	pager := servers.List(client, opts)
 
-	servers, err := api.ListServersByFilter(filter)
+	serverList := make([]servers.Server, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		serverList = append(serverList, s...)
+		if len(serverList) > 1 {
+			return false, ErrMultipleServersFound
+		}
+		return true, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if len(servers) == 0 {
+	if len(serverList) == 0 {
 		return nil, ErrServerNotFound
-	} else if len(servers) > 1 {
+	} else if len(serverList) > 1 {
 		return nil, ErrMultipleServersFound
 	}
 
-	return &servers[0], nil
+	return &serverList[0], nil
+}
+
+func firstAddr(netblob interface{}) string {
+	// Run-time types for the win :(
+	list, ok := netblob.([]interface{})
+	if !ok || len(list) < 1 {
+		return ""
+	}
+	props, ok := list[0].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	tmp, ok := props["addr"]
+	if !ok {
+		return ""
+	}
+	addr, ok := tmp.(string)
+	if !ok {
+		return ""
+	}
+	return addr
 }
 
 func (i *Instances) IPAddress(name string) (net.IP, error) {
-	srv, err := getServerByName(i.servers, name)
+	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
 
 	var s string
-	if len(srv.Addresses.Private) > 0 {
-		s = srv.Addresses.Private[0].Addr
-	} else if len(srv.Addresses.Public) > 0 {
-		s = srv.Addresses.Public[0].Addr
-	} else if srv.AccessIPv4 != "" {
+	if s == "" {
+		s = firstAddr(srv.Addresses["private"])
+	}
+	if s == "" {
+		s = firstAddr(srv.Addresses["public"])
+	}
+	if s == "" {
 		s = srv.AccessIPv4
-	} else {
+	}
+	if s == "" {
 		s = srv.AccessIPv6
 	}
-	return net.ParseIP(s), nil
+	if s == "" {
+		return nil, ErrNoAddressFound
+	}
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return nil, ErrInvalidAddress
+	}
+	return ip, nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
-	srv, err := getServerByName(i.servers, name)
+	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
 
-	rsrc, ok := i.flavor_to_resource[srv.Flavor.Id]
+	s, ok := srv.Flavor["id"]
+	if !ok {
+		return nil, ErrAttrNotFound
+	}
+	flavId, ok := s.(string)
+	if !ok {
+		return nil, ErrAttrNotFound
+	}
+	rsrc, ok := i.flavor_to_resource[flavId]
 	if !ok {
 		return nil, ErrFlavorNotFound
 	}
