@@ -98,6 +98,38 @@ func loadClientOrDie() *client.Client {
 	return c
 }
 
+func TestKubernetesROService(c *client.Client) bool {
+	svc := api.ServiceList{}
+	err := c.Get().
+		Namespace("default").
+		AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
+		Do().
+		Into(&svc)
+	if err != nil {
+		glog.Errorf("unexpected error listing services using ro service: %v", err)
+		return false
+	}
+	var foundRW, foundRO bool
+	for i := range svc.Items {
+		if svc.Items[i].Name == "kubernetes" {
+			foundRW = true
+		}
+		if svc.Items[i].Name == "kubernetes-ro" {
+			foundRO = true
+		}
+	}
+	if !foundRW {
+		glog.Error("no RW service found")
+	}
+	if !foundRO {
+		glog.Error("no RO service found")
+	}
+	if !foundRW || !foundRO {
+		return false
+	}
+	return true
+}
+
 func TestPodUpdate(c *client.Client) bool {
 	podClient := c.Pods(api.NamespaceDefault)
 
@@ -158,7 +190,8 @@ func main() {
 	c := loadClientOrDie()
 
 	tests := []func(c *client.Client) bool{
-	// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
+		TestKubernetesROService,
+		// TODO(brendandburns): fix this test and re-add it: TestPodUpdate,
 	}
 
 	passed := true

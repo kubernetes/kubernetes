@@ -19,6 +19,7 @@ package master
 import (
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,20 @@ type Config struct {
 	APIPrefix             string
 	CorsAllowedOriginList util.StringList
 	TokenAuthFile         string
+
+	// Number of masters running; all masters must be started with the
+	// same value for this field. (Numbers > 1 currently untested.)
+	MasterCount int
+
+	// The port on PublicAddress where a read-only server will be installed.
+	// Defaults to 7080 if not set.
+	ReadOnlyPort int
+	// The port on PublicAddress where a read-write server will be installed.
+	// Defaults to 443 if not set.
+	ReadWritePort int
+
+	// If empty, the first result from net.InterfaceAddrs will be used.
+	PublicAddress string
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -91,8 +106,14 @@ type Master struct {
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
 	tokenAuthFile         string
+	masterCount           int
+
 	// "Outputs"
 	Handler http.Handler
+
+	readOnlyServer  string
+	readWriteServer string
+	masterServices  *util.Runner
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -108,8 +129,60 @@ func NewEtcdHelper(client tools.EtcdGetSet, version string) (helper tools.EtcdHe
 	return tools.EtcdHelper{client, versionInterfaces.Codec, tools.RuntimeVersionAdapter{versionInterfaces.MetadataAccessor}}, nil
 }
 
+// setDefaults fills in any fields not set that are required to have valid data.
+func setDefaults(c *Config) {
+	if c.PortalNet == nil {
+		defaultNet := "10.0.0.0/24"
+		glog.Warningf("Portal net unspecified. Defaulting to %v.", defaultNet)
+		_, portalNet, err := net.ParseCIDR(defaultNet)
+		if err != nil {
+			glog.Fatalf("Unable to parse CIDR: %v", err)
+		}
+		c.PortalNet = portalNet
+	}
+	if c.MasterCount == 0 {
+		// Clearly, there will be at least one master.
+		c.MasterCount = 1
+	}
+	if c.ReadOnlyPort == 0 {
+		c.ReadOnlyPort = 7080
+	}
+	if c.ReadWritePort == 0 {
+		c.ReadWritePort = 443
+	}
+	if c.PublicAddress == "" {
+		// Find and use the first non-loopback address.
+		// TODO: potentially it'd be useful to skip the docker interface if it
+		// somehow is first in the list.
+		addrs, err := net.InterfaceAddrs()
+		if err != nil {
+			glog.Fatalf("Unable to get network interfaces: error='%v'", err)
+		}
+		found := false
+		for i := range addrs {
+			ip, _, err := net.ParseCIDR(addrs[i].String())
+			if err != nil {
+				glog.Errorf("Error parsing '%v': %v", addrs[i], err)
+				continue
+			}
+			if ip.IsLoopback() {
+				glog.Infof("'%v' (%v) is a loopback address, ignoring.", ip, addrs[i])
+				continue
+			}
+			found = true
+			c.PublicAddress = ip.String()
+			glog.Infof("Will report %v as public IP address.", ip)
+			break
+		}
+		if !found {
+			glog.Fatalf("Unable to find suitible network address in list: %v", addrs)
+		}
+	}
+}
+
 // New returns a new instance of Master connected to the given etcd server.
 func New(c *Config) *Master {
+	setDefaults(c)
 	minionRegistry := makeMinionRegistry(c)
 	serviceRegistry := etcd.NewRegistry(c.EtcdHelper, nil)
 	boundPodFactory := &pod.BasicBoundPodFactory{
@@ -131,7 +204,11 @@ func New(c *Config) *Master {
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		tokenAuthFile:         c.TokenAuthFile,
+		masterCount:           c.MasterCount,
+		readOnlyServer:        net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
+		readWriteServer:       net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
 	}
+	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
 	m.init(c)
 	return m
 }
@@ -188,6 +265,7 @@ func (m *Master) init(c *Config) {
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),
 	}
+
 	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(m.mux, c.APIPrefix+"/v1beta1")
 	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(m.mux, c.APIPrefix+"/v1beta2")
 	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
@@ -216,6 +294,9 @@ func (m *Master) init(c *Config) {
 	m.mux.HandleFunc("/_whoami", handleWhoAmI(authenticator))
 
 	m.Handler = handler
+
+	// TODO: Attempt clean shutdown?
+	m.masterServices.Start()
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.

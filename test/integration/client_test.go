@@ -41,6 +41,7 @@ func TestClient(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	mux := http.NewServeMux()
+
 	master.New(&master.Config{
 		EtcdHelper:        helper,
 		Mux:               mux,

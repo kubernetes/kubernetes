@@ -42,9 +42,23 @@ import (
 )
 
 var (
-	port                  = flag.Uint("port", 8080, "The port to listen on. Default 8080")
+	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
+	// arrange these text blocks sensibly. Grrr.
+	port = flag.Int("port", 8080, ""+
+		"The port to listen on. Default 8080. It is assumed that firewall rules are "+
+		"set up such that this port is not reachable from outside of the cluster. It is "+
+		"further assumed that port 443 on the cluster's public address is proxied to this "+
+		"port. This is performed by nginx in the default setup.")
 	address               = util.IP(net.ParseIP("127.0.0.1"))
-	readOnlyPort          = flag.Uint("read_only_port", 7080, "The port from which to serve read-only resources. If 0, don't serve on a read-only address.")
+	publicAddressOverride = flag.String("public_address_override", "", ""+
+		"Public serving address. Read only port will be opened on this address, "+
+		"and it is assumed that port 443 at this address will be proxied/redirected "+
+		"to '-address':'-port'. If blank, the address in the first listed interface "+
+		"will be used.")
+	readOnlyPort = flag.Int("read_only_port", 7080, ""+
+		"The port from which to serve read-only resources. If 0, don't serve on a "+
+		"read-only address. It is assumed that firewall rules are set up such that "+
+		"this port is not reachable from outside of the cluster.")
 	apiPrefix             = flag.String("api_prefix", "/api", "The prefix for API requests on the server. Default '/api'.")
 	storageVersion        = flag.String("storage_version", "", "The version to store resources with. Defaults to server preferred")
 	cloudProvider         = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
@@ -184,7 +198,7 @@ func main() {
 
 	n := net.IPNet(portalNet)
 	mux := http.NewServeMux()
-	m := master.New(&master.Config{
+	config := &master.Config{
 		Client:             client,
 		Cloud:              cloud,
 		EtcdHelper:         helper,
@@ -207,13 +221,26 @@ func main() {
 		APIPrefix:             *apiPrefix,
 		CorsAllowedOriginList: corsAllowedOriginList,
 		TokenAuthFile:         *tokenAuthFile,
-	})
 
+		ReadOnlyPort:  *readOnlyPort,
+		ReadWritePort: *port,
+		PublicAddress: *publicAddressOverride,
+	}
+	m := master.New(config)
+
+	roLocation := ""
 	if *readOnlyPort != 0 {
+		roLocation = net.JoinHostPort(config.PublicAddress, strconv.Itoa(config.ReadOnlyPort))
+	}
+	rwLocation := net.JoinHostPort(address.String(), strconv.Itoa(int(*port)))
+
+	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
+
+	if roLocation != "" {
 		// Allow 1 read-only request per second, allow up to 20 in a burst before enforcing.
 		rl := util.NewTokenBucketRateLimiter(1.0, 20)
 		readOnlyServer := &http.Server{
-			Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*readOnlyPort))),
+			Addr:           roLocation,
 			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.Handler))),
 			ReadTimeout:    5 * time.Minute,
 			WriteTimeout:   5 * time.Minute,
@@ -226,7 +253,7 @@ func main() {
 	}
 
 	s := &http.Server{
-		Addr:           net.JoinHostPort(address.String(), strconv.Itoa(int(*port))),
+		Addr:           rwLocation,
 		Handler:        apiserver.RecoverPanics(m.Handler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,

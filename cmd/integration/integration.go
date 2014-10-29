@@ -27,6 +27,8 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -127,9 +129,13 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	}
 
 	// Master
-	_, portalNet, err := net.ParseCIDR("10.0.0.0/24")
+	host, port, err := net.SplitHostPort(strings.TrimLeft(apiServer.URL, "http://"))
 	if err != nil {
-		glog.Fatalf("Unable to parse CIDR: %v", err)
+		glog.Fatalf("Unable to parse URL '%v': %v", apiServer.URL, err)
+	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil {
+		glog.Fatalf("Nonnumeric port? %v", err)
 	}
 	mux := http.NewServeMux()
 	// Create a master and install handlers into mux.
@@ -138,10 +144,13 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		EtcdHelper:        helper,
 		Minions:           machineList,
 		KubeletClient:     fakeKubeletClient{},
-		PortalNet:         portalNet,
 		Mux:               mux,
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
+
+		ReadWritePort: portNumber,
+		ReadOnlyPort:  portNumber,
+		PublicAddress: host,
 	})
 	handler.delegate = mux
 
@@ -342,6 +351,68 @@ func runAtomicPutTest(c *client.Client) {
 	glog.Info("Atomic PUTs work.")
 }
 
+func runMasterServiceTest(client *client.Client) {
+	time.Sleep(12 * time.Second)
+	var svcList api.ServiceList
+	err := client.Get().
+		Namespace("default").
+		Path("services").
+		Do().
+		Into(&svcList)
+	if err != nil {
+		glog.Fatalf("unexpected error listing services: %v", err)
+	}
+	var foundRW, foundRO bool
+	found := util.StringSet{}
+	for i := range svcList.Items {
+		found.Insert(svcList.Items[i].Name)
+		if svcList.Items[i].Name == "kubernetes" {
+			foundRW = true
+		}
+		if svcList.Items[i].Name == "kubernetes-ro" {
+			foundRO = true
+		}
+	}
+	if foundRW {
+		var ep api.Endpoints
+		err := client.Get().
+			Namespace("default").
+			Path("endpoints").
+			Path("kubernetes").
+			Do().
+			Into(&ep)
+		if err != nil {
+			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
+		}
+		if len(ep.Endpoints) == 0 {
+			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
+		}
+	} else {
+		glog.Errorf("no RW service found: %v", found)
+	}
+	if foundRO {
+		var ep api.Endpoints
+		err := client.Get().
+			Namespace("default").
+			Path("endpoints").
+			Path("kubernetes-ro").
+			Do().
+			Into(&ep)
+		if err != nil {
+			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
+		}
+		if len(ep.Endpoints) == 0 {
+			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
+		}
+	} else {
+		glog.Errorf("no RO service found: %v", found)
+	}
+	if !foundRW || !foundRO {
+		glog.Fatalf("Kubernetes service test failed: %v", found)
+	}
+	glog.Infof("Master service test passed.")
+}
+
 func runServiceTest(client *client.Client) {
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -438,6 +509,7 @@ func main() {
 		runAtomicPutTest,
 		runServiceTest,
 		runAPIVersionsTest,
+		runMasterServiceTest,
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
