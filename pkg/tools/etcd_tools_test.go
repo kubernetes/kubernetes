@@ -46,7 +46,7 @@ func (*TestResource) IsAnAPIObject() {}
 
 var scheme *runtime.Scheme
 var codec runtime.Codec
-var versioner = RuntimeVersionAdapter{meta.NewResourceVersioner()}
+var versioner = RuntimeVersionAdapter{meta.NewAccessor()}
 
 func init() {
 	scheme = runtime.NewScheme()

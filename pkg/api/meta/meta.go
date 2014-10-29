@@ -24,9 +24,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// Interface lets you work with object metadata from any of the versioned or
-// internal API objects.
+// Interface lets you work with object and list metadata from any of the versioned or
+// internal API objects. Attempting to set or retrieve a field on an object that does
+// not support that field (Name, UID, Namespace on lists) will be a no-op and return
+// a default value.
 type Interface interface {
+	Namespace() string
+	SetNamespace(namespace string)
 	Name() string
 	SetName(name string)
 	UID() string
@@ -45,6 +49,7 @@ type Interface interface {
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
 // value and are a no-op if set.
+// TODO: add a fast path for *TypeMeta and *ObjectMeta for internal objects
 func Accessor(obj interface{}) (Interface, error) {
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
@@ -62,26 +67,26 @@ func Accessor(obj interface{}) (Interface, error) {
 
 	a := &genericAccessor{}
 	if err := extractFromTypeMeta(typeMeta, a); err != nil {
-		return nil, fmt.Errorf("unable to find type fields on %#v", typeMeta)
+		return nil, fmt.Errorf("unable to find type fields on %#v: %v", typeMeta, err)
 	}
 
 	objectMeta := v.FieldByName("ObjectMeta")
 	if objectMeta.IsValid() {
 		// look for the ObjectMeta fields
 		if err := extractFromObjectMeta(objectMeta, a); err != nil {
-			return nil, fmt.Errorf("unable to find object fields on %#v", objectMeta)
+			return nil, fmt.Errorf("unable to find object fields on %#v: %v", objectMeta, err)
 		}
 	} else {
 		listMeta := v.FieldByName("ListMeta")
 		if listMeta.IsValid() {
 			// look for the ListMeta fields
 			if err := extractFromListMeta(listMeta, a); err != nil {
-				return nil, fmt.Errorf("unable to find list fields on %#v", listMeta)
+				return nil, fmt.Errorf("unable to find list fields on %#v: %v", listMeta, err)
 			}
 		} else {
 			// look for the older TypeMeta with all metadata
 			if err := extractFromObjectMeta(typeMeta, a); err != nil {
-				return nil, fmt.Errorf("unable to find object fields on %#v", typeMeta)
+				return nil, fmt.Errorf("unable to find object fields on %#v: %v", typeMeta, err)
 			}
 		}
 	}
@@ -89,33 +94,92 @@ func Accessor(obj interface{}) (Interface, error) {
 	return a, nil
 }
 
-// NewResourceVersioner returns a ResourceVersioner that can set or
-// retrieve ResourceVersion on objects derived from TypeMeta.
-func NewResourceVersioner() runtime.ResourceVersioner {
+// MetadataAccessor lets you work with object metadata from any of the versioned or
+// internal API objects.
+type MetadataAccessor interface {
+	APIVersion(obj runtime.Object) (string, error)
+	SetAPIVersion(obj runtime.Object, version string) error
+
+	Kind(obj runtime.Object) (string, error)
+	SetKind(obj runtime.Object, kind string) error
+
+	Namespace(obj runtime.Object) (string, error)
+	SetNamespace(obj runtime.Object, namespace string) error
+
+	Name(obj runtime.Object) (string, error)
+	SetName(obj runtime.Object, name string) error
+
+	UID(obj runtime.Object) (string, error)
+	SetUID(obj runtime.Object, uid string) error
+
+	SelfLink(obj runtime.Object) (string, error)
+	SetSelfLink(obj runtime.Object, selfLink string) error
+
+	runtime.ResourceVersioner
+}
+
+// NewAccessor returns a MetadataAccessor that can retrieve
+// or manipulate resource version on objects derived from core API
+// metadata concepts.
+func NewAccessor() MetadataAccessor {
 	return resourceAccessor{}
 }
 
 // resourceAccessor implements ResourceVersioner and SelfLinker.
 type resourceAccessor struct{}
 
-func (v resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
+func (resourceAccessor) Kind(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
 	}
-	return accessor.ResourceVersion(), nil
+	return accessor.Kind(), nil
 }
 
-func (v resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
+func (resourceAccessor) SetKind(obj runtime.Object, kind string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
 	}
-	accessor.SetResourceVersion(version)
+	accessor.SetKind(kind)
 	return nil
 }
 
-func (v resourceAccessor) Name(obj runtime.Object) (string, error) {
+func (resourceAccessor) APIVersion(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.APIVersion(), nil
+}
+
+func (resourceAccessor) SetAPIVersion(obj runtime.Object, version string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetAPIVersion(version)
+	return nil
+}
+
+func (resourceAccessor) Namespace(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.Namespace(), nil
+}
+
+func (resourceAccessor) SetNamespace(obj runtime.Object, namespace string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetNamespace(namespace)
+	return nil
+}
+
+func (resourceAccessor) Name(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -123,7 +187,33 @@ func (v resourceAccessor) Name(obj runtime.Object) (string, error) {
 	return accessor.Name(), nil
 }
 
-func (v resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
+func (resourceAccessor) SetName(obj runtime.Object, name string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetName(name)
+	return nil
+}
+
+func (resourceAccessor) UID(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.UID(), nil
+}
+
+func (resourceAccessor) SetUID(obj runtime.Object, uid string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetUID(uid)
+	return nil
+}
+
+func (resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return "", err
@@ -131,7 +221,7 @@ func (v resourceAccessor) SelfLink(obj runtime.Object) (string, error) {
 	return accessor.SelfLink(), nil
 }
 
-func (v resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
+func (resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error {
 	accessor, err := Accessor(obj)
 	if err != nil {
 		return err
@@ -140,20 +230,47 @@ func (v resourceAccessor) SetSelfLink(obj runtime.Object, selfLink string) error
 	return nil
 }
 
-// NewSelfLinker returns a SelfLinker that works on all TypeMeta SelfLink fields.
-func NewSelfLinker() runtime.SelfLinker {
-	return resourceAccessor{}
+func (resourceAccessor) ResourceVersion(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.ResourceVersion(), nil
+}
+
+func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetResourceVersion(version)
+	return nil
 }
 
 // genericAccessor contains pointers to strings that can modify an arbitrary
 // struct and implements the Accessor interface.
 type genericAccessor struct {
+	namespace       *string
 	name            *string
 	uid             *string
 	apiVersion      *string
 	kind            *string
 	resourceVersion *string
 	selfLink        *string
+}
+
+func (a genericAccessor) Namespace() string {
+	if a.namespace == nil {
+		return ""
+	}
+	return *a.namespace
+}
+
+func (a genericAccessor) SetNamespace(namespace string) {
+	if a.namespace == nil {
+		return
+	}
+	*a.namespace = namespace
 }
 
 func (a genericAccessor) Name() string {
@@ -253,6 +370,9 @@ func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 
 // extractFromObjectMeta extracts pointers to metadata fields from an object
 func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
+	if err := fieldPtr(v, "Namespace", &a.namespace); err != nil {
+		return err
+	}
 	if err := fieldPtr(v, "Name", &a.name); err != nil {
 		return err
 	}

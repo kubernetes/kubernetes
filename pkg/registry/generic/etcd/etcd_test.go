@@ -36,7 +36,7 @@ import (
 func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.EtcdHelper{f, testapi.Codec(), tools.RuntimeVersionAdapter{testapi.ResourceVersioner()}}
+	h := tools.EtcdHelper{f, testapi.Codec(), tools.RuntimeVersionAdapter{testapi.MetadataAccessor()}}
 	return f, &Etcd{
 		NewFunc:      func() runtime.Object { return &api.Pod{} },
 		NewListFunc:  func() runtime.Object { return &api.PodList{} },

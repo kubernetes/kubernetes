@@ -45,22 +45,24 @@ var Versions = []string{"v1beta1", "v1beta2"}
 // This codec can decode any object that Kubernetes is aware of.
 var Codec = v1beta1.Codec
 
+// accessor is the shared static metadata accessor for the API.
+var accessor = meta.NewAccessor()
+
 // ResourceVersioner describes a default versioner that can handle all types
 // of versioning.
 // TODO: when versioning changes, make this part of each API definition.
-var ResourceVersioner = meta.NewResourceVersioner()
+var ResourceVersioner runtime.ResourceVersioner = accessor
 
 // SelfLinker can set or get the SelfLink field of all API types.
 // TODO: when versioning changes, make this part of each API definition.
 // TODO(lavalamp): Combine SelfLinker & ResourceVersioner interfaces, force all uses
 // to go through the InterfacesFor method below.
-var SelfLinker = meta.NewSelfLinker()
+var SelfLinker runtime.SelfLinker = accessor
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
 type VersionInterfaces struct {
 	runtime.Codec
-	runtime.ResourceVersioner
-	runtime.SelfLinker
+	meta.MetadataAccessor
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
@@ -69,15 +71,13 @@ func InterfacesFor(version string) (*VersionInterfaces, error) {
 	switch version {
 	case "v1beta1":
 		return &VersionInterfaces{
-			Codec:             v1beta1.Codec,
-			ResourceVersioner: ResourceVersioner,
-			SelfLinker:        SelfLinker,
+			Codec:            v1beta1.Codec,
+			MetadataAccessor: accessor,
 		}, nil
 	case "v1beta2":
 		return &VersionInterfaces{
-			Codec:             v1beta2.Codec,
-			ResourceVersioner: ResourceVersioner,
-			SelfLinker:        SelfLinker,
+			Codec:            v1beta2.Codec,
+			MetadataAccessor: accessor,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
