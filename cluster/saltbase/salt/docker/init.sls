@@ -17,12 +17,16 @@ docker-repo:
     - require:
       - pkg: pkg-core
 
+{% if grains.cloud is defined %}
+{% if grains.cloud == 'gce' %}
 # The default GCE images have ip_forwarding explicitly set to 0.
 # Here we take care of commenting that out.
 /etc/sysctl.d/11-gce-network-security.conf:
   file.replace:
     - pattern: '^net.ipv4.ip_forward=0'
     - repl: '# net.ipv4.ip_forward=0'
+{% endif %}
+{% endif %}
 
 net.ipv4.ip_forward:
   sysctl.present:

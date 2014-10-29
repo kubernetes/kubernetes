@@ -1,9 +1,9 @@
-# WARNING
-These instructions are broken at git HEAD.  Please either:
-* Sync back to `v0.3` with `git checkout v0.3`
-* Download a [snapshot of `v0.3`](https://github.com/GoogleCloudPlatform/kubernetes/archive/v0.3.tar.gz)
-
 ## Getting started with vSphere
+
+The example below creates a Kubernetes cluster with 4 worker node Virtual
+Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This
+cluster is set up and controlled from your workstation (or wherever you find
+convenient).
 
 ### Prerequisites
 
@@ -23,15 +23,7 @@ These instructions are broken at git HEAD.  Please either:
    go get github.com/vmware/govmomi/govc
    ```
 
-5. Install godep (optional, only required when modifying package dependencies). [Instructions here](https://github.com/GoogleCloudPlatform/kubernetes#installing-godep)
-
-6. Get the Kubernetes source:
-
-   ```sh
-   mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform
-   git clone https://github.com/GoogleCloudPlatform/kubernetes.git
-   cd kubernetes
-   ```
+5. Get or build a [binary release](binary_release.md)
 
 ### Setup
 
@@ -46,7 +38,7 @@ gzip -d kube.vmdk.gz
 Upload this VMDK to your vSphere instance:
 
 ```sh
-export GOVC_URL='https://user:pass@hostname/sdk'
+export GOVC_URL='user:pass@hostname'
 export GOVC_INSECURE=1 # If the host above uses a self-signed cert
 export GOVC_DATASTORE='target datastore'
 export GOVC_RESOURCE_POOL='resource pool or cluster with access to datastore'
@@ -63,18 +55,13 @@ govc datastore.ls ./kube/
 Take a look at the file `cluster/vsphere/config-common.sh` fill in the required
 parameters. The guest login for the image that you imported is `kube:kube`.
 
-Now, let's continue with deploying Kubernetes:
+### Starting a cluster
+
+Now, let's continue with deploying Kubernetes.
+This process takes about ~10 minutes.
 
 ```sh
-cd kubernetes
-
-# Build source
-hack/build-go.sh
-
-# Build a release (argument is the instance prefix)
-release/build-release.sh kubernetes
-
-# Deploy Kubernetes (takes ~5 minutes, provided everything works out)
+cd kubernetes # Extracted binary release OR repository root
 export KUBERNETES_PROVIDER=vsphere
 cluster/kube-up.sh
 ```
@@ -84,3 +71,10 @@ Engine. Once you have successfully reached this point, your vSphere Kubernetes
 deployment works just as any other one!
 
 **Enjoy!**
+
+### Extra: debugging deployment failure
+
+The output of `kube-up.sh` displays the IP addresses of the VMs it deploys. You
+can log into any VM as the `kube` user to poke around and figure out what is
+going on (find yourself authorized with your SSH key, or use the password
+`kube` otherwise).

@@ -17,6 +17,9 @@ nginx:
   {% if grains.cloud == 'vagrant' %}
     {% set cert_ip=grains.fqdn_ip4 %}
   {% endif %}
+  {% if grains.cloud == 'vsphere' %}
+    {% set cert_ip=grains.ip_interfaces.eth0[0] %}
+  {% endif %}
 {% endif %}
 # If there is a pillar defined, override any defaults.
 {% if pillar['cert_ip'] is defined %}
@@ -34,6 +37,8 @@ nginx:
     - source: salt://nginx/{{certgen}} 
 {% if cert_ip is defined %}
     - args: {{cert_ip}}
+    - require:
+      - pkg: curl
 {% endif %}
     - cwd: /
     - user: root

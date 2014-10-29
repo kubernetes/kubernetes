@@ -18,14 +18,14 @@
 sed -i -e "s/http.us.debian.org/mirrors.kernel.org/" /etc/apt/sources.list
 
 # Resolve hostname of master
-if ! grep -q $MASTER_NAME /etc/hosts; then
-  echo "Adding host entry for $MASTER_NAME"
-  echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
+if ! grep -q $KUBE_MASTER /etc/hosts; then
+  echo "Adding host entry for $KUBE_MASTER"
+  echo "$KUBE_MASTER_IP $KUBE_MASTER" >> /etc/hosts
 fi
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+echo "master: $KUBE_MASTER" > /etc/salt/minion.d/master.conf
 
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
@@ -48,8 +48,4 @@ EOF
 #
 # We specify -X to avoid a race condition that can cause minion failure to
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-if [ ! -x /etc/init.d/salt-minion ]; then
-  wget -q -O - https://bootstrap.saltstack.com | sh -s -- -X
-else
-  /etc/init.d/salt-minion restart
-fi
+wget -q -O - https://bootstrap.saltstack.com | sh -s -- -X

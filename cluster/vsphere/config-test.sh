@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source $(dirname ${BASH_SOURCE})/config-common.sh
-
 NUM_MINIONS=2
+DISK=./kube/kube.vmdk
+GUEST_ID=debian7_64Guest
+
 INSTANCE_PREFIX="e2e-test-${USER}"
+MASTER_TAG="${INSTANCE_PREFIX}-master"
+MINION_TAG="${INSTANCE_PREFIX}-minion"
 
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_MEMORY_MB=1024
@@ -27,3 +30,5 @@ MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_MEMORY_MB=1024
 MINION_CPU=1
+
+PORTAL_NET="10.244.240.0/20"

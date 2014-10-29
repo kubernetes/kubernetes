@@ -14,24 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-function public-key {
-  local dir=${HOME}/.ssh
-
-  for f in $HOME/.ssh/{id_{rsa,dsa},*}.pub; do
-    if [ -r $f ]; then
-      echo $f
-      return
-    fi
-  done
-
-  echo "Can't find public key file..." 1>&2
-  exit 1
-}
-
-DISK=./kube/kube.vmdk
-GUEST_ID=debian7_64Guest
-PUBLIC_KEY_FILE=${PUBLIC_KEY_FILE-$(public-key)}
-SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR"
 
 # These need to be set
 #export GOVC_URL=

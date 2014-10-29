@@ -14,16 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source $(dirname ${BASH_SOURCE})/config-common.sh
+# Create the overlay files for the salt tree.  We create these in a separate
+# place so that we can blow away the rest of the salt configs on a kube-push and
+# re-apply these.
 
-NUM_MINIONS=4
-INSTANCE_PREFIX=kubernetes
+mkdir -p /srv/salt-overlay/pillar
+cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
+node_instance_prefix: $NODE_INSTANCE_PREFIX
+portal_net: $PORTAL_NET
+EOF
 
-MASTER_NAME="${INSTANCE_PREFIX}-master"
-MASTER_MEMORY_MB=1024
-MASTER_CPU=1
-
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
-MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
-MINION_MEMORY_MB=2048
-MINION_CPU=1
+mkdir -p /srv/salt-overlay/salt/nginx
+echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
