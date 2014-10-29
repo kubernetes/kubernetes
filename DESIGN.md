@@ -11,8 +11,6 @@
   - [etcd](#etcd)
   - [Kubernetes API Server](#kubernetes-api-server)
   - [Kubernetes Controller Manager Server](#kubernetes-controller-manager-server)
-- [Network Model](#network-model)
-- [Release Process](#release-process)
 - [GCE Cluster Configuration](#gce-cluster-configuration)
   - [Cluster Security](#cluster-security)
 
