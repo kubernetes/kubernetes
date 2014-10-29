@@ -106,7 +106,7 @@ KUBE_MASTER="--master=fed-master:8080"
 MINION_ADDRESSES="--machines=fed-minion"
 
 # Port minions listen on
-MINION_PORT="--minion_port=10250"
+MINION_PORT="--kubelet_port=10250"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
