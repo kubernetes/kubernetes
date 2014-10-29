@@ -683,7 +683,7 @@ type ServerOpList struct {
 type ObjectReference struct {
 	Kind            string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Namespace       string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
+	ID              string `json:"name,omitempty" yaml:"name,omitempty"`
 	UID             string `json:"uid,omitempty" yaml:"uid,omitempty"`
 	APIVersion      string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 	ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`

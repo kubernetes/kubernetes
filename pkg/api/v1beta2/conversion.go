@@ -574,5 +574,29 @@ func init() {
 			}
 			return s.Convert(&in.Items, &out.Items, 0)
 		},
+
+		// Object ID <-> Name
+		// TODO: amend the conversion package to allow overriding specific fields.
+		func(in *ObjectReference, out *newer.ObjectReference, s conversion.Scope) error {
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.Name = in.ID
+			out.UID = in.UID
+			out.APIVersion = in.APIVersion
+			out.ResourceVersion = in.ResourceVersion
+			out.FieldPath = in.FieldPath
+			return nil
+		},
+		func(in *newer.ObjectReference, out *ObjectReference, s conversion.Scope) error {
+			out.ID = in.Name
+			out.Kind = in.Kind
+			out.Namespace = in.Namespace
+			out.ID = in.Name
+			out.UID = in.UID
+			out.APIVersion = in.APIVersion
+			out.ResourceVersion = in.ResourceVersion
+			out.FieldPath = in.FieldPath
+			return nil
+		},
 	)
 }
