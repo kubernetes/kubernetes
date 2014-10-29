@@ -58,29 +58,9 @@ The kube-proxy takes several options.
 
 
 # EXAMPLES
-
-The kube-proxy can be called manually or from systemd. An example unit file looks as such:
-
-	[Unit]
-	Description=Kubernetes Proxy
-	# the proxy crashes if etcd isn't reachable.
-	# https://github.com/GoogleCloudPlatform/kubernetes/issues/1206
-	After=network.target
-	
-	[Service]
-	EnvironmentFile=/etc/kubernetes/config
-	EnvironmentFile=/etc/kubernetes/proxy
-	ExecStart=/usr/bin/kube-proxy \
-		--logtostderr=${KUBE_LOGTOSTDERR} \
-		--v=${KUBE_LOG_LEVEL} \
-		--etcd_servers=${KUBE_ETCD_SERVERS}
-	Restart=on-failure
-	
-	[Install]
-	WantedBy=multi-user.target
-
-Where the variables are stored in the /etc/kubernetes/ directory.
-
+```
+/usr/bin/kube-proxy --logtostderr=true --v=0 --etcd_servers=http://127.0.0.1:4001
+```
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.

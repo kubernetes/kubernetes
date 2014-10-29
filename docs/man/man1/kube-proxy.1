@@ -75,34 +75,12 @@ The kube\-proxy takes several options.
 
 .SH EXAMPLES
 .PP
-The kube\-proxy can be called manually or from systemd. An example unit file looks as such:
-
-.PP
 .RS
 
 .nf
-[Unit]
-Description=Kubernetes Proxy
-# the proxy crashes if etcd isn't reachable.
-# https://github.com/GoogleCloudPlatform/kubernetes/issues/1206
-After=network.target
-
-[Service]
-EnvironmentFile=/etc/kubernetes/config
-EnvironmentFile=/etc/kubernetes/proxy
-ExecStart=/usr/bin/kube\-proxy \\
-    \-\-logtostderr=\$\{KUBE\_LOGTOSTDERR\} \\
-    \-\-v=\$\{KUBE\_LOG\_LEVEL\} \\
-    \-\-etcd\_servers=\$\{KUBE\_ETCD\_SERVERS\}
-Restart=on\-failure
-
-[Install]
-WantedBy=multi\-user.target
+/usr/bin/kube\-proxy \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001
 
 .fi
-
-.PP
-Where the variables are stored in the /etc/kubernetes/ directory.
 
 .SH HISTORY
 .PP

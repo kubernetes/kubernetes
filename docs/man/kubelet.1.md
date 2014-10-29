@@ -97,32 +97,9 @@ There are 4 ways that a container manifest can be provided to the Kubelet:
 
 
 # EXAMPLES
-
-The kubelet can be called manually or from systemd. An example unit file looks as such:
-
-	[Unit]
-	Description=Kubernetes Kubelet
-	After=docker.socket cadvisor.service
-	Requires=docker.socket
-	
-	[Service]
-	EnvironmentFile=/etc/kubernetes/config
-	EnvironmentFile=/etc/kubernetes/kubelet
-	ExecStart=/usr/bin/kubelet \
-		--logtostderr=${KUBE_LOGTOSTDERR} \
-		--v=${KUBE_LOG_LEVEL} \
-		--etcd_servers=${KUBE_ETCD_SERVERS} \
-		--address=${MINION_ADDRESS} \
-		--port=${MINION_PORT} \
-	    --hostname_override=${MINION_HOSTNAME} \
-	    --allow_privileged=${KUBE_ALLOW_PRIV}
-	Restart=on-failure
-	
-	[Install]
-	WantedBy=multi-user.target
-
-Where the variables are stored in the /etc/kubernetes/ environment files.
-
+```
+/usr/bin/kubelet --logtostderr=true --v=0 --etcd_servers=http://127.0.0.1:4001 --address=127.0.0.1 --port=10250 --hostname_override=127.0.0.1 --allow_privileged=false
+```
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.
