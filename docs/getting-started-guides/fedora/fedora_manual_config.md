@@ -103,10 +103,10 @@ KUBE_API_PORT="--port=8080"
 KUBE_MASTER="--master=fed-master:8080"
 
 # Comma seperated list of minions
-MINION_ADDRESSES="--machines=fed-minion"
+KUBELET_ADDRESSES="--machines=fed-minion"
 
 # Port minions listen on
-MINION_PORT="--kubelet_port=10250"
+KUBELET_PORT="--kubelet_port=10250"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
@@ -155,19 +155,19 @@ curl -s -L http://fed-master:8080/api/v1beta1/services | python -mjson.tool
 
 ```       
 ###
-# kubernetes kublet (minion) config
+# kubernetes kubelet (minion) config
 
 # The address for the info server to serve on
-MINION_ADDRESS="--address=fed-minion"
+KUBELET_ADDRESS="--address=fed-minion"
 
 # The port for the info server to serve on
-MINION_PORT="--port=10250"
+KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-MINION_HOSTNAME="--hostname_override=fed-minion"
+KUBELET_HOSTNAME="--hostname_override=fed-minion"
 
 # Add your won!
-MINION_ARGS=""
+KUBELET_ARGS=""
 ```       
 
 * Start the appropriate services on minion (fed-minion).

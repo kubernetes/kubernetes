@@ -1,14 +1,14 @@
 ###
-# kubernetes kublet (minion) config
+# kubernetes kubelet (minion) config
 
 # The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
-MINION_ADDRESS="--address=127.0.0.1"
+KUBELET_ADDRESS="--address=127.0.0.1"
 
 # The port for the info server to serve on
-MINION_PORT="--port=10250"
+KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-MINION_HOSTNAME="--hostname_override=127.0.0.1"
+KUBELET_HOSTNAME="--hostname_override=127.0.0.1"
 
 # Add your own!
-MINION_ARGS=""
+KUBELET_ARGS=""

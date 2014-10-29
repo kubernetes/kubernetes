@@ -23,8 +23,8 @@ Assumptions of the service files
 Non kubernetes defaults in the environment files
 ------------------------------------------------
 1. Default to log to stdout/journald instead of directly to disk, see: [KUBE_LOGTOSTDERR](environ/config)
-2. Node list of 127.0.0.1 forced instead of relying on cloud provider, see: [MINION_ADDRESSES](environ/apiserver)
-3. Explicitly set the minion hostname to 127.0.0.1, see: [MINION_HOSTNAME](environ/kubelet)
+2. Node list of 127.0.0.1 forced instead of relying on cloud provider, see: [KUBELET_ADDRESSES](environ/apiserver)
+3. Explicitly set the minion hostname to 127.0.0.1, see: [KUBELET_HOSTNAME](environ/kubelet)
 4. There is no default for the IP address range of services.  This uses 10.254.0.0/16 see: [KUBE_SERVICE_ADDRESSES](environ/apiserver)
 
 Notes
