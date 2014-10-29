@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
@@ -59,27 +60,41 @@ var ResourceVersioner runtime.ResourceVersioner = accessor
 // to go through the InterfacesFor method below.
 var SelfLinker runtime.SelfLinker = accessor
 
-// VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
-type VersionInterfaces struct {
-	runtime.Codec
-	meta.MetadataAccessor
-}
+// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
+// Kubernetes versions.
+var RESTMapper meta.RESTMapper
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
-func InterfacesFor(version string) (*VersionInterfaces, error) {
+func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 	switch version {
 	case "v1beta1":
-		return &VersionInterfaces{
+		return &meta.VersionInterfaces{
 			Codec:            v1beta1.Codec,
 			MetadataAccessor: accessor,
 		}, nil
 	case "v1beta2":
-		return &VersionInterfaces{
+		return &meta.VersionInterfaces{
 			Codec:            v1beta2.Codec,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
 	}
+}
+
+func init() {
+	mapper := meta.NewDefaultRESTMapper(
+		Versions,
+		func(version string) (*meta.VersionInterfaces, bool) {
+			interfaces, err := InterfacesFor(version)
+			if err != nil {
+				return nil, false
+			}
+			return interfaces, true
+		},
+	)
+	mapper.Add(api.Scheme, true, Versions...)
+	// TODO: when v1beta3 is added it will not use mixed case.
+	RESTMapper = mapper
 }
