@@ -74,32 +74,12 @@ The kube\-scheduler can take several options.
 
 .SH EXAMPLES
 .PP
-The kube\-scheduler can be called manually or from systemd. An example unit file looks as such:
-
-.PP
 .RS
 
 .nf
-[Unit]
-Description=Kubernetes Scheduler
-
-[Service]
-EnvironmentFile=/etc/kubernetes/config
-EnvironmentFile=/etc/kubernetes/apiserver
-EnvironmentFile=/etc/kubernetes/scheduler
-ExecStart=/usr/bin/kube\-scheduler \\
-    \-\-logtostderr=\$\{KUBE\_LOGTOSTDERR\} \\
-    \-\-v=\$\{KUBE\_LOG\_LEVEL\} \\
-    \-\-master=\$\{KUBE\_MASTER\}
-Restart=on\-failure
-
-[Install]
-WantedBy=multi\-user.target
+/usr/bin/kube\-scheduler \-\-logtostderr=true \-\-v=0 \-\-master=127.0.0.1:8080
 
 .fi
-
-.PP
-Where the variables are stored in the /etc/kubernetes/ environment files.
 
 .SH HISTORY
 .PP

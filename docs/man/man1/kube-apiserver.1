@@ -78,7 +78,7 @@ The the kube\-apiserver several options.
     Duration of time to cache minion information. Default 30 seconds.
 
 .PP
-\fB\-minion\_port\fP=10250
+\fB\-kubelet\_port\fP=10250
     The port at which kubelet will be listening on the minions. Default is 10250.
 
 .PP
@@ -111,37 +111,12 @@ The the kube\-apiserver several options.
 
 .SH EXAMPLES
 .PP
-The kube\-apiserver can be called manually or from systemd. An example unit file looks as such:
-
-.PP
 .RS
 
 .nf
-[Unit]
-Description=Kubernetes API Server
-
-[Service]
-EnvironmentFile=/etc/kubernetes/config
-EnvironmentFile=/etc/kubernetes/apiserver
-User=kube
-ExecStart=/usr/bin/kube\-apiserver \\
-        \-\-logtostderr=\$\{KUBE\_LOGTOSTDERR\} \\
-        \-\-v=\$\{KUBE\_LOG\_LEVEL\} \\
-        \-\-etcd\_servers=\$\{KUBE\_ETCD\_SERVERS\} \\
-        \-\-address=\$\{KUBE\_API\_ADDRESS\} \\
-        \-\-port=\$\{KUBE\_API\_PORT\} \\
-        \-\-machines=\$\{MINION\_ADDRESSES\} \\
-        \-\-minion\_port=\$\{MINION\_PORT\} \\
-        \-\-allow\_privileged=\$\{KUBE\_ALLOW\_PRIV\}
-Restart=on\-failure
-
-[Install]
-WantedBy=multi\-user.target
+/usr/bin/kube\-apiserver \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-address=0.0.0.0 \-\-port=8080 \-\-machines=127.0.0.1 \-\-kubelet\_port=10250 \-\-allow\_privileged=false
 
 .fi
-
-.PP
-Where the variables are stored in the /etc/kubernetes/ environment files.
 
 .SH HISTORY
 .PP

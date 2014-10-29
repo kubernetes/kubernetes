@@ -130,37 +130,12 @@ HTTP server The kubelet can also listen for HTTP and respond to a simple API (un
 
 .SH EXAMPLES
 .PP
-The kubelet can be called manually or from systemd. An example unit file looks as such:
-
-.PP
 .RS
 
 .nf
-[Unit]
-Description=Kubernetes Kubelet
-After=docker.socket cadvisor.service
-Requires=docker.socket
-
-[Service]
-EnvironmentFile=/etc/kubernetes/config
-EnvironmentFile=/etc/kubernetes/kubelet
-ExecStart=/usr/bin/kubelet \\
-    \-\-logtostderr=\$\{KUBE\_LOGTOSTDERR\} \\
-    \-\-v=\$\{KUBE\_LOG\_LEVEL\} \\
-    \-\-etcd\_servers=\$\{KUBE\_ETCD\_SERVERS\} \\
-    \-\-address=\$\{MINION\_ADDRESS\} \\
-    \-\-port=\$\{MINION\_PORT\} \\
-    \-\-hostname\_override=\$\{MINION\_HOSTNAME\} \\
-    \-\-allow\_privileged=\$\{KUBE\_ALLOW\_PRIV\}
-Restart=on\-failure
-
-[Install]
-WantedBy=multi\-user.target
+/usr/bin/kubelet \-\-logtostderr=true \-\-v=0 \-\-etcd\_servers=http://127.0.0.1:4001 \-\-address=127.0.0.1 \-\-port=10250 \-\-hostname\_override=127.0.0.1 \-\-allow\_privileged=false
 
 .fi
-
-.PP
-Where the variables are stored in the /etc/kubernetes/ environment files.
 
 .SH HISTORY
 .PP

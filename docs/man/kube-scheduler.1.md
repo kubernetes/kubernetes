@@ -57,28 +57,9 @@ The kube-scheduler can take several options.
 	comma-separated list of pattern=N settings for file-filtered logging.
 
 # EXAMPLES
-
-The kube-scheduler can be called manually or from systemd. An example unit file looks as such:
-
-	[Unit]
-	Description=Kubernetes Scheduler
-	
-	[Service]
-	EnvironmentFile=/etc/kubernetes/config
-	EnvironmentFile=/etc/kubernetes/apiserver
-	EnvironmentFile=/etc/kubernetes/scheduler
-	ExecStart=/usr/bin/kube-scheduler \
-	    --logtostderr=${KUBE_LOGTOSTDERR} \
-	    --v=${KUBE_LOG_LEVEL} \
-	    --master=${KUBE_MASTER}
-	Restart=on-failure
-
-	[Install]
-	WantedBy=multi-user.target
-
-
-Where the variables are stored in the /etc/kubernetes/ environment files.
-
+```
+/usr/bin/kube-scheduler --logtostderr=true --v=0 --master=127.0.0.1:8080
+```
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier@redhat.com) based
  on the kubernetes source material and internal work.

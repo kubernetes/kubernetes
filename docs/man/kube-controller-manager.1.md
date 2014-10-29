@@ -63,29 +63,9 @@ The kube-controller-manager has several options.
 	comma-separated list of pattern=N settings for file-filtered logging.
 
 # EXAMPLES
-
-The kube-controller-manager can be called manually or from systemd. An example unit file looks as such:
-
-	[Unit]
-	Description=Kubernetes Controller Manager
-	
-	[Service]
-	EnvironmentFile=/etc/kubernetes/config
-	EnvironmentFile=/etc/kubernetes/apiserver
-	EnvironmentFile=/etc/kubernetes/controller-manager
-	User=kube
-	ExecStart=/usr/bin/kube-controller-manager \
-	    --logtostderr=${KUBE_LOGTOSTDERR} \
-	    --v=${KUBE_LOG_LEVEL} \
-	    --master=${KUBE_MASTER}
-	Restart=on-failure
-
-	[Install]
-	WantedBy=multi-user.target
-
-
-Where the variables are stored in the /etc/kubernetes/ enfironment files.
-
+```
+/usr/bin/kube-controller-manager --logtostderr=true --v=0 --master=127.0.0.1:8080
+```
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.
