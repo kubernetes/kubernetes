@@ -61,6 +61,7 @@ Now, let's continue with deploying Kubernetes.
 This process takes about ~10 minutes.
 
 ```sh
+cd kubernetes # Extracted binary release OR repository root
 export KUBERNETES_PROVIDER=vsphere
 cluster/kube-up.sh
 ```
