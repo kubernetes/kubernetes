@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -37,6 +39,41 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
+
+func TestTransformResponse(t *testing.T) {
+	invalid := []byte("aaaaa")
+	uri, _ := url.Parse("http://localhost")
+	testCases := []struct {
+		Response *http.Response
+		Data     []byte
+		Created  bool
+		Error    bool
+	}{
+		{Response: &http.Response{StatusCode: 200}, Data: []byte{}},
+		{Response: &http.Response{StatusCode: 201}, Data: []byte{}, Created: true},
+		{Response: &http.Response{StatusCode: 199}, Error: true},
+		{Response: &http.Response{StatusCode: 500}, Error: true},
+		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+	}
+	for i, test := range testCases {
+		r := NewRequest(nil, "", uri, testapi.Codec())
+		if test.Response.Body == nil {
+			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+		}
+		response, created, err := r.transformResponse(test.Response, &http.Request{})
+		hasErr := err != nil
+		if hasErr != test.Error {
+			t.Errorf("%d: unexpected error: %f %v", i, test.Error, err)
+		}
+		if !(test.Data == nil && response == nil) && !reflect.DeepEqual(test.Data, response) {
+			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)
+		}
+		if test.Created != created {
+			t.Errorf("%d: expected created %f, got %f", i, test.Created, created)
+		}
+	}
+}
 
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
@@ -48,6 +85,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
 	obj, err := c.Verb("POST").
 		Path("foo/bar").
@@ -351,15 +389,18 @@ func TestBody(t *testing.T) {
 	}
 }
 
-func TestSetPollPeriod(t *testing.T) {
+func TestSetPoller(t *testing.T) {
 	c := NewOrDie(&Config{})
 	r := c.Get()
-	if r.pollPeriod == 0 {
+	if c.PollPeriod == 0 {
 		t.Errorf("polling should be on by default")
 	}
-	r.PollPeriod(time.Hour)
-	if r.pollPeriod != time.Hour {
-		t.Errorf("'PollPeriod' doesn't work")
+	if r.poller == nil {
+		t.Errorf("polling should be on by default")
+	}
+	r.NoPoll()
+	if r.poller != nil {
+		t.Errorf("'NoPoll' doesn't work")
 	}
 }
 
@@ -374,6 +415,16 @@ func TestPolling(t *testing.T) {
 
 	callNumber := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if callNumber == 0 {
+			if r.URL.Path != "/api/v1beta1/" {
+				t.Fatalf("unexpected request URL path %s", r.URL.Path)
+			}
+		} else {
+			if r.URL.Path != "/api/v1beta1/operations/1234" {
+				t.Fatalf("unexpected request URL path %s", r.URL.Path)
+			}
+		}
+		t.Logf("About to write %d", callNumber)
 		data, err := v1beta1.Codec.Encode(objects[callNumber])
 		if err != nil {
 			t.Errorf("Unexpected encode error")
@@ -383,11 +434,11 @@ func TestPolling(t *testing.T) {
 	}))
 
 	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta1", Username: "user", Password: "pass"})
-
+	c.PollPeriod = 1 * time.Millisecond
 	trials := []func(){
 		func() {
 			// Check that we do indeed poll when asked to.
-			obj, err := c.Get().PollPeriod(5 * time.Millisecond).Do().Get()
+			obj, err := c.Get().Do().Get()
 			if err != nil {
 				t.Errorf("Unexpected error: %v %#v", err, err)
 				return
@@ -402,7 +453,7 @@ func TestPolling(t *testing.T) {
 		},
 		func() {
 			// Check that we don't poll when asked not to.
-			obj, err := c.Get().PollPeriod(0).Do().Get()
+			obj, err := c.Get().NoPoll().Do().Get()
 			if err == nil {
 				t.Errorf("Unexpected non error: %v", obj)
 				return
