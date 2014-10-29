@@ -1,7 +1,7 @@
 {% set etcd_version="v0.4.6" %}
 {% set etcd_tar_url="https://github.com/coreos/etcd/releases/download/%s/etcd-%s-linux-amd64.tar.gz"
   | format(etcd_version, etcd_version)  %}
-{% set etcd_tar_hash="md5=2949e9163e59dc4f8db9ad92f3245b20" %}
+{% set etcd_tar_hash="md5=661d58424ff33dd837b8ee988dd79ae3" %}
 
 etcd-tar:
   archive:
