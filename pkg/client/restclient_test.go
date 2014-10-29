@@ -242,3 +242,10 @@ func TestDoRequestCreated(t *testing.T) {
 	}
 	fakeHandler.ValidateRequest(t, "/"+testapi.Version()+"/test", "GET", nil)
 }
+
+func TestDefaultPoll(t *testing.T) {
+	c := &RESTClient{PollPeriod: 0}
+	if req, ok := c.DefaultPoll("test"); req != nil || ok {
+		t.Errorf("expected nil request and not poll")
+	}
+}

@@ -19,10 +19,12 @@ package client
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -39,6 +41,83 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
+
+func skipPolling(name string) (*Request, bool) {
+	return nil, false
+}
+
+func TestRequestWithErrorWontChange(t *testing.T) {
+	original := Request{err: errors.New("test")}
+	r := original
+	changed := r.Param("foo", "bar").
+		SelectorParam("labels", labels.Set{"a": "b"}.AsSelector()).
+		UintParam("uint", 1).
+		AbsPath("/abs").
+		Path("test").
+		ParseSelectorParam("foo", "a=b").
+		Namespace("new").
+		NoPoll().
+		Body("foo").
+		Poller(skipPolling).
+		Timeout(time.Millisecond).
+		Sync(true)
+	if changed != &r {
+		t.Errorf("returned request should point to the same object")
+	}
+	if !reflect.DeepEqual(&original, changed) {
+		t.Errorf("expected %#v, got %#v", &original, changed)
+	}
+}
+
+func TestRequestParseSelectorParam(t *testing.T) {
+	r := (&Request{}).ParseSelectorParam("foo", "a")
+	if r.err == nil || r.params != nil {
+		t.Errorf("should have set err and left params nil: %#v", r)
+	}
+}
+
+func TestRequestParam(t *testing.T) {
+	r := (&Request{}).Param("foo", "a")
+	if !reflect.DeepEqual(map[string]string{"foo": "a"}, r.params) {
+		t.Errorf("should have set a param: %#v", r)
+	}
+}
+
+type NotAnAPIObject struct{}
+
+func (NotAnAPIObject) IsAnAPIObject() {}
+
+func TestRequestBody(t *testing.T) {
+	// test unknown type
+	r := (&Request{}).Body([]string{"test"})
+	if r.err == nil || r.body != nil {
+		t.Errorf("should have set err and left body nil: %#v", r)
+	}
+
+	// test error set when failing to read file
+	f, err := ioutil.TempFile("", "test")
+	if err != nil {
+		t.Fatalf("unable to create temp file")
+	}
+	os.Remove(f.Name())
+	r = (&Request{}).Body(f.Name())
+	if r.err == nil || r.body != nil {
+		t.Errorf("should have set err and left body nil: %#v", r)
+	}
+
+	// test unencodable api object
+	r = (&Request{codec: latest.Codec}).Body(&NotAnAPIObject{})
+	if r.err == nil || r.body != nil {
+		t.Errorf("should have set err and left body nil: %#v", r)
+	}
+}
+
+func TestResultIntoWithErrReturnsErr(t *testing.T) {
+	res := Result{err: errors.New("test")}
+	if err := res.Into(&api.Pod{}); err != res.err {
+		t.Errorf("should have returned exact error from result")
+	}
+}
 
 func TestTransformResponse(t *testing.T) {
 	invalid := []byte("aaaaa")
@@ -71,6 +150,126 @@ func TestTransformResponse(t *testing.T) {
 		}
 		if test.Created != created {
 			t.Errorf("%d: expected created %f, got %f", i, test.Created, created)
+		}
+	}
+}
+
+type clientFunc func(req *http.Request) (*http.Response, error)
+
+func (f clientFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestRequestWatch(t *testing.T) {
+	testCases := []struct {
+		Request *Request
+		Err     bool
+	}{
+		{
+			Request: &Request{err: errors.New("bail")},
+			Err:     true,
+		},
+		{
+			Request: &Request{baseURL: &url.URL{}, path: "%"},
+			Err:     true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, errors.New("err")
+				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{StatusCode: http.StatusForbidden}, nil
+				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+		},
+	}
+	for i, testCase := range testCases {
+		watch, err := testCase.Request.Watch()
+		hasErr := err != nil
+		if hasErr != testCase.Err {
+			t.Errorf("%d: expected %f, got %f: %v", i, testCase.Err, hasErr, err)
+		}
+		if hasErr && watch != nil {
+			t.Errorf("%d: watch should be nil when error is returned", i)
+		}
+	}
+}
+
+func TestRequestStream(t *testing.T) {
+	testCases := []struct {
+		Request *Request
+		Err     bool
+	}{
+		{
+			Request: &Request{err: errors.New("bail")},
+			Err:     true,
+		},
+		{
+			Request: &Request{baseURL: &url.URL{}, path: "%"},
+			Err:     true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, errors.New("err")
+				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+		},
+	}
+	for i, testCase := range testCases {
+		body, err := testCase.Request.Stream()
+		hasErr := err != nil
+		if hasErr != testCase.Err {
+			t.Errorf("%d: expected %f, got %f: %v", i, testCase.Err, hasErr, err)
+		}
+		if hasErr && body != nil {
+			t.Errorf("%d: body should be nil when error is returned", i)
+		}
+	}
+}
+
+func TestRequestDo(t *testing.T) {
+	testCases := []struct {
+		Request *Request
+		Err     bool
+	}{
+		{
+			Request: &Request{err: errors.New("bail")},
+			Err:     true,
+		},
+		{
+			Request: &Request{baseURL: &url.URL{}, path: "%"},
+			Err:     true,
+		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return nil, errors.New("err")
+				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+		},
+	}
+	for i, testCase := range testCases {
+		body, err := testCase.Request.Do().Raw()
+		hasErr := err != nil
+		if hasErr != testCase.Err {
+			t.Errorf("%d: expected %f, got %f: %v", i, testCase.Err, hasErr, err)
+		}
+		if hasErr && body != nil {
+			t.Errorf("%d: body should be nil when error is returned", i)
 		}
 	}
 }

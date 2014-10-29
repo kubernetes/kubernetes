@@ -109,6 +109,9 @@ func (r *Request) Sync(sync bool) *Request {
 
 // Namespace applies the namespace scope to a request
 func (r *Request) Namespace(namespace string) *Request {
+	if r.err != nil {
+		return r
+	}
 	if len(namespace) > 0 {
 		return r.setParam("namespace", namespace)
 	}
@@ -225,8 +228,9 @@ func (r *Request) NoPoll() *Request {
 	return r.Poller(nil)
 }
 
-// Poller indicates this request should use the specify poll function to determine whether
-// a server "working" response should be retried.
+// Poller indicates this request should use the specified poll function to determine whether
+// a server "working" response should be retried. The poller is responsible for waiting or
+// outputting messages to the client.
 func (r *Request) Poller(poller PollFunc) *Request {
 	if r.err != nil {
 		return r
