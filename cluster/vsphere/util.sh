@@ -432,7 +432,7 @@ function kube-push {
   find-release-tars
 
   detect-master
-  upload-release-tars
+  upload-server-tars
 
   (
     echo "#! /bin/bash"
