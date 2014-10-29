@@ -7,7 +7,7 @@
 - [The Kubernetes Node](#the-kubernetes-node)
   - [Kubelet](#kubelet)
   - [Kubernetes Proxy](#kubernetes-proxy)
-- [The Kubernetes Master](#the-kubernetes-master)
+- [The Kubernetes Control Plane](#the-kubernetes-control-plane)
   - [etcd](#etcd)
   - [Kubernetes API Server](#kubernetes-api-server)
   - [Kubernetes Controller Manager Server](#kubernetes-controller-manager-server)
