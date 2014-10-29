@@ -135,6 +135,13 @@ func handleVersion(w http.ResponseWriter, req *http.Request) {
 	writeRawJSON(http.StatusOK, version.Get(), w)
 }
 
+// APIVersionHandler returns a handler which will list the provided versions as available.
+func APIVersionHandler(versions ...string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		writeRawJSON(http.StatusOK, version.APIVersions{Versions: versions}, w)
+	})
+}
+
 // writeJSON renders an object as JSON to the response.
 func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w http.ResponseWriter) {
 	output, err := codec.Encode(object)
