@@ -59,7 +59,7 @@ The the kube-apiserver several options.
 **-minion_cache_ttl**=30s
 	Duration of time to cache minion information. Default 30 seconds.
 
-**-minion_port**=10250
+**-kubelet_port**=10250
 	The port at which kubelet will be listening on the minions. Default is 10250.
 
 **-minion_regexp**=""
