@@ -33,6 +33,13 @@ type Codec interface {
 	Encoder
 }
 
+// ObjectTyper contains methods for extracting the APIVersion and Kind
+// of objects.
+type ObjectTyper interface {
+	DataVersionAndKind([]byte) (version, kind string, err error)
+	ObjectVersionAndKind(Object) (version, kind string, err error)
+}
+
 // ResourceVersioner provides methods for setting and retrieving
 // the resource version from an API object.
 type ResourceVersioner interface {
