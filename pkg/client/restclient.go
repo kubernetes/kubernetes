@@ -17,16 +17,13 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+
+	"github.com/golang/glog"
 )
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -45,7 +42,11 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be
 	// used.
-	Client *http.Client
+	Client HTTPClient
+
+	// Set the poll behavior of this client. If not set the DefaultPoll method will
+	// be called.
+	Poller PollFunc
 
 	Sync       bool
 	PollPeriod time.Duration
@@ -68,54 +69,11 @@ func NewRESTClient(baseURL *url.URL, c runtime.Codec) *RESTClient {
 		Codec:   c,
 
 		// Make asynchronous requests by default
-		// TODO: flip me to the default
 		Sync: false,
+
 		// Poll frequently when asynchronous requests are provided
 		PollPeriod: time.Second * 2,
 	}
-}
-
-// doRequest executes a request against a server
-func (c *RESTClient) doRequest(request *http.Request) ([]byte, bool, error) {
-	client := c.Client
-	if client == nil {
-		client = http.DefaultClient
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, false, err
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return body, false, err
-	}
-
-	// Did the server give us a status response?
-	isStatusResponse := false
-	var status api.Status
-	if err := c.Codec.DecodeInto(body, &status); err == nil && status.Status != "" {
-		isStatusResponse = true
-	}
-
-	switch {
-	case response.StatusCode < http.StatusOK || response.StatusCode > http.StatusPartialContent:
-		if !isStatusResponse {
-			return nil, false, fmt.Errorf("request [%#v] failed (%d) %s: %s", request, response.StatusCode, response.Status, string(body))
-		}
-		return nil, false, errors.FromObject(&status)
-	}
-
-	// If the server gave us a status back, look at what it was.
-	if isStatusResponse && status.Status != api.StatusSuccess {
-		// "Working" requests need to be handled specially.
-		// "Failed" requests are clearly just an error and it makes sense to return them as such.
-		return nil, false, errors.FromObject(&status)
-	}
-
-	created := response.StatusCode == http.StatusCreated
-	return body, created, err
 }
 
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
@@ -136,15 +94,11 @@ func (c *RESTClient) Verb(verb string) *Request {
 	// if c.Client != nil {
 	// 	timeout = c.Client.Timeout
 	// }
-	return &Request{
-		verb:       verb,
-		c:          c,
-		path:       c.baseURL.Path,
-		sync:       c.Sync,
-		timeout:    c.Timeout,
-		params:     map[string]string{},
-		pollPeriod: c.PollPeriod,
+	poller := c.Poller
+	if poller == nil {
+		poller = c.DefaultPoll
 	}
+	return NewRequest(c.Client, verb, c.baseURL, c.Codec).Poller(poller).Sync(c.Sync).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -168,6 +122,16 @@ func (c *RESTClient) Delete() *Request {
 }
 
 // PollFor makes a request to do a single poll of the completion of the given operation.
-func (c *RESTClient) PollFor(operationID string) *Request {
-	return c.Get().Path("operations").Path(operationID).Sync(false).PollPeriod(0)
+func (c *RESTClient) Operation(name string) *Request {
+	return c.Get().Path("operations").Path(name).Sync(false).NoPoll()
+}
+
+func (c *RESTClient) DefaultPoll(name string) (*Request, bool) {
+	if c.PollPeriod == 0 {
+		return nil, false
+	}
+	glog.Infof("Waiting for completion of operation %s", name)
+	time.Sleep(c.PollPeriod)
+	// Make a poll request
+	return c.Operation(name).Poller(c.DefaultPoll), true
 }
