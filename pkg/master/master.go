@@ -190,6 +190,8 @@ func (m *Master) init(c *Config) {
 	}
 	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(m.mux, c.APIPrefix+"/v1beta1")
 	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(m.mux, c.APIPrefix+"/v1beta2")
+	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
+	m.mux.Handle(c.APIPrefix, versionHandler)
 	apiserver.InstallSupport(m.mux)
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.mux)

@@ -251,6 +251,17 @@ func runReplicationControllerTest(c *client.Client) {
 	glog.Infof("Pods created")
 }
 
+func runAPIVersionsTest(c *client.Client) {
+	v, err := c.ServerAPIVersions()
+	if err != nil {
+		glog.Fatalf("failed to get api versions: %v", err)
+	}
+	if e, a := []string{"v1beta1", "v1beta2"}, v.Versions; !reflect.DeepEqual(e, a) {
+		glog.Fatalf("Expected version list '%v', got '%v'", e, a)
+	}
+	glog.Infof("Version test passed")
+}
+
 func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
@@ -426,6 +437,7 @@ func main() {
 		runReplicationControllerTest,
 		runAtomicPutTest,
 		runServiceTest,
+		runAPIVersionsTest,
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
