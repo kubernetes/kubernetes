@@ -77,10 +77,11 @@ type SimpleRESTStorage struct {
 	created *Simple
 
 	// These are set when Watch is called
-	fakeWatch                *watch.FakeWatcher
-	requestedLabelSelector   labels.Selector
-	requestedFieldSelector   labels.Selector
-	requestedResourceVersion string
+	fakeWatch                  *watch.FakeWatcher
+	requestedLabelSelector     labels.Selector
+	requestedFieldSelector     labels.Selector
+	requestedResourceVersion   string
+	requestedResourceNamespace string
 
 	// The id requested, and location to return for ResourceLocation
 	requestedResourceLocationID string
@@ -151,6 +152,7 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Sel
 	storage.requestedLabelSelector = label
 	storage.requestedFieldSelector = field
 	storage.requestedResourceVersion = resourceVersion
+	storage.requestedResourceNamespace = api.Namespace(ctx)
 	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
@@ -161,9 +163,9 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, label, field labels.Sel
 // Implement Redirector.
 func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (string, error) {
 	// validate that the namespace context on the request matches the expected input
-	requestedResourceNamespace := api.Namespace(ctx)
-	if storage.expectedResourceNamespace != requestedResourceNamespace {
-		return "", fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, requestedResourceNamespace)
+	storage.requestedResourceNamespace = api.Namespace(ctx)
+	if storage.expectedResourceNamespace != storage.requestedResourceNamespace {
+		return "", fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, storage.requestedResourceNamespace)
 	}
 	storage.requestedResourceLocationID = id
 	if err := storage.errors["resourceLocation"]; err != nil {
