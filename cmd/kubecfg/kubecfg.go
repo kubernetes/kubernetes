@@ -80,6 +80,7 @@ var parser = kubecfg.NewParser(map[string]runtime.Object{
 	"services":               &api.Service{},
 	"replicationControllers": &api.ReplicationController{},
 	"minions":                &api.Minion{},
+	"events":                 &api.Event{},
 })
 
 func usage() {
