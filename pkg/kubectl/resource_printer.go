@@ -56,6 +56,18 @@ func getPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (Re
 		printer = &YAMLPrinter{}
 	case "template":
 		var data []byte
+		if len(templateFile) == 0 {
+			return printer, fmt.Errorf("template format specified but no template given")
+		}
+		tmpl, err := template.New("output").Parse(templateFile)
+		if err != nil {
+			return printer, fmt.Errorf("Error parsing template %s, %v\n", string(data), err)
+		}
+		printer = &TemplatePrinter{
+			Template: tmpl,
+		}
+	case "templatefile":
+		var data []byte
 		if len(templateFile) > 0 {
 			var err error
 			data, err = ioutil.ReadFile(templateFile)
@@ -63,7 +75,7 @@ func getPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (Re
 				return printer, fmt.Errorf("Error reading template %s, %v\n", templateFile, err)
 			}
 		} else {
-			return printer, fmt.Errorf("template format specified but no template file given")
+			return printer, fmt.Errorf("templatefile format specified but no template file given")
 		}
 		tmpl, err := template.New("output").Parse(string(data))
 		if err != nil {

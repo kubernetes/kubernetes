@@ -26,7 +26,7 @@ import (
 
 func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get [(-o|--output=)console|json|yaml|...] <resource> [<id>]",
+		Use:   "get [(-o|--output=)json|yaml|...] <resource> [<id>]",
 		Short: "Display one or many resources",
 		Long: `Display one or many resources.
 
@@ -66,11 +66,9 @@ Examples:
 			checkErr(err)
 		},
 	}
-	// TODO Add an --output-version lock which can ensure that regardless of the
-	// server version, the client output stays the same.
-	cmd.Flags().StringP("output", "o", "console", "Output format: console|json|yaml|template")
-	cmd.Flags().Bool("no-headers", false, "When output format is console, don't print headers")
-	cmd.Flags().StringP("template", "t", "", "Path to template file to use when --output=template")
+	cmd.Flags().StringP("output", "o", "", "Output format: json|yaml|template|templatefile")
+	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers")
+	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when --output=template or --output=templatefile")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }
