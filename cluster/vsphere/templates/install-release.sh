@@ -14,11 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Install release
+# This script assumes that the environment variable SERVER_BINARY_TAR contains
+# the release tar to download and unpack. It is meant to be pushed to the
+# master and run.
 
-echo "Unpacking release"
-rm -rf master-release || false
-tar xzf master-release.tgz
+echo "Unpacking Salt tree"
+rm -rf kubernetes
+tar xzf "${SALT_TAR}"
 
 echo "Running release install script"
-sudo master-release/src/scripts/master-release-install.sh
+sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR}"
