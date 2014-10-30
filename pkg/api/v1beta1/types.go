@@ -66,7 +66,7 @@ type ContainerManifest struct {
 // ContainerManifestList is used to communicate container manifests to kubelet.
 type ContainerManifestList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Items    []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
+	Items    []ContainerManifest `json:"items" yaml:"items"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
@@ -398,7 +398,7 @@ type PodState struct {
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Items    []Pod `json:"items" yaml:"items,omitempty"`
+	Items    []Pod `json:"items" yaml:"items"`
 }
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
@@ -421,7 +421,7 @@ type ReplicationControllerState struct {
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Items    []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
+	Items    []ReplicationController `json:"items" yaml:"items"`
 }
 
 // ReplicationController represents the configuration of a replication controller.
@@ -485,7 +485,7 @@ type Endpoints struct {
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Items    []Endpoints `json:"items,omitempty" yaml:"items,omitempty"`
+	Items    []Endpoints `json:"items" yaml:"items"`
 }
 
 // NodeResources represents resources on a Kubernetes system node
@@ -517,7 +517,7 @@ type MinionList struct {
 	// DEPRECATED: the below Minions is due to a naming mistake and
 	// will be replaced with Items in the future.
 	Minions []Minion `json:"minions,omitempty" yaml:"minions,omitempty"`
-	Items   []Minion `json:"items,omitempty" yaml:"items,omitempty"`
+	Items   []Minion `json:"items" yaml:"items"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
@@ -676,7 +676,7 @@ type ServerOp struct {
 // ServerOpList is a list of operations, as delivered to API clients.
 type ServerOpList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
-	Items    []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
+	Items    []ServerOp `yaml:"items" json:"items"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -736,7 +736,7 @@ type Event struct {
 // EventList is a list of events.
 type EventList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
-	Items    []Event `yaml:"items,omitempty" json:"items,omitempty"`
+	Items    []Event `yaml:"items" json:"items"`
 }
 
 // Backported from v1beta3 to replace ContainerManifest
