@@ -239,13 +239,6 @@ function kube-up {
   local htpasswd
   htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
-  if ! gcutil getimage "${IMAGE}" > /dev/null 2>&1; then
-    echo "Adding new image: ${IMAGE}"
-    gcutil addimage "${IMAGE}" \
-      "gs://gcp-containers-images/${IMAGE}.tar.gz" \
-      --project "${PROJECT}"
-  fi
-
   if ! gcutil getnetwork "${NETWORK}" >/dev/null 2>&1; then
     echo "Creating new network for: ${NETWORK}"
     # The network needs to be created synchronously or we have a race. The
@@ -310,7 +303,7 @@ function kube-up {
     --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
     --zone "${ZONE}" \
     --machine_type "${MASTER_SIZE}" \
-    --image "${IMAGE}" \
+    --image "projects/${IMAGE_PROJECT}/global/images/${IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
     --service_account_scopes="storage-ro,compute-rw" \
@@ -339,7 +332,7 @@ function kube-up {
       --sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
       --zone "${ZONE}" \
       --machine_type "${MINION_SIZE}" \
-      --image "${IMAGE}" \
+      --image "projects/${IMAGE_PROJECT}/global/images/${IMAGE}" \
       --tags "${MINION_TAG}" \
       --network "${NETWORK}" \
       --service_account_scopes "${MINION_SCOPES}" \
