@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"code.google.com/p/go.net/websocket"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -159,27 +160,32 @@ func TestWatchParamParsing(t *testing.T) {
 		resourceVersion string
 		labelSelector   string
 		fieldSelector   string
+		namespace       string
 	}{
 		{
 			rawQuery:        "resourceVersion=1234",
 			resourceVersion: "1234",
 			labelSelector:   "",
 			fieldSelector:   "",
+			namespace:       api.NamespaceAll,
 		}, {
-			rawQuery:        "resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			rawQuery:        "namespace=default&resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
+			namespace:       api.NamespaceDefault,
 		}, {
-			rawQuery:        "fields=ID%3dfoo&resourceVersion=1492",
+			rawQuery:        "namespace=watchother&fields=ID%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
 			fieldSelector:   "ID=foo",
+			namespace:       "watchother",
 		}, {
 			rawQuery:        "",
 			resourceVersion: "",
 			labelSelector:   "",
 			fieldSelector:   "",
+			namespace:       api.NamespaceAll,
 		},
 	}
 
@@ -187,6 +193,7 @@ func TestWatchParamParsing(t *testing.T) {
 		simpleStorage.requestedLabelSelector = nil
 		simpleStorage.requestedFieldSelector = nil
 		simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
+		simpleStorage.requestedResourceNamespace = ""
 		dest.RawQuery = item.rawQuery
 		resp, err := http.Get(dest.String())
 		if err != nil {
@@ -194,6 +201,9 @@ func TestWatchParamParsing(t *testing.T) {
 			continue
 		}
 		resp.Body.Close()
+		if e, a := item.namespace, simpleStorage.requestedResourceNamespace; e != a {
+			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+		}
 		if e, a := item.resourceVersion, simpleStorage.requestedResourceVersion; e != a {
 			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
 		}

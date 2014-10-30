@@ -60,6 +60,10 @@ func isWebsocketRequest(req *http.Request) bool {
 // ServeHTTP processes watch requests.
 func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := api.NewContext()
+	namespace := req.URL.Query().Get("namespace")
+	if len(namespace) > 0 {
+		ctx = api.WithNamespace(ctx, namespace)
+	}
 	parts := splitPath(req.URL.Path)
 	if len(parts) < 1 || req.Method != "GET" {
 		notFound(w, req)
