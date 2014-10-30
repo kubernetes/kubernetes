@@ -62,7 +62,25 @@ func (h *RESTHandler) setSelfLink(obj runtime.Object, req *http.Request) error {
 	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path)
 	newURL.RawQuery = ""
 	newURL.Fragment = ""
-	return h.selfLinker.SetSelfLink(obj, newURL.String())
+	err := h.selfLinker.SetSelfLink(obj, newURL.String())
+	if err != nil {
+		return err
+	}
+	if !runtime.IsListType(obj) {
+		return nil
+	}
+
+	// Set self-link of objects in the list.
+	items, err := runtime.ExtractList(obj)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		if err := h.setSelfLinkAddName(items[i], req); err != nil {
+			return err
+		}
+	}
+	return runtime.SetList(obj, items)
 }
 
 // Like setSelfLink, but appends the object's name.

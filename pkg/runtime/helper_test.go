@@ -26,6 +26,21 @@ import (
 	"github.com/google/gofuzz"
 )
 
+func TestIsList(t *testing.T) {
+	tests := []struct {
+		obj    runtime.Object
+		isList bool
+	}{
+		{&api.PodList{}, true},
+		{&api.Pod{}, false},
+	}
+	for _, item := range tests {
+		if e, a := item.isList, runtime.IsListType(item.obj); e != a {
+			t.Errorf("%v: Expected %v, got %v", reflect.TypeOf(item.obj), e, a)
+		}
+	}
+}
+
 func TestExtractList(t *testing.T) {
 	pl := &api.PodList{
 		Items: []api.Pod{

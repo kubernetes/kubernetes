@@ -23,6 +23,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
+func IsListType(obj Object) bool {
+	_, err := GetItemsPtr(obj)
+	return err == nil
+}
+
 // GetItemsPtr returns a pointer to the list object's Items member.
 // If 'list' doesn't have an Items member, it's not really a list type
 // and an error will be returned.
