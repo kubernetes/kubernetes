@@ -29,6 +29,7 @@ import (
 )
 
 // EventRecorder knows how to store events (client.Client implements it.)
+// EventRecorder must respect the namespace that will be embedded in 'event'.
 type EventRecorder interface {
 	Create(event *api.Event) (*api.Event, error)
 }
@@ -96,6 +97,8 @@ var events = watch.NewMux(queueLen)
 // handling of events, so imagine people writing switch statements to handle them. You want to
 // make that easy.
 // 'message' is intended to be human readable.
+//
+// The resulting event will be created in the same namespace as the reference object.
 func Event(object runtime.Object, fieldPath, status, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
@@ -103,12 +106,18 @@ func Event(object runtime.Object, fieldPath, status, reason, message string) {
 		return
 	}
 	ref.FieldPath = fieldPath
+	t := util.Now()
+
 	e := &api.Event{
+		ObjectMeta: api.ObjectMeta{
+			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+			Namespace: ref.Namespace,
+		},
 		InvolvedObject: *ref,
 		Status:         status,
 		Reason:         reason,
 		Message:        message,
-		Timestamp:      util.Now(),
+		Timestamp:      t,
 	}
 
 	events.Action(watch.Added, e)

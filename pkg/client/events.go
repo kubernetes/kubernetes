@@ -50,7 +50,7 @@ func newEvents(c *Client) *events {
 // Create makes a new event. Returns the copy of the event the server returns, or an error.
 func (c *events) Create(event *api.Event) (*api.Event, error) {
 	result := &api.Event{}
-	err := c.r.Post().Path("events").Body(event).Do().Into(result)
+	err := c.r.Post().Path("events").Namespace(event.Namespace).Body(event).Do().Into(result)
 	return result, err
 }
 
