@@ -33,7 +33,7 @@ const (
 	ModifyDelete = ModifyAction("delete")
 )
 
-func Modify(w io.Writer, c *client.RESTClient, action ModifyAction, data []byte) error {
+func Modify(w io.Writer, c *client.RESTClient, namespace string, action ModifyAction, data []byte) error {
 	if action != ModifyCreate && action != ModifyUpdate && action != ModifyDelete {
 		return fmt.Errorf("Action not recognized")
 	}
@@ -64,11 +64,11 @@ func Modify(w io.Writer, c *client.RESTClient, action ModifyAction, data []byte)
 	var id string
 	switch action {
 	case "create":
-		id, err = doCreate(c, resource, data)
+		id, err = doCreate(c, namespace, resource, data)
 	case "update":
-		id, err = doUpdate(c, resource, obj)
+		id, err = doUpdate(c, namespace, resource, obj)
 	case "delete":
-		id, err = doDelete(c, resource, obj)
+		id, err = doDelete(c, namespace, resource, obj)
 	}
 
 	if err != nil {
@@ -80,8 +80,8 @@ func Modify(w io.Writer, c *client.RESTClient, action ModifyAction, data []byte)
 }
 
 // Creates the object then returns the ID of the newly created object.
-func doCreate(c *client.RESTClient, resource string, data []byte) (string, error) {
-	obj, err := c.Post().Path(resource).Body(data).Do().Get()
+func doCreate(c *client.RESTClient, namespace string, resource string, data []byte) (string, error) {
+	obj, err := c.Post().Namespace(namespace).Path(resource).Body(data).Do().Get()
 	if err != nil {
 		return "", err
 	}
@@ -89,7 +89,7 @@ func doCreate(c *client.RESTClient, resource string, data []byte) (string, error
 }
 
 // Creates the object then returns the ID of the newly created object.
-func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string, error) {
+func doUpdate(c *client.RESTClient, namespace string, resource string, obj runtime.Object) (string, error) {
 	// Figure out the ID of the object to update by introspecting into the
 	// object.
 	id, err := getIDFromObj(obj)
@@ -99,7 +99,7 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 
 	// Get the object from the server to find out its current resource
 	// version to prevent race conditions in updating the object.
-	serverObj, err := c.Get().Path(resource).Path(id).Do().Get()
+	serverObj, err := c.Get().Namespace(namespace).Path(resource).Path(id).Do().Get()
 	if err != nil {
 		return "", fmt.Errorf("Item Name %s does not exist for update: %v", id, err)
 	}
@@ -123,7 +123,7 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 	}
 
 	// Do the update.
-	err = c.Put().Path(resource).Path(id).Body(data).Do().Error()
+	err = c.Put().Namespace(namespace).Path(resource).Path(id).Body(data).Do().Error()
 	fmt.Printf("r: %q, i: %q, d: %s", resource, id, data)
 	if err != nil {
 		return "", err
@@ -132,7 +132,7 @@ func doUpdate(c *client.RESTClient, resource string, obj runtime.Object) (string
 	return id, nil
 }
 
-func doDelete(c *client.RESTClient, resource string, obj runtime.Object) (string, error) {
+func doDelete(c *client.RESTClient, namespace string, resource string, obj runtime.Object) (string, error) {
 	id, err := getIDFromObj(obj)
 	if err != nil {
 		return "", fmt.Errorf("Name not retrievable from object for delete: %v", err)
@@ -141,7 +141,7 @@ func doDelete(c *client.RESTClient, resource string, obj runtime.Object) (string
 		return "", fmt.Errorf("The supplied resource has no Name and cannot be deleted")
 	}
 
-	err = c.Delete().Path(resource).Path(id).Do().Error()
+	err = c.Delete().Namespace(namespace).Path(resource).Path(id).Do().Error()
 	if err != nil {
 		return "", err
 	}

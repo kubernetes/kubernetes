@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -55,6 +56,8 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.PersistentFlags().String("client-certificate", "", "Path to a client certificate for TLS.")
 	cmds.PersistentFlags().String("client-key", "", "Path to a client key file for TLS.")
 	cmds.PersistentFlags().Bool("insecure-skip-tls-verify", false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
+	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
+	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
 
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdProxy(out))
@@ -63,6 +66,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdCreate(out))
 	cmds.AddCommand(NewCmdUpdate(out))
 	cmds.AddCommand(NewCmdDelete(out))
+	cmds.AddCommand(NewCmdNamespace(out))
 
 	if err := cmds.Execute(); err != nil {
 		os.Exit(1)
@@ -136,6 +140,23 @@ func getFlagInt(cmd *cobra.Command, flag string) int {
 	// should prevent non-integer values from reaching here.
 	checkErr(err)
 	return v
+}
+
+func getKubeNamespace(cmd *cobra.Command) string {
+	result := api.NamespaceDefault
+	if ns := getFlagString(cmd, "namespace"); len(ns) > 0 {
+		result = ns
+		glog.V(2).Infof("Using namespace from -ns flag")
+	} else {
+		nsPath := getFlagString(cmd, "ns-path")
+		nsInfo, err := kubectl.LoadNamespaceInfo(nsPath)
+		if err != nil {
+			glog.Fatalf("Error loading current namespace: %v", err)
+		}
+		result = nsInfo.Namespace
+	}
+	glog.V(2).Infof("Using namespace %s", result)
+	return result
 }
 
 func getKubeConfig(cmd *cobra.Command) *client.Config {

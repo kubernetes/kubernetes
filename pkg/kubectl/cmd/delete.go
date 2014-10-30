@@ -71,7 +71,7 @@ Examples:
 			}
 
 			// TODO Add ability to require a resource-version check for delete.
-			err = kubectl.Modify(out, getKubeClient(cmd).RESTClient, kubectl.ModifyDelete, data)
+			err = kubectl.Modify(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), kubectl.ModifyDelete, data)
 			checkErr(err)
 		},
 	}

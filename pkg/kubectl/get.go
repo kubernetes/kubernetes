@@ -23,13 +23,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-func Get(w io.Writer, c *client.RESTClient, resource string, id string, selector string, format string, noHeaders bool, templateFile string) error {
+func Get(w io.Writer, c *client.RESTClient, namespace string, resource string, id string, selector string, format string, noHeaders bool, templateFile string) error {
 	path, err := resolveResource(resolveToPath, resource)
 	if err != nil {
 		return err
 	}
 
-	r := c.Verb("GET").Path(path)
+	r := c.Verb("GET").Namespace(namespace).Path(path)
 	if len(id) > 0 {
 		r.Path(id)
 	}
