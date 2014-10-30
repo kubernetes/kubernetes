@@ -276,7 +276,7 @@ func TestRequestDo(t *testing.T) {
 
 func TestDoRequestNewWay(t *testing.T) {
 	reqBody := "request body"
-	expectedObj := &api.Service{Port: 12345}
+	expectedObj := &api.Service{Spec: api.ServiceSpec{Port: 12345}}
 	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -311,7 +311,7 @@ func TestDoRequestNewWay(t *testing.T) {
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := v1beta1.Codec.Encode(reqObj)
-	expectedObj := &api.Service{Port: 12345}
+	expectedObj := &api.Service{Spec: api.ServiceSpec{Port: 12345}}
 	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -347,7 +347,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 func TestDoRequestNewWayObj(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := v1beta2.Codec.Encode(reqObj)
-	expectedObj := &api.Service{Port: 12345}
+	expectedObj := &api.Service{Spec: api.ServiceSpec{Port: 12345}}
 	expectedBody, _ := v1beta2.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -396,7 +396,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Port: 12345}
+	expectedObj := &api.Service{Spec: api.ServiceSpec{Port: 12345}}
 	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   200,
@@ -439,7 +439,7 @@ func TestWasCreated(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedObj := &api.Service{Port: 12345}
+	expectedObj := &api.Service{Spec: api.ServiceSpec{Port: 12345}}
 	expectedBody, _ := v1beta1.Codec.Encode(expectedObj)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   201,

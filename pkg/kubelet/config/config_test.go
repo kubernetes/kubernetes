@@ -42,10 +42,7 @@ func (s sortedPods) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 func (s sortedPods) Less(i, j int) bool {
-	if s[i].Namespace < s[j].Namespace {
-		return true
-	}
-	return s[i].Name < s[j].Name
+	return s[i].Namespace < s[j].Namespace
 }
 
 func CreateValidPod(name, namespace, source string) api.BoundPod {

@@ -62,12 +62,14 @@ func TestMakeBoundPodServices(t *testing.T) {
 			Items: []api.Service{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "test"},
-					Port:       8080,
-					ContainerPort: util.IntOrString{
-						Kind:   util.IntstrInt,
-						IntVal: 900,
+					Spec: api.ServiceSpec{
+						Port: 8080,
+						ContainerPort: util.IntOrString{
+							Kind:   util.IntstrInt,
+							IntVal: 900,
+						},
+						PortalIP: "1.2.3.4",
 					},
-					PortalIP: "1.2.3.4",
 				},
 			},
 		},
@@ -138,12 +140,14 @@ func TestMakeBoundPodServicesExistingEnvVar(t *testing.T) {
 			Items: []api.Service{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "test"},
-					Port:       8080,
-					ContainerPort: util.IntOrString{
-						Kind:   util.IntstrInt,
-						IntVal: 900,
+					Spec: api.ServiceSpec{
+						Port: 8080,
+						ContainerPort: util.IntOrString{
+							Kind:   util.IntstrInt,
+							IntVal: 900,
+						},
+						PortalIP: "1.2.3.4",
 					},
-					PortalIP: "1.2.3.4",
 				},
 			},
 		},

@@ -309,9 +309,11 @@ func createService(ctx api.Context, name string, port int, client client.Interfa
 				"name": name,
 			},
 		},
-		Port: port,
-		Selector: map[string]string{
-			"name": name,
+		Spec: api.ServiceSpec{
+			Port: port,
+			Selector: map[string]string{
+				"name": name,
+			},
 		},
 	}
 	svc, err := client.Services(api.Namespace(ctx)).Create(svc)

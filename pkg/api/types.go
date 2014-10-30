@@ -479,6 +479,38 @@ type ServiceList struct {
 	Items []Service `json:"items" yaml:"items"`
 }
 
+// ServiceStatus represents the current status of a service
+type ServiceStatus struct{}
+
+// ServiceSpec describes the attributes that a user creates on a service
+type ServiceSpec struct {
+	// Port is the TCP or UDP port that will be made available to each pod for connecting to the pods
+	// proxied by this service.
+	Port int `json:"port" yaml:"port"`
+
+	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
+	Protocol Protocol `json:"protocol,omitempty" yaml:"protocol,omitempty"`
+
+	// This service will route traffic to pods having labels matching this selector.
+	Selector map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
+
+	// PortalIP is usually assigned by the master.  If specified by the user
+	// we will try to respect it or else fail the request.  This field can
+	// not be changed by updates.
+	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
+
+	// ProxyPort is assigned by the master.  If 0, the proxy will choose an ephemeral port.
+	// TODO: This is awkward - if we had a BoundService, it would be better factored.
+	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty"`
+
+	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
+	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
+
+	// ContainerPort is the name of the port on the container to direct traffic to.
+	// Optional, if unspecified use the first port on the container.
+	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
+}
+
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
@@ -486,27 +518,11 @@ type Service struct {
 	TypeMeta   `json:",inline" yaml:",inline"`
 	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	// Required.
-	Port int `json:"port" yaml:"port"`
-	// Optional: Defaults to "TCP".
-	Protocol Protocol `yaml:"protocol,omitempty" json:"protocol,omitempty"`
+	// Spec defines the behavior of a service.
+	Spec ServiceSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
 
-	// This service will route traffic to pods having labels matching this selector.
-	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
-	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
-
-	// ContainerPort is the name of the port on the container to direct traffic to.
-	// Optional, if unspecified use the first port on the container.
-	ContainerPort util.IntOrString `json:"containerPort,omitempty" yaml:"containerPort,omitempty"`
-
-	// PortalIP is usually assigned by the master.  If specified by the user
-	// we will try to respect it or else fail the request.  This field can
-	// not be changed by updates.
-	PortalIP string `json:"portalIP,omitempty" yaml:"portalIP,omitempty"`
-
-	// ProxyPort is assigned by the master.  If specified by the user it will be ignored.
-	// TODO: This is awkward - if we had a BoundService, it would be better factored.
-	ProxyPort int `json:"proxyPort,omitempty" yaml:"proxyPort,omitempty"`
+	// Status represents the current status of a service.
+	Status ServiceStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service, for example:

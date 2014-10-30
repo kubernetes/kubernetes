@@ -83,11 +83,13 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, port int) error
 			Name:      serviceName,
 			Namespace: "default",
 		},
-		Port: port,
-		// We're going to add the endpoints by hand, so this selector is mainly to
-		// prevent identification of other pods. This selector will be useful when
-		// we start hosting apiserver in a pod.
-		Selector: map[string]string{"provider": "kubernetes", "component": "apiserver"},
+		Spec: api.ServiceSpec{
+			Port: port,
+			// We're going to add the endpoints by hand, so this selector is mainly to
+			// prevent identification of other pods. This selector will be useful when
+			// we start hosting apiserver in a pod.
+			Selector: map[string]string{"provider": "kubernetes", "component": "apiserver"},
+		},
 	}
 	// Kids, don't do this at home: this is a hack. There's no good way to call the business
 	// logic which lives in the REST object from here.

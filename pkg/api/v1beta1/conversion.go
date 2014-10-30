@@ -247,6 +247,7 @@ func init() {
 		},
 
 		func(in *newer.Service, out *Service, s conversion.Scope) error {
+
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
@@ -257,16 +258,15 @@ func init() {
 				return err
 			}
 
-			out.Port = in.Port
-			out.Protocol = Protocol(in.Protocol)
-			if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+			out.Port = in.Spec.Port
+			out.Protocol = Protocol(in.Spec.Protocol)
+			if err := s.Convert(&in.Spec.Selector, &out.Selector, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-			out.ContainerPort = in.ContainerPort
-			out.PortalIP = in.PortalIP
-			out.ProxyPort = in.ProxyPort
-
+			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
+			out.ContainerPort = in.Spec.ContainerPort
+			out.PortalIP = in.Spec.PortalIP
+			out.ProxyPort = in.Spec.ProxyPort
 			return nil
 		},
 		func(in *Service, out *newer.Service, s conversion.Scope) error {
@@ -280,16 +280,15 @@ func init() {
 				return err
 			}
 
-			out.Port = in.Port
-			out.Protocol = newer.Protocol(in.Protocol)
-			if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+			out.Spec.Port = in.Port
+			out.Spec.Protocol = newer.Protocol(in.Protocol)
+			if err := s.Convert(&in.Selector, &out.Spec.Selector, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
-			out.ContainerPort = in.ContainerPort
-			out.PortalIP = in.PortalIP
-			out.ProxyPort = in.ProxyPort
-
+			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+			out.Spec.ContainerPort = in.ContainerPort
+			out.Spec.PortalIP = in.PortalIP
+			out.Spec.ProxyPort = in.ProxyPort
 			return nil
 		},
 
