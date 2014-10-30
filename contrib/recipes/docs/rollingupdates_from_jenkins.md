@@ -16,7 +16,7 @@ Our project's build script (`bin/jenkins.sh`), is followed by our new kube-rolli
 	REGISTRY_LOCATION="dockerreg.web.local/"
 ```
 
-Jenkins builds our container, tags it with the build number, and runs a couple rudamentary tests on it. On success, it pushes it to our private docker registry. Once the container is pushed, it then executes our rolling update script.
+Jenkins builds our container, tags it with the build number, and runs a couple rudimentary tests on it. On success, it pushes it to our private docker registry. Once the container is pushed, it then executes our rolling update script.
 
 `kube-rolling.sh`
 ```
