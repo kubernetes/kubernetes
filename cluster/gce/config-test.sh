@@ -23,6 +23,7 @@ NUM_MINIONS=2
 # for containervm image, so that gcloud/gcutil will expand this
 # to the latest supported image.
 IMAGE=container-vm-v20141016
+IMAGE_PROJECT=google-containers
 NETWORK=e2e
 INSTANCE_PREFIX="e2e-test-${USER}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"

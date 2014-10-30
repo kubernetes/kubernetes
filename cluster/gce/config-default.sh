@@ -23,6 +23,7 @@ NUM_MINIONS=4
 # for containervm image, so that gcloud/gcutil will expand this
 # to the latest supported image.
 IMAGE=container-vm-v20141016
+IMAGE_PROJECT=google-containers
 NETWORK=default
 INSTANCE_PREFIX=kubernetes
 MASTER_NAME="${INSTANCE_PREFIX}-master"
