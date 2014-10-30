@@ -20,6 +20,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/rackspace/gophercloud"
 )
 
 func TestReadConfig(t *testing.T) {
@@ -30,14 +33,32 @@ func TestReadConfig(t *testing.T) {
 
 	cfg, err := readConfig(strings.NewReader(`
 [Global]
-authurl = http://auth.url
+auth-url = http://auth.url
 username = user
+[LoadBalancer]
+create-monitor = yes
+monitor-delay = 1m
+monitor-timeout = 30s
+monitor-max-retries = 3
 `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
 	}
 	if cfg.Global.AuthUrl != "http://auth.url" {
 		t.Errorf("incorrect authurl: %s", cfg.Global.AuthUrl)
+	}
+
+	if !cfg.LoadBalancer.CreateMonitor {
+		t.Errorf("incorrect lb.createmonitor: %s", cfg.LoadBalancer.CreateMonitor)
+	}
+	if cfg.LoadBalancer.MonitorDelay.Duration != 1*time.Minute {
+		t.Errorf("incorrect lb.monitordelay: %s", cfg.LoadBalancer.MonitorDelay)
+	}
+	if cfg.LoadBalancer.MonitorTimeout.Duration != 30*time.Second {
+		t.Errorf("incorrect lb.monitortimeout: %s", cfg.LoadBalancer.MonitorTimeout)
+	}
+	if cfg.LoadBalancer.MonitorMaxRetries != 3 {
+		t.Errorf("incorrect lb.monitormaxretries: %s", cfg.LoadBalancer.MonitorMaxRetries)
 	}
 }
 
@@ -56,8 +77,11 @@ func TestToAuthOptions(t *testing.T) {
 	}
 }
 
-// This allows testing against an existing OpenStack install, using the
-// standard OS_* OpenStack client environment variables.
+// This allows acceptance testing against an existing OpenStack
+// install, using the standard OS_* OpenStack client environment
+// variables.
+// FIXME: it would be better to hermetically test against canned JSON
+// requests/responses.
 func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.AuthUrl = os.Getenv("OS_AUTH_URL")
 
@@ -131,4 +155,52 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances.GetNodeResources(%s) failed: %s", srvs[0], err)
 	}
 	t.Logf("Found GetNodeResources(%s) = %s\n", srvs[0], rsrcs)
+}
+
+func TestTCPLoadBalancer(t *testing.T) {
+	cfg, ok := configFromEnv()
+	if !ok {
+		t.Skipf("No config found in environment")
+	}
+
+	os, err := newOpenStack(cfg)
+	if err != nil {
+		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+	}
+
+	lb, ok := os.TCPLoadBalancer()
+	if !ok {
+		t.Fatalf("TCPLoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+	}
+
+	exists, err := lb.TCPLoadBalancerExists("noexist", "region")
+	if err != nil {
+		t.Fatalf("TCPLoadBalancerExists(\"noexist\") returned error: %s", err)
+	}
+	if exists {
+		t.Fatalf("TCPLoadBalancerExists(\"noexist\") returned true")
+	}
+}
+
+func TestZones(t *testing.T) {
+	os := OpenStack{
+		provider: &gophercloud.ProviderClient{
+			IdentityBase: "http://auth.url/",
+		},
+		region: "myRegion",
+	}
+
+	z, ok := os.Zones()
+	if !ok {
+		t.Fatalf("Zones() returned false")
+	}
+
+	zone, err := z.GetZone()
+	if err != nil {
+		t.Fatalf("GetZone() returned error: %s", err)
+	}
+
+	if zone.Region != "myRegion" {
+		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
+	}
 }
