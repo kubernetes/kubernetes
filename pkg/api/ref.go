@@ -49,10 +49,10 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		return nil, fmt.Errorf("unexpected self link format: %v", meta.SelfLink())
 	}
 	return &ObjectReference{
-		Kind:       kind,
-		APIVersion: version[1],
-		// TODO: correct Name and UID when TypeMeta makes a distinction
+		Kind:            kind,
+		APIVersion:      version[1],
 		Name:            meta.Name(),
+		Namespace:       meta.Namespace(),
 		UID:             meta.UID(),
 		ResourceVersion: meta.ResourceVersion(),
 	}, nil
