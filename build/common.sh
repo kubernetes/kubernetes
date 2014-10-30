@@ -464,7 +464,7 @@ function kube::release::package_client_tarballs() {
       "${release_stage}/client/bin/"
 
     local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
-    tar czf "${package_name}" -C "${release_stage}/.." .
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
 }
 
@@ -486,7 +486,7 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
-    tar czf "${package_name}" -C "${release_stage}/.." .
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
 }
 
@@ -502,7 +502,7 @@ function kube::release::package_salt_tarball() {
   cp -R "${KUBE_ROOT}/cluster/saltbase" "${release_stage}/"
 
   local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
-  tar czf "${package_name}" -C "${release_stage}/.." .
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
 # This is all the stuff you need to run/install kubernetes.  This includes:
@@ -537,9 +537,33 @@ function kube::release::package_full_tarball() {
   cp "${KUBE_ROOT}/Vagrantfile" "${release_stage}/"
 
   local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
-  tar czf "${package_name}" -C "${release_stage}/.." .
+  kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
+# Build a release tarball.  $1 is the output tar name.  $2 is the base directory
+# of the files to be packaged.  This assumes that ${2}/kubernetes is what is
+# being packaged.
+function kube::release::create_tarball() {
+  local tarfile=$1
+  local stagingdir=$2
+
+  # Find gnu tar if it is available
+  local tar=tar
+  if which gtar > /dev/null; then
+    tar=gtar
+  fi
+
+  local tar_cmd=("$tar" "czf" "${tarfile}" "-C" "${stagingdir}" "kubernetes")
+  if "$tar" --version | grep -q GNU; then
+    tar_cmd=("${tar_cmd[@]}" "--owner=0" "--group=0")
+  else
+    echo "  !!! GNU tar not available.  User names will be embedded in output and"
+    echo "      release tars are not official. Build on Linux or install GNU tar"
+    echo "      on Mac OS X (brew install gnu-tar)"
+  fi
+
+  "${tar_cmd[@]}"
+}
 
 # ---------------------------------------------------------------------------
 # GCS Release
