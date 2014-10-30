@@ -102,4 +102,5 @@ That's it! Fleet will schedule the apiserver on one of your minions and once it'
 
 ###Questions
 twitter @jeefy
+
 irc.freenode.net #kubernetes jeefy

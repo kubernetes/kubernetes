@@ -53,4 +53,5 @@ When using a private docker registry as we are, the Jenkins slaves as well as th
 
 ### Questions
 twitter @jeefy
+
 irc.freenode.net #kubernetes jeefy
