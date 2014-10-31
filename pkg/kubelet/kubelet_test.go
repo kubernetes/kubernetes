@@ -182,8 +182,8 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	verifyCalls(t, fakeDocker, []string{"list"})
+	kubelet.drainWorkers()
+	verifyCalls(t, fakeDocker, []string{"list", "list", "inspect_container", "inspect_container"})
 }
 
 // drainWorkers waits until all workers are done.  Should only used for testing.
