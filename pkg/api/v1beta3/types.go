@@ -472,8 +472,8 @@ type PodStatus struct {
 // by clients and scheduled onto hosts.  BoundPod represents the state of this resource
 // to hosts.
 type Pod struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -486,7 +486,7 @@ type Pod struct {
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []Pod `json:"items" yaml:"items"`
 }
@@ -494,7 +494,7 @@ type PodList struct {
 // PodTemplateSpec describes the data a pod should have when created from a template
 type PodTemplateSpec struct {
 	// Metadata of the pods created from this template.
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -502,8 +502,8 @@ type PodTemplateSpec struct {
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodTemplateSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -512,7 +512,7 @@ type PodTemplate struct {
 // PodTemplateList is a list of PodTemplates.
 type PodTemplateList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []PodTemplate `json:"items" yaml:"items"`
 }
@@ -521,8 +521,8 @@ type PodTemplateList struct {
 // defines how a Pod may change after a Binding is created. A Pod is a request to
 // execute a pod, whereas a BoundPod is the specification that would be run on a server.
 type BoundPod struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the behavior of a pod.
 	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -531,8 +531,8 @@ type BoundPod struct {
 // BoundPods is a list of Pods bound to a common server. The resource version of
 // the pod list is guaranteed to only change when the list of bound pods changes.
 type BoundPods struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Host is the name of a node that these pods were bound to.
 	Host string `json:"host" yaml:"host"`
@@ -563,8 +563,8 @@ type ReplicationControllerStatus struct {
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the desired behavior of this replication controller.
 	Spec ReplicationControllerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -577,7 +577,7 @@ type ReplicationController struct {
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []ReplicationController `json:"items" yaml:"items"`
 }
@@ -617,8 +617,8 @@ type ServiceSpec struct {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 type Service struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the behavior of a service.
 	Spec ServiceSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -630,7 +630,7 @@ type Service struct {
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []Service `json:"items" yaml:"items"`
 }
@@ -638,8 +638,8 @@ type ServiceList struct {
 // Endpoints is a collection of endpoints that implement the actual service, for example:
 // Name: "mysql", Endpoints: ["10.10.1.1:1909", "10.10.2.2:8834"]
 type Endpoints struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata" yaml:"metadata"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata" yaml:"metadata"`
 
 	// Endpoints is the list of host ports that satisfy the service selector
 	Endpoints []string `json:"endpoints" yaml:"endpoints"`
@@ -648,7 +648,7 @@ type Endpoints struct {
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []Endpoints `json:"items" yaml:"items"`
 }
@@ -675,8 +675,8 @@ type ResourceList map[ResourceName]util.IntOrString
 // Node is a worker node in Kubernetenes.
 // The name of the node according to etcd is in ID.
 type Node struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Spec defines the behavior of a node.
 	Spec NodeSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
@@ -691,7 +691,7 @@ type Node struct {
 // NodeList is a list of minions.
 type NodeList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []Node `json:"items" yaml:"items"`
 }
@@ -699,8 +699,8 @@ type NodeList struct {
 // Binding is written by a scheduler to cause a pod to be bound to a node. Name is not
 // required for Bindings.
 type Binding struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// PodID is a Pod name to be bound to a node.
 	PodID string `json:"podID" yaml:"podID"`
@@ -711,7 +711,7 @@ type Binding struct {
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// One of: "Success", "Failure", "Working" (for operations not yet completed)
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
@@ -866,14 +866,14 @@ const (
 // Operation is assigned by the server when an operation is started, and can be used by
 // clients to retrieve the final result of the operation at a later time.
 type Operation struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata" yaml:"metadata"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata" yaml:"metadata"`
 }
 
 // OperationList is a list of operations, as delivered to API clients.
 type OperationList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []Operation `json:"items" yaml:"items"`
 }
@@ -900,8 +900,8 @@ type ObjectReference struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
-	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata" yaml:"metadata"`
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata" yaml:"metadata"`
 
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty" yaml:"involvedObject,omitempty"`
@@ -936,7 +936,7 @@ type Event struct {
 // EventList is a list of events.
 type EventList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ListMeta `json:"metadata" yaml:"metadata"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []Event `json:"items" yaml:"items"`
 }
