@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# any command line arguments will be passed to hack/build_go.sh to build the
+# cmd/integration binary.  --use_go_build is a legitimate argument, as are
+# any other build time arguments.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -26,9 +30,7 @@ cleanup() {
   kube::log::status "Integration test cleanup complete"
 }
 
-if [[ -z ${KUBE_NO_BUILD_INTEGRATION-} ]]; then
-    "${KUBE_ROOT}/hack/build-go.sh" cmd/integration
-fi
+"${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup HUP INT QUIT TERM
