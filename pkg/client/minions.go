@@ -17,7 +17,11 @@ limitations under the License.
 package client
 
 import (
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type MinionsInterface interface {
@@ -29,6 +33,8 @@ type MinionInterface interface {
 	Create(minion *api.Minion) (*api.Minion, error)
 	List() (*api.MinionList, error)
 	Delete(id string) error
+	ReserveResource(id string, resource api.ResourceName, value util.IntOrString) error
+	ReleaseResource(id string, resource api.ResourceName, value util.IntOrString) error
 }
 
 // minions implements Minions interface
@@ -65,4 +71,60 @@ func (c *minions) Get(id string) (result *api.Minion, err error) {
 // Delete deletes an existing minion.
 func (c *minions) Delete(id string) error {
 	return c.r.Delete().Path("minions").Path(id).Do().Error()
+}
+
+// Atomically update resources in use on a minion.
+func (c *minions) ReserveResource(id string, resource api.ResourceName, value util.IntOrString) error {
+	var minion api.Minion
+	err = c.r.Get().Path("minions").Path(id).Do().Into(&minion)
+	if err != nil {
+		return err
+	}
+	value, ok := minion.NodeResources.Usage[resource]
+	if ok {
+		if value.Kind != currentValue.Kind {
+			return errors.NewFieldInvalid(resource, value)
+		}
+		if value.Kind == util.IntstrInt {
+			minion.NodeResources.Usage[resource] = util.NewIntOrStringFromInt(value.IntVal + currentValue.IntVal)
+		} else {
+			minion.NodeResources.Usage[resource] = util.NewIntOrStringFromString(value.StrVal + ", " + currentValue.StrVal)
+		}
+	} else {
+		minion.NodeResources.Usage[resource] = value
+	}
+	return c.r.Put().Path("minions").Path(id).Body(minion).Do().Error()
+}
+
+// Atomically release a resources in use on a minion.
+func (c *minions) ReserveResource(id string, resource api.ResourceName, value util.IntOrString) error {
+	var minion api.Minion
+	err = c.r.Get().Path("minions").Path(id).Do().Into(&minion)
+	if err != nil {
+		return err
+	}
+	value, ok := minion.NodeResources.Usage[resource]
+	if !ok {
+		return errors.NewFieldNotFound(resource, minion.NodeResources.Usage)
+	}
+	if value.Kind != currentValue.Kind {
+		return errors.NewFieldInvalid(resource, value)
+	}
+	if value.Kind == util.IntstrInt {
+		minion.NodeResources.Usage[resource] = util.NewIntOrStringFromInt(currentValue.IntVal - value.IntVal)
+	} else {
+		values := strings.Split(currentValue.StrVal)
+		newValues := []string{}
+		for i := range values {
+			if values[i] != value.StrVal {
+				newValues = append(newValues, value.StrVal)
+			}
+		}
+		if len(newValues) > 0 {
+			minion.NodeResources.Usage[resource] = util.NewIntOrStringFromString(strings.Join(newValues, ","))
+		} else {
+			delete(minion.NodeResources.Usage, resource)
+		}
+	}
+	return c.r.Put().Path("minions").Path(id).Body(minion).Do().Error()
 }

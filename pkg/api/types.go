@@ -531,6 +531,8 @@ type EndpointsList struct {
 type NodeResources struct {
 	// Capacity represents the available resources.
 	Capacity ResourceList `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	// Usage represents the currently used resources.
+	Usage ResourceList `json:"usage,omitempty" yaml:"usage,omitempty"`
 }
 
 type ResourceName string
