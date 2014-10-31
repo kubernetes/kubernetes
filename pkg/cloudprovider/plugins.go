@@ -18,6 +18,7 @@ package cloudprovider
 
 import (
 	"io"
+	"os"
 	"sync"
 
 	"github.com/golang/glog"
@@ -59,4 +60,36 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 		return nil, nil
 	}
 	return f(config)
+}
+
+// InitCloudProvider creates an instance of the named cloud provider.
+func InitCloudProvider(name string, configFilePath string) Interface {
+	var config *os.File
+
+	if name == "" {
+		glog.Info("No cloud provider specified.")
+		return nil
+	}
+
+	if configFilePath != "" {
+		var err error
+
+		config, err = os.Open(configFilePath)
+		if err != nil {
+			glog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
+				configFilePath, err)
+		}
+
+		defer config.Close()
+	}
+
+	cloud, err := GetCloudProvider(name, config)
+	if err != nil {
+		glog.Fatalf("Couldn't init cloud provider %q: %#v", name, err)
+	}
+	if cloud == nil {
+		glog.Fatalf("Unknown cloud provider: %s", name)
+	}
+
+	return cloud
 }

@@ -27,10 +27,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
+	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
@@ -38,14 +42,34 @@ import (
 )
 
 var (
-	port         = flag.Int("port", ports.ControllerManagerPort, "The port that the controller-manager's http service runs on")
-	address      = util.IP(net.ParseIP("127.0.0.1"))
-	clientConfig = &client.Config{}
+	port            = flag.Int("port", ports.ControllerManagerPort, "The port that the controller-manager's http service runs on")
+	address         = util.IP(net.ParseIP("127.0.0.1"))
+	clientConfig    = &client.Config{}
+	cloudProvider   = flag.String("cloud_provider", "", "The provider for cloud services.  Empty string for no provider.")
+	cloudConfigFile = flag.String("cloud_config", "", "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	minionRegexp    = flag.String("minion_regexp", "", "If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.")
+	machineList     util.StringList
+	// TODO: Discover these by pinging the host machines, and rip out these flags.
+	nodeMilliCPU = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory   = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 )
 
 func init() {
 	flag.Var(&address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	flag.Var(&machineList, "machines", "List of machines to schedule onto, comma separated.")
 	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
+}
+
+func verifyMinionFlags() {
+	if *cloudProvider == "" || *minionRegexp == "" {
+		if len(machineList) == 0 {
+			glog.Info("No machines specified!")
+		}
+		return
+	}
+	if len(machineList) != 0 {
+		glog.Info("-machines is overwritten by -minion_regexp")
+	}
 }
 
 func main() {
@@ -54,6 +78,7 @@ func main() {
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
+	verifyMinionFlags()
 
 	if len(clientConfig.Host) == 0 {
 		glog.Fatal("usage: controller-manager -master <master>")
@@ -69,8 +94,18 @@ func main() {
 	endpoints := service.NewEndpointController(kubeClient)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
-	controllerManager := controller.NewReplicationManager(kubeClient)
+	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
 	controllerManager.Run(10 * time.Second)
+
+	cloud := cloudprovider.InitCloudProvider(*cloudProvider, *cloudConfigFile)
+	nodeResources := &api.NodeResources{
+		Capacity: api.ResourceList{
+			resources.CPU:    util.NewIntOrStringFromInt(*nodeMilliCPU),
+			resources.Memory: util.NewIntOrStringFromInt(*nodeMemory),
+		},
+	}
+	minionController := minionControllerPkg.NewMinionController(cloud, *minionRegexp, machineList, nodeResources, kubeClient)
+	minionController.Run(10 * time.Second)
 
 	select {}
 }

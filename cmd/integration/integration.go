@@ -37,7 +37,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
+	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
@@ -137,11 +138,11 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	if err != nil {
 		glog.Fatalf("Nonnumeric port? %v", err)
 	}
+
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		Client:            cl,
 		EtcdHelper:        helper,
-		Minions:           machineList,
 		KubeletClient:     fakeKubeletClient{},
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
@@ -160,11 +161,15 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
-	controllerManager := controller.NewReplicationManager(cl)
+	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
 
 	// Prove that controllerManager's watch works by making it not sync until after this
 	// test is over. (Hopefully we don't take 10 minutes!)
 	controllerManager.Run(10 * time.Minute)
+
+	nodeResources := &api.NodeResources{}
+	minionController := minionControllerPkg.NewMinionController(nil, "", machineList, nodeResources, cl)
+	minionController.Run(10 * time.Second)
 
 	// Kubelet (localhost)
 	os.MkdirAll(testRootDir, 0750)
