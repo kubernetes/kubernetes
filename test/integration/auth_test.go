@@ -32,31 +32,42 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+
+	"github.com/golang/glog"
 )
 
 func init() {
 	requireEtcd()
 }
 
+const (
+	AliceToken   string = "abc123" // username: alice.  Present in token file.
+	BobToken     string = "xyz987" // username: bob.  Present in token file.
+	UnknownToken string = "qwerty" // Not present in token file.
+	// Keep file in sync with above constants.
+	TokenfileCSV string = `
+abc123,alice,1
+xyz987,bob,2
+`
+)
+
+func writeTestTokenFile() string {
+	// Write a token file.
+	f, err := ioutil.TempFile("", "auth_integration_test")
+	f.Close()
+	if err != nil {
+		glog.Fatalf("unexpected error: %v", err)
+	}
+	if err := ioutil.WriteFile(f.Name(), []byte(TokenfileCSV), 0700); err != nil {
+		glog.Fatalf("unexpected error writing tokenfile: %v", err)
+	}
+	return f.Name()
+}
+
 // TestWhoAmI passes a known Bearer Token to the master's /_whoami endpoint and checks that
 // the master authenticates the user.
 func TestWhoAmI(t *testing.T) {
 	deleteAllEtcdKeys()
-
-	// Write a token file.
-	json := `
-abc123,alice,1
-xyz987,bob,2
-`
-	f, err := ioutil.TempFile("", "auth_integration_test")
-	f.Close()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(json), 0700); err != nil {
-		t.Fatalf("unexpected error writing tokenfile: %v", err)
-	}
 
 	// Set up a master
 
@@ -65,12 +76,14 @@ xyz987,bob,2
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		TokenAuthFile:     f.Name(),
+		TokenAuthFile:     tokenFilename,
 		AuthorizationMode: "AlwaysAllow",
 	})
 
@@ -86,8 +99,8 @@ xyz987,bob,2
 		expected string
 		succeeds bool
 	}{
-		{"Valid token", "abc123", "AUTHENTICATED AS alice", true},
-		{"Unknown token", "456jkl", "", false},
+		{"Valid token", AliceToken, "AUTHENTICATED AS alice", true},
+		{"Unknown token", UnknownToken, "", false},
 		{"No token", "", "", false},
 	}
 	for _, tc := range testCases {
@@ -96,27 +109,29 @@ xyz987,bob,2
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.token))
-
-		resp, err := transport.RoundTrip(req)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		if tc.succeeds {
-			body, err := ioutil.ReadAll(resp.Body)
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			actual := string(body)
-			if tc.expected != actual {
-				t.Errorf("case: %s expected: %v got: %v", tc.name, tc.expected, actual)
-			}
-		} else {
-			if resp.StatusCode != http.StatusUnauthorized {
-				t.Errorf("case: %s expected Unauthorized, got: %v", tc.name, resp.StatusCode)
-			}
+			if tc.succeeds {
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
 
+				actual := string(body)
+				if tc.expected != actual {
+					t.Errorf("case: %s expected: %v got: %v", tc.name, tc.expected, actual)
+				}
+			} else {
+				if resp.StatusCode != http.StatusUnauthorized {
+					t.Errorf("case: %s expected Unauthorized, got: %v", tc.name, resp.StatusCode)
+				}
+
+			}
 		}
 	}
 }
@@ -181,15 +196,16 @@ var aMinion string = `
 
 var aEvent string = `
 {
-  "kind": "Binding",
+  "kind": "Event",
   "apiVersion": "v1beta1",
   "id": "a",
   "involvedObject": {
     {
       "kind": "Minion",
-      "name": "a"
+      "name": "a",
       "apiVersion": "v1beta1",
     }
+  }
 }
 `
 
@@ -215,113 +231,116 @@ var aEndpoints string = `
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
 
+var code200or202 = map[int]bool{200: true, 202: true} // Unpredicatable which will be returned.
+var code404 = map[int]bool{404: true}
+var code409 = map[int]bool{409: true}
+var code422 = map[int]bool{422: true}
+var code500 = map[int]bool{500: true}
+
 func getTestRequests() []struct {
-	verb string
-	URL  string
-	body string
+	verb        string
+	URL         string
+	body        string
+	statusCodes map[int]bool // allowed status codes.
 } {
 	requests := []struct {
-		verb string
-		URL  string
-		body string
+		verb        string
+		URL         string
+		body        string
+		statusCodes map[int]bool // Set of expected resp.StatusCode if all goes well.
 	}{
 		// Normal methods on pods
-		{"GET", "/api/v1beta1/pods", ""},
-		{"GET", "/api/v1beta1/pods/a", ""},
-		{"POST", "/api/v1beta1/pods", aPod},
-		{"PUT", "/api/v1beta1/pods", aPod},
-		{"GET", "/api/v1beta1/pods", ""},
-		{"GET", "/api/v1beta1/pods/a", ""},
-		{"DELETE", "/api/v1beta1/pods", ""},
+		{"GET", "/api/v1beta1/pods", "", code200or202},
+		{"POST", "/api/v1beta1/pods", aPod, code200or202},
+		{"PUT", "/api/v1beta1/pods/a", aPod, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/pods", "", code200or202},
+		{"GET", "/api/v1beta1/pods/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/pods/a", "", code200or202},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"PATCH", "/api/v1beta1/pods/a", ""},
-		{"OPTIONS", "/api/v1beta1/pods", ""},
-		{"OPTIONS", "/api/v1beta1/pods/a", ""},
-		{"HEAD", "/api/v1beta1/pods", ""},
-		{"HEAD", "/api/v1beta1/pods/a", ""},
-		{"TRACE", "/api/v1beta1/pods", ""},
-		{"TRACE", "/api/v1beta1/pods/a", ""},
-		{"NOSUCHVERB", "/api/v1beta1/pods", ""},
+		{"PATCH", "/api/v1beta1/pods/a", "", code404},
+		{"OPTIONS", "/api/v1beta1/pods", "", code404},
+		{"OPTIONS", "/api/v1beta1/pods/a", "", code404},
+		{"HEAD", "/api/v1beta1/pods", "", code404},
+		{"HEAD", "/api/v1beta1/pods/a", "", code404},
+		{"TRACE", "/api/v1beta1/pods", "", code404},
+		{"TRACE", "/api/v1beta1/pods/a", "", code404},
+		{"NOSUCHVERB", "/api/v1beta1/pods", "", code404},
 
 		// Normal methods on services
-		{"GET", "/api/v1beta1/services", ""},
-		{"GET", "/api/v1beta1/services/a", ""},
-		{"POST", "/api/v1beta1/services", aService},
-		{"PUT", "/api/v1beta1/services", aService},
-		{"GET", "/api/v1beta1/services", ""},
-		{"GET", "/api/v1beta1/services/a", ""},
-		{"DELETE", "/api/v1beta1/services", ""},
+		{"GET", "/api/v1beta1/services", "", code200or202},
+		{"POST", "/api/v1beta1/services", aService, code200or202},
+		{"PUT", "/api/v1beta1/services/a", aService, code422}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"GET", "/api/v1beta1/services", "", code200or202},
+		{"GET", "/api/v1beta1/services/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/services/a", "", code200or202},
 
 		// Normal methods on replicationControllers
-		{"GET", "/api/v1beta1/replicationControllers", ""},
-		{"GET", "/api/v1beta1/replicationControllers/a", ""},
-		{"POST", "/api/v1beta1/replicationControllers", aRC},
-		{"PUT", "/api/v1beta1/replicationControllers", aRC},
-		{"GET", "/api/v1beta1/replicationControllers", ""},
-		{"GET", "/api/v1beta1/replicationControllers/a", ""},
-		{"DELETE", "/api/v1beta1/replicationControllers", ""},
+		{"GET", "/api/v1beta1/replicationControllers", "", code200or202},
+		{"POST", "/api/v1beta1/replicationControllers", aRC, code200or202},
+		{"PUT", "/api/v1beta1/replicationControllers/a", aRC, code409}, // See #2115 about why 409
+		{"GET", "/api/v1beta1/replicationControllers", "", code200or202},
+		{"GET", "/api/v1beta1/replicationControllers/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/replicationControllers/a", "", code200or202},
 
 		// Normal methods on endpoints
-		{"GET", "/api/v1beta1/endpoints", ""},
-		{"GET", "/api/v1beta1/endpoints/a", ""},
-		{"POST", "/api/v1beta1/endpoints", aEndpoints},
-		{"PUT", "/api/v1beta1/endpoints", aEndpoints},
-		{"GET", "/api/v1beta1/endpoints", ""},
-		{"GET", "/api/v1beta1/endpoints/a", ""},
-		{"DELETE", "/api/v1beta1/endpoints", ""},
+		{"GET", "/api/v1beta1/endpoints", "", code200or202},
+		{"POST", "/api/v1beta1/endpoints", aEndpoints, code200or202},
+		{"PUT", "/api/v1beta1/endpoints/a", aEndpoints, code200or202},
+		{"GET", "/api/v1beta1/endpoints", "", code200or202},
+		{"GET", "/api/v1beta1/endpoints/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/endpoints/a", "", code500}, // Issue #2113.
 
 		// Normal methods on minions
-		{"GET", "/api/v1beta1/minions", ""},
-		{"GET", "/api/v1beta1/minions/a", ""},
-		{"POST", "/api/v1beta1/minions", aMinion},
-		{"PUT", "/api/v1beta1/minions", aMinion},
-		{"GET", "/api/v1beta1/minions", ""},
-		{"GET", "/api/v1beta1/minions/a", ""},
-		{"DELETE", "/api/v1beta1/minions", ""},
+		{"GET", "/api/v1beta1/minions", "", code200or202},
+		{"POST", "/api/v1beta1/minions", aMinion, code200or202},
+		{"PUT", "/api/v1beta1/minions/a", aMinion, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/minions", "", code200or202},
+		{"GET", "/api/v1beta1/minions/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/minions/a", "", code200or202},
 
 		// Normal methods on events
-		{"GET", "/api/v1beta1/events", ""},
-		{"GET", "/api/v1beta1/events/a", ""},
-		{"POST", "/api/v1beta1/events", aEvent},
-		{"PUT", "/api/v1beta1/events", aEvent},
-		{"GET", "/api/v1beta1/events", ""},
-		{"GET", "/api/v1beta1/events/a", ""},
-		{"DELETE", "/api/v1beta1/events", ""},
+		{"GET", "/api/v1beta1/events", "", code200or202},
+		{"POST", "/api/v1beta1/events", aEvent, code200or202},
+		{"PUT", "/api/v1beta1/events/a", aEvent, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/events", "", code200or202},
+		{"GET", "/api/v1beta1/events", "", code200or202},
+		{"GET", "/api/v1beta1/events/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/events/a", "", code200or202},
 
 		// Normal methods on bindings
-		{"GET", "/api/v1beta1/events", ""},
-		{"GET", "/api/v1beta1/events/a", ""},
-		{"POST", "/api/v1beta1/events", aBinding},
-		{"PUT", "/api/v1beta1/events", aBinding},
-		{"GET", "/api/v1beta1/events", ""},
-		{"GET", "/api/v1beta1/events/a", ""},
-		{"DELETE", "/api/v1beta1/events", ""},
+		{"GET", "/api/v1beta1/bindings", "", code404},     // Bindings are write-only, so 404
+		{"POST", "/api/v1beta1/pods", aPod, code200or202}, // Need a pod to bind or you get a 404
+		{"POST", "/api/v1beta1/bindings", aBinding, code200or202},
+		{"PUT", "/api/v1beta1/bindings/a", aBinding, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/bindings", "", code404},
+		{"GET", "/api/v1beta1/bindings/a", "", code404},
+		{"DELETE", "/api/v1beta1/bindings/a", "", code404},
 
 		// Non-existent object type.
-		{"GET", "/api/v1beta1/foo", ""},
-		{"GET", "/api/v1beta1/foo/a", ""},
-		{"POST", "/api/v1beta1/foo", `{"foo": "foo"}`},
-		{"PUT", "/api/v1beta1/foo", `{"foo": "foo"}`},
-		{"GET", "/api/v1beta1/foo", ""},
-		{"GET", "/api/v1beta1/foo/a", ""},
-		{"DELETE", "/api/v1beta1/foo", ""},
+		{"GET", "/api/v1beta1/foo", "", code404},
+		{"POST", "/api/v1beta1/foo", `{"foo": "foo"}`, code404},
+		{"PUT", "/api/v1beta1/foo/a", `{"foo": "foo"}`, code404},
+		{"GET", "/api/v1beta1/foo", "", code404},
+		{"GET", "/api/v1beta1/foo/a", "", code404},
+		{"DELETE", "/api/v1beta1/foo", "", code404},
 
 		// Operations
-		{"GET", "/api/v1beta1/operations", ""},
-		{"GET", "/api/v1beta1/operations/1234567890", ""},
+		{"GET", "/api/v1beta1/operations", "", code200or202},
+		{"GET", "/api/v1beta1/operations/1234567890", "", code404},
 
 		// Special verbs on pods
-		{"GET", "/api/v1beta1/proxy/pods/a", ""},
-		{"GET", "/api/v1beta1/redirect/pods/a", ""},
+		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},
+		{"GET", "/api/v1beta1/redirect/minions/a", "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
+		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
-		{"GET", "/", ""},
-		{"GET", "/healthz", ""},
-		{"GET", "/versions", ""},
+		{"GET", "/", "", code200or202},
+		{"GET", "/healthz", "", code200or202},
+		{"GET", "/version", "", code200or202},
 	}
 	return requests
 }
@@ -361,12 +380,17 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := transport.RoundTrip(req)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode == http.StatusForbidden {
-			t.Errorf("Expected status other than Forbidden")
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
+			}
 		}
 	}
 }
@@ -400,13 +424,15 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-
-		resp, err := transport.RoundTrip(req)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusForbidden {
-			t.Errorf("Expected status Forbidden but got status %v", resp.Status)
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resp.StatusCode != http.StatusForbidden {
+				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
+			}
 		}
 	}
 }
