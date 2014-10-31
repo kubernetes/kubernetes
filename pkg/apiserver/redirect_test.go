@@ -33,6 +33,7 @@ func TestRedirect(t *testing.T) {
 		"foo": simpleStorage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	dontFollow := errors.New("don't follow")
 	client := http.Client{

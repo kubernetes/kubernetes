@@ -46,6 +46,7 @@ func TestHealthChecker(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(tt.status)
 		}))
+		defer ts.Close()
 		u, err := url.Parse(ts.URL)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -114,6 +115,7 @@ func TestMuxHealthChecker(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
+		defer ts.Close()
 		u, err := url.Parse(ts.URL)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)

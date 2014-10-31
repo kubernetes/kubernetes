@@ -52,6 +52,7 @@ func TestWatchWebsocket(t *testing.T) {
 		"foo": simpleStorage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
@@ -98,6 +99,7 @@ func TestWatchHTTP(t *testing.T) {
 		"foo": simpleStorage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
@@ -151,6 +153,7 @@ func TestWatchParamParsing(t *testing.T) {
 		"foo": simpleStorage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Path = "/prefix/version/watch/foo"
@@ -222,6 +225,8 @@ func TestWatchProtocolSelection(t *testing.T) {
 		"foo": simpleStorage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
+	defer server.CloseClientConnections()
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)

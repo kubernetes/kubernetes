@@ -43,6 +43,7 @@ func TestHTTPKubeletClient(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 
 	hostURL, err := url.Parse(testServer.URL)
 	if err != nil {
@@ -85,6 +86,7 @@ func TestHTTPKubeletClientNotFound(t *testing.T) {
 		ResponseBody: "Pod not found",
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 
 	hostURL, err := url.Parse(testServer.URL)
 	if err != nil {

@@ -156,6 +156,7 @@ func TestProxy(t *testing.T) {
 			}
 			fmt.Fprint(w, item.respBody)
 		}))
+		defer proxyServer.Close()
 
 		simpleStorage := &SimpleRESTStorage{
 			errors:                    map[string]error{},
@@ -166,6 +167,7 @@ func TestProxy(t *testing.T) {
 			"foo": simpleStorage,
 		}, codec, "/prefix/version", selfLinker)
 		server := httptest.NewServer(handler)
+		defer server.Close()
 
 		req, err := http.NewRequest(
 			item.method,

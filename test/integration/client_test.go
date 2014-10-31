@@ -47,6 +47,7 @@ func TestClient(t *testing.T) {
 	})
 
 	s := httptest.NewServer(m.Handler)
+	defer s.Close()
 
 	testCases := []string{
 		"v1beta1",

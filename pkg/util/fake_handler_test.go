@@ -26,6 +26,7 @@ import (
 func TestFakeHandlerPath(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	method := "GET"
 	path := "/foo/bar"
 	body := "somebody"
@@ -47,6 +48,7 @@ func TestFakeHandlerPath(t *testing.T) {
 func TestFakeHandlerPathNoBody(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	method := "GET"
 	path := "/foo/bar"
 
@@ -77,6 +79,7 @@ func (f *fakeError) Logf(format string, args ...interface{}) {}
 func TestFakeHandlerWrongPath(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	method := "GET"
 	path := "/foo/bar"
 	fakeT := fakeError{}
@@ -101,6 +104,7 @@ func TestFakeHandlerWrongPath(t *testing.T) {
 func TestFakeHandlerWrongMethod(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	method := "GET"
 	path := "/foo/bar"
 	fakeT := fakeError{}
@@ -125,6 +129,7 @@ func TestFakeHandlerWrongMethod(t *testing.T) {
 func TestFakeHandlerWrongBody(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	method := "GET"
 	path := "/foo/bar"
 	body := "somebody"
@@ -151,6 +156,7 @@ func TestFakeHandlerWrongBody(t *testing.T) {
 func TestFakeHandlerNilBody(t *testing.T) {
 	handler := FakeHandler{}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	method := "GET"
 	path := "/foo/bar"
 	body := "somebody"

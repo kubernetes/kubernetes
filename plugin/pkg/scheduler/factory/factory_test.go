@@ -40,6 +40,7 @@ func TestCreate(t *testing.T) {
 		T:            t,
 	}
 	server := httptest.NewServer(&handler)
+	defer server.Close()
 	client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 	factory := ConfigFactory{client}
 	factory.Create()
@@ -75,6 +76,7 @@ func TestCreateLists(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
+		defer server.Close()
 		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		// This test merely tests that the correct request is made.
 		item.factory().List()
@@ -132,6 +134,7 @@ func TestCreateWatches(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
+		defer server.Close()
 		factory.Client = client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		// This test merely tests that the correct request is made.
 		item.factory().Watch(item.rv)
@@ -162,6 +165,7 @@ func TestPollMinions(t *testing.T) {
 		// FakeHandler musn't be sent requests other than the one you want to test.
 		mux.Handle("/api/"+testapi.Version()+"/minions", &handler)
 		server := httptest.NewServer(mux)
+		defer server.Close()
 		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		cf := ConfigFactory{client}
 
@@ -189,6 +193,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	// FakeHandler musn't be sent requests other than the one you want to test.
 	mux.Handle("/api/"+testapi.Version()+"/pods/foo", &handler)
 	server := httptest.NewServer(mux)
+	defer server.Close()
 	factory := ConfigFactory{client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})}
 	queue := cache.NewFIFO()
 	podBackoff := podBackoff{
@@ -312,6 +317,7 @@ func TestBind(t *testing.T) {
 			T:            t,
 		}
 		server := httptest.NewServer(&handler)
+		defer server.Close()
 		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
 		b := binder{client}
 
