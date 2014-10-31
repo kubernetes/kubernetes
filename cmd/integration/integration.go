@@ -269,6 +269,63 @@ func runAPIVersionsTest(c *client.Client) {
 	glog.Infof("Version test passed")
 }
 
+func runSelfLinkTest(c *client.Client) {
+	var svc api.Service
+	err := c.Post().Path("services").Body(
+		&api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: "selflinktest",
+				Labels: map[string]string{
+					"name": "selflinktest",
+				},
+			},
+			Port: 12345,
+			// This is here because validation requires it.
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+		},
+	).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed creating selflinktest service: %v", err)
+	}
+	err = c.Get().AbsPath(svc.SelfLink).Do().Into(&svc)
+	if err != nil {
+		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
+	}
+
+	var svcList api.ServiceList
+	err = c.Get().Path("services").Do().Into(&svcList)
+	if err != nil {
+		glog.Fatalf("Failed listing services: %v", err)
+	}
+
+	err = c.Get().AbsPath(svcList.SelfLink).Do().Into(&svcList)
+	if err != nil {
+		glog.Fatalf("Failed listing services with supplied self link '%v': %v", svcList.SelfLink, err)
+	}
+
+	found := false
+	for i := range svcList.Items {
+		item := &svcList.Items[i]
+		if item.Name != "selflinktest" {
+			continue
+		}
+		found = true
+		err = c.Get().AbsPath(item.SelfLink).Do().Into(&svc)
+		if err != nil {
+			glog.Fatalf("Failed listing service with supplied self link '%v': %v", item.SelfLink, err)
+		}
+		break
+	}
+	if !found {
+		glog.Fatalf("never found selflinktest service")
+	}
+	glog.Infof("Self link test passed")
+
+	// TODO: Should test PUT at some point, too.
+}
+
 func runAtomicPutTest(c *client.Client) {
 	var svc api.Service
 	err := c.Post().Path("services").Body(
@@ -507,6 +564,7 @@ func main() {
 		runServiceTest,
 		runAPIVersionsTest,
 		runMasterServiceTest,
+		runSelfLinkTest,
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
