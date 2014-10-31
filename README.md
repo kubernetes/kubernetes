@@ -49,6 +49,7 @@ Check out examples of Kubernetes in action, and community projects in the larger
 * [Cluster monitoring with heapster and cAdvisor](https://github.com/GoogleCloudPlatform/heapster)
 * [Community projects](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Kubernetes-Community)
 * [Development guide](docs/devel/development.md)
+* [User contributed recipes](contrib/recipes)
 
 Or fork and start hacking!
 
