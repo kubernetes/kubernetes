@@ -82,6 +82,7 @@ func TestTcpHealthChecker(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
+	defer server.Close()
 	u, err := url.Parse(server.URL)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

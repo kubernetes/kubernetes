@@ -206,6 +206,7 @@ func TestNotFound(t *testing.T) {
 		"foo": &SimpleRESTStorage{},
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 	for k, v := range cases {
 		request, err := http.NewRequest(v.Method, server.URL+v.Path, nil)
@@ -227,6 +228,7 @@ func TestNotFound(t *testing.T) {
 func TestVersion(t *testing.T) {
 	handler := Handle(map[string]RESTStorage{}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	request, err := http.NewRequest("GET", server.URL+"/version", nil)
@@ -260,6 +262,7 @@ func TestSimpleList(t *testing.T) {
 	}
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
 	if err != nil {
@@ -282,6 +285,7 @@ func TestErrorList(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
 	if err != nil {
@@ -306,6 +310,7 @@ func TestNonEmptyList(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple")
 	if err != nil {
@@ -347,6 +352,7 @@ func TestGet(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
 	var itemOut Simple
@@ -371,6 +377,7 @@ func TestGetMissing(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/prefix/version/simple/id")
 	if err != nil {
@@ -389,6 +396,7 @@ func TestDelete(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
@@ -411,6 +419,7 @@ func TestDeleteMissing(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/prefix/version/simple/"+ID, nil)
@@ -435,6 +444,7 @@ func TestUpdate(t *testing.T) {
 	}
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	item := &Simple{
 		Other: "bar",
@@ -468,6 +478,7 @@ func TestUpdateMissing(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := Handle(storage, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	item := &Simple{
 		Other: "bar",
@@ -496,6 +507,7 @@ func TestCreate(t *testing.T) {
 	}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	simple := &Simple{
@@ -536,6 +548,7 @@ func TestCreateNotFound(t *testing.T) {
 		},
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	simple := &Simple{Other: "foo"}
@@ -600,6 +613,7 @@ func TestSyncCreate(t *testing.T) {
 		"foo": &storage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	simple := &Simple{
@@ -673,6 +687,7 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = time.Millisecond / 2
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	status := expectApiStatus(t, "DELETE", fmt.Sprintf("%s/prefix/version/foo/bar", server.URL), nil, http.StatusConflict)
 	if status.Status != api.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != api.StatusReasonAlreadyExists {
@@ -696,6 +711,7 @@ func TestAsyncCreateError(t *testing.T) {
 	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	simple := &Simple{Other: "bar"}
 	data, _ := codec.Encode(simple)
@@ -746,6 +762,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		writeJSON(http.StatusOK, latest.Codec, &UnregisteredAPIObject{"Undecodable"}, w)
 	}))
+	defer server.Close()
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != api.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
@@ -767,6 +784,7 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		writeRawJSON(http.StatusOK, &marshalError{errors.New("Undecodable")}, w)
 	}))
+	defer server.Close()
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
 	if err != nil {
@@ -792,6 +810,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 		"foo": &storage,
 	}, codec, "/prefix/version", selfLinker)
 	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	simple := &Simple{Other: "foo"}
 	data, _ := codec.Encode(simple)
@@ -825,6 +844,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			allowedOriginRegexps, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)
+		defer server.Close()
 		client := http.Client{}
 
 		request, err := http.NewRequest("GET", server.URL+"/version", nil)

@@ -37,6 +37,7 @@ func TestRateLimit(t *testing.T) {
 				}
 			},
 		)))
+		defer server.Close()
 		http.Get(server.URL)
 	}
 }
@@ -49,6 +50,7 @@ func TestReadOnly(t *testing.T) {
 			}
 		},
 	)))
+	defer server.Close()
 	for _, verb := range []string{"GET", "POST", "PUT", "DELETE", "CREATE"} {
 		req, err := http.NewRequest(verb, server.URL, nil)
 		if err != nil {

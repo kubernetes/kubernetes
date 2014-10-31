@@ -105,6 +105,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
+		defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := SourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err == nil {
@@ -171,6 +172,7 @@ func TestExtractFromHTTP(t *testing.T) {
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
+		defer testServer.Close()
 		ch := make(chan interface{}, 1)
 		c := SourceURL{testServer.URL, ch, nil}
 		if err := c.extractFromURL(); err != nil {

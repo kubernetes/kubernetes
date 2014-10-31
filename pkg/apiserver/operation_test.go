@@ -116,6 +116,7 @@ func TestOperationsList(t *testing.T) {
 	}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	simple := &Simple{
@@ -172,6 +173,7 @@ func TestOpGet(t *testing.T) {
 	}, codec, "/prefix/version", selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
+	defer server.Close()
 	client := http.Client{}
 
 	simple := &Simple{

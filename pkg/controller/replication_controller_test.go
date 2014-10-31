@@ -113,6 +113,7 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
@@ -133,6 +134,7 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
@@ -153,6 +155,7 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	fakePodControl := FakePodControl{}
@@ -174,6 +177,7 @@ func TestCreateReplica(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 
 	podControl := RealPodControl{
@@ -306,6 +310,7 @@ func TestSynchonize(t *testing.T) {
 		t.Errorf("Unexpected request for %v", req.RequestURI)
 	})
 	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	manager := NewReplicationManager(client)
 	fakePodControl := FakePodControl{}
