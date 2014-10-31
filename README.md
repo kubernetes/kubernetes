@@ -22,6 +22,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Digital Ocean](https://github.com/bketelsen/coreos-kubernetes-digitalocean)
   * [CoreOS](docs/getting-started-guides/coreos.md)
   * [OpenStack](https://developer.rackspace.com/blog/running-coreos-and-kubernetes/)
+  * [AWS](docs/getting-started-guides/aws.md)
   * [CloudStack](docs/getting-started-guides/cloudstack.md)
   * [Rackspace](docs/getting-started-guides/rackspace.md)
   * [vSphere](docs/getting-started-guides/vsphere.md)
@@ -30,6 +31,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Locally](docs/getting-started-guides/locally.md)
   * [Microsoft Azure](docs/getting-started-guides/azure.md)
 * [Kubernetes 101](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough)
+>>>>>>> upstream/master
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
 * [Kubernetes Client Libraries](docs/client-libraries.md)

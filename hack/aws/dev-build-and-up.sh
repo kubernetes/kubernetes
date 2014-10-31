@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'aws', 'azure', 'vagrant', 'local', 'vsphere'
+# This script will build a dev release and bring up a new cluster with that
+# release.
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+SCRIPT_DIR=$(CDPATH="" cd $(dirname $0); pwd)
+
+# First build a release
+$SCRIPT_DIR/../../release/aws/release.sh
+
+# Now bring a new cluster up with that release.
+$SCRIPT_DIR/../../cluster/aws/kube-up.sh

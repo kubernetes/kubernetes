@@ -14,10 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
+# Bring up a Kubernetes cluster.
 #
-# The valid values: 'gce', 'aws', 'azure', 'vagrant', 'local', 'vsphere'
+# If the full release name (s3://<bucket>/<release>) is passed in then we take
+# that directly.  If not then we assume we are doing development stuff and take
+# the defaults in the release config.
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+# exit on any error
+set -e
+
+source $(dirname $0)/../kube-env.sh
+source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
+
+echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
+
+verify-prereqs
+kube-up
+
+source $(dirname $0)/validate-cluster.sh
+
+echo "Done"
