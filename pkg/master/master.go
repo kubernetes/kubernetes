@@ -66,6 +66,7 @@ type Config struct {
 	APIPrefix             string
 	CorsAllowedOriginList util.StringList
 	TokenAuthFile         string
+	AuthorizationMode     string
 
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
@@ -101,6 +102,7 @@ type Master struct {
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
 	tokenAuthFile         string
+	authorizationzMode    string
 	masterCount           int
 
 	// "Outputs"
@@ -220,9 +222,11 @@ func New(c *Config) *Master {
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		tokenAuthFile:         c.TokenAuthFile,
-		masterCount:           c.MasterCount,
-		readOnlyServer:        net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
-		readWriteServer:       net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
+		authorizationzMode:    c.AuthorizationMode,
+
+		masterCount:     c.MasterCount,
+		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
+		readWriteServer: net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadWritePort))),
 	}
 	m.masterServices = util.NewRunner(m.serviceWriterLoop, m.roServiceWriterLoop)
 	m.init(c)
@@ -310,6 +314,14 @@ func (m *Master) init(c *Config) {
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
 
+	// Install Authorizer
+	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(m.authorizationzMode)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	handler = apiserver.WithAuthorizationCheck(handler, apiserver.BasicAttributeGetter, authorizer)
+
+	// Install Authenticator
 	if authenticator != nil {
 		handler = handlers.NewRequestAuthenticator(userContexts, authenticator, handlers.Unauthorized, handler)
 	}

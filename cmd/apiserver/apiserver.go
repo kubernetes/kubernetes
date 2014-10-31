@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -63,6 +64,7 @@ var (
 	healthCheckMinions    = flag.Bool("health_check_minions", true, "If true, health check minions and filter unhealthy ones. Default true.")
 	eventTTL              = flag.Duration("event_ttl", 48*time.Hour, "Amount of time to retain events. Default 2 days.")
 	tokenAuthFile         = flag.String("token_auth_file", "", "If set, the file that will be used to secure the API server via token authentication.")
+	authorizationMode     = flag.String("authorization_mode", "AlwaysAllow", "Selects how to do authorization.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	etcdServerList        util.StringList
 	etcdConfigFile        = flag.String("etcd_config", "", "The config file for the etcd client. Mutually exclusive with -etcd_servers.")
 	corsAllowedOriginList util.StringList
@@ -159,6 +161,7 @@ func main() {
 		ReadOnlyPort:          *readOnlyPort,
 		ReadWritePort:         *port,
 		PublicAddress:         *publicAddressOverride,
+		AuthorizationMode:     *authorizationMode,
 	}
 	m := master.New(config)
 

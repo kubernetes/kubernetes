@@ -41,7 +41,7 @@ start_etcd
 echo ""
 echo "Integration test cases..."
 echo ""
-GOFLAGS="-tags 'integration no-docker'" \
+GOFLAGS="-tags 'integration no-docker' -test.v" \
   "${KUBE_ROOT}/hack/test-go.sh" test/integration
 
 echo ""
