@@ -197,7 +197,6 @@ func main() {
 	}
 
 	n := net.IPNet(portalNet)
-	mux := http.NewServeMux()
 	config := &master.Config{
 		Client:             client,
 		Cloud:              cloud,
@@ -215,7 +214,6 @@ func main() {
 			},
 		},
 		PortalNet:             &n,
-		Mux:                   mux,
 		EnableLogsSupport:     *enableLogsSupport,
 		EnableUISupport:       true,
 		APIPrefix:             *apiPrefix,
