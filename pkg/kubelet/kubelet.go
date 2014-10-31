@@ -755,6 +755,28 @@ func (kl *Kubelet) SyncPods(pods []api.BoundPod) error {
 	return err
 }
 
+func updateBoundPods(changed []api.BoundPod, current []api.BoundPod) []api.BoundPod {
+	updated := []api.BoundPod{}
+	m := map[string]*api.BoundPod{}
+	for i := range changed {
+		pod := &changed[i]
+		m[pod.UID] = pod
+	}
+
+	for i := range current {
+		pod := &current[i]
+		if m[pod.UID] != nil {
+			updated = append(updated, *m[pod.UID])
+			glog.V(4).Infof("pod with UID: %s has a new spec %+v", pod.UID, *m[pod.UID])
+		} else {
+			updated = append(updated, *pod)
+			glog.V(4).Infof("pod with UID: %s stay with the same spec %+v", pod.UID, *pod)
+		}
+	}
+
+	return updated
+}
+
 // filterHostPortConflicts removes pods that conflict on Port.HostPort values
 func filterHostPortConflicts(pods []api.BoundPod) []api.BoundPod {
 	filtered := []api.BoundPod{}
@@ -782,9 +804,13 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		select {
 		case u := <-updates:
 			switch u.Op {
-			case SET, UPDATE:
-				glog.V(3).Infof("Containers changed")
+			case SET:
+				glog.V(3).Infof("SET: Containers changed")
 				kl.pods = u.Pods
+				kl.pods = filterHostPortConflicts(kl.pods)
+			case UPDATE:
+				glog.V(3).Infof("Update: Containers changed")
+				kl.pods = updateBoundPods(u.Pods, kl.pods)
 				kl.pods = filterHostPortConflicts(kl.pods)
 
 			default:
