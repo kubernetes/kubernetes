@@ -532,7 +532,7 @@ type BoundPod struct {
 // the pod list is guaranteed to only change when the list of bound pods changes.
 type BoundPods struct {
 	TypeMeta `json:",inline" yaml:",inline"`
-	Metadata ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Metadata ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Host is the name of a node that these pods were bound to.
 	Host string `json:"host" yaml:"host"`
