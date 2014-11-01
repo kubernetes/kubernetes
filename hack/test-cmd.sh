@@ -69,6 +69,7 @@ wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
 # Start apiserver
 ${GO_OUT}/apiserver \
   --address="127.0.0.1" \
+  --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --kubelet_port=${KUBELET_PORT} \
