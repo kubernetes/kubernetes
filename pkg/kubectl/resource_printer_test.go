@@ -54,9 +54,14 @@ func TestJSONPrinter(t *testing.T) {
 
 func TestPrintJSON(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	if err := Print(buf, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, "json", "", nil); err != nil {
+	printer, versioned, err := GetPrinter("json", "", nil)
+	if err != nil {
 		t.Errorf("unexpected error: %#v", err)
 	}
+	if !versioned {
+		t.Errorf("printer should be versioned")
+	}
+	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
 	obj := map[string]interface{}{}
 	if err := json.Unmarshal(buf.Bytes(), &obj); err != nil {
 		t.Errorf("unexpected error: %#v\n%s", err, buf.String())
@@ -65,9 +70,14 @@ func TestPrintJSON(t *testing.T) {
 
 func TestPrintYAML(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	if err := Print(buf, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, "yaml", "", nil); err != nil {
+	printer, versioned, err := GetPrinter("yaml", "", nil)
+	if err != nil {
 		t.Errorf("unexpected error: %#v", err)
 	}
+	if !versioned {
+		t.Errorf("printer should be versioned")
+	}
+	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
 	obj := map[string]interface{}{}
 	if err := yaml.Unmarshal(buf.Bytes(), &obj); err != nil {
 		t.Errorf("unexpected error: %#v\n%s", err, buf.String())
@@ -76,31 +86,33 @@ func TestPrintYAML(t *testing.T) {
 
 func TestPrintTemplate(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	if err := Print(buf, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, "template", "{{ .Name }}", nil); err != nil {
+	printer, versioned, err := GetPrinter("template", "{{ .Name }}", nil)
+	if err != nil {
 		t.Errorf("unexpected error: %#v", err)
 	}
+	if !versioned {
+		t.Errorf("printer should be versioned")
+	}
+	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
 	if buf.String() != "foo" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
 func TestPrintEmptyTemplate(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	if err := Print(buf, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, "template", "", nil); err == nil {
+	if _, _, err := GetPrinter("template", "", nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplate(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	if err := Print(buf, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, "template", "{{ .Name", nil); err == nil {
+	if _, _, err := GetPrinter("template", "{{ .Name", nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplateFile(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	if err := Print(buf, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, "templatefile", "", nil); err == nil {
+	if _, _, err := GetPrinter("templatefile", "", nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }

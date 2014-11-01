@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -33,7 +34,8 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 Possible resources include pods (po), replication controllers (rc), services
 (se) or minions (mi).
 
-If you specify a Go template, you can use any field defined in pkg/api/types.go.
+If you specify a Go template, you can use any fields defined for the API version
+you are connecting to the server with.
 
 Examples:
   $ kubectl get pods
@@ -54,16 +56,27 @@ Examples:
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			obj, err := kubectl.NewRESTHelper(client, mapping).Get(namespace, name, labels)
-			checkErr(err)
-
 			outputFormat := getFlagString(cmd, "output")
 			templateFile := getFlagString(cmd, "template")
 			defaultPrinter, err := f.Printer(cmd, mapping, getFlagBool(cmd, "no-headers"))
 			checkErr(err)
 
-			err = kubectl.Print(out, obj, outputFormat, templateFile, defaultPrinter)
+			printer, versioned, err := kubectl.GetPrinter(outputFormat, templateFile, defaultPrinter)
 			checkErr(err)
+
+			obj, err := kubectl.NewRESTHelper(client, mapping).Get(namespace, name, labels)
+			checkErr(err)
+
+			if versioned {
+				// TODO Add an --output-version lock which can ensure that regardless of the
+				// server version, the client output stays the same.
+				obj, err = mapping.ObjectConvertor.ConvertToVersion(obj, mapping.APIVersion)
+				checkErr(err)
+			}
+
+			if err := printer.PrintObj(obj, out); err != nil {
+				checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
+			}
 		},
 	}
 	cmd.Flags().StringP("output", "o", "", "Output format: json|yaml|template|templatefile")

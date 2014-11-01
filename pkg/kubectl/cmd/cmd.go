@@ -84,7 +84,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.PersistentFlags().StringP("server", "s", "", "Kubernetes apiserver to connect to")
 	cmds.PersistentFlags().StringP("auth-path", "a", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
 	cmds.PersistentFlags().Bool("match-server-version", false, "Require server version to match client version")
-	cmds.PersistentFlags().String("api-version", latest.Version, "The version of the API to use against the server (used for viewing resources only)")
+	cmds.PersistentFlags().String("api-version", latest.Version, "The version of the API to use against the server")
 	cmds.PersistentFlags().String("certificate-authority", "", "Path to a certificate file for the certificate authority")
 	cmds.PersistentFlags().String("client-certificate", "", "Path to a client certificate for TLS.")
 	cmds.PersistentFlags().String("client-key", "", "Path to a client key file for TLS.")
