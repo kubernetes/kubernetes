@@ -239,6 +239,8 @@ func (f *FakeEtcdClient) Delete(key string, recursive bool) (*etcd.Response, err
 		return nil, f.Err
 	}
 
+	f.Mutex.Lock()
+	defer f.Mutex.Unlock()
 	f.Data[key] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
