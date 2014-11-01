@@ -33,6 +33,11 @@ type Codec interface {
 	Encoder
 }
 
+// ObjectConvertor converts an object to a different version.
+type ObjectConvertor interface {
+	ConvertToVersion(in Object, outVersion string) (out Object, err error)
+}
+
 // ObjectTyper contains methods for extracting the APIVersion and Kind
 // of objects.
 type ObjectTyper interface {
