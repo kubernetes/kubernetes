@@ -52,9 +52,9 @@ APISERVER_LOG=/tmp/apiserver.log
   --address="${API_HOST}" \
   --port="${API_PORT}" \
   --etcd_servers="http://127.0.0.1:4001" \
-  --machines="127.0.0.1" \
   --portal_net="10.0.0.0/24" \
   --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
+  #--machines="127.0.0.1" \ removed
 APISERVER_PID=$!
 
 # Wait for apiserver to come up before launching the rest of the components.
