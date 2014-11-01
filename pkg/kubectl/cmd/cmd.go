@@ -196,6 +196,18 @@ func getKubeNamespace(cmd *cobra.Command) string {
 	return result
 }
 
+// getExplicitKubeNamespace returns the value of the namespace a
+// user explicitly provided on the command line, or false if no
+// such namespace was specified.
+func getExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
+	if ns := getFlagString(cmd, "namespace"); len(ns) > 0 {
+		return ns, true
+	}
+	// TODO: determine when --ns-path is set but equal to the default
+	// value and return its value and true.
+	return "", false
+}
+
 func getKubeConfig(cmd *cobra.Command) *client.Config {
 	config := &client.Config{}
 

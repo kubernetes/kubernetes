@@ -145,3 +145,14 @@ func ResourceFromFile(filename string, typer runtime.ObjectTyper, mapper meta.RE
 
 	return
 }
+
+// CompareNamespaceFromFile returns an error if the namespace the user has provided on the CLI
+// or via the default namespace file does not match the namespace of an input file. This
+// prevents a user from unintentionally updating the wrong namespace.
+func CompareNamespaceFromFile(cmd *cobra.Command, namespace string) error {
+	defaultNamespace := getKubeNamespace(cmd)
+	if defaultNamespace != namespace {
+		return fmt.Errorf("The namespace from the provided file %q does not match the namespace %q. You must pass '--namespace=%s' to perform this operation.", namespace, defaultNamespace, namespace)
+	}
+	return nil
+}
