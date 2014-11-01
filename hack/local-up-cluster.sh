@@ -147,6 +147,6 @@ cleanup()
     exit 0
 }
 
-trap cleanup EXIT
+trap cleanup EXIT SIGINT
 
 while true; do read x; done
