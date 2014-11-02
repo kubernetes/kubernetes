@@ -28,8 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-
-	"code.google.com/p/go-uuid/uuid"
 )
 
 // PodLister is anything that knows how to list pods.
@@ -64,7 +62,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 
 	if len(controller.Name) == 0 {
-		controller.Name = uuid.NewUUID().String()
+		controller.Name = util.NewUUID().String()
 	}
 	// Pod Manifest ID should be assigned by the pod API
 	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
