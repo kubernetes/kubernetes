@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -45,7 +46,7 @@ func TestClient(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		AuthorizationMode: "AlwaysAllow",
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
 
 	s := httptest.NewServer(m.Handler)

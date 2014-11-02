@@ -145,6 +145,12 @@ func main() {
 	}
 
 	n := net.IPNet(portalNet)
+
+	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(*authorizationMode)
+	if err != nil {
+		glog.Fatalf("Invalid Authorization Config: %v", err)
+	}
+
 	config := &master.Config{
 		Client:                client,
 		Cloud:                 cloud,
@@ -161,7 +167,7 @@ func main() {
 		ReadOnlyPort:          *readOnlyPort,
 		ReadWritePort:         *port,
 		PublicAddress:         *publicAddressOverride,
-		AuthorizationMode:     *authorizationMode,
+		Authorizer:            authorizer,
 	}
 	m := master.New(config)
 

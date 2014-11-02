@@ -67,8 +67,7 @@ type Config struct {
 	APIPrefix             string
 	CorsAllowedOriginList util.StringList
 	TokenAuthFile         string
-	AuthorizationMode     string
-	AuthorizerForTesting  authorizer.Authorizer
+	Authorizer            authorizer.Authorizer
 
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
@@ -104,7 +103,7 @@ type Master struct {
 	apiPrefix             string
 	corsAllowedOriginList util.StringList
 	tokenAuthFile         string
-	authorizationzMode    string
+	authorizer            authorizer.Authorizer
 	masterCount           int
 
 	// "Outputs"
@@ -227,7 +226,7 @@ func New(c *Config) *Master {
 		apiPrefix:             c.APIPrefix,
 		corsAllowedOriginList: c.CorsAllowedOriginList,
 		tokenAuthFile:         c.TokenAuthFile,
-		authorizationzMode:    c.AuthorizationMode,
+		authorizer:            c.Authorizer,
 
 		masterCount:     c.MasterCount,
 		readOnlyServer:  net.JoinHostPort(c.PublicAddress, strconv.Itoa(int(c.ReadOnlyPort))),
@@ -319,19 +318,8 @@ func (m *Master) init(c *Config) {
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
 
-	// Install Authorizer
-	var authorizer authorizer.Authorizer
-	if c.AuthorizerForTesting != nil {
-		authorizer = c.AuthorizerForTesting
-	} else {
-		var err error
-		authorizer, err = apiserver.NewAuthorizerFromAuthorizationConfig(m.authorizationzMode)
-		if err != nil {
-			glog.Fatal(err)
-		}
-	}
 	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts)
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, authorizer)
+	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
 	if authenticator != nil {

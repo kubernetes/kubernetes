@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	minionControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
@@ -146,7 +147,7 @@ func startComponents(manifestURL string) (apiServerURL string) {
 		KubeletClient:     fakeKubeletClient{},
 		EnableLogsSupport: false,
 		APIPrefix:         "/api",
-		AuthorizationMode: "AlwaysAllow",
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 
 		ReadWritePort: portNumber,
 		ReadOnlyPort:  portNumber,

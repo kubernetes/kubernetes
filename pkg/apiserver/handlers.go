@@ -30,10 +30,49 @@ import (
 	"github.com/golang/glog"
 )
 
+// specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
+// CRUDdy GET/POST/PUT/DELETE actions on REST objects.
+// TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
+// master's Mux.
+var specialVerbs = map[string]bool{
+	"proxy":    true,
+	"redirect": true,
+	"watch":    true,
+}
+
+// KindFromRequest returns Kind if Kind can be extracted from the request.  Otherwise, the empty string.
+func KindFromRequest(req http.Request) string {
+	// TODO: find a way to keep this code's assumptions about paths up to date with changes in the code.  Maybe instead
+	// of directly adding handler's code to the master's Mux, have a function which forces the structure when adding
+	// them.
+	parts := splitPath(req.URL.Path)
+	if len(parts) > 2 && parts[0] == "api" {
+		if _, ok := specialVerbs[parts[2]]; ok {
+			if len(parts) > 3 {
+				return parts[3]
+			}
+		} else {
+			return parts[2]
+		}
+	}
+	return ""
+}
+
+// IsReadOnlyReq() is true for any (or at least many) request which has no observable
+// side effects on state of apiserver (though there may be internal side effects like
+// caching and logging).
+func IsReadOnlyReq(req http.Request) bool {
+	if req.Method == "GET" {
+		// TODO: add OPTIONS and HEAD if we ever support those.
+		return true
+	}
+	return false
+}
+
 // ReadOnly passes all GET requests on to handler, and returns an error on all other requests.
 func ReadOnly(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == "GET" {
+		if IsReadOnlyReq(*req) {
 			handler.ServeHTTP(w, req)
 			return
 		}
@@ -142,6 +181,17 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	if ok {
 		attribs.User = user
 	}
+
+	attribs.ReadOnly = IsReadOnlyReq(*req)
+
+	// If a path follows the conventions of the REST object store, then
+	// we can extract the object Kind.  Otherwise, not.
+	attribs.Kind = KindFromRequest(*req)
+
+	// If the request specifies a namespace, then the namespace is filled in.
+	// Assumes there is no empty string namespace.  Unspecified results
+	// in empty (does not understand defaulting rules.)
+	attribs.Namespace = req.URL.Query().Get("namespace")
 
 	return &attribs
 }
