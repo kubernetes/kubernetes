@@ -68,9 +68,12 @@ Examples:
 			checkErr(err)
 
 			if versioned {
-				// TODO Add an --output-version lock which can ensure that regardless of the
-				// server version, the client output stays the same.
-				obj, err = mapping.ObjectConvertor.ConvertToVersion(obj, mapping.APIVersion)
+				outputVersion := getFlagString(cmd, "output-version")
+				if len(outputVersion) == 0 {
+					outputVersion = mapping.APIVersion
+				}
+
+				obj, err = mapping.ObjectConvertor.ConvertToVersion(obj, outputVersion)
 				checkErr(err)
 			}
 
@@ -80,6 +83,7 @@ Examples:
 		},
 	}
 	cmd.Flags().StringP("output", "o", "", "Output format: json|yaml|template|templatefile")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version)")
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers")
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when --output=template or --output=templatefile")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
