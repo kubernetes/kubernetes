@@ -53,8 +53,37 @@ func (m *RESTHelper) Delete(namespace, name string) error {
 	return m.RESTClient.Delete().Path(m.Resource).Namespace(namespace).Path(name).Do().Error()
 }
 
-func (m *RESTHelper) Create(namespace string, data []byte) error {
-	return m.RESTClient.Post().Path(m.Resource).Namespace(namespace).Body(data).Do().Error()
+func (m *RESTHelper) Create(namespace string, modify bool, data []byte) error {
+	if modify {
+		obj, err := m.Codec.Decode(data)
+		if err != nil {
+			// We don't know how to check a version on this object, but create it anyway
+			return createResource(m.RESTClient, m.Resource, namespace, data)
+		}
+
+		// Attempt to version the object based on client logic.
+		version, err := m.Versioner.ResourceVersion(obj)
+		if err != nil {
+			// We don't know how to clear the version on this object, so send it to the server as is
+			return createResource(m.RESTClient, m.Resource, namespace, data)
+		}
+		if version != "" {
+			if err := m.Versioner.SetResourceVersion(obj, ""); err != nil {
+				return err
+			}
+			newData, err := m.Codec.Encode(obj)
+			if err != nil {
+				return err
+			}
+			data = newData
+		}
+	}
+
+	return createResource(m.RESTClient, m.Resource, namespace, data)
+}
+
+func createResource(c RESTClient, resourcePath, namespace string, data []byte) error {
+	return c.Post().Path(resourcePath).Namespace(namespace).Body(data).Do().Error()
 }
 
 func (m *RESTHelper) Update(namespace, name string, overwrite bool, data []byte) error {

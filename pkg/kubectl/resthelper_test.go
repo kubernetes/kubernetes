@@ -133,14 +133,28 @@ func TestRESTHelperDelete(t *testing.T) {
 }
 
 func TestRESTHelperCreate(t *testing.T) {
-	tests := []struct {
-		Resp    *http.Response
-		HttpErr error
-		Object  runtime.Object
+	expectPost := func(req *http.Request) bool {
+		if req.Method != "POST" {
+			t.Errorf("unexpected method: %#v", req)
+			return false
+		}
+		if req.URL.Query().Get("namespace") != "bar" {
+			t.Errorf("url doesn't contain namespace: %#v", req)
+			return false
+		}
+		return true
+	}
 
-		Err  bool
-		Data []byte
-		Req  func(*http.Request) bool
+	tests := []struct {
+		Resp     *http.Response
+		RespFunc httpClientFunc
+		HttpErr  error
+		Modify   bool
+		Object   runtime.Object
+
+		ExpectObject runtime.Object
+		Err          bool
+		Req          func(*http.Request) bool
 	}{
 		{
 			HttpErr: errors.New("failure"),
@@ -158,48 +172,65 @@ func TestRESTHelperCreate(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body:       objBody(&api.Status{Status: api.StatusSuccess}),
 			},
-			Object: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
-			Req: func(req *http.Request) bool {
-				if req.Method != "POST" {
-					t.Errorf("unexpected method: %#v", req)
-					return false
-				}
-				if req.URL.Query().Get("namespace") != "bar" {
-					t.Errorf("url doesn't contain namespace: %#v", req)
-					return false
-				}
-				return true
-			},
+			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Req:          expectPost,
+		},
+		{
+			Modify:       false,
+			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
+			Req:          expectPost,
+		},
+		{
+			Modify:       true,
+			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
+			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
+			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
+			Req:          expectPost,
 		},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		client := &FakeRESTClient{
 			Resp: test.Resp,
 			Err:  test.HttpErr,
 		}
+		if test.RespFunc != nil {
+			client.Client = test.RespFunc
+		}
 		modifier := &RESTHelper{
 			RESTClient: client,
+			Codec:      testapi.Codec(),
+			Versioner:  testapi.MetadataAccessor(),
 		}
-		data := test.Data
+		data := []byte{}
 		if test.Object != nil {
 			data = []byte(runtime.EncodeOrDie(testapi.Codec(), test.Object))
 		}
-		err := modifier.Create("bar", data)
+		err := modifier.Create("bar", test.Modify, data)
 		if (err != nil) != test.Err {
-			t.Errorf("unexpected error: %f %v", test.Err, err)
+			t.Errorf("%d: unexpected error: %f %v", i, test.Err, err)
 		}
 		if err != nil {
 			continue
 		}
 		if test.Req != nil && !test.Req(client.Req) {
-			t.Errorf("unexpected request: %#v", client.Req)
+			t.Errorf("%d: unexpected request: %#v", i, client.Req)
 		}
-		if test.Data != nil {
-			body, _ := ioutil.ReadAll(client.Req.Body)
-			if !reflect.DeepEqual(test.Data, body) {
-				t.Errorf("unexpected body: %s", string(body))
-			}
+		body, err := ioutil.ReadAll(client.Req.Body)
+		if err != nil {
+			t.Fatalf("%d: unexpected error: %#v", i, err)
 		}
+		t.Logf("got body: %s", string(body))
+		expect := []byte{}
+		if test.ExpectObject != nil {
+			expect = []byte(runtime.EncodeOrDie(testapi.Codec(), test.ExpectObject))
+		}
+		if !reflect.DeepEqual(expect, body) {
+			t.Errorf("%d: unexpected body: %s", i, string(body))
+		}
+
 	}
 }
 
@@ -268,6 +299,22 @@ func TestRESTHelperGet(t *testing.T) {
 }
 
 func TestRESTHelperUpdate(t *testing.T) {
+	expectPut := func(req *http.Request) bool {
+		if req.Method != "PUT" {
+			t.Errorf("unexpected method: %#v", req)
+			return false
+		}
+		if !strings.HasSuffix(req.URL.Path, "/foo") {
+			t.Errorf("url doesn't contain name: %#v", req)
+			return false
+		}
+		if req.URL.Query().Get("namespace") != "bar" {
+			t.Errorf("url doesn't contain namespace: %#v", req)
+			return false
+		}
+		return true
+	}
+
 	tests := []struct {
 		Resp      *http.Response
 		RespFunc  httpClientFunc
@@ -298,21 +345,7 @@ func TestRESTHelperUpdate(t *testing.T) {
 				StatusCode: http.StatusOK,
 				Body:       objBody(&api.Status{Status: api.StatusSuccess}),
 			},
-			Req: func(req *http.Request) bool {
-				if req.Method != "PUT" {
-					t.Errorf("unexpected method: %#v", req)
-					return false
-				}
-				if !strings.HasSuffix(req.URL.Path, "/foo") {
-					t.Errorf("url doesn't contain name: %#v", req)
-					return false
-				}
-				if req.URL.Query().Get("namespace") != "bar" {
-					t.Errorf("url doesn't contain namespace: %#v", req)
-					return false
-				}
-				return true
-			},
+			Req: expectPut,
 		},
 		{
 			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}},
@@ -325,41 +358,13 @@ func TestRESTHelperUpdate(t *testing.T) {
 				}
 				return &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}})}, nil
 			},
-			Req: func(req *http.Request) bool {
-				if req.Method != "PUT" {
-					t.Errorf("unexpected method: %#v", req)
-					return false
-				}
-				if !strings.HasSuffix(req.URL.Path, "/foo") {
-					t.Errorf("url doesn't contain name: %#v", req)
-					return false
-				}
-				if req.URL.Query().Get("namespace") != "bar" {
-					t.Errorf("url doesn't contain namespace: %#v", req)
-					return false
-				}
-				return true
-			},
+			Req: expectPut,
 		},
 		{
 			Object:       &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			ExpectObject: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"}},
 			Resp:         &http.Response{StatusCode: http.StatusOK, Body: objBody(&api.Status{Status: api.StatusSuccess})},
-			Req: func(req *http.Request) bool {
-				if req.Method != "PUT" {
-					t.Errorf("unexpected method: %#v", req)
-					return false
-				}
-				if !strings.HasSuffix(req.URL.Path, "/foo") {
-					t.Errorf("url doesn't contain name: %#v", req)
-					return false
-				}
-				if req.URL.Query().Get("namespace") != "bar" {
-					t.Errorf("url doesn't contain namespace: %#v", req)
-					return false
-				}
-				return true
-			},
+			Req:          expectPut,
 		},
 	}
 	for i, test := range tests {

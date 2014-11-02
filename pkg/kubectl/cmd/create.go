@@ -47,7 +47,7 @@ Examples:
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			err = kubectl.NewRESTHelper(client, mapping).Create(namespace, data)
+			err = kubectl.NewRESTHelper(client, mapping).Create(namespace, true, data)
 			checkErr(err)
 			fmt.Fprintf(out, "%s\n", name)
 		},
