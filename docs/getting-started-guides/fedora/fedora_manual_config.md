@@ -102,9 +102,6 @@ KUBE_API_PORT="--port=8080"
 # How the replication controller and scheduler find the apiserver
 KUBE_MASTER="--master=fed-master:8080"
 
-# Comma seperated list of minions
-KUBELET_ADDRESSES="--machines=fed-minion"
-
 # Port minions listen on
 KUBELET_PORT="--kubelet_port=10250"
 
@@ -113,6 +110,18 @@ KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 
 # Add you own!
 KUBE_API_ARGS=""
+```
+
+* Edit /etc/kubernetes/controller-manager to appear as such:
+```
+###
+# kubernetes system config
+#
+# The following values are used to configure the kubernetes-controller-manager
+#
+
+# Comma seperated list of minions
+KUBELET_ADDRESSES="--machines=fed-minion"
 ```
 
 * Start the appropriate services on master:

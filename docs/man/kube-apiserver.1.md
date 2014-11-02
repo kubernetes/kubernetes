@@ -53,9 +53,6 @@ The the kube-apiserver several options.
 **-logtostderr**=
 	log to standard error instead of files. Default is false.
 
-**-machines**=[]
-	List of machines to schedule onto, comma separated.
-
 **-minion_cache_ttl**=30s
 	Duration of time to cache minion information. Default 30 seconds.
 

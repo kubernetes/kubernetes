@@ -39,11 +39,11 @@ containers:
         hostPort: 8080
         containerPort: 8080
         protocol: TCP
-    command: ["/kubernetes/apiserver", "-v=5", "-address=0.0.0.0", "-etcd_servers=http://127.0.0.1:4001", "-machines=${KUBELET_IP}"]
+    command: ["/kubernetes/apiserver", "-v=5", "-address=0.0.0.0", "-etcd_servers=http://127.0.0.1:4001"]
   - name: controller-manager
     image: kubernetes
     imagePullPolicy: never
-    command: ["/kubernetes/controller-manager", "-v=5", "-master=127.0.0.1:8080"]
+    command: ["/kubernetes/controller-manager", "-v=5", "-master=127.0.0.1:8080", "-machines=${KUBELET_IP}"]
   - name: proxy
     image: kubernetes
     imagePullPolicy: never

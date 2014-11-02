@@ -12,7 +12,6 @@ ExecStart=/usr/bin/kube-apiserver \
 	    ${KUBE_ETCD_SERVERS} \
 	    ${KUBE_API_ADDRESS} \
 	    ${KUBE_API_PORT} \
-	    ${KUBELET_ADDRESSES} \
 	    ${KUBELET_PORT} \
 	    ${KUBE_ALLOW_PRIV} \
 	    ${KUBE_SERVICE_ADDRESSES} \

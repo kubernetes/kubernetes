@@ -119,7 +119,6 @@ coreos:
         --address=127.0.0.1 \
         --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
-        --machines=192.168.12.10,192.168.12.11,192.168.12.12 \
         --logtostderr=true
         Restart=always
         RestartSec=10
@@ -161,6 +160,7 @@ coreos:
         [Service]
         ExecStart=/opt/bin/controller-manager \
         --master=127.0.0.1:8080 \
+        --machines=192.168.12.10,192.168.12.11,192.168.12.12 \
         --logtostderr=true
         Restart=always
         RestartSec=10

@@ -13,9 +13,6 @@ KUBE_API_PORT="--port=8080"
 # How the replication controller and scheduler find the apiserver
 KUBE_MASTER="--master=127.0.0.1:8080"
 
-# Comma seperated list of minions
-KUBELET_ADDRESSES="--machines=127.0.0.1"
-
 # Port minions listen on
 KUBELET_PORT="--kubelet_port=10250"
 
