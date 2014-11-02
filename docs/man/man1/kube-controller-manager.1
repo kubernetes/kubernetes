@@ -37,6 +37,18 @@ The kube\-controller\-manager has several options.
     The API version to use when talking to the server.
 
 .PP
+\fB\-cloud\_config\fP=""
+    The path to the cloud provider configuration file. Empty string for no configuration file.
+
+.PP
+\fB\-cloud\_provider\fP=""
+    The provider for cloud services. Empty string for no provider.
+
+.PP
+\fB\-minion\_regexp\fP=""
+    If non empty, and \-cloud\_provider is specified, a regular expression for matching minion VMs.
+
+.PP
 \fB\-insecure\_skip\_tls\_verify\fP=false
     If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
