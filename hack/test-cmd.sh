@@ -70,6 +70,7 @@ kube::log::status "Starting apiserver"
   --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+  --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
@@ -96,11 +97,30 @@ kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-
 
 kube::log::status "Testing kubectl(pods)"
 "${kube_cmd[@]}" get pods "${kube_flags[@]}"
+"${kube_cmd[@]}" create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
+"${kube_cmd[@]}" get pods "${kube_flags[@]}"
+"${kube_cmd[@]}" get pod redis-master-2 "${kube_flags[@]}"
+[[ "$("${kube_cmd[@]}" get pod redis-master-2 -o template --output-version=v1beta1 -t '{{ .ID }}' "${kube_flags[@]}")" == "redis-master-2" ]]
+output_pod=$("${kube_cmd[@]}" get pod redis-master-2 -o json --output-version=v1beta1 "${kube_flags[@]}")
+"${kube_cmd[@]}" delete pod redis-master-2 "${kube_flags[@]}"
+[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .Items }}' "${kube_flags[@]}") -eq 0 ]]
+echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
+[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .Items }}' "${kube_flags[@]}") -eq 1 ]]
+"${kube_cmd[@]}" get pods -o yaml "${kube_flags[@]}" | grep -q "id: redis-master-2"
+"${kube_cmd[@]}" describe pod redis-master-2 "${kube_flags[@]}" | grep -q 'Name:.*redis-master-2'
+"${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"
 
 kube::log::status "Testing kubectl(services)"
 "${kube_cmd[@]}" get services "${kube_flags[@]}"
 "${kube_cmd[@]}" create -f examples/guestbook/frontend-service.json "${kube_flags[@]}"
+"${kube_cmd[@]}" get services "${kube_flags[@]}"
 "${kube_cmd[@]}" delete service frontend "${kube_flags[@]}"
+
+kube::log::status "Testing kubectl(replicationcontrollers)"
+"${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
+"${kube_cmd[@]}" create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
+"${kube_cmd[@]}" get replicationcontrollers "${kube_flags[@]}"
+"${kube_cmd[@]}" describe replicationcontroller frontendController "${kube_flags[@]}" | grep -q 'Replicas:.*3 desired'
 
 kube::log::status "Testing kubectl(minions)"
 "${kube_cmd[@]}" get minions "${kube_flags[@]}"
