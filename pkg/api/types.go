@@ -680,6 +680,12 @@ const (
 	//                   field attributes will be set.
 	// Status code 422
 	StatusReasonInvalid StatusReason = "Invalid"
+
+	// StatusReasonBadRequest means that the request itself was invalid, because the request
+	// doesn't make any sense, for example deleting a read-only object.  This is different than
+	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
+	// data was invalid.  API calls that return BadRequest can never succeed.
+	StatusReasonBadRequest StatusReason = "BadRequest"
 )
 
 // StatusCause provides more information about an api.Status failure, including
