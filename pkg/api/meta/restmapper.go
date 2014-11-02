@@ -49,7 +49,7 @@ type DefaultRESTMapper struct {
 	interfacesFunc VersionInterfacesFunc
 }
 
-// VersionInterfacesFunc returns the appropriate codec and metadata accessor for a
+// VersionInterfacesFunc returns the appropriate codec, typer, and metadata accessor for a
 // given api version, or false if no such api version exists.
 type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, bool)
 
@@ -162,6 +162,7 @@ func (m *DefaultRESTMapper) RESTMapping(version, kind string) (*RESTMapping, err
 		Kind:       kind,
 
 		Codec:            interfaces.Codec,
+		ObjectConvertor:  interfaces.ObjectConvertor,
 		MetadataAccessor: interfaces.MetadataAccessor,
 	}, nil
 }

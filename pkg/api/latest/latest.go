@@ -71,11 +71,13 @@ func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 	case "v1beta1":
 		return &meta.VersionInterfaces{
 			Codec:            v1beta1.Codec,
+			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	case "v1beta2":
 		return &meta.VersionInterfaces{
 			Codec:            v1beta2.Codec,
+			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
 	default:
