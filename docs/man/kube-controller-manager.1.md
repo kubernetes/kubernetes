@@ -44,6 +44,9 @@ The kube-controller-manager has several options.
 **-logtostderr**=false
 	log to standard error instead of files.
 
+**-machines**=[]
+        List of machines to schedule onto, comma separated.
+
 **-master**=""
 	The address of the Kubernetes API server.
 

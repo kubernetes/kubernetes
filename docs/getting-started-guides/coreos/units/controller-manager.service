@@ -6,6 +6,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 [Service]
 ExecStart=/opt/bin/controller-manager \
 --master=127.0.0.1:8080 \
+--machines=127.0.0.1 \
 --etcd_servers=http://127.0.0.1:4001 \
 --logtostderr=true
 Restart=on-failure
