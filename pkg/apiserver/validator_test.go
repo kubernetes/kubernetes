@@ -63,12 +63,12 @@ func TestValidate(t *testing.T) {
 		{nil, "foo", health.Unhealthy, 500, true},
 	}
 
-	s := server{addr: "foo.com", port: 8080}
+	s := Server{Addr: "foo.com", Port: 8080, Path: "/healthz"}
 
 	for _, test := range tests {
 		fake := makeFake(test.data, test.code, test.err)
 		status, data, err := s.check(fake)
-		expect := fmt.Sprintf("http://%s:%d/healthz", s.addr, s.port)
+		expect := fmt.Sprintf("http://%s:%d/healthz", s.Addr, s.Port)
 		if fake.url != expect {
 			t.Errorf("expected %s, got %s", expect, fake.url)
 		}
