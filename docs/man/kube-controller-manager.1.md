@@ -29,6 +29,15 @@ The kube-controller-manager has several options.
 **-api_version**=""
 	The API version to use when talking to the server.
 
+**-cloud_config**=""
+	The path to the cloud provider configuration file. Empty string for no configuration file.
+
+**-cloud_provider**=""
+	The provider for cloud services. Empty string for no provider.
+
+**-minion_regexp**=""
+	If non empty, and -cloud_provider is specified, a regular expression for matching minion VMs.
+
 **-insecure_skip_tls_verify**=false
 	If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
