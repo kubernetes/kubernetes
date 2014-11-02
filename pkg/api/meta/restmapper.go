@@ -157,8 +157,10 @@ func (m *DefaultRESTMapper) RESTMapping(version, kind string) (*RESTMapping, err
 	}
 
 	return &RESTMapping{
-		Resource:         resource,
-		APIVersion:       version,
+		Resource:   resource,
+		APIVersion: version,
+		Kind:       kind,
+
 		Codec:            interfaces.Codec,
 		MetadataAccessor: interfaces.MetadataAccessor,
 	}, nil

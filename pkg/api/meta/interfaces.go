@@ -83,6 +83,7 @@ type RESTMapping struct {
 	// APIVersion represents the APIVersion that represents the resource as presented. It is provided
 	// for convenience for passing around a consistent mapping.
 	APIVersion string
+	Kind       string
 
 	runtime.Codec
 	MetadataAccessor
