@@ -37,4 +37,4 @@ network_closure.sh
 /third_party/pkg
 
 # also ignore etcd installed by hack/install-etcd.sh
-/third_party/etcd
+/third_party/etcd*

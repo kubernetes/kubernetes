@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -14,19 +14,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Make all of the client Kubernetes binaries for cross compile targets
-#
-# This makes the docker build image, builds the cross binaries and copies them
-# out of the docker container.
+kube::util::sortable_date() {
+  date "+%Y%m%d-%H%M%S"
+}
 
-set -o errexit
-set -o nounset
-set -o pipefail
+kube::util::wait_for_url() {
+  local url=$1
+  local prefix=${2:-}
+  local wait=${3:-0.2}
+  local times=${4:-10}
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
-
-kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command build/build-image/make-client.sh "$@"
-kube::build::copy_output
+  local i
+  for i in $(seq 1 $times); do
+    local out
+    if out=$(curl -fs $url 2>/dev/null); then
+      kube::log::status ${prefix}${out}
+      return 0
+    fi
+    sleep $wait
+  done
+  kube::log::error "Timed out waiting for ${url}"
+  return 1
+}

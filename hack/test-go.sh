@@ -19,30 +19,28 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/config-go.sh"
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Go to the top of the tree.
-cd "${KUBE_ROOT}"
+kube::golang::setup_env
 
-# Check for `go` binary and set ${GOPATH}.
-kube::setup_go_environment
-
-find_test_dirs() {
-  cd src/${KUBE_GO_PACKAGE}
-  find . -not \( \
-      \( \
-        -wholename './output' \
-        -o -wholename './_output' \
-        -o -wholename './release' \
-        -o -wholename './target' \
-        -o -wholename '*/third_party/*' \
-        -o -wholename '*/Godeps/*' \
-      \) -prune \
-    \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
+kube::test::find_dirs() {
+  (
+    cd ${KUBE_ROOT}
+    find . -not \( \
+        \( \
+          -wholename './output' \
+          -o -wholename './_output' \
+          -o -wholename './release' \
+          -o -wholename './target' \
+          -o -wholename '*/third_party/*' \
+          -o -wholename '*/Godeps/*' \
+        \) -prune \
+      \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
+  )
 }
 
-find_test_pkgs() {
-  find_test_dirs | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
+kube::test::find_pkgs() {
+  kube::test::find_dirs | xargs -n1 printf "${KUBE_GO_PACKAGE}/%s\n"
 }
 
 # -covermode=atomic becomes default with -race in Go >=1.3
@@ -50,10 +48,8 @@ KUBE_COVER=${KUBE_COVER:--cover -covermode=atomic}
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 60s}
 KUBE_RACE=${KUBE_RACE:--race}
 
-cd "${KUBE_TARGET}"
-
-usage() {
-  cat << EOF
+kube::test::usage() {
+  kube::log::usage_from_stdin <<EOF
 usage: $0 [OPTIONS] [TARGETS]
 
 OPTIONS:
@@ -69,24 +65,24 @@ iterations=1
 while getopts "hi:" opt ; do
   case $opt in
     h)
-      usage
+      kube::test::usage
       exit 0
       ;;
     i)
       iterations="$OPTARG"
       if ! isnum "${iterations}" || [[ "${iterations}" -le 0 ]]; then
-        echo "$0": argument to -i must be numeric and greater than 0 >&2
-        usage >&2
+        kube::log::usage "'$0': argument to -i must be numeric and greater than 0"
+        kube::test::usage
         exit 1
       fi
       ;;
     ?)
-      usage >&2
+      kube::test::usage
       exit 1
       ;;
     :)
-      echo "Option -$OPTARG <value>" >&2
-      usage >&2
+      kube::log::usage "Option -$OPTARG <value>"
+      kube::test::usage
       exit 1
       ;;
   esac
@@ -94,7 +90,7 @@ done
 shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${GOFLAGS:-})"
+eval "goflags=(${KUBE_GOFLAGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
@@ -105,19 +101,18 @@ for arg; do
     testcases+=("${arg}")
   fi
 done
-set -- ${testcases[@]+"${testcases[@]}"}
+set -- "${testcases[@]+${testcases[@]}}"
 
-if [[ "${iterations}" -gt 1 ]]; then
+if [[ $iterations -gt 1 ]]; then
   if [[ $# -eq 0 ]]; then
-    set -- $(find_test_dirs)
+    set -- $(kube::test::find_dirs)
   fi
-  echo "Running ${iterations} times"
+  kube::log::status "Running ${iterations} times"
   fails=0
   for arg; do
     trap 'exit 1' SIGINT
-    echo
     pkg=${KUBE_GO_PACKAGE}/${arg}
-    echo "${pkg}"
+    kube::log::status "${pkg}"
     # keep going, even if there are failures
     pass=0
     count=0
@@ -130,7 +125,7 @@ if [[ "${iterations}" -gt 1 ]]; then
       fi
       count=$((count + 1))
     done 2>&1
-    echo "${pass}" / "${count}" passed
+    kube::log::status "${pass} / ${count} passed"
   done
   if [[ ${fails} -gt 0 ]]; then
     exit 1
@@ -140,8 +135,8 @@ if [[ "${iterations}" -gt 1 ]]; then
 fi
 
 if [[ -n "${1-}" ]]; then
-  covdir="/tmp/k8s_coverage/$(date "+%s")"
-  echo saving coverage output in "${covdir}"
+  covdir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
+  kube::log::status "Saving coverage output in '${covdir}'"
   for arg; do
     trap 'exit 1' SIGINT
     mkdir -p "${covdir}/${arg}"
@@ -155,7 +150,7 @@ if [[ -n "${1-}" ]]; then
   exit 0
 fi
 
-find_test_pkgs | xargs go test "${goflags[@]:+${goflags[@]}}" \
+kube::test::find_pkgs | xargs go test "${goflags[@]:+${goflags[@]}}" \
     ${KUBE_RACE} \
     ${KUBE_TIMEOUT} \
     ${KUBE_COVER}

@@ -9,7 +9,8 @@
 OUT_DIR = _output
 GODEPS_PKG_DIR = Godeps/_workspace/pkg
 
-export GOFLAGS
+KUBE_GOFLAGS = $(GOFLAGS)
+export KUBE_GOFLAGS
 
 # Build code.
 #
@@ -49,7 +50,7 @@ check test:
 #   make test_integration
 test_integration test_integ:
 	hack/test-integration.sh
-.PHONY: integration
+.PHONY: test_integration test_integ
 
 # Build and run end-to-end tests.
 #
@@ -94,10 +95,10 @@ release:
 .PHONY: release
 
 # Build a release, but skip tests
-# 
+#
 # Example:
 #   make release-skip-tests
-release-skip-tests:
+release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n build/release.sh
-.PHONY: release-skip-tests
+.PHONY: release-skip-tests quick-release
 

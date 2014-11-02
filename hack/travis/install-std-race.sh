@@ -14,26 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script installs std -race on Travis (see https://code.google.com/p/go/issues/detail?id=6479)
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/build/build-image/common.sh"
+if [[ "${TRAVIS}" == "true" ]]; then
+  GO_VERSION=($(go version))
 
-platforms=(linux/amd64 $KUBE_CROSSPLATFORMS)
-targets=("${client_targets[@]}")
-
-if [[ $# -gt 0 ]]; then
-  targets=("$@")
+  if [[ ${GO_VERSION[2]} < "go1.3" ]]; then
+    echo "Installing the -race compatible version of the std go library"
+    go install -a -race std
+  fi
 fi
-
-for platform in "${platforms[@]}"; do
-  (
-    # Subshell to contain these exports
-    export GOOS=${platform%/*}
-    export GOARCH=${platform##*/}
-
-    kube::build::make_binaries "${targets[@]}"
-  )
-done

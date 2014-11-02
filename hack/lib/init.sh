@@ -18,9 +18,25 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-cd third_party
-git clone https://github.com/coreos/etcd.git
-cd etcd
-git checkout ab4bcc18694644d12f0c038339d8d039072502b1
-./build
+# The root of the build/dist directory
+KUBE_ROOT=$(
+  unset CDPATH
+  kube_root=$(dirname "${BASH_SOURCE}")/../..
+  cd "${kube_root}"
+  pwd
+)
 
+KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
+KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
+KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
+
+source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
+
+kube::log::install_errexit
+
+source "${KUBE_ROOT}/hack/lib/version.sh"
+source "${KUBE_ROOT}/hack/lib/golang.sh"
+source "${KUBE_ROOT}/hack/lib/etcd.sh"
+
+KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::golang::host_platform)"

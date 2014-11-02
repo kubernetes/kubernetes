@@ -18,4 +18,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_COVER=" " KUBE_RACE=" " hack/test-go.sh "" -test.run="^X" -benchtime=1s -bench=. -benchmem
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+KUBE_COVER=" " KUBE_RACE=" " "${KUBE_ROOT}/hack/test-go.sh" "" -test.run="^X" -benchtime=1s -bench=. -benchmem

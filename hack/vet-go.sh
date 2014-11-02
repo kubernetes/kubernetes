@@ -19,19 +19,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Set the environment variables required by the build.
-source "${KUBE_REPO_ROOT}/hack/config-go.sh"
+kube::golang::setup_env
 
-# Go to the top of the tree.
-cd "${KUBE_REPO_ROOT}"
-
-# Check for `go` binary and set ${GOPATH}.
-kube::setup_go_environment
+cd "${KUBE_ROOT}"
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${GOFLAGS:-})"
+eval "goflags=(${KUBE_GOFLAGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()
@@ -43,19 +39,20 @@ for arg; do
   fi
 done
 
-if [[ "${targets[@]+set}" != "set" ]]; then
+if [[ ${#targets[@]} -eq 0 ]]; then
   targets=("...")
 fi
 
-rc=0
 # Filter silly "exit status 1" lines and send main output to stdout.
+#
 # This is tricky - pipefail means any non-zero exit in a pipeline is reported,
 # and errexit exits on error.  Turning that into an || expression blocks the
 # errexit.  But $? is still not useful because grep will return an error when it
-# receives no input, which is exactly what go vet produces on success.  In short,
-# if go vet fails (produces output), grep will succeed, but if go vet succeeds
-# (produces no output) grep will fail.  Then we just look at PIPESTATUS[0] which
-# is go's exit code.
+# receives no input, which is exactly what go vet produces on success.  In
+# short, if go vet fails (produces output), grep will succeed, but if go vet
+# succeeds (produces no output) grep will fail.  Then we just look at
+# PIPESTATUS[0] which is go's exit code.
+rc=0
 go vet "${goflags[@]:+${goflags[@]}}" "${targets[@]/#/./}" 2>&1 \
     | grep -v "^exit status " \
     || rc=${PIPESTATUS[0]}

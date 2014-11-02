@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 # Copyright 2014 Google Inc. All rights reserved.
 #
@@ -29,12 +29,11 @@ KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command build/build-image/make-client.sh
-kube::build::run_build_command build/build-image/make-server.sh
+kube::build::run_build_command hack/build-cross.sh
 
 if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
-  kube::build::run_build_command build/build-image/run-tests.sh
-  kube::build::run_build_command build/build-image/run-integration.sh
+  kube::build::run_build_command hack/test-go.sh
+  kube::build::run_build_command hack/test-integration.sh
 fi
 
 kube::build::copy_output

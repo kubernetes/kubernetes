@@ -19,20 +19,10 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/build/build-image/common.sh"
 
-kube::build::make_binaries "./cmd/integration"
+ETCD_VERSION=${ETCD_VERSION:-v0.4.6}
 
-readonly ETCD_DIR="${KUBE_ROOT}/_output/etcd"
-mkdir -p "${ETCD_DIR}"
-
-echo "+++ Running integration test"
-
-etcd -name test -data-dir ${ETCD_DIR} > "${KUBE_ROOT}/_output/etcd.log" &
-readonly ETCD_PID=$!
-
-sleep 5
-
-"${KUBE_TARGET}/linux/amd64/integration"
-
-kill $ETCD_PID
+cd "${KUBE_ROOT}/third_party"
+curl -sL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz \
+  | tar xzf -
+ln -sF etcd-${ETCD_VERSION}-linux-amd64 etcd
