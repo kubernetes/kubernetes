@@ -27,7 +27,7 @@ func TestInstallHandler(t *testing.T) {
 	InstallHandler(mux)
 	req, err := http.NewRequest("GET", "http://example.com/healthz", nil)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
