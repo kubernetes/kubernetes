@@ -854,8 +854,8 @@ type BoundPod struct {
 // BoundPods is a list of Pods bound to a common server. The resource version of
 // the pod list is guaranteed to only change when the list of bound pods changes.
 type BoundPods struct {
-	TypeMeta   `json:",inline" yaml:",inline"`
-	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	TypeMeta `json:",inline" yaml:",inline"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	// Host is the name of a node that these pods were bound to.
 	Host string `json:"host" yaml:"host"`

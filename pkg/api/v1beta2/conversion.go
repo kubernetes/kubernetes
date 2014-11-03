@@ -334,7 +334,7 @@ func init() {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+			if err := s.Convert(&in.ListMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
 			out.Host = in.Host
@@ -344,7 +344,7 @@ func init() {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+			if err := s.Convert(&in.TypeMeta, &out.ListMeta, 0); err != nil {
 				return err
 			}
 			out.Host = in.Host
