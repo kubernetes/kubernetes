@@ -186,3 +186,40 @@ func TestInterfacesFor(t *testing.T) {
 		}
 	}
 }
+
+func TestRESTMapper(t *testing.T) {
+	if v, k, err := RESTMapper.VersionAndKindForResource("replicationControllers"); err != nil || v != Version || k != "ReplicationController" {
+		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
+	}
+	if v, k, err := RESTMapper.VersionAndKindForResource("replicationcontrollers"); err != nil || v != Version || k != "ReplicationController" {
+		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
+	}
+
+	for _, version := range Versions {
+		mapping, err := RESTMapper.RESTMapping(version, "ReplicationController")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if mapping.Resource != "replicationControllers" && mapping.Resource != "replicationcontrollers" {
+			t.Errorf("incorrect resource name: %#v", mapping)
+		}
+		if mapping.APIVersion != version {
+			t.Errorf("incorrect version: %v", mapping)
+		}
+
+		interfaces, _ := InterfacesFor(version)
+		if mapping.Codec != interfaces.Codec {
+			t.Errorf("unexpected codec: %#v", mapping)
+		}
+
+		rc := &internal.ReplicationController{ObjectMeta: internal.ObjectMeta{Name: "foo"}}
+		name, err := mapping.MetadataAccessor.Name(rc)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if name != "foo" {
+			t.Errorf("unable to retrieve object meta with: %v", mapping.MetadataAccessor)
+		}
+	}
+}

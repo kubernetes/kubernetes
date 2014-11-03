@@ -24,27 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// Interface lets you work with object and list metadata from any of the versioned or
-// internal API objects. Attempting to set or retrieve a field on an object that does
-// not support that field (Name, UID, Namespace on lists) will be a no-op and return
-// a default value.
-type Interface interface {
-	Namespace() string
-	SetNamespace(namespace string)
-	Name() string
-	SetName(name string)
-	UID() string
-	SetUID(uid string)
-	APIVersion() string
-	SetAPIVersion(version string)
-	Kind() string
-	SetKind(kind string)
-	ResourceVersion() string
-	SetResourceVersion(version string)
-	SelfLink() string
-	SetSelfLink(selfLink string)
-}
-
 // Accessor takes an arbitary object pointer and returns meta.Interface.
 // obj must be a pointer to an API type. An error is returned if the minimum
 // required fields are missing. Fields that are not required return the default
@@ -92,30 +71,6 @@ func Accessor(obj interface{}) (Interface, error) {
 	}
 
 	return a, nil
-}
-
-// MetadataAccessor lets you work with object metadata from any of the versioned or
-// internal API objects.
-type MetadataAccessor interface {
-	APIVersion(obj runtime.Object) (string, error)
-	SetAPIVersion(obj runtime.Object, version string) error
-
-	Kind(obj runtime.Object) (string, error)
-	SetKind(obj runtime.Object, kind string) error
-
-	Namespace(obj runtime.Object) (string, error)
-	SetNamespace(obj runtime.Object, namespace string) error
-
-	Name(obj runtime.Object) (string, error)
-	SetName(obj runtime.Object, name string) error
-
-	UID(obj runtime.Object) (string, error)
-	SetUID(obj runtime.Object, uid string) error
-
-	SelfLink(obj runtime.Object) (string, error)
-	SetSelfLink(obj runtime.Object, selfLink string) error
-
-	runtime.ResourceVersioner
 }
 
 // NewAccessor returns a MetadataAccessor that can retrieve
