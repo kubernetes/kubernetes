@@ -501,7 +501,14 @@ func TestUpdateMissing(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	simpleStorage := &SimpleRESTStorage{}
+	wait := sync.WaitGroup{}
+	wait.Add(1)
+	simpleStorage := &SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (returnObj runtime.Object, err error) {
+			wait.Wait()
+			return &Simple{}, nil
+		},
+	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
 	}, codec, "/prefix/version", selfLinker)
@@ -537,6 +544,7 @@ func TestCreate(t *testing.T) {
 	if itemOut.Status != api.StatusWorking || itemOut.Details == nil || itemOut.Details.ID == "" {
 		t.Errorf("Unexpected status: %#v (%s)", itemOut, string(body))
 	}
+	wait.Done()
 }
 
 func TestCreateNotFound(t *testing.T) {
