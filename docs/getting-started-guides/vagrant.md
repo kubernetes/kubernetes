@@ -3,7 +3,8 @@
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
-3. Get or build a [binary release](binary_release.md)
+3. Install the `net-tools` package for your distribution for VirtualBox's private networks.
+4. Get or build a [binary release](binary_release.md)
 
 ### Setup
 
@@ -276,6 +277,10 @@ If this is your first time creating the cluster, the kubelet on each minion sche
 
 Are you sure there was no build error?  After running `$ vagrant provision`, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
 It's very likely you see a build error due to an error in your source files!
+
+#### I have brought Vagrant up but the minions won't validate !
+
+Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
 #### I want to change the number of minions !
 
