@@ -17,7 +17,6 @@ script:
   - KUBE_TIMEOUT='-timeout 60s' ./hack/test-go.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
-  - ./hack/benchmark-go.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"
