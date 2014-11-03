@@ -206,6 +206,9 @@ func New(c *Config) *Master {
 	boundPodFactory := &pod.BasicBoundPodFactory{
 		ServiceRegistry: serviceRegistry,
 	}
+	if c.KubeletClient == nil {
+		glog.Fatalf("master.New() called with config.KubeletClient == nil")
+	}
 	m := &Master{
 		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),

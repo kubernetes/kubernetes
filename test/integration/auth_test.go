@@ -31,6 +31,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 
 	"github.com/golang/glog"
@@ -80,6 +81,7 @@ func TestWhoAmI(t *testing.T) {
 	defer os.Remove(tokenFilename)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
@@ -364,6 +366,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
@@ -408,6 +411,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",

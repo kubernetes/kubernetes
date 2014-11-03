@@ -126,13 +126,16 @@ func (c *HTTPKubeletClient) HealthCheck(host string) (health.Status, error) {
 	return health.DoHTTPCheck(fmt.Sprintf("%s/healthz", c.url(host)), c.Client)
 }
 
-// FakeKubeletClient is a fake implementation of PodInfoGetter. It is useful for testing.
-type FakePodInfoGetter struct {
-	data api.PodInfo
-	err  error
-}
+// FakeKubeletClient is a fake implementation of KubeletClient which returns an error
+// when called.  It is useful to pass to the master in a test configuration with
+// no kubelets.
+type FakeKubeletClient struct{}
 
 // GetPodInfo is a fake implementation of PodInfoGetter.GetPodInfo.
-func (c *FakePodInfoGetter) GetPodInfo(host, podNamespace string, podID string) (api.PodInfo, error) {
-	return c.data, c.err
+func (c FakeKubeletClient) GetPodInfo(host, podNamespace string, podID string) (api.PodInfo, error) {
+	return api.PodInfo{}, errors.New("Not Implemented")
+}
+
+func (c FakeKubeletClient) HealthCheck(host string) (health.Status, error) {
+	return health.Unknown, errors.New("Not Implemented")
 }
