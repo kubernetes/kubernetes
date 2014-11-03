@@ -67,6 +67,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(NewCmdUpdate(out))
 	cmds.AddCommand(NewCmdDelete(out))
 	cmds.AddCommand(NewCmdNamespace(out))
+	cmds.AddCommand(NewCmdLog(out))
 
 	if err := cmds.Execute(); err != nil {
 		os.Exit(1)
