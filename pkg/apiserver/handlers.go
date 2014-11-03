@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	authhandlers "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -121,18 +122,34 @@ func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedM
 }
 
 // RequestAttributeGetter is a function that extracts authorizer.Attributes from an http.Request
-type RequestAttributeGetter func(req *http.Request) (attribs authorizer.Attributes)
+type RequestAttributeGetter interface {
+	GetAttribs(req *http.Request) (attribs authorizer.Attributes)
+}
 
-// BasicAttributeGetter gets authorizer.Attributes from an http.Request.
-func BasicAttributeGetter(req *http.Request) (attribs authorizer.Attributes) {
-	// TODO: fill in attributes once attributes are defined.
-	return
+type requestAttributeGetter struct {
+	userContexts authhandlers.RequestContext
+}
+
+// NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
+func NewRequestAttributeGetter(userContexts authhandlers.RequestContext) RequestAttributeGetter {
+	return &requestAttributeGetter{userContexts}
+}
+
+func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
+	attribs := authorizer.AttributesRecord{}
+
+	user, ok := r.userContexts.Get(req)
+	if ok {
+		attribs.User = user
+	}
+
+	return &attribs
 }
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
 func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		err := a.Authorize(getAttribs(req))
+		err := a.Authorize(getAttribs.GetAttribs(req))
 		if err == nil {
 			handler.ServeHTTP(w, req)
 			return

@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/tokenfile"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -67,6 +68,7 @@ type Config struct {
 	CorsAllowedOriginList util.StringList
 	TokenAuthFile         string
 	AuthorizationMode     string
+	AuthorizerForTesting  authorizer.Authorizer
 
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
@@ -318,11 +320,18 @@ func (m *Master) init(c *Config) {
 	}
 
 	// Install Authorizer
-	authorizer, err := apiserver.NewAuthorizerFromAuthorizationConfig(m.authorizationzMode)
-	if err != nil {
-		glog.Fatal(err)
+	var authorizer authorizer.Authorizer
+	if c.AuthorizerForTesting != nil {
+		authorizer = c.AuthorizerForTesting
+	} else {
+		var err error
+		authorizer, err = apiserver.NewAuthorizerFromAuthorizationConfig(m.authorizationzMode)
+		if err != nil {
+			glog.Fatal(err)
+		}
 	}
-	handler = apiserver.WithAuthorizationCheck(handler, apiserver.BasicAttributeGetter, authorizer)
+	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts)
+	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, authorizer)
 
 	// Install Authenticator
 	if authenticator != nil {

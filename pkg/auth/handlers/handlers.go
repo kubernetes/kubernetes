@@ -28,6 +28,7 @@ import (
 // RequestContext is the interface used to associate a user with an http Request.
 type RequestContext interface {
 	Set(*http.Request, user.Info)
+	Get(req *http.Request) (user.Info, bool)
 	Remove(*http.Request)
 }
 
