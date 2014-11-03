@@ -32,7 +32,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
-	"code.google.com/p/go-uuid/uuid"
 	"github.com/golang/glog"
 )
 
@@ -93,7 +92,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
 		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
 	}
-	pod.DesiredState.Manifest.UUID = uuid.NewUUID().String()
+	pod.DesiredState.Manifest.UUID = util.NewUUID().String()
 	if len(pod.Name) == 0 {
 		pod.Name = pod.DesiredState.Manifest.UUID
 	}
