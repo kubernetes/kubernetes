@@ -16,6 +16,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 ### Contents
 * Getting Started Guides
   * [Google Compute Engine](docs/getting-started-guides/gce.md)
+  * [Locally](docs/getting-started-guides/locally.md)
   * [Vagrant](docs/getting-started-guides/vagrant.md)
   * Fedora (w/ [Ansible](docs/getting-started-guides/fedora/fedora_ansible_config.md) or [manual](docs/getting-started-guides/fedora/fedora_manual_config.md))
   * [Circle CI](https://circleci.com/docs/docker#google-compute-engine-and-kubernetes)
@@ -27,7 +28,6 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [vSphere](docs/getting-started-guides/vsphere.md)
 
 * The following clouds are currently broken at Kubernetes head.  Please sync your client to `v0.3` (`git checkout v0.3`) to use these:
-  * [Locally](docs/getting-started-guides/locally.md)
   * [Microsoft Azure](docs/getting-started-guides/azure.md)
 * [Kubernetes 101](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough)
 * [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)

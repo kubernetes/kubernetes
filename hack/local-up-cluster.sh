@@ -18,7 +18,14 @@
 # local-up.sh, but this one launches the three separate binaries.
 # You may need to run this as root to allow kubelet to open docker's socket.
 
-source $(dirname $0)/util.sh
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+cd "${KUBE_ROOT}"
+
+# Stop right away if the build fails
+set -e
+
+source "${KUBE_ROOT}/hack/lib/init.sh"
+"${KUBE_ROOT}/hack/build-go.sh"
 
 docker ps 2> /dev/null 1> /dev/null
 if [ "$?" != "0" ]; then
@@ -26,13 +33,8 @@ if [ "$?" != "0" ]; then
   exit 1
 fi
 
-# Stop right away if the build fails
-set -e
-
-$(dirname $0)/build-go.sh
-
 echo "Starting etcd"
-start_etcd
+kube::etcd::start
 
 # Shut down anyway if there's an error.
 set +e
@@ -44,7 +46,43 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/loc
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 
-GO_OUT=$(dirname $0)/../_output/go/bin
+# Detect the OS name/arch so that we can find our binary
+case "$(uname -s)" in
+  Darwin)
+    host_os=darwin
+    ;;
+  Linux)
+    host_os=linux
+    ;;
+  *)
+    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+    exit 1
+    ;;
+esac
+
+case "$(uname -m)" in
+  x86_64*)
+    host_arch=amd64
+    ;;
+  i?86_64*)
+    host_arch=amd64
+    ;;
+  amd64*)
+    host_arch=amd64
+    ;;
+  arm*)
+    host_arch=arm
+    ;;
+  i?86*)
+    host_arch=x86
+    ;;
+  *)
+    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+    exit 1
+    ;;
+esac
+
+GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 
 APISERVER_LOG=/tmp/apiserver.log
 "${GO_OUT}/apiserver" \
@@ -54,15 +92,15 @@ APISERVER_LOG=/tmp/apiserver.log
   --etcd_servers="http://127.0.0.1:4001" \
   --portal_net="10.0.0.0/24" \
   --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
-  #--machines="127.0.0.1" \ removed
 APISERVER_PID=$!
 
 # Wait for apiserver to come up before launching the rest of the components.
-wait_for_url "http://$API_HOST:$API_PORT/api/v1beta1/pods" "apiserver: "
+kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: "
 
 CTLRMGR_LOG=/tmp/controller-manager.log
 "${GO_OUT}/controller-manager" \
   -v=${LOG_LEVEL} \
+  --machines="127.0.0.1" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
