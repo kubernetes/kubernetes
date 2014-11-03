@@ -54,6 +54,7 @@ kube::log::status "Running kubectl with no options"
 # Start kubelet
 kube::log::status "Starting kubelet"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+  --root_dir=/tmp/kubelet.$$ \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
