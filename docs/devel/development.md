@@ -100,18 +100,7 @@ godep go tool cover -html=target/c.out
 
 ## Integration tests
 
-You need an etcd somewhere in your PATH. To install etcd, run:
-
-```
-cd kubernetes
-hack/travis/install-etcd.sh
-sudo ln -s $(pwd)/third_party/etcd/bin/etcd /usr/bin/etcd
-```
-
-```
-cd kubernetes
-hack/test-integration.sh
-```
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
 
 ## End-to-End tests
 

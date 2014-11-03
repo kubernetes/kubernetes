@@ -1,6 +1,6 @@
 ## Getting started locally
 
-### Requirements 
+### Requirements
 
 #### Linux
 
@@ -12,7 +12,7 @@ At least [Docker](https://docs.docker.com/installation/#installation) 1.0.0+. En
 
 #### etcd
 
-You need an [etcd](https://github.com/coreos/etcd) somewhere in your path. Get the [latest release](https://github.com/coreos/etcd/releases/) and place it in `/usr/bin`.
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
 
 ### Starting the cluster
 

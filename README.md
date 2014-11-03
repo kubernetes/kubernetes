@@ -32,8 +32,8 @@ While the concepts and architecture in Kubernetes represent years of experience 
 * The following clouds are currently broken at Kubernetes head.  Please sync your client to `v0.3` (`git checkout v0.3`) to use these:
   * [Microsoft Azure](docs/getting-started-guides/azure.md)
 
-* [Kubernetes 101](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough)
-* [kubecfg command line tool](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/cli.md)
+* [Kubernetes 101](examples/walkthrough)
+* [kubecfg command line tool](docs/cli.md)
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
 * [Kubernetes Client Libraries](docs/client-libraries.md)
 * [Discussion and Community Support](#community-discussion-and-support)
