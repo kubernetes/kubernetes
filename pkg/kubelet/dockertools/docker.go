@@ -301,7 +301,7 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 		// TODO(dchen1107): Remove the old separator "--" by end of Oct
 		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") &&
 			!strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
-			glog.Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
+			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
 			continue
 		}
 		result[DockerID(container.ID)] = container
