@@ -23,7 +23,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
 
-func TestEnsureChain(t *testing.T) {
+func getIptablesCommand(protocol Protocol) string {
+	if protocol == ProtocolIpv4 {
+		return "iptables"
+	}
+	if protocol == ProtocolIpv6 {
+		return "ip6tables"
+	}
+	panic("Unknown protocol")
+}
+
+func testEnsureChain(t *testing.T, protocol Protocol) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// Success.
@@ -41,7 +51,7 @@ func TestEnsureChain(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, protocol)
 	// Success.
 	exists, err := runner.EnsureChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -53,7 +63,8 @@ func TestEnsureChain(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 1 {
 		t.Errorf("expected 1 CombinedOutput() call, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll("iptables", "-t", "nat", "-N", "FOOBAR") {
+	cmd := getIptablesCommand(protocol)
+	if !util.NewStringSet(fcmd.CombinedOutputLog[0]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	// Exists.
@@ -71,6 +82,14 @@ func TestEnsureChain(t *testing.T) {
 	}
 }
 
+func TestEnsureChainIpv4(t *testing.T) {
+	testEnsureChain(t, ProtocolIpv4)
+}
+
+func TestEnsureChainIpv6(t *testing.T) {
+	testEnsureChain(t, ProtocolIpv6)
+}
+
 func TestFlushChain(t *testing.T) {
 	fcmd := exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
@@ -86,7 +105,7 @@ func TestFlushChain(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	// Success.
 	err := runner.FlushChain(TableNAT, Chain("FOOBAR"))
 	if err != nil {
@@ -118,7 +137,7 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	exists, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %+v", err)
@@ -150,7 +169,7 @@ func TestEnsureRuleNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	exists, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %+v", err)
@@ -179,7 +198,7 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	_, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -205,7 +224,7 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	_, err := runner.EnsureRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -228,7 +247,7 @@ func TestDeleteRuleAlreadyExists(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %+v", err)
@@ -257,7 +276,7 @@ func TestDeleteRuleNew(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err != nil {
 		t.Errorf("expected success, got %+v", err)
@@ -283,7 +302,7 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
@@ -309,7 +328,7 @@ func TestDeleteRuleErrorCreating(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(&fexec)
+	runner := New(&fexec, ProtocolIpv4)
 	err := runner.DeleteRule(TableNAT, ChainOutput, "abc", "123")
 	if err == nil {
 		t.Errorf("expected failure")
