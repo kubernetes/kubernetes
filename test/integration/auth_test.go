@@ -232,6 +232,7 @@ var aEndpoints string = `
 // depending on the authentication and authorization setup of the master.
 
 var code200or202 = map[int]bool{200: true, 202: true} // Unpredicatable which will be returned.
+var code400 = map[int]bool{400: true}
 var code404 = map[int]bool{404: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
@@ -291,7 +292,7 @@ func getTestRequests() []struct {
 		{"PUT", "/api/v1beta1/endpoints/a", aEndpoints, code200or202},
 		{"GET", "/api/v1beta1/endpoints", "", code200or202},
 		{"GET", "/api/v1beta1/endpoints/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/endpoints/a", "", code500}, // Issue #2113.
+		{"DELETE", "/api/v1beta1/endpoints/a", "", code400},
 
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200or202},
