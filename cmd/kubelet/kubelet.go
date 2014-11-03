@@ -141,7 +141,7 @@ func main() {
 	}
 	*rootDirectory = path.Clean(*rootDirectory)
 	if err := os.MkdirAll(*rootDirectory, 0750); err != nil {
-		glog.Warningf("Error creating root directory: %v", err)
+		glog.Fatalf("Error creating root directory: %v", err)
 	}
 
 	// source of all configuration
