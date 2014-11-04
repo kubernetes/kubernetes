@@ -26,7 +26,7 @@ import (
 // ClientFunc returns the RESTClient defined for given resource
 type ClientFunc func(mapping *meta.RESTMapping) (*client.RESTClient, error)
 
-// ApplyItems creates bulk of resources provided by items list. Each item must
+// CreateObjects creates bulk of resources provided by items list. Each item must
 // be valid API type. It requires ObjectTyper to parse the Version and Kind and
 // RESTMapper to get the resource URI and REST client that knows how to create
 // given type
@@ -59,7 +59,7 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 	return allErrors.Prefix("Config")
 }
 
-// Apply creates the obj using the provided clients and the resource URI
+// CreateObject creates the obj using the provided clients and the resource URI
 // mapping. It reports ValidationError when the object is missing the Metadata
 // or the Name and it will report any error occured during create REST call
 func CreateObject(client *client.RESTClient, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
