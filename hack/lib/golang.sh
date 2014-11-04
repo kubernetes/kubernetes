@@ -233,6 +233,9 @@ kube::golang::build_binaries() {
     local version_ldflags
     version_ldflags=$(kube::version::ldflags)
 
+    local host_platform
+    host_platform=$(kube::golang::host_platform)
+
     # Use eval to preserve embedded quoted strings.
     local goflags
     eval "goflags=(${KUBE_GOFLAGS:-})"
@@ -257,7 +260,7 @@ kube::golang::build_binaries() {
 
     local -a platforms=("${KUBE_BUILD_PLATFORMS[@]:+${KUBE_BUILD_PLATFORMS[@]}}")
     if [[ ${#platforms[@]} -eq 0 ]]; then
-      platforms=("$(kube::golang::host_platform)")
+      platforms=("${host_platform}")
     fi
 
     local binaries
