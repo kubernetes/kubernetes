@@ -27,13 +27,46 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
-func RunKubectl(out io.Writer) {
+// Factory provides abstractions that allow the Kubectl command to be extended across multiple types
+// of resources and different API sets.
+type Factory struct {
+	Mapper    meta.RESTMapper
+	Typer     runtime.ObjectTyper
+	Client    func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error)
+	Describer func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error)
+	Printer   func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
+}
+
+// NewFactory creates a factory with the default Kubernetes resources defined
+func NewFactory() *Factory {
+	return &Factory{
+		Mapper: latest.RESTMapper,
+		Typer:  api.Scheme,
+		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
+			return getKubeClient(cmd), nil
+		},
+		Describer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
+			describer, ok := kubectl.DescriberFor(mapping.Kind, getKubeClient(cmd))
+			if !ok {
+				return nil, fmt.Errorf("No description has been implemented for %q", mapping.Kind)
+			}
+			return describer, nil
+		},
+		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		},
+	}
+}
+
+func (f *Factory) Run(out io.Writer) {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -51,7 +84,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.PersistentFlags().StringP("server", "s", "", "Kubernetes apiserver to connect to")
 	cmds.PersistentFlags().StringP("auth-path", "a", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
 	cmds.PersistentFlags().Bool("match-server-version", false, "Require server version to match client version")
-	cmds.PersistentFlags().String("api-version", latest.Version, "The version of the API to use against the server (used for viewing resources only)")
+	cmds.PersistentFlags().String("api-version", latest.Version, "The version of the API to use against the server")
 	cmds.PersistentFlags().String("certificate-authority", "", "Path to a certificate file for the certificate authority")
 	cmds.PersistentFlags().String("client-certificate", "", "Path to a client certificate for TLS.")
 	cmds.PersistentFlags().String("client-key", "", "Path to a client key file for TLS.")
@@ -61,11 +94,13 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdProxy(out))
-	cmds.AddCommand(NewCmdGet(out))
-	cmds.AddCommand(NewCmdDescribe(out))
-	cmds.AddCommand(NewCmdCreate(out))
-	cmds.AddCommand(NewCmdUpdate(out))
-	cmds.AddCommand(NewCmdDelete(out))
+
+	cmds.AddCommand(f.NewCmdGet(out))
+	cmds.AddCommand(f.NewCmdDescribe(out))
+	cmds.AddCommand(f.NewCmdCreate(out))
+	cmds.AddCommand(f.NewCmdUpdate(out))
+	cmds.AddCommand(f.NewCmdDelete(out))
+
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(out))
 	cmds.AddCommand(NewCmdCreateAll(out))
@@ -159,6 +194,18 @@ func getKubeNamespace(cmd *cobra.Command) string {
 	}
 	glog.V(2).Infof("Using namespace %s", result)
 	return result
+}
+
+// getExplicitKubeNamespace returns the value of the namespace a
+// user explicitly provided on the command line, or false if no
+// such namespace was specified.
+func getExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
+	if ns := getFlagString(cmd, "namespace"); len(ns) > 0 {
+		return ns, true
+	}
+	// TODO: determine when --ns-path is set but equal to the default
+	// value and return its value and true.
+	return "", false
 }
 
 func getKubeConfig(cmd *cobra.Command) *client.Config {

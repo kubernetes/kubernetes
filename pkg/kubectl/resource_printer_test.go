@@ -52,6 +52,71 @@ func TestJSONPrinter(t *testing.T) {
 	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
 }
 
+func TestPrintJSON(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	printer, versioned, err := GetPrinter("json", "", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err)
+	}
+	if !versioned {
+		t.Errorf("printer should be versioned")
+	}
+	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
+	obj := map[string]interface{}{}
+	if err := json.Unmarshal(buf.Bytes(), &obj); err != nil {
+		t.Errorf("unexpected error: %#v\n%s", err, buf.String())
+	}
+}
+
+func TestPrintYAML(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	printer, versioned, err := GetPrinter("yaml", "", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err)
+	}
+	if !versioned {
+		t.Errorf("printer should be versioned")
+	}
+	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
+	obj := map[string]interface{}{}
+	if err := yaml.Unmarshal(buf.Bytes(), &obj); err != nil {
+		t.Errorf("unexpected error: %#v\n%s", err, buf.String())
+	}
+}
+
+func TestPrintTemplate(t *testing.T) {
+	buf := bytes.NewBuffer([]byte{})
+	printer, versioned, err := GetPrinter("template", "{{ .Name }}", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err)
+	}
+	if !versioned {
+		t.Errorf("printer should be versioned")
+	}
+	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
+	if buf.String() != "foo" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestPrintEmptyTemplate(t *testing.T) {
+	if _, _, err := GetPrinter("template", "", nil); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestPrintBadTemplate(t *testing.T) {
+	if _, _, err := GetPrinter("template", "{{ .Name", nil); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestPrintBadTemplateFile(t *testing.T) {
+	if _, _, err := GetPrinter("templatefile", "", nil); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
 func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data []byte, v interface{}) error) {
 	buf := bytes.NewBuffer([]byte{})
 

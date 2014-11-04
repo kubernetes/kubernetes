@@ -17,13 +17,14 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdDelete(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete ([-f filename] | (<resource> <id>))",
 		Short: "Delete a resource by filename, stdin or resource and id",
@@ -48,31 +49,14 @@ Examples:
   $ kubectl delete pod 1234-56-7890-234234-456456
   <delete a pod with ID 1234-56-7890-234234-456456>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// If command line args are passed in, use those preferentially.
-			if len(args) > 0 && len(args) != 2 {
-				usageError(cmd, "If passing in command line parameters, must be resource and name")
-			}
-
-			var data []byte
-			var err error
-
-			if len(args) == 2 {
-				data, err = kubectl.CreateResource(args[0], args[1])
-			} else {
-				filename := getFlagString(cmd, "filename")
-				if len(filename) > 0 {
-					data, err = readConfigData(getFlagString(cmd, "filename"))
-				}
-			}
+			filename := getFlagString(cmd, "filename")
+			mapping, namespace, name := ResourceFromArgsOrFile(cmd, args, filename, f.Typer, f.Mapper)
+			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			if len(data) == 0 {
-				usageError(cmd, "Must specify filename or command line params")
-			}
-
-			// TODO Add ability to require a resource-version check for delete.
-			err = kubectl.Modify(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), kubectl.ModifyDelete, data)
+			err = kubectl.NewRESTHelper(client, mapping).Delete(namespace, name)
 			checkErr(err)
+			fmt.Fprintf(out, "%s\n", name)
 		},
 	}
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to delete the resource")

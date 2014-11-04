@@ -36,11 +36,18 @@ func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
 	return nil
 }
 
+type fakeConvertor struct{}
+
+func (fakeConvertor) ConvertToVersion(in runtime.Object, _ string) (runtime.Object, error) {
+	return in, nil
+}
+
 var validCodec = fakeCodec{}
 var validAccessor = resourceAccessor{}
+var validConvertor = fakeConvertor{}
 
 func fakeInterfaces(version string) (*VersionInterfaces, bool) {
-	return &VersionInterfaces{Codec: validCodec, MetadataAccessor: validAccessor}, true
+	return &VersionInterfaces{Codec: validCodec, ObjectConvertor: validConvertor, MetadataAccessor: validAccessor}, true
 }
 
 func unmatchedVersionInterfaces(version string) (*VersionInterfaces, bool) {
@@ -155,7 +162,7 @@ func TestRESTMapperRESTMapping(t *testing.T) {
 		if mapping.APIVersion != version {
 			t.Errorf("%d: unexpected version: %#v", i, mapping)
 		}
-		if mapping.Codec == nil || mapping.MetadataAccessor == nil {
+		if mapping.Codec == nil || mapping.MetadataAccessor == nil || mapping.ObjectConvertor == nil {
 			t.Errorf("%d: missing codec and accessor: %#v", i, mapping)
 		}
 	}

@@ -14,14 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package kubectl
 
 import (
-	"os"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-func main() {
-	cmd.NewFactory().Run(os.Stdout)
+// RESTClient is a client helper for dealing with RESTful resources
+// in a generic way.
+type RESTClient interface {
+	Get() *client.Request
+	Post() *client.Request
+	Delete() *client.Request
+	Put() *client.Request
 }

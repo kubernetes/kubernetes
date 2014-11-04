@@ -17,22 +17,25 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/spf13/cobra"
 )
 
-func NewCmdGet(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get [(-o|--output=)table|json|yaml|template] [-t <file>|--template=<file>] <resource> [<id>]",
+		Use:   "get [(-o|--output=)json|yaml|...] <resource> [<id>]",
 		Short: "Display one or many resources",
 		Long: `Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
 (se) or minions (mi).
 
-If you specify a Go template, you can use any field defined in pkg/api/types.go.
+If you specify a Go template, you can use any fields defined for the API version
+you are connecting to the server with.
 
 Examples:
   $ kubectl get pods
@@ -44,28 +47,45 @@ Examples:
   $ kubectl get -f json pod 1234-56-7890-234234-456456
   <list single pod in json output format>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			var resource, id string
-			if len(args) == 0 {
-				usageError(cmd, "Need to supply a resource.")
-			}
-			if len(args) >= 1 {
-				resource = args[0]
-			}
-			if len(args) >= 2 {
-				id = args[1]
-			}
+			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, f.Mapper)
+
+			selector := getFlagString(cmd, "selector")
+			labels, err := labels.ParseSelector(selector)
+			checkErr(err)
+
+			client, err := f.Client(cmd, mapping)
+			checkErr(err)
+
 			outputFormat := getFlagString(cmd, "output")
 			templateFile := getFlagString(cmd, "template")
-			selector := getFlagString(cmd, "selector")
-			err := kubectl.Get(out, getKubeClient(cmd).RESTClient, getKubeNamespace(cmd), resource, id, selector, outputFormat, getFlagBool(cmd, "no-headers"), templateFile)
+			defaultPrinter, err := f.Printer(cmd, mapping, getFlagBool(cmd, "no-headers"))
 			checkErr(err)
+
+			printer, versioned, err := kubectl.GetPrinter(outputFormat, templateFile, defaultPrinter)
+			checkErr(err)
+
+			obj, err := kubectl.NewRESTHelper(client, mapping).Get(namespace, name, labels)
+			checkErr(err)
+
+			if versioned {
+				outputVersion := getFlagString(cmd, "output-version")
+				if len(outputVersion) == 0 {
+					outputVersion = mapping.APIVersion
+				}
+
+				obj, err = mapping.ObjectConvertor.ConvertToVersion(obj, outputVersion)
+				checkErr(err)
+			}
+
+			if err := printer.PrintObj(obj, out); err != nil {
+				checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
+			}
 		},
 	}
-	// TODO Add an --output-version lock which can ensure that regardless of the
-	// server version, the client output stays the same.
-	cmd.Flags().StringP("output", "o", "console", "Output format: console|json|yaml|template")
-	cmd.Flags().Bool("no-headers", false, "When output format is console, don't print headers")
-	cmd.Flags().StringP("template", "t", "", "Path to template file to use when --output=template")
+	cmd.Flags().StringP("output", "o", "", "Output format: json|yaml|template|templatefile")
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version)")
+	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers")
+	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when --output=template or --output=templatefile")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	return cmd
 }

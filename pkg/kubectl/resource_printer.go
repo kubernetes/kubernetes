@@ -34,7 +34,10 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-func getPrinter(format, templateFile string, noHeaders bool) (ResourcePrinter, error) {
+// GetPrinter returns a resource printer and a bool indicating whether the object must be
+// versioned for the given format.
+func GetPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (ResourcePrinter, bool, error) {
+	versioned := true
 	var printer ResourcePrinter
 	switch format {
 	case "json":
@@ -43,31 +46,46 @@ func getPrinter(format, templateFile string, noHeaders bool) (ResourcePrinter, e
 		printer = &YAMLPrinter{}
 	case "template":
 		var data []byte
-		if len(templateFile) > 0 {
-			var err error
-			data, err = ioutil.ReadFile(templateFile)
-			if err != nil {
-				return printer, fmt.Errorf("Error reading template %s, %v\n", templateFile, err)
-			}
-		} else {
-			return printer, fmt.Errorf("template format specified but no template file given")
+		if len(templateFile) == 0 {
+			return nil, false, fmt.Errorf("template format specified but no template given")
 		}
-		tmpl, err := template.New("output").Parse(string(data))
+		tmpl, err := template.New("output").Parse(templateFile)
 		if err != nil {
-			return printer, fmt.Errorf("Error parsing template %s, %v\n", string(data), err)
+			return nil, false, fmt.Errorf("Error parsing template %s, %v\n", string(data), err)
 		}
 		printer = &TemplatePrinter{
 			Template: tmpl,
 		}
+	case "templatefile":
+		var data []byte
+		if len(templateFile) > 0 {
+			var err error
+			data, err = ioutil.ReadFile(templateFile)
+			if err != nil {
+				return nil, false, fmt.Errorf("Error reading template %s, %v\n", templateFile, err)
+			}
+		} else {
+			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
+		}
+		tmpl, err := template.New("output").Parse(string(data))
+		if err != nil {
+			return nil, false, fmt.Errorf("Error parsing template %s, %v\n", string(data), err)
+		}
+		printer = &TemplatePrinter{
+			Template: tmpl,
+		}
+	case "":
+		printer = defaultPrinter
+		versioned = false
 	default:
-		printer = NewHumanReadablePrinter(noHeaders)
+		return nil, false, fmt.Errorf("output format %q not recognized", format)
 	}
-	return printer, nil
+	return printer, versioned, nil
 }
 
 // ResourcePrinter is an interface that knows how to print API resources.
 type ResourcePrinter interface {
-	// Print receives an arbitrary JSON body, formats it and prints it to a writer.
+	// Print receives an arbitrary object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
 }
 
