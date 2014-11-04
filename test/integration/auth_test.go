@@ -32,6 +32,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -88,7 +89,7 @@ func TestWhoAmI(t *testing.T) {
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
 		TokenAuthFile:     tokenFilename,
-		AuthorizationMode: "AlwaysAllow",
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
 
 	s := httptest.NewServer(m.Handler)
@@ -237,6 +238,7 @@ var aEndpoints string = `
 
 var code200or202 = map[int]bool{200: true, 202: true} // Unpredicatable which will be returned.
 var code400 = map[int]bool{400: true}
+var code403 = map[int]bool{403: true}
 var code404 = map[int]bool{404: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
@@ -372,7 +374,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		AuthorizationMode: "AlwaysAllow",
+		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 	})
 
 	s := httptest.NewServer(m.Handler)
@@ -417,7 +419,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
-		AuthorizationMode: "AlwaysDeny",
+		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
 	})
 
 	s := httptest.NewServer(m.Handler)
@@ -465,8 +467,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
-	aaa := allowAliceAuthorizer{}
-
 	// Set up a master
 
 	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
@@ -475,22 +475,19 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	}
 
 	m := master.New(&master.Config{
-		EtcdHelper:           helper,
-		KubeletClient:        client.FakeKubeletClient{},
-		EnableLogsSupport:    false,
-		EnableUISupport:      false,
-		APIPrefix:            "/api",
-		TokenAuthFile:        tokenFilename,
-		AuthorizerForTesting: aaa,
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		TokenAuthFile:     tokenFilename,
+		Authorizer:        allowAliceAuthorizer{},
 	})
 
 	s := httptest.NewServer(m.Handler)
 	defer s.Close()
 	transport := http.DefaultTransport
 
-	// Alice is authorized.
-
-	//
 	for _, r := range getTestRequests() {
 		token := AliceToken
 		t.Logf("case %v", r)
@@ -524,8 +521,6 @@ func TestBobIsForbidden(t *testing.T) {
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
-	aaa := allowAliceAuthorizer{}
-
 	// Set up a master
 
 	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
@@ -534,22 +529,19 @@ func TestBobIsForbidden(t *testing.T) {
 	}
 
 	m := master.New(&master.Config{
-		EtcdHelper:           helper,
-		KubeletClient:        client.FakeKubeletClient{},
-		EnableLogsSupport:    false,
-		EnableUISupport:      false,
-		APIPrefix:            "/api",
-		TokenAuthFile:        tokenFilename,
-		AuthorizerForTesting: aaa,
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		TokenAuthFile:     tokenFilename,
+		Authorizer:        allowAliceAuthorizer{},
 	})
 
 	s := httptest.NewServer(m.Handler)
 	defer s.Close()
 	transport := http.DefaultTransport
 
-	// Alice is authorized.
-
-	//
 	for _, r := range getTestRequests() {
 		token := BobToken
 		t.Logf("case %v", r)
@@ -585,8 +577,6 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
-	aaa := allowAliceAuthorizer{}
-
 	// Set up a master
 
 	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
@@ -595,13 +585,13 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	}
 
 	m := master.New(&master.Config{
-		EtcdHelper:           helper,
-		KubeletClient:        client.FakeKubeletClient{},
-		EnableLogsSupport:    false,
-		EnableUISupport:      false,
-		APIPrefix:            "/api",
-		TokenAuthFile:        tokenFilename,
-		AuthorizerForTesting: aaa,
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		TokenAuthFile:     tokenFilename,
+		Authorizer:        allowAliceAuthorizer{},
 	})
 
 	s := httptest.NewServer(m.Handler)
@@ -625,7 +615,248 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			}
 			// Expect all of unauthenticated user's request to be "Unauthorized"
 			if resp.StatusCode != http.StatusUnauthorized {
-				t.Errorf("Expected status Unauthorized, but got %s", resp.Status)
+				t.Errorf("Expected status %v, but got %v", http.StatusUnauthorized, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
+			}
+		}
+	}
+}
+
+// Inject into master an authorizer that uses namespace information.
+// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
+type allowFooNamespaceAuthorizer struct{}
+
+func (allowFooNamespaceAuthorizer) Authorize(a authorizer.Attributes) error {
+	if a.GetNamespace() == "foo" {
+		return nil
+	}
+	return errors.New("I can't allow that.  Try another namespace, buddy.")
+}
+
+// TestNamespaceAuthorization tests that authorization can be controlled
+// by namespace.
+func TestNamespaceAuthorization(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
+	// This file has alice and bob in it.
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		TokenAuthFile:     tokenFilename,
+		Authorizer:        allowFooNamespaceAuthorizer{},
+	})
+
+	s := httptest.NewServer(m.Handler)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb        string
+		URL         string
+		body        string
+		statusCodes map[int]bool // allowed status codes.
+	}{
+		{"POST", "/api/v1beta1/pods?namespace=foo", aPod, code200or202},
+		{"GET", "/api/v1beta1/pods?namespace=foo", "", code200or202},
+		{"GET", "/api/v1beta1/pods/a?namespace=foo", "", code200or202},
+		{"DELETE", "/api/v1beta1/pods/a?namespace=foo", "", code200or202},
+
+		{"POST", "/api/v1beta1/pods?namespace=bar", aPod, code403},
+		{"GET", "/api/v1beta1/pods?namespace=bar", "", code403},
+		{"GET", "/api/v1beta1/pods/a?namespace=bar", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a?namespace=bar", "", code403},
+
+		{"POST", "/api/v1beta1/pods", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a", "", code403},
+	}
+
+	for _, r := range requests {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+			}
+		}
+	}
+}
+
+// Inject into master an authorizer that uses kind information.
+// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
+type allowServicesAuthorizer struct{}
+
+func (allowServicesAuthorizer) Authorize(a authorizer.Attributes) error {
+	if a.GetKind() == "services" {
+		return nil
+	}
+	return errors.New("I can't allow that.  Hint: try services.")
+}
+
+// TestKindAuthorization tests that authorization can be controlled
+// by namespace.
+func TestKindAuthorization(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
+	// This file has alice and bob in it.
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		TokenAuthFile:     tokenFilename,
+		Authorizer:        allowServicesAuthorizer{},
+	})
+
+	s := httptest.NewServer(m.Handler)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb        string
+		URL         string
+		body        string
+		statusCodes map[int]bool // allowed status codes.
+	}{
+		{"POST", "/api/v1beta1/services", aService, code200or202},
+		{"GET", "/api/v1beta1/services", "", code200or202},
+		{"GET", "/api/v1beta1/services/a", "", code200or202},
+		{"DELETE", "/api/v1beta1/services/a", "", code200or202},
+
+		{"POST", "/api/v1beta1/pods", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a", "", code403},
+	}
+
+	for _, r := range requests {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+			}
+		}
+	}
+}
+
+// Inject into master an authorizer that uses ReadOnly information.
+// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
+type allowReadAuthorizer struct{}
+
+func (allowReadAuthorizer) Authorize(a authorizer.Attributes) error {
+	if a.IsReadOnly() {
+		return nil
+	}
+	return errors.New("I'm afraid I can't let you do that.")
+}
+
+// TestReadOnlyAuthorization tests that authorization can be controlled
+// by namespace.
+func TestReadOnlyAuthorization(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
+	// This file has alice and bob in it.
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
+		EnableLogsSupport: false,
+		EnableUISupport:   false,
+		APIPrefix:         "/api",
+		TokenAuthFile:     tokenFilename,
+		Authorizer:        allowReadAuthorizer{},
+	})
+
+	s := httptest.NewServer(m.Handler)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	requests := []struct {
+		verb        string
+		URL         string
+		body        string
+		statusCodes map[int]bool // allowed status codes.
+	}{
+		{"POST", "/api/v1beta1/pods", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code200or202},
+		{"GET", "/api/v1beta1/pods/a", "", code404},
+	}
+
+	for _, r := range requests {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 			}
 		}
 	}

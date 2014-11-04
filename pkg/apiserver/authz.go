@@ -36,6 +36,10 @@ func (alwaysAllowAuthorizer) Authorize(a authorizer.Attributes) (err error) {
 	return nil
 }
 
+func NewAlwaysAllowAuthorizer() authorizer.Authorizer {
+	return new(alwaysAllowAuthorizer)
+}
+
 // alwaysDenyAuthorizer is an implementation of authorizer.Attributes
 // which always says no to an authorization request.
 // It is useful in unit tests to force an operation to be forbidden.
@@ -43,6 +47,10 @@ type alwaysDenyAuthorizer struct{}
 
 func (alwaysDenyAuthorizer) Authorize(a authorizer.Attributes) (err error) {
 	return errors.New("Everything is forbidden.")
+}
+
+func NewAlwaysDenyAuthorizer() authorizer.Authorizer {
+	return new(alwaysDenyAuthorizer)
 }
 
 const (
@@ -59,9 +67,9 @@ func NewAuthorizerFromAuthorizationConfig(authorizationMode string) (authorizer.
 	// Keep cases in sync with constant list above.
 	switch authorizationMode {
 	case ModeAlwaysAllow:
-		return new(alwaysAllowAuthorizer), nil
+		return NewAlwaysAllowAuthorizer(), nil
 	case ModeAlwaysDeny:
-		return new(alwaysDenyAuthorizer), nil
+		return NewAlwaysDenyAuthorizer(), nil
 	default:
 		return nil, errors.New("Unknown authorization mode")
 	}

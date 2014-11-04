@@ -107,6 +107,7 @@ func (g *APIGroup) InstallREST(mux Mux, paths ...string) {
 		prefix = strings.TrimRight(prefix, "/")
 		proxyHandler := &ProxyHandler{prefix + "/proxy/", g.handler.storage, g.handler.codec}
 		mux.Handle(prefix+"/", http.StripPrefix(prefix, restHandler))
+		// Note: update GetAttribs() when adding a handler.
 		mux.Handle(prefix+"/watch/", http.StripPrefix(prefix+"/watch/", watchHandler))
 		mux.Handle(prefix+"/proxy/", http.StripPrefix(prefix+"/proxy/", proxyHandler))
 		mux.Handle(prefix+"/redirect/", http.StripPrefix(prefix+"/redirect/", redirectHandler))
