@@ -1,0 +1,176 @@
+@media #{$xs} {
+    body {
+        padding-top: 70px;
+    }
+    h2 {
+        font-size: 30px;
+        line-height: initial;
+    }
+    h3 {
+        font-size: 25px;
+        line-height: 50px;
+    }
+    h4 {
+        font-size: 18px;
+        line-height: 25px;
+    }
+    p {
+        font-size: 15px;
+        line-height: 23px;
+        &.split {
+            @include cross-browser(column-count,1);
+        }
+    }
+    footer {
+        background-image: url('#{$img_dir_mobile}/hexegon_texture_footer.png');
+    }
+
+    #nav {
+        background-color: $turquoise;
+        background-image: url('#{$img_dir_mobile}/nav_logo.svg');
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 124px 17px;
+//        @include slide-in(calc(100% - 70px)); // not iOS7 safe
+        @include slide-in-ios-safe(calc(100% - 70px));
+        #logo-mobile {
+            height: 17px;
+            margin: 25px 0;
+        }
+        .back-to-top {
+            width: 28px;
+            height: 18px;
+            margin-top: 25px;
+            display: block;
+        }
+        #mobile-menu-button {
+            width: 24px;
+            height: 18px;
+            margin: 35px 0 16px;
+            float: left;
+            position: relative;
+            @include slide-in(8px);
+            span {
+                &, &:before, &:after {
+                    background-color: $white;
+                    width: 24px;
+                    height: 3px;
+                    position: absolute;
+                    display: block;
+                    cursor: pointer;
+                    content: "";
+                    @include cross-browser(transition,all 500ms ease-in-out);
+                }
+                &:before {
+                    top: -7px;
+                }
+                &:after {
+                    bottom: -7px;
+                }
+            }
+            &.slide-in {
+                span {
+                    background-color: transparent;
+                    &:before, &:after {
+                        top: 0;
+                    }
+                    &:before {
+                        @include cross-browser(transform,rotate(45deg));
+                    }
+                    &:after {
+                        top: 10px;
+                        @include cross-browser(transform,translateY(-10px) rotate(-45deg));
+                    }
+                }
+            }
+        }
+    }
+
+    #mobile-nav-container {
+        background-color: $blue;
+        font-size: 22px;
+        line-height: 69px;
+        width: calc(100% - 70px);
+        border-right: 1px solid $white;
+        position: fixed;
+        overflow: scroll;
+        top: 0;
+        bottom: 0;
+        left: calc(-100% + 70px);
+        z-index: $zNav + 1;
+        @include slide-in(100%);
+        a {
+            color: $white;
+            display: block;
+            border-bottom: 1px solid $white;
+            div {
+                background-color: transparent;
+                width: 10px;
+                height: 10px;
+                border-radius: 1px;
+                margin-left: 24px;
+                margin-right: 10px;
+                display: inline-block;
+            }
+            &.active {
+                div {
+                    background-color: $turquoise;
+                    vertical-align: middle;
+                    margin-bottom: 4px;
+                }
+            }
+        }
+
+    }
+
+    .button {
+        font-size: 18px;
+        line-height: 25px;
+        margin-bottom: 25px;
+    }
+
+    .hero {
+        background-image: url('#{$img_dir_mobile}/hexegon_texture_hero.png');
+        padding: 50px 0 35px;
+        h4 {
+            margin: 30px 0 60px;
+        }
+    }
+
+    .what {
+        padding: 60px 0 5px;
+        img { 
+            margin: 45px 0 60px;
+        }
+    }
+
+    .who {
+        background-image: url('#{$img_dir_mobile}/hexegon_texture_video.png');
+        padding: 30px 0;
+    }
+
+    .why {
+        padding: 75px 0 30px;
+        .list {
+            margin: 0;
+            .item {
+                border-bottom: 2px solid $bluegray;
+                padding: 35px 0 69px;
+                &:last-child {
+                    border-bottom: 0;
+                }
+            }
+        }
+    }
+    .talk {
+        padding: 30px 0 60px;
+    }
+    .talk-tab {
+        h2 {
+        }
+    }
+
+    .youtube-wrapper {
+        margin-bottom: 30px;
+    }
+}

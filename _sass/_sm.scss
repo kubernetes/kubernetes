@@ -1,0 +1,107 @@
+@media #{$sm} {
+    body {
+        padding-top: 70px;
+    }
+    p {
+        font-size: 15px;
+    }
+    h3 {
+        font-size: 28px;
+    }
+    #nav {
+        background-color: $turquoise;
+        background-image: url('#{$img_dir_mobile}/nav_logo.svg');
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 124px 17px;
+//        @include slide-in(calc(100% - 70px)); // not iOS7 safe
+        @include slide-in-ios-safe(calc(100% - 70px));
+        #logo-mobile {
+            height: 17px;
+            margin: 25px 0;
+        }
+        .back-to-top {
+            width: 28px;
+            height: 18px;
+            margin-top: 25px;
+            display: block;
+        }
+        #mobile-menu-button {
+            width: 24px;
+            height: 18px;
+            margin: 35px 0 16px;
+            float: left;
+            position: relative;
+            @include slide-in(-1px);
+            span {
+                &, &:before, &:after {
+                    background-color: $white;
+                    width: 24px;
+                    height: 3px;
+                    position: absolute;
+                    display: block;
+                    cursor: pointer;
+                    content: "";
+                    @include cross-browser(transition,all 500ms ease-in-out);
+                }
+                &:before {
+                    top: -7px;
+                }
+                &:after {
+                    bottom: -7px;
+                }
+            }
+            &.slide-in {
+                span {
+                    background-color: transparent;
+                    &:before, &:after {
+                        top: 0;
+                    }
+                    &:before {
+                        @include cross-browser(transform,rotate(45deg));
+                    }
+                    &:after {
+                        top: 10px;
+                        @include cross-browser(transform,translateY(-10px) rotate(-45deg));
+                    }
+                }
+            }
+        }
+    }
+
+    #mobile-nav-container {
+        background-color: $blue;
+        font-size: 22px;
+        line-height: 69px;
+        width: calc(100% - 70px);
+        border-right: 1px solid $white;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: calc(-100% + 70px);
+        z-index: $zNav + 1;
+        @include slide-in(100%);
+        a {
+            color: $white;
+            display: block;
+            border-bottom: 1px solid $white;
+            div {
+                background-color: transparent;
+                width: 10px;
+                height: 10px;
+                border-radius: 1px;
+                margin-left: 24px;
+                margin-right: 10px;
+                display: inline-block;
+            }
+            &.active {
+                div {
+                    background-color: $turquoise;
+                    vertical-align: middle;
+                    margin-bottom: 4px;
+                }
+            }
+        }
+
+    }
+}

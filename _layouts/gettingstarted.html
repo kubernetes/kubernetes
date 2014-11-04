@@ -1,0 +1,69 @@
+---
+layout: default
+---
+
+<div class="hero interior">
+ <div class="container">
+  <div class="row">
+   <div class="col-lg-2 col-md-2 col-sm-2 hidden-xs">
+    <img src="{{page.hero.img}}" alt="{{page.hero.alt}}"
+     class="img-responsive" />
+   </div>
+   <div class="col-lg-10 col-md-10 col-md-10">
+    <div class="row">
+     <div class="col-xs-12">
+      <h1 class="text-white">{{page.hero.title}}</h1>
+     </div>
+    </div>
+    <div class="row">
+     <div class="col-xs-12">
+      <h4 class="text-white text-left">{{page.hero.text}}</h4>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="getting-started">
+ <div class="container">
+  <ul class="steps">
+{% for step in page.steps %}
+   <li class="step">
+    <div class="row">
+     <div class="col-lg-1 col-md-1 col-sm-1 xs-hidden">
+      <div class="bullet">
+      </div>
+     </div>
+     <div class="col-lg-10 col-md-10 col-sm-10">
+      <div class="row">
+       <div class="col-xs-12">
+        <h3 class="text-gray">{{step.title}}</h3>
+       </div>
+      </div>
+      <div class="row">
+       <div class="col-xs-12">
+        <p class="interior">{{step.text}}</p>
+       </div>
+      </div>
+    {% if 'installation' == step.slug %}
+      <div class="row">
+       <div class="col-xs-11">
+        <div class="guides">
+        {% for guide in page.install-guides %}
+         <a href="{{guide.url}}" class="button dynamic">{{guide.label}}</a>
+        {% endfor %}
+        </div>
+       </div>
+      </div>
+    {% elsif 'first_app' == step.slug %}
+     FIRST APP
+    {% elsif 'technical' == step.slug %}
+     TECH STUFF
+    {% endif %}
+     </div>
+    </div>
+   </li>
+{% endfor %}
+  </ul>
+ </div>
+</div>

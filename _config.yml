@@ -1,0 +1,60 @@
+# Site settings
+title: Kubernetes by Google
+
+email: your-email@domain.com
+
+description: > # this means to ignore newlines until "baseurl:"
+ Manage a cluster of Linux containers as a single system to accelerate Dev and simplify Ops with Kubernetes by Google.
+
+baseurl: "" # the subpath of your site, e.g. /blog/
+
+url: "http://kubernetes.io" # the base hostname & protocol for your site
+
+# Build settings
+markdown: kramdown
+#sass:
+#    style: :compressed
+
+logo:
+    desktop: /img/desktop/nav_logo.svg
+    mobile: /img/mobile/nav_logo.svg
+
+nav:
+ - label: Home
+   url: /
+   slug: home
+ - label: Getting Started
+   #url: /gettingstarted
+   url: /legacy/gettingstarted
+   slug: gettingstarted
+ - label: Community
+   #url: /community
+   url: /legacy/community
+   slug: community
+ - label: News
+   #url: /news
+   url: /legacy/news
+   slug: news
+ - label: Events
+   #url: /events
+   url: /legacy/events
+   slug: events
+ - label: Blog
+   url: http://googlecloudplatform.blogspot.com/search/label/Kubernetes
+   slug: blog
+
+footer:
+    connect: Connect With Us!
+    social: 
+      - label: stackoverflow
+        url: http://stackoverflow.com/questions/tagged/kubernetes
+      - label: twitter
+        url: https://twitter.com/googlecloud
+      - label: googleplus
+        url: https://plus.google.com/+googlecloudplatform
+            
+    links:
+      - label: Freenode
+        url: http://webchat.freenode.net/?channels=google-containers
+      - label: Mailing List
+        url: "https://groups.google.com/forum/#!forum/google-containers" 

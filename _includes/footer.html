@@ -1,0 +1,45 @@
+<footer class="text-center">
+ <div class="container">
+  <div class="row">
+   <div class="col-xs-12">
+    <h5>
+     {{site.footer.connect}}
+    </h5>
+   </div>
+  </div>
+  <div class="row">
+   <div class="col-xs-12">
+    <div class="social">
+{% for link in site.footer.social %}
+     <a href="{{link.url}}" class="{{link.label}}"><span>{{link.label}}</span></a>
+{% endfor %}
+    </div>
+   </div>
+  </div>
+  <div class="row">
+   <div class="col-xs-12">
+{% for link in site.footer.links %}
+    <a href="{{link.url}}">{{link.label}}</a>
+    {% if false == forloop.last %} | {% endif %}
+{% endfor %}
+   </div>
+  </div>
+  <div class="row">
+   <div class="col-xs-12">
+    <div class="copyright">
+     © Kubernetes {{page.date}}
+    </div>
+   </div>
+  </div>
+ </div>
+</footer>
+
+<!-- end of content -->
+<!-- responsive test blocks -->
+<div class="visible-xs-block"></div>
+<div class="visible-sm-block"></div>
+<div class="visible-md-block"></div>
+<div class="visible-lg-block"></div>
+<!-- end of responsive test blocks -->
+ </body>
+</html>
