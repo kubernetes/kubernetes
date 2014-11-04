@@ -237,10 +237,13 @@ kube::golang::build_binaries() {
     local goflags
     eval "goflags=(${KUBE_GOFLAGS:-})"
 
+    local use_go_build
     local -a targets=()
     local arg
     for arg; do
-      if [[ "${arg}" == -* ]]; then
+      if [[ "${arg}" == "--use_go_build" ]]; then
+        use_go_build=true
+      elif [[ "${arg}" == -* ]]; then
         # Assume arguments starting with a dash are flags to pass to go.
         goflags+=("${arg}")
       else
@@ -264,9 +267,25 @@ kube::golang::build_binaries() {
     for platform in "${platforms[@]}"; do
       kube::golang::set_platform_envs "${platform}"
       kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
-      go install "${goflags[@]:+${goflags[@]}}" \
-          -ldflags "${version_ldflags}" \
-          "${binaries[@]}"
+      if [[ -n ${use_go_build:-} ]]; then
+        # Try and replicate the native binary placement of go install without calling go install
+        local output_path="${KUBE_GOPATH}/bin"
+        if [[ $platform != $host_platform ]]; then
+          output_path="${output_path}/${platform//\//_}"
+        fi
+
+        for binary in "${binaries[@]}"; do
+          local bin=$(basename "${binary}")
+          go build -o "${output_path}/${bin}" \
+              "${goflags[@]:+${goflags[@]}}" \
+              -ldflags "${version_ldflags}" \
+              "${binary}"
+        done
+      else
+        go install "${goflags[@]:+${goflags[@]}}" \
+            -ldflags "${version_ldflags}" \
+            "${binaries[@]}"
+      fi
     done
   )
 }
