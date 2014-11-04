@@ -56,10 +56,10 @@ xyz987,bob,2
 func writeTestTokenFile(t *testing.T) string {
 	// Write a token file.
 	f, err := ioutil.TempFile("", "auth_integration_test")
-	f.Close()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	f.Close()
 	if err := ioutil.WriteFile(f.Name(), []byte(TokenfileCSV), 0700); err != nil {
 		t.Fatalf("unexpected error writing tokenfile: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestWhoAmI(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.token))
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -135,7 +135,7 @@ func TestWhoAmI(t *testing.T) {
 				}
 
 			}
-		}
+		}()
 	}
 }
 
@@ -386,7 +386,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -397,7 +397,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
 			}
-		}
+		}()
 	}
 }
 
@@ -431,7 +431,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -440,7 +440,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 			if resp.StatusCode != http.StatusForbidden {
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
 			}
-		}
+		}()
 	}
 }
 
@@ -496,7 +496,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -505,7 +505,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 			}
-		}
+		}()
 	}
 }
 
@@ -550,7 +550,7 @@ func TestBobIsForbidden(t *testing.T) {
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -560,7 +560,7 @@ func TestBobIsForbidden(t *testing.T) {
 			if resp.StatusCode != http.StatusForbidden {
 				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
 			}
-		}
+		}()
 	}
 }
 
@@ -605,7 +605,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -617,7 +617,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
 			}
-		}
+		}()
 	}
 }
 
@@ -637,7 +637,7 @@ func (allowFooNamespaceAuthorizer) Authorize(a authorizer.Attributes) error {
 func TestNamespaceAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
@@ -693,7 +693,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -702,7 +702,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 			}
-		}
+		}()
 	}
 }
 
@@ -722,7 +722,7 @@ func (allowServicesAuthorizer) Authorize(a authorizer.Attributes) error {
 func TestKindAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
@@ -802,7 +802,7 @@ func (allowReadAuthorizer) Authorize(a authorizer.Attributes) error {
 func TestReadOnlyAuthorization(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
@@ -847,7 +847,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
@@ -856,6 +856,6 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
 			}
-		}
+		}()
 	}
 }
