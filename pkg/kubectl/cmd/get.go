@@ -32,7 +32,7 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 		Long: `Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
-(se) or minions (mi).
+(se), minions (mi), or events (ev).
 
 If you specify a Go template, you can use any fields defined for the API version
 you are connecting to the server with.

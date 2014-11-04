@@ -177,6 +177,7 @@ var replicationControllerColumns = []string{"NAME", "IMAGE(S)", "SELECTOR", "REP
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
 var minionColumns = []string{"NAME"}
 var statusColumns = []string{"STATUS"}
+var eventColumns = []string{"NAME", "KIND", "STATUS", "REASON", "MESSAGE"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -189,6 +190,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(minionColumns, printMinion)
 	h.Handler(minionColumns, printMinionList)
 	h.Handler(statusColumns, printStatus)
+	h.Handler(eventColumns, printEvent)
+	h.Handler(eventColumns, printEventList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -275,6 +278,27 @@ func printMinionList(list *api.MinionList, w io.Writer) error {
 func printStatus(status *api.Status, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%v\n", status.Status)
 	return err
+}
+
+func printEvent(event *api.Event, w io.Writer) error {
+	_, err := fmt.Fprintf(
+		w, "%s\t%s\t%s\t%s\t%s\n",
+		event.InvolvedObject.Name,
+		event.InvolvedObject.Kind,
+		event.Status,
+		event.Reason,
+		event.Message,
+	)
+	return err
+}
+
+func printEventList(list *api.EventList, w io.Writer) error {
+	for i := range list.Items {
+		if err := printEvent(&list.Items[i], w); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
