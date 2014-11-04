@@ -183,11 +183,11 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 		go func() {
 			defer util.HandleCrash()
 			podID := pod.Name
+			podNamespace := pod.Namespace
 			backoff.wait(podID)
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
-			ctx := api.WithNamespace(api.NewContext(), pod.Namespace)
-			err := factory.Client.Get().Namespace(api.Namespace(ctx)).Path("pods").Path(podID).Do().Into(pod)
+			err := factory.Client.Get().Namespace(podNamespace).Path("pods").Path(podID).Do().Into(pod)
 			if err != nil {
 				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
 				return
