@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -625,9 +626,10 @@ func TestValidatePodUpdate(t *testing.T) {
 
 func TestValidateService(t *testing.T) {
 	testCases := []struct {
-		name    string
-		svc     api.Service
-		numErrs int
+		name     string
+		svc      api.Service
+		existing api.ServiceList
+		numErrs  int
 	}{
 		{
 			name: "missing id",
@@ -728,6 +730,64 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "invalid port in use",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
+				Port:       80,
+				CreateExternalLoadBalancer: true,
+				Selector:                   map[string]string{"foo": "bar"},
+			},
+			existing: api.ServiceList{
+				Items: []api.Service{
+					{Port: 80, CreateExternalLoadBalancer: true},
+				},
+			},
+			numErrs: 1,
+		},
+		{
+			name: "same port in use, but not external",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
+				Port:       80,
+				CreateExternalLoadBalancer: true,
+				Selector:                   map[string]string{"foo": "bar"},
+			},
+			existing: api.ServiceList{
+				Items: []api.Service{
+					{Port: 80},
+				},
+			},
+			numErrs: 0,
+		},
+		{
+			name: "same port in use, but not external on input",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
+				Port:       80,
+				Selector:   map[string]string{"foo": "bar"},
+			},
+			existing: api.ServiceList{
+				Items: []api.Service{
+					{Port: 80, CreateExternalLoadBalancer: true},
+				},
+			},
+			numErrs: 0,
+		},
+		{
+			name: "same port in use, but neither external",
+			svc: api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
+				Port:       80,
+				Selector:   map[string]string{"foo": "bar"},
+			},
+			existing: api.ServiceList{
+				Items: []api.Service{
+					{Port: 80},
+				},
+			},
+			numErrs: 0,
+		},
+		{
 			name: "invalid label",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{
@@ -745,7 +805,9 @@ func TestValidateService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		errs := ValidateService(&tc.svc)
+		registry := registrytest.NewServiceRegistry()
+		registry.List = tc.existing
+		errs := ValidateService(&tc.svc, registry, api.NewDefaultContext())
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %+v", tc.name, errs)
 		}
@@ -756,7 +818,7 @@ func TestValidateService(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Selector:   map[string]string{"foo": "bar"},
 	}
-	errs := ValidateService(&svc)
+	errs := ValidateService(&svc, registrytest.NewServiceRegistry(), api.NewDefaultContext())
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}

@@ -87,7 +87,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
-	if errs := validation.ValidateService(service); len(errs) > 0 {
+	if errs := validation.ValidateService(service, rs.registry, ctx); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", service.Name, errs)
 	}
 
@@ -229,7 +229,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, errors.NewConflict("service", service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
-	if errs := validation.ValidateService(service); len(errs) > 0 {
+	if errs := validation.ValidateService(service, rs.registry, ctx); len(errs) > 0 {
 		return nil, errors.NewInvalid("service", service.Name, errs)
 	}
 	return apiserver.MakeAsync(func() (runtime.Object, error) {

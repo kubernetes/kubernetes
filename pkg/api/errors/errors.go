@@ -132,6 +132,19 @@ func NewBadRequest(reason string) error {
 	}
 }
 
+// NewInternalError returns an error indicating the item is invalid and cannot be processed.
+func NewInternalError(err error) error {
+	return &statusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   500,
+		Reason: api.StatusReasonInternalError,
+		Details: &api.StatusDetails{
+			Causes: []api.StatusCause{{Message: err.Error()}},
+		},
+		Message: fmt.Sprintf("Internal error occurred: %v", err),
+	}}
+}
+
 // IsNotFound returns true if the specified error was created by NewNotFoundErr.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound

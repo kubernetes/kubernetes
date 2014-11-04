@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -26,6 +27,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+type ServiceLister interface {
+	ListServices(api.Context) (*api.ServiceList, error)
+}
 
 func validateVolumes(volumes []api.Volume) (util.StringSet, errs.ValidationErrorList) {
 	allErrs := errs.ValidationErrorList{}
@@ -382,7 +387,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 }
 
 // ValidateService tests if required fields in the service are set.
-func ValidateService(service *api.Service) errs.ValidationErrorList {
+func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if len(service.Name) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("name", service.Name))
@@ -402,6 +407,19 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 	if labels.Set(service.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Selector))
+	}
+	if service.CreateExternalLoadBalancer {
+		services, err := lister.ListServices(ctx)
+		if err != nil {
+			allErrs = append(allErrs, errs.NewInternalError(err))
+		} else {
+			for i := range services.Items {
+				if services.Items[i].CreateExternalLoadBalancer && services.Items[i].Port == service.Port {
+					allErrs = append(allErrs, errs.NewConflict("service", service.Namespace, fmt.Errorf("Port: %d is already in use", service.Port)))
+					break
+				}
+			}
+		}
 	}
 	allErrs = append(allErrs, validateLabels(service.Labels)...)
 	allErrs = append(allErrs, validateLabels(service.Selector)...)

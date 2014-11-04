@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
 )
@@ -42,7 +43,7 @@ func validateObject(obj runtime.Object) (errors []error) {
 		}
 	case *api.Service:
 		api.ValidNamespace(ctx, &t.ObjectMeta)
-		errors = validation.ValidateService(t)
+		errors = validation.ValidateService(t, registrytest.NewServiceRegistry(), api.NewDefaultContext())
 	case *api.ServiceList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)

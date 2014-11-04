@@ -686,6 +686,13 @@ const (
 	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
 	// data was invalid.  API calls that return BadRequest can never succeed.
 	StatusReasonBadRequest StatusReason = "BadRequest"
+
+	// StatusReasonInternalError indicates that an internal error occurred, it is unexpected
+	// and the outcome of the call is unknown.
+	// Details (optional):
+	//   "causes" - The original error
+	// Status code 500
+	StatusReasonInternalError = "InternalError"
 )
 
 // StatusCause provides more information about an api.Status failure, including
