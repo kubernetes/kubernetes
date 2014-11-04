@@ -24,6 +24,7 @@ package integration
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -31,6 +32,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 
@@ -437,6 +439,193 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 			}
 			if resp.StatusCode != http.StatusForbidden {
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
+			}
+		}
+	}
+}
+
+// Inject into master an authorizer that uses user info.
+// TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
+type allowAliceAuthorizer struct{}
+
+func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
+	if a.GetUserName() == "alice" {
+		return nil
+	}
+	return errors.New("I can't allow that.  Go ask alice.")
+}
+
+// TestAliceNotForbiddenOrUnauthorized tests a user who is known to
+// the authentication system and authorized to do any actions.
+func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
+
+	deleteAllEtcdKeys()
+
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
+	// This file has alice and bob in it.
+
+	aaa := allowAliceAuthorizer{}
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:           helper,
+		KubeletClient:        client.FakeKubeletClient{},
+		EnableLogsSupport:    false,
+		EnableUISupport:      false,
+		APIPrefix:            "/api",
+		TokenAuthFile:        tokenFilename,
+		AuthorizerForTesting: aaa,
+	})
+
+	s := httptest.NewServer(m.Handler)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	// Alice is authorized.
+
+	//
+	for _, r := range getTestRequests() {
+		token := AliceToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+			}
+		}
+	}
+}
+
+// TestBobIsForbidden tests that a user who is known to
+// the authentication system but not authorized to do any actions
+// should receive "Forbidden".
+func TestBobIsForbidden(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
+	// This file has alice and bob in it.
+
+	aaa := allowAliceAuthorizer{}
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:           helper,
+		KubeletClient:        client.FakeKubeletClient{},
+		EnableLogsSupport:    false,
+		EnableUISupport:      false,
+		APIPrefix:            "/api",
+		TokenAuthFile:        tokenFilename,
+		AuthorizerForTesting: aaa,
+	})
+
+	s := httptest.NewServer(m.Handler)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	// Alice is authorized.
+
+	//
+	for _, r := range getTestRequests() {
+		token := BobToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Expect all of bob's actions to return Forbidden
+			if resp.StatusCode != http.StatusForbidden {
+				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
+			}
+		}
+	}
+}
+
+// TestUnknownUserIsUnauthorized tests that a user who is unknown
+// to the authentication system get status code "Unauthorized".
+// An authorization module is installed in this scenario for integration
+// test purposes, but requests aren't expected to reach it.
+func TestUnknownUserIsUnauthorized(t *testing.T) {
+	deleteAllEtcdKeys()
+
+	tokenFilename := writeTestTokenFile()
+	defer os.Remove(tokenFilename)
+	// This file has alice and bob in it.
+
+	aaa := allowAliceAuthorizer{}
+
+	// Set up a master
+
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := master.New(&master.Config{
+		EtcdHelper:           helper,
+		KubeletClient:        client.FakeKubeletClient{},
+		EnableLogsSupport:    false,
+		EnableUISupport:      false,
+		APIPrefix:            "/api",
+		TokenAuthFile:        tokenFilename,
+		AuthorizerForTesting: aaa,
+	})
+
+	s := httptest.NewServer(m.Handler)
+	defer s.Close()
+	transport := http.DefaultTransport
+
+	for _, r := range getTestRequests() {
+		token := UnknownToken
+		t.Logf("case %v", r)
+		bodyBytes := bytes.NewReader([]byte(r.body))
+		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		{
+			resp, err := transport.RoundTrip(req)
+			defer resp.Body.Close()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// Expect all of unauthenticated user's request to be "Unauthorized"
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Errorf("Expected status Unauthorized, but got %s", resp.Status)
 			}
 		}
 	}

@@ -16,10 +16,14 @@ limitations under the License.
 
 package authorizer
 
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+)
+
 // Attributes is an interface used by an Authorizer to get information about a request
 // that is used to make an authorization decision.
 type Attributes interface {
-	// TODO: add attribute getter functions, e.g. GetUserName(), per #1430.
+	GetUserName() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -27,4 +31,13 @@ type Attributes interface {
 // authorized, otherwise it returns an error.
 type Authorizer interface {
 	Authorize(a Attributes) (err error)
+}
+
+// AttributesRecord implements Attributes interface.
+type AttributesRecord struct {
+	User user.Info
+}
+
+func (a *AttributesRecord) GetUserName() string {
+	return a.User.GetName()
 }
