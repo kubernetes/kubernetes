@@ -31,6 +31,7 @@ func TestGetReference(t *testing.T) {
 	table := map[string]struct {
 		obj       runtime.Object
 		ref       *ObjectReference
+		fieldPath string
 		shouldErr bool
 	}{
 		"pod": {
@@ -42,12 +43,14 @@ func TestGetReference(t *testing.T) {
 					SelfLink:        "/api/v1beta1/pods/foo",
 				},
 			},
+			fieldPath: ".desiredState.containers[0]",
 			ref: &ObjectReference{
 				Kind:            "Pod",
 				APIVersion:      "v1beta1",
 				Name:            "foo",
 				UID:             "bar",
 				ResourceVersion: "42",
+				FieldPath:       ".desiredState.containers[0]",
 			},
 		},
 		"serviceList": {
@@ -85,7 +88,7 @@ func TestGetReference(t *testing.T) {
 	}
 
 	for name, item := range table {
-		ref, err := GetReference(item.obj)
+		ref, err := GetPartialReference(item.obj, item.fieldPath)
 		if e, a := item.shouldErr, (err != nil); e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 			continue
