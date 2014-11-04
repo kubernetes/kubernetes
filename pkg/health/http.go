@@ -18,7 +18,9 @@ package health
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -76,7 +78,12 @@ func getURLParts(currentState api.PodState, container api.Container) (string, in
 
 // formatURL formats a URL from args.  For testability.
 func formatURL(host string, port int, path string) string {
-	return fmt.Sprintf("http://%s:%d%s", host, port, path)
+	u := url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
+		Path:   path,
+	}
+	return u.String()
 }
 
 // DoHTTPCheck checks if a GET request to the url succeeds.
