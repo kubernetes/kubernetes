@@ -229,23 +229,24 @@ func (r *Registry) assignPod(ctx api.Context, podID string, machine string) erro
 	if err != nil {
 		return err
 	}
-	// TODO: move this to a watch/rectification loop.
-	pod, err := r.boundPodFactory.MakeBoundPod(machine, finalPod)
+	boundPod, err := r.boundPodFactory.MakeBoundPod(machine, finalPod)
 	if err != nil {
 		return err
 	}
+	// Doing the constraint check this way provides atomicity guarantees.
 	contKey := makeContainerKey(machine)
 	err = r.AtomicUpdate(contKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
-		pods := *in.(*api.BoundPods)
-		pods.Items = append(pods.Items, *pod)
-		if !constraint.Allowed(pods.Items) {
+		boundPodList := in.(*api.BoundPods)
+		boundPodList.Items = append(boundPodList.Items, *boundPod)
+		if !constraint.Allowed(boundPodList.Items) {
 			return nil, fmt.Errorf("The assignment would cause a constraint violation")
 		}
-		return &pods, nil
+		return boundPodList, nil
 	})
 	if err != nil {
-		// Put the pod's host back the way it was. This is a terrible hack that
-		// won't be needed if we convert this to a rectification loop.
+		// Put the pod's host back the way it was. This is a terrible hack, but
+		// can't really be helped, since there's not really a way to do atomic
+		// multi-object changes in etcd.
 		if _, err2 := r.setPodHostTo(ctx, podID, machine, ""); err2 != nil {
 			glog.Errorf("Stranding pod %v; couldn't clear host after previous error: %v", podID, err2)
 		}
