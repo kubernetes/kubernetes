@@ -36,8 +36,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-
-	"github.com/golang/glog"
 )
 
 func init() {
@@ -55,15 +53,15 @@ xyz987,bob,2
 `
 )
 
-func writeTestTokenFile() string {
+func writeTestTokenFile(t *testing.T) string {
 	// Write a token file.
 	f, err := ioutil.TempFile("", "auth_integration_test")
 	f.Close()
 	if err != nil {
-		glog.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := ioutil.WriteFile(f.Name(), []byte(TokenfileCSV), 0700); err != nil {
-		glog.Fatalf("unexpected error writing tokenfile: %v", err)
+		t.Fatalf("unexpected error writing tokenfile: %v", err)
 	}
 	return f.Name()
 }
@@ -80,7 +78,7 @@ func TestWhoAmI(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
@@ -463,7 +461,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
@@ -517,7 +515,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 func TestBobIsForbidden(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
@@ -573,7 +571,7 @@ func TestBobIsForbidden(t *testing.T) {
 func TestUnknownUserIsUnauthorized(t *testing.T) {
 	deleteAllEtcdKeys()
 
-	tokenFilename := writeTestTokenFile()
+	tokenFilename := writeTestTokenFile(t)
 	defer os.Remove(tokenFilename)
 	// This file has alice and bob in it.
 
