@@ -41,6 +41,7 @@ func TestClient(t *testing.T) {
 	}
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
+		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		APIPrefix:         "/api",
