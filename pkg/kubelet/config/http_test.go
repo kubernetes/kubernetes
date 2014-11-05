@@ -146,14 +146,24 @@ func TestExtractFromHTTP(t *testing.T) {
 						Name:      "1",
 						Namespace: "default",
 					},
-					Spec: api.PodSpec{Containers: []api.Container{{Name: "1", Image: "foo"}}},
+					Spec: api.PodSpec{
+						Containers: []api.Container{{
+							Name:  "1",
+							Image: "foo",
+							TerminationMessagePath: "/dev/termination-log"}},
+					},
 				},
 				api.BoundPod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "bar",
 						Namespace: "default",
 					},
-					Spec: api.PodSpec{Containers: []api.Container{{Name: "1", Image: "foo"}}},
+					Spec: api.PodSpec{
+						Containers: []api.Container{{
+							Name:  "1",
+							Image: "foo",
+							TerminationMessagePath: "/dev/termination-log"}},
+					},
 				}),
 		},
 		{
