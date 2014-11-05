@@ -36,6 +36,10 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if obj == nil {
 		return nil, ErrNilObject
 	}
+	if ref, ok := obj.(*ObjectReference); ok {
+		// Don't make a reference to a reference.
+		return ref, nil
+	}
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -57,3 +61,17 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 		ResourceVersion: meta.ResourceVersion(),
 	}, nil
 }
+
+// GetPartialReference is exactly like GetReference, but allows you to set the FieldPath.
+func GetPartialReference(obj runtime.Object, fieldPath string) (*ObjectReference, error) {
+	ref, err := GetReference(obj)
+	if err != nil {
+		return nil, err
+	}
+	ref.FieldPath = fieldPath
+	return ref, nil
+}
+
+// Allow clients to preemptively get a reference to an API object and pass it to places that
+// intend only to get a reference to that object. This simplifies the event recording interface.
+func (*ObjectReference) IsAnAPIObject() {}

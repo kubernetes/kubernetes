@@ -45,24 +45,28 @@ func (t *testEventRecorder) clearOnEvent() {
 }
 
 func TestEventf(t *testing.T) {
+	testPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			SelfLink:  "/api/v1beta1/pods/foo",
+			Name:      "foo",
+			Namespace: "baz",
+			UID:       "bar",
+		},
+	}
+	testRef, err := api.GetPartialReference(testPod, "desiredState.manifest.containers[2]")
+	if err != nil {
+		t.Fatal(err)
+	}
 	table := []struct {
-		obj                       runtime.Object
-		fieldPath, status, reason string
-		messageFmt                string
-		elements                  []interface{}
-		expect                    *api.Event
-		expectLog                 string
+		obj            runtime.Object
+		status, reason string
+		messageFmt     string
+		elements       []interface{}
+		expect         *api.Event
+		expectLog      string
 	}{
 		{
-			obj: &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					SelfLink:  "/api/v1beta1/pods/foo",
-					Name:      "foo",
-					Namespace: "baz",
-					UID:       "bar",
-				},
-			},
-			fieldPath:  "desiredState.manifest.containers[2]",
+			obj:        testRef,
 			status:     "running",
 			reason:     "started",
 			messageFmt: "some verbose message: %v",
@@ -86,6 +90,31 @@ func TestEventf(t *testing.T) {
 				Source:  "eventTest",
 			},
 			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): status: 'running', reason: 'started' some verbose message: 1`,
+		},
+		{
+			obj:        testPod,
+			status:     "running",
+			reason:     "started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "v1beta1",
+				},
+				Status:  "running",
+				Reason:  "started",
+				Message: "some verbose message: 1",
+				Source:  "eventTest",
+			},
+			expectLog: `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:""}): status: 'running', reason: 'started' some verbose message: 1`,
 		},
 	}
 
@@ -120,7 +149,7 @@ func TestEventf(t *testing.T) {
 			called <- struct{}{}
 		})
 
-		record.Eventf(item.obj, item.fieldPath, item.status, item.reason, item.messageFmt, item.elements...)
+		record.Eventf(item.obj, item.status, item.reason, item.messageFmt, item.elements...)
 
 		<-called
 		<-called

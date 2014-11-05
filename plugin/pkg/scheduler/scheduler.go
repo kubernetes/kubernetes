@@ -68,7 +68,7 @@ func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
-		record.Eventf(pod, "", string(api.PodPending), "failedScheduling", "Error scheduling: %v", err)
+		record.Eventf(pod, string(api.PodPending), "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
@@ -78,9 +78,9 @@ func (s *Scheduler) scheduleOne() {
 		Host:       dest,
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
-		record.Eventf(pod, "", string(api.PodPending), "failedScheduling", "Binding rejected: %v", err)
+		record.Eventf(pod, string(api.PodPending), "failedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	record.Eventf(pod, "", string(api.PodPending), "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	record.Eventf(pod, string(api.PodPending), "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
 }

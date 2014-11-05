@@ -91,7 +91,8 @@ const queueLen = 1000
 var events = watch.NewMux(queueLen)
 
 // Event constructs an event from the given information and puts it in the queue for sending.
-// 'object' is the object this event is about; 'fieldPath', if not "", locates a part of 'object'.
+// 'object' is the object this event is about. Event will make a reference-- or you may also
+// pass a reference to the object directly.
 // 'status' is the new status of the object. 'reason' is the reason it now has this status.
 // Both 'status' and 'reason' should be short and unique; they will be used to automate
 // handling of events, so imagine people writing switch statements to handle them. You want to
@@ -99,13 +100,12 @@ var events = watch.NewMux(queueLen)
 // 'message' is intended to be human readable.
 //
 // The resulting event will be created in the same namespace as the reference object.
-func Event(object runtime.Object, fieldPath, status, reason, message string) {
+func Event(object runtime.Object, status, reason, message string) {
 	ref, err := api.GetReference(object)
 	if err != nil {
-		glog.Errorf("Could not construct reference to: %#v due to: %v", object, err)
+		glog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", object, err, status, reason, message)
 		return
 	}
-	ref.FieldPath = fieldPath
 	t := util.Now()
 
 	e := &api.Event{
@@ -124,6 +124,6 @@ func Event(object runtime.Object, fieldPath, status, reason, message string) {
 }
 
 // Eventf is just like Event, but with Sprintf for the message field.
-func Eventf(object runtime.Object, fieldPath, status, reason, messageFmt string, args ...interface{}) {
-	Event(object, fieldPath, status, reason, fmt.Sprintf(messageFmt, args...))
+func Eventf(object runtime.Object, status, reason, messageFmt string, args ...interface{}) {
+	Event(object, status, reason, fmt.Sprintf(messageFmt, args...))
 }
