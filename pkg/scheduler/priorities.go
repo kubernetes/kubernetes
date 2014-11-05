@@ -34,9 +34,8 @@ func calculatePercentage(requested, capacity int) int {
 func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
 	totalCPU := 0
 	totalMemory := 0
-	for ix := range pods {
-		for cIx := range pods[ix].DesiredState.Manifest.Containers {
-			container := &(pods[ix].DesiredState.Manifest.Containers[cIx])
+	for _, pod := range pods {
+		for _, container := range pod.DesiredState.Manifest.Containers {
 			totalCPU += container.CPU
 			totalMemory += container.Memory
 		}
