@@ -207,8 +207,8 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 
 // NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
 // inside a container.
-func NewDockerContainerCommandRunner() ContainerCommandRunner {
-	return &dockerContainerCommandRunner{}
+func NewDockerContainerCommandRunner(client DockerInterface) ContainerCommandRunner {
+	return &dockerContainerCommandRunner{client: client}
 }
 
 func (p dockerPuller) Pull(image string) error {
