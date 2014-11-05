@@ -148,7 +148,7 @@ func setDefaults(c *Config) {
 	if c.ReadWritePort == 0 {
 		c.ReadWritePort = 443
 	}
-	if c.PublicAddress == "" {
+	for c.PublicAddress == "" {
 		// Find and use the first non-loopback address.
 		// TODO: potentially it'd be useful to skip the docker interface if it
 		// somehow is first in the list.
@@ -173,7 +173,9 @@ func setDefaults(c *Config) {
 			break
 		}
 		if !found {
-			glog.Fatalf("Unable to find suitible network address in list: %v", addrs)
+			glog.Errorf("Unable to find suitible network address in list: '%v'\n"+
+				"Will try again in 5 seconds. Set the public address directly to avoid this wait.", addrs)
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
