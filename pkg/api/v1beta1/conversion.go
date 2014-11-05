@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"errors"
 	"strconv"
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -155,6 +156,43 @@ func init() {
 				if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
 					return err
 				}
+			}
+			return nil
+		},
+
+		// Convert all to the new PodCondition constants
+		func(in *newer.PodCondition, out *PodStatus, s conversion.Scope) error {
+			switch *in {
+			case "":
+				*out = ""
+			case newer.PodPending:
+				*out = PodWaiting
+			case newer.PodRunning:
+				*out = PodRunning
+			case newer.PodSucceeded:
+				*out = PodTerminated
+			case newer.PodFailed:
+				*out = PodTerminated
+			default:
+				return errors.New("The string provided is not a valid PodCondition constant value")
+			}
+
+			return nil
+		},
+
+		func(in *PodStatus, out *newer.PodCondition, s conversion.Scope) error {
+			switch *in {
+			case "":
+				*out = ""
+			case PodWaiting:
+				*out = newer.PodPending
+			case PodRunning:
+				*out = newer.PodRunning
+			case PodTerminated:
+				// Older API versions did not contain enough info to map to PodFailed
+				*out = newer.PodFailed
+			default:
+				return errors.New("The string provided is not a valid PodCondition constant value")
 			}
 			return nil
 		},

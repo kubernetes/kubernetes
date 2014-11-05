@@ -267,9 +267,9 @@ func getInstanceIPFromCloud(cloud cloudprovider.Interface, host string) string {
 	return addr.String()
 }
 
-func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, error) {
+func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodCondition, error) {
 	if pod.CurrentState.Host == "" {
-		return api.PodWaiting, nil
+		return api.PodPending, nil
 	}
 	if minions != nil {
 		res, err := minions.List()
@@ -285,13 +285,13 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 			}
 		}
 		if !found {
-			return api.PodTerminated, nil
+			return api.PodFailed, nil
 		}
 	} else {
 		glog.Errorf("Unexpected missing minion interface, status may be in-accurate")
 	}
 	if pod.CurrentState.Info == nil {
-		return api.PodWaiting, nil
+		return api.PodPending, nil
 	}
 	running := 0
 	stopped := 0
@@ -313,10 +313,10 @@ func getPodStatus(pod *api.Pod, minions client.MinionInterface) (api.PodStatus, 
 	case running > 0 && unknown == 0:
 		return api.PodRunning, nil
 	case running == 0 && stopped > 0 && unknown == 0:
-		return api.PodTerminated, nil
+		return api.PodFailed, nil
 	case running == 0 && stopped == 0 && unknown > 0:
-		return api.PodWaiting, nil
+		return api.PodPending, nil
 	default:
-		return api.PodWaiting, nil
+		return api.PodPending, nil
 	}
 }

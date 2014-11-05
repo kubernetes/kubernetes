@@ -31,8 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
-	"github.com/google/gofuzz"
+	docker "github.com/fsouza/go-dockerclient"
+	fuzz "github.com/google/gofuzz"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 40, "How many fuzzing iterations to do.")
@@ -85,6 +85,10 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		// only when all 8 bytes are set.
 		j.ResourceVersion = strconv.FormatUint(c.RandUint64()>>8, 10)
 		j.SelfLink = c.RandString()
+	},
+	func(j *api.PodCondition, c fuzz.Continue) {
+		statuses := []api.PodCondition{api.PodPending, api.PodRunning, api.PodFailed}
+		*j = statuses[c.Rand.Intn(len(statuses))]
 	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.

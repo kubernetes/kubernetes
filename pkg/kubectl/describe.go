@@ -120,7 +120,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	running, waiting, terminated, err := getPodStatusForReplicationController(pc, controller)
+	running, waiting, succeeded, failed, err := getPodStatusForReplicationController(pc, controller)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +131,7 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.DesiredState.ReplicaSelector))
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.CurrentState.Replicas, controller.DesiredState.Replicas)
-		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Terminated\n", running, waiting, terminated)
+		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		return nil
 	})
 }
@@ -216,7 +216,7 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 	return list
 }
 
-func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, terminated int, err error) {
+func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, succeeded, failed int, err error) {
 	rcPods, err := c.List(labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
 	if err != nil {
 		return
@@ -224,10 +224,12 @@ func getPodStatusForReplicationController(c client.PodInterface, controller *api
 	for _, pod := range rcPods.Items {
 		if pod.CurrentState.Status == api.PodRunning {
 			running++
-		} else if pod.CurrentState.Status == api.PodWaiting {
+		} else if pod.CurrentState.Status == api.PodPending {
 			waiting++
-		} else if pod.CurrentState.Status == api.PodTerminated {
-			terminated++
+		} else if pod.CurrentState.Status == api.PodSucceeded {
+			succeeded++
+		} else if pod.CurrentState.Status == api.PodFailed {
+			failed++
 		}
 	}
 	return
