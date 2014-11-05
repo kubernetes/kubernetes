@@ -331,17 +331,24 @@ type Lifecycle struct {
 
 // The below types are used by kube_client and api_server.
 
-// PodStatus represents a status of a pod.
-type PodStatus string
+// PodCondition is a label for the condition of a pod at the current time.
+type PodCondition string
 
 // These are the valid statuses of pods.
 const (
-	// PodWaiting means that we're waiting for the pod to begin running.
-	PodWaiting PodStatus = "Waiting"
-	// PodRunning means that the pod is up and running.
-	PodRunning PodStatus = "Running"
-	// PodTerminated means that the pod has stopped.
-	PodTerminated PodStatus = "Terminated"
+	// PodPending means the pod has been accepted by the system, but one or more of the containers
+	// has not been started. This includes time before being bound to a node, as well as time spent
+	// pulling images onto the host.
+	PodPending PodCondition = "Pending"
+	// PodRunning means the pod has been bound to a node and all of the containers have been started.
+	// At least one container is still running or is in the process of being restarted.
+	PodRunning PodCondition = "Running"
+	// PodSucceeded means that all containers in the pod have voluntarily terminated
+	// with a container exit code of 0, and the system is not going to restart any of these containers.
+	PodSucceeded PodCondition = "Succeeded"
+	// PodFailed means that all containers in the pod have terminated, and at least one container has
+	// terminated in a failure (exited with a non-zero exit code or was stopped by the system).
+	PodFailed PodCondition = "Failed"
 )
 
 type ContainerStateWaiting struct {
@@ -408,7 +415,7 @@ type RestartPolicy struct {
 // PodState is the state of a pod, used as either input (desired state) or output (current state).
 type PodState struct {
 	Manifest ContainerManifest `json:"manifest,omitempty" yaml:"manifest,omitempty"`
-	Status   PodStatus         `json:"status,omitempty" yaml:"status,omitempty"`
+	Status   PodCondition      `json:"status,omitempty" yaml:"status,omitempty"`
 	Host     string            `json:"host,omitempty" yaml:"host,omitempty"`
 	HostIP   string            `json:"hostIP,omitempty" yaml:"hostIP,omitempty"`
 	PodIP    string            `json:"podIP,omitempty" yaml:"podIP,omitempty"`

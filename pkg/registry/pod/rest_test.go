@@ -418,10 +418,10 @@ func TestMakePodStatus(t *testing.T) {
 
 	tests := []struct {
 		pod    *api.Pod
-		status api.PodStatus
+		status api.PodCondition
 		test   string
 	}{
-		{&api.Pod{DesiredState: desiredState, CurrentState: currentState}, api.PodWaiting, "waiting"},
+		{&api.Pod{DesiredState: desiredState, CurrentState: currentState}, api.PodPending, "waiting"},
 		{
 			&api.Pod{
 				DesiredState: desiredState,
@@ -429,7 +429,7 @@ func TestMakePodStatus(t *testing.T) {
 					Host: "machine-2",
 				},
 			},
-			api.PodTerminated,
+			api.PodFailed,
 			"no info, but bad machine",
 		},
 		{
@@ -457,7 +457,7 @@ func TestMakePodStatus(t *testing.T) {
 					Host: "machine-two",
 				},
 			},
-			api.PodTerminated,
+			api.PodFailed,
 			"all running but minion is missing",
 		},
 		{
@@ -471,7 +471,7 @@ func TestMakePodStatus(t *testing.T) {
 					Host: "machine",
 				},
 			},
-			api.PodTerminated,
+			api.PodFailed,
 			"all stopped",
 		},
 		{
@@ -485,7 +485,7 @@ func TestMakePodStatus(t *testing.T) {
 					Host: "machine-two",
 				},
 			},
-			api.PodTerminated,
+			api.PodFailed,
 			"all stopped but minion missing",
 		},
 		{
@@ -512,7 +512,7 @@ func TestMakePodStatus(t *testing.T) {
 					Host: "machine",
 				},
 			},
-			api.PodWaiting,
+			api.PodPending,
 			"mixed state #2",
 		},
 	}
