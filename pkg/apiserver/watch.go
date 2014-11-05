@@ -30,8 +30,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/golang/glog"
+	"golang.org/x/net/websocket"
 )
 
 type WatchHandler struct {

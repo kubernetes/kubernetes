@@ -365,7 +365,7 @@ func TestAllocs(t *testing.T) {
 				c := WithValue(bg, k1, nil)
 				c.Value(k1)
 			},
-			limit:      1,
+			limit:      3,
 			gccgoLimit: 3,
 		},
 		{

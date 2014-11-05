@@ -24,10 +24,10 @@ import (
 	"reflect"
 	"testing"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"golang.org/x/net/websocket"
 )
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event

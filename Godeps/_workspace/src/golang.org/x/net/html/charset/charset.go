@@ -1,3 +1,7 @@
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package charset provides common text encodings for HTML documents.
 //
 // The mapping from encoding labels to encodings is defined at
@@ -11,10 +15,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"code.google.com/p/go.net/html"
-	"code.google.com/p/go.text/encoding"
-	"code.google.com/p/go.text/encoding/charmap"
-	"code.google.com/p/go.text/transform"
+	"golang.org/x/net/html"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/transform"
 )
 
 // Lookup returns the encoding with the specified label, and its canonical

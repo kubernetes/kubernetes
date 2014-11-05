@@ -1,3 +1,7 @@
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // +build ignore
 
 package main
@@ -48,9 +52,9 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("import (")
-	fmt.Println(`"code.google.com/p/go.text/encoding"`)
+	fmt.Println(`"golang.org/x/text/encoding"`)
 	for _, pkg := range []string{"charmap", "japanese", "korean", "simplifiedchinese", "traditionalchinese", "unicode"} {
-		fmt.Printf("\"code.google.com/p/go.text/encoding/%s\"\n", pkg)
+		fmt.Printf("\"golang.org/x/text/encoding/%s\"\n", pkg)
 	}
 	fmt.Println(")")
 	fmt.Println()

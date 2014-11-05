@@ -1,12 +1,17 @@
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package charset
 
 import (
 	"bytes"
 	"io/ioutil"
+	"runtime"
 	"strings"
 	"testing"
 
-	"code.google.com/p/go.text/transform"
+	"golang.org/x/text/transform"
 )
 
 func transformString(t transform.Transformer, s string) (string, error) {
@@ -129,6 +134,11 @@ var sniffTestCases = []struct {
 }
 
 func TestSniff(t *testing.T) {
+	switch runtime.GOOS {
+	case "nacl": // platforms that don't permit direct file system access
+		t.Skipf("not supported on %q", runtime.GOOS)
+	}
+
 	for _, tc := range sniffTestCases {
 		content, err := ioutil.ReadFile("testdata/" + tc.filename)
 		if err != nil {
@@ -145,6 +155,11 @@ func TestSniff(t *testing.T) {
 }
 
 func TestReader(t *testing.T) {
+	switch runtime.GOOS {
+	case "nacl": // platforms that don't permit direct file system access
+		t.Skipf("not supported on %q", runtime.GOOS)
+	}
+
 	for _, tc := range sniffTestCases {
 		content, err := ioutil.ReadFile("testdata/" + tc.filename)
 		if err != nil {
