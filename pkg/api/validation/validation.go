@@ -408,14 +408,14 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	if labels.Set(service.Spec.Selector).AsSelector().Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.selector", service.Spec.Selector))
 	}
-	if service.CreateExternalLoadBalancer {
+	if service.Spec.CreateExternalLoadBalancer {
 		services, err := lister.ListServices(ctx)
 		if err != nil {
 			allErrs = append(allErrs, errs.NewInternalError(err))
 		} else {
 			for i := range services.Items {
-				if services.Items[i].CreateExternalLoadBalancer && services.Items[i].Port == service.Port {
-					allErrs = append(allErrs, errs.NewConflict("service", service.Namespace, fmt.Errorf("Port: %d is already in use", service.Port)))
+				if services.Items[i].Spec.CreateExternalLoadBalancer && services.Items[i].Spec.Port == service.Spec.Port {
+					allErrs = append(allErrs, errs.NewConflict("service", service.Namespace, fmt.Errorf("Port: %d is already in use", service.Spec.Port)))
 					break
 				}
 			}
