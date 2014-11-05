@@ -155,8 +155,8 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 	return tabbedString(func(out *tabwriter.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
-		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Selector))
-		fmt.Fprintf(out, "Port:\t%d\n", service.Port)
+		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
+		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
 		return nil
 	})
 }

@@ -182,8 +182,10 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Selector: map[string]string{
-					"foo": "bar",
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},
@@ -219,8 +221,10 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Selector: map[string]string{
-					"foo": "bar",
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},
@@ -248,8 +252,10 @@ func TestSyncEndpointsItems(t *testing.T) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Selector: map[string]string{
-					"foo": "bar",
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},
@@ -277,8 +283,10 @@ func TestSyncEndpointsPodError(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
-				Selector: map[string]string{
-					"foo": "bar",
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},

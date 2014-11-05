@@ -286,10 +286,12 @@ func runSelfLinkTest(c *client.Client) {
 					"name": "selflinktest",
 				},
 			},
-			Port: 12345,
-			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
+			Spec: api.ServiceSpec{
+				Port: 12345,
+				// This is here because validation requires it.
+				Selector: map[string]string{
+					"foo": "bar",
+				},
 			},
 		},
 	).Do().Into(&svc)
@@ -346,10 +348,12 @@ func runAtomicPutTest(c *client.Client) {
 					"name": "atomicService",
 				},
 			},
-			Port: 12345,
-			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
+			Spec: api.ServiceSpec{
+				Port: 12345,
+				// This is here because validation requires it.
+				Selector: map[string]string{
+					"foo": "bar",
+				},
 			},
 		},
 	).Do().Into(&svc)
@@ -380,10 +384,10 @@ func runAtomicPutTest(c *client.Client) {
 					glog.Errorf("Error getting atomicService: %v", err)
 					continue
 				}
-				if tmpSvc.Selector == nil {
-					tmpSvc.Selector = map[string]string{l: v}
+				if tmpSvc.Spec.Selector == nil {
+					tmpSvc.Spec.Selector = map[string]string{l: v}
 				} else {
-					tmpSvc.Selector[l] = v
+					tmpSvc.Spec.Selector[l] = v
 				}
 				glog.Infof("Posting update (%s, %s)", l, v)
 				err = c.Put().Path("services").Path(svc.Name).Body(&tmpSvc).Do().Error()
@@ -406,8 +410,8 @@ func runAtomicPutTest(c *client.Client) {
 	if err := c.Get().Path("services").Path(svc.Name).Do().Into(&svc); err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
-	if !reflect.DeepEqual(testLabels, labels.Set(svc.Selector)) {
-		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Selector)
+	if !reflect.DeepEqual(testLabels, labels.Set(svc.Spec.Selector)) {
+		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Spec.Selector)
 	}
 	glog.Info("Atomic PUTs work.")
 }
@@ -509,10 +513,12 @@ func runServiceTest(client *client.Client) {
 	}
 	svc1 := api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service1"},
-		Selector: map[string]string{
-			"name": "thisisalonglabel",
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{
+				"name": "thisisalonglabel",
+			},
+			Port: 8080,
 		},
-		Port: 8080,
 	}
 	_, err = client.Services(api.NamespaceDefault).Create(&svc1)
 	if err != nil {
@@ -524,10 +530,12 @@ func runServiceTest(client *client.Client) {
 	// A second service with the same port.
 	svc2 := api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service2"},
-		Selector: map[string]string{
-			"name": "thisisalonglabel",
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{
+				"name": "thisisalonglabel",
+			},
+			Port: 8080,
 		},
-		Port: 8080,
 	}
 	_, err = client.Services(api.NamespaceDefault).Create(&svc2)
 	if err != nil {

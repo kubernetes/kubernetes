@@ -340,7 +340,7 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Port: svcInfo.proxyPort, ProxyPort: svcInfo.proxyPort, Protocol: "TCP"},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "TCP", ProxyPort: svcInfo.proxyPort}, Status: api.ServiceStatus{}},
 	})
 	testEchoTCP(t, "127.0.0.1", svcInfo.proxyPort)
 }
@@ -371,7 +371,7 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Port: svcInfo.proxyPort, ProxyPort: svcInfo.proxyPort, Protocol: "UDP"},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: svcInfo.proxyPort, Protocol: "UDP", ProxyPort: svcInfo.proxyPort}, Status: api.ServiceStatus{}},
 	})
 	testEchoUDP(t, "127.0.0.1", svcInfo.proxyPort)
 }
@@ -406,7 +406,7 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 		t.Errorf("expected difference, got %d %d", newPort, svcInfo.proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Port: newPort, ProxyPort: newPort, Protocol: "TCP"},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPort, Protocol: "TCP", ProxyPort: newPort}, Status: api.ServiceStatus{}},
 	})
 	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())
@@ -451,7 +451,7 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 		t.Errorf("expected difference, got %d %d", newPort, svcInfo.proxyPort)
 	}
 	p.OnUpdate([]api.Service{
-		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Port: newPort, ProxyPort: newPort, Protocol: "UDP"},
+		{ObjectMeta: api.ObjectMeta{Name: "echo"}, Spec: api.ServiceSpec{Port: newPort, Protocol: "UDP", ProxyPort: newPort}, Status: api.ServiceStatus{}},
 	})
 	if err := waitForClosedPortUDP(p, svcInfo.proxyPort); err != nil {
 		t.Fatalf(err.Error())

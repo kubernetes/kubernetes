@@ -397,16 +397,16 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 	if !util.IsDNSSubdomain(service.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", service.Namespace))
 	}
-	if !util.IsValidPortNum(service.Port) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("port", service.Port))
+	if !util.IsValidPortNum(service.Spec.Port) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port))
 	}
-	if len(service.Protocol) == 0 {
-		service.Protocol = "TCP"
-	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Protocol))) {
-		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", service.Protocol))
+	if len(service.Spec.Protocol) == 0 {
+		service.Spec.Protocol = "TCP"
+	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
 	}
-	if labels.Set(service.Selector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("selector", service.Selector))
+	if labels.Set(service.Spec.Selector).AsSelector().Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.selector", service.Spec.Selector))
 	}
 	if service.CreateExternalLoadBalancer {
 		services, err := lister.ListServices(ctx)
@@ -422,7 +422,7 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 		}
 	}
 	allErrs = append(allErrs, validateLabels(service.Labels)...)
-	allErrs = append(allErrs, validateLabels(service.Selector)...)
+	allErrs = append(allErrs, validateLabels(service.Spec.Selector)...)
 	return allErrs
 }
 

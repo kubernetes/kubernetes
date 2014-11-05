@@ -148,7 +148,7 @@ func (s ConfigSourceEtcd) decodeServices(node *etcd.Node, retServices []api.Serv
 			glog.Errorf("Couldn't get endpoints for %s %s : %v skipping", svc.Namespace, svc.Name, err)
 			endpoints = api.Endpoints{}
 		} else {
-			glog.V(3).Infof("Got service: %s %s on localport %d mapping to: %s", svc.Namespace, svc.Name, svc.Port, endpoints)
+			glog.V(3).Infof("Got service: %s %s on localport %d mapping to: %s", svc.Namespace, svc.Name, svc.Spec.Port, endpoints)
 		}
 		retEndpoints = append(retEndpoints, endpoints)
 	}

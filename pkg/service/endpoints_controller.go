@@ -57,7 +57,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			continue
 		}
 		glog.Infof("About to update endpoints for service %v", service.Name)
-		pods, err := e.client.Pods(service.Namespace).List(labels.Set(service.Selector).AsSelector())
+		pods, err := e.client.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error syncing service: %#v, skipping.", service)
 			resultErr = err
@@ -65,7 +65,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		}
 		endpoints := []string{}
 		for _, pod := range pods.Items {
-			port, err := findPort(&pod.DesiredState.Manifest, service.ContainerPort)
+			port, err := findPort(&pod.DesiredState.Manifest, service.Spec.ContainerPort)
 			if err != nil {
 				glog.Errorf("Failed to find port for service: %v, %v", service, err)
 				continue

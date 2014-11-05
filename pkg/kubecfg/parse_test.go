@@ -94,9 +94,11 @@ func TestParseService(t *testing.T) {
 				"area": "staging",
 			},
 		},
-		Port: 8080,
-		Selector: map[string]string{
-			"area": "staging",
+		Spec: api.ServiceSpec{
+			Port: 8080,
+			Selector: map[string]string{
+				"area": "staging",
+			},
 		},
 	}, v1beta1.Codec, testParser)
 }

@@ -1144,27 +1144,28 @@ func TestEtcdUpdateService(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
-	key, _ := makeServiceKey(ctx, "foo")
-	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
+	key, _ := makeServiceKey(ctx, "uniquefoo")
+	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.Service{ObjectMeta: api.ObjectMeta{Name: "uniquefoo"}}), 0)
 	registry := NewTestEtcdRegistry(fakeClient)
 	testService := api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name:            "foo",
+			Name:            "uniquefoo",
 			ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10),
 			Labels: map[string]string{
 				"baz": "bar",
 			},
 		},
-		Selector: map[string]string{
-			"baz": "bar",
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{
+				"baz": "bar",
+			},
 		},
 	}
 	err := registry.UpdateService(ctx, &testService)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	svc, err := registry.GetService(ctx, "foo")
+	svc, err := registry.GetService(ctx, "uniquefoo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

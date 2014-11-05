@@ -635,8 +635,10 @@ func TestValidateService(t *testing.T) {
 			name: "missing id",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault},
-				Port:       8675,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the ID is missing.
 			numErrs: 1,
@@ -645,8 +647,10 @@ func TestValidateService(t *testing.T) {
 			name: "missing namespace",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Port:       8675,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the Namespace is missing.
 			numErrs: 1,
@@ -655,8 +659,10 @@ func TestValidateService(t *testing.T) {
 			name: "invalid id",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "123abc", Namespace: api.NamespaceDefault},
-				Port:       8675,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the ID is invalid.
 			numErrs: 1,
@@ -665,7 +671,9 @@ func TestValidateService(t *testing.T) {
 			name: "missing port",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the port number is missing/invalid.
 			numErrs: 1,
@@ -674,8 +682,10 @@ func TestValidateService(t *testing.T) {
 			name: "invalid port",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       65536,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     66536,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			// Should fail because the port number is invalid.
 			numErrs: 1,
@@ -684,9 +694,11 @@ func TestValidateService(t *testing.T) {
 			name: "invalid protocol",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       8675,
-				Protocol:   "INVALID",
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+					Protocol: "INVALID",
+				},
 			},
 			// Should fail because the protocol is invalid.
 			numErrs: 1,
@@ -695,7 +707,9 @@ func TestValidateService(t *testing.T) {
 			name: "missing selector",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-				Port:       8675,
+				Spec: api.ServiceSpec{
+					Port: 8675,
+				},
 			},
 			// Should fail because the selector is missing.
 			numErrs: 1,
@@ -704,9 +718,11 @@ func TestValidateService(t *testing.T) {
 			name: "valid 1",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       1,
-				Protocol:   "TCP",
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+					Protocol: "TCP",
+				},
 			},
 			numErrs: 0,
 		},
@@ -714,9 +730,11 @@ func TestValidateService(t *testing.T) {
 			name: "valid 2",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       65535,
-				Protocol:   "UDP",
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+					Protocol: "UDP",
+				},
 			},
 			numErrs: 0,
 		},
@@ -724,8 +742,10 @@ func TestValidateService(t *testing.T) {
 			name: "valid 3",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       80,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			numErrs: 0,
 		},
@@ -797,8 +817,10 @@ func TestValidateService(t *testing.T) {
 						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 					},
 				},
-				Port:     80,
-				Selector: map[string]string{"foo": "bar", "NoUppercaseOrSpecialCharsLike=Equals": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     8675,
+					Selector: map[string]string{"foo": "bar", "NoUppercaseOrSpecialCharsLike=Equals": "bar"},
+				},
 			},
 			numErrs: 2,
 		},
@@ -814,15 +836,17 @@ func TestValidateService(t *testing.T) {
 	}
 
 	svc := api.Service{
-		Port:       6502,
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
-		Selector:   map[string]string{"foo": "bar"},
+		Spec: api.ServiceSpec{
+			Port:     8675,
+			Selector: map[string]string{"foo": "bar"},
+		},
 	}
 	errs := ValidateService(&svc, registrytest.NewServiceRegistry(), api.NewDefaultContext())
 	if len(errs) != 0 {
 		t.Errorf("Unexpected non-zero error list: %#v", errs)
 	}
-	if svc.Protocol != "TCP" {
+	if svc.Spec.Protocol != "TCP" {
 		t.Errorf("Expected default protocol of 'TCP': %#v", errs)
 	}
 }

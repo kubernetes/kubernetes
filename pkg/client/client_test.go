@@ -429,8 +429,10 @@ func TestListServices(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Selector: map[string]string{
-							"one": "two",
+						Spec: api.ServiceSpec{
+							Selector: map[string]string{
+								"one": "two",
+							},
 						},
 					},
 				},
@@ -456,8 +458,10 @@ func TestListServicesLabels(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						Selector: map[string]string{
-							"one": "two",
+						Spec: api.ServiceSpec{
+							Selector: map[string]string{
+								"one": "two",
+							},
 						},
 					},
 				},
