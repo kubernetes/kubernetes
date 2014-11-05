@@ -753,13 +753,15 @@ func TestValidateService(t *testing.T) {
 			name: "invalid port in use",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       80,
-				CreateExternalLoadBalancer: true,
-				Selector:                   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port: 80,
+					CreateExternalLoadBalancer: true,
+					Selector:                   map[string]string{"foo": "bar"},
+				},
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Port: 80, CreateExternalLoadBalancer: true},
+					{Spec: api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true}},
 				},
 			},
 			numErrs: 1,
@@ -768,13 +770,15 @@ func TestValidateService(t *testing.T) {
 			name: "same port in use, but not external",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       80,
-				CreateExternalLoadBalancer: true,
-				Selector:                   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port: 80,
+					CreateExternalLoadBalancer: true,
+					Selector:                   map[string]string{"foo": "bar"},
+				},
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Port: 80},
+					{Spec: api.ServiceSpec{Port: 80}},
 				},
 			},
 			numErrs: 0,
@@ -783,12 +787,14 @@ func TestValidateService(t *testing.T) {
 			name: "same port in use, but not external on input",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       80,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     80,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Port: 80, CreateExternalLoadBalancer: true},
+					{Spec: api.ServiceSpec{Port: 80, CreateExternalLoadBalancer: true}},
 				},
 			},
 			numErrs: 0,
@@ -797,12 +803,14 @@ func TestValidateService(t *testing.T) {
 			name: "same port in use, but neither external",
 			svc: api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "abc123", Namespace: api.NamespaceDefault},
-				Port:       80,
-				Selector:   map[string]string{"foo": "bar"},
+				Spec: api.ServiceSpec{
+					Port:     80,
+					Selector: map[string]string{"foo": "bar"},
+				},
 			},
 			existing: api.ServiceList{
 				Items: []api.Service{
-					{Port: 80},
+					{Spec: api.ServiceSpec{Port: 80}},
 				},
 			},
 			numErrs: 0,
