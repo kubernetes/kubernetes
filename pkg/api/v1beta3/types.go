@@ -456,6 +456,8 @@ type PodSpec struct {
 // state of a system.
 type PodStatus struct {
 	Condition PodCondition `json:"condition,omitempty" yaml:"condition,omitempty"`
+	// A human readable message indicating details about why the pod is in this state.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 
 	// Host is the name of the node that this Pod is currently bound to, or empty if no
 	// assignment has been done.
