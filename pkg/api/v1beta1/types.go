@@ -330,6 +330,7 @@ type ContainerStateTerminated struct {
 	ExitCode   int       `json:"exitCode" yaml:"exitCode"`
 	Signal     int       `json:"signal,omitempty" yaml:"signal,omitempty"`
 	Reason     string    `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Message    string    `json:"message,omitempty" yaml:"message,omitempty"`
 	StartedAt  time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty"`
 	FinishedAt time.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty"`
 }
