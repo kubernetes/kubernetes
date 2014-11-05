@@ -588,6 +588,14 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 				continue
 			}
 			killedContainers[containerID] = empty{}
+
+			// Also kill associated network container
+			if netContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uuid, networkContainerName); found {
+				if err := kl.killContainer(netContainer); err != nil {
+					glog.V(1).Infof("Failed to kill network container %s: %v", netContainer.ID, err)
+					continue
+				}
+			}
 		}
 
 		// Check RestartPolicy for container
