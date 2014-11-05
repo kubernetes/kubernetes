@@ -6,6 +6,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 EnvironmentFile=-/etc/kubernetes/config
 EnvironmentFile=-/etc/kubernetes/apiserver
 EnvironmentFile=-/etc/kubernetes/scheduler
+User=kube
 ExecStart=/usr/bin/kube-scheduler \
 	    ${KUBE_LOGTOSTDERR} \
 	    ${KUBE_LOG_LEVEL} \
