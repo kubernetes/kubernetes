@@ -191,7 +191,12 @@ func main() {
 		}
 		go func() {
 			defer util.HandleCrash()
-			glog.Fatal(readOnlyServer.ListenAndServe())
+			for {
+				if err := readOnlyServer.ListenAndServe(); err != nil {
+					glog.Errorf("Unable to listen for read only traffic (%v); will try again.", err)
+				}
+				time.Sleep(15 * time.Second)
+			}
 		}()
 	}
 
