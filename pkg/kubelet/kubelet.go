@@ -73,7 +73,7 @@ func NewMainKubelet(
 		resyncInterval:        ri,
 		networkContainerImage: ni,
 		podWorkers:            newPodWorkers(),
-		runner:                dockertools.NewDockerContainerCommandRunner(),
+		runner:                dockertools.NewDockerContainerCommandRunner(dc),
 		httpClient:            &http.Client{},
 		pullQPS:               pullQPS,
 		pullBurst:             pullBurst,
