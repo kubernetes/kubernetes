@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -178,6 +179,42 @@ func TestPodFitsPorts(t *testing.T) {
 		}
 		if test.fits != fits {
 			t.Errorf("%s: expected %v, saw %v", test.test, test.fits, fits)
+		}
+	}
+}
+
+func TestGetUsedPorts(t *testing.T) {
+	tests := []struct {
+		pods []api.Pod
+
+		ports map[int]bool
+	}{
+		{
+			[]api.Pod{
+				newPod("m1", 9090),
+			},
+			map[int]bool{9090: true},
+		},
+		{
+			[]api.Pod{
+				newPod("m1", 9090),
+				newPod("m1", 9091),
+			},
+			map[int]bool{9090: true, 9091: true},
+		},
+		{
+			[]api.Pod{
+				newPod("m1", 9090),
+				newPod("m2", 9091),
+			},
+			map[int]bool{9090: true, 9091: true},
+		},
+	}
+
+	for _, test := range tests {
+		ports := getUsedPorts(test.pods...)
+		if !reflect.DeepEqual(test.ports, ports) {
+			t.Errorf("expect %v, got %v", test.ports, ports)
 		}
 	}
 }
