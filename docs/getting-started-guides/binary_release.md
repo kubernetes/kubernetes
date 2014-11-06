@@ -6,7 +6,7 @@ You can either build a release from sources or download a pre-built release.  If
 
 Soon, we will have a list of numbered and nightly releases.  Until then, you can download a development release/snapshot from [here](http://storage.googleapis.com/kubernetes-releases-56726/devel/kubernetes.tar.gz).
 
-Unpack this tar file on Linux or OS X.  Unpack this tar file on Linux or OS X, cd to the created `kubernetes/` directory, and then follow the getting started guide for your cloud.
+Unpack this tar file on Linux or OS X, cd to the created `kubernetes/` directory, and then follow the getting started guide for your cloud.
 
 ### Building from source
 
