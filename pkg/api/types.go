@@ -434,7 +434,7 @@ type PodList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []Pod `json:"items" yaml:"items,omitempty"`
+	Items []Pod `json:"items" yaml:"items"`
 }
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
@@ -460,7 +460,7 @@ type ReplicationControllerList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []ReplicationController `json:"items,omitempty" yaml:"items,omitempty"`
+	Items []ReplicationController `json:"items" yaml:"items"`
 }
 
 // ReplicationController represents the configuration of a replication controller.
@@ -546,7 +546,7 @@ type EndpointsList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []Endpoints `json:"items,omitempty" yaml:"items,omitempty"`
+	Items []Endpoints `json:"items" yaml:"items"`
 }
 
 // NodeResources represents resources on a Kubernetes system node
@@ -580,7 +580,7 @@ type MinionList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []Minion `json:"items,omitempty" yaml:"items,omitempty"`
+	Items []Minion `json:"items" yaml:"items"`
 }
 
 // Binding is written by a scheduler to cause a pod to be bound to a host.
@@ -773,7 +773,7 @@ type ServerOpList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []ServerOp `yaml:"items,omitempty" json:"items,omitempty"`
+	Items []ServerOp `yaml:"items" json:"items"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -836,7 +836,7 @@ type EventList struct {
 	TypeMeta `yaml:",inline" json:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []Event `yaml:"items,omitempty" json:"items,omitempty"`
+	Items []Event `yaml:"items" json:"items"`
 }
 
 // ContainerManifest corresponds to the Container Manifest format, documented at:
@@ -864,7 +864,7 @@ type ContainerManifestList struct {
 	TypeMeta `json:",inline" yaml:",inline"`
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Items []ContainerManifest `json:"items,omitempty" yaml:"items,omitempty"`
+	Items []ContainerManifest `json:"items" yaml:"items,omitempty"`
 }
 
 // Included in partial form from v1beta3 to replace ContainerManifest
