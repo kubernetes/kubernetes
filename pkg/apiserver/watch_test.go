@@ -40,9 +40,9 @@ var watchTestTable = []struct {
 	t   watch.EventType
 	obj runtime.Object
 }{
-	{watch.Added, &Simple{Other: "A Name"}},
-	{watch.Modified, &Simple{Other: "Another Name"}},
-	{watch.Deleted, &Simple{Other: "Another Name"}},
+	{watch.Added, &Simple{ObjectMeta: api.ObjectMeta{Name: "foo"}}},
+	{watch.Modified, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
+	{watch.Deleted, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
 }
 
 func TestWatchWebsocket(t *testing.T) {
@@ -50,13 +50,13 @@ func TestWatchWebsocket(t *testing.T) {
 	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/api/version", selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
-	dest.Path = "/prefix/version/watch/foo"
+	dest.Path = "/api/version/watch/foo"
 	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
@@ -76,7 +76,14 @@ func TestWatchWebsocket(t *testing.T) {
 		if got.Type != action {
 			t.Errorf("Unexpected type: %v", got.Type)
 		}
-		if e, a := runtime.EncodeOrDie(codec, object), string(got.Object); !reflect.DeepEqual(e, a) {
+		gotObj, err := codec.Decode(got.Object)
+		if err != nil {
+			t.Fatalf("Decode error: %v", err)
+		}
+		if _, err := api.GetReference(gotObj); err != nil {
+			t.Errorf("Unable to construct reference: %v", err)
+		}
+		if e, a := object, gotObj; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 	}
@@ -97,13 +104,13 @@ func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/api/version", selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/prefix/version/watch/foo"
+	dest.Path = "/api/version/watch/foo"
 	dest.RawQuery = ""
 
 	request, err := http.NewRequest("GET", dest.String(), nil)
@@ -134,7 +141,16 @@ func TestWatchHTTP(t *testing.T) {
 		if got.Type != item.t {
 			t.Errorf("%d: Unexpected type: %v", i, got.Type)
 		}
-		if e, a := runtime.EncodeOrDie(codec, item.obj), string(got.Object); !reflect.DeepEqual(e, a) {
+		t.Logf("obj: %v", string(got.Object))
+		gotObj, err := codec.Decode(got.Object)
+		if err != nil {
+			t.Fatalf("Decode error: %v", err)
+		}
+		t.Logf("obj: %#v", gotObj)
+		if _, err := api.GetReference(gotObj); err != nil {
+			t.Errorf("Unable to construct reference: %v", err)
+		}
+		if e, a := item.obj, gotObj; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 	}
@@ -151,12 +167,12 @@ func TestWatchParamParsing(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/api/version", selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/prefix/version/watch/foo"
+	dest.Path = "/api/version/watch/foo"
 
 	table := []struct {
 		rawQuery        string
@@ -223,14 +239,14 @@ func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/api/version", selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	defer server.CloseClientConnections()
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/prefix/version/watch/foo"
+	dest.Path = "/api/version/watch/foo"
 	dest.RawQuery = ""
 
 	table := []struct {

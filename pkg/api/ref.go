@@ -50,7 +50,7 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	}
 	version := versionFromSelfLink.FindStringSubmatch(meta.SelfLink())
 	if len(version) < 2 {
-		return nil, fmt.Errorf("unexpected self link format: %v", meta.SelfLink())
+		return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", meta.SelfLink(), version)
 	}
 	return &ObjectReference{
 		Kind:            kind,

@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+
 	"github.com/golang/glog"
 )
 
@@ -89,7 +90,12 @@ func NewAPIGroup(storage map[string]RESTStorage, codec runtime.Codec, canonicalP
 // in a slash.
 func (g *APIGroup) InstallREST(mux Mux, paths ...string) {
 	restHandler := &g.handler
-	watchHandler := &WatchHandler{g.handler.storage, g.handler.codec}
+	watchHandler := &WatchHandler{
+		storage:         g.handler.storage,
+		codec:           g.handler.codec,
+		canonicalPrefix: g.handler.canonicalPrefix,
+		selfLinker:      g.handler.selfLinker,
+	}
 	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
 	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
 
