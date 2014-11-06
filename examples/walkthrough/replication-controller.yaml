@@ -22,4 +22,4 @@ desiredState:
     # Important: these labels need to match the selector above
     # The api server enforces this constraint.
     labels:
-      - name: nginx
+      name: nginx
