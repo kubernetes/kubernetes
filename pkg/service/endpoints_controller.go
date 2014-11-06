@@ -138,15 +138,15 @@ func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
 
 // findPort locates the container port for the given manifest and portName.
 func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, error) {
-	firstContianerPort := -1
+	firstContainerPort := 0
 	if len(manifest.Containers[0].Ports) > 0 {
-		firstContianerPort = manifest.Containers[0].Ports[0].ContainerPort
+		firstContainerPort = manifest.Containers[0].Ports[0].ContainerPort
 	}
 
 	switch portName.Kind {
 	case util.IntstrString:
-		if len(portName.StrVal) == 0 && firstContianerPort != -1 {
-			return firstContianerPort, nil
+		if len(portName.StrVal) == 0 && firstContainerPort != -1 {
+			return firstContainerPort, nil
 		}
 		name := portName.StrVal
 		for _, container := range manifest.Containers {
@@ -157,11 +157,11 @@ func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, 
 			}
 		}
 	case util.IntstrInt:
-		if portName.IntVal == 0 && firstContianerPort != -1 {
-			return firstContianerPort, nil
+		if portName.IntVal == 0 && firstContainerPort != -1 {
+			return firstContainerPort, nil
 		}
 		return portName.IntVal, nil
 	}
 
-	return -1, fmt.Errorf("no suitable port for manifest: %s", manifest.ID)
+	return 0, fmt.Errorf("no suitable port for manifest: %s", manifest.ID)
 }
