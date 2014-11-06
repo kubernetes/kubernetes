@@ -379,7 +379,7 @@ function authorize-internal () {
 
   FOUND=`aws ec2 describe-security-groups --group-ids ${dest_sg} --filters Name=ip-permission.group-id,Values=${src_sg} Name=ip-permission.from-port,Values=${from_port} Name=ip-permission.to-port,Values=${to_port} Name=ip-permission.protocol,Values=${protocol} --query SecurityGroups[].GroupId`
   if [[ "${FOUND}" == "" ]]; then
-    aws ec2 authorize-security-group-ingress --group-id $dest_sg --source-group ${src_sg} --protocol ${protocol} --port ${ports)
+    aws ec2 authorize-security-group-ingress --group-id $dest_sg --source-group ${src_sg} --protocol ${protocol} --port ${ports}
   fi
 }
 
@@ -578,7 +578,7 @@ function kube-up {
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
     INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:kubernetes-id,Values=minion-${i}" "Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY}" --query Reservations[0].Instances[0].PublicIpAddress)
-    if [[ ${INSTANCE_ID} == "" ]; then
+    if [[ ${INSTANCE_ID} == "" ]]; then
       INSTANCE_ID=`aws ec2 run-instance --query Instances[].InstanceId \
         --image-id ${AMI} \
         --key-name ${KEYPAIR} \
