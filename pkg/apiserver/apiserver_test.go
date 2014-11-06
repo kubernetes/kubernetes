@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -44,17 +45,17 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-var codec = latest.Codec
+var codec = testapi.Codec()
 var selfLinker = latest.SelfLinker
 
 func init() {
 	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{})
-	api.Scheme.AddKnownTypes(latest.Version, &Simple{}, &SimpleList{})
+	api.Scheme.AddKnownTypes(testapi.Version(), &Simple{}, &SimpleList{})
 }
 
 type Simple struct {
 	api.TypeMeta   `yaml:",inline" json:",inline"`
-	api.ObjectMeta `yaml:"metadata,inline" json:"metadata,inline"`
+	api.ObjectMeta `yaml:"metadata" json:"metadata"`
 	Other          string `yaml:"other,omitempty" json:"other,omitempty"`
 }
 
@@ -67,6 +68,21 @@ type SimpleList struct {
 }
 
 func (*SimpleList) IsAnAPIObject() {}
+
+func TestSimpleSetupRight(t *testing.T) {
+	s := &Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
+	wire, err := codec.Encode(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := codec.Decode(wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(s, s2) {
+		t.Fatalf("encode/decode broken:\n%#v\n%#v\n", s, s2)
+	}
+}
 
 type SimpleRESTStorage struct {
 	errors  map[string]error

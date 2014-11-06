@@ -19,21 +19,39 @@ package apiserver
 import (
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 
-	"code.google.com/p/go.net/websocket"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+
+	"code.google.com/p/go.net/websocket"
+	"github.com/golang/glog"
 )
 
 type WatchHandler struct {
-	storage map[string]RESTStorage
-	codec   runtime.Codec
+	storage         map[string]RESTStorage
+	codec           runtime.Codec
+	canonicalPrefix string
+	selfLinker      runtime.SelfLinker
+}
+
+// setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
+func (h *WatchHandler) setSelfLinkAddName(obj runtime.Object, req *http.Request) error {
+	name, err := h.selfLinker.Name(obj)
+	if err != nil {
+		return err
+	}
+	newURL := *req.URL
+	newURL.Path = path.Join(h.canonicalPrefix, req.URL.Path, name)
+	newURL.RawQuery = ""
+	newURL.Fragment = ""
+	return h.selfLinker.SetSelfLink(obj, newURL.String())
 }
 
 func getWatchParams(query url.Values) (label, field labels.Selector, resourceVersion string) {
@@ -84,7 +102,11 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		// TODO: This is one watch per connection. We want to multiplex, so that
 		// multiple watches of the same thing don't create two watches downstream.
-		watchServer := &WatchServer{watching, h.codec}
+		watchServer := &WatchServer{watching, h.codec, func(obj runtime.Object) {
+			if err := h.setSelfLinkAddName(obj, req); err != nil {
+				glog.Errorf("Failed to set self link for object %#v", obj)
+			}
+		}}
 		if isWebsocketRequest(req) {
 			websocket.Handler(watchServer.HandleWS).ServeHTTP(httplog.Unlogged(w), req)
 		} else {
@@ -100,6 +122,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 type WatchServer struct {
 	watching watch.Interface
 	codec    runtime.Codec
+	fixup    func(runtime.Object)
 }
 
 // HandleWS implements a websocket handler.
@@ -122,6 +145,7 @@ func (w *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
+			w.fixup(event.Object)
 			obj, err := watchjson.Object(w.codec, &event)
 			if err != nil {
 				// Client disconnect.
@@ -171,6 +195,7 @@ func (self *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			self.fixup(event.Object)
 			if err := encoder.Encode(&event); err != nil {
 				// Client disconnect.
 				self.watching.Stop()
