@@ -429,6 +429,9 @@ EOF
 function kube-down {
   # Detect the project into $PROJECT
   detect-project
+  
+  # Monitoring might have been setup. It doesn't hurt to attempt shutdown even it wasn't setup.
+  teardown-monitoring
 
   echo "Bringing down cluster"
   gcutil deletefirewall  \
@@ -568,4 +571,30 @@ function ssh-to-node {
 # Restart the kube-proxy on a node ($1)
 function restart-kube-proxy {
   ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+}
+
+# Setup monitoring using heapster and InfluxDB
+function setup-monitoring {
+    read -p "Setup monitoring of the cluster using heapster (https://github.com/GoogleCloudPlatform/heapster) [Y|N]? " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+	teardown-monitoring
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" && 
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &&
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json"
+	if [ $? -ne 0 ]; then
+	    teardown-monitoring
+	else
+	    dashboardIP="http://`kubectl.sh get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
+	    echo "Grafana dashboard is available at $dashboardIP"
+	    echo "username is 'admin' and password is 'admin'"
+	fi
+    fi
+}
+
+function teardown-monitoring {
+    kubectl.sh delete pods heapster || true
+    kubectl.sh delete pods influx-grafana || true
+    kubectl.sh delete services influx-master || true
 }
