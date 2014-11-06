@@ -66,6 +66,10 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 		glog.Errorf("Unable to convert pod template: %v", err)
 		return
 	}
+	if labels.Set(pod.Labels).AsSelector().Empty() {
+		glog.Errorf("Unable to create pod replica, no labels")
+		return
+	}
 	if _, err := r.kubeClient.Pods(namespace).Create(pod); err != nil {
 		glog.Errorf("Unable to create pod replica: %v", err)
 	}
