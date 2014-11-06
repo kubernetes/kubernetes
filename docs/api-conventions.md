@@ -16,10 +16,8 @@ Types of Resources
 
 All API resources are either:
 
-1. **Objects** represents a physical or virtual construct in the system
-   An API object resource is a record of intent - once created, the system will work to ensure that resource exists. All API objects have common metadata intended for client use.
-2. **Lists** are collections of **objects** of one or more types
-   Lists have a limited set of common metadata. All lists use the "items" field to contain the array of objects they return. Each resource kind should have an endpoint that returns the full set of resources, as well as zero or more endpoints that return subsets of the full list.
+1. **Objects** represents a physical or virtual construct in the system. An API object is a record of intent - once created, the system will work to ensure that resource exists. All API objects have common metadata intended for client use.
+2. **Lists** are collections of **objects** of one or more types. Lists have a limited set of common metadata. All lists use the "items" field to contain the array of objects they return. Each resource kind should have an endpoint that returns the full set of resources, as well as zero or more endpoints that return subsets of the full list.
 
    In addition, all lists that return objects with labels should support label filtering (see [labels.md](labels.md), and most lists should support filtering by fields.
 
@@ -88,17 +86,17 @@ Verbs on Resources
 
 API resources should use the traditional REST pattern:
 
-* GET /<resourceNamePlural> - Retrieve a list of type <resourceName>, e.g. GET /pods returns a list of Pods
-* POST /<resourceNamePlural> - Create a new resource from the JSON object provided by the client
-* GET /<resourceNamePlural>/<name> - Retrieves a single resource with the given name, e.g. GET /pods/first returns a Pod named 'first'
-* DELETE /<resourceNamePlural>/<name>  - Delete the single resource with the given name
-* PUT /<resourceNamePlural>/<name> - Update or create the resource with the given name with the JSON object provided by the client
+* GET /&lt;resourceNamePlural&gt; - Retrieve a list of type &lt;resourceName&gt;, e.g. GET /pods returns a list of Pods.
+* POST /&lt;resourceNamePlural&gt; - Create a new resource from the JSON object provided by the client.
+* GET /&lt;resourceNamePlural&gt;/&lt;name&gt; - Retrieves a single resource with the given name, e.g. GET /pods/first returns a Pod named 'first'.
+* DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name.
+* PUT /&lt;resourceNamePlural&gt;/&lt;name&gt; - Update or create the resource with the given name with the JSON object provided by the client.
 
 Kubernetes by convention exposes additional verbs as new endpoints with singular names. Examples:
 
-* GET /watch/<resourceNamePlural> - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
-* GET /watch/<resourceNamePlural>/<name> - Receive a stream of JSON objects corresponding to changes made to the named resource of the given kind over time
-* GET /redirect/<resourceNamePlural>/<name> - If the named resource can be described by a URL, return an HTTP redirect to that URL instead of a JSON response. For example, a service exposes a port and IP address and a client could invoke the redirect verb to receive an HTTP 307 redirection to that port and IP.
+* GET /watch/&lt;resourceNamePlural&gt; - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
+* GET /watch/&lt;resourceNamePlural&gt;/&lt;name&gt; - Receive a stream of JSON objects corresponding to changes made to the named resource of the given kind over time.
+* GET /redirect/&lt;resourceNamePlural&gt;/&lt;name&gt; - If the named resource can be described by a URL, return an HTTP redirect to that URL instead of a JSON response. For example, a service exposes a port and IP address and a client could invoke the redirect verb to receive an HTTP 307 redirection to that port and IP.
 
 Support of additional verbs is not required for all object types.
 
