@@ -133,7 +133,7 @@ func generateService(name string, portSpec string) {
 
 	svc := []v1beta3.Service{{
 		TypeMeta: v1beta3.TypeMeta{APIVersion: "v1beta3", Kind: "Service"},
-		Metadata: v1beta3.ObjectMeta{
+		ObjectMeta: v1beta3.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"service": name,
@@ -167,7 +167,7 @@ func generatePodTemplate(sname string, cname string, podSpec v1beta3.PodSpec) {
 	name := fmt.Sprintf("%s-%s", sname, cname)
 	pt := []v1beta3.PodTemplate{{
 		TypeMeta: v1beta3.TypeMeta{APIVersion: "v1beta3", Kind: "PodTemplate"},
-		Metadata: v1beta3.ObjectMeta{
+		ObjectMeta: v1beta3.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"service": sname,
@@ -175,7 +175,7 @@ func generatePodTemplate(sname string, cname string, podSpec v1beta3.PodSpec) {
 			},
 		},
 		Spec: v1beta3.PodTemplateSpec{
-			Metadata: v1beta3.ObjectMeta{
+			ObjectMeta: v1beta3.ObjectMeta{
 				Labels: map[string]string{
 					"service": sname,
 					"track":   cname,
@@ -199,7 +199,7 @@ func generateReplicationController(sname string, cname string, replicas int) {
 	name := fmt.Sprintf("%s-%s", sname, cname)
 	rc := []v1beta3.ReplicationController{{
 		TypeMeta: v1beta3.TypeMeta{APIVersion: "v1beta3", Kind: "ReplicationController"},
-		Metadata: v1beta3.ObjectMeta{
+		ObjectMeta: v1beta3.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"service": sname,
