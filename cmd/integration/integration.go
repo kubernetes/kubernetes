@@ -19,7 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -238,7 +237,7 @@ func runReplicationControllerTest(c *client.Client) {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	var controller api.ReplicationController
-	if err := json.Unmarshal(data, &controller); err != nil {
+	if err := api.Scheme.DecodeInto(data, &controller); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 
