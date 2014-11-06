@@ -128,14 +128,22 @@ function upload-server-tars() {
   local -r staging_path="${staging_bucket}/devel"
 
   echo "+++ Staging server tars to S3: s3://${staging_path}"
+
   SERVER_BINARY_TAR_URL="s3://${staging_path}/${SERVER_BINARY_TAR##*/}"
   SERVER_BINARY_TAR_DOWNLOAD_URL="http://s3-us-west-2.amazonaws.com/${staging_path}/${SERVER_BINARY_TAR##*/}"
-  # TODO: move to acl private & signed url
-  aws s3 cp --acl public-read "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_URL}"
+
   SALT_TAR_URL="s3://${staging_path}/${SALT_TAR##*/}"
   SALT_TAR_DOWNLOAD_URL="http://s3-us-west-2.amazonaws.com/${staging_path}/${SALT_TAR##*/}"
+
+  mkdir ${KUBE_TEMP}/s3
+  cp -p "${SERVER_BINARY_TAR}" ${KUBE_TEMP}/s3/
+  cp -p "${SALT_TAR}" ${KUBE_TEMP}/s3/
+
   # TODO: move to acl private & signed url
-  aws s3 cp --acl public-read "${SALT_TAR}" "${SALT_TAR_URL}"
+  aws s3 sync --acl public-read ${KUBE_TEMP}/s3/ "s3://${staging_path}/"
+  #aws s3 cp --acl public-read "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_URL}"
+  # TODO: move to acl private & signed url
+  #aws s3 cp --acl public-read "${SALT_TAR}" "${SALT_TAR_URL}"
 }
 
 # Detect the information about the minions
@@ -484,14 +492,14 @@ function get-admin-token {
 #   KUBE_ROOT
 #   <Various vars set in config file>
 function kube-up {
+  ensure-temp-dir
+
   # Detect the project into $PROJECT if it isn't set
   detect-project
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
   upload-server-tars
-
-  ensure-temp-dir
 
   get-password
   python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
