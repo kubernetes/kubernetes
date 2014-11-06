@@ -146,3 +146,22 @@ func makeImageList(manifest api.ContainerManifest) string {
 	}
 	return strings.Join(images, ",")
 }
+
+// ExpandResourceShortcut will return the expanded version of resource
+// (something that a pkg/api/meta.RESTMapper can understand), if it is
+// indeed a shortcut. Otherwise, will return resource unmodified.
+// TODO: Combine with RESTMapper stuff to provide a general solution
+// to this problem.
+func ExpandResourceShortcut(resource string) string {
+	shortForms := map[string]string{
+		"po": "pods",
+		"rc": "replicationcontrollers",
+		"se": "services",
+		"mi": "minions",
+		"ev": "events",
+	}
+	if expanded, ok := shortForms[resource]; ok {
+		return expanded
+	}
+	return resource
+}
