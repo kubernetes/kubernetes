@@ -54,18 +54,18 @@ type AttributesRecord struct {
 	Kind      string
 }
 
-func (a *AttributesRecord) GetUserName() string {
+func (a AttributesRecord) GetUserName() string {
 	return a.User.GetName()
 }
 
-func (a *AttributesRecord) IsReadOnly() bool {
+func (a AttributesRecord) IsReadOnly() bool {
 	return a.ReadOnly
 }
 
-func (a *AttributesRecord) GetNamespace() string {
+func (a AttributesRecord) GetNamespace() string {
 	return a.Namespace
 }
 
-func (a *AttributesRecord) GetKind() string {
+func (a AttributesRecord) GetKind() string {
 	return a.Kind
 }

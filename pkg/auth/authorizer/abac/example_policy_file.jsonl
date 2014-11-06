@@ -1,0 +1,7 @@
+{"user":"admin"}
+{"user":"scheduler", "readonly": true, "kind": "pods"}
+{"user":"scheduler", "kind": "bindings"}
+{"user":"kubelet",  "readonly": true, "kind": "bindings"}
+{"user":"kubelet", "kind": "events"}
+{"user":"alice", "ns": "projectCaribou"}
+{"user":"bob", "readonly": true, "ns": "projectCaribou"}
