@@ -103,7 +103,7 @@ desiredState:
     containers:
       - name: git-monitor
         image: kubernetes/git-monitor
-        envVar:
+        env:
           - name: GIT_REPO
             value: http://github.com/some/repo.git
         volumeMounts:
