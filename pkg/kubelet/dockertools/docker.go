@@ -613,6 +613,8 @@ func (dk *dockerKeyring) reindex() {
 	sort.Sort(sort.Reverse(sort.StringSlice(dk.index)))
 }
 
+const defaultRegistryHost = "index.docker.io/v1/"
+
 func (dk *dockerKeyring) lookup(image string) (docker.AuthConfiguration, bool) {
 	// range over the index as iterating over a map does not provide
 	// a predictable ordering
@@ -622,6 +624,11 @@ func (dk *dockerKeyring) lookup(image string) (docker.AuthConfiguration, bool) {
 		}
 
 		return dk.creds[k], true
+	}
+
+	// use credentials for the default registry if provided
+	if auth, ok := dk.creds[defaultRegistryHost]; ok {
+		return auth, true
 	}
 
 	return docker.AuthConfiguration{}, false
