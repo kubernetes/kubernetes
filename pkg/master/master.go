@@ -106,12 +106,13 @@ type Master struct {
 	authorizer            authorizer.Authorizer
 	masterCount           int
 
-	// "Outputs"
-	Handler http.Handler
-
 	readOnlyServer  string
 	readWriteServer string
 	masterServices  *util.Runner
+
+	// "Outputs"
+	Handler         http.Handler
+	InsecureHandler http.Handler
 }
 
 // NewEtcdHelper returns an EtcdHelper for the provided arguments or an error if the version
@@ -195,6 +196,8 @@ func setDefaults(c *Config) {
 //   http.Handler which handles all the endpoints provided by the master,
 //   including the API, the UI, and miscelaneous debugging endpoints.  All
 //   these are subject to authorization and authentication.
+//   InsecureHandler -- an http.Handler which handles all the same
+//   endpoints as Handler, but no authorization and authentication is done.
 // Public methods:
 //   HandleWithAuth -- Allows caller to add an http.Handler for an endpoint
 //   that uses the same authentication and authorization (if any is configured)
@@ -319,6 +322,8 @@ func (m *Master) init(c *Config) {
 		}
 		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
 	}
+
+	m.InsecureHandler = handler
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(userContexts)
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)

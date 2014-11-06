@@ -185,7 +185,7 @@ func main() {
 		rl := util.NewTokenBucketRateLimiter(1.0, 20)
 		readOnlyServer := &http.Server{
 			Addr:           roLocation,
-			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.Handler))),
+			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler))),
 			ReadTimeout:    5 * time.Minute,
 			WriteTimeout:   5 * time.Minute,
 			MaxHeaderBytes: 1 << 20,
@@ -203,7 +203,7 @@ func main() {
 
 	s := &http.Server{
 		Addr:           rwLocation,
-		Handler:        apiserver.RecoverPanics(m.Handler),
+		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
