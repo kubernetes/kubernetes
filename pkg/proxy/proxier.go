@@ -482,7 +482,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 }
 
 func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
-	args := iptablesPortalArgs(info.portalIP, info.portalPort, proxier.listenAddress, info.proxyPort, service)
+	args := iptablesPortalArgs(info.portalIP, info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesProxyChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesProxyChain, service)
@@ -495,7 +495,7 @@ func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
 }
 
 func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
-	args := iptablesPortalArgs(info.portalIP, info.portalPort, proxier.listenAddress, info.proxyPort, service)
+	args := iptablesPortalArgs(info.portalIP, info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesProxyChain, args...); err != nil {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesProxyChain, service)
 		return err
@@ -533,11 +533,11 @@ var zeroIP = net.ParseIP("0.0.0.0")
 var localhostIP = net.ParseIP("127.0.0.1")
 
 // Build a slice of iptables args for a portal rule.
-func iptablesPortalArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service string) []string {
+func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
 	args := []string{
 		"-m", "comment",
 		"--comment", service,
-		"-p", "tcp",
+		"-p", strings.ToLower(string(protocol)),
 		"-d", destIP.String(),
 		"--dport", fmt.Sprintf("%d", destPort),
 	}
