@@ -79,50 +79,77 @@ func TestFindPort(t *testing.T) {
 			},
 		},
 	}
+	emptyPortsManifest := api.ContainerManifest{
+		Containers: []api.Container{
+			{
+				Ports: []api.Port{},
+			},
+		},
+	}
 	tests := []struct {
+		manifest api.ContainerManifest
 		portName util.IntOrString
 
 		wport int
 		werr  bool
 	}{
 		{
+			manifest,
 			util.IntOrString{Kind: util.IntstrString, StrVal: "foo"},
 			8080,
 			false,
 		},
 		{
+			manifest,
 			util.IntOrString{Kind: util.IntstrString, StrVal: "bar"},
 			8000,
 			false,
 		},
 		{
+			manifest,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 8000},
 			8000,
 			false,
 		},
 		{
+			manifest,
 			util.IntOrString{Kind: util.IntstrInt, IntVal: 7000},
 			7000,
 			false,
 		},
 		{
+			manifest,
 			util.IntOrString{Kind: util.IntstrString, StrVal: "baz"},
 			0,
 			true,
 		},
 		{
+			manifest,
 			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
 			8080,
 			false,
 		},
 		{
-			util.IntOrString{},
+			manifest,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
 			8080,
 			false,
 		},
+		{
+			emptyPortsManifest,
+			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			0,
+			true,
+		},
+		{
+			emptyPortsManifest,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
+			0,
+			true,
+		},
 	}
 	for _, test := range tests {
-		port, err := findPort(&manifest, test.portName)
+		port, err := findPort(&test.manifest, test.portName)
 		if port != test.wport {
 			t.Errorf("Expected port %d, Got %d", test.wport, port)
 		}

@@ -145,8 +145,11 @@ func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, 
 
 	switch portName.Kind {
 	case util.IntstrString:
-		if len(portName.StrVal) == 0 && firstContainerPort != -1 {
-			return firstContainerPort, nil
+		if len(portName.StrVal) == 0 {
+			if firstContainerPort != 0 {
+				return firstContainerPort, nil
+			}
+			break
 		}
 		name := portName.StrVal
 		for _, container := range manifest.Containers {
@@ -157,8 +160,11 @@ func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, 
 			}
 		}
 	case util.IntstrInt:
-		if portName.IntVal == 0 && firstContainerPort != -1 {
-			return firstContainerPort, nil
+		if portName.IntVal == 0 {
+			if firstContainerPort != 0 {
+				return firstContainerPort, nil
+			}
+			break
 		}
 		return portName.IntVal, nil
 	}
