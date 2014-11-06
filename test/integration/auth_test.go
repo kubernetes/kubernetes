@@ -232,10 +232,13 @@ var aEndpoints string = `
 }
 `
 
+// To ensure that a POST completes before a dependent GET, make operations
+// effectively synchronous with the following parameters.
+var syncFlags = "?sync=true&timeout=60s"
+
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
-
-var code200or202 = map[int]bool{200: true, 202: true} // Unpredicatable which will be returned.
+var code200 = map[int]bool{200: true}
 var code400 = map[int]bool{400: true}
 var code403 = map[int]bool{403: true}
 var code404 = map[int]bool{404: true}
@@ -256,12 +259,12 @@ func getTestRequests() []struct {
 		statusCodes map[int]bool // Set of expected resp.StatusCode if all goes well.
 	}{
 		// Normal methods on pods
-		{"GET", "/api/v1beta1/pods", "", code200or202},
-		{"POST", "/api/v1beta1/pods", aPod, code200or202},
-		{"PUT", "/api/v1beta1/pods/a", aPod, code500}, // See #2114 about why 500
-		{"GET", "/api/v1beta1/pods", "", code200or202},
-		{"GET", "/api/v1beta1/pods/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/pods/a", "", code200or202},
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200},
+		{"PUT", "/api/v1beta1/pods/a" + syncFlags, aPod, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"GET", "/api/v1beta1/pods/a", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a", "", code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
@@ -276,51 +279,51 @@ func getTestRequests() []struct {
 		{"NOSUCHVERB", "/api/v1beta1/pods", "", code404},
 
 		// Normal methods on services
-		{"GET", "/api/v1beta1/services", "", code200or202},
-		{"POST", "/api/v1beta1/services", aService, code200or202},
-		{"PUT", "/api/v1beta1/services/a", aService, code422}, // TODO: GET and put back server-provided fields to avoid a 422
-		{"GET", "/api/v1beta1/services", "", code200or202},
-		{"GET", "/api/v1beta1/services/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/services/a", "", code200or202},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"POST", "/api/v1beta1/services" + syncFlags, aService, code200},
+		{"PUT", "/api/v1beta1/services/a" + syncFlags, aService, code422}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"GET", "/api/v1beta1/services/a", "", code200},
+		{"DELETE", "/api/v1beta1/services/a", "", code200},
 
 		// Normal methods on replicationControllers
-		{"GET", "/api/v1beta1/replicationControllers", "", code200or202},
-		{"POST", "/api/v1beta1/replicationControllers", aRC, code200or202},
-		{"PUT", "/api/v1beta1/replicationControllers/a", aRC, code409}, // See #2115 about why 409
-		{"GET", "/api/v1beta1/replicationControllers", "", code200or202},
-		{"GET", "/api/v1beta1/replicationControllers/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/replicationControllers/a", "", code200or202},
+		{"GET", "/api/v1beta1/replicationControllers", "", code200},
+		{"POST", "/api/v1beta1/replicationControllers" + syncFlags, aRC, code200},
+		{"PUT", "/api/v1beta1/replicationControllers/a" + syncFlags, aRC, code409}, // See #2115 about why 409
+		{"GET", "/api/v1beta1/replicationControllers", "", code200},
+		{"GET", "/api/v1beta1/replicationControllers/a", "", code200},
+		{"DELETE", "/api/v1beta1/replicationControllers/a", "", code200},
 
 		// Normal methods on endpoints
-		{"GET", "/api/v1beta1/endpoints", "", code200or202},
-		{"POST", "/api/v1beta1/endpoints", aEndpoints, code200or202},
-		{"PUT", "/api/v1beta1/endpoints/a", aEndpoints, code200or202},
-		{"GET", "/api/v1beta1/endpoints", "", code200or202},
-		{"GET", "/api/v1beta1/endpoints/a", "", code200or202},
+		{"GET", "/api/v1beta1/endpoints", "", code200},
+		{"POST", "/api/v1beta1/endpoints" + syncFlags, aEndpoints, code200},
+		{"PUT", "/api/v1beta1/endpoints/a" + syncFlags, aEndpoints, code200},
+		{"GET", "/api/v1beta1/endpoints", "", code200},
+		{"GET", "/api/v1beta1/endpoints/a", "", code200},
 		{"DELETE", "/api/v1beta1/endpoints/a", "", code400},
 
 		// Normal methods on minions
-		{"GET", "/api/v1beta1/minions", "", code200or202},
-		{"POST", "/api/v1beta1/minions", aMinion, code200or202},
-		{"PUT", "/api/v1beta1/minions/a", aMinion, code500}, // See #2114 about why 500
-		{"GET", "/api/v1beta1/minions", "", code200or202},
-		{"GET", "/api/v1beta1/minions/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/minions/a", "", code200or202},
+		{"GET", "/api/v1beta1/minions", "", code200},
+		{"POST", "/api/v1beta1/minions" + syncFlags, aMinion, code200},
+		{"PUT", "/api/v1beta1/minions/a" + syncFlags, aMinion, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/minions", "", code200},
+		{"GET", "/api/v1beta1/minions/a", "", code200},
+		{"DELETE", "/api/v1beta1/minions/a", "", code200},
 
 		// Normal methods on events
-		{"GET", "/api/v1beta1/events", "", code200or202},
-		{"POST", "/api/v1beta1/events", aEvent, code200or202},
-		{"PUT", "/api/v1beta1/events/a", aEvent, code500}, // See #2114 about why 500
-		{"GET", "/api/v1beta1/events", "", code200or202},
-		{"GET", "/api/v1beta1/events", "", code200or202},
-		{"GET", "/api/v1beta1/events/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/events/a", "", code200or202},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"POST", "/api/v1beta1/events" + syncFlags, aEvent, code200},
+		{"PUT", "/api/v1beta1/events/a" + syncFlags, aEvent, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"GET", "/api/v1beta1/events/a", "", code200},
+		{"DELETE", "/api/v1beta1/events/a", "", code200},
 
 		// Normal methods on bindings
-		{"GET", "/api/v1beta1/bindings", "", code404},     // Bindings are write-only, so 404
-		{"POST", "/api/v1beta1/pods", aPod, code200or202}, // Need a pod to bind or you get a 404
-		{"POST", "/api/v1beta1/bindings", aBinding, code200or202},
-		{"PUT", "/api/v1beta1/bindings/a", aBinding, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/bindings", "", code404},            // Bindings are write-only, so 404
+		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200}, // Need a pod to bind or you get a 404
+		{"POST", "/api/v1beta1/bindings" + syncFlags, aBinding, code200},
+		{"PUT", "/api/v1beta1/bindings/a" + syncFlags, aBinding, code500}, // See #2114 about why 500
 		{"GET", "/api/v1beta1/bindings", "", code404},
 		{"GET", "/api/v1beta1/bindings/a", "", code404},
 		{"DELETE", "/api/v1beta1/bindings/a", "", code404},
@@ -334,7 +337,7 @@ func getTestRequests() []struct {
 		{"DELETE", "/api/v1beta1/foo", "", code404},
 
 		// Operations
-		{"GET", "/api/v1beta1/operations", "", code200or202},
+		{"GET", "/api/v1beta1/operations", "", code200},
 		{"GET", "/api/v1beta1/operations/1234567890", "", code404},
 
 		// Special verbs on pods
@@ -344,9 +347,9 @@ func getTestRequests() []struct {
 		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
 
 		// Non-object endpoints
-		{"GET", "/", "", code200or202},
-		{"GET", "/healthz", "", code200or202},
-		{"GET", "/version", "", code200or202},
+		{"GET", "/", "", code200},
+		{"GET", "/healthz", "", code200},
+		{"GET", "/version", "", code200},
 	}
 	return requests
 }
@@ -677,10 +680,10 @@ func TestNamespaceAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", "/api/v1beta1/pods?namespace=foo", aPod, code200or202},
-		{"GET", "/api/v1beta1/pods?namespace=foo", "", code200or202},
-		{"GET", "/api/v1beta1/pods/a?namespace=foo", "", code200or202},
-		{"DELETE", "/api/v1beta1/pods/a?namespace=foo", "", code200or202},
+		{"POST", "/api/v1beta1/pods?namespace=foo", aPod, code200},
+		{"GET", "/api/v1beta1/pods?namespace=foo", "", code200},
+		{"GET", "/api/v1beta1/pods/a?namespace=foo", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a?namespace=foo", "", code200},
 
 		{"POST", "/api/v1beta1/pods?namespace=bar", aPod, code403},
 		{"GET", "/api/v1beta1/pods?namespace=bar", "", code403},
@@ -753,10 +756,10 @@ func TestKindAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", "/api/v1beta1/services", aService, code200or202},
-		{"GET", "/api/v1beta1/services", "", code200or202},
-		{"GET", "/api/v1beta1/services/a", "", code200or202},
-		{"DELETE", "/api/v1beta1/services/a", "", code200or202},
+		{"POST", "/api/v1beta1/services", aService, code200},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"GET", "/api/v1beta1/services/a", "", code200},
+		{"DELETE", "/api/v1beta1/services/a", "", code200},
 
 		{"POST", "/api/v1beta1/pods", aPod, code403},
 		{"GET", "/api/v1beta1/pods", "", code403},
@@ -825,7 +828,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		statusCodes map[int]bool // allowed status codes.
 	}{
 		{"POST", "/api/v1beta1/pods", aPod, code403},
-		{"GET", "/api/v1beta1/pods", "", code200or202},
+		{"GET", "/api/v1beta1/pods", "", code200},
 		{"GET", "/api/v1beta1/pods/a", "", code404},
 	}
 
