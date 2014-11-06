@@ -575,10 +575,7 @@ function restart-kube-proxy {
 
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring {
-    read -p "Setup monitoring of the cluster using heapster (https://github.com/GoogleCloudPlatform/heapster) [Y|N]? " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]
-    then
+    if [ $MONITORING ]; then
 	teardown-monitoring
 	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" && 
 	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &&
