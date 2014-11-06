@@ -25,6 +25,14 @@ grains:
   cloud: aws
 EOF
 
+cat <<EOF > /etc/aws.conf
+{
+  "Global": {
+    "Region": "${AWS_ZONE}"
+  }
+}
+EOF
+
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
 cat <<EOF >/etc/salt/master.d/auto-accept.conf
@@ -35,11 +43,8 @@ cat <<EOF >/etc/salt/master.d/reactor.conf
 # React to new minions starting by running highstate on them.
 reactor:
   - 'salt/minion/*/start':
-    - /srv/reactor/start.sls
+    - /srv/reactor/highstate-new.sls
 EOF
-
-mkdir -p /srv/salt/nginx
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 
 # Install Salt
 #
@@ -50,5 +55,3 @@ echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd
 set +x
 curl -L --connect-timeout 20 --retry 6 --retry-delay 10 http://bootstrap.saltstack.com | sh -s -- -M -X
 set -x
-
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd

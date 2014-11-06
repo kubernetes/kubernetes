@@ -14,23 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Bring up a Kubernetes cluster.
-#
-# If the full release name (s3://<bucket>/<release>) is passed in then we take
-# that directly.  If not then we assume we are doing development stuff and take
-# the defaults in the release config.
+# Create the overlay files for the salt tree.  We create these in a separate
+# place so that we can blow away the rest of the salt configs on a kube-push and
+# re-apply these.
 
-# exit on any error
-set -e
+mkdir -p /srv/salt-overlay/pillar
+cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
+node_instance_prefix: $NODE_INSTANCE_PREFIX
+portal_net: $PORTAL_NET
+use-fluentd-es: $FLUENTD_ELASTICSEARCH
+use-fluentd-gcp: $FLUENTD_GCP
+EOF
 
-source $(dirname $0)/../kube-env.sh
-source $(dirname $0)/../$KUBERNETES_PROVIDER/util.sh
-
-echo "Starting cluster using provider: $KUBERNETES_PROVIDER"
-
-verify-prereqs
-kube-up
-
-source $(dirname $0)/validate-cluster.sh
-
-echo "Done"
+mkdir -p /srv/salt-overlay/salt/nginx
+echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd

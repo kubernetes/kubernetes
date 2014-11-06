@@ -2,6 +2,7 @@
 
 The example below creates an elastic Kubernetes cluster with 3 worker nodes and a master.
 
+<<<<<<< HEAD
 ## Highlights
 
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config)
@@ -34,13 +35,28 @@ aws cloudformation describe-stack-events --stack-name kubernetes
 ```
 
 > Record the Kubernetes Master IP address
+=======
+1. You need an AWS account. Visit [http://aws.amazon.com](http://aws.amazon.com) to get started
+2. Install and configure [AWS Command Line Interface](http://aws.amazon.com/cli)
 
+### Run from a binary release
+>>>>>>> Update the AWS config.
+
+1. Download the [binary release](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/binary_release.md)
+2. Unpack the archive and ```cd kubernetes```
+3. Turn up the cluster:
 ```
+<<<<<<< HEAD
 aws cloudformation describe-stacks --stack-name kubernetes
+=======
+export KUBERNETES_PROVIDER=aws
+cluster/kube-up.sh
+>>>>>>> Update the AWS config.
 ```
 
 [Skip to kubecfg client configuration](#configure-the-kubecfg-ssh-tunnel)
 
+<<<<<<< HEAD
 ### Manually
 
 The following commands use the CoreOS 490.0.0 alpha AMI `ami-e18dc5d1` from the `us-west-2` region. For a list of different regions and corresponding AMI IDs see the [CoreOS EC2 cloud provider documentation](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
@@ -97,8 +113,15 @@ aws ec2 describe-instances --instance-id <instance-id>
 Edit `node.yaml` and replace all instances of `<master-private-ip>` with the **private** IP address of the master node.
 
 ### Launch 3 worker nodes
+=======
+### Running examples
 
+Take a look at [next steps](https://github.com/GoogleCloudPlatform/kubernetes#where-to-go-next)
+>>>>>>> Update the AWS config.
+
+### Tearing down the cluster
 ```
+<<<<<<< HEAD
 aws ec2 run-instances --count 3 --image-id ami-e18dc5d1 --key-name <keypair> \
 --region us-west-2 --security-groups kubernetes --instance-type m3.medium \
 --user-data file://node.yaml
@@ -201,3 +224,11 @@ Visit the public IP address in your browser to view the running pod.
 ```
 kubecfg delete pods/hello
 ```
+=======
+cd kubernetes
+cluster/kube-down.sh
+```
+
+### Cloud Formation
+There is a contributed example from [CoreOS](http://www.coreos.com) using Cloud Formation.
+>>>>>>> Update the AWS config.

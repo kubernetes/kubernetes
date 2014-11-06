@@ -14,6 +14,9 @@ nginx:
   {% if grains.cloud == 'gce' %}
     {% set cert_ip='_use_gce_external_ip_' %}
   {% endif %}
+  {% if grains.cloud == 'aws' %}
+    {% set cert_ip='_use_aws_external_ip_' %}
+  {% endif %}
   {% if grains.cloud == 'vagrant' %}
     {% set cert_ip=grains.fqdn_ip4 %}
   {% endif %}
