@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Copyright 2014 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The repositories are really slow and there are GCE mirrors
+sed -i -e "\|^deb.*http://http.debian.net/debian| s/^/#/" /etc/apt/sources.list
+sed -i -e "\|^deb.*http://ftp.debian.org/debian| s/^/#/" /etc/apt/sources.list.d/backports.list
+
+# Prepopulate the name of the Master
+mkdir -p /etc/salt/minion.d
+echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+
+# Turn on debugging for salt-minion
+# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
+
+# Compute the private protocol 41 address for the bridge
+if [[ ${IPV6_BRIDGE_PREFIX} == "" ]]; then
+  IPV4=`wget http://169.254.169.254/latest/meta-data/local-ipv4 -q -O -`
+  IPV4_SPACES=`echo $IPV4| tr "." " "`
+  IPV6=`printf "2002:%02x%02x:%02x%02x::1" ${IPV4_SPACES}`
+  IPV6_BRIDGE_PREFIX=`printf "2002:%02x%02x:%02x%02x:1::" ${IPV4_SPACES}`
+  IPV6_BRIDGE_MASK=64
+
+  IPV6_BRIDGE="${IPV6_BRIDGE_PREFIX}/${IPV6_BRIDGE_MASK}"
+fi
+
+# Our minions will have a pool role to distinguish them from the master.
+cat <<EOF >/etc/salt/minion.d/grains.conf
+grains:
+  roles:
+    - kubernetes-pool
+  cbr-cidr: ${IPV6_BRIDGE}
+  cloud: ec2
+EOF
+
+# Install Salt
+#
+# We specify -X to avoid a race condition that can cause minion failure to
+# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
+curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X
