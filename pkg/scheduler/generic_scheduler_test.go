@@ -68,6 +68,53 @@ func makeMinionList(nodeNames []string) api.MinionList {
 	return result
 }
 
+func TestSelectHost(t *testing.T) {
+	scheduler := genericScheduler{random: rand.New(rand.NewSource(0))}
+	tests := []struct {
+		list          HostPriorityList
+		possibleHosts map[string]bool
+	}{
+		{
+			list: []HostPriority{
+				{host: "machine1.1", score: 1},
+				{host: "machine2.1", score: 2},
+			},
+			possibleHosts: map[string]bool{"machine1.1": true},
+		},
+		// equal scores
+		{
+			list: []HostPriority{
+				{host: "machine1.1", score: 1},
+				{host: "machine1.2", score: 1},
+				{host: "machine1.3", score: 1},
+				{host: "machine2.1", score: 2},
+			},
+			possibleHosts: map[string]bool{"machine1.1": true, "machine1.2": true, "machine1.3": true},
+		},
+		// out of order scores
+		{
+			list: []HostPriority{
+				{host: "machine1.1", score: 1},
+				{host: "machine1.2", score: 1},
+				{host: "machine2.1", score: 2},
+				{host: "machine3.1", score: 3},
+				{host: "machine1.3", score: 1},
+			},
+			possibleHosts: map[string]bool{"machine1.1": true, "machine1.2": true, "machine1.3": true},
+		},
+	}
+
+	for _, test := range tests {
+		// increase the randomness
+		for i := 0; i < 10; i++ {
+			got := scheduler.selectHost(test.list)
+			if !test.possibleHosts[got] {
+				t.Errorf("got %s is not in the possible map %v", got, test.possibleHosts)
+			}
+		}
+	}
+}
+
 func TestGenericScheduler(t *testing.T) {
 	tests := []struct {
 		predicates   []FitPredicate
