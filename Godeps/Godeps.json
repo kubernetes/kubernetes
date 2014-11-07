@@ -65,7 +65,7 @@
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
-			"Rev": "d1c4472bf2efd3826f2b5bdcc02d8416798d678c"
+			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
 		},
 		{
 			"ImportPath": "github.com/google/cadvisor/client",
