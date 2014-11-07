@@ -222,13 +222,14 @@ func getPodStatusForReplicationController(c client.PodInterface, controller *api
 		return
 	}
 	for _, pod := range rcPods.Items {
-		if pod.CurrentState.Status == api.PodRunning {
+		switch pod.CurrentState.Status {
+		case api.PodRunning:
 			running++
-		} else if pod.CurrentState.Status == api.PodPending {
+		case api.PodPending:
 			waiting++
-		} else if pod.CurrentState.Status == api.PodSucceeded {
+		case api.PodSucceeded:
 			succeeded++
-		} else if pod.CurrentState.Status == api.PodFailed {
+		case api.PodFailed:
 			failed++
 		}
 	}
