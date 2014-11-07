@@ -8,7 +8,7 @@
       "id": "heapster",
       "containers": [{
         "name": "heapster",
-        "image": "kubernetes/heapster",
+        "image": "kubernetes/heapster:latest",
 	}]
     }
   },

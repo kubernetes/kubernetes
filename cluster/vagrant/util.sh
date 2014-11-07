@@ -174,7 +174,11 @@ function restart-kube-proxy {
 }
 
 function setup-monitoring {
-    echo "TODO"
+  echo "TODO"
+}
+
+function teardown-monitoring {
+  echo "TODO"
 }
 
 # Perform preparations required to run e2e tests
