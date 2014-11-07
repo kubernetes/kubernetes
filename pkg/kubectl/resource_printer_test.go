@@ -86,14 +86,17 @@ func TestPrintYAML(t *testing.T) {
 
 func TestPrintTemplate(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, versioned, err := GetPrinter("template", "{{ .Name }}", nil)
+	printer, versioned, err := GetPrinter("template", "{{.id}}", nil)
 	if err != nil {
-		t.Errorf("unexpected error: %#v", err)
+		t.Fatalf("unexpected error: %#v", err)
 	}
 	if !versioned {
 		t.Errorf("printer should be versioned")
 	}
-	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
+	err = printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
 	if buf.String() != "foo" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
@@ -202,5 +205,21 @@ func TestUnknownTypePrinting(t *testing.T) {
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
 		t.Errorf("An error was expected from printing unknown type")
+	}
+}
+
+func TestTemplateEmitsVersionedObjects(t *testing.T) {
+	// kind is always blank in memory and set on the wire
+	printer, err := NewTemplatePrinter([]byte(`{{.kind}}`))
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(&api.Pod{}, buffer)
+	if err != nil {
+		t.Fatalf("print fail: %v", err)
+	}
+	if e, a := "Pod", string(buffer.Bytes()); e != a {
+		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
