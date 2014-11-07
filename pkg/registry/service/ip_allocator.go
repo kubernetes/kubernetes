@@ -95,8 +95,8 @@ func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 
 	ipSpaceSize := int64(-1)
 	ones, bits := subnet.Mask.Size()
-	if (bits-ones) < 63 {
-		ipSpaceSize = int64(1)<<uint(bits - ones)
+	if (bits - ones) < 63 {
+		ipSpaceSize = int64(1) << uint(bits-ones)
 
 		if ipSpaceSize < minIPSpace {
 			glog.Errorf("IPAllocator requires at least %d IPs", minIPSpace)
@@ -105,16 +105,16 @@ func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 	}
 
 	ipa := &ipAllocator{
-		subnet:      *subnet,
-		ipSpaceSize: ipSpaceSize,
-		random:      r,
+		subnet:         *subnet,
+		ipSpaceSize:    ipSpaceSize,
+		random:         r,
 		randomAttempts: 1000,
 	}
 	ipa.used.Init()
 
 	zero := make(net.IP, len(subnet.IP), len(subnet.IP))
 	for i := 0; i < len(subnet.IP); i++ {
-		zero[i] = subnet.IP[i]&subnet.Mask[i]
+		zero[i] = subnet.IP[i] & subnet.Mask[i]
 	}
 	ipa.used.Add(zero) // block the zero addr
 
@@ -122,7 +122,7 @@ func newIPAllocator(subnet *net.IPNet) *ipAllocator {
 
 	broadcast := make(net.IP, len(subnet.IP), len(subnet.IP))
 	for i := 0; i < len(subnet.IP); i++ {
-		broadcast[i] = subnet.IP[i]|^subnet.Mask[i]
+		broadcast[i] = subnet.IP[i] | ^subnet.Mask[i]
 	}
 	ipa.used.Add(broadcast) // block the broadcast addr
 
@@ -187,7 +187,7 @@ func (ipa *ipAllocator) createRandomIp() net.IP {
 			randomIp[i] = ipa.subnet.IP[i]
 		} else {
 			b := byte(ipa.random.Intn(256))
-			randomIp[i] = (ipa.subnet.IP[i]&mask[i])|(b&^mask[i])
+			randomIp[i] = (ipa.subnet.IP[i] & mask[i]) | (b &^ mask[i])
 		}
 	}
 
@@ -203,7 +203,7 @@ func ipAdd(ip net.IP, offset int) net.IP {
 		result := int(out[i]) + add
 		out[i] = byte(result % 256)
 		offset >>= 8
-		offset += result/256 // carry
+		offset += result / 256 // carry
 	}
 	return out
 }
