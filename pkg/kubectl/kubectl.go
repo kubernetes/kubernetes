@@ -46,10 +46,10 @@ func GetKubeClient(config *client.Config, matchVersion bool) (*client.Client, er
 		clientVersion := version.Get()
 		serverVersion, err := c.ServerVersion()
 		if err != nil {
-			return nil, fmt.Errorf("Couldn't read version from server: %v\n", err)
+			return nil, fmt.Errorf("couldn't read version from server: %v\n", err)
 		}
 		if s := *serverVersion; !reflect.DeepEqual(clientVersion, s) {
-			return nil, fmt.Errorf("Server version (%#v) differs from client version (%#v)!\n", s, clientVersion)
+			return nil, fmt.Errorf("server version (%#v) differs from client version (%#v)!\n", s, clientVersion)
 		}
 	}
 
@@ -92,7 +92,7 @@ func LoadNamespaceInfo(path string) (*NamespaceInfo, error) {
 // SaveNamespaceInfo saves a NamespaceInfo object at the specified file path.
 func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
 	if !util.IsDNSLabel(ns.Namespace) {
-		return fmt.Errorf("Namespace %s is not a valid DNS Label", ns.Namespace)
+		return fmt.Errorf("namespace %s is not a valid DNS Label", ns.Namespace)
 	}
 	data, err := json.Marshal(ns)
 	err = ioutil.WriteFile(path, data, 0600)

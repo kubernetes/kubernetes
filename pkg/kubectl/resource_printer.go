@@ -51,7 +51,7 @@ func GetPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (Re
 		}
 		tmpl, err := template.New("output").Parse(templateFile)
 		if err != nil {
-			return nil, false, fmt.Errorf("Error parsing template %s, %v\n", string(data), err)
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
 		printer = &TemplatePrinter{
 			Template: tmpl,
@@ -62,14 +62,14 @@ func GetPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (Re
 			var err error
 			data, err = ioutil.ReadFile(templateFile)
 			if err != nil {
-				return nil, false, fmt.Errorf("Error reading template %s, %v\n", templateFile, err)
+				return nil, false, fmt.Errorf("error reading template %s, %v\n", templateFile, err)
 			}
 		} else {
 			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
 		}
 		tmpl, err := template.New("output").Parse(string(data))
 		if err != nil {
-			return nil, false, fmt.Errorf("Error parsing template %s, %v\n", string(data), err)
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
 		printer = &TemplatePrinter{
 			Template: tmpl,
@@ -157,16 +157,16 @@ func (h *HumanReadablePrinter) Handler(columns []string, printFunc interface{}) 
 
 func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
-		return fmt.Errorf("Invalid print handler. %#v is not a function.", printFunc)
+		return fmt.Errorf("invalid print handler. %#v is not a function.", printFunc)
 	}
 	funcType := printFunc.Type()
 	if funcType.NumIn() != 2 || funcType.NumOut() != 1 {
-		return fmt.Errorf("Invalid print handler." +
+		return fmt.Errorf("invalid print handler." +
 			"Must accept 2 parameters and return 1 value.")
 	}
 	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
-		return fmt.Errorf("Invalid print handler. The expected signature is: "+
+		return fmt.Errorf("invalid print handler. The expected signature is: "+
 			"func handler(obj %v, w io.Writer) error", funcType.In(0))
 	}
 	return nil
@@ -317,7 +317,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 			return resultValue.Interface().(error)
 		}
 	} else {
-		return fmt.Errorf("Error: unknown type %#v", obj)
+		return fmt.Errorf("error: unknown type %#v", obj)
 	}
 }
 
