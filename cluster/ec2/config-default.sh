@@ -35,7 +35,9 @@ SSH_USER=ubuntu
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 #POLL_SLEEP_INTERVAL=3
 
-# This is the 0a64 => 10.100.0.0
-#  10.100 is hard coded in the VPC setup
-PORTAL_NET="2002:0a64:0000::/48"
-
+# Once we have IPv6 merged...
+  # This is the 0a64 => 10.100.0.0
+  #  10.100 is hard coded in the VPC setup
+  #PORTAL_NET="2002:0a64:0000::/48"
+# Until IPv6...
+PORTAL_NET="10.100.0.0/16"

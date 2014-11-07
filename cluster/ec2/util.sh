@@ -604,6 +604,7 @@ function kube-up {
     (
       echo "#! /bin/bash"
       echo "readonly MASTER_NAME='${KUBE_MASTER_PRIVATE_IP}'"
+      echo "readonly MINION_ID='${i}'"
 #      echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/ec2/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"

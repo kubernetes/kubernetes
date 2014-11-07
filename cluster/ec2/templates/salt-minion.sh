@@ -36,6 +36,9 @@ if [[ ${IPV6_BRIDGE_PREFIX} == "" ]]; then
   IPV6_BRIDGE="${IPV6_BRIDGE_PREFIX}/${IPV6_BRIDGE_MASK}"
 fi
 
+# Until we have IPv6 support merged
+IPV6_BRIDGE="100.64.${MINION_ID}.0/24"
+
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
