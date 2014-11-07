@@ -2,7 +2,6 @@
 
 set -ex
 
-# Copyright 2014 Meteor Development Group Inc. All rights reserved.
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
