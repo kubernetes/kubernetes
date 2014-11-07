@@ -49,10 +49,13 @@ func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (str
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("failed to find a fit for pod: %v", pod)
 	}
-	return g.selectHost(priorityList), nil
+	return g.selectHost(priorityList)
 }
 
-func (g *genericScheduler) selectHost(priorityList HostPriorityList) string {
+func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, error) {
+	if len(priorityList) == 0 {
+		return "", fmt.Errorf("empty priorityList")
+	}
 	sort.Sort(priorityList)
 
 	hosts := getMinHosts(priorityList)
@@ -60,7 +63,7 @@ func (g *genericScheduler) selectHost(priorityList HostPriorityList) string {
 	defer g.randomLock.Unlock()
 
 	ix := g.random.Int() % len(hosts)
-	return hosts[ix]
+	return hosts[ix], nil
 }
 
 func findNodesThatFit(pod api.Pod, podLister PodLister, predicates []FitPredicate, nodes api.MinionList) (api.MinionList, error) {

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func falsePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
@@ -72,14 +73,16 @@ func TestSelectHost(t *testing.T) {
 	scheduler := genericScheduler{random: rand.New(rand.NewSource(0))}
 	tests := []struct {
 		list          HostPriorityList
-		possibleHosts map[string]bool
+		possibleHosts util.StringSet
+		expectsErr    bool
 	}{
 		{
 			list: []HostPriority{
 				{host: "machine1.1", score: 1},
 				{host: "machine2.1", score: 2},
 			},
-			possibleHosts: map[string]bool{"machine1.1": true},
+			possibleHosts: util.NewStringSet("machine1.1"),
+			expectsErr:    false,
 		},
 		// equal scores
 		{
@@ -89,7 +92,8 @@ func TestSelectHost(t *testing.T) {
 				{host: "machine1.3", score: 1},
 				{host: "machine2.1", score: 2},
 			},
-			possibleHosts: map[string]bool{"machine1.1": true, "machine1.2": true, "machine1.3": true},
+			possibleHosts: util.NewStringSet("machine1.1", "machine1.2", "machine1.3"),
+			expectsErr:    false,
 		},
 		// out of order scores
 		{
@@ -100,16 +104,32 @@ func TestSelectHost(t *testing.T) {
 				{host: "machine3.1", score: 3},
 				{host: "machine1.3", score: 1},
 			},
-			possibleHosts: map[string]bool{"machine1.1": true, "machine1.2": true, "machine1.3": true},
+			possibleHosts: util.NewStringSet("machine1.1", "machine1.2", "machine1.3"),
+			expectsErr:    false,
+		},
+		// empty priorityList
+		{
+			list:          []HostPriority{},
+			possibleHosts: util.NewStringSet(),
+			expectsErr:    true,
 		},
 	}
 
 	for _, test := range tests {
 		// increase the randomness
 		for i := 0; i < 10; i++ {
-			got := scheduler.selectHost(test.list)
-			if !test.possibleHosts[got] {
-				t.Errorf("got %s is not in the possible map %v", got, test.possibleHosts)
+			got, err := scheduler.selectHost(test.list)
+			if test.expectsErr {
+				if err == nil {
+					t.Error("Unexpected non-error")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if !test.possibleHosts.Has(got) {
+					t.Errorf("got %s is not in the possible map %v", got, test.possibleHosts)
+				}
 			}
 		}
 	}
