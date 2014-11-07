@@ -126,11 +126,12 @@ function upload-server-tars() {
 
   echo "+++ Staging server tars to S3: s3://${staging_path}"
 
+  # TODO: Region if not us-east?  (s3-us-west-1.amazonaws.com)
   SERVER_BINARY_TAR_URL="s3://${staging_path}/${SERVER_BINARY_TAR##*/}"
-  SERVER_BINARY_TAR_DOWNLOAD_URL="http://s3-us-west-2.amazonaws.com/${staging_path}/${SERVER_BINARY_TAR##*/}"
+  SERVER_BINARY_TAR_DOWNLOAD_URL="http://s3.amazonaws.com/${staging_path}/${SERVER_BINARY_TAR##*/}"
 
   SALT_TAR_URL="s3://${staging_path}/${SALT_TAR##*/}"
-  SALT_TAR_DOWNLOAD_URL="http://s3-us-west-2.amazonaws.com/${staging_path}/${SALT_TAR##*/}"
+  SALT_TAR_DOWNLOAD_URL="http://s3.amazonaws.com/${staging_path}/${SALT_TAR##*/}"
 
   mkdir ${KUBE_TEMP}/s3
   cp -p "${SERVER_BINARY_TAR}" ${KUBE_TEMP}/s3/
