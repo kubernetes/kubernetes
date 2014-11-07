@@ -471,3 +471,7 @@ function test-setup {
 function test-teardown {
 	echo "TODO"
 }
+
+function setup-monitoring {
+    echo "TODO"
+}

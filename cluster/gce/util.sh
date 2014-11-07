@@ -429,9 +429,6 @@ EOF
 function kube-down {
   # Detect the project into $PROJECT
   detect-project
-  
-  # Monitoring might have been setup. It doesn't hurt to attempt shutdown even it wasn't setup.
-  teardown-monitoring
 
   echo "Bringing down cluster"
   gcutil deletefirewall  \
@@ -577,21 +574,41 @@ function restart-kube-proxy {
 function setup-monitoring {
     if [ $MONITORING ]; then
 	teardown-monitoring
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" && 
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &&
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json"
+	if ! gcutil getfirewall monitoring-heapster &> /dev/null; then
+	    gcutil addfirewall monitoring-heapster \
+		--project "${PROJECT}" \
+		--norespect_terminal_width \
+		--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+		--target_tags="${MINION_TAG}" \
+		--allowed "tcp:80,tcp:8083,tcp:8086,tcp:9200";
+	    if [ $? -ne 0 ]; then
+		echo "Failed to Setup Firewall for Monitoring" && false
+	    fi
+	fi
+
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null && 
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
 	if [ $? -ne 0 ]; then
+	    echo "Failed to Setup Monitoring"
 	    teardown-monitoring
 	else
-	    dashboardIP="http://`kubectl.sh get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
-	    echo "Grafana dashboard is available at $dashboardIP"
-	    echo "username is 'admin' and password is 'admin'"
+	    dashboardIP="http://admin:admin@`kubectl.sh get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
+	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online."
 	fi
     fi
 }
 
 function teardown-monitoring {
-    kubectl.sh delete pods heapster || true
-    kubectl.sh delete pods influx-grafana || true
-    kubectl.sh delete services influx-master || true
+  if [ $MONITORING ]; then
+    kubectl.sh delete pods heapster &> /dev/null || true
+    kubectl.sh delete pods influx-grafana &> /dev/null || true
+    kubectl.sh delete services influx-master &> /dev/null || true
+    gcutil deletefirewall  \
+	--project "${PROJECT}" \
+	--norespect_terminal_width \
+	--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
+	--force \
+	monitoring-heapster || true > /dev/null
+  fi
 }

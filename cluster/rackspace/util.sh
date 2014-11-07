@@ -322,3 +322,7 @@ kube-up() {
   echo "    subject to \"Man in the middle\" type attacks."
   echo
 }
+
+function setup-monitoring {
+    echo "TODO"
+}
