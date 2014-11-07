@@ -36,13 +36,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// DockerContainerData is the structured representation of the JSON object returned by Docker inspect
-type DockerContainerData struct {
-	state struct {
-		Running bool
-	}
-}
-
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
 type DockerInterface interface {
 	ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error)
