@@ -138,21 +138,36 @@ func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
 
 // findPort locates the container port for the given manifest and portName.
 func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, error) {
-	if ((portName.Kind == util.IntstrString && len(portName.StrVal) == 0) ||
-		(portName.Kind == util.IntstrInt && portName.IntVal == 0)) &&
-		len(manifest.Containers[0].Ports) > 0 {
-		return manifest.Containers[0].Ports[0].ContainerPort, nil
+	firstContainerPort := 0
+	if len(manifest.Containers[0].Ports) > 0 {
+		firstContainerPort = manifest.Containers[0].Ports[0].ContainerPort
 	}
-	if portName.Kind == util.IntstrInt {
-		return portName.IntVal, nil
-	}
-	name := portName.StrVal
-	for _, container := range manifest.Containers {
-		for _, port := range container.Ports {
-			if port.Name == name {
-				return port.ContainerPort, nil
+
+	switch portName.Kind {
+	case util.IntstrString:
+		if len(portName.StrVal) == 0 {
+			if firstContainerPort != 0 {
+				return firstContainerPort, nil
+			}
+			break
+		}
+		name := portName.StrVal
+		for _, container := range manifest.Containers {
+			for _, port := range container.Ports {
+				if port.Name == name {
+					return port.ContainerPort, nil
+				}
 			}
 		}
+	case util.IntstrInt:
+		if portName.IntVal == 0 {
+			if firstContainerPort != 0 {
+				return firstContainerPort, nil
+			}
+			break
+		}
+		return portName.IntVal, nil
 	}
-	return -1, fmt.Errorf("no suitable port for manifest: %s", manifest.ID)
+
+	return 0, fmt.Errorf("no suitable port for manifest: %s", manifest.ID)
 }

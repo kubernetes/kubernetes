@@ -79,45 +79,86 @@ func TestFindPort(t *testing.T) {
 			},
 		},
 	}
-	port, err := findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "foo"})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	emptyPortsManifest := api.ContainerManifest{
+		Containers: []api.Container{
+			{
+				Ports: []api.Port{},
+			},
+		},
 	}
-	if port != 8080 {
-		t.Errorf("Expected 8080, Got %d", port)
+	tests := []struct {
+		manifest api.ContainerManifest
+		portName util.IntOrString
+
+		wport int
+		werr  bool
+	}{
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrString, StrVal: "foo"},
+			8080,
+			false,
+		},
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrString, StrVal: "bar"},
+			8000,
+			false,
+		},
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 8000},
+			8000,
+			false,
+		},
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 7000},
+			7000,
+			false,
+		},
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrString, StrVal: "baz"},
+			0,
+			true,
+		},
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			8080,
+			false,
+		},
+		{
+			manifest,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
+			8080,
+			false,
+		},
+		{
+			emptyPortsManifest,
+			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
+			0,
+			true,
+		},
+		{
+			emptyPortsManifest,
+			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
+			0,
+			true,
+		},
 	}
-	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "bar"})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if port != 8000 {
-		t.Errorf("Expected 8000, Got %d", port)
-	}
-	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrInt, IntVal: 8000})
-	if port != 8000 {
-		t.Errorf("Expected 8000, Got %d", port)
-	}
-	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrInt, IntVal: 7000})
-	if port != 7000 {
-		t.Errorf("Expected 7000, Got %d", port)
-	}
-	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: "baz"})
-	if err == nil {
-		t.Error("unexpected non-error")
-	}
-	port, err = findPort(&manifest, util.IntOrString{Kind: util.IntstrString, StrVal: ""})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if port != 8080 {
-		t.Errorf("Expected 8080, Got %d", port)
-	}
-	port, err = findPort(&manifest, util.IntOrString{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if port != 8080 {
-		t.Errorf("Expected 8080, Got %d", port)
+	for _, test := range tests {
+		port, err := findPort(&test.manifest, test.portName)
+		if port != test.wport {
+			t.Errorf("Expected port %d, Got %d", test.wport, port)
+		}
+		if err == nil && test.werr {
+			t.Errorf("unexpected non-error")
+		}
+		if err != nil && test.werr == false {
+			t.Errorf("unexpected error: %v", err)
+		}
 	}
 }
 
