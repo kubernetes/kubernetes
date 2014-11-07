@@ -53,6 +53,9 @@ func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (str
 }
 
 func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, error) {
+	if len(priorityList) == 0 {
+		return "", fmt.Errorf("empty priorityList")
+	}
 	sort.Sort(priorityList)
 
 	hosts := getMinHosts(priorityList)
