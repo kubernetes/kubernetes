@@ -172,3 +172,7 @@ function ssh-to-node {
 function restart-kube-proxy {
   ssh-to-node "$1" "sudo systemctl restart kube-proxy"
 }
+
+function setup-monitoring {
+    echo "TODO"
+}

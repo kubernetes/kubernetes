@@ -35,3 +35,5 @@ MINION_SCOPES="compute-rw"
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
+# When set to true, heapster will be setup as part of the cluster bring up.
+MONITORING=true
