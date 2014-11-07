@@ -139,9 +139,9 @@ func formatLabels(labelMap map[string]string) string {
 	return l
 }
 
-func makeImageList(manifest api.ContainerManifest) string {
+func makeImageList(spec *api.PodSpec) string {
 	var images []string
-	for _, container := range manifest.Containers {
+	for _, container := range spec.Containers {
 		images = append(images, container.Image)
 	}
 	return strings.Join(images, ",")

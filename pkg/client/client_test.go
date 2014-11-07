@@ -309,8 +309,9 @@ func TestListControllers(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						DesiredState: api.ReplicationControllerState{
+						Spec: api.ReplicationControllerSpec{
 							Replicas: 2,
+							Template: &api.PodTemplateSpec{},
 						},
 					},
 				},
@@ -335,8 +336,9 @@ func TestGetController(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -361,8 +363,9 @@ func TestUpdateController(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -396,8 +399,9 @@ func TestCreateController(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},

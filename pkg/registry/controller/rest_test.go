@@ -116,6 +116,15 @@ func TestControllerDecode(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
+		Spec: api.ReplicationControllerSpec{
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "nginx",
+					},
+				},
+			},
+		},
 	}
 	body, err := latest.Codec.Encode(controller)
 	if err != nil {
@@ -140,29 +149,29 @@ func TestControllerParsing(t *testing.T) {
 				"name": "nginx",
 			},
 		},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerSpec{
 			Replicas: 2,
-			ReplicaSelector: map[string]string{
+			Selector: map[string]string{
 				"name": "nginx",
 			},
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "dockerfile/nginx",
-								Ports: []api.Port{
-									{
-										ContainerPort: 80,
-										HostPort:      8080,
-									},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "nginx",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "dockerfile/nginx",
+							Ports: []api.Port{
+								{
+									ContainerPort: 80,
+									HostPort:      8080,
 								},
 							},
 						},
 					},
-				},
-				Labels: map[string]string{
-					"name": "nginx",
 				},
 			},
 		},
@@ -205,9 +214,11 @@ func TestControllerParsing(t *testing.T) {
 }
 
 var validPodTemplate = api.PodTemplate{
-	DesiredState: api.PodState{
-		Manifest: api.ContainerManifest{
-			Version: "v1beta1",
+	Spec: api.PodTemplateSpec{
+		ObjectMeta: api.ObjectMeta{
+			Labels: map[string]string{"a": "b"},
+		},
+		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
 					Name:  "test",
@@ -216,7 +227,6 @@ var validPodTemplate = api.PodTemplate{
 			},
 		},
 	},
-	Labels: map[string]string{"a": "b"},
 }
 
 func TestCreateController(t *testing.T) {
@@ -240,10 +250,10 @@ func TestCreateController(t *testing.T) {
 	}
 	controller := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "test"},
-		DesiredState: api.ReplicationControllerState{
-			Replicas:        2,
-			ReplicaSelector: map[string]string{"a": "b"},
-			PodTemplate:     validPodTemplate,
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 2,
+			Selector: map[string]string{"a": "b"},
+			Template: &validPodTemplate.Spec,
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -273,13 +283,13 @@ func TestControllerStorageValidatesCreate(t *testing.T) {
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: map[string]string{"bar": "baz"},
+			Spec: api.ReplicationControllerSpec{
+				Selector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			ObjectMeta:   api.ObjectMeta{Name: "abc"},
-			DesiredState: api.ReplicationControllerState{},
+			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			Spec:       api.ReplicationControllerSpec{},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -304,13 +314,13 @@ func TestControllerStorageValidatesUpdate(t *testing.T) {
 	failureCases := map[string]api.ReplicationController{
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: map[string]string{"bar": "baz"},
+			Spec: api.ReplicationControllerSpec{
+				Selector: map[string]string{"bar": "baz"},
 			},
 		},
 		"empty selector": {
-			ObjectMeta:   api.ObjectMeta{Name: "abc"},
-			DesiredState: api.ReplicationControllerState{},
+			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			Spec:       api.ReplicationControllerSpec{},
 		},
 	}
 	ctx := api.NewDefaultContext()
@@ -351,19 +361,19 @@ func TestFillCurrentState(t *testing.T) {
 		podLister: &fakeLister,
 	}
 	controller := api.ReplicationController{
-		DesiredState: api.ReplicationControllerState{
-			ReplicaSelector: map[string]string{
+		Spec: api.ReplicationControllerSpec{
+			Selector: map[string]string{
 				"foo": "bar",
 			},
 		},
 	}
 	ctx := api.NewContext()
 	storage.fillCurrentState(ctx, &controller)
-	if controller.CurrentState.Replicas != 2 {
-		t.Errorf("expected 2, got: %d", controller.CurrentState.Replicas)
+	if controller.Status.Replicas != 2 {
+		t.Errorf("expected 2, got: %d", controller.Status.Replicas)
 	}
-	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.DesiredState.ReplicaSelector).AsSelector()) {
-		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.DesiredState.ReplicaSelector).AsSelector(), fakeLister.s)
+	if !reflect.DeepEqual(fakeLister.s, labels.Set(controller.Spec.Selector).AsSelector()) {
+		t.Errorf("unexpected output: %#v %#v", labels.Set(controller.Spec.Selector).AsSelector(), fakeLister.s)
 	}
 }
 

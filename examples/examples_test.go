@@ -36,12 +36,18 @@ func validateObject(obj runtime.Object) (errors []error) {
 	ctx := api.NewDefaultContext()
 	switch t := obj.(type) {
 	case *api.ReplicationController:
-		errors = validation.ValidateManifest(&t.DesiredState.PodTemplate.DesiredState.Manifest)
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
+		errors = validation.ValidateReplicationController(t)
 	case *api.ReplicationControllerList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Service:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
 		api.ValidNamespace(ctx, &t.ObjectMeta)
 		errors = validation.ValidateService(t, registrytest.NewServiceRegistry(), api.NewDefaultContext())
 	case *api.ServiceList:
@@ -49,8 +55,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
 	case *api.Pod:
+		if t.Namespace == "" {
+			t.Namespace = api.NamespaceDefault
+		}
 		api.ValidNamespace(ctx, &t.ObjectMeta)
-		errors = validation.ValidateManifest(&t.DesiredState.Manifest)
+		errors = validation.ValidatePod(t)
 	case *api.PodList:
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)

@@ -185,6 +185,14 @@ func makeImageList(manifest api.ContainerManifest) string {
 	return strings.Join(images, ",")
 }
 
+func makeImageListPodSpec(spec api.PodSpec) string {
+	var images []string
+	for _, container := range spec.Containers {
+		images = append(images, container.Image)
+	}
+	return strings.Join(images, ",")
+}
+
 func podHostString(host, ip string) string {
 	if host == "" && ip == "" {
 		return "<unassigned>"
@@ -211,8 +219,8 @@ func printPodList(podList *api.PodList, w io.Writer) error {
 
 func printReplicationController(controller *api.ReplicationController, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\n",
-		controller.Name, makeImageList(controller.DesiredState.PodTemplate.DesiredState.Manifest),
-		labels.Set(controller.DesiredState.ReplicaSelector), controller.DesiredState.Replicas)
+		controller.Name, makeImageListPodSpec(controller.Spec.Template.Spec),
+		labels.Set(controller.Spec.Selector), controller.Spec.Replicas)
 	return err
 }
 

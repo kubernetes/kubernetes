@@ -107,18 +107,15 @@ func TestParseController(t *testing.T) {
 	DoParseTest(t, "replicationControllers", &api.ReplicationController{
 		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "ReplicationController"},
 		ObjectMeta: api.ObjectMeta{Name: "my controller"},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerSpec{
 			Replicas: 9001,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						ID: "My manifest",
-						Containers: []api.Container{
-							{Name: "my container"},
-						},
-						Volumes: []api.Volume{
-							{Name: "volume"},
-						},
+			Template: &api.PodTemplateSpec{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "my container"},
+					},
+					Volumes: []api.Volume{
+						{Name: "volume"},
 					},
 				},
 			},

@@ -75,6 +75,23 @@ var apiObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 1).Funcs(
 		statuses := []internal.PodCondition{internal.PodPending, internal.PodRunning, internal.PodFailed}
 		*j = statuses[c.Rand.Intn(len(statuses))]
 	},
+	func(j *internal.ReplicationControllerSpec, c fuzz.Continue) {
+		// TemplateRef must be nil for round trip
+		c.Fuzz(&j.Template)
+		if j.Template == nil {
+			// TODO: v1beta1/2 can't round trip a nil template correctly, fix by having v1beta1/2
+			// conversion compare converted object to nil via DeepEqual
+			j.Template = &internal.PodTemplateSpec{}
+		}
+		j.Template.ObjectMeta = internal.ObjectMeta{Labels: j.Template.ObjectMeta.Labels}
+		j.Template.Spec.NodeSelector = nil
+		c.Fuzz(&j.Selector)
+		j.Replicas = int(c.RandUint64())
+	},
+	func(j *internal.ReplicationControllerStatus, c fuzz.Continue) {
+		// only replicas round trips
+		j.Replicas = int(c.RandUint64())
+	},
 	func(intstr *util.IntOrString, c fuzz.Continue) {
 		// util.IntOrString will panic if its kind is set wrong.
 		if c.RandBool() {
@@ -127,6 +144,7 @@ func TestInternalRoundTrip(t *testing.T) {
 
 		if err := internal.Scheme.Convert(obj, newer); err != nil {
 			t.Errorf("unable to convert %#v to %#v: %v", obj, newer, err)
+			continue
 		}
 
 		actual, err := internal.Scheme.New("", k)
@@ -137,6 +155,7 @@ func TestInternalRoundTrip(t *testing.T) {
 
 		if err := internal.Scheme.Convert(newer, actual); err != nil {
 			t.Errorf("unable to convert %#v to %#v: %v", newer, actual, err)
+			continue
 		}
 
 		if !reflect.DeepEqual(obj, actual) {
