@@ -572,7 +572,7 @@ function restart-kube-proxy {
 
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring {
-    if [ $MONITORING ]; then
+    if [ $MONITORING == true ]; then
 	teardown-monitoring
 	if ! gcutil getfirewall monitoring-heapster &> /dev/null; then
 	    gcutil addfirewall monitoring-heapster \
@@ -600,7 +600,7 @@ function setup-monitoring {
 }
 
 function teardown-monitoring {
-  if [ $MONITORING ]; then
+  if [ $MONITORING == true ]; then
     kubectl.sh delete pods heapster &> /dev/null || true
     kubectl.sh delete pods influx-grafana &> /dev/null || true
     kubectl.sh delete services influx-master &> /dev/null || true
