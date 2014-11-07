@@ -589,45 +589,53 @@ function restart-kube-proxy {
 
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring {
-    if [ $MONITORING ]; then
-	teardown-monitoring
+    if [[ "${MONITORING}" == "true" ]]; then
+	echo "Setting up Cluster Monitoring using Heapster."
+	detect-project
 	if ! gcutil getfirewall monitoring-heapster &> /dev/null; then
 	    gcutil addfirewall monitoring-heapster \
 		--project "${PROJECT}" \
 		--norespect_terminal_width \
 		--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
 		--target_tags="${MINION_TAG}" \
-		--allowed "tcp:80,tcp:8083,tcp:8086,tcp:9200";
+		--allowed "tcp:80,tcp:8083,tcp:8086,tcp:9200" &> /dev/null;
 	    if [ $? -ne 0 ]; then
 		echo "Failed to Setup Firewall for Monitoring" && false
 	    fi
 	fi
+
+	# Re-use master auth for Grafana
+	get-password
+	sed -i "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
+	sed -i "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
         local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
-	${kubectl} create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null &&
-	${kubectl} create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
-	${kubectl} create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
-	if [ $? -ne 0 ]; then
+	if "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" &> /dev/null \
+	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
+	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" &> /dev/null; then
+	    dashboardIP="http://$KUBE_USER:$KUBE_PASSWORD@`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
+	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online. Use the master user name and password for the dashboard."
+	else
 	    echo "Failed to Setup Monitoring"
 	    teardown-monitoring
-	else
-	    dashboardIP="http://admin:admin@`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
-	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online."
 	fi
     fi
 }
 
 function teardown-monitoring {
-  if [ $MONITORING ]; then
+  if [[ "${MONITORING}" == "true" ]]; then
+    detect-project
     local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
     ${kubectl} delete pods heapster &> /dev/null || true
     ${kubectl} delete pods influx-grafana &> /dev/null || true
     ${kubectl} delete services influx-master &> /dev/null || true
-    gcutil deletefirewall  \
+    if gcutil getfirewall monitoring-heapster &> /dev/null; then
+      gcutil deletefirewall  \
 	--project "${PROJECT}" \
 	--norespect_terminal_width \
 	--sleep_between_polls "${POLL_SLEEP_INTERVAL}" \
 	--force \
-	monitoring-heapster || true > /dev/null
+	monitoring-heapster &> /dev/null || true
+    fi
   fi
 }
 
