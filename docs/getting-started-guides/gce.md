@@ -32,6 +32,8 @@ cluster/kube-up.sh
 The script above relies on Google Storage to stage the Kubernetes release. It
 then will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/gce/config-default.sh`
+You can view a transcript of a successful cluster creation
+[here](https://gist.github.com/satnam6502/fc689d1b46db9772adea).
 
 The instances must be able to connect to each other using their private IP. The
 script uses the "default" network which should have a firewall rule called

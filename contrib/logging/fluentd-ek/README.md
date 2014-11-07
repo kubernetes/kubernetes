@@ -78,7 +78,7 @@ Once you have turned up a Kubernetes cluster with the environment variable``FLUE
 
 We need to create an instance of Elasticsearch which will run on the cluster (this is not done automatically as part of the manifest pod creation step). We only want to run one instance of Elasticsearch on the cluster but we want it to appear as if it is running on every node. We can accomplish this by writing a suitable pod specification and service specification since this "appear to run everywhere on the cluster" abstraction is one of the things that Kubernetes provides.
 
-First, here is the pod specification for Elasticsearch ``es-pod.yml``
+First, here is the pod specification for Elasticsearch [es-pod.yml](es.pod.yml):
 
 ```
 apiVersion: v1beta1
@@ -109,7 +109,7 @@ labels:
 
 This runs the official Docker image for Elasticsearch and wires up ports 9200 (for submitting and querying information) and 9300 (a port used to compose multiple instances of Elasticsearch -- more about this elsewhere). Kubernetes may have to restart an Elasticsearch container if something goes wrong and it would be  shame to loose all the information (logs) that has been gathered when the original container dies and takes down all its information with it.  To avoid this problem we wire up some persistent storage for Elasticsearch so the gathered data persists between one invocation of the Elasticsearch container and another.
 
-To allow us to query Elasticsearch from outside the cluster (e.g. from our laptop) and to allow other Kubernetes pods access to the Elasticsearch web interface we define a Kubernetes Elasticsearch service ```es-service.yml```
+To allow us to query Elasticsearch from outside the cluster (e.g. from our laptop) and to allow other Kubernetes pods access to the Elasticsearch web interface we define a Kubernetes Elasticsearch service [es-service.yml](es-service.yml):
 
 ```
 apiVersion: v1beta1
@@ -188,7 +188,7 @@ $ curl http://130.211.122.249:9200
 
 A nice aspect of this architecture is that all the Docker container log files from all the nodes get automatically interleaved into the same Elasticsearch datastore. Each node thinks it is talking directly to Elasticsearch but in reality only one node has the instance and requests to Elasticsearch on other nodes are proxies to the actual instance. All of this is transparent to the Fluentd configuration.
 
-To view the log information gathered inside Elasticsearch we can use the [Kibana](http://www.elasticsearch.org/overview/kibana/) viewer. Again, we will create one instance of this and run it on the cluster somewhere (Kubernetes will decide where) and this will be done with a Docker container. Here is the pod specification ```kibana-pod.yml```
+To view the log information gathered inside Elasticsearch we can use the [Kibana](http://www.elasticsearch.org/overview/kibana/) viewer. Again, we will create one instance of this and run it on the cluster somewhere (Kubernetes will decide where) and this will be done with a Docker container. Here is the pod specification [kibana-pod.yml](kibana-pod.yml):
 
 ```
 apiVersion: v1beta1
@@ -210,7 +210,7 @@ labels:
 
 This runs a specially made Kibana Docker image which is tailored for use with Kubernetes. One reason for this is that this image needs to know how to contact the Elasticsearch server which it should do by contacting the internal cluster IP and port number for the service. This information is made available with environment variable. For a service called ``elasticsearch`` the environment variables ``ELASTICSEARCH_SERVICE_HOST`` and ``ELASTICSEARCH_SERVICE_PORT`` define the internal cluster IP address and port of the Elasticsearch service. This capability allows us to compose Kubernetes services. This pod wires up port 80 of the container which serves the Kibana dashboard web page.
 
-The Kibana service is defined as follows ``kibana-service.yml``
+The Kibana service is defined as follows [kibana-service.yml](kibana-service.yml):
 
 ```
 apiVersion: v1beta1
@@ -225,7 +225,7 @@ createExternalLoadBalancer: true
 
 This maps the internal container port 80 to an external port 5601 for the Kibana viewer service.
 
-Finally, we need some pod that will produce some output which can be logged. We use a synthetic logger which periodically writes out the name of the pod that is is running in, a count and the date at a rate of 0.25 lines per second ``synthetic_0_25lps.yml``
+Finally, we need some pod that will produce some output which can be logged. We use a synthetic logger which periodically writes out the name of the pod that is is running in, a count and the date at a rate of 0.25 lines per second [synthetic_0_25lps.yml](synthetic_0_25lps.yml):
 
 ```
 apiVersion: v1beta1
