@@ -26,7 +26,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -324,13 +323,11 @@ func getPrinter() kubecfg.ResourcePrinter {
 		} else {
 			data = []byte(*templateStr)
 		}
-		tmpl, err := template.New("output").Parse(string(data))
+		var err error
+		printer, err = kubecfg.NewTemplatePrinter(data)
 		if err != nil {
-			glog.Fatalf("Error parsing template %s, %v\n", string(data), err)
+			glog.Fatalf("Error '%v' parsing template:\n'%s'", err, string(data))
 			return nil
-		}
-		printer = &kubecfg.TemplatePrinter{
-			Template: tmpl,
 		}
 	default:
 		printer = humanReadablePrinter()

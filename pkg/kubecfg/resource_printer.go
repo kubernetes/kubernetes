@@ -319,19 +319,32 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
 type TemplatePrinter struct {
-	Template *template.Template
+	template *template.Template
+}
+
+func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
+	t, err := template.New("output").Parse(string(tmpl))
+	if err != nil {
+		return nil, err
+	}
+	return &TemplatePrinter{t}, nil
 }
 
 // Print parses the data as JSON, and re-formats it with the Go Template.
 func (t *TemplatePrinter) Print(data []byte, w io.Writer) error {
-	obj, err := latest.Codec.Decode(data)
+	obj := map[string]interface{}{}
+	err := json.Unmarshal(data, &obj)
 	if err != nil {
 		return err
 	}
-	return t.PrintObj(obj, w)
+	return t.template.Execute(w, obj)
 }
 
 // PrintObj formats the obj with the Go Template.
 func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	return t.Template.Execute(w, obj)
+	data, err := latest.Codec.Encode(obj)
+	if err != nil {
+		return err
+	}
+	return t.Print(data, w)
 }
