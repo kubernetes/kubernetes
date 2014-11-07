@@ -186,6 +186,44 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"list", "list", "inspect_container", "inspect_container"})
 }
 
+func TestSyncPodsWithTerminationLog(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	container := api.Container{
+		Name: "bar",
+		TerminationMessagePath: "/dev/somepath",
+	}
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					container,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+	verifyCalls(t, fakeDocker, []string{
+		"list", "create", "start", "list", "inspect_container", "list", "create", "start"})
+
+	fakeDocker.Lock()
+	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
+	if fakeDocker.Container.HostConfig == nil ||
+		!matchString(t, "/tmp/kubelet/foo/bar/k8s_bar\\.[a-f0-9]", parts[0]) ||
+		parts[1] != "/dev/somepath" {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Container)
+	}
+	fakeDocker.Unlock()
+}
+
 // drainWorkers waits until all workers are done.  Should only used for testing.
 func (kl *Kubelet) drainWorkers() {
 	for {
