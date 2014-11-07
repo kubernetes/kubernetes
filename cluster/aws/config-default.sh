@@ -44,3 +44,9 @@ ENABLE_NODE_LOGGING=true
 LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
 IAM_PROFILE="kubernetes"
 LOG="/dev/null"
+
+# Optional: Install cluster DNS.
+ENABLE_CLUSTER_DNS=true
+DNS_SERVER_IP="10.0.0.10"
+DNS_DOMAIN="kubernetes.local"
+DNS_REPLICAS=1

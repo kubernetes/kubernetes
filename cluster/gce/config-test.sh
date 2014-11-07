@@ -51,3 +51,9 @@ ENABLE_CLUSTER_MONITORING=false
 
 # Don't require https for registries in our local RFC1918 network
 EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+
+# Optional: Install cluster DNS.
+ENABLE_CLUSTER_DNS=true
+DNS_SERVER_IP="10.0.0.10"
+DNS_DOMAIN="kubernetes.local"
+DNS_REPLICAS=1

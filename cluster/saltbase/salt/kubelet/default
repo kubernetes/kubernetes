@@ -27,4 +27,11 @@
 
 {% set registry_qps = "-registry_qps=0.1" %}
 
-DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{apiservers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}}"
+{% set cluster_dns = "" %}
+{% set cluster_domain = "" %}
+{% if pillar['enable_cluster_dns'] is defined and pillar['enable_cluster_dns'] %}
+  {% set cluster_dns = "-cluster_dns=" + pillar['dns_server'] %}
+  {% set cluster_domain = "-cluster_domain=" + pillar['dns_domain'] %}
+{% endif %}
+
+DAEMON_ARGS="{{daemon_args}} {{etcd_servers}} {{apiservers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"

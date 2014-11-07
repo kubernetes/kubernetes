@@ -25,6 +25,9 @@ portal_net: $PORTAL_NET
 enable_node_monitoring: $ENABLE_NODE_MONITORING
 enable_node_logging: $ENABLE_NODE_LOGGING
 logging_destination: $LOGGING_DESTINATION
+enable_cluster_dns: $ENABLE_CLUSTER_DNS
+dns_server: $DNS_SERVER_IP
+dns_domain: $DNS_DOMAIN
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

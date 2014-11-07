@@ -187,6 +187,9 @@ rax-boot-minions() {
         -e "s|ENABLE_NODE_MONITORING|${ENABLE_NODE_MONITORING:-false}|" \
         -e "s|ENABLE_NODE_LOGGING|${ENABLE_NODE_LOGGING:-false}|" \
         -e "s|LOGGING_DESTINATION|${LOGGING_DESTINATION:-}|" \
+        -e "s|ENABLE_CLUSTER_DNS|${ENABLE_CLUSTER_DNS:-false}|" \
+        -e "s|DNS_SERVER_IP|${DNS_SERVER_IP:-}|" \
+        -e "s|DNS_DOMAIN|${DNS_DOMAIN:-}|" \
     $(dirname $0)/rackspace/cloud-config/minion-cloud-config.yaml > $KUBE_TEMP/minion-cloud-config-$(($i + 1)).yaml
 
 
