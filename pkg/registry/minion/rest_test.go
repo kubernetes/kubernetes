@@ -83,6 +83,29 @@ func TestMinionREST(t *testing.T) {
 	}
 }
 
+func TestMinionRESTWithHealthCheck(t *testing.T) {
+	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
+	minionHealthRegistry := HealthyRegistry{
+		delegate: minionRegistry,
+		client:   &notMinion{minion: "m1"},
+	}
+
+	ms := NewREST(&minionHealthRegistry)
+	ctx := api.NewContext()
+
+	c, err := ms.Create(ctx, &api.Minion{ObjectMeta: api.ObjectMeta{Name: "m1"}})
+	if err != nil {
+		t.Errorf("insert failed")
+	}
+	result := <-c
+	if m, ok := result.Object.(*api.Minion); !ok || m.Name != "m1" {
+		t.Errorf("insert return value was weird: %#v", result)
+	}
+	if _, err := ms.Get(ctx, "m1"); err == nil {
+		t.Errorf("node is unhealthy, expect no result from apiserver")
+	}
+}
+
 func contains(nodes *api.MinionList, nodeID string) bool {
 	for _, node := range nodes.Items {
 		if node.Name == nodeID {
