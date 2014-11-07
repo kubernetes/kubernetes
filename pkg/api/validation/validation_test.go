@@ -862,43 +862,41 @@ func TestValidateService(t *testing.T) {
 func TestValidateReplicationController(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
+		Spec: api.PodTemplateSpec{
+			ObjectMeta: api.ObjectMeta{
+				Labels: validSelector,
 			},
 		},
-		Labels: validSelector,
 	}
 	invalidVolumePodTemplate := api.PodTemplate{
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
+		Spec: api.PodTemplateSpec{
+			Spec: api.PodSpec{
 				Volumes: []api.Volume{{Name: "gcepd", Source: &api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{"my-PD", "ext4", 1, false}}}},
 			},
 		},
 	}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
+		Spec: api.PodTemplateSpec{
+			Spec: api.PodSpec{},
+			ObjectMeta: api.ObjectMeta{
+				Labels: invalidSelector,
 			},
 		},
-		Labels: invalidSelector,
 	}
 	successCases := []api.ReplicationController{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
 			},
 		},
 	}
@@ -911,49 +909,49 @@ func TestValidateReplicationController(t *testing.T) {
 	errorCases := map[string]api.ReplicationController{
 		"zero-length ID": {
 			ObjectMeta: api.ObjectMeta{Name: "", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		"missing-namespace": {
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		"empty selector": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				PodTemplate: validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		"selector_doesnt_match": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: map[string]string{"foo": "bar"},
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: map[string]string{"foo": "bar"},
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		"invalid manifest": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
 			},
 		},
 		"read-write presistent disk": {
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     invalidVolumePodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &invalidVolumePodTemplate.Spec,
 			},
 		},
 		"negative_replicas": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-			DesiredState: api.ReplicationControllerState{
-				Replicas:        -1,
-				ReplicaSelector: validSelector,
+			Spec: api.ReplicationControllerSpec{
+				Replicas: -1,
+				Selector: validSelector,
 			},
 		},
 		"invalid_label": {
@@ -964,9 +962,9 @@ func TestValidateReplicationController(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			DesiredState: api.ReplicationControllerState{
-				ReplicaSelector: validSelector,
-				PodTemplate:     validPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Selector: validSelector,
+				Template: &validPodTemplate.Spec,
 			},
 		},
 		"invalid_label 2": {
@@ -977,8 +975,8 @@ func TestValidateReplicationController(t *testing.T) {
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				},
 			},
-			DesiredState: api.ReplicationControllerState{
-				PodTemplate: invalidPodTemplate,
+			Spec: api.ReplicationControllerSpec{
+				Template: &invalidPodTemplate.Spec,
 			},
 		},
 	}
@@ -989,13 +987,14 @@ func TestValidateReplicationController(t *testing.T) {
 		}
 		for i := range errs {
 			field := errs[i].(errors.ValidationError).Field
-			if !strings.HasPrefix(field, "desiredState.podTemplate.") &&
+			if !strings.HasPrefix(field, "spec.template.") &&
 				field != "name" &&
 				field != "namespace" &&
-				field != "desiredState.replicaSelector" &&
+				field != "spec.selector" &&
+				field != "spec.template" &&
 				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "desiredState.replicas" &&
-				field != "desiredState.label" &&
+				field != "spec.replicas" &&
+				field != "spec.template.label" &&
 				field != "label" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
