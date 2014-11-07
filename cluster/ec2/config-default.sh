@@ -15,19 +15,27 @@
 # limitations under the License.
 
 REGION=us-east-1
-AMI=ami-0268d56a
 
 INSTANCETYPE=m3.medium
 NUM_MINIONS=1
 
 CLUSTER_KEY=kubernetes
 
+# Ubuntu AMI
+AMI=ami-9eaa1cf6
 SSH_USER=ubuntu
+
+# AWS AMI... doesn't work - sudo needs a tty?
+#AMI=ami-0268d56a
+#SSH_USER=ec2-user
 
 #MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
 #MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 #MINION_SCOPES="compute-rw"
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 #POLL_SLEEP_INTERVAL=3
-PORTAL_NET="2002:0a00:0000::/48"
+
+# This is the 0a64 => 10.100.0.0
+#  10.100 is hard coded in the VPC setup
+PORTAL_NET="2002:0a64:0000::/48"
 

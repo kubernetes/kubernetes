@@ -80,8 +80,8 @@ function find-release-tars {
 # Vars set:
 #   PROJECT
 function detect-project () {
-  # TODO: Come up with a unique PROJECT
-  PROJECT="kubernetes"
+  # TODO: Do we need a project? Should this be == CLUSTER_KEY?
+  PROJECT=""
 #  if [[ -z "${PROJECT-}" ]]; then
 #    PROJECT=$(aws config list project | tail -n 1 | cut -f 3 -d ' ')
 #  fi
@@ -208,14 +208,17 @@ function set-cluster-tag() {
 #   KUBE_MASTER_PUBLIC_IP
 #   KUBE_MASTER_PRIVATE_IP
 function find-master () {
-  JSON=$(aws ec2 describe-instances --filters "Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY}" "Name=tag:kubernetes-role,Values=master" --output json)
-  KUBE_MASTER_PUBLIC_IP=$(echo ${JSON} | \
-                     python -c 'import sys, json; print json.load(sys.stdin)["Reservations"][0]["Instances"][0]["PublicIpAddress"]')
-  KUBE_MASTER_PRIVATE_IP=$(echo ${JSON} | \
-                     python -c 'import sys, json; print json.load(sys.stdin)["Reservations"][0]["Instances"][0]["PrivateIpAddress"]')
-  KUBE_MASTER_INSTANCE_ID=$(echo ${JSON} | \
-                     python -c 'import sys, json; print json.load(sys.stdin)["Reservations"][0]["Instances"][0]["InstanceId"]')
-  if [[ ! -z "${KUBE_MASTER_PUBLIC_IP-}" ]]; then
+  KUBE_MASTER_INSTANCE_ID=$(aws ec2 describe-instances \
+                                --filters "Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY}" \
+                                          "Name=tag:kubernetes-role,Values=master" \
+                                          "Name=instance-state-name,Values=pending,running" \
+                                --query Reservations[].Instances[].InstanceId)
+  if [[ ! -z "${KUBE_MASTER_INSTANCE_ID-}" ]]; then
+    KUBE_MASTER_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids ${KUBE_MASTER_INSTANCE_ID} \
+                                --query Reservations[].Instances[].PublicIpAddress)
+    KUBE_MASTER_PRIVATE_IP=$(aws ec2 describe-instances --instance-ids ${KUBE_MASTER_INSTANCE_ID} \
+                                --query Reservations[].Instances[].PrivateIpAddress)
+
     echo "Using master: $KUBE_MASTER_PUBLIC_IP / $KUBE_MASTER_PRIVATE_IP"
   fi
 }
@@ -243,8 +246,8 @@ function detect-master () {
 # Vars set:
 #   VPC_ID
 function ensure-vpc () {
-  VPC_ID=`aws ec2 describe-vpcs --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} --query Vpcs[0].VpcId`
-  if [[ "${VPC_ID}" == "None" ]]; then
+  VPC_ID=`aws ec2 describe-vpcs --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} --query Vpcs[].VpcId`
+  if [[ "${VPC_ID}" == "" ]]; then
     echo "Creating VPC"
     # We aren't allowed to create anything bigger than a /16
     VPC_ID=`aws ec2 create-vpc --cidr 10.100.0.0/16 --query Vpc.VpcId`
@@ -263,10 +266,17 @@ function ensure-vpc () {
 function ensure-subnet () {
   local AZ=$1
   local NETMASK=$2
-  SUBNET_ID=`aws ec2 describe-subnets --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} Name=availability-zone,Values=${AZ} --query Subnets[0].SubnetId`
-  if [[ "${SUBNET_ID}" == "None" ]]; then
+  SUBNET_ID=`aws ec2 describe-subnets \
+                 --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} \
+                           Name=availability-zone,Values=${AZ} \
+                 --query Subnets[0].SubnetId`
+  if [[ "${SUBNET_ID}" == "" ]]; then
     echo "Creating subnet in VPC"
-    SUBNET_ID=`aws ec2 create-subnet --vpc-id ${VPC_ID} --cidr-block ${NETMASK} --availability-zone=${AZ} --query Subnet.SubnetId`
+    SUBNET_ID=`aws ec2 create-subnet \
+                   --vpc-id ${VPC_ID} \
+                   --cidr-block ${NETMASK} \
+                   --availability-zone=${AZ} \
+                   --query Subnet.SubnetId`
     set-cluster-tag ${SUBNET_ID}
   fi
   echo "Using vpc subnet: ${SUBNET_ID}"
@@ -280,7 +290,9 @@ function ensure-subnet () {
 # Vars set:
 #   GATEWAY_ID
 function ensure-gateway () {
-  GATEWAY_ID=`aws ec2 describe-internet-gateways --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} --query InternetGateways[0].InternetGatewayId`
+  GATEWAY_ID=`aws ec2 describe-internet-gateways \
+                  --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} \
+                  --query InternetGateways[0].InternetGatewayId`
   if [[ "${GATEWAY_ID}" == "None" ]]; then
     echo "Creating Internet Gateway in VPC"
     GATEWAY_ID=`aws ec2 create-internet-gateway --query InternetGateway.InternetGatewayId`
@@ -299,11 +311,14 @@ function ensure-gateway () {
 # Vars set:
 #   ROUTE_TABLE_ID
 function ensure-routetable () {
-  ROUTE_TABLE_ID=`aws ec2 describe-route-tables --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} Name=vpc-id,Values=${VPC_ID} --query RouteTables[0].RouteTableId`
+  ROUTE_TABLE_ID=`aws ec2 describe-route-tables \
+                      --filters Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY} \
+                                Name=vpc-id,Values=${VPC_ID} \
+                      --query RouteTables[].RouteTableId`
   if [[ "${ROUTE_TABLE_ID}" == "" ]]; then
     echo "Creating route table in VPC"
     ROUTE_TABLE_ID=`aws ec2 create-route-table --vpc-id ${VPC_ID} --query RouteTable.RouteTableId`
-    tag_resource ${ROUTE_TABLE_ID}
+    set-cluster-tag ${ROUTE_TABLE_ID}
   fi
   echo "Using route table: ${ROUTE_TABLE_ID}"
 }
@@ -358,7 +373,13 @@ function authorize-ingress () {
     ports="all"
   fi
 
-  FOUND=`aws ec2 describe-security-groups --group-ids ${SECURITY_GROUP_ID} --filter Name=ip-permission.cidr,Values=${cidr} --filter Name=ip-permission.from-port,Values=${from_port} --filter Name=ip-permission.to-port,Values=${to_port} --filter Name=ip-permission.protocol,Values=${protocol} --query SecurityGroups[].GroupId`
+  FOUND=`aws ec2 describe-security-groups \
+             --group-ids ${SECURITY_GROUP_ID} \
+             --filters Name=ip-permission.cidr,Values=${cidr} \
+                       Name=ip-permission.from-port,Values=${from_port} \
+                       Name=ip-permission.to-port,Values=${to_port} \
+                       Name=ip-permission.protocol,Values=${protocol} \
+             --query SecurityGroups[].GroupId`
   if [[ "${FOUND}" == "" ]]; then
     aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol ${protocol} --cidr ${cidr} --port ${ports}
   fi
@@ -437,7 +458,7 @@ function wait-running() {
       return 0
     fi
 
-    echo $i
+    echo "Instance not running.  Waiting..."
     let i=i+1
   done
 
@@ -530,8 +551,8 @@ function kube-up {
 
   find-master
 
-  ensure_keypair
-  ensure_instancetype
+  ensure-keypair
+  ensure-instancetype
 
   if [[ -z ${KUBE_MASTER_INSTANCE_ID} ]]; then
     (
@@ -554,16 +575,18 @@ function kube-up {
       grep -v "^#" "${KUBE_ROOT}/cluster/ec2/templates/salt-master.sh"
     )  > "${KUBE_TEMP}/master-start.sh"
 
-    INSTANCE_ID=`aws ec2 run-instance --query Instances[].InstanceId \
+    INSTANCE_ID=`aws ec2 run-instances --query Instances[].InstanceId \
       --image-id ${AMI} \
       --key-name ${KEYPAIR} \
-      --security-groups kubernetes-default \
+      --security-group-ids ${SECURITY_GROUP_ID} \
       --instance-type ${INSTANCETYPE} \
       --subnet-id ${SUBNET_ID} \
       --associate-public-ip-address \
       --user-data file://${KUBE_TEMP}/master-start.sh`
     set-cluster-tag ${INSTANCE_ID}
     set-tag ${INSTANCE_ID} kubernetes-id master-0
+    set-tag ${INSTANCE_ID} kubernetes-role master
+    set-tag ${INSTANCE_ID} Name ${CLUSTER_KEY}-master-0
   fi
 
   detect-master
@@ -585,18 +608,24 @@ function kube-up {
       grep -v "^#" "${KUBE_ROOT}/cluster/ec2/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
-    INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:kubernetes-id,Values=minion-${i}" "Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY}" --query Reservations[0].Instances[0].PublicIpAddress)
+    INSTANCE_ID=$(aws ec2 describe-instances \
+                      --filters "Name=tag:kubernetes-id,Values=minion-${i}" \
+                                "Name=tag:kubernetes-cluster,Values=${CLUSTER_KEY}" \
+                                "Name=instance-state-name,Values=pending,running" \
+                      --query Reservations[].Instances[].InstanceId)
     if [[ ${INSTANCE_ID} == "" ]]; then
-      INSTANCE_ID=`aws ec2 run-instance --query Instances[].InstanceId \
+      INSTANCE_ID=`aws ec2 run-instances --query Instances[].InstanceId \
         --image-id ${AMI} \
         --key-name ${KEYPAIR} \
-        --security-groups kubernetes-default \
+        --security-group-ids ${SECURITY_GROUP_ID} \
         --instance-type ${INSTANCETYPE} \
         --subnet-id ${SUBNET_ID} \
         --associate-public-ip-address \
         --user-data file://${KUBE_TEMP}/minion-start-${i}.sh`
       set-cluster-tag ${INSTANCE_ID}
       set-tag ${INSTANCE_ID} kubernetes-id minion-${i}
+      set-tag ${INSTANCE_ID} kubernetes-role minion
+      set-tag ${INSTANCE_ID} Name ${CLUSTER_KEY}-minion-${i}
     fi
 
     wait-running ${INSTANCE_ID}
@@ -722,6 +751,7 @@ function kube-push {
   detect-master
 
   # Make sure we have the tar files staged on Google Storage
+  ensure-temp-dir
   find-release-tars
   upload-server-tars
 
