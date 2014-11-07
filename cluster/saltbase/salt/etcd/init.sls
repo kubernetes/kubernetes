@@ -1,7 +1,19 @@
+# We are caching the etcd tar file in GCS for reliability and speed.  To
+# update this to a new version, do the following:
+# 2. Download tar file:
+#    curl -LO https://github.com/coreos/etcd/releases/download/<ver>/etcd-<ver>-linux-amd64.tar.gz
+# 3. Upload to GCS (the cache control makes :
+#    gsutil cp <tar> gs://kubernetes-release/etcd/<tar>
+# 4. Make it world readable:
+#    gsutil -m acl ch -R -g all:R gs://kubernetes-release/etcd/
+# 5. Get a hash of the tar:
+#    shasum <tar>
+# 6. Update this file with new tar version and new hash
+
 {% set etcd_version="v0.4.6" %}
-{% set etcd_tar_url="https://github.com/coreos/etcd/releases/download/%s/etcd-%s-linux-amd64.tar.gz"
-  | format(etcd_version, etcd_version)  %}
-{% set etcd_tar_hash="md5=661d58424ff33dd837b8ee988dd79ae3" %}
+{% set etcd_tar_url="https://storage.googleapis.com/kubernetes-release/etcd/etcd-%s-linux-amd64.tar.gz"
+  | format(etcd_version)  %}
+{% set etcd_tar_hash="sha1=5db514e30b9f340eda00671230d5136855ae14d7" %}
 
 etcd-tar:
   archive:
