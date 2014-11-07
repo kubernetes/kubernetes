@@ -61,7 +61,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		if err != nil {
 			return nil, err
 		}
-		minion, err := rs.registry.GetMinion(ctx, minion.Name)
+		minionName := minion.Name
+		minion, err := rs.registry.GetMinion(ctx, minionName)
+		if err == ErrNotHealty {
+			return rs.toApiMinion(minionName), nil
+		}
 		if minion == nil {
 			return nil, ErrDoesNotExist
 		}
