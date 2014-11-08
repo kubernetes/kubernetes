@@ -515,6 +515,10 @@ function kube::release::package_server_tarballs() {
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
+    # Include the client binaries here too as they are useful debugging tools.
+    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/server/bin/"
+
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
@@ -547,7 +551,14 @@ function kube::release::package_full_tarball() {
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
-  cp -R "${LOCAL_OUTPUT_BINPATH}" "${release_stage}/platforms"
+  # Copy all of the client binaries in here, but not test or server binaries.
+  # The server binaries are included with the server binary tarball.
+  local platform
+  for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
+    mkdir -p "${release_stage}/platforms/${platform}"
+    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/platforms/${platform}"
+  done
 
   # We want everything in /cluster except saltbase.  That is only needed on the
   # server.
