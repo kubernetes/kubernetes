@@ -28,6 +28,7 @@ import (
 	"text/template"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/golang/glog"
@@ -45,34 +46,25 @@ func GetPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (Re
 	case "yaml":
 		printer = &YAMLPrinter{}
 	case "template":
-		var data []byte
 		if len(templateFile) == 0 {
 			return nil, false, fmt.Errorf("template format specified but no template given")
 		}
-		tmpl, err := template.New("output").Parse(templateFile)
+		var err error
+		printer, err = NewTemplatePrinter([]byte(templateFile))
 		if err != nil {
-			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
-		}
-		printer = &TemplatePrinter{
-			Template: tmpl,
+			return nil, false, fmt.Errorf("error parsing template %s, %v\n", templateFile, err)
 		}
 	case "templatefile":
-		var data []byte
-		if len(templateFile) > 0 {
-			var err error
-			data, err = ioutil.ReadFile(templateFile)
-			if err != nil {
-				return nil, false, fmt.Errorf("error reading template %s, %v\n", templateFile, err)
-			}
-		} else {
+		if len(templateFile) == 0 {
 			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
 		}
-		tmpl, err := template.New("output").Parse(string(data))
+		data, err := ioutil.ReadFile(templateFile)
+		if err != nil {
+			return nil, false, fmt.Errorf("error reading template %s, %v\n", templateFile, err)
+		}
+		printer, err = NewTemplatePrinter(data)
 		if err != nil {
 			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
-		}
-		printer = &TemplatePrinter{
-			Template: tmpl,
 		}
 	case "":
 		printer = defaultPrinter
@@ -323,12 +315,29 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
 type TemplatePrinter struct {
-	Template *template.Template
+	template *template.Template
+}
+
+func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
+	t, err := template.New("output").Parse(string(tmpl))
+	if err != nil {
+		return nil, err
+	}
+	return &TemplatePrinter{t}, nil
 }
 
 // PrintObj formats the obj with the Go Template.
 func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	return t.Template.Execute(w, obj)
+	data, err := latest.Codec.Encode(obj)
+	if err != nil {
+		return err
+	}
+	outObj := map[string]interface{}{}
+	err = json.Unmarshal(data, &outObj)
+	if err != nil {
+		return err
+	}
+	return t.template.Execute(w, outObj)
 }
 
 func tabbedString(f func(*tabwriter.Writer) error) (string, error) {

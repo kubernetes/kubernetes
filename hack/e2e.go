@@ -40,6 +40,9 @@ var (
 	tests   = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
 	root    = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose = flag.Bool("v", false, "If true, print all command output.")
+
+	cfgCmd = flag.String("cfg", "", "If nonempty, pass this as an argument, and call kubecfg. Implies -v.")
+	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
 )
 
 var signals = make(chan os.Signal, 100)
@@ -87,18 +90,24 @@ func main() {
 		}
 	}
 
-	failed, passed := []string{}, []string{}
-	if *tests != "" {
-		failed, passed = Test()
+	failure := false
+	switch {
+	case *cfgCmd != "":
+		failure = !runBash("'kubecfg "+*cfgCmd+"'", "$KUBECFG "+*cfgCmd)
+	case *ctlCmd != "":
+		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECFG "+*ctlCmd)
+	case *tests != "":
+		failed, passed := Test()
+		log.Printf("Passed tests: %v", passed)
+		log.Printf("Failed tests: %v", failed)
+		failure = len(failed) > 0
 	}
 
 	if *down {
 		TearDown()
 	}
 
-	log.Printf("Passed tests: %v", passed)
-	log.Printf("Failed tests: %v", failed)
-	if len(failed) > 0 {
+	if failure {
 		os.Exit(1)
 	}
 }

@@ -69,7 +69,7 @@ function query_pods() {
   local i
   for i in $(seq 1 10); do
     pods_unsorted=($(${KUBECFG} \
-        '-template={{range.Items}}{{.Name}} {{end}}' \
+        '-template={{range.items}}{{.id}} {{end}}' \
         -l name="$1" list pods))
     found="${#pods_unsorted[*]}"
     if [[ "${found}" == "$2" ]]; then
@@ -103,7 +103,7 @@ function wait_for_pods() {
     echo "Waiting for ${pods_needed} pods to become 'running'"
     pods_needed="$2"
     for id in ${pods_sorted}; do
-      status=$(${KUBECFG} -template '{{.CurrentState.Status}}' get "pods/${id}")
+      status=$(${KUBECFG} -template '{{.currentState.status}}' get "pods/${id}")
       if [[ "${status}" == "Running" ]]; then
         pods_needed=$((pods_needed-1))
       fi
@@ -213,9 +213,9 @@ svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
 # Get the portal IPs.
-svc1_ip=$(${KUBECFG} -template '{{.PortalIP}}' get "services/${svc1_name}")
+svc1_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc1_name}")
 test -n "${svc1_ip}" || error "Service1 IP is blank"
-svc2_ip=$(${KUBECFG} -template '{{.PortalIP}}' get "services/${svc2_name}")
+svc2_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc2_name}")
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
   error "Portal IPs conflict: ${svc1_ip}"
@@ -272,7 +272,7 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
 # Get the portal IP.
-svc3_ip=$(${KUBECFG} -template '{{.PortalIP}}' get "services/${svc3_name}")
+svc3_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc3_name}")
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 if [[ "${svc3_ip}" != "${svc1_ip}" ]]; then
   error "Portal IPs not resued: ${svc3_ip} != ${svc1_ip}"
@@ -325,7 +325,7 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
 # Get the portal IP.
-svc4_ip=$(${KUBECFG} -template '{{.PortalIP}}' get "services/${svc4_name}")
+svc4_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc4_name}")
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
   error "Portal IPs conflict: ${svc4_ip}"
