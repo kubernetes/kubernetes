@@ -6,7 +6,6 @@ containers:
     volumeMounts:
       - name: containers
         mountPath: /var/lib/docker/containers
-        readOnly: true
 volumes:
   - name: containers
     source:
