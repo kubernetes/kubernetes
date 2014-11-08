@@ -100,12 +100,12 @@ kube::log::status "Testing kubectl(pods)"
 "${kube_cmd[@]}" create -f examples/guestbook/redis-master.json "${kube_flags[@]}"
 "${kube_cmd[@]}" get pods "${kube_flags[@]}"
 "${kube_cmd[@]}" get pod redis-master-2 "${kube_flags[@]}"
-[[ "$("${kube_cmd[@]}" get pod redis-master-2 -o template --output-version=v1beta1 -t '{{ .ID }}' "${kube_flags[@]}")" == "redis-master-2" ]]
+[[ "$("${kube_cmd[@]}" get pod redis-master-2 -o template --output-version=v1beta1 -t '{{ .id }}' "${kube_flags[@]}")" == "redis-master-2" ]]
 output_pod=$("${kube_cmd[@]}" get pod redis-master-2 -o json --output-version=v1beta1 "${kube_flags[@]}")
 "${kube_cmd[@]}" delete pod redis-master-2 "${kube_flags[@]}"
-[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .Items }}' "${kube_flags[@]}") -eq 0 ]]
+[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}") -eq 0 ]]
 echo $output_pod | "${kube_cmd[@]}" create -f - "${kube_flags[@]}"
-[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .Items }}' "${kube_flags[@]}") -eq 1 ]]
+[[ $("${kube_cmd[@]}" get pods -o template -t '{{ len .items }}' "${kube_flags[@]}") -eq 1 ]]
 "${kube_cmd[@]}" get pods -o yaml "${kube_flags[@]}" | grep -q "id: redis-master-2"
 "${kube_cmd[@]}" describe pod redis-master-2 "${kube_flags[@]}" | grep -q 'Name:.*redis-master-2'
 "${kube_cmd[@]}" delete -f examples/guestbook/redis-master.json "${kube_flags[@]}"

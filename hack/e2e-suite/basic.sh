@@ -37,7 +37,7 @@ function teardown() {
 
 trap "teardown" EXIT
 
-pod_id_list=$($KUBECFG '-template={{range.Items}}{{.Name}} {{end}}' -l replicationController=my-hostname list pods)
+pod_id_list=$($KUBECFG '-template={{range.items}}{{.id}} {{end}}' -l replicationController=my-hostname list pods)
 # Pod turn up on a clean cluster can take a while for the docker image pull.
 all_running=0
 for i in $(seq 1 24); do
@@ -45,7 +45,7 @@ for i in $(seq 1 24); do
   sleep 5
   all_running=1
   for id in $pod_id_list; do
-    current_status=$($KUBECFG -template '{{.CurrentState.Status}}' get pods/$id) || true
+    current_status=$($KUBECFG -template '{{.currentState.status}}' get pods/$id) || true
     if [[ "$current_status" != "Running" ]]; then
       all_running=0
       break
@@ -69,7 +69,7 @@ sleep 5
 
 # Verify that something is listening.
 for id in ${pod_id_list}; do
-  ip=$($KUBECFG -template '{{.CurrentState.HostIP}}' get pods/$id)
+  ip=$($KUBECFG -template '{{.currentState.hostIP}}' get pods/$id)
   echo "Trying to reach server that should be running at ${ip}:8080..."
   ok=0
   for i in $(seq 1 5); do

@@ -38,7 +38,7 @@ function validate() {
     sleep 2
 
     local pod_id_list
-    pod_id_list=($($KUBECFG -template='{{range.Items}}{{.Name}} {{end}}' -l name="${CONTROLLER_NAME}" list pods))
+    pod_id_list=($($KUBECFG -template='{{range.items}}{{.id}} {{end}}' -l name="${CONTROLLER_NAME}" list pods))
 
     echo "  ${#pod_id_list[@]} out of ${num_replicas} created"
 
@@ -61,7 +61,7 @@ function validate() {
       # currently always set to a zero time.
       #
       # You can read about the syntax here: http://golang.org/pkg/text/template/
-      template_string="{{and ((index .CurrentState.Info \"${CONTROLLER_NAME}\").State.Running) .CurrentState.Info.net.State.Running}}"
+      template_string="{{and ((index .currentState.info \"${CONTROLLER_NAME}\").state.running.startedAt) .currentState.info.net.state.running.startedAt}}"
       current_status=$($KUBECFG -template="${template_string}" get "pods/$id") || {
         if [[ $current_status =~ "pod \"${id}\" not found" ]]; then
           echo "  $id no longer exists"
@@ -73,12 +73,12 @@ function validate() {
         fi
       }
 
-      if [[ "$current_status" != "{0001-01-01 00:00:00 +0000 UTC}" ]]; then
+      if [[ "$current_status" != "0001-01-01T00:00:00Z" ]]; then
         echo "  $id is created but not running"
         continue
       fi
 
-      template_string="{{(index .CurrentState.Info \"${CONTROLLER_NAME}\").Image}}"
+      template_string="{{(index .currentState.info \"${CONTROLLER_NAME}\").image}}"
       current_image=$($KUBECFG -template="${template_string}" get "pods/$id")
       if [[ "$current_image" != "${DOCKER_HUB_USER}/update-demo:${container_image_version}" ]]; then
         echo "  ${id} is created but running wrong image"
@@ -86,7 +86,7 @@ function validate() {
       fi
 
 
-      host_ip=$($KUBECFG -template='{{.CurrentState.HostIP}}' get pods/$id)
+      host_ip=$($KUBECFG -template='{{.currentState.hostIP}}' get pods/$id)
       curl -s --max-time 5 --fail http://${host_ip}:8080/data.json \
           | grep -q ${container_image_version} || {
         echo "  ${id} is running the right image but curl to contents failed or returned wrong info"

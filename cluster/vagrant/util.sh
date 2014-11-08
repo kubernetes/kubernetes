@@ -92,7 +92,7 @@ function kube-up {
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
-      minions=$("${KUBE_ROOT}/cluster/kubecfg.sh" -template '{{range.Items}}{{.Name}}:{{end}}' list minions)
+      minions=$("${KUBE_ROOT}/cluster/kubecfg.sh" -template '{{range.items}}{{.id}}:{{end}}' list minions)
       count=$(echo $minions | grep -c "${MINION_NAMES[i]}") || {
         printf "."
         sleep 2

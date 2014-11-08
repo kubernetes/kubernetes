@@ -33,7 +33,7 @@ detect-master > /dev/null
 detect-minions > /dev/null
 
 MINIONS_FILE=/tmp/minions
-"${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.Items}}{{.Name}}\n{{end}}' list minions > ${MINIONS_FILE}
+"${KUBE_ROOT}/cluster/kubecfg.sh" -template $'{{range.items}}{{.id}}\n{{end}}' list minions > ${MINIONS_FILE}
 
 # On vSphere, use minion IPs as their names
 if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]]; then
