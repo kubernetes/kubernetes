@@ -121,10 +121,16 @@ function upload-server-tars() {
   local -r staging_path="${staging_bucket}/devel"
 
   echo "+++ Staging server tars to Google Storage: ${staging_path}"
-  SERVER_BINARY_TAR_URL="${staging_path}/${SERVER_BINARY_TAR##*/}"
-  gsutil -q cp "${SERVER_BINARY_TAR}" "${SERVER_BINARY_TAR_URL}"
-  SALT_TAR_URL="${staging_path}/${SALT_TAR##*/}"
-  gsutil -q cp "${SALT_TAR}" "${SALT_TAR_URL}"
+  local server_binary_gs_url="${staging_path}/${SERVER_BINARY_TAR##*/}"
+  gsutil -q -h "Cache-Control:private, max-age=0" cp "${SERVER_BINARY_TAR}" "${server_binary_gs_url}"
+  gsutil acl ch -g all:R "${server_binary_gs_url}" >/dev/null 2>&1
+  local salt_gs_url="${staging_path}/${SALT_TAR##*/}"
+  gsutil -q -h "Cache-Control:private, max-age=0" cp "${SALT_TAR}" "${salt_gs_url}"
+  gsutil acl ch -g all:R "${salt_gs_url}" >/dev/null 2>&1
+
+  # Convert from gs:// URL to an https:// URL
+  SERVER_BINARY_TAR_URL="${server_binary_gs_url/gs:\/\//https://storage.googleapis.com/}"
+  SALT_TAR_URL="${salt_gs_url/gs:\/\//https://storage.googleapis.com/}"
 }
 
 # Detect the information about the minions
@@ -287,6 +293,7 @@ function kube-up {
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly FLUENTD_ELASTICSEARCH='${FLUENTD_ELASTICSEARCH:-false}'"
     echo "readonly FLUENTD_GCP='${FLUENTD_GCP:-false}'"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
@@ -315,6 +322,7 @@ function kube-up {
       echo "#! /bin/bash"
       echo "MASTER_NAME='${MASTER_NAME}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+      grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
 
@@ -489,6 +497,7 @@ function kube-push {
     echo "cd /var/cache/kubernetes-install"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
+    grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
@@ -586,7 +595,7 @@ function setup-monitoring {
 	    fi
 	fi
 
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null && 
+	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null &&
 	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
 	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
 	if [ $? -ne 0 ]; then

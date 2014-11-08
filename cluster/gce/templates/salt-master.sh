@@ -21,6 +21,11 @@ sed -i -e "\|^deb.*http://ftp.debian.org/debian| s/^/#/" /etc/apt/sources.list.d
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
+
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
@@ -41,12 +46,16 @@ reactor:
     - /srv/reactor/highstate-new.sls
 EOF
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-#
-# -M installs the master
-set +x
-curl -L --connect-timeout 20 --retry 6 --retry-delay 10 http://bootstrap.saltstack.com | sh -s -- -M -X
-set -x
+cat <<EOF >/etc/salt/master.d/log-level-debug.d
+log_level: debug
+log_level_logfile: debug
+EOF
+
+install-salt --master
+
+# Wait a few minutes and trigger another Salt run to better recover from
+# any transient errors.
+echo "Sleeping 180"
+sleep 180
+salt-call state.highstate || true
+
