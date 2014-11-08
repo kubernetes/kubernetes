@@ -22,8 +22,10 @@ sed -i -e "\|^deb.*http://ftp.debian.org/debian| s/^/#/" /etc/apt/sources.list.d
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 
-# Turn on debugging for salt-minion
-# echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
 
 # Our minions will have a pool role to distinguish them from the master.
 cat <<EOF >/etc/salt/minion.d/grains.conf
@@ -34,8 +36,10 @@ grains:
   cloud: gce
 EOF
 
-# Install Salt
-#
-# We specify -X to avoid a race condition that can cause minion failure to
-# install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X
+install-salt
+
+# Wait a few minutes and trigger another Salt run to better recover from
+# any transient errors.
+echo "Sleeping 180"
+sleep 180
+salt-call state.highstate || true
