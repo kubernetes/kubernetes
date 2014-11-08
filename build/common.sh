@@ -515,6 +515,10 @@ function kube::release::package_server_tarballs() {
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
+    # Include the client binaries here too as they are useful debugging tools.
+    cp "${KUBE_CLIENT_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/server/bin/"
+
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done

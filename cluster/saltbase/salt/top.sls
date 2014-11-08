@@ -31,6 +31,7 @@ base:
     - controller-manager
     - scheduler
     - nginx
+    - kube-client-tools
     - logrotate
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
