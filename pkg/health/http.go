@@ -94,6 +94,7 @@ func formatURL(host string, port int, path string) string {
 func DoHTTPCheck(url string, client HTTPGetInterface) (Status, error) {
 	res, err := client.Get(url)
 	if err != nil {
+		glog.V(1).Infof("Health check failed for %s, Error: %v", url, err)
 		return Unknown, err
 	}
 	defer res.Body.Close()

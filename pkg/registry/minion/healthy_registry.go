@@ -45,11 +45,11 @@ func (r *HealthyRegistry) GetMinion(ctx api.Context, minionID string) (*api.Mini
 		return nil, err
 	}
 	status, err := r.client.HealthCheck(minionID)
+	if status == health.Unhealthy || status == health.Unknown {
+		return nil, ErrNotHealty
+	}
 	if err != nil {
 		return nil, err
-	}
-	if status == health.Unhealthy {
-		return nil, ErrNotHealty
 	}
 	return minion, nil
 }

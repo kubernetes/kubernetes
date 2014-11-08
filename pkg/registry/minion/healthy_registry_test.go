@@ -68,25 +68,28 @@ func TestBasicDelegation(t *testing.T) {
 }
 
 type notMinion struct {
-	minion string
+	minions map[string]health.Status
 }
 
 func (n *notMinion) HealthCheck(host string) (health.Status, error) {
-	if host != n.minion {
-		return health.Healthy, nil
+	if status, ok := n.minions[host]; ok {
+		return status, nil
 	} else {
-		return health.Unhealthy, nil
+		return health.Healthy, nil
 	}
 }
 
 func TestFiltering(t *testing.T) {
 	ctx := api.NewContext()
-	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3"}, api.NodeResources{})
+	mockMinionRegistry := registrytest.NewMinionRegistry([]string{"m1", "m2", "m3", "m4"}, api.NodeResources{})
 	healthy := HealthyRegistry{
 		delegate: mockMinionRegistry,
-		client:   &notMinion{minion: "m1"},
+		client: &notMinion{minions: map[string]health.Status{
+			"m1": health.Unhealthy,
+			"m2": health.Unknown,
+		}},
 	}
-	expected := []string{"m2", "m3"}
+	expected := []string{"m3", "m4"}
 	list, err := healthy.ListMinions(ctx)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
