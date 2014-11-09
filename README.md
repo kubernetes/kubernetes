@@ -34,7 +34,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
 * [Kubernetes API Documentation](http://cdn.rawgit.com/GoogleCloudPlatform/kubernetes/31a0daae3627c91bc96e1f02a6344cd76e294791/api/kubernetes.html)
 * [Kubernetes Client Libraries](docs/client-libraries.md)
 * [Discussion and Community Support](#community-discussion-and-support)
-* [Hacking on Kubernetes](#development)
+* [Hacking on Kubernetes](CONTRIBUTING.md)
 * [Hacking on Kubernetes Salt configuration](docs/salt.md)
 * [Kubernetes User Interface](docs/ux.md)
 
