@@ -2,13 +2,17 @@
     body {
         padding-top: 70px;
     }
+    h1 {
+        font-size: 35px;
+        line-height: 50px;
+    }
     h2 {
         font-size: 30px;
         line-height: initial;
     }
     h3 {
         font-size: 25px;
-        line-height: 50px;
+        line-height: 25px;
     }
     h4 {
         font-size: 18px;
@@ -19,6 +23,10 @@
         line-height: 23px;
         &.split {
             @include cross-browser(column-count,1);
+        }
+        &.interior {
+            font-size: 16px;
+            line-height: 22px;
         }
     }
     footer {
@@ -33,6 +41,7 @@
         background-size: 124px 17px;
 //        @include slide-in(calc(100% - 70px)); // not iOS7 safe
         @include slide-in-ios-safe(calc(100% - 70px));
+        padding: 0 15px;
         #logo-mobile {
             height: 17px;
             margin: 25px 0;
@@ -127,13 +136,29 @@
         font-size: 18px;
         line-height: 25px;
         margin-bottom: 25px;
+        &.small {
+            font-size: 17px;
+            line-height: 23.2px;
+        }
+        &.tile {
+            margin-bottom: 20px;
+        }
     }
 
     .hero {
-        background-image: url('#{$img_dir_mobile}/hexegon_texture_hero.png');
-        padding: 50px 0 35px;
-        h4 {
-            margin: 30px 0 60px;
+        &.homepage {
+            background-image: url('#{$img_dir_mobile}/hexegon_texture_hero.png');
+            padding: 50px 0 35px;
+            h4 {
+                margin: 30px 0 60px;
+            }
+        }
+        &.interior {
+            background-image: url('#{$img_dir_mobile}/hero_hexagon_texture_interior_mobile.png');
+            padding: 37px 0 55px;
+            h4 {
+                margin: 5px 0 0 0;
+            }
         }
     }
 
@@ -172,5 +197,106 @@
 
     .youtube-wrapper {
         margin-bottom: 30px;
+    }
+
+    .bullet {
+        width: 52px;
+        height: 52px;
+        margin-bottom: 10px;
+        margin-right: 15px;
+    }
+
+    .steps {
+        .step {
+            margin-top: 45px;
+            padding-bottom: 65px;
+        }
+    }
+
+    .button-group {
+        margin: 35px 0 -15px;
+        &.tiles {
+            padding: 0 5px;
+            .col-xs-6 {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+        }
+    }
+
+    .vertical-center {
+        display: table-cell;
+        vertical-align: middle;
+    }
+
+    .height-52 { // I hate this...
+        height: 52px;
+    }
+
+    ul {
+        &.list {
+            padding: 0 0 40px;
+            li {
+                margin: 45px 0 0;
+                .thumb {
+                    margin-bottom: 10px;
+                }
+            }
+        }
+    }
+
+    .date {
+        background-size: 20px 24px;
+        font-size: 14px;
+    }
+
+    .headline {
+        margin: 30px 0;
+        h3 {
+            line-height: 33px;
+        }
+    }
+
+    .byline {
+        font-size: 16px;
+        margin-bottom: 60px;
+    }
+
+    .news, .events {
+        padding: 0 0 90px;
+    }
+
+    .events {
+        padding-top: 40px;
+    }
+
+    .stream {
+        font-size: 16px;
+        font-family: $fontsMuli;
+        line-height: 25px;
+        a {
+            font-size: 16px;
+            font-family: $fontsMontserrat;
+            font-weight: 700;
+            line-height: 25px;
+            display: block;
+            svg {
+                width: 8px;
+                height: 14px;
+                margin-left: 5px;
+            }
+        }
+    }
+
+    .event {
+        .meta {
+            div {
+                font-size: 14px;
+                line-height: 23px;
+                &:first-child {
+                    margin-top: 27px;
+                }
+            }
+        }
     }
 }

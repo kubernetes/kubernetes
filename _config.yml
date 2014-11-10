@@ -1,19 +1,24 @@
 # Site settings
 title: Kubernetes by Google
 
-email: your-email@domain.com
-
-description: > # this means to ignore newlines until "baseurl:"
- Manage a cluster of Linux containers as a single system to accelerate Dev and simplify Ops with Kubernetes by Google.
+description: Manage a cluster of Linux containers as a single system to accelerate Dev and simplify Ops with Kubernetes by Google.
 
 baseurl: "" # the subpath of your site, e.g. /blog/
+
+og: # if title, site_name or description are left blank, we will use the global
+    # title and description. 
+    title: 
+    site_name:
+    description:
+    type: website
+    image: /img/global/og_img.jpg
 
 url: "http://kubernetes.io" # the base hostname & protocol for your site
 
 # Build settings
 markdown: kramdown
-#sass:
-#    style: :compressed
+sass:
+    style: :compressed
 
 logo:
     desktop: /img/desktop/nav_logo.svg
@@ -23,25 +28,30 @@ nav:
  - label: Home
    url: /
    slug: home
+   external: false
  - label: Getting Started
-   #url: /gettingstarted
-   url: /legacy/gettingstarted
+   url: /gettingstarted
    slug: gettingstarted
+   external: false
  - label: Community
    #url: /community
    url: /legacy/community
    slug: community
+   external: false
  - label: News
    #url: /news
    url: /legacy/news
    slug: news
+   external: false
  - label: Events
-   #url: /events
-   url: /legacy/events
+   url: /events
+   #url: /legacy/events
    slug: events
+   external: false
  - label: Blog
    url: http://googlecloudplatform.blogspot.com/search/label/Kubernetes
    slug: blog
+   external: true
 
 footer:
     connect: Connect With Us!

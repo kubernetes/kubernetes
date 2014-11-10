@@ -2,42 +2,22 @@
 layout: default
 ---
 
-<div class="hero interior">
- <div class="container">
-  <div class="row">
-   <div class="col-lg-2 col-md-2 col-sm-2 hidden-xs">
-    <img src="{{page.hero.img}}" alt="{{page.hero.alt}}"
-     class="img-responsive" />
-   </div>
-   <div class="col-lg-10 col-md-10 col-md-10">
-    <div class="row">
-     <div class="col-xs-12">
-      <h1 class="text-white">{{page.hero.title}}</h1>
-     </div>
-    </div>
-    <div class="row">
-     <div class="col-xs-12">
-      <h4 class="text-white text-left">{{page.hero.text}}</h4>
-     </div>
-    </div>
-   </div>
-  </div>
- </div>
-</div>
 <div class="getting-started">
  <div class="container">
   <ul class="steps">
 {% for step in page.steps %}
    <li class="step">
     <div class="row">
-     <div class="col-lg-1 col-md-1 col-sm-1 xs-hidden">
-      <div class="bullet">
+     <div class="col-lg-1 col-md-1 col-sm-1">
+      <div class="bullet hidden-xs">
       </div>
      </div>
      <div class="col-lg-10 col-md-10 col-sm-10">
       <div class="row">
        <div class="col-xs-12">
-        <h3 class="text-gray">{{step.title}}</h3>
+        <div class="bullet visible-xs-block float-left">
+        </div>
+        <h3 class="vertical-center height-52 text-gray">{{step.title}}</h3>
        </div>
       </div>
       <div class="row">
@@ -48,17 +28,32 @@ layout: default
     {% if 'installation' == step.slug %}
       <div class="row">
        <div class="col-xs-11">
-        <div class="guides">
-        {% for guide in page.install-guides %}
-         <a href="{{guide.url}}" class="button dynamic">{{guide.label}}</a>
+        <div class="button-group">
+        {% for guide in page.installguides %}
+         <a href="{{guide.url}}" class="button small dynamic">{{guide.label}}</a>
         {% endfor %}
         </div>
        </div>
       </div>
     {% elsif 'first_app' == step.slug %}
-     FIRST APP
+      <div class="row">
+       <div class="col-lg-3 col-md-3 col-sm-3">
+        <div class="button-group float-none">
+         <a href="{{page.firstapp.url}}" class="button small">{{page.firstapp.label}}</a>
+        </div>
+       </div>
+      </div>
     {% elsif 'technical' == step.slug %}
-     TECH STUFF
+      <div class="row">
+       <div class="button-group float-none">
+        <div class="col-lg-4 col-md-5 col-sm-6">
+         <a href="{{page.techdetails.api.url}}" class="button small">{{page.techdetails.api.label}}</a>
+        </div>
+        <div class="col-lg-4 col-md-5 col-sm-6">
+         <a href="{{page.techdetails.kubecfg.url}}" class="button small">{{page.techdetails.kubecfg.label}}</a>
+        </div>
+       </div>
+      </div>
     {% endif %}
      </div>
     </div>

@@ -1,0 +1,8 @@
+.ie-mobile {
+    #mobile-nav-container {
+        @include slide-in-ios-safe(0px);
+        &.slide-in {
+            @include cross-browser(transform,none);
+        }
+    }
+}

@@ -4,6 +4,7 @@ $(document).ready(function (){
     init_back_to_top(jQuery);
     init_youtube_fix_ie(jQuery);
     init_mobile_menu_button(jQuery);
+    init_browser_detect(jQuery);
 
 });
 
@@ -40,8 +41,16 @@ function init_back_to_top($) {
     $('.back-to-top').click(function(e) {
         e.preventDefault();
         $('html,body').animate({
-            scrollTop: 0
-        },500);
+            scrollTop: 0 
+        },{
+            duration: 500,
+            done: function() {
+                // Hack for Windows Phone
+                setTimeout(function() { 
+                    window.scrollTo(0,0);
+                },550);
+            }
+        });
     });
 }
 
@@ -57,6 +66,33 @@ function init_mobile_menu_button($) {
         e.preventDefault();
         $('.mobile-menu-slide').toggleClass('slide-in');
     });
+}
+
+/*
+ * Seemed like a bit of overkill to make a jQuery plugin for this, so 
+ * I'm just passing in the selector.
+ */
+function init_list_load_more($,selector,num) {
+    var i = 0,
+        l = num || 1,
+        to_show = num || 1,
+        items = $('ul.list li');
+
+    function show() {
+        for ( i; i < l; i++ ) {
+            items.eq(i).fadeIn('fast');
+        }
+        l += to_show;
+        if ( i >= items.length ) {
+            selector.fadeOut();
+        }
+    }
+
+    selector.on('click',function() {
+        show();
+    });
+
+    return show();
 }
 
 function is_responsive_size(size) {
@@ -98,3 +134,17 @@ var is_md = function() {
 var is_lg = function() {
     return is_responsive_size('lg');
 }
+
+function init_browser_detect($) {
+    /* 
+     * Currently only used to detect IE Mobile. Might use for IE10...
+     */
+    function detect() {
+        if ( navigator.userAgent.match(/Windows Phone/i) ) {
+            $('body').addClass('ie-mobile');
+        }
+    }
+
+    return detect();
+}
+

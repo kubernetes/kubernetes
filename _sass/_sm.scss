@@ -5,8 +5,15 @@
     p {
         font-size: 15px;
     }
+    h1 {
+        font-size: 60px;
+        margin-top: 10px;
+    }
     h3 {
         font-size: 28px;
+        &.alt {
+            font-size: 25px;
+        }
     }
     #nav {
         background-color: $turquoise;
@@ -16,6 +23,7 @@
         background-size: 124px 17px;
 //        @include slide-in(calc(100% - 70px)); // not iOS7 safe
         @include slide-in-ios-safe(calc(100% - 70px));
+        padding: 0 15px;
         #logo-mobile {
             height: 17px;
             margin: 25px 0;
@@ -32,7 +40,7 @@
             margin: 35px 0 16px;
             float: left;
             position: relative;
-            @include slide-in(-1px);
+            @include slide-in(8px);
             span {
                 &, &:before, &:after {
                     background-color: $white;
@@ -103,5 +111,31 @@
             }
         }
 
+    }
+
+    .headline {
+        margin: 25px 0 15px;
+        h3 {
+            font-size: 23px;
+            line-height: 33px;
+        }
+    }
+
+    .byline {
+        font-size: 18px;
+    }
+
+    .stream {
+        a {
+            display: block;
+        }
+    }
+
+    .event {
+        .meta {
+            div {
+                font-size: 14px;
+            }
+        }
     }
 }

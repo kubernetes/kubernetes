@@ -2,21 +2,33 @@
 <html>
  <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width initial-scale=1" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="description" content="{{site.description}}">
+  <meta name="viewport" 
+   content="width=device-width, initial-scale=1, user-scalable=no" />
+  <meta property="og:title" content="{% if site.og.title %}{{site.og.title}}{% else %}{{site.title}}{% endif %}">
+  <meta property="og:site_name" content="{% if site.og.site_name %}{{site.og.site_name}}{% else %}{{site.title}}{% endif %}">
+  <meta property="og:description" content="{% if site.og.description %}{{site.og.description}}{% else %}{{site.description}}{% endif %}">
+  <meta property="og:type" content="{{site.og.type}}">
+  <meta property="og:url" content="{{site.url}}">
+  <meta property="og:image" content="{{site.url}}{{site.og.image}}">
 
-  <title>{% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}</title>
-  <meta name="description" content="{{ site.description }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <link rel="stylesheet" href="{{ "/css/main.css" | prepend: site.baseurl }}">
+  <link rel="shortcut icon" 
+   href="{{site.url}}/img/global/favicon.png" type="image/vnd.microsoft.icon" />
+  <!-- apple device icons -->
+  <link rel="apple-touch-icon" 
+   href="{{site.url}}/img/global/apple_touch_icon_2X.jpg" />
+  <!-- end apple device icons -->
+  <link rel="stylesheet" href="{{site.url}}{{ "/css/main.css" | prepend: site.baseurl }}">
   <link rel="canonical" href="{{ page.url | replace:'index.html','' | prepend: site.baseurl | prepend: site.url }}">
+  <title>{% if page.title %}{{ page.title }}{% else %}{{ site.title }}{% endif %}</title>
   <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
   <script>
     if ( !window.jQuery ) {
-        document.write('<script src="/js/jquery-2.1.1.min.js"><\/script>');
+        document.write('<script src="{{site.url}}/js/jquery-2.1.1.min.js"><\/script>');
     }
   </script>
-  <script type="text/javascript" src="/js/script.js"></script>
+  <script type="text/javascript" src="{{site.url}}/js/script.js"></script>
  </head>
  <body>
   {% include header.html %}

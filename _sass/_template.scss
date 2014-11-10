@@ -21,6 +21,7 @@ h1 {
     font-family: $fontsMontserrat;
     font-weight: 700;
     line-height: 78px;
+    margin-top: 20px;
 }
 
 h2 {
@@ -38,7 +39,7 @@ h3 {
     font-family: $fontsMontserrat;
     font-weight: 700;
     text-align: left;
-    line-height: 50px;
+    line-height: 40px;
     letter-spacing: 0em;
 }
 
@@ -79,7 +80,7 @@ em {
 a {
     color: $turquoise;
     &:hover {
-        color: $orange;
+        color: $blue;
         text-decoration: none;
     }
 }
@@ -93,6 +94,9 @@ footer {
     padding: 70px 0;
     a {
         color: $white;
+        &:hover {
+            color: $orange;
+        }
     }
 }
 
@@ -186,18 +190,30 @@ footer {
     padding: 20px 0;
     display: block;
     &:hover {
-        background-color: $white;
-        color: $turquoise;
+        background-color: $blue;
+        color: $white;
         text-decoration: none;
     }
-    &.dynamic {
+    &.small {
         font-size: 20px;
         font-weight: 700;
         line-height: 23.2px;
+        padding: 19px 15px;
+    }
+    &.dynamic {
+        float: left;
         margin-bottom: 15px;
         margin-right: 15px;
-        padding: 20px 15px;
-        float: left;
+    }
+    &.tile {
+        padding: 0;
+        margin-bottom: 30px;
+    }
+    &.alt {
+        &:hover {
+            background-color: $white;
+            color: $turquoise;
+        }
     }
 }
 
@@ -240,7 +256,7 @@ footer {
     a {
         background-image: url('#{$img_dir_desktop}/social_icons/sprite.png');
         background-repeat: no-repeat;
-        background-size: 365%;
+        background-size: 168px 92px;
         width: 46px;
         height: 46px;
         border-radius: 3px;
@@ -290,15 +306,17 @@ footer {
     background-color: $blue;
     background-position: bottom;
     background-repeat: repeat-x;
+    border-bottom: 5px solid $orange;
     &.homepage {
         background-image: url('#{$img_dir_desktop}/hexegon_texture_hero-01.png');
         padding: 210px 0 220px;
-        border-bottom: 5px solid $orange;
         h4 {
             margin: 67px 0 80px
         }
     }
     &.interior {
+        background-image: url('#{$img_dir_desktop}/hero_hexagon_texture_interior.png');
+        padding: 127px 0 145px;
     }
 }
 
@@ -380,7 +398,129 @@ footer {
     }
 }
 
-.guides {
+.button-group {
     margin: 50px 0 -15px;
     float: left;
+}
+
+.float-none {
+    float: none;
+}
+
+.float-right {
+    float: right;
+}
+
+.float-left {
+    float: left;
+}
+
+ul {
+    &.list {
+        padding-bottom: 50px;
+        li {
+            margin: 70px 0 0;
+            .thumb {
+                border: 1px solid $bluegray;
+                border-radius: 3px;
+                margin-bottom: 70px;
+            }
+        }
+    }
+}
+
+.date {
+    background-image: url('#{$img_dir_desktop}/mini_icons/calendar.svg');
+    background-repeat: no-repeat;
+    background-size: 21px 24px;
+    background-position: left center;
+    font-size: 16px;
+    font-family: $fontsMontserrat;
+    line-height: 28px;
+    margin-top: 7px;
+    padding-left: 34px;
+}
+
+.headline {
+    margin: 45px 0 30px;
+}
+
+.byline {
+    font-size: 20px;
+    font-family: $fontsMuli;
+    font-weight: 400;
+    line-height: 28px;
+    margin-bottom: 70px;
+    address {
+        font-style: italic;
+        display: inline-block;
+    }
+}
+
+.news {
+    padding: 20px 0 120px;
+}
+.lazy_load_item {
+    display: none;
+}
+
+.events {
+    padding: 85px 0 120px;
+}
+
+.stream {
+    margin-bottom: 20px;
+    a {
+        font-size: 25px;
+        font-family: $fontsMontserrat;
+        font-weight: 700;
+        svg {
+            width: 15px;
+            height: 26px;
+            margin-left: 10px;
+            vertical-align: middle;
+            path {
+                fill: $turquoise;
+            }
+        }
+        &:hover {
+            svg {
+                path {
+                    fill: $blue;
+                }
+            }
+        }
+    }
+}
+
+.event {
+    .meta {
+        div {
+            background-repeat: no-repeat;
+            background-size: 20px 20px;
+            font-size: 16px;
+            font-family: $fontsMuli;
+            line-height: 20px;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            margin-bottom: 25px;
+            padding-left: 34px;
+            &:first-child {
+                margin-bottom: 20px;
+                padding-left: 0;
+            }
+        }
+        .location {
+            background-image: url('#{$img_dir_desktop}/mini_icons/destination.svg');
+        }
+        .venue {
+            background-image: url('#{$img_dir_desktop}/mini_icons/venue.svg');
+        }
+        .speaker {
+            background-image: url('#{$img_dir_desktop}/mini_icons/speaker.svg');
+        }
+        .url {
+            background-image: url('#{$img_dir_desktop}/mini_icons/link.svg');
+        }
+    }
 }
