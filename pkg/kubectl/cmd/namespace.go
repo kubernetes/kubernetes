@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ Examples:
   $ kubectl namespace other
   Set current namespace to other`,
 		Run: func(cmd *cobra.Command, args []string) {
-			nsPath := getFlagString(cmd, "ns-path")
+			nsPath := GetFlagString(cmd, "ns-path")
 			var err error
 			var ns *kubectl.NamespaceInfo
 			switch len(args) {

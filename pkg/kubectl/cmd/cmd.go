@@ -19,11 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
-	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -128,66 +124,13 @@ func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
 }
 
-func getFlagString(cmd *cobra.Command, flag string) string {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	return f.Value.String()
-}
-
-func getFlagBool(cmd *cobra.Command, flag string) bool {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	// Caseless compare.
-	if strings.ToLower(f.Value.String()) == "true" {
-		return true
-	}
-	return false
-}
-
-// Returns nil if the flag wasn't set.
-func getFlagBoolPtr(cmd *cobra.Command, flag string) *bool {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	// Check if flag was not set at all.
-	if !f.Changed && f.DefValue == f.Value.String() {
-		return nil
-	}
-	var ret bool
-	// Caseless compare.
-	if strings.ToLower(f.Value.String()) == "true" {
-		ret = true
-	} else {
-		ret = false
-	}
-	return &ret
-}
-
-// Assumes the flag has a default value.
-func getFlagInt(cmd *cobra.Command, flag string) int {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("Flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	v, err := strconv.Atoi(f.Value.String())
-	// This is likely not a sufficiently friendly error message, but cobra
-	// should prevent non-integer values from reaching here.
-	checkErr(err)
-	return v
-}
-
 func getKubeNamespace(cmd *cobra.Command) string {
 	result := api.NamespaceDefault
-	if ns := getFlagString(cmd, "namespace"); len(ns) > 0 {
+	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
 		result = ns
 		glog.V(2).Infof("Using namespace from -ns flag")
 	} else {
-		nsPath := getFlagString(cmd, "ns-path")
+		nsPath := GetFlagString(cmd, "ns-path")
 		nsInfo, err := kubectl.LoadNamespaceInfo(nsPath)
 		if err != nil {
 			glog.Fatalf("Error loading current namespace: %v", err)
@@ -202,7 +145,7 @@ func getKubeNamespace(cmd *cobra.Command) string {
 // user explicitly provided on the command line, or false if no
 // such namespace was specified.
 func getExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
-	if ns := getFlagString(cmd, "namespace"); len(ns) > 0 {
+	if ns := GetFlagString(cmd, "namespace"); len(ns) > 0 {
 		return ns, true
 	}
 	// TODO: determine when --ns-path is set but equal to the default
@@ -214,7 +157,7 @@ func getKubeConfig(cmd *cobra.Command) *client.Config {
 	config := &client.Config{}
 
 	var host string
-	if hostFlag := getFlagString(cmd, "server"); len(hostFlag) > 0 {
+	if hostFlag := GetFlagString(cmd, "server"); len(hostFlag) > 0 {
 		host = hostFlag
 		glog.V(2).Infof("Using server from -s flag: %s", host)
 	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
@@ -231,7 +174,7 @@ func getKubeConfig(cmd *cobra.Command) *client.Config {
 		// Get the values from the file on disk (or from the user at the
 		// command line). Override them with the command line parameters, if
 		// provided.
-		authPath := getFlagString(cmd, "auth-path")
+		authPath := GetFlagString(cmd, "auth-path")
 		authInfo, err := kubectl.LoadAuthInfo(authPath, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
@@ -240,13 +183,13 @@ func getKubeConfig(cmd *cobra.Command) *client.Config {
 		config.Username = authInfo.User
 		config.Password = authInfo.Password
 		// First priority is flag, then file.
-		config.CAFile = firstNonEmptyString(getFlagString(cmd, "certificate-authority"), authInfo.CAFile)
-		config.CertFile = firstNonEmptyString(getFlagString(cmd, "client-certificate"), authInfo.CertFile)
-		config.KeyFile = firstNonEmptyString(getFlagString(cmd, "client-key"), authInfo.KeyFile)
+		config.CAFile = FirstNonEmptyString(GetFlagString(cmd, "certificate-authority"), authInfo.CAFile)
+		config.CertFile = FirstNonEmptyString(GetFlagString(cmd, "client-certificate"), authInfo.CertFile)
+		config.KeyFile = FirstNonEmptyString(GetFlagString(cmd, "client-key"), authInfo.KeyFile)
 		config.BearerToken = authInfo.BearerToken
 		// For config.Insecure, the command line ALWAYS overrides the authInfo
 		// file, regardless of its setting.
-		if insecureFlag := getFlagBoolPtr(cmd, "insecure-skip-tls-verify"); insecureFlag != nil {
+		if insecureFlag := GetFlagBoolPtr(cmd, "insecure-skip-tls-verify"); insecureFlag != nil {
 			config.Insecure = *insecureFlag
 		} else if authInfo.Insecure != nil {
 			config.Insecure = *authInfo.Insecure
@@ -254,7 +197,7 @@ func getKubeConfig(cmd *cobra.Command) *client.Config {
 	}
 
 	// The API version (e.g. v1beta1), not the binary version.
-	config.Version = getFlagString(cmd, "api-version")
+	config.Version = GetFlagString(cmd, "api-version")
 
 	return config
 }
@@ -263,72 +206,11 @@ func getKubeClient(cmd *cobra.Command) *client.Client {
 	config := getKubeConfig(cmd)
 
 	// The binary version.
-	matchVersion := getFlagBool(cmd, "match-server-version")
+	matchVersion := GetFlagBool(cmd, "match-server-version")
 
 	c, err := kubectl.GetKubeClient(config, matchVersion)
 	if err != nil {
 		glog.Fatalf("Error creating kubernetes client: %v", err)
 	}
 	return c
-}
-
-// Returns the first non-empty string out of the ones provided. If all
-// strings are empty, returns an empty string.
-func firstNonEmptyString(args ...string) string {
-	for _, s := range args {
-		if len(s) > 0 {
-			return s
-		}
-	}
-	return ""
-}
-
-// readConfigData reads the bytes from the specified filesytem or network
-// location or from stdin if location == "-".
-func readConfigData(location string) ([]byte, error) {
-	if len(location) == 0 {
-		return nil, fmt.Errorf("Location given but empty")
-	}
-
-	if location == "-" {
-		// Read from stdin.
-		data, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(data) == 0 {
-			return nil, fmt.Errorf(`Read from stdin specified ("-") but no data found`)
-		}
-
-		return data, nil
-	}
-
-	// Use the location as a file path or URL.
-	return readConfigDataFromLocation(location)
-}
-
-func readConfigDataFromLocation(location string) ([]byte, error) {
-	// we look for http:// or https:// to determine if valid URL, otherwise do normal file IO
-	if strings.Index(location, "http://") == 0 || strings.Index(location, "https://") == 0 {
-		resp, err := http.Get(location)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to access URL %s: %v\n", location, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("Unable to read URL, server reported %d %s", resp.StatusCode, resp.Status)
-		}
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to read URL %s: %v\n", location, err)
-		}
-		return data, nil
-	} else {
-		data, err := ioutil.ReadFile(location)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to read %s: %v\n", location, err)
-		}
-		return data, nil
-	}
 }

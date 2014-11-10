@@ -49,7 +49,7 @@ Examples:
   $ kubectl delete pod 1234-56-7890-234234-456456
   <delete a pod with ID 1234-56-7890-234234-456456>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			filename := getFlagString(cmd, "filename")
+			filename := GetFlagString(cmd, "filename")
 			mapping, namespace, name := ResourceFromArgsOrFile(cmd, args, filename, f.Typer, f.Mapper)
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)

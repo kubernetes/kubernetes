@@ -39,7 +39,7 @@ Examples:
   $ cat pod.json | kubectl update -f -
   <update a pod based on the json passed into stdin>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			filename := getFlagString(cmd, "filename")
+			filename := GetFlagString(cmd, "filename")
 			if len(filename) == 0 {
 				usageError(cmd, "Must specify filename to update")
 			}
