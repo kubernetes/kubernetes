@@ -35,9 +35,8 @@ readonly KUBE_GCS_UPLOAD_RELEASE="${KUBE_GCS_UPLOAD_RELEASE:-n}"
 readonly KUBE_GCS_NO_CACHING="${KUBE_GCS_NO_CACHING:-y}"
 readonly KUBE_GCS_MAKE_PUBLIC="${KUBE_GCS_MAKE_PUBLIC:-y}"
 # KUBE_GCS_RELEASE_BUCKET default: kubernetes-releases-${project_hash}
-# KUBE_GCS_RELEASE_PREFIX default: devel/
-# KUBE_GCS_DOCKER_REG_PREFIX default: docker-reg/
-
+readonly KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel/}
+readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg/}
 
 
 # Constants
@@ -615,7 +614,7 @@ function kube::release::gcs::release() {
   kube::release::gcs::verify_prereqs
   kube::release::gcs::ensure_release_bucket
   kube::release::gcs::push_images
-  kube::release::gcs::copy_release_tarballs
+  kube::release::gcs::copy_release_artifacts
 }
 
 # Verify things are set up for uploading to GCS
@@ -654,8 +653,6 @@ function kube::release::gcs::ensure_release_bucket() {
   local project_hash
   project_hash=$(kube::build::short_hash "$GCLOUD_PROJECT")
   KUBE_GCS_RELEASE_BUCKET=${KUBE_GCS_RELEASE_BUCKET-kubernetes-releases-${project_hash}}
-  KUBE_GCS_RELEASE_PREFIX=${KUBE_GCS_RELEASE_PREFIX-devel/}
-  KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg/}
 
   if ! gsutil ls "gs://${KUBE_GCS_RELEASE_BUCKET}" >/dev/null 2>&1 ; then
     echo "Creating Google Cloud Storage bucket: $KUBE_GCS_RELEASE_BUCKET"
@@ -716,7 +713,7 @@ function kube::release::gcs::push_images() {
   done
 }
 
-function kube::release::gcs::copy_release_tarballs() {
+function kube::release::gcs::copy_release_artifacts() {
   # TODO: This isn't atomic.  There will be points in time where there will be
   # no active release.  Also, if something fails, the release could be half-
   # copied.  The real way to do this would perhaps to have some sort of release
@@ -728,7 +725,7 @@ function kube::release::gcs::copy_release_tarballs() {
     gcs_options=("-h" "Cache-Control:private, max-age=0")
   fi
 
-  echo "+++ Copying client tarballs to ${gcs_destination}"
+  echo "+++ Copying release artifacts to ${gcs_destination}"
 
   # First delete all objects at the destination
   gsutil -q rm -f -R "${gcs_destination}" >/dev/null 2>&1 || true
@@ -736,14 +733,19 @@ function kube::release::gcs::copy_release_tarballs() {
   # Now upload everything in release directory
   gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
 
+  # Having the "template" scripts from the GCE cluster deploy hosted with the
+  # release is useful for GKE.  Copy everything from that directory up also.
+  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp "${KUBE_ROOT}/cluster/gce/templates/*.sh" "${gcs_destination}extra/gce-templates/"
+
   # TODO(jbeda): Generate an HTML page with links for this release so it is easy
   # to see it.  For extra credit, generate a dynamic page that builds up the
   # release list using the GCS JSON API.  Use Angular and Bootstrap for extra
   # extra credit.
 
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
+    echo "+++ Marking all uploaded objects public"
     gsutil acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
   fi
 
-  gsutil ls -lh "${gcs_destination}"
+  gsutil ls -lhr "${gcs_destination}"
 }
