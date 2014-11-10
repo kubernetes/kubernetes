@@ -93,12 +93,12 @@ Examples:
 				return getKubeClient(cmd).RESTClient, nil
 			}
 
-			filename := getFlagString(cmd, "filename")
+			filename := GetFlagString(cmd, "filename")
 			if len(filename) == 0 {
 				usageError(cmd, "Must pass a filename to update")
 			}
 
-			data, err := readConfigData(filename)
+			data, err := ReadConfigData(filename)
 			checkErr(err)
 
 			items, errs := DataToObjects(mapper, typer, data)

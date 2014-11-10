@@ -28,7 +28,7 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 		Use:   "version",
 		Short: "Print version of client and server",
 		Run: func(cmd *cobra.Command, args []string) {
-			if getFlagBool(cmd, "client") {
+			if GetFlagBool(cmd, "client") {
 				kubectl.GetClientVersion(out)
 			} else {
 				kubectl.GetVersion(out, getKubeClient(cmd))

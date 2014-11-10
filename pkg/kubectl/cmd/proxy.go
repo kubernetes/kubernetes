@@ -30,9 +30,9 @@ func NewCmdProxy(out io.Writer) *cobra.Command {
 		Short: "Run a proxy to the Kubernetes API server",
 		Long:  `Run a proxy to the Kubernetes API server.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			port := getFlagInt(cmd, "port")
+			port := GetFlagInt(cmd, "port")
 			glog.Infof("Starting to serve on localhost:%d", port)
-			server, err := kubectl.NewProxyServer(getFlagString(cmd, "www"), getKubeConfig(cmd), port)
+			server, err := kubectl.NewProxyServer(GetFlagString(cmd, "www"), getKubeConfig(cmd), port)
 			checkErr(err)
 			glog.Fatal(server.Serve())
 		},

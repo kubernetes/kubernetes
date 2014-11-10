@@ -49,16 +49,16 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, f.Mapper)
 
-			selector := getFlagString(cmd, "selector")
+			selector := GetFlagString(cmd, "selector")
 			labels, err := labels.ParseSelector(selector)
 			checkErr(err)
 
 			client, err := f.Client(cmd, mapping)
 			checkErr(err)
 
-			outputFormat := getFlagString(cmd, "output")
-			templateFile := getFlagString(cmd, "template")
-			defaultPrinter, err := f.Printer(cmd, mapping, getFlagBool(cmd, "no-headers"))
+			outputFormat := GetFlagString(cmd, "output")
+			templateFile := GetFlagString(cmd, "template")
+			defaultPrinter, err := f.Printer(cmd, mapping, GetFlagBool(cmd, "no-headers"))
 			checkErr(err)
 
 			printer, versioned, err := kubectl.GetPrinter(outputFormat, templateFile, defaultPrinter)
@@ -68,7 +68,7 @@ Examples:
 			checkErr(err)
 
 			if versioned {
-				outputVersion := getFlagString(cmd, "output-version")
+				outputVersion := GetFlagString(cmd, "output-version")
 				if len(outputVersion) == 0 {
 					outputVersion = mapping.APIVersion
 				}
