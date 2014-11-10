@@ -28,7 +28,7 @@ import (
 // may not provide optimal spreading for the members of that Service.
 // TODO: consider if we want to include Service label sets in the scheduling priority.
 func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	pods, err := podLister.ListPods(labels.SelectorFromSet(pod.Labels))
+	pods, err := getMatchingPods(pod.Labels, podLister)
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +38,8 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 	}
 
 	counts := map[string]int{}
-	for _, pod := range pods {
-		counts[pod.CurrentState.Host]++
+	for _, otherPod := range pods {
+		counts[otherPod.CurrentState.Host] += commonLabelsCount(pod.Labels, otherPod.Labels)
 	}
 
 	result := []HostPriority{}
@@ -51,4 +51,32 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 
 func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
 	return NewGenericScheduler(predicates, CalculateSpreadPriority, podLister, random)
+}
+
+// Returns a map of pod name to pod with an entry for all pods that have at least one label in the label set.
+// This could possibly be replaced with an orTerm selector but it doesn't exist yet.
+func getMatchingPods(labelSet map[string]string, podLister PodLister) (map[string]api.Pod, error) {
+	podSet := map[string]api.Pod{}
+	for k, v := range labelSet {
+		pods, err := podLister.ListPods(labels.SelectorFromSet(map[string]string{k: v}))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, pod := range pods {
+			podSet[pod.ObjectMeta.Name] = pod
+		}
+	}
+	return podSet, nil
+}
+
+// Returns the number of shared labels between two label sets.
+func commonLabelsCount(labels, others map[string]string) int {
+	var count int
+	for k, v := range labels {
+		if other, ok := others[k]; ok && v == other {
+			count++
+		}
+	}
+	return count
 }

@@ -61,40 +61,40 @@ func TestSpreadPriority(t *testing.T) {
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods:         []api.Pod{{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 0}},
 			test:         "different labels",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2, Name: "a"}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "b"}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 1}},
+			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
 			test:         "one label match",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2, Name: "a"}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "b"}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "c"}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 1}},
+			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 2}},
 			test:         "two label matches on different machines",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2, Name: "a"}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "b"}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "c"}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "d"}},
 			},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
+			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 4}},
 			test:         "three label matches",
 		},
 	}
@@ -106,6 +106,38 @@ func TestSpreadPriority(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.expectedList, list) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		}
+	}
+}
+
+func TestCommonLabelsCount(t *testing.T) {
+	labels1 := map[string]string{
+		"foo": "bar",
+		"baz": "blah",
+	}
+	labels2 := map[string]string{
+		"bar": "foo",
+		"baz": "blah",
+	}
+
+	tests := []struct {
+		labelsA, labelsB map[string]string
+		commonCount      int
+	}{
+		{labels1, labels2, 1},
+		{labels1, labels1, 2},
+		{labels2, labels2, 2},
+	}
+
+	for _, test := range tests {
+		expected := test.commonCount
+		actual := commonLabelsCount(test.labelsA, test.labelsB)
+		if expected != actual {
+			t.Errorf("error: expected %s got %s", expected, actual)
+		}
+		actual = commonLabelsCount(test.labelsA, test.labelsB)
+		if expected != actual {
+			t.Errorf("error: expected %s got %s", expected, actual)
 		}
 	}
 }
