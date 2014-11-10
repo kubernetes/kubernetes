@@ -50,6 +50,7 @@ type FakeEtcdClient struct {
 	TestIndex   bool
 	ChangeIndex uint64
 	LastSetTTL  uint64
+	Machines    []string
 
 	// Will become valid after Watch is called; tester may write to it. Tester may
 	// also read from it to verify that it's closed after injecting an error.
@@ -81,6 +82,10 @@ func NewFakeEtcdClient(t TestLogger) *FakeEtcdClient {
 	// WatchResponse, WatchInjectError and WatchStop are ready to read/write.
 	ret.watchCompletedChan = make(chan bool)
 	return ret
+}
+
+func (f *FakeEtcdClient) GetCluster() []string {
+	return f.Machines
 }
 
 func (f *FakeEtcdClient) ExpectNotFoundGet(key string) {

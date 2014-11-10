@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -33,20 +32,21 @@ type httpGet interface {
 	Get(url string) (*http.Response, error)
 }
 
-type server struct {
-	addr string
-	port int
+type Server struct {
+	Addr string
+	Port int
+	Path string
 }
 
 // validator is responsible for validating the cluster and serving
 type validator struct {
 	// a list of servers to health check
-	servers map[string]server
+	servers map[string]Server
 	client  httpGet
 }
 
-func (s *server) check(client httpGet) (health.Status, string, error) {
-	resp, err := client.Get("http://" + net.JoinHostPort(s.addr, strconv.Itoa(s.port)) + "/healthz")
+func (s *Server) check(client httpGet) (health.Status, string, error) {
+	resp, err := client.Get("http://" + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
 	if err != nil {
 		return health.Unknown, "", err
 	}
@@ -82,8 +82,7 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		reply = append(reply, ServerStatus{name, status.String(), status, msg, errorMsg})
 	}
-	data, err := json.Marshal(reply)
-	log.Printf("FOO: %s", string(data))
+	data, err := json.MarshalIndent(reply, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
@@ -94,8 +93,15 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewValidator creates a validator for a set of servers.
-func NewValidator(servers map[string]string) (http.Handler, error) {
-	result := map[string]server{}
+func NewValidator(servers map[string]Server) (http.Handler, error) {
+	return &validator{
+		servers: servers,
+		client:  &http.Client{},
+	}, nil
+}
+
+func makeTestValidator(servers map[string]string, get httpGet) (http.Handler, error) {
+	result := map[string]Server{}
 	for name, value := range servers {
 		host, port, err := net.SplitHostPort(value)
 		if err != nil {
@@ -105,16 +111,10 @@ func NewValidator(servers map[string]string) (http.Handler, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid server spec: %s (%v)", port, err)
 		}
-		result[name] = server{host, val}
+		result[name] = Server{Addr: host, Port: val, Path: "/healthz"}
 	}
-	return &validator{
-		servers: result,
-		client:  &http.Client{},
-	}, nil
-}
 
-func makeTestValidator(servers map[string]string, get httpGet) (http.Handler, error) {
-	v, e := NewValidator(servers)
+	v, e := NewValidator(result)
 	if e == nil {
 		v.(*validator).client = get
 	}

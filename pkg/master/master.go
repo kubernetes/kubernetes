@@ -17,12 +17,15 @@ limitations under the License.
 package master
 
 import (
+	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
@@ -306,6 +309,9 @@ func (m *Master) init(c *Config) {
 	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
 	m.mux.Handle(c.APIPrefix, versionHandler)
 	apiserver.InstallSupport(m.mux)
+	serversToValidate := m.getServersToValidate(c)
+
+	apiserver.InstallValidator(m.mux, serversToValidate)
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.mux)
 	}
@@ -338,6 +344,43 @@ func (m *Master) init(c *Config) {
 
 	// TODO: Attempt clean shutdown?
 	m.masterServices.Start()
+}
+
+func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
+	serversToValidate := map[string]apiserver.Server{
+		"controller-manager": {Addr: "127.0.0.1", Port: 10252, Path: "/healthz"},
+		"scheduler":          {Addr: "127.0.0.1", Port: 10251, Path: "/healthz"},
+	}
+	for ix, machine := range c.EtcdHelper.Client.GetCluster() {
+		etcdUrl, err := url.Parse(machine)
+		if err != nil {
+			glog.Errorf("Failed to parse etcd url for validation: %v", err)
+			continue
+		}
+		var port int
+		var addr string
+		if strings.Contains(etcdUrl.Host, ":") {
+			var portString string
+			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
+			if err != nil {
+				glog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
+				continue
+			}
+			port, _ = strconv.Atoi(portString)
+		} else {
+			addr = etcdUrl.Host
+			port = 4001
+		}
+		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
+	}
+	nodes, err := m.minionRegistry.ListMinions(api.NewDefaultContext())
+	if err != nil {
+		glog.Errorf("Failed to list minions: %v", err)
+	}
+	for ix, node := range nodes.Items {
+		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.HostIP, Port: 10250, Path: "/healthz"}
+	}
+	return serversToValidate
 }
 
 // API_v1beta1 returns the resources and codec for API version v1beta1.

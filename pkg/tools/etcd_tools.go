@@ -43,6 +43,7 @@ var (
 
 // EtcdClient is an injectable interface for testing.
 type EtcdClient interface {
+	GetCluster() []string
 	AddChild(key, data string, ttl uint64) (*etcd.Response, error)
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
@@ -56,6 +57,7 @@ type EtcdClient interface {
 
 // EtcdGetSet interface exposes only the etcd operations needed by EtcdHelper.
 type EtcdGetSet interface {
+	GetCluster() []string
 	Get(key string, sort, recursive bool) (*etcd.Response, error)
 	Set(key, value string, ttl uint64) (*etcd.Response, error)
 	Create(key, value string, ttl uint64) (*etcd.Response, error)

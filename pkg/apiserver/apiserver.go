@@ -85,6 +85,15 @@ func NewAPIGroup(storage map[string]RESTStorage, codec runtime.Codec, canonicalP
 	}}
 }
 
+func InstallValidator(mux Mux, servers map[string]Server) {
+	validator, err := NewValidator(servers)
+	if err != nil {
+		glog.Errorf("failed to set up validator: %v", err)
+		return
+	}
+	mux.Handle("/validate", validator)
+}
+
 // InstallREST registers the REST handlers (storage, watch, and operations) into a mux.
 // It is expected that the provided prefix will serve all operations. Path MUST NOT end
 // in a slash.
@@ -99,16 +108,6 @@ func (g *APIGroup) InstallREST(mux Mux, paths ...string) {
 	redirectHandler := &RedirectHandler{g.handler.storage, g.handler.codec}
 	opHandler := &OperationHandler{g.handler.ops, g.handler.codec}
 
-	servers := map[string]string{
-		"controller-manager": "127.0.0.1:10252",
-		"scheduler":          "127.0.0.1:10251",
-		// TODO: Add minion health checks here too.
-	}
-	validator, err := NewValidator(servers)
-	if err != nil {
-		glog.Errorf("failed to set up validator: %v", err)
-		validator = nil
-	}
 	for _, prefix := range paths {
 		prefix = strings.TrimRight(prefix, "/")
 		proxyHandler := &ProxyHandler{prefix + "/proxy/", g.handler.storage, g.handler.codec}
@@ -119,9 +118,6 @@ func (g *APIGroup) InstallREST(mux Mux, paths ...string) {
 		mux.Handle(prefix+"/redirect/", http.StripPrefix(prefix+"/redirect/", redirectHandler))
 		mux.Handle(prefix+"/operations", http.StripPrefix(prefix+"/operations", opHandler))
 		mux.Handle(prefix+"/operations/", http.StripPrefix(prefix+"/operations/", opHandler))
-		if validator != nil {
-			mux.Handle(prefix+"/validate", validator)
-		}
 	}
 }
 
