@@ -105,6 +105,20 @@ function ensure-temp-dir {
   fi
 }
 
+function setup-monitoring {
+  if [ ${MONITORING-} ]; then
+    # TODO: Implement this.
+    echo "Monitoring not currently supported on AWS"
+  fi
+}
+
+function teardown-monitoring {
+  if [ ${MONITORING-} ]; then
+    # TODO: Implement this.
+    echo "Monitoring not currently supported on AWS"
+  fi
+}
+
 # Verify and find the various tar files that we are going to use on the server.
 #
 # Vars set:
@@ -143,12 +157,12 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SALT_TAR_URL=
 
-  local project_hash
-  local key = $(aws configure get aws_access_key_id)
+  local project_hash=
+  local key=$(aws configure get aws_access_key_id)
   if which md5 > /dev/null 2>&1; then
-    project_hash = $(md5 -q -s "${USER} ${key}")
+    project_hash=$(md5 -q -s "${USER} ${key}")
   else
-    project_hash = $(echo -n "${USER} ${key}" | md5sum)
+    project_hash=$(echo -n "${USER} ${key}" | md5sum)
   fi
   local -r staging_bucket="kubernetes-staging-${project_hash}"
 
