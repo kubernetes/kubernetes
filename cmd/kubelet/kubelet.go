@@ -188,6 +188,9 @@ func main() {
 		*registryBurst,
 		*minimumGCAge,
 		*maxContainerCount)
+
+	k.BirthCry()
+
 	go func() {
 		util.Forever(func() {
 			err := k.GarbageCollectContainers()
