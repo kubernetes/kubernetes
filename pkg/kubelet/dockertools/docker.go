@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash/adler32"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -364,8 +365,9 @@ var (
 	ErrContainerCannotRun = errors.New("Container cannot run")
 )
 
-func inspectContainer(client DockerInterface, dockerID, containerName string) (*api.ContainerStatus, error) {
+func inspectContainer(client DockerInterface, dockerID, containerName, tPath string) (*api.ContainerStatus, error) {
 	inspectResult, err := client.InspectContainer(dockerID)
+
 	if err != nil {
 		return nil, err
 	}
@@ -396,6 +398,17 @@ func inspectContainer(client DockerInterface, dockerID, containerName string) (*
 			StartedAt:  inspectResult.State.StartedAt,
 			FinishedAt: inspectResult.State.FinishedAt,
 		}
+		if tPath != "" {
+			path, found := inspectResult.Volumes[tPath]
+			if found {
+				data, err := ioutil.ReadFile(path)
+				if err != nil {
+					glog.Errorf("Error on reading termination-log %s(%v)", path, err)
+				} else {
+					containerStatus.State.Termination.Message = string(data)
+				}
+			}
+		}
 		waiting = false
 	}
 
@@ -414,6 +427,11 @@ func inspectContainer(client DockerInterface, dockerID, containerName string) (*
 // GetDockerPodInfo returns docker info for all containers in the pod/manifest.
 func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName, uuid string) (api.PodInfo, error) {
 	info := api.PodInfo{}
+	expectedContainers := make(map[string]api.Container)
+	for _, container := range manifest.Containers {
+		expectedContainers[container.Name] = container
+	}
+	expectedContainers["net"] = api.Container{}
 
 	containers, err := client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
@@ -428,6 +446,14 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName,
 		if uuid != "" && dockerUUID != uuid {
 			continue
 		}
+		c, found := expectedContainers[dockerContainerName]
+		terminationMessagePath := ""
+		if !found {
+			// TODO(dchen1107): should figure out why not continue here
+			// continue
+		} else {
+			terminationMessagePath = c.TerminationMessagePath
+		}
 		// We assume docker return us a list of containers in time order
 		if containerStatus, found := info[dockerContainerName]; found {
 			containerStatus.RestartCount += 1
@@ -435,7 +461,7 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName,
 			continue
 		}
 
-		containerStatus, err := inspectContainer(client, value.ID, dockerContainerName)
+		containerStatus, err := inspectContainer(client, value.ID, dockerContainerName, terminationMessagePath)
 		if err != nil {
 			return nil, err
 		}

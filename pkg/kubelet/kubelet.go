@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"sort"
 	"strconv"
@@ -295,7 +296,6 @@ func makeBinds(pod *api.BoundPod, container *api.Container, podVolumes volumeMap
 	}
 	return binds
 }
-
 func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
 	exposedPorts := map[docker.Port]struct{}{}
 	portBindings := map[docker.Port][]docker.PortBinding{}
@@ -462,6 +462,21 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	dockerContainer, err := kl.dockerClient.CreateContainer(opts)
 	if err != nil {
 		return "", err
+	}
+	if len(container.TerminationMessagePath) != 0 {
+		p := path.Join(kl.rootDirectory, pod.Name, container.Name)
+		if err := os.MkdirAll(p, 0750); err != nil {
+			glog.Errorf("Error on creating %s(%v)", p, err)
+		} else {
+			containerLogPath := path.Join(p, dockerContainer.ID)
+			fs, err := os.Create(containerLogPath)
+			if err != nil {
+				glog.Errorf("Error on creating termination-log file: %s(%v)", containerLogPath, err)
+			}
+			defer fs.Close()
+			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+			binds = append(binds, b)
+		}
 	}
 	privileged := false
 	if capabilities.Get().AllowPrivileged {

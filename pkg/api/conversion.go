@@ -34,6 +34,14 @@ func init() {
 			out.Spec.RestartPolicy = in.RestartPolicy
 			out.Name = in.ID
 			out.UID = in.UUID
+			// TODO(dchen1107): Move this conversion to pkg/api/v1beta[123]/conversion.go
+			// along with fixing #1502
+			for i := range out.Spec.Containers {
+				ctr := &out.Spec.Containers[i]
+				if len(ctr.TerminationMessagePath) == 0 {
+					ctr.TerminationMessagePath = TerminationMessagePathDefault
+				}
+			}
 			return nil
 		},
 		func(in *BoundPod, out *ContainerManifest, s conversion.Scope) error {
@@ -43,6 +51,12 @@ func init() {
 			out.Version = "v1beta2"
 			out.ID = in.Name
 			out.UUID = in.UID
+			for i := range out.Containers {
+				ctr := &out.Containers[i]
+				if len(ctr.TerminationMessagePath) == 0 {
+					ctr.TerminationMessagePath = TerminationMessagePathDefault
+				}
+			}
 			return nil
 		},
 		func(in *ContainerManifestList, out *BoundPods, s conversion.Scope) error {

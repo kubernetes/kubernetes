@@ -40,6 +40,7 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 			{
 				Name:  "c" + id,
 				Image: "foo",
+				TerminationMessagePath: "/somepath",
 			},
 		},
 		Volumes: []api.Volume{
@@ -62,6 +63,7 @@ func ExampleManifestAndPod(id string) (api.ContainerManifest, api.BoundPod) {
 				{
 					Name:  "c" + id,
 					Image: "foo",
+					TerminationMessagePath: "/somepath",
 				},
 			},
 			Volumes: []api.Volume{
@@ -124,7 +126,7 @@ func TestReadFromFile(t *testing.T) {
 				Namespace: "default",
 			},
 			Spec: api.PodSpec{
-				Containers: []api.Container{{Image: "test/image"}},
+				Containers: []api.Container{{Image: "test/image", TerminationMessagePath: "/dev/termination-log"}},
 			},
 		})
 		if !reflect.DeepEqual(expected, update) {

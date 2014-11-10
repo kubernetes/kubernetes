@@ -109,6 +109,11 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
+	f.Container = &docker.Container{
+		ID:         id,
+		Config:     &docker.Config{Image: "testimage"},
+		HostConfig: hostConfig,
+	}
 	return f.Err
 }
 

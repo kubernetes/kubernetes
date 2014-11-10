@@ -222,6 +222,8 @@ type Container struct {
 	VolumeMounts  []VolumeMount  `yaml:"volumeMounts,omitempty" json:"volumeMounts,omitempty"`
 	LivenessProbe *LivenessProbe `yaml:"livenessProbe,omitempty" json:"livenessProbe,omitempty"`
 	Lifecycle     *Lifecycle     `yaml:"lifecycle,omitempty" json:"lifecycle,omitempty"`
+	// Optional: Defaults to /dev/termination-log
+	TerminationMessagePath string `yaml:"terminationMessagePath,omitempty" json:"terminationMessagePath,omitempty"`
 	// Optional: Default to false.
 	Privileged bool `json:"privileged,omitempty" yaml:"privileged,omitempty"`
 	// Optional: Policy for pulling images for this container
@@ -295,6 +297,7 @@ type ContainerStateTerminated struct {
 	ExitCode   int       `json:"exitCode" yaml:"exitCode"`
 	Signal     int       `json:"signal,omitempty" yaml:"signal,omitempty"`
 	Reason     string    `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Message    string    `json:"message,omitempty" yaml:"message,omitempty"`
 	StartedAt  time.Time `json:"startedAt,omitempty" yaml:"startedAt,omitempty"`
 	FinishedAt time.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty"`
 }
