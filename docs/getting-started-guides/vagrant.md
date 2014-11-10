@@ -121,10 +121,10 @@ cluster/kubecfg.sh
 
 ### Authenticating with your master
 
-When using the vagrant provider in Kubernetes, the `cluster/kubecfg.sh` script will cache your credentials in a `~/.kubernetes_auth_vagrant` file so you will not be prompted for them in the future.
+When using the vagrant provider in Kubernetes, the `cluster/kubecfg.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
 
 ```
-cat ~/.kubernetes_auth_vagrant
+cat ~/.kubernetes_vagrant_auth
 { "User": "vagrant",
   "Password": "vagrant"}
 ```
@@ -253,10 +253,10 @@ hack/e2e-test.sh
 
 #### I just created the cluster, but I am getting authorization errors!
 
-You probably have an incorrect ~/.kubernetes_auth_vagrant file for the cluster you are attempting to contact.
+You probably have an incorrect ~/.kubernetes_vagrant_auth file for the cluster you are attempting to contact.
 
 ```
-rm ~/.kubernetes_auth_vagrant
+rm ~/.kubernetes_vagrant_auth
 ```
 
 After using kubecfg.sh make sure that the correct credentials are set:
