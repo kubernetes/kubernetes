@@ -326,3 +326,7 @@ kube-up() {
 function setup-monitoring {
     echo "TODO"
 }
+
+function teardown-monitoring {
+   echo "TODO"
+}

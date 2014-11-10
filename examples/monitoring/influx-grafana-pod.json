@@ -8,7 +8,7 @@
       "id": "influx-grafana",
       "containers": [{
         "name": "influxdb",
-        "image": "kubernetes/heapster_influxdb",
+        "image": "kubernetes/heapster_influxdb:latest",
         "ports": [
 		 {"containerPort": 8083, "hostPort": 8083},
 		 {"containerPort": 8086, "hostPort": 8086},
@@ -16,13 +16,13 @@
 		 {"containerPort": 8099, "hostPort": 8099}]
       }, {
 	"name": "grafana",
-        "image": "kubernetes/heapster_grafana",
+        "image": "kubernetes/heapster_grafana:latest",
         "ports": [{"containerPort": 80, "hostPort": 80}],
 	"env": [{"name": HTTP_USER, "value": admin},
-	        {"name": HTTP_PASS, "value": admin}],
+		{"name": HTTP_PASS, "value": "admin"}],
       }, {
 	"name": "elasticsearch",
-        "image": "dockerfile/elasticsearch",
+        "image": "dockerfile/elasticsearch:latest",
         "ports": [{"containerPort": 9200, "hostPort": 9200},
 		  {"containerPort": 9300}],
       }]

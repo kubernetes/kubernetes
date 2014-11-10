@@ -176,3 +176,7 @@ function restart-kube-proxy {
 function setup-monitoring {
     echo "TODO"
 }
+
+function teardown-monitoring {
+   echo "TODO"
+}
