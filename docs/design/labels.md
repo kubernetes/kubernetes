@@ -32,7 +32,7 @@ Label selectors permit very simple filtering by label keys and values. The simpl
 
 Currently the system supports selection by exact match of a map of keys and values. Matching objects must have all of the specified labels (both keys and values), though they may have additional labels as well.
 
-We are in the process of extending the label selection specification (see [selector.go](../blob/master/pkg/labels/selector.go) and https://github.com/GoogleCloudPlatform/kubernetes/issues/341) to support conjunctions of requirements of the following forms:
+We are in the process of extending the label selection specification (see [selector.go](/pkg/labels/selector.go) and https://github.com/GoogleCloudPlatform/kubernetes/issues/341) to support conjunctions of requirements of the following forms:
 ```
 key1 in (value11, value12, ...)
 key1 not in (value11, value12, ...)
