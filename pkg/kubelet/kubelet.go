@@ -998,3 +998,16 @@ func (kl *Kubelet) RunInContainer(podFullName, uuid, container string, cmd []str
 	}
 	return kl.runner.RunInContainer(dockerContainer.ID, cmd)
 }
+
+// BirthCry sends an event that the kubelet has started up.
+func (kl *Kubelet) BirthCry() {
+	// Make an event that kubelet restarted.
+	// TODO: get the real minion object of ourself,
+	// and use the real minion name and UID.
+	ref := &api.ObjectReference{
+		Kind: "Minion",
+		Name: kl.hostname,
+		UID:  kl.hostname,
+	}
+	record.Eventf(ref, "", "starting", "Starting kubelet.")
+}
