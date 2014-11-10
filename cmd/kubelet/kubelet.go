@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -124,6 +125,9 @@ func main() {
 	}
 
 	etcd.SetLogger(util.NewLogger("etcd "))
+
+	// Log the events locally too.
+	record.StartLogging(glog.Infof)
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: *allowPrivileged,
