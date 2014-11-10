@@ -60,7 +60,7 @@ purge-old-docker:
 #    curl https://get.docker.com/ubuntu/dists/docker/main/binary-amd64/Packages
 # 2. Download based on that:
 #    curl -O https://get.docker.com/ubuntu/pool/main/<...>
-# 3. Upload to GCS (the cache control makes :
+# 3. Upload to GCS:
 #    gsutil cp <deb> gs://kubernetes-release/docker/<deb>
 # 4. Make it world readable:
 #    gsutil acl ch -R -g all:R gs://kubernetes-release/docker/<deb>
