@@ -18,6 +18,7 @@ While the concepts and architecture in Kubernetes represent years of experience 
   * [Google Compute Engine](docs/getting-started-guides/gce.md)
   * [Locally](docs/getting-started-guides/locally.md)
   * [Vagrant](docs/getting-started-guides/vagrant.md)
+  * [AWS with CoreOS and Cloud Formation](docs/getting-started-guides/aws-coreos.md)
   * [AWS](docs/getting-started-guides/aws.md)
   * Fedora (w/ [Ansible](docs/getting-started-guides/fedora/fedora_ansible_config.md) or [manual](docs/getting-started-guides/fedora/fedora_manual_config.md))
   * [Circle CI](https://circleci.com/docs/docker#google-compute-engine-and-kubernetes)
