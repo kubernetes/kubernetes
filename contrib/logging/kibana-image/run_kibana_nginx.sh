@@ -167,6 +167,7 @@ server {
         location ~ /elasticsearch/?(.*)$ {
         proxy_http_version 1.1;
                 proxy_set_header Upgrade \$http_upgrade;
+                proxy_read_timeout 1d;
                 proxy_set_header Connection "upgrade";
                 proxy_pass http://${PROXY_HOST}:${PROXY_PORT}/\$1;
         }
