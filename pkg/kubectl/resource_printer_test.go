@@ -25,23 +25,33 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+
 	"gopkg.in/v1/yaml"
 )
 
 type testStruct struct {
-	Key        string         `yaml:"Key" json:"Key"`
-	Map        map[string]int `yaml:"Map" json:"Map"`
-	StringList []string       `yaml:"StringList" json:"StringList"`
-	IntList    []int          `yaml:"IntList" json:"IntList"`
+	api.TypeMeta   `yaml:",inline" json:",inline"`
+	api.ObjectMeta `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Key            string         `yaml:"Key" json:"Key"`
+	Map            map[string]int `yaml:"Map" json:"Map"`
+	StringList     []string       `yaml:"StringList" json:"StringList"`
+	IntList        []int          `yaml:"IntList" json:"IntList"`
 }
 
 func (ts *testStruct) IsAnAPIObject() {}
 
+func init() {
+	api.Scheme.AddKnownTypes("", &testStruct{})
+	api.Scheme.AddKnownTypes(latest.Version, &testStruct{})
+}
+
 var testData = testStruct{
-	"testValue",
-	map[string]int{"TestSubkey": 1},
-	[]string{"a", "b", "c"},
-	[]int{1, 2, 3},
+	Key:        "testValue",
+	Map:        map[string]int{"TestSubkey": 1},
+	StringList: []string{"a", "b", "c"},
+	IntList:    []int{1, 2, 3},
 }
 
 func TestYAMLPrinter(t *testing.T) {
@@ -128,12 +138,19 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 		t.Fatal(err)
 	}
 	var poutput testStruct
-	err = yaml.Unmarshal(buf.Bytes(), &poutput)
+	// Verify that given function runs without error.
+	err = unmarshalFunc(buf.Bytes(), &poutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use real decode function to undo the versioning process.
+	poutput = testStruct{}
+	err = latest.Codec.DecodeInto(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(testData, poutput) {
-		t.Errorf("Test data and unmarshaled data are not equal: %#v vs %#v", poutput, testData)
+		t.Errorf("Test data and unmarshaled data are not equal: %v", util.ObjectDiff(poutput, testData))
 	}
 
 	obj := &api.Pod{
@@ -142,12 +159,19 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	buf.Reset()
 	printer.PrintObj(obj, buf)
 	var objOut api.Pod
-	err = yaml.Unmarshal([]byte(buf.String()), &objOut)
+	// Verify that given function runs without error.
+	err = unmarshalFunc(buf.Bytes(), &objOut)
 	if err != nil {
 		t.Errorf("Unexpeted error: %#v", err)
 	}
+	// Use real decode function to undo the versioning process.
+	objOut = api.Pod{}
+	err = latest.Codec.DecodeInto(buf.Bytes(), &objOut)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(obj, &objOut) {
-		t.Errorf("Unexpected inequality:\n%#v \nvs\n%#v", obj, &objOut)
+		t.Errorf("Unexpected inequality:\n%v", util.ObjectDiff(obj, &objOut))
 	}
 }
 

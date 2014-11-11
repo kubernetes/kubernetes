@@ -37,6 +37,7 @@ import (
 
 // GetPrinter returns a resource printer and a bool indicating whether the object must be
 // versioned for the given format.
+// TODO: remove the 'versioned' return value, replace with method on ResourcePrinter.
 func GetPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (ResourcePrinter, bool, error) {
 	versioned := true
 	var printer ResourcePrinter
@@ -86,12 +87,28 @@ type JSONPrinter struct{}
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
 func (i *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	output, err := json.MarshalIndent(obj, "", "    ")
+	data, err := latest.Codec.Encode(obj)
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprint(w, string(output)+"\n")
+	dst := bytes.Buffer{}
+	err = json.Indent(&dst, data, "", "    ")
+	dst.WriteByte('\n')
+	_, err = w.Write(dst.Bytes())
 	return err
+}
+
+func toVersionedMap(obj runtime.Object) (map[string]interface{}, error) {
+	data, err := latest.Codec.Encode(obj)
+	if err != nil {
+		return nil, err
+	}
+	outObj := map[string]interface{}{}
+	err = json.Unmarshal(data, &outObj)
+	if err != nil {
+		return nil, err
+	}
+	return outObj, nil
 }
 
 // YAMLPrinter is an implementation of ResourcePrinter which parsess JSON, and re-formats as YAML.
@@ -99,7 +116,12 @@ type YAMLPrinter struct{}
 
 // PrintObj prints the data as YAML.
 func (y *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	output, err := yaml.Marshal(obj)
+	outObj, err := toVersionedMap(obj)
+	if err != nil {
+		return err
+	}
+
+	output, err := yaml.Marshal(outObj)
 	if err != nil {
 		return err
 	}
@@ -328,12 +350,7 @@ func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
 
 // PrintObj formats the obj with the Go Template.
 func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	data, err := latest.Codec.Encode(obj)
-	if err != nil {
-		return err
-	}
-	outObj := map[string]interface{}{}
-	err = json.Unmarshal(data, &outObj)
+	outObj, err := toVersionedMap(obj)
 	if err != nil {
 		return err
 	}
