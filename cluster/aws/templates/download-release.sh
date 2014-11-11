@@ -14,10 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'aws', 'azure', 'vagrant', 'local', 'vsphere'
+# Download and install release
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+# This script assumes that the environment variable MASTER_RELEASE_TAR contains
+# the release tar to download and unpack.  It is meant to be pushed to the
+# master and run.
+
+echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
+wget "$SERVER_BINARY_TAR_URL" .
+
+echo "Downloading binary release tar ($SALT_TAR_URL)"
+wget "$SALT_TAR_URL" .
+
+echo "Unpacking Salt tree"
+rm -rf kubernetes
+tar xzf "${SALT_TAR_URL##*/}"
+
+echo "Running release install script"
+sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"

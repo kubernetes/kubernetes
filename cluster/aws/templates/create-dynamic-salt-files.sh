@@ -14,10 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the default provider of Kubernetes cluster to know where to load provider-specific scripts
-# You can override the default provider by exporting the KUBERNETES_PROVIDER
-# variable in your bashrc
-#
-# The valid values: 'gce', 'aws', 'azure', 'vagrant', 'local', 'vsphere'
+# Create the overlay files for the salt tree.  We create these in a separate
+# place so that we can blow away the rest of the salt configs on a kube-push and
+# re-apply these.
 
-KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-gce}
+mkdir -p /srv/salt-overlay/pillar
+cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
+node_instance_prefix: $NODE_INSTANCE_PREFIX
+portal_net: $PORTAL_NET
+use-fluentd-es: $FLUENTD_ELASTICSEARCH
+use-fluentd-gcp: $FLUENTD_GCP
+EOF
+
+mkdir -p /srv/salt-overlay/salt/nginx
+echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
