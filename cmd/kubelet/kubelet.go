@@ -32,7 +32,9 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -70,11 +72,14 @@ var (
 	enableDebuggingHandlers = flag.Bool("enable_debugging_handlers", true, "Enables server endpoints for log collection and local running of containers and commands")
 	minimumGCAge            = flag.Duration("minimum_container_ttl_duration", 0, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")
 	maxContainerCount       = flag.Int("maximum_dead_containers_per_container", 5, "Maximum number of old instances of a container to retain per container.  Each container takes up some disk space.  Default: 5.")
+	authPath                = flag.String("auth_path", "", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
+	apiServerList           util.StringList
 )
 
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
+	flag.Var(&apiServerList, "api_servers", "List of Kubernetes API servers to publish events to. (ip:port), comma separated.")
 }
 
 func getDockerEndpoint() string {
@@ -125,6 +130,39 @@ func main() {
 	}
 
 	etcd.SetLogger(util.NewLogger("etcd "))
+
+	// Make an API client if possible.
+	var apiClient *client.Client = nil
+	if len(apiServerList) < 1 {
+		glog.Info("No api servers specified.")
+	} else {
+		authInfo, err := clientauth.LoadFromFile(*authPath)
+		if err != nil {
+			glog.Warningf("Not able to load auth config file: %v", err)
+		} else {
+			clientConfig, err := authInfo.MergeWithConfig(client.Config{})
+			if err != nil {
+				glog.Warningf("Not able to make client config: %v", err)
+			} else {
+				// TODO: adapt Kube client to support LB over several servers.
+				if len(apiServerList) > 1 {
+					glog.Infof("Mulitple api servers specified.  Picking first one")
+				}
+				clientConfig.Host = apiServerList[0]
+				if c, err := client.New(&clientConfig); err != nil {
+					glog.Warningf("No API client configured: %v", err)
+				} else {
+					apiClient = c
+					glog.Infof("API Client created.")
+				}
+			}
+		}
+	}
+	// Send events to APIserver if there is a client.
+	if apiClient != nil {
+		glog.Infof("Sending events to APIserver.")
+		record.StartRecording(apiClient.Events(""), "kubelet")
+	}
 
 	// Log the events locally too.
 	record.StartLogging(glog.Infof)
