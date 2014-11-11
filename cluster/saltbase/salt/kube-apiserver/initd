@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 ### BEGIN INIT INFO
-# Provides:   apiserver
+# Provides:   kube-apiserver
 # Required-Start:    $local_fs $network $syslog
 # Required-Stop:
 # Default-Start:     2 3 4 5
@@ -15,12 +15,12 @@
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="The Kubernetes API server"
-NAME=apiserver
-DAEMON=/usr/local/bin/apiserver
+NAME=kube-apiserver
+DAEMON=/usr/local/bin/kube-apiserver
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-DAEMON_USER=apiserver
+DAEMON_USER=kube-apiserver
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0

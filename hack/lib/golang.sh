@@ -20,11 +20,11 @@ readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
 # The set of server targets that we are only building for Linux
 readonly KUBE_SERVER_TARGETS=(
-  cmd/proxy
-  cmd/apiserver
-  cmd/controller-manager
+  cmd/kube-proxy
+  cmd/kube-apiserver
+  cmd/kube-controller-manager
   cmd/kubelet
-  plugin/cmd/scheduler
+  plugin/cmd/kube-scheduler
 )
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 

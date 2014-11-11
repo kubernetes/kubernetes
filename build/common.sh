@@ -83,10 +83,10 @@ readonly DOCKER_DATA_MOUNT_ARGS=(
 
 readonly KUBE_RUN_IMAGE_BASE="kubernetes"
 readonly KUBE_RUN_IMAGES=(
-  apiserver
-  controller-manager
-  proxy
-  scheduler
+  kube-apiserver
+  kube-controller-manager
+  kube-proxy
+  kube-scheduler
   kubelet
   bootstrap
 )

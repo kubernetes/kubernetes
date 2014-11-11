@@ -20,10 +20,10 @@ First, create your kube-apiserver.service file (change necessary variables)
 
     [Service]
     EnvironmentFile=/etc/network-environment
-    ExecStartPre=/usr/bin/rm /opt/bin/apiserver
-    ExecStartPre=/usr/bin/wget -P /opt/bin https://path/to/apiserver/binary
-    ExecStartPre=/usr/bin/chmod +x /opt/bin/apiserver
-    ExecStart=/opt/bin/apiserver \
+    ExecStartPre=/usr/bin/rm /opt/bin/kube-apiserver
+    ExecStartPre=/usr/bin/wget -P /opt/bin https://path/to/kube-apiserver/binary
+    ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
+    ExecStart=/opt/bin/kube-apiserver \
     -address=0.0.0.0 \
     -port=8080 \
     -etcd_servers=http://10.1.10.10:4001

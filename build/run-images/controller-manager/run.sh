@@ -18,4 +18,4 @@
 # configuration and that we have a local minion.
 KUBE_MINIONS="${KUBE_MINIONS:-$(hostname -f)}"
 
-./controller-manager -master="${API_SERVER}" --machines="${KUBE_MINIONS}"
+./kube-controller-manager -master="${API_SERVER}" --machines="${KUBE_MINIONS}"

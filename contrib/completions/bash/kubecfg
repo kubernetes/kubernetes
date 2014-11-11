@@ -12,7 +12,7 @@
 #     . kubecfg
 #
 # Note:
-# Currently, the completions will not work if the apiserver daemon is not
+# Currently, the completions will not work if the kube-apiserver daemon is not
 # running on localhost on the standard port 8080
 
 __contains_word () {

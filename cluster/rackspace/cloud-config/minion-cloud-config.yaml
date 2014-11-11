@@ -119,8 +119,8 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/proxy /opt/bin/proxy
-        ExecStart=/opt/bin/proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
+        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
         Restart=always
         RestartSec=2
     - name: minion-advertiser.service
