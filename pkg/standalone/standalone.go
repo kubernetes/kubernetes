@@ -114,11 +114,14 @@ func RunScheduler(cl *client.Client) {
 }
 
 // RunControllerManager starts a controller
-func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int) {
+func RunControllerManager(machineList []string, cl *client.Client, nodeMilliCPU, nodeMemory int64) {
+	if int64(int(nodeMilliCPU)) != nodeMilliCPU || int64(int(nodeMemory)) != nodeMemory {
+		glog.Fatalf("Overflow, nodeCPU or nodeMemory too large for the platform")
+	}
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
-			resources.CPU:    util.NewIntOrStringFromInt(nodeMilliCPU),
-			resources.Memory: util.NewIntOrStringFromInt(nodeMemory),
+			resources.CPU:    util.NewIntOrStringFromInt(int(nodeMilliCPU)),
+			resources.Memory: util.NewIntOrStringFromInt(int(nodeMemory)),
 		},
 	}
 	minionController := minionControllerPkg.NewMinionController(nil, "", machineList, nodeResources, cl)
