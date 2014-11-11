@@ -19,9 +19,7 @@ package cmd
 import (
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/config"
@@ -69,7 +67,7 @@ func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (resul
 	return
 }
 
-func NewCmdCreateAll(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdCreateAll(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "createall -f filename",
 		Short: "Create all resources specified in filename or stdin",
@@ -84,11 +82,6 @@ Examples:
   $ cat config.json | kubectl apply -f -
   <creates all resources listed in config.json>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// TODO: Replace this with Factory.Typer
-			typer := api.Scheme
-			// TODO: Replace this with Factory.Mapper
-			mapper := latest.RESTMapper
-			// TODO: Replace this with Factory.Client
 			clientFunc := func(*meta.RESTMapping) (*client.RESTClient, error) {
 				return getKubeClient(cmd).RESTClient, nil
 			}
@@ -101,8 +94,8 @@ Examples:
 			data, err := ReadConfigData(filename)
 			checkErr(err)
 
-			items, errs := DataToObjects(mapper, typer, data)
-			applyErrs := config.CreateObjects(typer, mapper, clientFunc, items)
+			items, errs := DataToObjects(f.Mapper, f.Typer, data)
+			applyErrs := config.CreateObjects(f.Typer, f.Mapper, clientFunc, items)
 			errs = append(errs, applyErrs...)
 			if len(errs) > 0 {
 				for _, e := range errs {
