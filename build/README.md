@@ -52,11 +52,11 @@ Env Variable | Default | Description
 `KUBE_SKIP_CONFIRMATIONS` | `n` | If `y` then no questions are asked and the scripts just continue.
 `KUBE_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
 `KUBE_GCS_RELEASE_BUCKET` | `kubernetes-releases-${project_hash}` | The bucket to upload releases to
-`KUBE_GCS_RELEASE_PREFIX` | `devel/` | The path under the release bucket to put releases
+`KUBE_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
 `KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
 `KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
 `KUBE_BUILD_RUN_IMAGES` | `n` | *Experimental* Build Docker images for running most server components.
-`KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg/` | *Experimental* When uploading docker images, the bucket that backs the registry.
+`KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
 
 ## Basic Flow
 
