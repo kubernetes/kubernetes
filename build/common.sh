@@ -172,7 +172,7 @@ function kube::build::clean_output() {
   fi
 
   echo "+++ Removing data container"
-  docker rm "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
 
   echo "+++ Cleaning out local _output directory"
   rm -rf "${LOCAL_OUTPUT_ROOT}"
@@ -405,13 +405,13 @@ function kube::build::run_build_command() {
     docker run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}")
 
   # Remove the container if it is left over from some previous aborted run
-  docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
   "${docker_cmd[@]}" "$@"
 
   # Remove the container after we run.  '--rm' might be appropriate but it
   # appears that sometimes it fails. See
   # https://github.com/docker/docker/issues/3968
-  docker rm "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  docker rm -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
 }
 
 # Test if the output directory is remote (and can only be accessed through
