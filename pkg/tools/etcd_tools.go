@@ -19,12 +19,18 @@ package tools
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os/exec"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -359,4 +365,43 @@ func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, tryUpdat
 		}
 		return err
 	}
+}
+
+func checkEtcd(host string) error {
+	response, err := http.Get(host + "/version")
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix("etcd", string(body)) {
+		return fmt.Errorf("Unknown server: %s", string(body))
+	}
+	return nil
+}
+
+func startEtcd() (*exec.Cmd, error) {
+	cmd := exec.Command("etcd")
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+	return cmd, nil
+}
+
+func NewEtcdClientStartServerIfNecessary(server string) (EtcdClient, error) {
+	err := checkEtcd(server)
+	if err != nil {
+		glog.Infof("Failed to find etcd, attempting to start.")
+		_, err := startEtcd()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	servers := []string{server}
+	return etcd.NewClient(servers), nil
 }

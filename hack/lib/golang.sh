@@ -37,6 +37,7 @@ readonly KUBE_SERVER_PLATFORMS=(
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubecfg
   cmd/kubectl
+  cmd/kubernetes
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 
