@@ -62,7 +62,7 @@ func doTestStore(t *testing.T, store Store) {
 		}
 
 		// Check that ID list is correct.
-		ids := store.Contains()
+		ids := store.ContainedIDs()
 		if !ids.HasAll("a", "c", "e") {
 			t.Errorf("missing items")
 		}
@@ -90,7 +90,7 @@ func doTestStore(t *testing.T, store Store) {
 		}
 
 		// Check that ID list is correct.
-		ids := store.Contains()
+		ids := store.ContainedIDs()
 		if !ids.HasAll("foo", "bar") {
 			t.Errorf("missing items")
 		}

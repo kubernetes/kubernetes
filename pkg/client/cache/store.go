@@ -31,7 +31,7 @@ type Store interface {
 	Update(id string, obj interface{})
 	Delete(id string)
 	List() []interface{}
-	Contains() util.StringSet
+	ContainedIDs() util.StringSet
 	Get(id string) (item interface{}, exists bool)
 
 	// Replace will delete the contents of the store, using instead the
@@ -78,10 +78,10 @@ func (c *cache) List() []interface{} {
 	return list
 }
 
-// Contains returns a util.StringSet containing all IDs of stored the items.
+// ContainedIDs returns a util.StringSet containing all IDs of stored the items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (c *cache) Contains() util.StringSet {
+func (c *cache) ContainedIDs() util.StringSet {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	set := util.StringSet{}

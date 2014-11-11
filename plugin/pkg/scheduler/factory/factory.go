@@ -95,7 +95,7 @@ func (factory *ConfigFactory) Create() *scheduler.Config {
 			glog.V(2).Infof("About to try and schedule pod %v\n"+
 				"\tknown minions: %v\n"+
 				"\tknown scheduled pods: %v\n",
-				pod.Name, minionCache.Contains(), podCache.Contains())
+				pod.Name, minionCache.ContainedIDs(), podCache.ContainedIDs())
 			return pod
 		},
 		Error: factory.makeDefaultErrorFunc(&podBackoff, podQueue),

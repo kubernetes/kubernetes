@@ -72,10 +72,10 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
-// Contains returns a util.StringSet containing all IDs of stored the items.
+// ContainedIDs returns a util.StringSet containing all IDs of stored the items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (c *FIFO) Contains() util.StringSet {
+func (c *FIFO) ContainedIDs() util.StringSet {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	set := util.StringSet{}

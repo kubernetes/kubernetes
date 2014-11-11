@@ -70,7 +70,7 @@ func TestPoller_sync(t *testing.T) {
 		for line, pairs := range item.steps {
 			p.sync(testEnumerator(pairs))
 
-			ids := s.Contains()
+			ids := s.ContainedIDs()
 			for _, pair := range pairs {
 				if !ids.Has(pair.id) {
 					t.Errorf("%v, %v: expected to find entry for %v, but did not.", testCase, line, pair.id)
@@ -113,7 +113,7 @@ func TestPoller_Run(t *testing.T) {
 	<-done
 
 	// We never added anything, verify that.
-	if e, a := 0, len(s.Contains()); e != a {
+	if e, a := 0, len(s.ContainedIDs()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
