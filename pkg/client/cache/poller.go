@@ -68,7 +68,7 @@ func (p *Poller) Run() {
 }
 
 func (p *Poller) sync(e Enumerator) {
-	current := p.store.Contains()
+	current := p.store.ContainedIDs()
 	for i := 0; i < e.Len(); i++ {
 		id, object := e.Get(i)
 		p.store.Update(id, object)
