@@ -175,7 +175,9 @@ func GetKubeConfig(cmd *cobra.Command) *client.Config {
 		// command line). Override them with the command line parameters, if
 		// provided.
 		authPath := GetFlagString(cmd, "auth-path")
-		authInfo, err := kubectl.LoadAuthInfo(authPath, os.Stdin)
+		authInfo, err := kubectl.LoadClientAuthInfoOrPrompt(authPath, os.Stdin)
+		// TODO: handle the case where the file could not be written but
+		// we still got a user/pass from prompting.
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
 		}
