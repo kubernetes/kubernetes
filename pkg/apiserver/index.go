@@ -19,16 +19,19 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/emicklei/go-restful"
 )
 
 // handleIndex is the root index page for Kubernetes.
-func handleIndex(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/" && req.URL.Path != "/index.html" {
-		notFound(w, req)
+func handleIndex(req *restful.Request, resp *restful.Response) {
+	// TODO: use restful's Request/Response methods
+	if req.Request.URL.Path != "/" && req.Request.URL.Path != "/index.html" {
+		notFound(resp.ResponseWriter, req.Request)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	// TODO: serve this out of a file?
+	resp.ResponseWriter.WriteHeader(http.StatusOK)
+	// TODO: serve this out of a file
 	data := "<html><body>Welcome to Kubernetes</body></html>"
-	fmt.Fprint(w, data)
+	fmt.Fprint(resp.ResponseWriter, data)
 }

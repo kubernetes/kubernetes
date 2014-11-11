@@ -32,8 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -45,12 +44,54 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 	return obj, nil
 }
 
-var codec = testapi.Codec()
-var selfLinker = latest.SelfLinker
+// This creates a fake API version, similar to api/latest.go
+const testVersion = "version"
+
+var versions = []string{testVersion}
+var codec = runtime.CodecFor(api.Scheme, testVersion)
+var accessor = meta.NewAccessor()
+var versioner runtime.ResourceVersioner = accessor
+var selfLinker runtime.SelfLinker = accessor
+var mapper meta.RESTMapper
+
+func interfacesFor(version string) (*meta.VersionInterfaces, error) {
+	switch version {
+	case testVersion:
+		return &meta.VersionInterfaces{
+			Codec:            codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(versions, ", "))
+	}
+}
 
 func init() {
-	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{})
-	api.Scheme.AddKnownTypes(testapi.Version(), &Simple{}, &SimpleList{})
+	// Certain API objects are returned regardless of the contents of storage:
+	// api.Status is returned in errors
+	// api.ServerOp/api.ServerOpList are returned by /operations
+
+	// "internal" version
+	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{},
+		&api.Status{}, &api.ServerOp{}, &api.ServerOpList{})
+	// "version" version
+	// TODO: Use versioned api objects?
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{},
+		&api.Status{}, &api.ServerOp{}, &api.ServerOpList{})
+
+	defMapper := meta.NewDefaultRESTMapper(
+		versions,
+		func(version string) (*meta.VersionInterfaces, bool) {
+			interfaces, err := interfacesFor(version)
+			if err != nil {
+				return nil, false
+			}
+			return interfaces, true
+		},
+	)
+	defMapper.Add(api.Scheme, true, versions...)
+	mapper = defMapper
 }
 
 type Simple struct {
@@ -204,23 +245,24 @@ func TestNotFound(t *testing.T) {
 	type T struct {
 		Method string
 		Path   string
+		Status int
 	}
 	cases := map[string]T{
-		"PATCH method":                 {"PATCH", "/prefix/version/foo"},
-		"GET long prefix":              {"GET", "/prefix/"},
-		"GET missing storage":          {"GET", "/prefix/version/blah"},
-		"GET with extra segment":       {"GET", "/prefix/version/foo/bar/baz"},
-		"POST with extra segment":      {"POST", "/prefix/version/foo/bar"},
-		"DELETE without extra segment": {"DELETE", "/prefix/version/foo"},
-		"DELETE with extra segment":    {"DELETE", "/prefix/version/foo/bar/baz"},
-		"PUT without extra segment":    {"PUT", "/prefix/version/foo"},
-		"PUT with extra segment":       {"PUT", "/prefix/version/foo/bar/baz"},
-		"watch missing storage":        {"GET", "/prefix/version/watch/"},
-		"watch with bad method":        {"POST", "/prefix/version/watch/foo/bar"},
+		"PATCH method":                 {"PATCH", "/prefix/version/foo", http.StatusMethodNotAllowed},
+		"GET long prefix":              {"GET", "/prefix/", http.StatusNotFound},
+		"GET missing storage":          {"GET", "/prefix/version/blah", http.StatusNotFound},
+		"GET with extra segment":       {"GET", "/prefix/version/foo/bar/baz", http.StatusNotFound},
+		"POST with extra segment":      {"POST", "/prefix/version/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE without extra segment": {"DELETE", "/prefix/version/foo", http.StatusMethodNotAllowed},
+		"DELETE with extra segment":    {"DELETE", "/prefix/version/foo/bar/baz", http.StatusNotFound},
+		"PUT without extra segment":    {"PUT", "/prefix/version/foo", http.StatusMethodNotAllowed},
+		"PUT with extra segment":       {"PUT", "/prefix/version/foo/bar/baz", http.StatusNotFound},
+		"watch missing storage":        {"GET", "/prefix/version/watch/", http.StatusNotFound},
+		"watch with bad method":        {"POST", "/prefix/version/watch/foo/bar", http.StatusNotFound},
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &SimpleRESTStorage{},
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -235,14 +277,14 @@ func TestNotFound(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		if response.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected %d for %s (%s), Got %#v", http.StatusNotFound, v, k, response)
+		if response.StatusCode != v.Status {
+			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v, k, response)
 		}
 	}
 }
 
 func TestVersion(t *testing.T) {
-	handler := Handle(map[string]RESTStorage{}, codec, "/prefix/version", selfLinker)
+	handler := Handle(map[string]RESTStorage{}, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -276,7 +318,7 @@ func TestSimpleList(t *testing.T) {
 		t:           t,
 		expectedSet: "/prefix/version/simple",
 	}
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -299,7 +341,7 @@ func TestErrorList(t *testing.T) {
 		errors: map[string]error{"list": fmt.Errorf("test Error")},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -309,7 +351,7 @@ func TestErrorList(t *testing.T) {
 	}
 
 	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusInternalServerError, resp)
 	}
 }
 
@@ -324,7 +366,7 @@ func TestNonEmptyList(t *testing.T) {
 		},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -366,7 +408,7 @@ func TestGet(t *testing.T) {
 		expectedSet: "/prefix/version/simple/id",
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -391,7 +433,7 @@ func TestGetMissing(t *testing.T) {
 		errors: map[string]error{"get": apierrs.NewNotFound("simple", "id")},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -410,7 +452,7 @@ func TestDelete(t *testing.T) {
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -433,7 +475,7 @@ func TestDeleteMissing(t *testing.T) {
 		errors: map[string]error{"delete": apierrs.NewNotFound("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -458,7 +500,7 @@ func TestUpdate(t *testing.T) {
 		t:           t,
 		expectedSet: "/prefix/version/simple/" + ID,
 	}
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -467,7 +509,8 @@ func TestUpdate(t *testing.T) {
 	}
 	body, err := codec.Encode(item)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		// The following cases will fail, so die now
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	client := http.Client{}
@@ -477,7 +520,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if simpleStorage.updated.Name != item.Name {
+	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
 	}
 	if !selfLinker.called {
@@ -492,7 +535,7 @@ func TestUpdateMissing(t *testing.T) {
 		errors: map[string]error{"update": apierrs.NewNotFound("simple", ID)},
 	}
 	storage["simple"] = &simpleStorage
-	handler := Handle(storage, codec, "/prefix/version", selfLinker)
+	handler := Handle(storage, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -527,7 +570,7 @@ func TestCreate(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": simpleStorage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/prefix", testVersion, selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -570,7 +613,7 @@ func TestCreateNotFound(t *testing.T) {
 			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrs.NewNotFound("simple", "id")},
 		},
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -635,7 +678,7 @@ func TestSyncCreate(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -708,7 +751,7 @@ func TestAsyncDelayReturnsError(t *testing.T) {
 			return nil, apierrs.NewAlreadyExists("foo", "bar")
 		},
 	}
-	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version", selfLinker)
+	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix", testVersion, selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = time.Millisecond / 2
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -732,7 +775,7 @@ func TestAsyncCreateError(t *testing.T) {
 		name:        "bar",
 		expectedSet: "/prefix/version/foo/bar",
 	}
-	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix/version", selfLinker)
+	handler := Handle(map[string]RESTStorage{"foo": &storage}, codec, "/prefix", testVersion, selfLinker)
 	handler.(*defaultAPIServer).group.handler.asyncOpWait = 0
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -784,7 +827,7 @@ func (*UnregisteredAPIObject) IsAnAPIObject() {}
 
 func TestWriteJSONDecodeError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		writeJSON(http.StatusOK, latest.Codec, &UnregisteredAPIObject{"Undecodable"}, w)
+		writeJSON(http.StatusOK, codec, &UnregisteredAPIObject{"Undecodable"}, w)
 	}))
 	defer server.Close()
 	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
@@ -832,7 +875,7 @@ func TestSyncCreateTimeout(t *testing.T) {
 	}
 	handler := Handle(map[string]RESTStorage{
 		"foo": &storage,
-	}, codec, "/prefix/version", selfLinker)
+	}, codec, "/prefix", testVersion, selfLinker)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -864,7 +907,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 		}
 
 		handler := CORS(
-			Handle(map[string]RESTStorage{}, codec, "/prefix/version", selfLinker),
+			Handle(map[string]RESTStorage{}, codec, "/prefix", testVersion, selfLinker),
 			allowedOriginRegexps, nil, nil, "true",
 		)
 		server := httptest.NewServer(handler)

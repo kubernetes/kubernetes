@@ -242,6 +242,7 @@ var code200 = map[int]bool{200: true}
 var code400 = map[int]bool{400: true}
 var code403 = map[int]bool{403: true}
 var code404 = map[int]bool{404: true}
+var code405 = map[int]bool{405: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
 var code500 = map[int]bool{500: true}
@@ -269,14 +270,14 @@ func getTestRequests() []struct {
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"PATCH", "/api/v1beta1/pods/a", "", code404},
-		{"OPTIONS", "/api/v1beta1/pods", "", code404},
-		{"OPTIONS", "/api/v1beta1/pods/a", "", code404},
-		{"HEAD", "/api/v1beta1/pods", "", code404},
-		{"HEAD", "/api/v1beta1/pods/a", "", code404},
-		{"TRACE", "/api/v1beta1/pods", "", code404},
-		{"TRACE", "/api/v1beta1/pods/a", "", code404},
-		{"NOSUCHVERB", "/api/v1beta1/pods", "", code404},
+		{"PATCH", "/api/v1beta1/pods/a", "", code405},
+		{"OPTIONS", "/api/v1beta1/pods", "", code405},
+		{"OPTIONS", "/api/v1beta1/pods/a", "", code405},
+		{"HEAD", "/api/v1beta1/pods", "", code405},
+		{"HEAD", "/api/v1beta1/pods/a", "", code405},
+		{"TRACE", "/api/v1beta1/pods", "", code405},
+		{"TRACE", "/api/v1beta1/pods/a", "", code405},
+		{"NOSUCHVERB", "/api/v1beta1/pods", "", code405},
 
 		// Normal methods on services
 		{"GET", "/api/v1beta1/services", "", code200},
@@ -320,12 +321,12 @@ func getTestRequests() []struct {
 		{"DELETE", "/api/v1beta1/events/a" + syncFlags, "", code200},
 
 		// Normal methods on bindings
-		{"GET", "/api/v1beta1/bindings", "", code404},            // Bindings are write-only, so 404
+		{"GET", "/api/v1beta1/bindings", "", code405},            // Bindings are write-only
 		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200}, // Need a pod to bind or you get a 404
 		{"POST", "/api/v1beta1/bindings" + syncFlags, aBinding, code200},
 		{"PUT", "/api/v1beta1/bindings/a" + syncFlags, aBinding, code500}, // See #2114 about why 500
-		{"GET", "/api/v1beta1/bindings", "", code404},
-		{"GET", "/api/v1beta1/bindings/a", "", code404},
+		{"GET", "/api/v1beta1/bindings", "", code405},
+		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
 		{"DELETE", "/api/v1beta1/bindings/a" + syncFlags, "", code404},
 
 		// Non-existent object type.
@@ -340,7 +341,8 @@ func getTestRequests() []struct {
 		{"GET", "/api/v1beta1/operations", "", code200},
 		{"GET", "/api/v1beta1/operations/1234567890", "", code404},
 
-		// Special verbs on pods
+		// Special verbs on nodes
+		// TODO: Will become 405 once these are converted to go-restful
 		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},
 		{"GET", "/api/v1beta1/redirect/minions/a", "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.

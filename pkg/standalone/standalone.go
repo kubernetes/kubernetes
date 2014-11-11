@@ -96,11 +96,8 @@ func RunApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr string, p
 		ReadOnlyPort:  port,
 		PublicAddress: addr,
 	})
-	mux := http.NewServeMux()
-	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(mux, "/api/v1beta1")
-	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(mux, "/api/v1beta2")
-	apiserver.InstallSupport(mux)
-	handler.delegate = mux
+
+	handler.delegate = m.InsecureHandler
 
 	go http.ListenAndServe(fmt.Sprintf("%s:%d", addr, port), &handler)
 }

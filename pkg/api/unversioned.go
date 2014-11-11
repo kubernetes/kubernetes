@@ -16,28 +16,11 @@ limitations under the License.
 
 package api
 
-import (
-	"strings"
-)
+// This file contains API types that are unversioned.
 
-// TODO: Address these per #1502
-
-func IsPullAlways(p PullPolicy) bool {
-	// Default to pull always
-	if len(p) == 0 {
-		return true
-	}
-	return pullPoliciesEqual(p, PullAlways)
-}
-
-func IsPullNever(p PullPolicy) bool {
-	return pullPoliciesEqual(p, PullNever)
-}
-
-func IsPullIfNotPresent(p PullPolicy) bool {
-	return pullPoliciesEqual(p, PullIfNotPresent)
-}
-
-func pullPoliciesEqual(p1, p2 PullPolicy) bool {
-	return strings.ToLower(string(p1)) == strings.ToLower(string(p2))
+// APIVersions lists the api versions that are available, to allow
+// version negotiation. APIVersions isn't just an unnamed array of
+// strings in order to allow for future evolution, though unversioned
+type APIVersions struct {
+	Versions []string `json:"versions" yaml:"versions"`
 }

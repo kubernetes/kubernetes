@@ -20,20 +20,24 @@ import (
 	"net/http"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
+
+	"github.com/emicklei/go-restful"
 )
 
 // handleWhoAmI returns the user-string which this request is authenticated as (if any).
 // Useful for debugging authentication.  Always returns HTTP status okay and a human
 // readable (not intended as API) description of authentication state of request.
-func handleWhoAmI(auth authenticator.Request) func(w http.ResponseWriter, req *http.Request) {
-	return func(w http.ResponseWriter, req *http.Request) {
+func handleWhoAmI(auth authenticator.Request) restful.RouteFunction {
+	return func(req *restful.Request, resp *restful.Response) {
+		// This is supposed to go away, so it's not worth the effort to convert to restful
+		w := resp.ResponseWriter
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		if auth == nil {
 			w.Write([]byte("NO AUTHENTICATION SUPPORT"))
 			return
 		}
-		userInfo, ok, err := auth.AuthenticateRequest(req)
+		userInfo, ok, err := auth.AuthenticateRequest(req.Request)
 		if err != nil {
 			w.Write([]byte("ERROR WHILE AUTHENTICATING"))
 			return

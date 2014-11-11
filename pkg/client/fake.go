@@ -71,7 +71,7 @@ func (c *Fake) ServerVersion() (*version.Info, error) {
 	return &versionInfo, nil
 }
 
-func (c *Fake) ServerAPIVersions() (*version.APIVersions, error) {
+func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-apiversions", Value: nil})
-	return &version.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
+	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
 }

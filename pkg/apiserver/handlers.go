@@ -121,6 +121,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 	})
 }
 
+// TODO: use restful.CrossOriginResourceSharing
 // Simple CORS implementation that wraps an http Handler
 // For a more detailed implementation use https://github.com/martini-contrib/cors
 // or implement CORS at your proxy layer
