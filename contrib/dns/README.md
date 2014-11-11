@@ -38,11 +38,13 @@ sed -e "s/{DNS_SERVER_IP}/$DNS_SERVER_IP/g" \
 ```
 
 ## How does it work?
-SkyDNS depends on etcd, but it doesn't really need what etcd offers when in
-Kubernetes mode.  SkyDNS finds the Kubernetes master through the
-`kubernetes-ro` service, and pulls service info from it, essentially using
-etcd as a cache.  For simplicity, we run etcd and SkyDNS together in a pod,
-without linking the etcd instances into a cluster.
+SkyDNS depends on etcd for what to serve, but it doesn't really need all of
+what etcd offers in the way we use it.  For simplicty, we run etcd and SkyDNS
+together in a pod, and we do not try to link etcd instances across replicas.  A
+helper container called `kube2sky` also runs in the pod and acts a bridge
+between Kubernetes and SkyDNS.  It finds the Kubernetes master through the
+`kubernetes-ro` service, it pulls service info from the master, and it writes
+that to etcd for SkyDNS to find.
 
 ## Known issues
 DNS resolution does not work from nodes directly, but it DOES work for

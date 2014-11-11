@@ -15,17 +15,25 @@ desiredState:
       manifest:
         version: v1beta2
         id: skydns
+        dnsPolicy: "Default"  # Don't use cluster DNS.
         containers:
           - name: etcd
             image: quay.io/coreos/etcd:latest
-            command: [ "/etcd", "-bind-addr=127.0.0.1" ]
-            ports:
-              - name: server
-                containerPort: 7001
-          - name: skydns
-            image: skynetservices/skydns:k8sfix
             command: [
-                    "-kubernetes=true",
+                    "/etcd",
+                    "-bind-addr=127.0.0.1",
+                    "-peer-bind-addr=127.0.0.1",
+            ]
+          - name: kube2sky
+            image: kubernetes/kube2sky:latest
+            command: [
+                    # entrypoint = "/kube2sky",
+                    "-domain={DNS_DOMAIN}",
+            ]
+          - name: skydns
+            image: skynetservices/skydns:latest
+            command: [
+                    # entrypoint = "/skydns",
                     "-machines=http://localhost:4001",
                     "-addr=0.0.0.0:53",
                     "-domain={DNS_DOMAIN}.",
