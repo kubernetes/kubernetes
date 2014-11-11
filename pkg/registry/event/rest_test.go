@@ -98,6 +98,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		InvolvedObject: api.ObjectReference{
 			Kind:            "Pod",
 			Name:            "foo",
+			Namespace:       "baz",
 			UID:             "long uid string",
 			APIVersion:      testapi.Version(),
 			ResourceVersion: "0",
@@ -105,6 +106,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		},
 		Status: "tested",
 		Reason: "forTesting",
+		Source: "test",
 	}
 	label, field, err := rest.getAttrs(eventA)
 	if err != nil {
@@ -116,12 +118,14 @@ func TestRESTgetAttrs(t *testing.T) {
 	expect := labels.Set{
 		"involvedObject.kind":            "Pod",
 		"involvedObject.name":            "foo",
+		"involvedObject.namespace":       "baz",
 		"involvedObject.uid":             "long uid string",
 		"involvedObject.apiVersion":      testapi.Version(),
 		"involvedObject.resourceVersion": "0",
 		"involvedObject.fieldPath":       "",
 		"status":                         "tested",
 		"reason":                         "forTesting",
+		"source":                         "test",
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
