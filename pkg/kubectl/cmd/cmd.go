@@ -153,7 +153,9 @@ func getExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
 	return "", false
 }
 
-func getKubeConfig(cmd *cobra.Command) *client.Config {
+// GetKubeConfig returns a config used for the Kubernetes client with CLI
+// options parsed.
+func GetKubeConfig(cmd *cobra.Command) *client.Config {
 	config := &client.Config{}
 
 	var host string
@@ -203,7 +205,7 @@ func getKubeConfig(cmd *cobra.Command) *client.Config {
 }
 
 func getKubeClient(cmd *cobra.Command) *client.Client {
-	config := getKubeConfig(cmd)
+	config := GetKubeConfig(cmd)
 
 	// The binary version.
 	matchVersion := GetFlagBool(cmd, "match-server-version")
