@@ -94,12 +94,12 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdGet(out))
 	cmds.AddCommand(f.NewCmdDescribe(out))
 	cmds.AddCommand(f.NewCmdCreate(out))
+	cmds.AddCommand(f.NewCmdCreateAll(out))
 	cmds.AddCommand(f.NewCmdUpdate(out))
 	cmds.AddCommand(f.NewCmdDelete(out))
 
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(NewCmdLog(out))
-	cmds.AddCommand(NewCmdCreateAll(out))
 
 	if err := cmds.Execute(); err != nil {
 		os.Exit(1)
