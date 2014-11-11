@@ -34,8 +34,7 @@ nav:
    slug: gettingstarted
    external: false
  - label: Community
-   #url: /community
-   url: /legacy/community
+   url: /community
    slug: community
    external: false
  - label: News
@@ -44,8 +43,7 @@ nav:
    slug: news
    external: false
  - label: Events
-   url: /events
-   #url: /legacy/events
+   url: /legacy/events
    slug: events
    external: false
  - label: Blog
