@@ -40,8 +40,8 @@ var (
 	dockerEndpoint = flag.String("docker_endpoint", "", "If non-empty, use this for the docker endpoint to communicate with")
 	etcdServer     = flag.String("etcd_server", "http://localhost:4001", "If non-empty, path to the set of etcd server to use")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
-	nodeMilliCPU = flag.Int("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
-	nodeMemory   = flag.Int("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
+	nodeMilliCPU = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
+	nodeMemory   = flag.Int64("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 )
 
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr string, port int) {
