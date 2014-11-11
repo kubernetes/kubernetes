@@ -7,12 +7,7 @@
 
 ### Cluster turnup
 
-#### Option 1: Install a binary release
-
-1. Download the [binary release](getting-started-guides/binary_release.md)
-2. Unpack the archive and ```cd kubernetes```
-
-#### Option 2: Install from source
+#### Install from source
 1. ```git clone https://github.com/GoogleCloudPlatform/kubernetes.git```
 2. ```cd kubernetes; make release```
 
