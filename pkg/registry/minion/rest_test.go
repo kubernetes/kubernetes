@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -87,7 +88,10 @@ func TestMinionRESTWithHealthCheck(t *testing.T) {
 	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
 	minionHealthRegistry := HealthyRegistry{
 		delegate: minionRegistry,
-		client:   &notMinion{minion: "m1"},
+		client: &notMinion{minions: map[string]health.Status{
+			"m1": health.Unhealthy,
+			"m2": health.Unknown,
+		}},
 	}
 
 	ms := NewREST(&minionHealthRegistry)
@@ -102,6 +106,18 @@ func TestMinionRESTWithHealthCheck(t *testing.T) {
 		t.Errorf("insert return value was weird: %#v", result)
 	}
 	if _, err := ms.Get(ctx, "m1"); err == nil {
+		t.Errorf("node is unhealthy, expect no result from apiserver")
+	}
+
+	c, err = ms.Create(ctx, &api.Minion{ObjectMeta: api.ObjectMeta{Name: "m2"}})
+	if err != nil {
+		t.Errorf("insert failed")
+	}
+	result = <-c
+	if m, ok := result.Object.(*api.Minion); !ok || m.Name != "m2" {
+		t.Errorf("insert return value was weird: %#v", result)
+	}
+	if _, err := ms.Get(ctx, "m2"); err == nil {
 		t.Errorf("node is unhealthy, expect no result from apiserver")
 	}
 }
