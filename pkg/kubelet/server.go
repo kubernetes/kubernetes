@@ -54,8 +54,8 @@ func ListenAndServeKubeletServer(host HostInterface, updates chan<- interface{},
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		ReadTimeout:    5 * time.Minute,
+		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 	glog.Fatal(s.ListenAndServe())
