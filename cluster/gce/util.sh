@@ -299,6 +299,14 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/salt-master.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
 
+  # Report logging choice (if any).
+  if [[ "${FLUENTD_ELASTICSEARCH-}" == "true" ]]; then
+    echo "+++ Logging using Fluentd to Elasticsearch"
+  fi
+  if [[ "${FLUENTD_GCP-}" == "true" ]]; then
+    echo "+++ Logging using Fluentd to Google Cloud Logging"
+  fi
+
   # For logging to GCP we need to enable some minion scopes.
   if [[ "${FLUENTD_GCP-}" == "true" ]]; then
      MINION_SCOPES="${MINION_SCOPES}, https://www.googleapis.com/auth/logging.write"
