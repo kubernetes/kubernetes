@@ -499,7 +499,7 @@ func (kl *Kubelet) runContainer(pod *api.BoundPod, container *api.Container, pod
 	} else {
 		// Remember this reference so we can report events about this container
 		kl.setRef(dockertools.DockerID(dockerContainer.ID), ref)
-		record.Eventf(ref, "", "running", "started", "Started with docker id %v", dockerContainer.ID)
+		record.Eventf(ref, "running", "started", "Started with docker id %v", dockerContainer.ID)
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
@@ -529,7 +529,7 @@ func (kl *Kubelet) killContainerByID(ID, name string) error {
 		glog.Warningf("No ref for pod '%v' - '%v'", ID, name)
 	} else {
 		// TODO: pass reason down here, and state, or move this call up the stack.
-		record.Eventf(ref, "", "killing", "Killing %v - %v", ID, name)
+		record.Eventf(ref, "terminated", "killing", "Killing %v - %v", ID, name)
 	}
 
 	return err
