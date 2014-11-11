@@ -621,3 +621,8 @@ function teardown-monitoring {
 	monitoring-heapster || true > /dev/null
   fi
 }
+
+# Perform preparations required to run e2e tests
+function prepare-e2e() {
+  detect-project
+}
