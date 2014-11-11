@@ -2,7 +2,7 @@
 
 # Releases and Official Builds
 
-Official releases are built in Docker containers.  Details are [here](build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
+Official releases are built in Docker containers.  Details are [here](../../build/README.md).  You can do simple builds and development with just a local Docker installation.  If want to build go locally outside of docker, please continue below.
 
 ## Go development environment
 
@@ -104,7 +104,7 @@ You need an etcd somewhere in your PATH. To install etcd, run:
 
 ```
 cd kubernetes
-hack/install-etcd.sh
+hack/travis/install-etcd.sh
 sudo ln -s $(pwd)/third_party/etcd/bin/etcd /usr/bin/etcd
 ```
 
