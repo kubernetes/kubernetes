@@ -595,9 +595,9 @@ function setup-monitoring {
 	    fi
 	fi
 
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null &&
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
-	kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
+	${KUBE_ROOT}/cluster/kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null &&
+	${KUBE_ROOT}/cluster/kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
+	${KUBE_ROOT}/cluster/kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
 	if [ $? -ne 0 ]; then
 	    echo "Failed to Setup Monitoring"
 	    teardown-monitoring
@@ -610,9 +610,9 @@ function setup-monitoring {
 
 function teardown-monitoring {
   if [ $MONITORING ]; then
-    kubectl.sh delete pods heapster &> /dev/null || true
-    kubectl.sh delete pods influx-grafana &> /dev/null || true
-    kubectl.sh delete services influx-master &> /dev/null || true
+    ${KUBE_ROOT}/cluster/kubectl.sh delete pods heapster &> /dev/null || true
+    ${KUBE_ROOT}/cluster/kubectl.sh delete pods influx-grafana &> /dev/null || true
+    ${KUBE_ROOT}/cluster/kubectl.sh delete services influx-master &> /dev/null || true
     gcutil deletefirewall  \
 	--project "${PROJECT}" \
 	--norespect_terminal_width \
