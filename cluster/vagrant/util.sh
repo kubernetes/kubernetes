@@ -176,3 +176,8 @@ function restart-kube-proxy {
 function setup-monitoring {
     echo "TODO"
 }
+
+# Perform preparations required to run e2e tests
+function prepare-e2e() {
+  echo "Vagrant doesn't need special preparations for e2e tests"
+}

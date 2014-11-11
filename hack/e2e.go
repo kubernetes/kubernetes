@@ -224,9 +224,7 @@ export KUBECFG="` + *root + `/cluster/kubecfg.sh -expect_version_match"
 source "` + *root + `/cluster/kube-env.sh"
 source "` + *root + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
-if [[ ${KUBERNETES_PROVIDER} == "gce" ]]; then
-  detect-project
-fi
+prepare-e2e
 
 `
 
