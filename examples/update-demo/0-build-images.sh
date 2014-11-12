@@ -27,7 +27,6 @@ fi
 
 set -x
 
-docker build -t update-demo-base images/base
 docker build -t "${DOCKER_HUB_USER}/update-demo:kitten" images/kitten
 docker build -t "${DOCKER_HUB_USER}/update-demo:nautilus" images/nautilus
 
