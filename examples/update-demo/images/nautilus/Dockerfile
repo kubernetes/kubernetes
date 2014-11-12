@@ -12,5 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM kubernetes/test-webserver
-ADD html/data.json html/nautilus.jpg /
+FROM update-demo-base
