@@ -37,3 +37,10 @@ POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 # When set to true, heapster will be setup as part of the cluster bring up.
 MONITORING=true
+# Turn on Elasticsearch logging unless Google Cloud Logging has been selected or
+# if Elasticsearch logging has been specifically turned off.
+if [[ "${FLUENTD_GCP-}" != "true" ]]; then
+  if [[ "${FLUENTD_ELASTICSEARCH-}" != "false" ]]; then
+    FLUENTD_ELASTICSEARCH="true"
+  fi
+fi
