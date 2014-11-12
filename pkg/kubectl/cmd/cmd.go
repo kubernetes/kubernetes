@@ -106,11 +106,9 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	}
 }
 
-// TODO: remove this function and references to it-- errors it prints are
-// very unhelpful because file/line number are wrong.
 func checkErr(err error) {
 	if err != nil {
-		glog.Fatalf("%v", err)
+		glog.FatalDepth(1, err)
 	}
 }
 
