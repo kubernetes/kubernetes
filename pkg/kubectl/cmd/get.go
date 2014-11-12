@@ -61,21 +61,15 @@ Examples:
 			defaultPrinter, err := f.Printer(cmd, mapping, GetFlagBool(cmd, "no-headers"))
 			checkErr(err)
 
-			printer, versioned, err := kubectl.GetPrinter(outputFormat, templateFile, defaultPrinter)
+			outputVersion := GetFlagString(cmd, "output-version")
+			if len(outputVersion) == 0 {
+				outputVersion = mapping.APIVersion
+			}
+			printer, err := kubectl.GetPrinter(outputVersion, outputFormat, templateFile, defaultPrinter)
 			checkErr(err)
 
 			obj, err := kubectl.NewRESTHelper(client, mapping).Get(namespace, name, labels)
 			checkErr(err)
-
-			if versioned {
-				outputVersion := GetFlagString(cmd, "output-version")
-				if len(outputVersion) == 0 {
-					outputVersion = mapping.APIVersion
-				}
-
-				obj, err = mapping.ObjectConvertor.ConvertToVersion(obj, outputVersion)
-				checkErr(err)
-			}
 
 			if err := printer.PrintObj(obj, out); err != nil {
 				checkErr(fmt.Errorf("Unable to output the provided object: %v", err))

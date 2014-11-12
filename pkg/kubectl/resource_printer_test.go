@@ -42,9 +42,11 @@ type testStruct struct {
 
 func (ts *testStruct) IsAnAPIObject() {}
 
+const TestVersion = latest.Version
+
 func init() {
 	api.Scheme.AddKnownTypes("", &testStruct{})
-	api.Scheme.AddKnownTypes(latest.Version, &testStruct{})
+	api.Scheme.AddKnownTypes(TestVersion, &testStruct{})
 }
 
 var testData = testStruct{
@@ -55,20 +57,20 @@ var testData = testStruct{
 }
 
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &YAMLPrinter{}, yaml.Unmarshal)
+	testPrinter(t, &YAMLPrinter{TestVersion}, yaml.Unmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
+	testPrinter(t, &JSONPrinter{TestVersion}, json.Unmarshal)
 }
 
 func TestPrintJSON(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, versioned, err := GetPrinter("json", "", nil)
+	printer, err := GetPrinter(TestVersion, "json", "", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err)
 	}
-	if !versioned {
+	if !printer.IsVersioned() {
 		t.Errorf("printer should be versioned")
 	}
 	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
@@ -80,11 +82,11 @@ func TestPrintJSON(t *testing.T) {
 
 func TestPrintYAML(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, versioned, err := GetPrinter("yaml", "", nil)
+	printer, err := GetPrinter(TestVersion, "yaml", "", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err)
 	}
-	if !versioned {
+	if !printer.IsVersioned() {
 		t.Errorf("printer should be versioned")
 	}
 	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
@@ -96,11 +98,11 @@ func TestPrintYAML(t *testing.T) {
 
 func TestPrintTemplate(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, versioned, err := GetPrinter("template", "{{.id}}", nil)
+	printer, err := GetPrinter(TestVersion, "template", "{{.id}}", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	if !versioned {
+	if !printer.IsVersioned() {
 		t.Errorf("printer should be versioned")
 	}
 	err = printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
@@ -113,19 +115,19 @@ func TestPrintTemplate(t *testing.T) {
 }
 
 func TestPrintEmptyTemplate(t *testing.T) {
-	if _, _, err := GetPrinter("template", "", nil); err == nil {
+	if _, err := GetPrinter(TestVersion, "template", "", nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplate(t *testing.T) {
-	if _, _, err := GetPrinter("template", "{{ .Name", nil); err == nil {
+	if _, err := GetPrinter(TestVersion, "template", "{{ .Name", nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplateFile(t *testing.T) {
-	if _, _, err := GetPrinter("templatefile", "", nil); err == nil {
+	if _, err := GetPrinter(TestVersion, "templatefile", "", nil); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -234,7 +236,7 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplateEmitsVersionedObjects(t *testing.T) {
 	// kind is always blank in memory and set on the wire
-	printer, err := NewTemplatePrinter([]byte(`{{.kind}}`))
+	printer, err := NewTemplatePrinter(TestVersion, []byte(`{{.kind}}`))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
