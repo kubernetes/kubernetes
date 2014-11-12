@@ -50,7 +50,5 @@ EOF
 #
 # -M installs the master
 set +x
-wget -q -O - https://bootstrap.saltstack.com | sh -s -- -M -X
+curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -X
 set -x
-
-echo $MASTER_HTPASSWD > /srv/salt/nginx/htpasswd

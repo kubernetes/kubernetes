@@ -27,15 +27,15 @@ convenient).
 
 ### Setup
 
-Download a prebuilt Debian VMDK to be used as base image:
+Download a prebuilt Debian 7.7 VMDK that we'll use as a base image:
 
 ```sh
-wget https://storage.googleapis.com/govmomi/vmdk/kube.vmdk.gz{,.md5}
+curl --remote-name-all https://storage.googleapis.com/govmomi/vmdk/2014-11-11/kube.vmdk.gz{,.md5}
 md5sum -c kube.vmdk.gz.md5
 gzip -d kube.vmdk.gz
 ```
 
-Upload this VMDK to your vSphere instance:
+Import this VMDK into your vSphere datastore:
 
 ```sh
 export GOVC_URL='user:pass@hostname'
@@ -46,7 +46,7 @@ export GOVC_RESOURCE_POOL='resource pool or cluster with access to datastore'
 govc import.vmdk kube.vmdk ./kube/
 ```
 
-Verify that the VMDK was correctly uploaded and expanded to 10GiB:
+Verify that the VMDK was correctly uploaded and expanded to ~3GiB:
 
 ```sh
 govc datastore.ls ./kube/
