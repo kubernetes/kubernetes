@@ -68,7 +68,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
 
-	controller.CreationTimestamp = util.Now()
+	api.FillObjectMetaSystemFields(ctx, &controller.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.CreateController(ctx, controller)

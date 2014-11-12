@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -68,7 +67,9 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if len(endpoints.Name) == 0 {
 		return nil, fmt.Errorf("id is required: %#v", obj)
 	}
-	endpoints.CreationTimestamp = util.Now()
+
+	api.FillObjectMetaSystemFields(ctx, &endpoints.ObjectMeta)
+
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.UpdateEndpoints(ctx, endpoints)
 		if err != nil {

@@ -31,7 +31,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
 )
@@ -92,7 +91,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 		return nil, errors.NewInvalid("service", service.Name, errs)
 	}
 
-	service.CreationTimestamp = util.Now()
+	api.FillObjectMetaSystemFields(ctx, &service.ObjectMeta)
 
 	if service.Spec.PortalIP == "" {
 		// Allocate next available.

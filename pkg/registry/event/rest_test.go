@@ -48,6 +48,9 @@ func TestRESTCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
+	if !api.HasObjectMetaSystemFieldValues(&eventA.ObjectMeta) {
+		t.Errorf("storage did not populate object meta field values")
+	}
 	if e, a := eventA, (<-c).Object; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}

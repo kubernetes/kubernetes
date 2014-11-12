@@ -264,6 +264,9 @@ func TestCreateController(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	if !api.HasObjectMetaSystemFieldValues(&controller.ObjectMeta) {
+		t.Errorf("storage did not populate object meta field values")
+	}
 
 	select {
 	case <-channel:

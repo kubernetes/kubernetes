@@ -43,6 +43,9 @@ func TestMinionREST(t *testing.T) {
 		t.Errorf("insert failed")
 	}
 	obj := <-c
+	if !api.HasObjectMetaSystemFieldValues(&obj.Object.(*api.Minion).ObjectMeta) {
+		t.Errorf("storage did not populate object meta field values")
+	}
 	if m, ok := obj.Object.(*api.Minion); !ok || m.Name != "baz" {
 		t.Errorf("insert return value was weird: %#v", obj)
 	}
