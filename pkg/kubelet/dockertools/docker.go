@@ -334,6 +334,7 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 // By default the function will return snapshot of the container log
 // Log streaming is possible if 'follow' param is set to true
 // Log tailing is possible when number of tailed lines are set and only if 'follow' is false
+// TODO: Make 'RawTerminal' option  flagable.
 func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
 	opts := docker.LogsOptions{
 		Container:    containerID,
@@ -342,7 +343,7 @@ func GetKubeletDockerContainerLogs(client DockerInterface, containerID, tail str
 		OutputStream: stdout,
 		ErrorStream:  stderr,
 		Timestamps:   true,
-		RawTerminal:  true,
+		RawTerminal:  false,
 		Follow:       follow,
 	}
 
