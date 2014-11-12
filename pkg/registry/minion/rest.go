@@ -23,6 +23,8 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -50,8 +52,9 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !ok {
 		return nil, fmt.Errorf("not a minion: %#v", obj)
 	}
-	if minion.Name == "" {
-		return nil, fmt.Errorf("ID should not be empty: %#v", minion)
+
+	if errs := validation.ValidateMinion(minion); len(errs) > 0 {
+		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
 	}
 
 	minion.CreationTimestamp = util.Now()

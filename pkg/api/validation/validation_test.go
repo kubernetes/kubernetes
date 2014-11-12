@@ -1020,3 +1020,49 @@ func TestValidateBoundPodNoName(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateMinion(t *testing.T) {
+	validSelector := map[string]string{"a": "b"}
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	successCases := []api.Minion{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			HostIP:     "something",
+			Labels:     validSelector,
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc"},
+			HostIP:     "something",
+		},
+	}
+	for _, successCase := range successCases {
+		if errs := ValidateMinion(&successCase); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := map[string]api.Minion{
+		"zero-length Name": {
+			ObjectMeta: api.ObjectMeta{Name: ""},
+			HostIP:     "something",
+			Labels:     validSelector,
+		},
+		"invalid-labels": {
+			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			Labels:     invalidSelector,
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateMinion(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		}
+		for i := range errs {
+			field := errs[i].(errors.ValidationError).Field
+			if field != "name" &&
+				field != "label" {
+				t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			}
+		}
+	}
+}

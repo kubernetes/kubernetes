@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -113,4 +114,31 @@ func contains(nodes *api.MinionList, nodeID string) bool {
 		}
 	}
 	return false
+}
+
+func TestMinionStorageValidatesCreate(t *testing.T) {
+	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	ctx := api.NewContext()
+	validSelector := map[string]string{"a": "b"}
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	failureCases := map[string]api.Minion{
+		"zero-length Name": {
+			ObjectMeta: api.ObjectMeta{Name: ""},
+			HostIP:     "something",
+			Labels:     validSelector,
+		},
+		"invalid-labels": {
+			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			Labels:     invalidSelector,
+		},
+	}
+	for _, failureCase := range failureCases {
+		c, err := storage.Create(ctx, &failureCase)
+		if c != nil {
+			t.Errorf("Expected nil channel")
+		}
+		if !errors.IsInvalid(err) {
+			t.Errorf("Expected to get an invalid resource error, got %v", err)
+		}
+	}
 }
