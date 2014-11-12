@@ -40,6 +40,7 @@ type serviceInfo struct {
 	timeout    time.Duration
 	mu         sync.Mutex // protects active
 	active     bool
+	publicIP   []string
 }
 
 func (si *serviceInfo) isActive() bool {
@@ -443,7 +444,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		if exists && info.isActive() && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) {
 			continue
 		}
-		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP)) {
+		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP) || service.Spec.CreateExternalLoadBalancer != (len(info.publicIP) > 0)) {
 			glog.V(4).Infof("Something changed for service %q: stopping it", service.Name)
 			err := proxier.closePortal(service.Name, info)
 			if err != nil {
@@ -462,6 +463,9 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		}
 		info.portalIP = serviceIP
 		info.portalPort = service.Spec.Port
+		if service.Spec.CreateExternalLoadBalancer {
+			info.publicIP = service.Spec.PublicIPs
+		}
 		err = proxier.openPortal(service.Name, info)
 		if err != nil {
 			glog.Errorf("Failed to open portal for %q: %s", service.Name, err)
@@ -494,6 +498,25 @@ func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
 	if !existed {
 		glog.Infof("Opened iptables portal for service %q on %s:%d", service, info.portalIP, info.portalPort)
 	}
+	if len(info.publicIP) > 0 {
+		return proxier.openExternalPortal(service, info)
+	}
+	return nil
+}
+
+func (proxier *Proxier) openExternalPortal(service string, info *serviceInfo) error {
+	for _, publicIP := range info.publicIP {
+		proxier.iptables.EnsureRule(iptables.TableNAT, iptables.ChainPostrouting, iptablesRoutingArgs(publicIP)...)
+		args := iptablesPortalArgs(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
+		existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesProxyChain, args...)
+		if err != nil {
+			glog.Errorf("Failed to install iptables %s rule for service %q", iptablesProxyChain, service)
+			return err
+		}
+		if !existed {
+			glog.Infof("Opened iptables external portal for service %q on %s:%d", service, publicIP, info.proxyPort)
+		}
+	}
 	return nil
 }
 
@@ -503,7 +526,23 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesProxyChain, service)
 		return err
 	}
+	if len(info.publicIP) > 0 {
+		return proxier.closeExternalPortal(service, info)
+	}
 	glog.Infof("Closed iptables portal for service %q", service)
+	return nil
+}
+
+func (proxier *Proxier) closeExternalPortal(service string, info *serviceInfo) error {
+	for _, publicIP := range info.publicIP {
+		proxier.iptables.DeleteRule(iptables.TableNAT, iptables.ChainPostrouting, iptablesRoutingArgs(publicIP)...)
+		args := iptablesPortalArgs(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
+		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesProxyChain, args...); err != nil {
+			glog.Errorf("Failed to delete external iptables %s rule for service %q", iptablesProxyChain, service)
+			return err
+		}
+	}
+	glog.Infof("Closed external iptables portal for service %q", service)
 	return nil
 }
 
@@ -537,6 +576,16 @@ var localhostIPv4 = net.ParseIP("127.0.0.1")
 
 var zeroIPv6 = net.ParseIP("::0")
 var localhostIPv6 = net.ParseIP("::1")
+
+// Build an iptables args to route in a specific external ip
+func iptablesRoutingArgs(destIP string) []string {
+	return []string{
+		"!",
+		"-d", destIP + "/32",
+		"-o", "eth0",
+		"-j", "MASQUERADE",
+	}
+}
 
 // Build a slice of iptables args for a portal rule.
 func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {

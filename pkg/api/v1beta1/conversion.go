@@ -370,6 +370,7 @@ func init() {
 				return err
 			}
 			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
+			out.PublicIPs = in.Spec.PublicIPs
 			out.ContainerPort = in.Spec.ContainerPort
 			out.PortalIP = in.Spec.PortalIP
 			out.ProxyPort = in.Spec.ProxyPort
@@ -392,6 +393,7 @@ func init() {
 				return err
 			}
 			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+			out.Spec.PublicIPs = in.PublicIPs
 			out.Spec.ContainerPort = in.ContainerPort
 			out.Spec.PortalIP = in.PortalIP
 			out.Spec.ProxyPort = in.ProxyPort
