@@ -63,12 +63,15 @@ var (
 	cAdvisorPort            = flag.Uint("cadvisor_port", 4194, "The port of the localhost cAdvisor endpoint")
 	oomScoreAdj             = flag.Int("oom_score_adj", -900, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	apiServerList           util.StringList
+	clusterDomain           = flag.String("cluster_domain", "", "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
+	clusterDNS              = util.IP(nil)
 )
 
 func init() {
 	flag.Var(&etcdServerList, "etcd_servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd_config")
 	flag.Var(&address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
 	flag.Var(&apiServerList, "api_servers", "List of Kubernetes API servers to publish events to. (ip:port), comma separated.")
+	flag.Var(&clusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 }
 
 func setupRunOnce() {
@@ -114,6 +117,8 @@ func main() {
 		RegistryBurst:           *registryBurst,
 		MinimumGCAge:            *minimumGCAge,
 		MaxContainerCount:       *maxContainerCount,
+		ClusterDomain:           *clusterDomain,
+		ClusterDNS:              clusterDNS,
 		Runonce:                 *runonce,
 		Port:                    *port,
 		CAdvisorPort:            *cAdvisorPort,

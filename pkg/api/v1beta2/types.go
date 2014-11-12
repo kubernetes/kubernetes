@@ -817,6 +817,8 @@ type ContainerManifest struct {
 	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
 	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
+	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
+	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
@@ -828,11 +830,27 @@ type ContainerManifestList struct {
 
 // Backported from v1beta3 to replace ContainerManifest
 
+// DNSPolicy defines how a pod's DNS will be configured.
+type DNSPolicy string
+
+const (
+	// DNSClusterFirst indicates that the pod should use cluster DNS
+	// first, if it is available, then fall back on the default (as
+	// determined by kubelet) DNS settings.
+	DNSClusterFirst DNSPolicy = "ClusterFirst"
+
+	// DNSDefault indicates that the pod should use the default (as
+	// determined by kubelet) DNS settings.
+	DNSDefault DNSPolicy = "Default"
+)
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes       []Volume      `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
 	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
+	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
+	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"selector which must match a node's labels for the pod to be scheduled on that node"`
 
