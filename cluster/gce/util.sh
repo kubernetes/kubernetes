@@ -594,15 +594,15 @@ function setup-monitoring {
 		echo "Failed to Setup Firewall for Monitoring" && false
 	    fi
 	fi
-
-	${KUBE_ROOT}/cluster/kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null &&
-	${KUBE_ROOT}/cluster/kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
-	${KUBE_ROOT}/cluster/kubectl.sh create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
+        local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
+	${kubectl} create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" > /dev/null &&
+	${kubectl} create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" > /dev/null &&
+	${kubectl} create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" > /dev/null
 	if [ $? -ne 0 ]; then
 	    echo "Failed to Setup Monitoring"
 	    teardown-monitoring
 	else
-	    dashboardIP="http://admin:admin@`kubectl.sh get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
+	    dashboardIP="http://admin:admin@`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
 	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online."
 	fi
     fi
@@ -610,9 +610,10 @@ function setup-monitoring {
 
 function teardown-monitoring {
   if [ $MONITORING ]; then
-    ${KUBE_ROOT}/cluster/kubectl.sh delete pods heapster &> /dev/null || true
-    ${KUBE_ROOT}/cluster/kubectl.sh delete pods influx-grafana &> /dev/null || true
-    ${KUBE_ROOT}/cluster/kubectl.sh delete services influx-master &> /dev/null || true
+    local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
+    ${kubectl} delete pods heapster &> /dev/null || true
+    ${kubectl} delete pods influx-grafana &> /dev/null || true
+    ${kubectl} delete services influx-master &> /dev/null || true
     gcutil deletefirewall  \
 	--project "${PROJECT}" \
 	--norespect_terminal_width \
