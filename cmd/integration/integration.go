@@ -110,14 +110,28 @@ func startComponents(manifestURL string) (apiServerURL string) {
 	apiServer := httptest.NewServer(&handler)
 
 	etcdClient := etcd.NewClient(servers)
-	keys, err := etcdClient.Get("/", false, false)
-	if err != nil {
-		glog.Fatalf("Unable to list root etcd keys: %v", err)
-	}
-	for _, node := range keys.Node.Nodes {
-		if _, err := etcdClient.Delete(node.Key, true); err != nil {
-			glog.Fatalf("Unable delete key: %v", err)
+	sleep := 4 * time.Second
+	ok := false
+	for i := 0; i < 3; i++ {
+		keys, err := etcdClient.Get("/", false, false)
+		if err != nil {
+			glog.Warningf("Unable to list root etcd keys: %v", err)
+			if i < 2 {
+				time.Sleep(sleep)
+				sleep = sleep * sleep
+			}
+			continue
 		}
+		for _, node := range keys.Node.Nodes {
+			if _, err := etcdClient.Delete(node.Key, true); err != nil {
+				glog.Fatalf("Unable delete key: %v", err)
+			}
+		}
+		ok = true
+		break
+	}
+	if !ok {
+		glog.Fatalf("Failed to connect to etcd")
 	}
 
 	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
