@@ -26,8 +26,8 @@ Currently the list of all services that are running at the time when the contain
 For a service named **foo** that maps to a container port named **bar**, the following variables are defined:
 
 ```sh
-FOO_SERVICE_HOST=&lt;the host the service is running on&gt;
-FOO_SERVICE_PORT=&lt;the port the service is running on&gt;
+FOO_SERVICE_HOST=<the host the service is running on>
+FOO_SERVICE_PORT=<the port the service is running on>
 ```
 
 Going forward, we expect that Services will have a dedicated IP address.  In that context, we will also surface services to the container via DNS.  Of course DNS is still not an enumerable protocol, so we will continue to provide environment variables so that containers can do discovery.
