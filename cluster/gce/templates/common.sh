@@ -18,9 +18,13 @@
 #
 # $1 is the URL to download
 download-or-bust() {
+  local -r url="$1"
+  local -r file="${url##*/}"
+  rm -f "$file"
   until [[ -e "${1##*/}" ]]; do
-    echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
-    curl --ipv4 -LO --connect-timeout 20 --retry 6 --retry-delay 10 "$1"
+    echo "Downloading file ($SERVER_BINARY_TAR_URL)"
+    curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "$1"
+    md5sum "$file"
   done
 }
 
