@@ -278,7 +278,11 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Got status: %v", resp.StatusCode)
+		var body []byte
+		if resp.Body != nil {
+			body, _ = ioutil.ReadAll(resp.Body)
+		}
+		return nil, fmt.Errorf("For request '%v', got status: %v\nbody: %v", req.URL, resp.StatusCode, string(body))
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
 }

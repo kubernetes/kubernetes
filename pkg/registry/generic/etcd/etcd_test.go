@@ -417,7 +417,7 @@ func TestEtcdWatch(t *testing.T) {
 	}
 
 	fakeClient, registry := NewTestGenericEtcdRegistry(t)
-	wi, err := registry.Watch(api.NewContext(), EverythingMatcher{}, 1)
+	wi, err := registry.Watch(api.NewContext(), EverythingMatcher{}, "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

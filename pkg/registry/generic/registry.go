@@ -76,7 +76,7 @@ type Registry interface {
 	Update(ctx api.Context, id string, obj runtime.Object) error
 	Get(ctx api.Context, id string) (runtime.Object, error)
 	Delete(ctx api.Context, id string) error
-	Watch(ctx api.Context, m Matcher, resourceVersion uint64) (watch.Interface, error)
+	Watch(ctx api.Context, m Matcher, resourceVersion string) (watch.Interface, error)
 }
 
 // FilterList filters any list object that conforms to the api conventions,

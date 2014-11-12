@@ -216,9 +216,18 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 
 // returns either "", or a list of args intended for appending with the
 // kubecfg or kubectl commands (begining with a space).
-func kubeClientArgs() string {
+func kubecfgArgs() string {
 	if *checkVersionSkew {
 		return " -expect_version_match"
+	}
+	return ""
+}
+
+// returns either "", or a list of args intended for appending with the
+// kubectl command (begining with a space).
+func kubectlArgs() string {
+	if *checkVersionSkew {
+		return " --match-server-version"
 	}
 	return ""
 }
@@ -233,8 +242,8 @@ export KUBE_CONFIG_FILE="config-test.sh"
 
 # TODO(jbeda): This will break on usage if there is a space in
 # ${KUBE_ROOT}.  Covert to an array?  Or an exported function?
-export KUBECFG="` + *root + `/cluster/kubecfg.sh` + kubeClientArgs() + `"
-export KUBECTL="` + *root + `/cluster/kubectl.sh` + kubeClientArgs() + `"
+export KUBECFG="` + *root + `/cluster/kubecfg.sh` + kubecfgArgs() + `"
+export KUBECTL="` + *root + `/cluster/kubectl.sh` + kubectlArgs() + `"
 
 source "` + *root + `/cluster/kube-env.sh"
 source "` + *root + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
