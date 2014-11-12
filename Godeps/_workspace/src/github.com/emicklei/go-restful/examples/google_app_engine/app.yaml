@@ -1,0 +1,20 @@
+#
+# Include your application ID here
+#
+application: <your_app_id>
+version: 1
+runtime: go
+api_version: go1
+
+handlers:
+#
+# Regex for all swagger files to make as static content.
+# You should create the folder static/swagger and copy
+# swagger-ui into it.
+#
+- url: /apidocs/(.*?)/(.*\.(js|html|css))
+  static_files: static/swagger/\1/\2
+  upload: static/swagger/(.*?)/(.*\.(js|html|css))
+
+- url: /.*
+  script: _go_app
