@@ -69,13 +69,16 @@ func DataToObjects(m meta.RESTMapper, t runtime.ObjectTyper, data []byte) (resul
 
 func (f *Factory) NewCmdCreateAll(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "createall -f filename",
-		Short: "Create all resources specified in filename or stdin",
-		Long: `Create all resources contained in JSON file specified in filename or stdin
+		Use:   "createall [-d directory] [-f filename]",
+		Short: "Create all resources specified in a directory, filename or stdin",
+		Long: `Create all resources contained in JSON file specified in a directory, filename or stdin
 
 JSON and YAML formats are accepted.
 
 Examples:
+  $ kubectl createall -d configs/
+  <creates all resources listed in JSON or YAML files, found recursively under the configs directory>
+
   $ kubectl createall -f config.json
   <creates all resources listed in config.json>
 
@@ -87,23 +90,36 @@ Examples:
 			}
 
 			filename := GetFlagString(cmd, "filename")
-			if len(filename) == 0 {
-				usageError(cmd, "Must pass a filename to update")
+			directory := GetFlagString(cmd, "directory")
+			if (len(filename) == 0 && len(directory) == 0) || (len(filename) != 0 && len(directory) != 0) {
+				usageError(cmd, "Must pass a directory or filename to update")
 			}
 
-			data, err := ReadConfigData(filename)
-			checkErr(err)
+			files := []string{}
+			if len(filename) != 0 {
+				files = append(files, filename)
 
-			items, errs := DataToObjects(f.Mapper, f.Typer, data)
-			applyErrs := config.CreateObjects(f.Typer, f.Mapper, clientFunc, items)
-			errs = append(errs, applyErrs...)
-			if len(errs) > 0 {
-				for _, e := range errs {
-					glog.Error(e)
+			} else {
+				files = append(GetFilesFromDir(directory, ".json"), GetFilesFromDir(directory, ".yaml")...)
+			}
+
+			for _, filename := range files {
+				data, err := ReadConfigData(filename)
+				checkErr(err)
+
+				items, errs := DataToObjects(f.Mapper, f.Typer, data)
+				applyErrs := config.CreateObjects(f.Typer, f.Mapper, clientFunc, items)
+
+				errs = append(errs, applyErrs...)
+				if len(errs) > 0 {
+					for _, e := range errs {
+						glog.Error(e)
+					}
 				}
 			}
 		},
 	}
+	cmd.Flags().StringP("directory", "d", "", "Directory of JSON or YAML files to use to update the resource")
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to update the resource")
 	return cmd
 }
