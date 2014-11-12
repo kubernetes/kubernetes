@@ -64,8 +64,6 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if len(controller.Name) == 0 {
 		controller.Name = util.NewUUID().String()
 	}
-	// Pod Manifest ID should be assigned by the pod API
-	controller.DesiredState.PodTemplate.DesiredState.Manifest.ID = ""
 	if errs := validation.ValidateReplicationController(controller); len(errs) > 0 {
 		return nil, errors.NewInvalid("replicationController", controller.Name, errs)
 	}
@@ -158,41 +156,41 @@ func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVer
 	// TODO(lavalamp): remove watch.Filter, which is broken. Implement consistent way of filtering.
 	// TODO(lavalamp): this watch method needs a test.
 	return watch.Filter(incoming, func(e watch.Event) (watch.Event, bool) {
-		repController, ok := e.Object.(*api.ReplicationController)
+		controller, ok := e.Object.(*api.ReplicationController)
 		if !ok {
 			// must be an error event-- pass it on
 			return e, true
 		}
-		match := label.Matches(labels.Set(repController.Labels))
+		match := label.Matches(labels.Set(controller.Labels))
 		if match {
-			rs.fillCurrentState(ctx, repController)
+			rs.fillCurrentState(ctx, controller)
 		}
 		return e, match
 	}), nil
 }
 
-func (rs *REST) waitForController(ctx api.Context, ctrl *api.ReplicationController) (runtime.Object, error) {
+func (rs *REST) waitForController(ctx api.Context, controller *api.ReplicationController) (runtime.Object, error) {
 	for {
-		pods, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+		pods, err := rs.podLister.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
 		if err != nil {
-			return ctrl, err
+			return controller, err
 		}
-		if len(pods.Items) == ctrl.DesiredState.Replicas {
+		if len(pods.Items) == controller.Spec.Replicas {
 			break
 		}
 		time.Sleep(rs.pollPeriod)
 	}
-	return ctrl, nil
+	return controller, nil
 }
 
-func (rs *REST) fillCurrentState(ctx api.Context, ctrl *api.ReplicationController) error {
+func (rs *REST) fillCurrentState(ctx api.Context, controller *api.ReplicationController) error {
 	if rs.podLister == nil {
 		return nil
 	}
-	list, err := rs.podLister.ListPods(ctx, labels.Set(ctrl.DesiredState.ReplicaSelector).AsSelector())
+	list, err := rs.podLister.ListPods(ctx, labels.Set(controller.Spec.Selector).AsSelector())
 	if err != nil {
 		return err
 	}
-	ctrl.CurrentState.Replicas = len(list.Items)
+	controller.Status.Replicas = len(list.Items)
 	return nil
 }

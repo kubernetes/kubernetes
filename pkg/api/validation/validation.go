@@ -167,7 +167,7 @@ func validateVolumeMounts(mounts []api.VolumeMount, volumes util.StringSet) errs
 		if len(mnt.Name) == 0 {
 			mErrs = append(mErrs, errs.NewFieldRequired("name", mnt.Name))
 		} else if !volumes.Has(mnt.Name) {
-			mErrs = append(mErrs, errs.NewNotFound("name", mnt.Name))
+			mErrs = append(mErrs, errs.NewFieldNotFound("name", mnt.Name))
 		}
 		if len(mnt.MountPath) == 0 {
 			mErrs = append(mErrs, errs.NewFieldRequired("mountPath", mnt.MountPath))
@@ -293,6 +293,7 @@ var supportedManifestVersions = util.NewStringSet("v1beta1", "v1beta2")
 // This includes checking formatting and uniqueness.  It also canonicalizes the
 // structure by setting default values and implementing any backwards-compatibility
 // tricks.
+// TODO: replaced by ValidatePodSpec
 func ValidateManifest(manifest *api.ContainerManifest) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
@@ -345,6 +346,21 @@ func ValidatePod(pod *api.Pod) errs.ValidationErrorList {
 	}
 	allErrs = append(allErrs, ValidatePodState(&pod.DesiredState).Prefix("desiredState")...)
 	allErrs = append(allErrs, validateLabels(pod.Labels)...)
+	return allErrs
+}
+
+// ValidatePodSpec tests that the specified PodSpec has valid data.
+// This includes checking formatting and uniqueness.  It also canonicalizes the
+// structure by setting default values and implementing any backwards-compatibility
+// tricks.
+func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	allVolumes, vErrs := validateVolumes(spec.Volumes)
+	allErrs = append(allErrs, vErrs.Prefix("volumes")...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
+	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
+	allErrs = append(allErrs, validateLabels(spec.NodeSelector).Prefix("nodeSelector")...)
 	return allErrs
 }
 
@@ -435,30 +451,44 @@ func ValidateReplicationController(controller *api.ReplicationController) errs.V
 	if !util.IsDNSSubdomain(controller.Namespace) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("namespace", controller.Namespace))
 	}
-	allErrs = append(allErrs, ValidateReplicationControllerState(&controller.DesiredState).Prefix("desiredState")...)
+	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec).Prefix("spec")...)
 	allErrs = append(allErrs, validateLabels(controller.Labels)...)
 	return allErrs
 }
 
-// ValidateReplicationControllerState tests if required fields in the replication controller state are set.
-func ValidateReplicationControllerState(state *api.ReplicationControllerState) errs.ValidationErrorList {
+// ValidateReplicationControllerSpec tests if required fields in the replication controller spec are set.
+func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if labels.Set(state.ReplicaSelector).AsSelector().Empty() {
-		allErrs = append(allErrs, errs.NewFieldRequired("replicaSelector", state.ReplicaSelector))
+
+	selector := labels.Set(spec.Selector).AsSelector()
+	if selector.Empty() {
+		allErrs = append(allErrs, errs.NewFieldRequired("selector", spec.Selector))
 	}
-	selector := labels.Set(state.ReplicaSelector).AsSelector()
-	labels := labels.Set(state.PodTemplate.Labels)
-	if !selector.Matches(labels) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("podTemplate.labels", state.PodTemplate))
+	if spec.Replicas < 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", spec.Replicas))
 	}
-	allErrs = append(allErrs, validateLabels(labels)...)
-	if state.Replicas < 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", state.Replicas))
+
+	if spec.Template == nil {
+		allErrs = append(allErrs, errs.NewFieldRequired("template", spec.Template))
+	} else {
+		labels := labels.Set(spec.Template.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels))
+		}
+		allErrs = append(allErrs, validateLabels(spec.Template.Labels).Prefix("template.labels")...)
+		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template).Prefix("template")...)
 	}
-	allErrs = append(allErrs, ValidateManifest(&state.PodTemplate.DesiredState.Manifest).Prefix("podTemplate.desiredState.manifest")...)
-	allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(state.PodTemplate.DesiredState.Manifest.Volumes).Prefix("podTemplate.desiredState.manifest")...)
 	return allErrs
 }
+
+// ValidatePodTemplateSpec validates the spec of a pod template
+func ValidatePodTemplateSpec(spec *api.PodTemplateSpec) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec).Prefix("spec")...)
+	allErrs = append(allErrs, ValidateReadOnlyPersistentDisks(spec.Spec.Volumes).Prefix("spec.volumes")...)
+	return allErrs
+}
+
 func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	for _, vol := range volumes {

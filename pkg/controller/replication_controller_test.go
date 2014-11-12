@@ -62,21 +62,21 @@ func (f *FakePodControl) deletePod(namespace string, podName string) error {
 
 func newReplicationController(replicas int) api.ReplicationController {
 	return api.ReplicationController{
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo/bar",
-							},
-						},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
 					},
 				},
-				Labels: map[string]string{
-					"name": "foo",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
 				},
 			},
 		},
@@ -188,21 +188,21 @@ func TestCreateReplica(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "test",
 		},
-		DesiredState: api.ReplicationControllerState{
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo/bar",
-							},
-						},
+		Spec: api.ReplicationControllerSpec{
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name":                  "foo",
+						"type":                  "production",
+						"replicationController": "test",
 					},
 				},
-				Labels: map[string]string{
-					"name":                  "foo",
-					"type":                  "production",
-					"replicationController": "test",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
 				},
 			},
 		},
@@ -210,11 +210,18 @@ func TestCreateReplica(t *testing.T) {
 
 	podControl.createReplica(ns, controllerSpec)
 
+	manifest := api.ContainerManifest{}
+	if err := api.Scheme.Convert(&controllerSpec.Spec.Template.Spec, &manifest); err != nil {
+		t.Fatalf("unexpected error", err)
+	}
+
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Labels: controllerSpec.DesiredState.PodTemplate.Labels,
+			Labels: controllerSpec.Spec.Template.Labels,
 		},
-		DesiredState: controllerSpec.DesiredState.PodTemplate.DesiredState,
+		DesiredState: api.PodState{
+			Manifest: manifest,
+		},
 	}
 	fakeHandler.ValidateRequest(t, makeURL("/pods?namespace=default"), "POST", nil)
 	actualPod, err := client.Codec.Decode([]byte(fakeHandler.RequestBody))
@@ -230,42 +237,42 @@ func TestCreateReplica(t *testing.T) {
 func TestSynchonize(t *testing.T) {
 	controllerSpec1 := api.ReplicationController{
 		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerSpec{
 			Replicas: 4,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "foo/bar",
-							},
-						},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
 					},
 				},
-				Labels: map[string]string{
-					"name": "foo",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+						},
+					},
 				},
 			},
 		},
 	}
 	controllerSpec2 := api.ReplicationController{
 		TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
-		DesiredState: api.ReplicationControllerState{
+		Spec: api.ReplicationControllerSpec{
 			Replicas: 3,
-			PodTemplate: api.PodTemplate{
-				DesiredState: api.PodState{
-					Manifest: api.ContainerManifest{
-						Containers: []api.Container{
-							{
-								Image: "bar/baz",
-							},
-						},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "bar",
+						"type": "production",
 					},
 				},
-				Labels: map[string]string{
-					"name": "bar",
-					"type": "production",
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "bar/baz",
+						},
+					},
 				},
 			},
 		},

@@ -19,7 +19,6 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -237,24 +236,24 @@ func runReplicationControllerTest(c *client.Client) {
 	if err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
-	var controllerRequest api.ReplicationController
-	if err := json.Unmarshal(data, &controllerRequest); err != nil {
+	var controller api.ReplicationController
+	if err := api.Scheme.DecodeInto(data, &controller); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 
 	glog.Infof("Creating replication controllers")
-	if _, err := c.ReplicationControllers(api.NamespaceDefault).Create(&controllerRequest); err != nil {
+	if _, err := c.ReplicationControllers(api.NamespaceDefault).Create(&controller); err != nil {
 		glog.Fatalf("Unexpected error: %#v", err)
 	}
 	glog.Infof("Done creating replication controllers")
 
 	// Give the controllers some time to actually create the pods
-	if err := wait.Poll(time.Second, time.Second*30, c.ControllerHasDesiredReplicas(controllerRequest)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, c.ControllerHasDesiredReplicas(controller)); err != nil {
 		glog.Fatalf("FAILED: pods never created %v", err)
 	}
 
 	// wait for minions to indicate they have info about the desired pods
-	pods, err := c.Pods(api.NamespaceDefault).List(labels.Set(controllerRequest.DesiredState.ReplicaSelector).AsSelector())
+	pods, err := c.Pods(api.NamespaceDefault).List(labels.Set(controller.Spec.Selector).AsSelector())
 	if err != nil {
 		glog.Fatalf("FAILED: unable to get pods to list: %v", err)
 	}

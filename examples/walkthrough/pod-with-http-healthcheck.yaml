@@ -1,5 +1,6 @@
 kind: Pod
 apiVersion: v1beta1
+id: pod-with-healthcheck
 desiredState:
   manifest:
     version: v1beta1

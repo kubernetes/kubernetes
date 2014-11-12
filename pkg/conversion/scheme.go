@@ -208,7 +208,7 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	if v, _, err := s.ObjectVersionAndKind(out); err == nil {
 		outVersion = v
 	}
-	return s.converter.Convert(in, out, 0, s.generateConvertMeta(inVersion, outVersion))
+	return s.converter.Convert(in, out, AllowDifferentFieldTypeNames, s.generateConvertMeta(inVersion, outVersion))
 }
 
 // ConvertToVersion attempts to convert an input object to its matching Kind in another

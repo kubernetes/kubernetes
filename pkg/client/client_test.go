@@ -89,7 +89,7 @@ func (c *testClient) Validate(t *testing.T, received runtime.Object, err error) 
 	c.ValidateCommon(t, err)
 
 	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
-		t.Errorf("bad response for request %#v: expected %s, got %s", c.Request, c.Response.Body, received)
+		t.Errorf("bad response for request %#v: expected %#v, got %#v", c.Request, c.Response.Body, received)
 	}
 }
 
@@ -97,7 +97,7 @@ func (c *testClient) ValidateRaw(t *testing.T, received []byte, err error) {
 	c.ValidateCommon(t, err)
 
 	if c.Response.Body != nil && !reflect.DeepEqual(c.Response.Body, received) {
-		t.Errorf("bad response for request %#v: expected %s, got %s", c.Request, c.Response.Body, received)
+		t.Errorf("bad response for request %#v: expected %#v, got %#v", c.Request, c.Response.Body, received)
 	}
 }
 
@@ -309,8 +309,9 @@ func TestListControllers(t *testing.T) {
 								"name": "baz",
 							},
 						},
-						DesiredState: api.ReplicationControllerState{
+						Spec: api.ReplicationControllerSpec{
 							Replicas: 2,
+							Template: &api.PodTemplateSpec{},
 						},
 					},
 				},
@@ -335,8 +336,9 @@ func TestGetController(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -361,8 +363,9 @@ func TestUpdateController(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},
@@ -396,8 +399,9 @@ func TestCreateController(t *testing.T) {
 						"name": "baz",
 					},
 				},
-				DesiredState: api.ReplicationControllerState{
+				Spec: api.ReplicationControllerSpec{
 					Replicas: 2,
+					Template: &api.PodTemplateSpec{},
 				},
 			},
 		},

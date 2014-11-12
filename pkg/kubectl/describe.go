@@ -87,9 +87,15 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
+	// TODO: remove me when pods are converted
+	spec := &api.PodSpec{}
+	if err := api.Scheme.Convert(&pod.DesiredState.Manifest, spec); err != nil {
+		glog.Errorf("Unable to convert pod manifest: %v", err)
+	}
+
 	return tabbedString(func(out *tabwriter.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(pod.DesiredState.Manifest))
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(spec))
 		fmt.Fprintf(out, "Host:\t%s\n", pod.CurrentState.Host+"/"+pod.CurrentState.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.CurrentState.Status))
@@ -127,10 +133,10 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 
 	return tabbedString(func(out *tabwriter.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
-		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(controller.DesiredState.PodTemplate.DesiredState.Manifest))
-		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.DesiredState.ReplicaSelector))
+		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
+		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
-		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.CurrentState.Replicas, controller.DesiredState.Replicas)
+		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		return nil
 	})
@@ -197,7 +203,7 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 	// Find the ones that match labelsToMatch.
 	var matchingRCs []api.ReplicationController
 	for _, controller := range rcs.Items {
-		selector := labels.SelectorFromSet(controller.DesiredState.ReplicaSelector)
+		selector := labels.SelectorFromSet(controller.Spec.Selector)
 		if selector.Matches(labelsToMatch) {
 			matchingRCs = append(matchingRCs, controller)
 		}
@@ -206,7 +212,7 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 	// Format the matching RC's into strings.
 	var rcStrings []string
 	for _, controller := range matchingRCs {
-		rcStrings = append(rcStrings, fmt.Sprintf("%s (%d/%d replicas created)", controller.Name, controller.CurrentState.Replicas, controller.DesiredState.Replicas))
+		rcStrings = append(rcStrings, fmt.Sprintf("%s (%d/%d replicas created)", controller.Name, controller.Status.Replicas, controller.Spec.Replicas))
 	}
 
 	list := strings.Join(rcStrings, ", ")
@@ -217,7 +223,7 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 }
 
 func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, succeeded, failed int, err error) {
-	rcPods, err := c.List(labels.SelectorFromSet(controller.DesiredState.ReplicaSelector))
+	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector))
 	if err != nil {
 		return
 	}

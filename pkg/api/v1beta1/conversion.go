@@ -256,12 +256,10 @@ func init() {
 				return err
 			}
 
-			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+			if err := s.Convert(&in.Spec, &out.DesiredState, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
-				return err
-			}
+			out.CurrentState.Replicas = in.Status.Replicas
 			return nil
 		},
 		func(in *ReplicationController, out *newer.ReplicationController, s conversion.Scope) error {
@@ -275,10 +273,80 @@ func init() {
 				return err
 			}
 
-			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+			if err := s.Convert(&in.DesiredState, &out.Spec, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+			out.Status.Replicas = in.CurrentState.Replicas
+			return nil
+		},
+
+		func(in *newer.ReplicationControllerSpec, out *ReplicationControllerState, s conversion.Scope) error {
+			out.Replicas = in.Replicas
+			if err := s.Convert(&in.Selector, &out.ReplicaSelector, 0); err != nil {
+				return err
+			}
+			if in.TemplateRef != nil && in.Template == nil {
+				return errors.New("objects with a template ref cannot be converted to older objects, must populate template")
+			}
+			if in.Template != nil {
+				if err := s.Convert(in.Template, &out.PodTemplate, 0); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		func(in *ReplicationControllerState, out *newer.ReplicationControllerSpec, s conversion.Scope) error {
+			out.Replicas = in.Replicas
+			if err := s.Convert(&in.ReplicaSelector, &out.Selector, 0); err != nil {
+				return err
+			}
+			out.Template = &newer.PodTemplateSpec{}
+			if err := s.Convert(&in.PodTemplate, out.Template, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.PodTemplateSpec, out *PodTemplate, s conversion.Scope) error {
+			if err := s.Convert(&in.Spec, &out.DesiredState.Manifest, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PodTemplate, out *newer.PodTemplateSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.DesiredState.Manifest, &out.Spec, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.ObjectMeta.Labels, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+
+		func(in *newer.PodSpec, out *ContainerManifest, s conversion.Scope) error {
+			if err := s.Convert(&in.Volumes, &out.Volumes, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Containers, &out.Containers, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
+				return err
+			}
+			out.Version = "v1beta2"
+			return nil
+		},
+		func(in *ContainerManifest, out *newer.PodSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Volumes, &out.Volumes, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Containers, &out.Containers, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
 			return nil

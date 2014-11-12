@@ -442,6 +442,15 @@ type PodList struct {
 	Items []Pod `json:"items" yaml:"items"`
 }
 
+// PodSpec is a description of a pod
+type PodSpec struct {
+	Volumes       []Volume      `json:"volumes" yaml:"volumes"`
+	Containers    []Container   `json:"containers" yaml:"containers"`
+	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	// NodeSelector is a selector which must be true for the pod to fit on a node
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
+}
+
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 type Pod struct {
 	TypeMeta   `json:",inline" yaml:",inline"`
@@ -453,11 +462,72 @@ type Pod struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 }
 
-// ReplicationControllerState is the state of a replication controller, either input (create, update) or as output (list, get).
-type ReplicationControllerState struct {
-	Replicas        int               `json:"replicas" yaml:"replicas"`
-	ReplicaSelector map[string]string `json:"replicaSelector,omitempty" yaml:"replicaSelector,omitempty"`
-	PodTemplate     PodTemplate       `json:"podTemplate,omitempty" yaml:"podTemplate,omitempty"`
+// PodTemplateSpec describes the data a pod should have when created from a template
+type PodTemplateSpec struct {
+	// Metadata of the pods created from this template.
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	// Spec defines the behavior of a pod.
+	Spec PodSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// PodTemplate describes a template for creating copies of a predefined pod.
+type PodTemplate struct {
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	// Spec defines the pods that will be created from this template
+	Spec PodTemplateSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// PodTemplateList is a list of PodTemplates.
+type PodTemplateList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	Items []PodTemplate `json:"items" yaml:"items"`
+}
+
+// ReplicationControllerSpec is the specification of a replication controller.
+// As the internal representation of a replication controller, it may have either
+// a TemplateRef or a Template set.
+type ReplicationControllerSpec struct {
+	// Replicas is the number of desired replicas.
+	Replicas int `json:"replicas" yaml:"replicas"`
+
+	// Selector is a label query over pods that should match the Replicas count.
+	Selector map[string]string `json:"selector" yaml:"selector"`
+
+	// TemplateRef is a reference to an object that describes the pod that will be created if
+	// insufficient replicas are detected. This reference is ignored if a Template is set.
+	// Must be set before converting to a v1beta3 API object
+	TemplateRef *ObjectReference `json:"templateRef,omitempty" yaml:"templateRef,omitempty"`
+
+	// Template is the object that describes the pod that will be created if
+	// insufficient replicas are detected. Internally, this takes precedence over a
+	// TemplateRef.
+	// Must be set before converting to a v1beta1 or v1beta2 API object.
+	Template *PodTemplateSpec `json:"template,omitempty" yaml:"template,omitempty"`
+}
+
+// ReplicationControllerStatus represents the current status of a replication
+// controller.
+type ReplicationControllerStatus struct {
+	// Replicas is the number of actual replicas.
+	Replicas int `json:"replicas" yaml:"replicas"`
+}
+
+// ReplicationController represents the configuration of a replication controller.
+type ReplicationController struct {
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	// Spec defines the desired behavior of this replication controller.
+	Spec ReplicationControllerSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+
+	// Status is the current status of this replication controller. This data may be
+	// out of date by some window of time.
+	Status ReplicationControllerStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ReplicationControllerList is a collection of replication controllers.
@@ -466,21 +536,6 @@ type ReplicationControllerList struct {
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []ReplicationController `json:"items" yaml:"items"`
-}
-
-// ReplicationController represents the configuration of a replication controller.
-type ReplicationController struct {
-	TypeMeta   `json:",inline" yaml:",inline"`
-	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-
-	DesiredState ReplicationControllerState `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	CurrentState ReplicationControllerState `json:"currentState,omitempty" yaml:"currentState,omitempty"`
-}
-
-// PodTemplate holds the information used for creating pods.
-type PodTemplate struct {
-	DesiredState PodState          `json:"desiredState,omitempty" yaml:"desiredState,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // ServiceList holds a list of services.
@@ -870,15 +925,6 @@ type ContainerManifestList struct {
 	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Items []ContainerManifest `json:"items" yaml:"items,omitempty"`
-}
-
-// Included in partial form from v1beta3 to replace ContainerManifest
-
-// PodSpec is a description of a pod
-type PodSpec struct {
-	Volumes       []Volume      `json:"volumes" yaml:"volumes"`
-	Containers    []Container   `json:"containers" yaml:"containers"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
 }
 
 // BoundPod is a collection of containers that should be run on a host. A BoundPod

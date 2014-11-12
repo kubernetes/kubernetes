@@ -116,7 +116,7 @@ func EnforcePtr(obj interface{}) (reflect.Value, error) {
 		if v.Kind() == reflect.Invalid {
 			return reflect.Value{}, fmt.Errorf("expected pointer, but got invalid kind")
 		}
-		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v type", v.Type().Name())
+		return reflect.Value{}, fmt.Errorf("expected pointer, but got %v type", v.Type())
 	}
 	if v.IsNil() {
 		return reflect.Value{}, fmt.Errorf("expected pointer, but got nil")

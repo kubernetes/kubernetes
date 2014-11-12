@@ -750,6 +750,8 @@ type PodSpec struct {
 	Volumes       []Volume      `json:"volumes" yaml:"volumes"`
 	Containers    []Container   `json:"containers" yaml:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	// NodeSelector is a selector which must be true for the pod to fit on a node
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 }
 
 // BoundPod is a collection of containers that should be run on a host. A BoundPod
