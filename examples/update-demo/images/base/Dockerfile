@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM scratch
-MAINTAINER David Oppenheimer <davidopp@google.com>
-ADD test-webserver test-webserver
-EXPOSE 80
-ENTRYPOINT ["/test-webserver"]
+FROM dockerfile/nginx
+
+ADD default /etc/nginx/sites-available/default
+
+ONBUILD ADD html /usr/share/nginx/html
+ONBUILD RUN chmod -R a+r /usr/share/nginx/html
+
+CMD ["nginx"]
