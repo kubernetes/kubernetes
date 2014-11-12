@@ -97,6 +97,16 @@ func TestSpreadPriority(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 4}},
 			test:         "three label matches",
 		},
+		{
+			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []api.Pod{
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "a", Namespace: "a"}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "a", Namespace: "b"}},
+			},
+			nodes:        []string{"machine1", "machine2"},
+			expectedList: []HostPriority{{"machine1", 2}, {"machine2", 2}},
+			test:         "same name different namespace",
+		},
 	}
 
 	for _, test := range tests {

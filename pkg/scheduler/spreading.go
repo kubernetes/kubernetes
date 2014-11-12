@@ -55,6 +55,7 @@ func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predi
 
 // Returns a map of pod name to pod with an entry for all pods that have at least one label in the label set.
 // This could possibly be replaced with an orTerm selector but it doesn't exist yet.
+// TODO: look at replacing podSet key with pod.ObjectMeta.UID when it's populated
 func getMatchingPods(labelSet map[string]string, podLister PodLister) (map[string]api.Pod, error) {
 	podSet := map[string]api.Pod{}
 	for k, v := range labelSet {
@@ -64,7 +65,7 @@ func getMatchingPods(labelSet map[string]string, podLister PodLister) (map[strin
 		}
 
 		for _, pod := range pods {
-			podSet[pod.ObjectMeta.Name] = pod
+			podSet[pod.ObjectMeta.Namespace+pod.ObjectMeta.Name] = pod
 		}
 	}
 	return podSet, nil
