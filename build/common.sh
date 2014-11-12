@@ -190,9 +190,11 @@ function kube::build::prepare_output() {
       selinuxenabled && \
       which chcon >/dev/null ; then
     if [[ ! $(ls -Zd "${LOCAL_OUTPUT_ROOT}") =~ svirt_sandbox_file_t ]] ; then
-      echo "+++ Applying SELinux policy to '_output' directory.  If this fails it may be"
-      echo "    because you have root owned files under _output.  Delete those and continue"
-      chcon -Rt svirt_sandbox_file_t "${LOCAL_OUTPUT_ROOT}"
+      echo "+++ Applying SELinux policy to '_output' directory."
+      if ! chcon -Rt svirt_sandbox_file_t "${LOCAL_OUTPUT_ROOT}"; then
+        echo "    ***Failed***.  This may be because you have root owned files under _output."
+        echo "    Continuing, but this build may fail later if SELinux prevents access."
+      fi
     fi
   fi
 
