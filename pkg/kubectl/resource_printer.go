@@ -37,75 +37,117 @@ import (
 
 // GetPrinter returns a resource printer and a bool indicating whether the object must be
 // versioned for the given format.
-func GetPrinter(format, templateFile string, defaultPrinter ResourcePrinter) (ResourcePrinter, bool, error) {
-	versioned := true
+func GetPrinter(version, format, templateFile string, defaultPrinter ResourcePrinter) (ResourcePrinter, error) {
 	var printer ResourcePrinter
 	switch format {
 	case "json":
-		printer = &JSONPrinter{}
+		printer = &JSONPrinter{version}
 	case "yaml":
-		printer = &YAMLPrinter{}
+		printer = &YAMLPrinter{version}
 	case "template":
 		if len(templateFile) == 0 {
-			return nil, false, fmt.Errorf("template format specified but no template given")
+			return nil, fmt.Errorf("template format specified but no template given")
 		}
 		var err error
-		printer, err = NewTemplatePrinter([]byte(templateFile))
+		printer, err = NewTemplatePrinter(version, []byte(templateFile))
 		if err != nil {
-			return nil, false, fmt.Errorf("error parsing template %s, %v\n", templateFile, err)
+			return nil, fmt.Errorf("error parsing template %s, %v\n", templateFile, err)
 		}
 	case "templatefile":
 		if len(templateFile) == 0 {
-			return nil, false, fmt.Errorf("templatefile format specified but no template file given")
+			return nil, fmt.Errorf("templatefile format specified but no template file given")
 		}
 		data, err := ioutil.ReadFile(templateFile)
 		if err != nil {
-			return nil, false, fmt.Errorf("error reading template %s, %v\n", templateFile, err)
+			return nil, fmt.Errorf("error reading template %s, %v\n", templateFile, err)
 		}
-		printer, err = NewTemplatePrinter(data)
+		printer, err = NewTemplatePrinter(version, data)
 		if err != nil {
-			return nil, false, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
+			return nil, fmt.Errorf("error parsing template %s, %v\n", string(data), err)
 		}
 	case "":
 		printer = defaultPrinter
-		versioned = false
 	default:
-		return nil, false, fmt.Errorf("output format %q not recognized", format)
+		return nil, fmt.Errorf("output format %q not recognized", format)
 	}
-	return printer, versioned, nil
+	return printer, nil
 }
 
 // ResourcePrinter is an interface that knows how to print API resources.
 type ResourcePrinter interface {
 	// Print receives an arbitrary object, formats it and prints it to a writer.
 	PrintObj(runtime.Object, io.Writer) error
+
+	// Returns true if this printer emits properly versioned output.
+	IsVersioned() bool
 }
 
-// IdentityPrinter is an implementation of ResourcePrinter which simply copies the body out to the output stream.
-type JSONPrinter struct{}
+// JSONPrinter is an implementation of ResourcePrinter which prints as JSON.
+type JSONPrinter struct {
+	version string
+}
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which simply writes the object to the Writer.
-func (i *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	output, err := json.MarshalIndent(obj, "", "    ")
+func (j *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
+	vi, err := latest.InterfacesFor(j.version)
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprint(w, string(output)+"\n")
+
+	data, err := vi.Codec.Encode(obj)
+	if err != nil {
+		return err
+	}
+	dst := bytes.Buffer{}
+	err = json.Indent(&dst, data, "", "    ")
+	dst.WriteByte('\n')
+	_, err = w.Write(dst.Bytes())
 	return err
 }
 
-// YAMLPrinter is an implementation of ResourcePrinter which parsess JSON, and re-formats as YAML.
-type YAMLPrinter struct{}
+// IsVersioned returns true.
+func (*JSONPrinter) IsVersioned() bool { return true }
+
+func toVersionedMap(version string, obj runtime.Object) (map[string]interface{}, error) {
+	vi, err := latest.InterfacesFor(version)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := vi.Codec.Encode(obj)
+	if err != nil {
+		return nil, err
+	}
+	outObj := map[string]interface{}{}
+	err = json.Unmarshal(data, &outObj)
+	if err != nil {
+		return nil, err
+	}
+	return outObj, nil
+}
+
+// YAMLPrinter is an implementation of ResourcePrinter which prints as YAML.
+type YAMLPrinter struct {
+	version string
+}
 
 // PrintObj prints the data as YAML.
 func (y *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	output, err := yaml.Marshal(obj)
+	outObj, err := toVersionedMap(y.version, obj)
+	if err != nil {
+		return err
+	}
+
+	output, err := yaml.Marshal(outObj)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprint(w, string(output))
 	return err
 }
+
+// IsVersioned returns true.
+func (*YAMLPrinter) IsVersioned() bool { return true }
 
 type handlerEntry struct {
 	columns   []string
@@ -117,6 +159,9 @@ type HumanReadablePrinter struct {
 	handlerMap map[reflect.Type]*handlerEntry
 	noHeaders  bool
 }
+
+// IsVersioned returns false-- human readable printers do not make versioned output.
+func (*HumanReadablePrinter) IsVersioned() bool { return false }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
 func NewHumanReadablePrinter(noHeaders bool) *HumanReadablePrinter {
@@ -315,25 +360,24 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
 type TemplatePrinter struct {
+	version  string
 	template *template.Template
 }
 
-func NewTemplatePrinter(tmpl []byte) (*TemplatePrinter, error) {
+func NewTemplatePrinter(version string, tmpl []byte) (*TemplatePrinter, error) {
 	t, err := template.New("output").Parse(string(tmpl))
 	if err != nil {
 		return nil, err
 	}
-	return &TemplatePrinter{t}, nil
+	return &TemplatePrinter{version, t}, nil
 }
+
+// IsVersioned returns true.
+func (*TemplatePrinter) IsVersioned() bool { return true }
 
 // PrintObj formats the obj with the Go Template.
 func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	data, err := latest.Codec.Encode(obj)
-	if err != nil {
-		return err
-	}
-	outObj := map[string]interface{}{}
-	err = json.Unmarshal(data, &outObj)
+	outObj, err := toVersionedMap(t.version, obj)
 	if err != nil {
 		return err
 	}

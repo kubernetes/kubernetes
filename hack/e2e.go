@@ -31,15 +31,19 @@ import (
 )
 
 var (
-	isup    = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
-	build   = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
-	up      = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
-	push    = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
-	down    = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
-	test    = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
-	tests   = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
-	root    = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
-	verbose = flag.Bool("v", false, "If true, print all command output.")
+	isup             = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
+	build            = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
+	up               = flag.Bool("up", false, "If true, start the the e2e cluster. If cluster is already up, recreate it.")
+	push             = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
+	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
+	test             = flag.Bool("test", false, "Run all tests in hack/e2e-suite.")
+	tests            = flag.String("tests", "", "Run only tests in hack/e2e-suite matching this glob. Ignored if -test is set.")
+	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
+	verbose          = flag.Bool("v", false, "If true, print all command output.")
+	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
+		"By default, verify that client and server have exact version match. "+
+		"You can explicitly set to false if you're, e.g., testing client changes "+
+		"for which the server version doesn't make a difference.")
 
 	cfgCmd = flag.String("cfg", "", "If nonempty, pass this as an argument, and call kubecfg. Implies -v.")
 	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
@@ -95,7 +99,7 @@ func main() {
 	case *cfgCmd != "":
 		failure = !runBash("'kubecfg "+*cfgCmd+"'", "$KUBECFG "+*cfgCmd)
 	case *ctlCmd != "":
-		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECFG "+*ctlCmd)
+		failure = !runBash("'kubectl "+*ctlCmd+"'", "$KUBECTL "+*ctlCmd)
 	case *tests != "":
 		failed, passed := Test()
 		log.Printf("Passed tests: %v", passed)
@@ -210,7 +214,17 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	return true
 }
 
-var bashCommandPrefix = `
+// returns either "", or a list of args intended for appending with the
+// kubecfg or kubectl commands (begining with a space).
+func kubeClientArgs() string {
+	if *checkVersionSkew {
+		return " -expect_version_match"
+	}
+	return ""
+}
+
+func bashWrap(cmd string) string {
+	return `
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -219,19 +233,14 @@ export KUBE_CONFIG_FILE="config-test.sh"
 
 # TODO(jbeda): This will break on usage if there is a space in
 # ${KUBE_ROOT}.  Covert to an array?  Or an exported function?
-export KUBECFG="` + *root + `/cluster/kubecfg.sh -expect_version_match"
+export KUBECFG="` + *root + `/cluster/kubecfg.sh` + kubeClientArgs() + `"
+export KUBECTL="` + *root + `/cluster/kubectl.sh` + kubeClientArgs() + `"
 
 source "` + *root + `/cluster/kube-env.sh"
 source "` + *root + `/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
+` + cmd + `
 `
-
-var bashCommandSuffix = `
-
-`
-
-func bashWrap(cmd string) string {
-	return bashCommandPrefix + cmd + bashCommandSuffix
 }

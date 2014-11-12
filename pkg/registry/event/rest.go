@@ -88,8 +88,10 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, e
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid object type")
 	}
+	// TODO: internal version leaks through here. This should be versioned.
 	return labels.Set{}, labels.Set{
 		"involvedObject.kind":            event.InvolvedObject.Kind,
+		"involvedObject.namespace":       event.InvolvedObject.Namespace,
 		"involvedObject.name":            event.InvolvedObject.Name,
 		"involvedObject.uid":             event.InvolvedObject.UID,
 		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
@@ -97,6 +99,7 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, e
 		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
 		"status":                         event.Status,
 		"reason":                         event.Reason,
+		"source":                         event.Source,
 	}, nil
 }
 
