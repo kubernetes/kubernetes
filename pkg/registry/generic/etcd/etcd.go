@@ -91,8 +91,12 @@ func (e *Etcd) Delete(ctx api.Context, id string) error {
 
 // Watch starts a watch for the items that m matches.
 // TODO: Detect if m references a single object instead of a list.
-func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion uint64) (watch.Interface, error) {
-	return e.Helper.WatchList(e.KeyRoot, resourceVersion, func(obj runtime.Object) bool {
+func (e *Etcd) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
+	if err != nil {
+		return nil, err
+	}
+	return e.Helper.WatchList(e.KeyRoot, version, func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		return err == nil && matches
 	})

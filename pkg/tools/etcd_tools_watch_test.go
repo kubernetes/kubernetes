@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -599,5 +600,40 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	}
 	if _, open := <-watching.ResultChan(); open {
 		t.Errorf("An injected error did not cause a graceful shutdown")
+	}
+}
+
+func TestEtcdParseWatchResourceVersion(t *testing.T) {
+	testCases := []struct {
+		Version       string
+		Kind          string
+		ExpectVersion uint64
+		Err           bool
+	}{
+		{Version: "", ExpectVersion: 0},
+		{Version: "a", Err: true},
+		{Version: " ", Err: true},
+		{Version: "1", ExpectVersion: 2},
+		{Version: "10", ExpectVersion: 11},
+	}
+	for _, testCase := range testCases {
+		version, err := ParseWatchResourceVersion(testCase.Version, testCase.Kind)
+		switch {
+		case testCase.Err:
+			if err == nil {
+				t.Errorf("%s: unexpected non-error", testCase.Version)
+				continue
+			}
+			if !errors.IsInvalid(err) {
+				t.Errorf("%s: unexpected error: %v", testCase.Version, err)
+				continue
+			}
+		case !testCase.Err && err != nil:
+			t.Errorf("%s: unexpected error: %v", testCase.Version, err)
+			continue
+		}
+		if version != testCase.ExpectVersion {
+			t.Errorf("%s: expected version %d but was %d", testCase.Version, testCase.ExpectVersion, version)
+		}
 	}
 }
