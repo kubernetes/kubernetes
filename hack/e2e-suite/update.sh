@@ -102,7 +102,7 @@ function validate() {
   return 0
 }
 
-export DOCKER_HUB_USER=jbeda
+export DOCKER_HUB_USER=davidopp
 
 # Launch a container
 ${KUBE_ROOT}/examples/update-demo/2-create-replication-controller.sh
