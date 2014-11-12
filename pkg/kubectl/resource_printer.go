@@ -154,10 +154,14 @@ type handlerEntry struct {
 	printFunc reflect.Value
 }
 
-// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide more elegant output.
+// HumanReadablePrinter is an implementation of ResourcePrinter which attempts to provide
+// more elegant output. It is not threadsafe, but you may call PrintObj repeatedly; headers
+// will only be printed if the object type changes. This makes it useful for printing items
+// recieved from watches.
 type HumanReadablePrinter struct {
 	handlerMap map[reflect.Type]*handlerEntry
 	noHeaders  bool
+	lastType   reflect.Type
 }
 
 // IsVersioned returns false-- human readable printers do not make versioned output.
@@ -348,9 +352,11 @@ func printEventList(list *api.EventList, w io.Writer) error {
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
 	defer w.Flush()
-	if handler := h.handlerMap[reflect.TypeOf(obj)]; handler != nil {
-		if !h.noHeaders {
+	t := reflect.TypeOf(obj)
+	if handler := h.handlerMap[t]; handler != nil {
+		if !h.noHeaders && t != h.lastType {
 			h.printHeader(handler.columns, w)
+			h.lastType = t
 		}
 		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(w)}
 		resultValue := handler.printFunc.Call(args)[0]

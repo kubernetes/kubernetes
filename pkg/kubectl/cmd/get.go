@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/spf13/cobra"
@@ -50,7 +51,7 @@ Examples:
 			mapping, namespace, name := ResourceOrTypeFromArgs(cmd, args, f.Mapper)
 
 			selector := GetFlagString(cmd, "selector")
-			labels, err := labels.ParseSelector(selector)
+			labelSelector, err := labels.ParseSelector(selector)
 			checkErr(err)
 
 			client, err := f.Client(cmd, mapping)
@@ -68,11 +69,25 @@ Examples:
 			printer, err := kubectl.GetPrinter(outputVersion, outputFormat, templateFile, defaultPrinter)
 			checkErr(err)
 
-			obj, err := kubectl.NewRESTHelper(client, mapping).Get(namespace, name, labels)
+			restHelper := kubectl.NewRESTHelper(client, mapping)
+			obj, err := restHelper.Get(namespace, name, labelSelector)
 			checkErr(err)
 
 			if err := printer.PrintObj(obj, out); err != nil {
 				checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
+			}
+
+			if GetFlagBool(cmd, "watch") {
+				vi, err := latest.InterfacesFor(outputVersion)
+				checkErr(err)
+
+				rv, err := vi.MetadataAccessor.ResourceVersion(obj)
+				checkErr(err)
+
+				w, err := restHelper.Watch(namespace, rv, labelSelector, labels.Set{}.AsSelector())
+				checkErr(err)
+
+				kubectl.WatchLoop(w, printer, out)
 			}
 		},
 	}
@@ -81,5 +96,6 @@ Examples:
 	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers")
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when --output=template or --output=templatefile")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	return cmd
 }

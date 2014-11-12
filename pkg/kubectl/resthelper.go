@@ -20,6 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // RESTHelper provides methods for retrieving or mutating a RESTful
@@ -47,6 +48,17 @@ func NewRESTHelper(client RESTClient, mapping *meta.RESTMapping) *RESTHelper {
 
 func (m *RESTHelper) Get(namespace, name string, selector labels.Selector) (runtime.Object, error) {
 	return m.RESTClient.Get().Path(m.Resource).Namespace(namespace).Path(name).SelectorParam("labels", selector).Do().Get()
+}
+
+func (m *RESTHelper) Watch(namespace, resourceVersion string, labelSelector, fieldSelector labels.Selector) (watch.Interface, error) {
+	return m.RESTClient.Get().
+		Path("watch").
+		Path(m.Resource).
+		Namespace(namespace).
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", labelSelector).
+		SelectorParam("fields", fieldSelector).
+		Watch()
 }
 
 func (m *RESTHelper) Delete(namespace, name string) error {
