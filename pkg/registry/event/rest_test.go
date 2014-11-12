@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -50,6 +51,8 @@ func TestRESTCreate(t *testing.T) {
 	if e, a := eventA, (<-c).Object; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
+	// Ensure we implement the interface
+	_ = apiserver.ResourceWatcher(rest)
 }
 
 func TestRESTDelete(t *testing.T) {
@@ -216,7 +219,7 @@ func TestRESTWatch(t *testing.T) {
 		Reason: "forTesting",
 	}
 	reg, rest := NewTestREST()
-	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), 0)
+	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), "0")
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}

@@ -18,7 +18,6 @@ package etcd
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -97,21 +96,6 @@ func makePodKey(ctx api.Context, id string) (string, error) {
 	return MakeEtcdItemKey(ctx, PodPath, id)
 }
 
-// ParseWatchResourceVersion takes a resource version argument and converts it to
-// the etcd version we should pass to helper.Watch(). Because resourceVersion is
-// an opaque value, the default watch behavior for non-zero watch is to watch
-// the next value (if you pass "1", you will see updates from "2" onwards).
-func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
-	if resourceVersion == "" || resourceVersion == "0" {
-		return 0, nil
-	}
-	version, err := strconv.ParseUint(resourceVersion, 10, 64)
-	if err != nil {
-		return 0, etcderr.InterpretResourceVersionError(err, kind, resourceVersion)
-	}
-	return version + 1, nil
-}
-
 // ListPods obtains a list of pods with labels that match selector.
 func (r *Registry) ListPods(ctx api.Context, selector labels.Selector) (*api.PodList, error) {
 	return r.ListPodsPredicate(ctx, func(pod *api.Pod) bool {
@@ -143,7 +127,7 @@ func (r *Registry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool
 
 // WatchPods begins watching for new, changed, or deleted pods.
 func (r *Registry) WatchPods(ctx api.Context, resourceVersion string, filter func(*api.Pod) bool) (watch.Interface, error) {
-	version, err := ParseWatchResourceVersion(resourceVersion, "pod")
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "pod")
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +338,7 @@ func (r *Registry) ListControllers(ctx api.Context) (*api.ReplicationControllerL
 
 // WatchControllers begins watching for new, changed, or deleted controllers.
 func (r *Registry) WatchControllers(ctx api.Context, resourceVersion string) (watch.Interface, error) {
-	version, err := ParseWatchResourceVersion(resourceVersion, "replicationControllers")
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "replicationControllers")
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +500,7 @@ func (r *Registry) UpdateService(ctx api.Context, svc *api.Service) error {
 
 // WatchServices begins watching for new, changed, or deleted service configurations.
 func (r *Registry) WatchServices(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	version, err := ParseWatchResourceVersion(resourceVersion, "service")
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "service")
 	if err != nil {
 		return nil, err
 	}
@@ -561,7 +545,7 @@ func (r *Registry) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) er
 
 // WatchEndpoints begins watching for new, changed, or deleted endpoint configurations.
 func (r *Registry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	version, err := ParseWatchResourceVersion(resourceVersion, "endpoints")
+	version, err := tools.ParseWatchResourceVersion(resourceVersion, "endpoints")
 	if err != nil {
 		return nil, err
 	}

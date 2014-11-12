@@ -52,7 +52,7 @@ func (r *GenericRegistry) List(ctx api.Context, m generic.Matcher) (runtime.Obje
 	return generic.FilterList(r.ObjectList, m)
 }
 
-func (r *GenericRegistry) Watch(ctx api.Context, m generic.Matcher, resourceVersion uint64) (watch.Interface, error) {
+func (r *GenericRegistry) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	// TODO: wire filter down into the mux; it needs access to current and previous state :(
 	return r.Mux.Watch(), nil
 }
