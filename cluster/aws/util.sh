@@ -162,7 +162,7 @@ function upload-server-tars() {
   if which md5 > /dev/null 2>&1; then
     project_hash=$(md5 -q -s "${USER} ${key}")
   else
-    project_hash=$(echo -n "${USER} ${key}" | md5sum)
+    project_hash=$(echo -n "${USER} ${key}" | md5sum | awk '{ print $1 }')
   fi
   local -r staging_bucket="kubernetes-staging-${project_hash}"
 

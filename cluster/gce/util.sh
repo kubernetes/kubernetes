@@ -106,7 +106,7 @@ function upload-server-tars() {
   if which md5 > /dev/null 2>&1; then
     project_hash=$(md5 -q -s "$PROJECT")
   else
-    project_hash=$(echo -n "$PROJECT" | md5sum)
+    project_hash=$(echo -n "$PROJECT" | md5sum | awk '{ print $1 }')
   fi
   project_hash=${project_hash:0:5}
 
