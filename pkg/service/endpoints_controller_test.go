@@ -30,7 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func newPodList(count int) api.PodList {
+func newPodList(count int) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
@@ -54,7 +54,7 @@ func newPodList(count int) api.PodList {
 			},
 		})
 	}
-	return api.PodList{
+	return &api.PodList{
 		TypeMeta: api.TypeMeta{APIVersion: testapi.Version(), Kind: "PodList"},
 		Items:    pods,
 	}
@@ -170,15 +170,15 @@ type serverResponse struct {
 func makeTestServer(t *testing.T, podResponse serverResponse, serviceResponse serverResponse, endpointsResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
 	fakePodHandler := util.FakeHandler{
 		StatusCode:   podResponse.statusCode,
-		ResponseBody: util.EncodeJSON(podResponse.obj),
+		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), podResponse.obj.(runtime.Object)),
 	}
 	fakeServiceHandler := util.FakeHandler{
 		StatusCode:   serviceResponse.statusCode,
-		ResponseBody: util.EncodeJSON(serviceResponse.obj),
+		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), serviceResponse.obj.(runtime.Object)),
 	}
 	fakeEndpointsHandler := util.FakeHandler{
 		StatusCode:   endpointsResponse.statusCode,
-		ResponseBody: util.EncodeJSON(endpointsResponse.obj),
+		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), endpointsResponse.obj.(runtime.Object)),
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/api/"+testapi.Version()+"/pods", &fakePodHandler)
@@ -195,8 +195,8 @@ func makeTestServer(t *testing.T, podResponse serverResponse, serviceResponse se
 func TestSyncEndpointsEmpty(t *testing.T) {
 	testServer, _ := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(0)},
-		serverResponse{http.StatusOK, api.ServiceList{}},
-		serverResponse{http.StatusOK, api.Endpoints{}})
+		serverResponse{http.StatusOK, &api.ServiceList{}},
+		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
@@ -208,8 +208,8 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 func TestSyncEndpointsError(t *testing.T) {
 	testServer, _ := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(0)},
-		serverResponse{http.StatusInternalServerError, api.ServiceList{}},
-		serverResponse{http.StatusOK, api.Endpoints{}})
+		serverResponse{http.StatusInternalServerError, &api.ServiceList{}},
+		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
@@ -233,8 +233,8 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	}
 	testServer, endpointsHandler := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(1)},
-		serverResponse{http.StatusOK, serviceList},
-		serverResponse{http.StatusOK, api.Endpoints{
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
@@ -272,8 +272,8 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	}
 	testServer, endpointsHandler := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(1)},
-		serverResponse{http.StatusOK, serviceList},
-		serverResponse{http.StatusOK, api.Endpoints{
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
@@ -303,8 +303,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 	}
 	testServer, endpointsHandler := makeTestServer(t,
 		serverResponse{http.StatusOK, newPodList(1)},
-		serverResponse{http.StatusOK, serviceList},
-		serverResponse{http.StatusOK, api.Endpoints{}})
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)
@@ -333,9 +333,9 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		},
 	}
 	testServer, _ := makeTestServer(t,
-		serverResponse{http.StatusInternalServerError, api.PodList{}},
-		serverResponse{http.StatusOK, serviceList},
-		serverResponse{http.StatusOK, api.Endpoints{}})
+		serverResponse{http.StatusInternalServerError, &api.PodList{}},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
 	endpoints := NewEndpointController(client)

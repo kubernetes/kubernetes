@@ -30,7 +30,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/google/cadvisor/info"
 )
 
@@ -97,6 +96,15 @@ func newServerTest() *serverTestFramework {
 	return fw
 }
 
+// encodeJSON returns obj marshalled as a JSON string, panicing on any errors
+func encodeJSON(obj interface{}) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	return string(data)
+}
+
 func readResp(resp *http.Response) (string, error) {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
@@ -124,7 +132,7 @@ func TestContainer(t *testing.T) {
 			},
 		},
 	}
-	body := bytes.NewBuffer([]byte(util.EncodeJSON(expected[0]))) // Only send a single ContainerManifest
+	body := bytes.NewBuffer([]byte(encodeJSON(expected[0]))) // Only send a single ContainerManifest
 	resp, err := http.Post(fw.testHTTPServer.URL+"/container", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
@@ -199,7 +207,7 @@ func TestContainers(t *testing.T) {
 			},
 		},
 	}
-	body := bytes.NewBuffer([]byte(util.EncodeJSON(expected)))
+	body := bytes.NewBuffer([]byte(encodeJSON(expected)))
 	resp, err := http.Post(fw.testHTTPServer.URL+"/containers", "application/json", body)
 	if err != nil {
 		t.Errorf("Post returned: %v", err)
