@@ -114,10 +114,6 @@ func (r *Registry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool
 	filtered := []api.Pod{}
 	for _, pod := range allPods.Items {
 		if filter(&pod) {
-			// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
-			// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
-			// matches our desires.
-			pod.CurrentState.Host = pod.DesiredState.Host
 			filtered = append(filtered, pod)
 		}
 	}
@@ -153,10 +149,6 @@ func (r *Registry) GetPod(ctx api.Context, id string) (*api.Pod, error) {
 	if err = r.ExtractObj(key, &pod, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, "pod", id)
 	}
-	// TODO: Currently nothing sets CurrentState.Host. We need a feedback loop that sets
-	// the CurrentState.Host and Status fields. Here we pretend that reality perfectly
-	// matches our desires.
-	pod.CurrentState.Host = pod.DesiredState.Host
 	return &pod, nil
 }
 
@@ -167,11 +159,8 @@ func makeContainerKey(machine string) string {
 // CreatePod creates a pod based on a specification.
 func (r *Registry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	// Set current status to "Waiting".
-	pod.CurrentState.Status = api.PodPending
-	pod.CurrentState.Host = ""
-	// DesiredState.Host == "" is a signal to the scheduler that this pod needs scheduling.
-	pod.DesiredState.Status = api.PodRunning
-	pod.DesiredState.Host = ""
+	pod.Status.Condition = api.PodPending
+	pod.Status.Host = ""
 	key, err := makePodKey(ctx, pod.Name)
 	if err != nil {
 		return err
@@ -197,10 +186,10 @@ func (r *Registry) setPodHostTo(ctx api.Context, podID, oldMachine, machine stri
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
 		}
-		if pod.DesiredState.Host != oldMachine {
-			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.Name, pod.DesiredState.Host)
+		if pod.Status.Host != oldMachine {
+			return nil, fmt.Errorf("pod %v is already assigned to host %v", pod.Name, pod.Status.Host)
 		}
-		pod.DesiredState.Host = machine
+		pod.Status.Host = machine
 		finalPod = pod
 		return pod, nil
 	})
@@ -248,9 +237,9 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	if err != nil {
 		return err
 	}
-	scheduled := podOut.DesiredState.Host != ""
+	scheduled := podOut.Status.Host != ""
 	if scheduled {
-		pod.DesiredState.Host = podOut.DesiredState.Host
+		pod.Status.Host = podOut.Status.Host
 		// If it's already been scheduled, limit the types of updates we'll accept.
 		errs := validation.ValidatePodUpdate(pod, &podOut)
 		if len(errs) != 0 {
@@ -267,18 +256,19 @@ func (r *Registry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 		// never scheduled, just update.
 		return nil
 	}
-	containerKey := makeContainerKey(podOut.DesiredState.Host)
-	return r.AtomicUpdate(containerKey, &api.ContainerManifestList{}, func(in runtime.Object) (runtime.Object, error) {
-		manifests := in.(*api.ContainerManifestList)
-		for ix := range manifests.Items {
-			if manifests.Items[ix].ID == pod.Name {
-				manifests.Items[ix] = pod.DesiredState.Manifest
-				return manifests, nil
+
+	containerKey := makeContainerKey(podOut.Status.Host)
+	return r.AtomicUpdate(containerKey, &api.BoundPods{}, func(in runtime.Object) (runtime.Object, error) {
+		boundPods := in.(*api.BoundPods)
+		for ix := range boundPods.Items {
+			if boundPods.Items[ix].Name == pod.Name {
+				boundPods.Items[ix].Spec = pod.Spec
+				return boundPods, nil
 			}
 		}
 		// This really shouldn't happen
-		glog.Warningf("Couldn't find: %s in %#v", pod.Name, manifests)
-		return manifests, fmt.Errorf("Failed to update pod, couldn't find %s in %#v", pod.Name, manifests)
+		glog.Warningf("Couldn't find: %s in %#v", pod.Name, boundPods)
+		return boundPods, fmt.Errorf("Failed to update pod, couldn't find %s in %#v", pod.Name, boundPods)
 	})
 }
 
@@ -299,7 +289,7 @@ func (r *Registry) DeletePod(ctx api.Context, podID string) error {
 	if err != nil {
 		return etcderr.InterpretDeleteError(err, "pod", podID)
 	}
-	machine := pod.DesiredState.Host
+	machine := pod.Status.Host
 	if machine == "" {
 		// Pod was never scheduled anywhere, just return.
 		return nil

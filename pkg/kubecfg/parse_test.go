@@ -71,15 +71,12 @@ func TestParsePod(t *testing.T) {
 	DoParseTest(t, "pods", &api.Pod{
 		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Pod"},
 		ObjectMeta: api.ObjectMeta{Name: "test pod"},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				ID: "My manifest",
-				Containers: []api.Container{
-					{Name: "my container"},
-				},
-				Volumes: []api.Volume{
-					{Name: "volume"},
-				},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "my container"},
+			},
+			Volumes: []api.Volume{
+				{Name: "volume"},
 			},
 		},
 	}, v1beta1.Codec, testParser)

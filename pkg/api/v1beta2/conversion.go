@@ -119,7 +119,7 @@ func init() {
 			case PodRunning:
 				*out = newer.PodRunning
 			case PodTerminated:
-				// Older API versions did not contain enough info to map to PodFailed
+				// Older API versions did not contain enough info to map to PodSucceeded
 				*out = newer.PodFailed
 			default:
 				return errors.New("The string provided is not a valid PodCondition constant value")
@@ -138,15 +138,13 @@ func init() {
 			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
-
-			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+			if err := s.Convert(&in.Spec, &out.DesiredState.Manifest, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+			if err := s.Convert(&in.Status, &out.CurrentState, 0); err != nil {
 				return err
 			}
-
-			if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+			if err := s.Convert(&in.Spec.NodeSelector, &out.NodeSelector, 0); err != nil {
 				return err
 			}
 			return nil
@@ -161,15 +159,13 @@ func init() {
 			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
 				return err
 			}
-
-			if err := s.Convert(&in.DesiredState, &out.DesiredState, 0); err != nil {
+			if err := s.Convert(&in.DesiredState.Manifest, &out.Spec, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.CurrentState, &out.CurrentState, 0); err != nil {
+			if err := s.Convert(&in.CurrentState, &out.Status, 0); err != nil {
 				return err
 			}
-
-			if err := s.Convert(&in.NodeSelector, &out.NodeSelector, 0); err != nil {
+			if err := s.Convert(&in.NodeSelector, &out.Spec.NodeSelector, 0); err != nil {
 				return err
 			}
 			return nil
@@ -282,6 +278,43 @@ func init() {
 			return nil
 		},
 
+		func(in *newer.PodStatus, out *PodState, s conversion.Scope) error {
+			if err := s.Convert(&in.Condition, &out.Status, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
+				return err
+			}
+			out.Host = in.Host
+			out.HostIP = in.HostIP
+			out.PodIP = in.PodIP
+			return nil
+		},
+		func(in *PodState, out *newer.PodStatus, s conversion.Scope) error {
+			if err := s.Convert(&in.Status, &out.Condition, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
+				return err
+			}
+			out.Host = in.Host
+			out.HostIP = in.HostIP
+			out.PodIP = in.PodIP
+			return nil
+		},
+
+		func(in *newer.PodSpec, out *PodState, s conversion.Scope) error {
+			if err := s.Convert(&in, &out.Manifest, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *PodState, out *newer.PodSpec, s conversion.Scope) error {
+			if err := s.Convert(&in.Manifest, &out, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		func(in *newer.Service, out *Service, s conversion.Scope) error {
 			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 				return err

@@ -46,29 +46,24 @@ func TestLeastRequested(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	machine1State := api.PodState{
+	machine1Status := api.PodStatus{
 		Host: "machine1",
 	}
-	machine2State := api.PodState{
+	machine2Status := api.PodStatus{
 		Host: "machine2",
 	}
-	cpuOnly := api.PodState{
-		Manifest: api.ContainerManifest{
-			Containers: []api.Container{
-				{CPU: 1000},
-				{CPU: 2000},
-			},
+	cpuOnly := api.PodSpec{
+		Containers: []api.Container{
+			{CPU: 1000},
+			{CPU: 2000},
 		},
-		Host: "machine1",
+		//	Host: "machine1",
 	}
-	cpuAndMemory := api.PodState{
-		Manifest: api.ContainerManifest{
-			Containers: []api.Container{
-				{CPU: 1000, Memory: 2000},
-				{CPU: 2000, Memory: 3000},
-			},
+	cpuAndMemory := api.PodSpec{
+		Containers: []api.Container{
+			{CPU: 1000, Memory: 2000},
+			{CPU: 2000, Memory: 3000},
 		},
-		Host: "machine2",
 	}
 	tests := []struct {
 		pod          api.Pod
@@ -87,10 +82,10 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "no resources requested",
 			pods: []api.Pod{
-				{DesiredState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{DesiredState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{DesiredState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{DesiredState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{
@@ -98,8 +93,8 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 37 /* int(75% / 2) */}, {"machine2", 62 /* int( 75% + 50% / 2) */}},
 			test:         "no resources requested",
 			pods: []api.Pod{
-				{DesiredState: cpuOnly},
-				{DesiredState: cpuAndMemory},
+				{Spec: cpuOnly, Status: api.PodStatus{Host: "machine1"}},
+				{Spec: cpuAndMemory, Status: api.PodStatus{Host: "machine2"}},
 			},
 		},
 		{
@@ -107,8 +102,8 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "zero minion resources",
 			pods: []api.Pod{
-				{DesiredState: cpuOnly},
-				{DesiredState: cpuAndMemory},
+				{Spec: cpuOnly},
+				{Spec: cpuAndMemory},
 			},
 		},
 	}

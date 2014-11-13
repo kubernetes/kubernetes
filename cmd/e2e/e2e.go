@@ -46,10 +46,10 @@ func waitForPodRunning(c *client.Client, id string) {
 			glog.Warningf("Get pod failed: %v", err)
 			continue
 		}
-		if pod.CurrentState.Status == api.PodRunning {
+		if pod.Status.Condition == api.PodRunning {
 			break
 		}
-		glog.Infof("Waiting for pod status to be running (%s)", pod.CurrentState.Status)
+		glog.Infof("Waiting for pod status to be running (%s)", pod.Status.Condition)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestPodUpdate(c *client.Client) bool {
 	value = "time" + value
 	pod.Labels["time"] = value
 	pod.ResourceVersion = podOut.ResourceVersion
-	pod.DesiredState.Manifest.UUID = podOut.DesiredState.Manifest.UUID
+	pod.UID = podOut.UID
 	pod, err = podClient.Update(pod)
 	if err != nil {
 		glog.Errorf("Failed to update pod: %v", err)

@@ -172,8 +172,8 @@ func TestListPods(t *testing.T) {
 			Body: &api.PodList{
 				Items: []api.Pod{
 					{
-						CurrentState: api.PodState{
-							Status: api.PodRunning,
+						Status: api.PodStatus{
+							Condition: api.PodRunning,
 						},
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{
@@ -205,8 +205,8 @@ func TestListPodsLabels(t *testing.T) {
 			Body: &api.PodList{
 				Items: []api.Pod{
 					{
-						CurrentState: api.PodState{
-							Status: api.PodRunning,
+						Status: api.PodStatus{
+							Condition: api.PodRunning,
 						},
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{
@@ -233,8 +233,8 @@ func TestGetPod(t *testing.T) {
 		Response: Response{
 			StatusCode: 200,
 			Body: &api.Pod{
-				CurrentState: api.PodState{
-					Status: api.PodRunning,
+				Status: api.PodStatus{
+					Condition: api.PodRunning,
 				},
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -260,8 +260,8 @@ func TestDeletePod(t *testing.T) {
 
 func TestCreatePod(t *testing.T) {
 	requestPod := &api.Pod{
-		CurrentState: api.PodState{
-			Status: api.PodRunning,
+		Status: api.PodStatus{
+			Condition: api.PodRunning,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Labels: map[string]string{
@@ -291,8 +291,8 @@ func TestUpdatePod(t *testing.T) {
 				"name": "baz",
 			},
 		},
-		CurrentState: api.PodState{
-			Status: api.PodRunning,
+		Status: api.PodStatus{
+			Condition: api.PodRunning,
 		},
 	}
 	c := &testClient{

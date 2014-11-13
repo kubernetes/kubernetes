@@ -216,7 +216,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	podInfo := fakeKubeletClient{}
 	return func() (bool, error) {
 		for i := range pods.Items {
-			host, id, namespace := pods.Items[i].CurrentState.Host, pods.Items[i].Name, pods.Items[i].Namespace
+			host, id, namespace := pods.Items[i].Status.Host, pods.Items[i].Name, pods.Items[i].Namespace
 			if len(host) == 0 {
 				return false, nil
 			}
@@ -499,21 +499,18 @@ func runServiceTest(client *client.Client) {
 				"name": "thisisalonglabel",
 			},
 		},
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Version: "v1beta1",
-				Containers: []api.Container{
-					{
-						Name:  "c1",
-						Image: "foo",
-						Ports: []api.Port{
-							{ContainerPort: 1234},
-						},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "c1",
+					Image: "foo",
+					Ports: []api.Port{
+						{ContainerPort: 1234},
 					},
 				},
 			},
 		},
-		CurrentState: api.PodState{
+		Status: api.PodStatus{
 			PodIP: "1.2.3.4",
 		},
 	}

@@ -56,10 +56,8 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 		})
 	}
 	return api.Pod{
-		DesiredState: api.PodState{
-			Manifest: api.ContainerManifest{
-				Containers: containers,
-			},
+		Spec: api.PodSpec{
+			Containers: containers,
 		},
 	}
 }
@@ -220,27 +218,23 @@ func TestGetUsedPorts(t *testing.T) {
 }
 
 func TestDiskConflicts(t *testing.T) {
-	volState := api.PodState{
-		Manifest: api.ContainerManifest{
-			Volumes: []api.Volume{
-				{
-					Source: &api.VolumeSource{
-						GCEPersistentDisk: &api.GCEPersistentDisk{
-							PDName: "foo",
-						},
+	volState := api.PodSpec{
+		Volumes: []api.Volume{
+			{
+				Source: &api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDisk{
+						PDName: "foo",
 					},
 				},
 			},
 		},
 	}
-	volState2 := api.PodState{
-		Manifest: api.ContainerManifest{
-			Volumes: []api.Volume{
-				{
-					Source: &api.VolumeSource{
-						GCEPersistentDisk: &api.GCEPersistentDisk{
-							PDName: "bar",
-						},
+	volState2 := api.PodSpec{
+		Volumes: []api.Volume{
+			{
+				Source: &api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDisk{
+						PDName: "bar",
 					},
 				},
 			},
@@ -253,9 +247,9 @@ func TestDiskConflicts(t *testing.T) {
 		test         string
 	}{
 		{api.Pod{}, []api.Pod{}, true, "nothing"},
-		{api.Pod{}, []api.Pod{{DesiredState: volState}}, true, "one state"},
-		{api.Pod{DesiredState: volState}, []api.Pod{{DesiredState: volState}}, false, "same state"},
-		{api.Pod{DesiredState: volState2}, []api.Pod{{DesiredState: volState}}, true, "different state"},
+		{api.Pod{}, []api.Pod{{Spec: volState}}, true, "one state"},
+		{api.Pod{Spec: volState}, []api.Pod{{Spec: volState}}, false, "same state"},
+		{api.Pod{Spec: volState2}, []api.Pod{{Spec: volState}}, true, "different state"},
 	}
 
 	for _, test := range tests {
@@ -286,8 +280,10 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				NodeSelector: map[string]string{
-					"foo": "bar",
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			fits: false,
@@ -295,8 +291,10 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				NodeSelector: map[string]string{
-					"foo": "bar",
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			labels: map[string]string{
@@ -307,8 +305,10 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				NodeSelector: map[string]string{
-					"foo": "bar",
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 			labels: map[string]string{
@@ -320,9 +320,11 @@ func TestPodFitsSelector(t *testing.T) {
 		},
 		{
 			pod: api.Pod{
-				NodeSelector: map[string]string{
-					"foo": "bar",
-					"baz": "blah",
+				Spec: api.PodSpec{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
 				},
 			},
 			labels: map[string]string{

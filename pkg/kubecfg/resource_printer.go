@@ -177,7 +177,7 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 	return err
 }
 
-func makeImageList(manifest api.ContainerManifest) string {
+func makeImageList(manifest api.PodSpec) string {
 	var images []string
 	for _, container := range manifest.Containers {
 		images = append(images, container.Image)
@@ -202,9 +202,9 @@ func podHostString(host, ip string) string {
 
 func printPod(pod *api.Pod, w io.Writer) error {
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-		pod.Name, makeImageList(pod.DesiredState.Manifest),
-		podHostString(pod.CurrentState.Host, pod.CurrentState.HostIP),
-		labels.Set(pod.Labels), pod.CurrentState.Status)
+		pod.Name, makeImageList(pod.Spec),
+		podHostString(pod.Status.Host, pod.Status.HostIP),
+		labels.Set(pod.Labels), pod.Status.Condition)
 	return err
 }
 

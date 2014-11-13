@@ -64,17 +64,18 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			continue
 		}
 		endpoints := []string{}
+
 		for _, pod := range pods.Items {
-			port, err := findPort(&pod.DesiredState.Manifest, service.Spec.ContainerPort)
+			port, err := findPort(&pod, service.Spec.ContainerPort)
 			if err != nil {
 				glog.Errorf("Failed to find port for service: %v, %v", service, err)
 				continue
 			}
-			if len(pod.CurrentState.PodIP) == 0 {
+			if len(pod.Status.PodIP) == 0 {
 				glog.Errorf("Failed to find an IP for pod: %v", pod)
 				continue
 			}
-			endpoints = append(endpoints, net.JoinHostPort(pod.CurrentState.PodIP, strconv.Itoa(port)))
+			endpoints = append(endpoints, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(port)))
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
@@ -137,10 +138,10 @@ func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
 }
 
 // findPort locates the container port for the given manifest and portName.
-func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, error) {
+func findPort(pod *api.Pod, portName util.IntOrString) (int, error) {
 	firstContainerPort := 0
-	if len(manifest.Containers[0].Ports) > 0 {
-		firstContainerPort = manifest.Containers[0].Ports[0].ContainerPort
+	if len(pod.Spec.Containers) > 0 && len(pod.Spec.Containers[0].Ports) > 0 {
+		firstContainerPort = pod.Spec.Containers[0].Ports[0].ContainerPort
 	}
 
 	switch portName.Kind {
@@ -152,7 +153,7 @@ func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, 
 			break
 		}
 		name := portName.StrVal
-		for _, container := range manifest.Containers {
+		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
 				if port.Name == name {
 					return port.ContainerPort, nil
@@ -169,5 +170,5 @@ func findPort(manifest *api.ContainerManifest, portName util.IntOrString) (int, 
 		return portName.IntVal, nil
 	}
 
-	return 0, fmt.Errorf("no suitable port for manifest: %s", manifest.ID)
+	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }

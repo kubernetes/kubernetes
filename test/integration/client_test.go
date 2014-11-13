@@ -79,24 +79,22 @@ func TestClient(t *testing.T) {
 
 		// get a validation error
 		pod := &api.Pod{
-			DesiredState: api.PodState{
-				Manifest: api.ContainerManifest{
-					Version: "v1beta2",
-					Containers: []api.Container{
-						{
-							Name: "test",
-						},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test",
 					},
 				},
 			},
 		}
+
 		got, err := client.Pods(ns).Create(pod)
 		if err == nil {
-			t.Fatalf("unexpected non-error: %v", err)
+			t.Fatalf("unexpected non-error: %v", got)
 		}
 
 		// get a created pod
-		pod.DesiredState.Manifest.Containers[0].Image = "an-image"
+		pod.Spec.Containers[0].Image = "an-image"
 		got, err = client.Pods(ns).Create(pod)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -117,7 +115,7 @@ func TestClient(t *testing.T) {
 		if actual.Name != got.Name {
 			t.Errorf("expected pod %#v, got %#v", got, actual)
 		}
-		if actual.CurrentState.Host != "" {
+		if actual.Status.Host != "" {
 			t.Errorf("expected pod to be unscheduled, got %#v", actual)
 		}
 	}

@@ -32,10 +32,10 @@ func TestSpreadPriority(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	machine1State := api.PodState{
+	machine1Status := api.PodStatus{
 		Host: "machine1",
 	}
-	machine2State := api.PodState{
+	machine2Status := api.PodStatus{
 		Host: "machine2",
 	}
 	tests := []struct {
@@ -52,14 +52,14 @@ func TestSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{CurrentState: machine1State}},
+			pods:         []api.Pod{{Status: machine1Status}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "no labels",
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pods:         []api.Pod{{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "different labels",
@@ -67,8 +67,8 @@ func TestSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 1}},
@@ -77,9 +77,9 @@ func TestSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 1}},
@@ -88,10 +88,10 @@ func TestSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},

@@ -62,7 +62,7 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 			Labels: desiredLabels,
 		},
 	}
-	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.DesiredState.Manifest); err != nil {
+	if err := api.Scheme.Convert(&controller.Spec.Template.Spec, &pod.Spec); err != nil {
 		glog.Errorf("Unable to convert pod template: %v", err)
 		return
 	}
@@ -143,8 +143,8 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 func (rm *ReplicationManager) filterActivePods(pods []api.Pod) []api.Pod {
 	var result []api.Pod
 	for _, value := range pods {
-		if api.PodSucceeded != value.CurrentState.Status &&
-			api.PodFailed != value.CurrentState.Status {
+		if api.PodSucceeded != value.Status.Condition &&
+			api.PodFailed != value.Status.Condition {
 			result = append(result, value)
 		}
 	}

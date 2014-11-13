@@ -45,6 +45,16 @@ func Codec() runtime.Codec {
 	return interfaces.Codec
 }
 
+// Converter returns the api.Scheme for the API version to test against, as set by the
+// KUBE_API_VERSION env var.
+func Converter() runtime.ObjectConvertor {
+	interfaces, err := latest.InterfacesFor(Version())
+	if err != nil {
+		panic(err)
+	}
+	return interfaces.ObjectConvertor
+}
+
 // MetadataAccessor returns the MetadataAccessor for the API version to test against,
 // as set by the KUBE_API_VERSION env var.
 func MetadataAccessor() meta.MetadataAccessor {

@@ -82,7 +82,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 
 	// TODO: remove me when pods are converted
 	spec := &api.PodSpec{}
-	if err := api.Scheme.Convert(&pod.DesiredState.Manifest, spec); err != nil {
+	if err := api.Scheme.Convert(&pod.Spec, spec); err != nil {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
 
@@ -91,9 +91,9 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(spec))
-		fmt.Fprintf(out, "Host:\t%s\n", pod.CurrentState.Host+"/"+pod.CurrentState.HostIP)
+		fmt.Fprintf(out, "Host:\t%s\n", pod.Status.Host+"/"+pod.Status.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
-		fmt.Fprintf(out, "Status:\t%s\n", string(pod.CurrentState.Status))
+		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Condition))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", getReplicationControllersForLabels(rc, labels.Set(pod.Labels)))
 		if events != nil {
 			describeEvents(events, out)
@@ -247,7 +247,7 @@ func getPodStatusForReplicationController(c client.PodInterface, controller *api
 		return
 	}
 	for _, pod := range rcPods.Items {
-		switch pod.CurrentState.Status {
+		switch pod.Status.Condition {
 		case api.PodRunning:
 			running++
 		case api.PodPending:
