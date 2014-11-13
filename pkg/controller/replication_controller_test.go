@@ -284,10 +284,10 @@ func TestSynchonize(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: util.EncodeJSON(controllerSpec1),
+						Value: runtime.EncodeOrDie(testapi.Codec(), &controllerSpec1),
 					},
 					{
-						Value: util.EncodeJSON(controllerSpec2),
+						Value: runtime.EncodeOrDie(testapi.Codec(), &controllerSpec2),
 					},
 				},
 			},

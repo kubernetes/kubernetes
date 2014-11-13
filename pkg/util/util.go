@@ -60,12 +60,6 @@ func Forever(f func(), period time.Duration) {
 	}
 }
 
-// EncodeJSON returns obj marshalled as a JSON string, ignoring any errors.
-func EncodeJSON(obj interface{}) string {
-	data, _ := json.Marshal(obj)
-	return string(data)
-}
-
 // IntOrString is a type that can hold an int or a string.  When used in
 // JSON or YAML marshalling and unmarshalling, it produces or consumes the
 // inner type.  This allows you to have, for example, a JSON field that can

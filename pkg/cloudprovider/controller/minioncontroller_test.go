@@ -30,7 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func newMinionList(count int) api.MinionList {
+func newMinionList(count int) *api.MinionList {
 	minions := []api.Minion{}
 	for i := 0; i < count; i++ {
 		minions = append(minions, api.Minion{
@@ -39,7 +39,7 @@ func newMinionList(count int) api.MinionList {
 			},
 		})
 	}
-	return api.MinionList{
+	return &api.MinionList{
 		Items: minions,
 	}
 }
@@ -52,7 +52,7 @@ type serverResponse struct {
 func makeTestServer(t *testing.T, minionResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
 	fakeMinionHandler := util.FakeHandler{
 		StatusCode:   minionResponse.statusCode,
-		ResponseBody: util.EncodeJSON(minionResponse.obj),
+		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), minionResponse.obj.(runtime.Object)),
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/api/"+testapi.Version()+"/minions", &fakeMinionHandler)

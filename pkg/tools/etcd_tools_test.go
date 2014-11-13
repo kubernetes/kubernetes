@@ -24,10 +24,9 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/coreos/go-etcd/etcd"
 )
 
@@ -100,7 +99,7 @@ func TestExtractToList(t *testing.T) {
 	}
 
 	var got api.PodList
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -151,7 +150,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -198,7 +197,7 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 	}
 
 	var got api.PodList
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.ExtractToList("/some/key", &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
@@ -211,8 +210,8 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 func TestExtractObj(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	expect := api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	fakeClient.Set("/some/key", util.EncodeJSON(expect), 0)
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	fakeClient.Set("/some/key", runtime.EncodeOrDie(testapi.Codec(), &expect), 0)
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	var got api.Pod
 	err := helper.ExtractObj("/some/key", &got, false)
 	if err != nil {
@@ -266,12 +265,12 @@ func TestExtractObjNotFoundErr(t *testing.T) {
 func TestCreateObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.CreateObj("/some/key", obj, 5)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := latest.Codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -287,12 +286,12 @@ func TestCreateObj(t *testing.T) {
 func TestSetObj(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := latest.Codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -310,18 +309,18 @@ func TestSetObjWithVersion(t *testing.T) {
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, obj),
+				Value:         runtime.EncodeOrDie(testapi.Codec(), obj),
 				ModifiedIndex: 1,
 			},
 		},
 	}
 
-	helper := EtcdHelper{fakeClient, latest.Codec, versioner}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), versioner}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
-	data, err := latest.Codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
@@ -335,12 +334,12 @@ func TestSetObjWithVersion(t *testing.T) {
 func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, latest.Codec, nil}
+	helper := EtcdHelper{fakeClient, testapi.Codec(), nil}
 	err := helper.SetObj("/some/key", obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
-	data, err := latest.Codec.Encode(obj)
+	data, err := testapi.Codec().Encode(obj)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
