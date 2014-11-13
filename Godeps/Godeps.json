@@ -40,6 +40,10 @@
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
 		},
 		{
+			"ImportPath": "github.com/RangelReale/osin",
+			"Rev": "1f4e9754a8931fbd9834ab11592f358418efc9ff"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v0.2.0-rc1-120-g23142f6",
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
