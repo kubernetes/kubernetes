@@ -38,6 +38,13 @@
 
 {% endif %}
 
+/srv/kubernetes/known_tokens.csv:
+  file.managed:
+    - source: salt://kube-apiserver/known_tokens.csv
+    - user: kube-apiserver
+    - group: kube-apiserver
+    - mode: 400
+
 kube-apiserver:
   group.present:
     - system: True
