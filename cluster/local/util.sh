@@ -14,6 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+. "${KUBE_ROOT}/cluster/kube-util.sh"
+
 function detect-master () {
   echo "Running locally"
 }
+
+function test-build-release {
+  # Make a release
+  "${KUBE_ROOT}/build/release.sh"
+}
+
+function kube-up {
+  ("${KUBE_ROOT}/hack/local-up-cluster.sh" &)
+}
+
+function kube-down {
+  killall local-up-cluster.sh
+}
+
