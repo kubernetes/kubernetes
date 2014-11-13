@@ -146,7 +146,7 @@ var expandTests = []ExpandTest{
 		map[string]string{
 			"bucket": "red or blue",
 		},
-		"http://www.golang.org/{object}/delete",
+		"http://www.golang.org//delete",
 	},
 	// multiple expansions
 	{
@@ -181,6 +181,16 @@ var expandTests = []ExpandTest{
 			"bucket": "red",
 		},
 		"http://www.golang.org/{bucket/get",
+	},
+	// "+" prefix for suppressing escape
+	// See also: http://tools.ietf.org/html/rfc6570#section-3.2.3
+	{
+		"http://www.golang.org/{+topic}",
+		map[string]string{
+			"topic": "/topics/myproject/mytopic",
+		},
+		// The double slashes here look weird, but it's intentional
+		"http://www.golang.org//topics/myproject/mytopic",
 	},
 }
 

@@ -17,8 +17,9 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
+
+	"code.google.com/p/google-api-go-client/googleapi/internal/uritemplates"
 )
 
 // ContentTyper is an interface for Readers which know (or would like
@@ -310,27 +311,16 @@ func SetOpaque(u *url.URL) {
 	}
 }
 
-// Find {encoded} strings
-var findEncodedStrings = regexp.MustCompile(`(\{[A-Za-z_]+\})`)
-
 // Expand subsitutes any {encoded} strings in the URL passed in using
 // the map supplied.
 //
 // This calls SetOpaque to avoid encoding of the parameters in the URL path.
 func Expand(u *url.URL, expansions map[string]string) {
-	u.Path = findEncodedStrings.ReplaceAllStringFunc(u.Path, func(replace string) string {
-		argument := replace[1 : len(replace)-1]
-		value, ok := expansions[argument]
-		if !ok {
-			// Expansion not found - leave unchanged
-			return replace
-		}
-		// Would like to call url.escape(value, encodePath) here
-		encodedValue := url.QueryEscape(value)
-		encodedValue = strings.Replace(encodedValue, "+", "%20", -1)
-		return encodedValue
-	})
-	SetOpaque(u)
+	expanded, err := uritemplates.Expand(u.Path, expansions)
+	if err == nil {
+		u.Path = expanded
+		SetOpaque(u)
+	}
 }
 
 // CloseBody is used to close res.Body.
@@ -374,4 +364,38 @@ func ConvertVariant(v map[string]interface{}, dst interface{}) bool {
 		return false
 	}
 	return json.Unmarshal(buf.Bytes(), dst) == nil
+}
+
+// A Field names a field to be retrieved with a partial response.
+// See https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
+//
+// Partial responses can dramatically reduce the amount of data that must be sent to your application.
+// In order to request partial responses, you can specify the full list of fields
+// that your application needs by adding the Fields option to your request.
+//
+// Field strings use camelCase with leading lower-case characters to identify fields within the response.
+//
+// For example, if your response has a "NextPageToken" and a slice of "Items" with "Id" fields,
+// you could request just those fields like this:
+//
+//     svc.Events.List().Fields("nextPageToken", "items/id").Do()
+//
+// or if you were also interested in each Item's "Updated" field, you can combine them like this:
+//
+//     svc.Events.List().Fields("nextPageToken", "items(id,updated)").Do()
+//
+// More information about field formatting can be found here:
+// https://developers.google.com/+/api/#fields-syntax
+//
+// Another way to find field names is through the Google API explorer:
+// https://developers.google.com/apis-explorer/#p/
+type Field string
+
+// CombineFields combines fields into a single string.
+func CombineFields(s []Field) string {
+	r := make([]string, len(s))
+	for i, v := range s {
+		r[i] = string(v)
+	}
+	return strings.Join(r, ",")
 }
