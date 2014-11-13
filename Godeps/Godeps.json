@@ -44,6 +44,10 @@
 			"Rev": "1f4e9754a8931fbd9834ab11592f358418efc9ff"
 		},
 		{
+			"ImportPath": "github.com/RangelReale/osincli",
+			"Rev": "23618ea0fc3faa3f43954ce8ff48e31f5c784212"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v0.2.0-rc1-120-g23142f6",
 			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
