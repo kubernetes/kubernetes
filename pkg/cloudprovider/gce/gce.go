@@ -424,5 +424,5 @@ func (gce *GCECloud) ListClusters() ([]string, error) {
 }
 
 func (gce *GCECloud) Master(clusterName string) (string, error) {
-	return "k8s-" + clusterName + "-master.internal", nil
+	return "k8s-" + clusterName + "-master", nil
 }

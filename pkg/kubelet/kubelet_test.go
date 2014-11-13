@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -28,6 +29,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -1569,4 +1572,39 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
 	}
 	fakeDocker.Unlock()
+}
+
+func TestKubeletJoinCluster(t *testing.T) {
+	hostname := "host"
+	clusterName := "cluster1"
+	client := &client.Fake{}
+	cloud := &fake_cloud.FakeCloud{
+		NodeResources: &api.NodeResources{},
+		IP:            net.ParseIP("3.4.5.6"),
+		ClusterList:   []string{"cluster1", "cluster2"},
+		MasterName:    "master1",
+	}
+	kubelet, _, _ := newTestKubelet(t)
+	kubelet.hostname = hostname
+	kubelet.cloud = cloud
+	kubelet.apiClient = client
+
+	kubelet.JoinCluster(clusterName)
+
+	if len(client.Actions) != 1 ||
+		client.Actions[0].Action != "create-minion" {
+		t.Errorf("unexpected action list: %v", client.Actions)
+	}
+	minion, ok := client.Actions[0].Value.(*api.Minion)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", client.Actions[0].Value)
+	}
+	if minion.Name != hostname || minion.HostIP != cloud.IP.String() {
+		t.Errorf("unexpected minion created: %v", minion)
+	}
+
+	expectedCalls := []string{"get-node-resources", "ip-address"}
+	if !reflect.DeepEqual(expectedCalls, cloud.Calls) {
+		t.Errorf("unexpected cloud provider calls.  expected %v got %v", expectedCalls, cloud.Calls)
+	}
 }

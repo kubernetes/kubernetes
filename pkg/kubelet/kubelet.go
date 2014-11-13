@@ -31,7 +31,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/health"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -60,6 +62,8 @@ func NewMainKubelet(
 	hn string,
 	dc dockertools.DockerInterface,
 	ec tools.EtcdClient,
+	cl *client.Client,
+	cd cloudprovider.Interface,
 	rd string,
 	ni string,
 	ri time.Duration,
@@ -71,6 +75,8 @@ func NewMainKubelet(
 		hostname:              hn,
 		dockerClient:          dc,
 		etcdClient:            ec,
+		apiClient:             cl,
+		cloud:                 cd,
 		rootDirectory:         rd,
 		resyncInterval:        ri,
 		networkContainerImage: ni,
@@ -143,6 +149,10 @@ type Kubelet struct {
 	// Optional, minimum age required for garbage collection.  If zero, no limit.
 	minimumGCAge      time.Duration
 	maxContainerCount int
+
+	// Optional, can not join clusters without this.
+	apiClient client.Interface
+	cloud     cloudprovider.Interface
 }
 
 type ByCreated []*docker.Container
@@ -175,6 +185,10 @@ func (kl *Kubelet) purgeOldest(ids []string) error {
 	}
 
 	return nil
+}
+
+func (kl *Kubelet) JoinCluster(clusterName string) error {
+	return registerKubelet(kl.hostname, kl.apiClient, kl.cloud, clusterName)
 }
 
 // TODO: Also enforce a maximum total number of containers.
