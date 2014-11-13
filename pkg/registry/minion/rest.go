@@ -60,18 +60,11 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	minion.CreationTimestamp = util.Now()
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		// TODO: Need to fill in any server-set fields (uid, timestamp, etc) before
+		// returning minion. Can't do it properly at the moment because the registry
+		// healthchecking, which might cause it to not return the minion at all. Fix
+		// this after we move the healthchecking out of the minion registry.
 		err := rs.registry.CreateMinion(ctx, minion)
-		if err != nil {
-			return nil, err
-		}
-		minionName := minion.Name
-		minion, err := rs.registry.GetMinion(ctx, minionName)
-		if err == ErrNotHealty {
-			return rs.toApiMinion(minionName), nil
-		}
-		if minion == nil {
-			return nil, ErrDoesNotExist
-		}
 		if err != nil {
 			return nil, err
 		}
