@@ -76,6 +76,13 @@ func TestIsConfigTransportSecure(t *testing.T) {
 			},
 			Secure: false,
 		},
+		{
+			Config: &Config{
+				Host:     "1.2.3.4:567",
+				Insecure: true,
+			},
+			Secure: true,
+		},
 	}
 	for _, testCase := range testCases {
 		secure := IsConfigTransportSecure(testCase.Config)
