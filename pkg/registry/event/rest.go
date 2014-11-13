@@ -24,7 +24,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -46,7 +45,8 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	event.CreationTimestamp = util.Now()
+
+	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		err := rs.registry.Create(ctx, event.Name, event)

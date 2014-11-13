@@ -586,12 +586,14 @@ func TestCreatePod(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
 	select {
 	case <-channel:
 		// Do nothing, this is expected.
 	case <-time.After(time.Millisecond * 100):
 		t.Error("Unexpected timeout on async channel")
+	}
+	if !api.HasObjectMetaSystemFieldValues(&podRegistry.Pod.ObjectMeta) {
+		t.Errorf("Expected ObjectMeta field values were populated")
 	}
 }
 

@@ -100,7 +100,8 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if errs := validation.ValidatePod(pod); len(errs) > 0 {
 		return nil, errors.NewInvalid("pod", pod.Name, errs)
 	}
-	pod.CreationTimestamp = util.Now()
+
+	api.FillObjectMetaSystemFields(ctx, &pod.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		if err := rs.registry.CreatePod(ctx, pod); err != nil {

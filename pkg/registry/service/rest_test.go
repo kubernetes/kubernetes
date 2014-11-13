@@ -55,6 +55,9 @@ func TestServiceRegistryCreate(t *testing.T) {
 	c, _ := storage.Create(ctx, svc)
 	created_svc := <-c
 	created_service := created_svc.Object.(*api.Service)
+	if !api.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
+		t.Errorf("storage did not populate object meta field values")
+	}
 	if created_service.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", created_service.Name)
 	}
