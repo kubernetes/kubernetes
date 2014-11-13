@@ -19,6 +19,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 function detect-master () {
   echo "Running locally"
+  KUBE_MASTER=127.0.0.1
+  KUBE_MASTER_IP=127.0.0.1
 }
 
 function test-build-release {
@@ -31,6 +33,9 @@ function kube-up {
 }
 
 function kube-down {
-  killall local-up-cluster.sh
+  ps -ef | grep local-up-cluster.sh | awk '{print $2}' | xargs kill
 }
 
+function prepare-e2e() {
+  echo "Running e2e locally"
+}
