@@ -80,6 +80,10 @@ func newVagrantCloud() (*VagrantCloud, error) {
 	}, nil
 }
 
+func (aws *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.
 func (v *VagrantCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false

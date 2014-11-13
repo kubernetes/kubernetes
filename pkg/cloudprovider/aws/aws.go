@@ -101,6 +101,10 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc) (*AWSCloud, error) {
 	}, nil
 }
 
+func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
 func (aws *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false

@@ -45,8 +45,11 @@ func (f *FakeCloud) ClearCalls() {
 	f.Calls = []string{}
 }
 
+func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return f, true
+}
+
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
-//
 // Actually it just returns f itself.
 func (f *FakeCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return f, true
