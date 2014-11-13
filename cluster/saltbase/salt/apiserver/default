@@ -27,4 +27,7 @@
   {% set portal_net = "-portal_net=" + pillar['portal_net'] %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}}"
+{% set cert_file = "-tls_cert_file=/srv/kubernetes/server.cert" %}
+{% set key_file = "-tls_private_key_file=/srv/kubernetes/server.key" %}
+
+DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}} {{cert_file}} {{key_file}}"

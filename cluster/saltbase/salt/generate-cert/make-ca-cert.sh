@@ -19,6 +19,9 @@ set -o nounset
 set -o pipefail
 
 cert_ip=$1
+cert_dir=/srv/kubernetes
+
+mkdir -p "$cert_dir"
 
 # TODO: Add support for discovery on other providers?
 if [ "$cert_ip" == "_use_gce_external_ip_" ]; then
@@ -33,19 +36,28 @@ tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
 trap 'rm -rf "${tmpdir}"' EXIT
 cd "${tmpdir}"
 
-# TODO: For now, this is a patched repo that makes subject-alt-name work, when the fix is upstream
-#  move back to the upstream easyrsa
-curl -L -J -O https://github.com/brendandburns/easy-rsa/archive/master.tar.gz > /dev/null 2>&1
-tar xzf easy-rsa-master.tar.gz > /dev/null 2>&1
+# TODO: For now, this is a patched tool that makes subject-alt-name work, when
+# the fix is upstream  move back to the upstream easyrsa.  This is cached in GCS
+# but is originally taken from:
+#   https://github.com/brendandburns/easy-rsa/archive/master.tar.gz
+#
+# To update, do the following:
+# curl -o easy-rsa.tar.gz https://github.com/brendandburns/easy-rsa/archive/master.tar.gz
+# gsutil cp easy-rsa.tar.gz gs://kubernetes-release/easy-rsa/easy-rsa.tar.gz
+# gsutil acl ch -R -g all:R gs://kubernetes-release/easy-rsa/easy-rsa.tar.gz
+#
+# Due to GCS caching of public objects, it may take time for this to be widely
+# distributed.
+curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+tar xzf easy-rsa.tar.gz > /dev/null 2>&1
 
 cd easy-rsa-master/easyrsa3
 ./easyrsa init-pki > /dev/null 2>&1
 ./easyrsa --batch build-ca nopass > /dev/null 2>&1
 ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
 ./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1
-cp -p pki/issued/kubernetes-master.crt /usr/share/nginx/server.cert > /dev/null 2>&1
-cp -p pki/private/kubernetes-master.key /usr/share/nginx/server.key > /dev/null 2>&1
-cp -p pki/ca.crt /usr/share/nginx/ca.crt
-cp -p pki/issued/kubecfg.crt /usr/share/nginx/kubecfg.crt
-cp -p pki/private/kubecfg.key /usr/share/nginx/kubecfg.key
-
+cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
+cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
+cp -p pki/ca.crt "${cert_dir}/ca.crt"
+cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
+cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"

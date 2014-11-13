@@ -26,6 +26,7 @@ base:
 
   'roles:kubernetes-master':
     - match: grain
+    - generate-cert
     - etcd
     - apiserver
     - controller-manager
