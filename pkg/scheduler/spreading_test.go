@@ -39,83 +39,91 @@ func TestSpreadPriority(t *testing.T) {
 		Host: "machine2",
 	}
 	tests := []struct {
-		pod          api.Pod
-		pods         []api.Pod
-		nodes        []string
-		expectedList HostPriorityList
-		test         string
+		pod            api.Pod
+		pods           []api.Pod
+		nodes          []string
+		expectedList   HostPriorityList
+		expectedListV2 HostPriorityList
+		test           string
 	}{
 		{
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
-			test:         "nothing scheduled",
+			nodes:          []string{"machine1", "machine2"},
+			expectedList:   []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedListV2: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:           "nothing scheduled",
 		},
 		{
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{CurrentState: machine1State}},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
-			test:         "no labels",
+			pod:            api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:           []api.Pod{{CurrentState: machine1State}},
+			nodes:          []string{"machine1", "machine2"},
+			expectedList:   []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedListV2: []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			test:           "no labels",
 		},
 		{
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 0}},
-			test:         "different labels",
-		},
-		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2, Name: "a"}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "b"}},
-			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 1}, {"machine2", 2}},
-			test:         "one label match",
+			pod:            api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:           []api.Pod{{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			nodes:          []string{"machine1", "machine2"},
+			expectedList:   []HostPriority{{"machine1", 0}, {"machine2", 0}},
+			expectedListV2: []HostPriority{{"machine1", 1}, {"machine2", 0}},
+			test:           "different labels",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2, Name: "a"}},
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "b"}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "c"}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 2}},
-			test:         "two label matches on different machines",
+			nodes:          []string{"machine1", "machine2"},
+			expectedList:   []HostPriority{{"machine1", 0}, {"machine2", 1}},
+			expectedListV2: []HostPriority{{"machine1", 1}, {"machine2", 2}},
+			test:           "one label match",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2, Name: "a"}},
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "b"}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "c"}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "d"}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 4}},
-			test:         "three label matches",
+			nodes:          []string{"machine1", "machine2"},
+			expectedList:   []HostPriority{{"machine1", 1}, {"machine2", 1}},
+			expectedListV2: []HostPriority{{"machine1", 3}, {"machine2", 2}},
+			test:           "two label matches on different machines",
 		},
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "a", Namespace: "a"}},
-				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1, Name: "a", Namespace: "b"}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{CurrentState: machine1State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{CurrentState: machine2State, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
-			nodes:        []string{"machine1", "machine2"},
-			expectedList: []HostPriority{{"machine1", 2}, {"machine2", 2}},
-			test:         "same name different namespace",
+			nodes:          []string{"machine1", "machine2"},
+			expectedList:   []HostPriority{{"machine1", 1}, {"machine2", 2}},
+			expectedListV2: []HostPriority{{"machine1", 3}, {"machine2", 4}},
+			test:           "three label matches",
 		},
 	}
 
 	for _, test := range tests {
-		list, err := CalculateSpreadPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(makeMinionList(test.nodes)))
+		podLister := FakePodLister(test.pods)
+		minionLister := FakeMinionLister(makeMinionList(test.nodes))
+
+		list, err := CalculateSpreadPriority(test.pod, podLister, minionLister)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(test.expectedList, list) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedList, list)
+		}
+
+		list, err = CalculateSpreadPriorityV2(test.pod, podLister, minionLister)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expectedListV2, list) {
+			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedListV2, list)
 		}
 	}
 }
