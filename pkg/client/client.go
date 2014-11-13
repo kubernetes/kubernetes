@@ -30,6 +30,7 @@ type Interface interface {
 	PodsNamespacer
 	ReplicationControllersNamespacer
 	ServicesNamespacer
+	EndpointsNamespacer
 	VersionInterface
 	MinionsInterface
 	EventsInterface
