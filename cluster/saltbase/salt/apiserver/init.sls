@@ -56,3 +56,26 @@ apiserver:
 {% if grains['os_family'] != 'RedHat' %}
       - file: /etc/init.d/apiserver
 {% endif %}
+
+/usr/share/apiserver:
+  directory:
+    - user: apiserver
+    - group: apiserver
+    - mode: 644
+
+// Hack: copy cert/key already generated for nginx.
+/usr/share/apiserver/server.cert:
+  file:
+    - copy
+    - source: /usr/share/nginx/server.cert
+    - user: apiserver
+    - group: apiserver
+    - mode: 644
+
+/usr/share/apiserver/server.key:
+  file:
+    - copy
+    - source: /usr/share/nginx/server.key
+    - user: apiserver
+    - group: apiserver
+    - mode: 600
