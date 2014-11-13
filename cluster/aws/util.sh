@@ -227,7 +227,7 @@ function kube-up {
   if [ ! -f $AWS_SSH_KEY ]; then
     ssh-keygen -f $AWS_SSH_KEY -N ''
   fi
-    
+
   $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > /dev/null 2>&1 || true
   VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
   $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > /dev/null
@@ -294,14 +294,14 @@ function kube-up {
       --security-group-ids $SEC_GROUP_ID \
       --associate-public-ip-address \
       --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
-    sleep 3        
+    sleep 3
     n=0
     until [ $n -ge 5 ]; do
       $AWS_CMD create-tags --resources $minion_id --tags Key=Name,Value=${MINION_NAMES[$i]} > /dev/null && break
       n=$[$n+1]
       sleep 15
     done
-        
+
     sleep 3
     n=0
     until [ $n -ge 5 ]; do
@@ -309,7 +309,7 @@ function kube-up {
       n=$[$n+1]
       sleep 15
     done
-    
+
     sleep 3
     $AWS_CMD modify-instance-attribute --instance-id $minion_id --source-dest-check '{"Value": false}' > /dev/null
 
@@ -343,7 +343,7 @@ function kube-up {
   detect-master > /dev/null
   detect-minions > /dev/null
 
-  # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to 
+  # Wait 3 minutes for cluster to come up.  We hit it with a "highstate" after that to
   # make sure that everything is well configured.
   echo "Waiting for cluster to settle"
   local i
@@ -353,7 +353,7 @@ function kube-up {
   done
   echo "Re-running salt highstate"
   ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > /dev/null
-    
+
   echo "Waiting for cluster initialization."
   echo
   echo "  This will continually check to see if the API for kubernetes is reachable."
@@ -400,9 +400,9 @@ function kube-up {
   # config file.  Distribute the same way the htpasswd is done.
   (
     umask 077
-    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /usr/share/nginx/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /usr/share/nginx/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /usr/share/nginx/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+    ssh -oStrictHostKeyChecking=no -i ~/.ssh/kube_aws_rsa ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
 
     cat << EOF > ~/.kubernetes_auth
 {

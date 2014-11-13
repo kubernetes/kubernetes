@@ -33,8 +33,8 @@ server {
         index index.html index.htm;
 
         ssl on;
-        ssl_certificate /usr/share/nginx/server.cert;
-        ssl_certificate_key /usr/share/nginx/server.key;
+        ssl_certificate /srv/kubernetes/server.cert;
+        ssl_certificate_key /srv/kubernetes/server.key;
 
         ssl_session_timeout 5m;
 
@@ -53,7 +53,7 @@ server {
           proxy_connect_timeout 159s;
           proxy_send_timeout   600s;
           proxy_read_timeout   600s;
-          
+
           # Disable retry
           proxy_next_upstream off;
 

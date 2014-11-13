@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+cert_dir=/srv/kubernetes
+
 openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
   -subj "/CN=kubernetes.invalid/O=Kubernetes" \
-  -keyout /usr/share/nginx/server.key  -out /usr/share/nginx/server.cert
+  -keyout "${cert_dir}/server.key" -out "${cert_dir}/server.cert"
