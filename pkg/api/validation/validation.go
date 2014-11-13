@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+// ServiceLister is an abstract interface for testing.
 type ServiceLister interface {
 	ListServices(api.Context) (*api.ServiceList, error)
 }

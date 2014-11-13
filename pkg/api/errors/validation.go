@@ -52,6 +52,7 @@ const (
 	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
 )
 
+// ValueOf converts a ValidationErrorType into its corresponding error message.
 func ValueOf(t ValidationErrorType) string {
 	switch t {
 	case ValidationErrorTypeNotFound:
