@@ -73,11 +73,13 @@ Examples:
 			obj, err := restHelper.Get(namespace, name, labelSelector)
 			checkErr(err)
 
-			if err := printer.PrintObj(obj, out); err != nil {
-				checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
+			if !GetFlagBool(cmd, "watch-only") {
+				if err := printer.PrintObj(obj, out); err != nil {
+					checkErr(fmt.Errorf("Unable to output the provided object: %v", err))
+				}
 			}
 
-			if GetFlagBool(cmd, "watch") {
+			if GetFlagBool(cmd, "watch") || GetFlagBool(cmd, "watch-only") {
 				vi, err := latest.InterfacesFor(outputVersion)
 				checkErr(err)
 
@@ -97,5 +99,6 @@ Examples:
 	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when --output=template or --output=templatefile")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
+	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requseted object(s), without listing/getting first.")
 	return cmd
 }
