@@ -60,6 +60,7 @@ type DockerID string
 type DockerPuller interface {
 	Pull(image string) error
 	IsImagePresent(image string) (bool, error)
+	RequireLatestImage(name string) bool
 }
 
 // dockerPuller is the default implementation of DockerPuller.
@@ -247,8 +248,21 @@ func (p dockerPuller) IsImagePresent(name string) (bool, error) {
 	return false, err
 }
 
+func (p dockerPuller) RequireLatestImage(name string) bool {
+	_, tag := parseImageName(name)
+
+	if tag == "latest" {
+		return true
+	}
+	return false
+}
+
 func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 	return p.puller.IsImagePresent(name)
+}
+
+func (p throttledDockerPuller) RequireLatestImage(name string) bool {
+	return p.puller.RequireLatestImage(name)
 }
 
 // DockerContainers is a map of containers

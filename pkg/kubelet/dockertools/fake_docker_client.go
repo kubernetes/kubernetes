@@ -210,3 +210,7 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 	}
 	return false, nil
 }
+
+func (f *FakeDockerPuller) RequireLatestImage(name string) bool {
+	return true
+}
