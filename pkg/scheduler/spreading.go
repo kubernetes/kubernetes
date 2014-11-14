@@ -52,3 +52,64 @@ func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister Mini
 func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
 	return NewGenericScheduler(predicates, CalculateSpreadPriority, podLister, random)
 }
+
+// CalculateSpreadPriorityV2 by minimizing the number of pods on the same machine with common labels.
+// This method differs from the original CalculateSpreadPriority in that it considers the number of shared labels
+// between pods rather than only spreading pods with exactly equal label sets.
+func CalculateSpreadPriorityV2(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	pods, err := getMatchingPods(pod.Labels, podLister)
+	if err != nil {
+		return nil, err
+	}
+	minions, err := minionLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	counts := map[string]int{}
+	for _, otherPod := range pods {
+		counts[otherPod.CurrentState.Host] += commonLabelsCount(pod.Labels, otherPod.Labels)
+	}
+
+	result := []HostPriority{}
+	for _, minion := range minions.Items {
+		result = append(result, HostPriority{host: minion.Name, score: counts[minion.Name]})
+	}
+	return result, nil
+}
+
+func NewSpreadingV2Scheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
+	return NewGenericScheduler(predicates, CalculateSpreadPriorityV2, podLister, random)
+}
+
+// Returns a map of pod name to pod with an entry for all pods that have at least one label in the label set.
+// This could possibly be replaced with an orTerm selector but it doesn't exist yet.
+func getMatchingPods(labelSet map[string]string, podLister PodLister) ([]api.Pod, error) {
+	pods := []api.Pod{}
+	allPods, err := podLister.ListPods(labels.SelectorFromSet(nil))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pod := range allPods {
+		for k, v := range pod.Labels {
+			if labelSet[k] == v {
+				pods = append(pods, pod)
+				break
+			}
+		}
+	}
+
+	return pods, nil
+}
+
+// Returns the number of shared labels between two label sets.
+func commonLabelsCount(labels, others map[string]string) int {
+	var count int
+	for k, v := range labels {
+		if other, ok := others[k]; ok && v == other {
+			count++
+		}
+	}
+	return count
+}
