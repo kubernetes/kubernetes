@@ -1,6 +1,6 @@
 # Logging Pods in a Kubernetes Cluster using Fluentd, Elasticsearch and Kibana
 
-To enable logging of the activity inside a [pod](../../../docs/pods.md) using Elasticsearch set ``FLUENTD_ELASTICSEARCH=true`` in ``config-default.sh`` before launching the cluster. When a cluster is created a Docker container will be placed on each node which uses the [Fluentd](http://www.fluentd.org/) log collector to shovel all the container logs to an instance of [Elasticsearch](http://www.elasticsearch.org/) (or anything else that will listen to [Logstash](http://logstash.net/docs/1.4.2/tutorials/getting-started-with-logstash) format JSON on port 9200).
+When a GCE Kubernetes cluster is created a [pod](../../../docs/pods.md) will be placed on each node which uses the [Fluentd](http://www.fluentd.org/) log collector to collect all the Docker container logs and send them to an instance of [Elasticsearch](http://www.elasticsearch.org/) (or anything else that will listen to [Logstash](http://logstash.net/docs/1.4.2/tutorials/getting-started-with-logstash) format JSON on port 9200).
 
 We can verify that a Fluentd collector is running by ssh-ing into one of the nodes and looking at the running containers.
 
