@@ -45,9 +45,3 @@ func Get() Info {
 func (info Info) String() string {
 	return info.GitVersion
 }
-
-// APIVersions lists the api versions that are available, to allow
-// version negotiation.
-type APIVersions struct {
-	Versions []string `json:"versions" yaml:"versions"`
-}

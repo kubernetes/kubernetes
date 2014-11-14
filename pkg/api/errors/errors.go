@@ -105,7 +105,7 @@ func NewInvalid(kind, name string, errs ValidationErrorList) error {
 	}
 	return &statusError{api.Status{
 		Status: api.StatusFailure,
-		Code:   422, // RFC 4918
+		Code:   422, // RFC 4918: StatusUnprocessableEntity
 		Reason: api.StatusReasonInvalid,
 		Details: &api.StatusDetails{
 			Kind:   kind,
@@ -121,7 +121,7 @@ func NewBadRequest(reason string) error {
 	return &statusError{
 		api.Status{
 			Status: api.StatusFailure,
-			Code:   400,
+			Code:   http.StatusBadRequest,
 			Reason: api.StatusReasonBadRequest,
 			Details: &api.StatusDetails{
 				Causes: []api.StatusCause{
@@ -136,7 +136,7 @@ func NewBadRequest(reason string) error {
 func NewInternalError(err error) error {
 	return &statusError{api.Status{
 		Status: api.StatusFailure,
-		Code:   500,
+		Code:   http.StatusInternalServerError,
 		Reason: api.StatusReasonInternalError,
 		Details: &api.StatusDetails{
 			Causes: []api.StatusCause{{Message: err.Error()}},

@@ -14,24 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package api
 
-import (
-	"fmt"
-	"net/http"
+// This file contains API types that are unversioned.
 
-	"github.com/emicklei/go-restful"
-)
-
-// handleIndex is the root index page for Kubernetes.
-func handleIndex(req *restful.Request, resp *restful.Response) {
-	// TODO: use restful's Request/Response methods
-	if req.Request.URL.Path != "/" && req.Request.URL.Path != "/index.html" {
-		notFound(resp.ResponseWriter, req.Request)
-		return
-	}
-	resp.ResponseWriter.WriteHeader(http.StatusOK)
-	// TODO: serve this out of a file
-	data := "<html><body>Welcome to Kubernetes</body></html>"
-	fmt.Fprint(resp.ResponseWriter, data)
+// APIVersions lists the api versions that are available, to allow
+// version negotiation. APIVersions isn't just an unnamed array of
+// strings in order to allow for future evolution, though unversioned
+type APIVersions struct {
+	Versions []string `json:"versions" yaml:"versions"`
 }

@@ -17,10 +17,13 @@ limitations under the License.
 package master
 
 import (
+	"bytes"
+	_ "expvar"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
+	rt "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +54,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 )
 
@@ -64,7 +69,6 @@ type Config struct {
 	MinionRegexp          string
 	KubeletClient         client.KubeletClient
 	PortalNet             *net.IPNet
-	Mux                   apiserver.Mux
 	EnableLogsSupport     bool
 	EnableUISupport       bool
 	APIPrefix             string
@@ -101,6 +105,8 @@ type Master struct {
 	client                *client.Client
 	portalNet             *net.IPNet
 	mux                   apiserver.Mux
+	handlerContainer      *restful.Container
+	rootWebService        *restful.WebService
 	enableLogsSupport     bool
 	enableUISupport       bool
 	apiPrefix             string
@@ -218,6 +224,7 @@ func New(c *Config) *Master {
 	if c.KubeletClient == nil {
 		glog.Fatalf("master.New() called with config.KubeletClient == nil")
 	}
+	mx := http.NewServeMux()
 	m := &Master{
 		podRegistry:           etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		controllerRegistry:    etcd.NewRegistry(c.EtcdHelper, nil),
@@ -228,7 +235,9 @@ func New(c *Config) *Master {
 		minionRegistry:        minionRegistry,
 		client:                c.Client,
 		portalNet:             c.PortalNet,
-		mux:                   http.NewServeMux(),
+		mux:                   mx,
+		handlerContainer:      NewHandlerContainer(mx),
+		rootWebService:        new(restful.WebService),
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
 		apiPrefix:             c.APIPrefix,
@@ -253,6 +262,7 @@ func (m *Master) HandleWithAuth(pattern string, handler http.Handler) {
 	// URLs into attributes that an Authorizer can understand, and have
 	// sensible policy defaults for plugged-in endpoints.  This will be different
 	// for generic endpoints versus REST object endpoints.
+	// TODO: convert to go-restful
 	m.mux.Handle(pattern, handler)
 }
 
@@ -260,7 +270,29 @@ func (m *Master) HandleWithAuth(pattern string, handler http.Handler) {
 // Applies the same authentication and authorization (if any is configured)
 // to the request is used for the master's built-in endpoints.
 func (m *Master) HandleFuncWithAuth(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+	// TODO: convert to go-restful
 	m.mux.HandleFunc(pattern, handler)
+}
+
+func NewHandlerContainer(mux *http.ServeMux) *restful.Container {
+	container := restful.NewContainer()
+	container.ServeMux = mux
+	container.RecoverHandler(logStackOnRecover)
+	return container
+}
+
+//TODO: Unify with RecoverPanics?
+func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) {
+	var buffer bytes.Buffer
+	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))
+	for i := 2; ; i += 1 {
+		_, file, line, ok := rt.Caller(i)
+		if !ok {
+			break
+		}
+		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
+	}
+	glog.Errorln(buffer.String())
 }
 
 func makeMinionRegistry(c *Config) minion.Registry {
@@ -286,6 +318,7 @@ func (m *Master) init(c *Config) {
 		authenticator = bearertoken.New(tokenAuthenticator)
 	}
 
+	// TODO: Factor out the core API registration
 	m.storage = map[string]apiserver.RESTStorage{
 		"pods": pod.NewREST(&pod.RESTConfig{
 			CloudProvider: c.Cloud,
@@ -304,13 +337,17 @@ func (m *Master) init(c *Config) {
 		"bindings": binding.NewREST(m.bindingRegistry),
 	}
 
-	apiserver.NewAPIGroup(m.API_v1beta1()).InstallREST(m.mux, c.APIPrefix+"/v1beta1")
-	apiserver.NewAPIGroup(m.API_v1beta2()).InstallREST(m.mux, c.APIPrefix+"/v1beta2")
-	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
-	m.mux.Handle(c.APIPrefix, versionHandler)
-	apiserver.InstallSupport(m.mux)
-	serversToValidate := m.getServersToValidate(c)
+	apiserver.NewAPIGroupVersion(m.API_v1beta1()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta1")
+	apiserver.NewAPIGroupVersion(m.API_v1beta2()).InstallREST(m.handlerContainer, c.APIPrefix, "v1beta2")
 
+	// TODO: InstallREST should register each version automatically
+	versionHandler := apiserver.APIVersionHandler("v1beta1", "v1beta2")
+	m.rootWebService.Route(m.rootWebService.GET(c.APIPrefix).To(versionHandler))
+
+	apiserver.InstallSupport(m.handlerContainer, m.rootWebService)
+
+	// TODO: use go-restful
+	serversToValidate := m.getServersToValidate(c)
 	apiserver.InstallValidator(m.mux, serversToValidate)
 	if c.EnableLogsSupport {
 		apiserver.InstallLogsSupport(m.mux)
@@ -319,7 +356,14 @@ func (m *Master) init(c *Config) {
 		ui.InstallSupport(m.mux)
 	}
 
+	// TODO: install runtime/pprof handler
+	// See github.com/emicklei/go-restful/blob/master/examples/restful-cpuprofiler-service.go
+
 	handler := http.Handler(m.mux.(*http.ServeMux))
+
+	// TODO: handle CORS and auth using go-restful
+	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
+	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
 
 	if len(c.CorsAllowedOriginList) > 0 {
 		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
@@ -338,7 +382,23 @@ func (m *Master) init(c *Config) {
 	if authenticator != nil {
 		handler = handlers.NewRequestAuthenticator(userContexts, authenticator, handlers.Unauthorized, handler)
 	}
-	m.mux.HandleFunc("/_whoami", handleWhoAmI(authenticator))
+	// TODO: Remove temporary _whoami handler
+	m.rootWebService.Route(m.rootWebService.GET("/_whoami").To(handleWhoAmI(authenticator)))
+
+	// Install root web services
+	m.handlerContainer.Add(m.rootWebService)
+
+	// TODO: Make this optional?
+	// Enable swagger UI and discovery API
+	swaggerConfig := swagger.Config{
+		WebServices: m.handlerContainer.RegisteredWebServices(),
+		// TODO: Parameterize the path?
+		ApiPath: "/swaggerapi/",
+		// TODO: Distribute UI javascript and enable the UI
+		//SwaggerPath: "/swaggerui/",
+		//SwaggerFilePath: "/srv/apiserver/swagger/dist"
+	}
+	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 
 	m.Handler = handler
 

@@ -20,6 +20,8 @@ import (
 	"strings"
 )
 
+// TODO: Address these per #1502
+
 func IsPullAlways(p PullPolicy) bool {
 	return pullPoliciesEqual(p, PullAlways)
 }
