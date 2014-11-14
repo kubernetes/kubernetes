@@ -201,7 +201,7 @@ func main() {
 		// TODO: eventually apiserver should start on 443 and be secure by default
 		clientConfig.Host = "http://localhost:8080"
 	}
-	if client.IsConfigTransportSecure(clientConfig) {
+	if client.IsConfigTransportTLS(clientConfig) {
 		auth, err := kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
 		if err != nil {
 			glog.Fatalf("Error loading auth: %v", err)
