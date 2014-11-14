@@ -18,8 +18,9 @@ package kubectl
 
 import (
 	"fmt"
+	"io"
+	"sort"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -61,6 +62,21 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 
 	pod, err := pc.Get(name)
 	if err != nil {
+		events, err2 := d.Events(namespace).List(
+			labels.Everything(),
+			labels.Set{
+				"involvedObject.name":      name,
+				"involvedObject.kind":      "Pod",
+				"involvedObject.namespace": namespace,
+			}.AsSelector(),
+		)
+		if err2 == nil && len(events.Items) > 0 {
+			return tabbedString(func(out io.Writer) error {
+				fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
+				describeEvents(events, out)
+				return nil
+			})
+		}
 		return "", err
 	}
 
@@ -70,13 +86,18 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
 
-	return tabbedString(func(out *tabwriter.Writer) error {
+	events, _ := d.Events(namespace).Search(pod)
+
+	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(spec))
 		fmt.Fprintf(out, "Host:\t%s\n", pod.CurrentState.Host+"/"+pod.CurrentState.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.CurrentState.Status))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", getReplicationControllersForLabels(rc, labels.Set(pod.Labels)))
+		if events != nil {
+			describeEvents(events, out)
+		}
 		return nil
 	})
 }
@@ -101,13 +122,18 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 		return "", err
 	}
 
-	return tabbedString(func(out *tabwriter.Writer) error {
+	events, _ := d.Events(namespace).Search(controller)
+
+	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", controller.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&controller.Spec.Template.Spec))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(controller.Spec.Selector))
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(controller.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		if events != nil {
+			describeEvents(events, out)
+		}
 		return nil
 	})
 }
@@ -125,11 +151,16 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	return tabbedString(func(out *tabwriter.Writer) error {
+	events, _ := d.Events(namespace).Search(service)
+
+	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
+		if events != nil {
+			describeEvents(events, out)
+		}
 		return nil
 	})
 }
@@ -146,10 +177,34 @@ func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	return tabbedString(func(out *tabwriter.Writer) error {
+	events, _ := d.Events(namespace).Search(minion)
+
+	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", minion.Name)
+		if events != nil {
+			describeEvents(events, out)
+		}
 		return nil
 	})
+}
+
+type sortableEvents []api.Event
+
+func (s sortableEvents) Len() int           { return len(s) }
+func (s sortableEvents) Less(i, j int) bool { return s[i].Timestamp.Before(s[j].Timestamp.Time) }
+func (s sortableEvents) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func describeEvents(el *api.EventList, w io.Writer) {
+	if len(el.Items) == 0 {
+		fmt.Fprint(w, "No events.")
+		return
+	}
+	sort.Sort(sortableEvents(el.Items))
+	fmt.Fprint(w, "Events:\nFrom\tSubobjectPath\tStatus\tReason\tMessage\n")
+	for _, e := range el.Items {
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
+			e.Source, e.InvolvedObject.FieldPath, e.Status, e.Reason, e.Message)
+	}
 }
 
 // Get all replication controllers whose selectors would match a given set of

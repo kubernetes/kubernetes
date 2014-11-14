@@ -396,7 +396,7 @@ func (t *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	return t.template.Execute(w, outObj)
 }
 
-func tabbedString(f func(*tabwriter.Writer) error) (string, error) {
+func tabbedString(f func(io.Writer) error) (string, error) {
 	out := new(tabwriter.Writer)
 	b := make([]byte, 1024)
 	buf := bytes.NewBuffer(b)
