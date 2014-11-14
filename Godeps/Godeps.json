@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3.1",
+	"GoVersion": "go1.3",
 	"Packages": [
 		"./..."
 	],
@@ -42,12 +42,17 @@
 		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
 			"Comment": "release-96",
-			"Rev": "0923cdda5b82a7dd0dd5c689f824ca5e7d9b60de"
+			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
+		},
+		{
+			"ImportPath": "code.google.com/p/google-api-go-client/container/v1beta1",
+			"Comment": "release-105",
+			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
 			"ImportPath": "code.google.com/p/google-api-go-client/googleapi",
 			"Comment": "release-96",
-			"Rev": "0923cdda5b82a7dd0dd5c689f824ca5e7d9b60de"
+			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",

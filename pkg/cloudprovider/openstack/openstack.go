@@ -208,6 +208,10 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	return rsrc, nil
 }
 
+func (aws *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
 func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false
 }

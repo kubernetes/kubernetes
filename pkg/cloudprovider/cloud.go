@@ -30,6 +30,16 @@ type Interface interface {
 	Instances() (Instances, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
+	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
+	Clusters() (Clusters, bool)
+}
+
+// Clusters is an abstract, pluggable interface for clusters of containers.
+type Clusters interface {
+	// List lists the names of the available clusters.
+	ListClusters() ([]string, error)
+	// Master gets back the address (either DNS name or IP address) of the master node for the cluster.
+	Master(clusterName string) (string, error)
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.

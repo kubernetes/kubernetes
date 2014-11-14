@@ -32,6 +32,8 @@ type FakeCloud struct {
 	IP            net.IP
 	Machines      []string
 	NodeResources *api.NodeResources
+	ClusterList   []string
+	MasterName    string
 
 	cloudprovider.Zone
 }
@@ -45,8 +47,19 @@ func (f *FakeCloud) ClearCalls() {
 	f.Calls = []string{}
 }
 
+func (f *FakeCloud) ListClusters() ([]string, error) {
+	return f.ClusterList, f.Err
+}
+
+func (f *FakeCloud) Master(name string) (string, error) {
+	return f.MasterName, f.Err
+}
+
+func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return f, true
+}
+
 // TCPLoadBalancer returns a fake implementation of TCPLoadBalancer.
-//
 // Actually it just returns f itself.
 func (f *FakeCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return f, true

@@ -1,0 +1,13 @@
+Discovery Service:
+http://code.google.com/apis/discovery/
+http://code.google.com/apis/discovery/v1/reference.html
+
+The "type" key:
+http://tools.ietf.org/html/draft-zyp-json-schema-03#section-5.1
+
+The "format" key:
+http://tools.ietf.org/html/draft-zyp-json-schema-03#section-5.23
+http://code.google.com/apis/discovery/v1/reference.html#parameter-format-summary
+
+Google JSON format docs:
+http://google-styleguide.googlecode.com/svn/trunk/jsoncstyleguide.xml

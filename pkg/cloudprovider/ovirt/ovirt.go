@@ -95,6 +95,10 @@ func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 	return &OVirtCloud{VmsRequest: request}, nil
 }
 
+func (aws *OVirtCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for oVirt cloud
 func (v *OVirtCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 	return nil, false

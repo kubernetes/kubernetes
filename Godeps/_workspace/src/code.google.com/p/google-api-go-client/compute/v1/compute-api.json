@@ -1,18 +1,18 @@
 {
  "kind": "discovery#restDescription",
- "etag": "\"FrPV2U6xXFUq8eRv_PO3IoAURkc/Qrs2SriggaSYO28pp7DFm8wFPbo\"",
+ "etag": "\"l66ggWbucbkBw9Lpos72oziyefE/qp3DHGvWPpREzEdWk7WwxnpgC9w\"",
  "discoveryVersion": "v1",
  "id": "compute:v1",
  "name": "compute",
  "version": "v1",
- "revision": "20140625",
+ "revision": "20141014",
  "title": "Compute Engine API",
  "description": "API for the Google Compute Engine service.",
  "ownerDomain": "google.com",
  "ownerName": "Google",
  "icons": {
-  "x16": "http://www.google.com/images/icons/product/compute_engine-16.png",
-  "x32": "http://www.google.com/images/icons/product/compute_engine-32.png"
+  "x16": "https://www.google.com/images/icons/product/compute_engine-16.png",
+  "x32": "https://www.google.com/images/icons/product/compute_engine-32.png"
  },
  "documentationLink": "https://developers.google.com/compute/docs/reference/latest/",
  "protocol": "rest",
@@ -345,6 +345,17 @@
      "$ref": "AttachedDiskInitializeParams",
      "description": "Initialization parameters."
     },
+    "interface": {
+     "type": "string",
+     "enum": [
+      "NVME",
+      "SCSI"
+     ],
+     "enumDescriptions": [
+      "",
+      ""
+     ]
+    },
     "kind": {
      "type": "string",
      "description": "Type of the resource.",
@@ -395,7 +406,7 @@
   "AttachedDiskInitializeParams": {
    "id": "AttachedDiskInitializeParams",
    "type": "object",
-   "description": "Initialization parameters for the new disk (Mutually exclusive with 'source', can currently only be specified on the boot disk).",
+   "description": "Initialization parameters for the new disk (input-only). Can only be specified on the boot disk or local SSDs. Mutually exclusive with 'source'.",
    "properties": {
     "diskName": {
      "type": "string",
@@ -444,7 +455,7 @@
     },
     "group": {
      "type": "string",
-     "description": "URL of a zonal Cloud Resource View resource. This resoure view defines the list of instances that serve traffic. Member virtual machine instances from each resource view must live in the same zone as the resource view itself."
+     "description": "URL of a zonal Cloud Resource View resource. This resource view defines the list of instances that serve traffic. Member virtual machine instances from each resource view must live in the same zone as the resource view itself. No two backends in a backend service are allowed to use same Resource View resource."
     },
     "maxRate": {
      "type": "integer",
@@ -512,8 +523,12 @@
     },
     "port": {
      "type": "integer",
-     "description": "The TCP port to connect on the backend. The default value is 80.",
+     "description": "Deprecated in favor of port_name. The TCP port to connect on the backend. The default value is 80.",
      "format": "int32"
+    },
+    "portName": {
+     "type": "string",
+     "description": "Name of backend port. The same name should appear in the resource views referenced by this service. Required."
     },
     "protocol": {
      "type": "string",
@@ -675,7 +690,7 @@
     },
     "sourceImage": {
      "type": "string",
-     "description": "The source image used to create this disk. Once the source image has been deleted from the system, this field will not be set, even if an image with the same name has been re-created."
+     "description": "The source image used to create this disk."
     },
     "sourceImageId": {
      "type": "string",
@@ -683,7 +698,7 @@
     },
     "sourceSnapshot": {
      "type": "string",
-     "description": "The source snapshot used to create this disk. Once the source snapshot has been deleted from the system, this field will be cleared, and will not be set even if a snapshot with the same name has been re-created."
+     "description": "The source snapshot used to create this disk."
     },
     "sourceSnapshotId": {
      "type": "string",
@@ -785,6 +800,11 @@
     "creationTimestamp": {
      "type": "string",
      "description": "Creation timestamp in RFC3339 text format (output only)."
+    },
+    "defaultDiskSizeGb": {
+     "type": "string",
+     "description": "Server defined default disk size in gb (output only).",
+     "format": "int64"
     },
     "deprecated": {
      "$ref": "DeprecationStatus",
@@ -1085,13 +1105,7 @@
     },
     "network": {
      "type": "string",
-     "description": "URL of the network to which this firewall is applied; provided by the client when the firewall is created.",
-     "annotations": {
-      "required": [
-       "compute.firewalls.insert",
-       "compute.firewalls.patch"
-      ]
-     }
+     "description": "URL of the network to which this firewall is applied; provided by the client when the firewall is created."
     },
     "selfLink": {
      "type": "string",
@@ -1162,7 +1176,7 @@
     },
     "IPProtocol": {
      "type": "string",
-     "description": "The IP protocol to which this rule applies, valid options are 'TCP', 'UDP', 'ESP', 'AH' or 'SCTP'",
+     "description": "The IP protocol to which this rule applies, valid options are 'TCP', 'UDP', 'ESP', 'AH' or 'SCTP'.",
      "enum": [
       "AH",
       "ESP",
@@ -1203,7 +1217,7 @@
     },
     "portRange": {
      "type": "string",
-     "description": "Applicable only when 'IPProtocol' is 'TCP', 'UDP' or 'SCTP', only packets addressed to ports in the specified range will be forwarded to 'target'. If 'portRange' is left empty (default value), all ports are forwarded. Forwarding rules with the same [IPAddress, IPProtocol] pair must have disjoint port ranges. @pattern: \\d+(?:-\\d+)?"
+     "description": "Applicable only when 'IPProtocol' is 'TCP', 'UDP' or 'SCTP', only packets addressed to ports in the specified range will be forwarded to 'target'. If 'portRange' is left empty (default value), all ports are forwarded. Forwarding rules with the same [IPAddress, IPProtocol] pair must have disjoint port ranges."
     },
     "region": {
      "type": "string",
@@ -1385,6 +1399,11 @@
     "ipAddress": {
      "type": "string",
      "description": "The IP address represented by this resource."
+    },
+    "port": {
+     "type": "integer",
+     "description": "The port on the instance.",
+     "format": "int32"
     }
    }
   },
@@ -1398,7 +1417,7 @@
     },
     "hosts": {
      "type": "array",
-     "description": "The list of host patterns to match. They must be FQDN except that it may start with ?*.? or ?*-?. The ?*? acts like a glob and will match any string of atoms (separated by .?s and -?s) to the left.",
+     "description": "The list of host patterns to match. They must be valid hostnames except that they may start with *. or *-. The * acts like a glob and will match any string of atoms (separated by .s and -s) to the left.",
      "items": {
       "type": "string"
      }
@@ -1597,7 +1616,7 @@
     },
     "sourceDisk": {
      "type": "string",
-     "description": "The source disk used to create this image. Once the source disk has been deleted from the system, this field will be cleared, and will not be set even if a disk with the same name has been re-created."
+     "description": "The source disk used to create this image."
     },
     "sourceDiskId": {
      "type": "string",
@@ -1836,12 +1855,143 @@
     }
    }
   },
+  "InstanceProperties": {
+   "id": "InstanceProperties",
+   "type": "object",
+   "description": "",
+   "properties": {
+    "canIpForward": {
+     "type": "boolean",
+     "description": "Allows instances created based on this template to send packets with source IP addresses other than their own and receive packets with destination IP addresses other than their own. If these instances will be used as an IP gateway or it will be set as the next-hop in a Route resource, say true. If unsure, leave this set to false."
+    },
+    "description": {
+     "type": "string",
+     "description": "An optional textual description for the instances created based on the instance template resource; provided by the client when the template is created."
+    },
+    "disks": {
+     "type": "array",
+     "description": "Array of disks associated with instance created based on this template.",
+     "items": {
+      "$ref": "AttachedDisk"
+     }
+    },
+    "machineType": {
+     "type": "string",
+     "description": "Name of the machine type resource describing which machine type to use to host the instances created based on this template; provided by the client when the instance template is created.",
+     "annotations": {
+      "required": [
+       "compute.instanceTemplates.insert"
+      ]
+     }
+    },
+    "metadata": {
+     "$ref": "Metadata",
+     "description": "Metadata key/value pairs assigned to instances created based on this template. Consists of custom metadata or predefined keys; see Instance documentation for more information."
+    },
+    "networkInterfaces": {
+     "type": "array",
+     "description": "Array of configurations for this interface. This specifies how this interface is configured to interact with other network services, such as connecting to the internet. Currently, ONE_TO_ONE_NAT is the only access config supported. If there are no accessConfigs specified, then this instances created based based on this template will have no external internet access.",
+     "items": {
+      "$ref": "NetworkInterface"
+     }
+    },
+    "scheduling": {
+     "$ref": "Scheduling",
+     "description": "Scheduling options for the instances created based on this template."
+    },
+    "serviceAccounts": {
+     "type": "array",
+     "description": "A list of service accounts each with specified scopes, for which access tokens are to be made available to the instances created based on this template, through metadata queries.",
+     "items": {
+      "$ref": "ServiceAccount"
+     }
+    },
+    "tags": {
+     "$ref": "Tags",
+     "description": "A list of tags to be applied to the instances created based on this template used to identify valid sources or targets for network firewalls. Provided by the client on instance creation. The tags can be later modified by the setTags method. Each tag within the list must comply with RFC1035."
+    }
+   }
+  },
   "InstanceReference": {
    "id": "InstanceReference",
    "type": "object",
    "properties": {
     "instance": {
      "type": "string"
+    }
+   }
+  },
+  "InstanceTemplate": {
+   "id": "InstanceTemplate",
+   "type": "object",
+   "description": "An Instance Template resource.",
+   "properties": {
+    "creationTimestamp": {
+     "type": "string",
+     "description": "Creation timestamp in RFC3339 text format (output only)."
+    },
+    "description": {
+     "type": "string",
+     "description": "An optional textual description of the instance template resource; provided by the client when the resource is created."
+    },
+    "id": {
+     "type": "string",
+     "description": "Unique identifier for the resource; defined by the server (output only).",
+     "format": "uint64"
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of the resource.",
+     "default": "compute#instanceTemplate"
+    },
+    "name": {
+     "type": "string",
+     "description": "Name of the instance template resource; provided by the client when the resource is created. The name must be 1-63 characters long, and comply with RFC1035",
+     "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+     "annotations": {
+      "required": [
+       "compute.instanceTemplates.insert"
+      ]
+     }
+    },
+    "properties": {
+     "$ref": "InstanceProperties",
+     "description": "The instance properties portion of this instance template resource."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for the resource (output only)."
+    }
+   }
+  },
+  "InstanceTemplateList": {
+   "id": "InstanceTemplateList",
+   "type": "object",
+   "description": "Contains a list of instance template resources.",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Unique identifier for the resource; defined by the server (output only)."
+    },
+    "items": {
+     "type": "array",
+     "description": "A list of instance template resources.",
+     "items": {
+      "$ref": "InstanceTemplate"
+     }
+    },
+    "kind": {
+     "type": "string",
+     "description": "Type of resource.",
+     "default": "compute#instanceTemplateList"
+    },
+    "nextPageToken": {
+     "type": "string",
+     "description": "A token used to continue a truncated list request (output only)."
+    },
+    "selfLink": {
+     "type": "string",
+     "description": "Server defined URL for this resource (output only)."
     }
    }
   },
@@ -1922,9 +2072,13 @@
    "type": "object",
    "description": "A license resource.",
    "properties": {
+    "chargesUseFee": {
+     "type": "boolean",
+     "description": "If true, the customer will be charged license fee for running software that contains this license on an instance."
+    },
     "kind": {
      "type": "string",
-     "description": "Identifies what kind of resource this is. Value: the fixed string \"compute#license\".",
+     "description": "Type of resource.",
      "default": "compute#license"
     },
     "name": {
@@ -2678,7 +2832,7 @@
    "properties": {
     "paths": {
      "type": "array",
-     "description": "The list of path patterns to match. Each must start with ?/\" and the only place a \"*\" is allowed is at the end following a \"/\". The string fed to the path matcher does not include any text after the first \"?\" or \"#\", and those chars are not allowed here.",
+     "description": "The list of path patterns to match. Each must start with / and the only place a * is allowed is at the end following a /. The string fed to the path matcher does not include any text after the first ? or #, and those chars are not allowed here.",
      "items": {
       "type": "string"
      }
@@ -2765,6 +2919,7 @@
       "IN_USE_ADDRESSES",
       "KERNELS",
       "KERNELS_TOTAL_GB",
+      "LOCAL_SSD_TOTAL_GB",
       "NETWORKS",
       "OPERATIONS",
       "ROUTES",
@@ -2777,6 +2932,7 @@
       "URL_MAPS"
      ],
      "enumDescriptions": [
+      "",
       "",
       "",
       "",
@@ -2909,7 +3065,8 @@
    "type": "object",
    "properties": {
     "group": {
-     "type": "string"
+     "type": "string",
+     "description": "A URI referencing one of the resource views listed in the backend service."
     }
    }
   },
@@ -3208,7 +3365,7 @@
     },
     "sourceDisk": {
      "type": "string",
-     "description": "The source disk used to create this snapshot. Once the source disk has been deleted from the system, this field will be cleared, and will not be set even if a disk with the same name has been re-created (output only)."
+     "description": "The source disk used to create this snapshot."
     },
     "sourceDiskId": {
      "type": "string",
@@ -6343,6 +6500,146 @@
      ],
      "response": {
       "$ref": "ImageList"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
+     ]
+    }
+   }
+  },
+  "instanceTemplates": {
+   "methods": {
+    "delete": {
+     "id": "compute.instanceTemplates.delete",
+     "path": "{project}/global/instanceTemplates/{instanceTemplate}",
+     "httpMethod": "DELETE",
+     "description": "Deletes the specified instance template resource.",
+     "parameters": {
+      "instanceTemplate": {
+       "type": "string",
+       "description": "Name of the instance template resource to delete.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "instanceTemplate"
+     ],
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "get": {
+     "id": "compute.instanceTemplates.get",
+     "path": "{project}/global/instanceTemplates/{instanceTemplate}",
+     "httpMethod": "GET",
+     "description": "Returns the specified instance template resource.",
+     "parameters": {
+      "instanceTemplate": {
+       "type": "string",
+       "description": "Name of the instance template resource to return.",
+       "required": true,
+       "pattern": "[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?",
+       "location": "path"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project",
+      "instanceTemplate"
+     ],
+     "response": {
+      "$ref": "InstanceTemplate"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/compute",
+      "https://www.googleapis.com/auth/compute.readonly"
+     ]
+    },
+    "insert": {
+     "id": "compute.instanceTemplates.insert",
+     "path": "{project}/global/instanceTemplates",
+     "httpMethod": "POST",
+     "description": "Creates an instance template resource in the specified project using the data included in the request.",
+     "parameters": {
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "request": {
+      "$ref": "InstanceTemplate"
+     },
+     "response": {
+      "$ref": "Operation"
+     },
+     "scopes": [
+      "https://www.googleapis.com/auth/compute"
+     ]
+    },
+    "list": {
+     "id": "compute.instanceTemplates.list",
+     "path": "{project}/global/instanceTemplates",
+     "httpMethod": "GET",
+     "description": "Retrieves the list of instance template resources contained within the specified project.",
+     "parameters": {
+      "filter": {
+       "type": "string",
+       "description": "Optional. Filter expression for filtering listed resources.",
+       "location": "query"
+      },
+      "maxResults": {
+       "type": "integer",
+       "description": "Optional. Maximum count of results to be returned. Maximum value is 500 and default value is 500.",
+       "default": "500",
+       "format": "uint32",
+       "minimum": "0",
+       "maximum": "500",
+       "location": "query"
+      },
+      "pageToken": {
+       "type": "string",
+       "description": "Optional. Tag returned by a previous list request truncated by maxResults. Used to continue a previous list request.",
+       "location": "query"
+      },
+      "project": {
+       "type": "string",
+       "description": "Name of the project scoping this request.",
+       "required": true,
+       "pattern": "(?:(?:[-a-z0-9]{1,63}\\.)*(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?):)?(?:[0-9]{1,19}|(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?))",
+       "location": "path"
+      }
+     },
+     "parameterOrder": [
+      "project"
+     ],
+     "response": {
+      "$ref": "InstanceTemplateList"
      },
      "scopes": [
       "https://www.googleapis.com/auth/compute",
