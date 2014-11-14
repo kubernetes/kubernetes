@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
+// ErrNilObject indicates an error that the obj passed to GetReference is nil.
 var ErrNilObject = errors.New("Can't reference a nil object")
 
 var versionFromSelfLink = regexp.MustCompile("/api/([^/]*)/")
@@ -72,6 +73,6 @@ func GetPartialReference(obj runtime.Object, fieldPath string) (*ObjectReference
 	return ref, nil
 }
 
-// Allow clients to preemptively get a reference to an API object and pass it to places that
+// IsAnAPIObject allows clients to preemptively get a reference to an API object and pass it to places that
 // intend only to get a reference to that object. This simplifies the event recording interface.
 func (*ObjectReference) IsAnAPIObject() {}

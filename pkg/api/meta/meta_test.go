@@ -471,7 +471,7 @@ func TestTypeMetaSelfLinker(t *testing.T) {
 		},
 	}
 
-	var linker runtime.SelfLinker = NewAccessor()
+	linker := runtime.SelfLinker(NewAccessor())
 	for name, item := range table {
 		got, err := linker.SelfLink(item.obj)
 		if e, a := item.succeed, err == nil; e != a {

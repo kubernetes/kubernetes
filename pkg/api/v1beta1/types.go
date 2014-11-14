@@ -80,8 +80,9 @@ type Volume struct {
 	Source *VolumeSource `yaml:"source" json:"source"`
 }
 
+// VolumeSource represents the source location of a valume to mount.
+// Only one of its members may be specified.
 type VolumeSource struct {
-	// Only one of the following sources may be specified
 	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
 	// things that are allowed to see the host machine. Most containers will NOT need this.
@@ -114,9 +115,10 @@ const (
 	ProtocolUDP Protocol = "UDP"
 )
 
-// GCEPersistent Disk resource.
-// A GCE PD must exist before mounting to a container. The disk must
-// also be in the same GCE project and zone as the kubelet.
+// GCEPersistentDisk represents a Persistent Disk resource in Google Compute Engine.
+//
+// A GCE PD must exist and be formatted before mounting to a container.
+// The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
 type GCEPersistentDisk struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
@@ -228,11 +230,11 @@ type LivenessProbe struct {
 type PullPolicy string
 
 const (
-	// Always attempt to pull the latest image.  Container will fail If the pull fails.
+	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
 	PullAlways PullPolicy = "PullAlways"
-	// Never pull an image, only use a local image.  Container will fail if the image isn't present
+	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
 	PullNever PullPolicy = "PullNever"
-	// Pull if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
+	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "PullIfNotPresent"
 )
 
@@ -337,9 +339,10 @@ type ContainerStateTerminated struct {
 	FinishedAt time.Time `json:"finishedAt,omitempty" yaml:"finishedAt,omitempty"`
 }
 
+// ContainerState holds a possible state of container.
+// Only one of its members may be specified.
+// If none of them is specified, the default one is ContainerStateWaiting.
 type ContainerState struct {
-	// Only one of the following ContainerState may be specified.
-	// If none of them is specified, the default one is ContainerStateWaiting.
 	Waiting     *ContainerStateWaiting    `json:"waiting,omitempty" yaml:"waiting,omitempty"`
 	Running     *ContainerStateRunning    `json:"running,omitempty" yaml:"running,omitempty"`
 	Termination *ContainerStateTerminated `json:"termination,omitempty" yaml:"termination,omitempty"`
@@ -657,7 +660,7 @@ const (
 	// CauseTypeFieldValueNotFound is used to report failure to find a requested value
 	// (e.g. looking up an ID).
 	CauseTypeFieldValueNotFound CauseType = "FieldValueNotFound"
-	// CauseTypeFieldValueInvalid is used to report required values that are not
+	// CauseTypeFieldValueRequired is used to report required values that are not
 	// provided (e.g. empty strings, null values, or empty arrays).
 	CauseTypeFieldValueRequired CauseType = "FieldValueRequired"
 	// CauseTypeFieldValueDuplicate is used to report collisions of values that must be

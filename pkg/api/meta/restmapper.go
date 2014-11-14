@@ -30,7 +30,7 @@ type typeMeta struct {
 	Kind       string
 }
 
-// RESTMapper exposes mappings between the types defined in a
+// DefaultRESTMapper exposes mappings between the types defined in a
 // runtime.Scheme. It assumes that all types defined the provided scheme
 // can be mapped with the provided MetadataAccessor and Codec interfaces.
 //
@@ -132,7 +132,7 @@ func (m *DefaultRESTMapper) RESTMapping(version, kind string) (*RESTMapping, err
 			}
 		}
 		if len(version) == 0 {
-			return nil, fmt.Errorf("no object named %q is registered.", kind)
+			return nil, fmt.Errorf("no object named %q is registered", kind)
 		}
 	}
 

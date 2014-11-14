@@ -160,22 +160,21 @@ func runTest(t *testing.T, codec runtime.Codec, source runtime.Object) {
 	if err != nil {
 		t.Errorf("%v: %v", name, err)
 		return
-	} else {
-		if !reflect.DeepEqual(source, obj2) {
-			t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v", name, util.ObjectDiff(source, obj2), codec, string(data), source)
-			return
-		}
 	}
+	if !reflect.DeepEqual(source, obj2) {
+		t.Errorf("1: %v: diff: %v\nCodec: %v\nData: %s\nSource: %#v", name, util.ObjectDiff(source, obj2), codec, string(data), source)
+		return
+	}
+
 	obj3 := reflect.New(reflect.TypeOf(source).Elem()).Interface().(runtime.Object)
 	err = codec.DecodeInto(data, obj3)
 	if err != nil {
 		t.Errorf("2: %v: %v", name, err)
 		return
-	} else {
-		if !reflect.DeepEqual(source, obj3) {
-			t.Errorf("3: %v: diff: %v\nCodec: %v", name, util.ObjectDiff(source, obj3), codec)
-			return
-		}
+	}
+	if !reflect.DeepEqual(source, obj3) {
+		t.Errorf("3: %v: diff: %v\nCodec: %v", name, util.ObjectDiff(source, obj3), codec)
+		return
 	}
 }
 
