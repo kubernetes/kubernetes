@@ -27,7 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubecfg"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -78,18 +78,13 @@ func loadClientOrDie() *client.Client {
 	config := client.Config{
 		Host: *host,
 	}
-	auth, err := kubecfg.LoadAuthInfo(*authConfig, os.Stdin)
+	auth, err := clientauth.LoadFromFile(*authConfig)
 	if err != nil {
 		glog.Fatalf("Error loading auth: %v", err)
 	}
-	config.Username = auth.User
-	config.Password = auth.Password
-	config.CAFile = auth.CAFile
-	config.CertFile = auth.CertFile
-	config.KeyFile = auth.KeyFile
-	config.BearerToken = auth.BearerToken
-	if auth.Insecure != nil {
-		config.Insecure = *auth.Insecure
+	config, err = auth.MergeWithConfig(config)
+	if err != nil {
+		glog.Fatalf("Error creating client")
 	}
 	c, err := client.New(&config)
 	if err != nil {

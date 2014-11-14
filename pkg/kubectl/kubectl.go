@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -54,16 +55,6 @@ func GetKubeClient(config *client.Config, matchVersion bool) (*client.Client, er
 	}
 
 	return c, nil
-}
-
-type AuthInfo struct {
-	User        string
-	Password    string
-	CAFile      string
-	CertFile    string
-	KeyFile     string
-	BearerToken string
-	Insecure    *bool
 }
 
 type NamespaceInfo struct {
@@ -99,9 +90,10 @@ func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
 	return err
 }
 
-// LoadAuthInfo parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
-func LoadAuthInfo(path string, r io.Reader) (*AuthInfo, error) {
-	var auth AuthInfo
+// LoadClientAuthInfoOrPrompt parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
+func LoadClientAuthInfoOrPrompt(path string, r io.Reader) (*clientauth.Info, error) {
+	var auth clientauth.Info
+	// Prompt for user/pass and write a file if none exists.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		auth.User = promptForString("Username", r)
 		auth.Password = promptForString("Password", r)
@@ -112,15 +104,11 @@ func LoadAuthInfo(path string, r io.Reader) (*AuthInfo, error) {
 		err = ioutil.WriteFile(path, data, 0600)
 		return &auth, err
 	}
-	data, err := ioutil.ReadFile(path)
+	authPtr, err := clientauth.LoadFromFile(path)
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(data, &auth)
-	if err != nil {
-		return nil, err
-	}
-	return &auth, err
+	return authPtr, nil
 }
 
 func promptForString(field string, r io.Reader) string {

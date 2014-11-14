@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 )
 
 func validateAction(expectedAction, actualAction client.FakeAction, t *testing.T) {
@@ -85,15 +86,15 @@ func TestLoadNamespaceInfo(t *testing.T) {
 	}
 }
 
-func TestLoadAuthInfo(t *testing.T) {
+func TestLoadClientAuthInfoOrPrompt(t *testing.T) {
 	loadAuthInfoTests := []struct {
 		authData string
-		authInfo *AuthInfo
+		authInfo *clientauth.Info
 		r        io.Reader
 	}{
 		{
 			`{"user": "user", "password": "pass"}`,
-			&AuthInfo{User: "user", Password: "pass"},
+			&clientauth.Info{User: "user", Password: "pass"},
 			nil,
 		},
 		{
@@ -101,7 +102,7 @@ func TestLoadAuthInfo(t *testing.T) {
 		},
 		{
 			"missing",
-			&AuthInfo{User: "user", Password: "pass"},
+			&clientauth.Info{User: "user", Password: "pass"},
 			bytes.NewBufferString("user\npass"),
 		},
 	}
@@ -122,10 +123,10 @@ func TestLoadAuthInfo(t *testing.T) {
 			aifile.Close()
 			os.Remove(aifile.Name())
 		}
-		authInfo, err := LoadAuthInfo(aifile.Name(), tt.r)
+		authInfo, err := LoadClientAuthInfoOrPrompt(aifile.Name(), tt.r)
 		if len(tt.authData) == 0 && tt.authData != "missing" {
 			if err == nil {
-				t.Error("LoadAuthInfo didn't fail on empty file")
+				t.Error("LoadClientAuthInfoOrPrompt didn't fail on empty file")
 			}
 			continue
 		}
@@ -133,7 +134,7 @@ func TestLoadAuthInfo(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(authInfo, tt.authInfo) {
-			t.Errorf("Expected %v, got %v", tt.authInfo, authInfo)
+			t.Errorf("Expected %#v, got %#v", tt.authInfo, authInfo)
 		}
 	}
 }
