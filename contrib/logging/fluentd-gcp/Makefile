@@ -1,6 +1,6 @@
 # Makefile for a synthetic logger to be logged
 # by GCP. The cluster must have been created with
-# the environment variable FLUENTD_GCP set to 'true'.
+# the variable LOGGING_DESTINATION=GCP.
 
 .PHONY: up down logger-up logger-down get
 

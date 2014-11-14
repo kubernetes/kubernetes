@@ -283,9 +283,9 @@ function kube-up {
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
-    echo "readonly FLUENTD_ELASTICSEARCH='${FLUENTD_ELASTICSEARCH:-false}'"
-    echo "readonly FLUENTD_GCP='${FLUENTD_GCP:-false}'"
     echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
+    echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
+    echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
@@ -293,16 +293,12 @@ function kube-up {
   ) > "${KUBE_TEMP}/master-start.sh"
 
   # Report logging choice (if any).
-  if [[ "${FLUENTD_ELASTICSEARCH-}" == "true" ]]; then
-    echo "+++ Logging using Fluentd to Elasticsearch"
-  fi
-  if [[ "${FLUENTD_GCP-}" == "true" ]]; then
-    echo "+++ Logging using Fluentd to Google Cloud Logging"
-  fi
-
-  # For logging to GCP we need to enable some minion scopes.
-  if [[ "${FLUENTD_GCP-}" == "true" ]]; then
-     MINION_SCOPES="${MINION_SCOPES}, https://www.googleapis.com/auth/logging.write"
+  if [[ "${ENABLE_NODE_LOGGING-}" == "true" ]]; then
+    echo "+++ Logging using Fluentd to ${LOGGING_DESTINATION:-unknown}"
+    # For logging to GCP we need to enable some minion scopes.
+    if [[ "${LOGGING_DESTINATION-}" == "gcp" ]]; then
+      MINION_SCOPES="${MINION_SCOPES}, https://www.googleapis.com/auth/logging.write"
+    fi
   fi
 
   gcloud compute instances create "${MASTER_NAME}" \

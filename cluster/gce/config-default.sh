@@ -42,13 +42,9 @@ ENABLE_NODE_MONITORING=true
 # Optional: When set to true, heapster will be setup as part of the cluster bring up.
 ENABLE_CLUSTER_MONITORING=true
 
-# Turn on Elasticsearch logging unless Google Cloud Logging has been selected or
-# if Elasticsearch logging has been specifically turned off.
-if [[ "${FLUENTD_GCP-}" != "true" ]]; then
-  if [[ "${FLUENTD_ELASTICSEARCH-}" != "false" ]]; then
-    FLUENTD_ELASTICSEARCH="true"
-  fi
-fi
-
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING=true
+LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp

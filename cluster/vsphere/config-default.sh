@@ -35,3 +35,7 @@ PORTAL_NET="10.244.240.0/20"
 
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING=true
+
+# Optional: Enable node logging.
+ENABLE_NODE_LOGGING=true
+LOGGING_DESTINATION=elasticsearch
