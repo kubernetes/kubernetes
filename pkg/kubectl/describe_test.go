@@ -27,37 +27,13 @@ type describeClient struct {
 	T         *testing.T
 	Namespace string
 	Err       error
-	Fake      *client.Fake
-}
-
-func (c *describeClient) Pod(namespace string) (client.PodInterface, error) {
-	if namespace != c.Namespace {
-		c.T.Errorf("unexpected namespace arg: %s", namespace)
-	}
-	return c.Fake.Pods(namespace), c.Err
-}
-
-func (c *describeClient) ReplicationController(namespace string) (client.ReplicationControllerInterface, error) {
-	if namespace != c.Namespace {
-		c.T.Errorf("unexpected namespace arg: %s", namespace)
-	}
-	return c.Fake.ReplicationControllers(namespace), c.Err
-}
-
-func (c *describeClient) Service(namespace string) (client.ServiceInterface, error) {
-	if namespace != c.Namespace {
-		c.T.Errorf("unexpected namespace arg: %s", namespace)
-	}
-	return c.Fake.Services(namespace), c.Err
+	*client.Fake
 }
 
 func TestDescribePod(t *testing.T) {
 	fake := &client.Fake{}
 	c := &describeClient{T: t, Namespace: "foo", Fake: fake}
-	d := PodDescriber{
-		PodClient:                   c.Pod,
-		ReplicationControllerClient: c.ReplicationController,
-	}
+	d := PodDescriber{c}
 	out, err := d.Describe("foo", "bar")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -70,9 +46,7 @@ func TestDescribePod(t *testing.T) {
 func TestDescribeService(t *testing.T) {
 	fake := &client.Fake{}
 	c := &describeClient{T: t, Namespace: "foo", Fake: fake}
-	d := ServiceDescriber{
-		ServiceClient: c.Service,
-	}
+	d := ServiceDescriber{c}
 	out, err := d.Describe("foo", "bar")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
