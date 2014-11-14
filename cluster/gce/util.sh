@@ -566,7 +566,7 @@ function restart-kube-proxy {
 
 # Setup monitoring using heapster and InfluxDB
 function setup-monitoring {
-  if [[ "${MONITORING}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     echo "Setting up cluster monitoring using Heapster."
 
     if ! gcloud compute firewall-rules describe monitoring-heapster &>/dev/null; then
@@ -604,7 +604,7 @@ function setup-monitoring {
 }
 
 function teardown-monitoring {
-  if [[ "${MONITORING}" == "true" ]]; then
+  if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     detect-project
 
     local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"

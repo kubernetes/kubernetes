@@ -106,14 +106,14 @@ function ensure-temp-dir {
 }
 
 function setup-monitoring {
-  if [ ${MONITORING-} ]; then
+  if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     # TODO: Implement this.
     echo "Monitoring not currently supported on AWS"
   fi
 }
 
 function teardown-monitoring {
-  if [ ${MONITORING-} ]; then
+  if [[ "${ENABLE_CLUSTER_MONITORING}" == "true" ]]; then
     # TODO: Implement this.
     echo "Monitoring not currently supported on AWS"
   fi
