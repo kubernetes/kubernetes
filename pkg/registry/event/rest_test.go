@@ -38,38 +38,74 @@ func NewTestREST() (testRegistry, *REST) {
 	return reg, NewREST(reg)
 }
 
+func testEvent(name string) *api.Event {
+	return &api.Event{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+		InvolvedObject: api.ObjectReference{
+			Namespace: "default",
+		},
+		Reason: "forTesting",
+	}
+}
+
 func TestRESTCreate(t *testing.T) {
-	_, rest := NewTestREST()
-	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Reason:     "forTesting",
+	table := []struct {
+		ctx   api.Context
+		event *api.Event
+		valid bool
+	}{
+		{
+			ctx:   api.NewDefaultContext(),
+			event: testEvent("foo"),
+			valid: true,
+		}, {
+			ctx:   api.NewContext(),
+			event: testEvent("bar"),
+			valid: true,
+		}, {
+			ctx:   api.WithNamespace(api.NewContext(), "nondefault"),
+			event: testEvent("bazzzz"),
+			valid: false,
+		},
 	}
-	c, err := rest.Create(api.NewContext(), eventA)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
+
+	for _, item := range table {
+		_, rest := NewTestREST()
+		c, err := rest.Create(item.ctx, item.event)
+		if !item.valid {
+			if err == nil {
+				ctxNS := api.Namespace(item.ctx)
+				t.Errorf("unexpected non-error for %v (%v, %v)", item.event.Name, ctxNS, item.event.Namespace)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%v: Unexpected error %v", item.event.Name, err)
+			continue
+		}
+		if !api.HasObjectMetaSystemFieldValues(&item.event.ObjectMeta) {
+			t.Errorf("storage did not populate object meta field values")
+		}
+		if e, a := item.event, (<-c).Object; !reflect.DeepEqual(e, a) {
+			t.Errorf("diff: %s", util.ObjectDiff(e, a))
+		}
+		// Ensure we implement the interface
+		_ = apiserver.ResourceWatcher(rest)
 	}
-	if !api.HasObjectMetaSystemFieldValues(&eventA.ObjectMeta) {
-		t.Errorf("storage did not populate object meta field values")
-	}
-	if e, a := eventA, (<-c).Object; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", util.ObjectDiff(e, a))
-	}
-	// Ensure we implement the interface
-	_ = apiserver.ResourceWatcher(rest)
 }
 
 func TestRESTDelete(t *testing.T) {
 	_, rest := NewTestREST()
-	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Reason:     "forTesting",
-	}
-	c, err := rest.Create(api.NewContext(), eventA)
+	eventA := testEvent("foo")
+	c, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	<-c
-	c, err = rest.Delete(api.NewContext(), eventA.Name)
+	c, err = rest.Delete(api.NewDefaultContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -80,16 +116,13 @@ func TestRESTDelete(t *testing.T) {
 
 func TestRESTGet(t *testing.T) {
 	_, rest := NewTestREST()
-	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Reason:     "forTesting",
-	}
-	c, err := rest.Create(api.NewContext(), eventA)
+	eventA := testEvent("foo")
+	c, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	<-c
-	got, err := rest.Get(api.NewContext(), eventA.Name)
+	got, err := rest.Get(api.NewDefaultContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -140,16 +173,13 @@ func TestRESTgetAttrs(t *testing.T) {
 
 func TestRESTUpdate(t *testing.T) {
 	_, rest := NewTestREST()
-	eventA := &api.Event{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Reason:     "forTesting",
-	}
-	c, err := rest.Create(api.NewContext(), eventA)
+	eventA := testEvent("foo")
+	c, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	<-c
-	_, err = rest.Update(api.NewContext(), eventA)
+	_, err = rest.Update(api.NewDefaultContext(), eventA)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}

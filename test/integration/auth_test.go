@@ -202,13 +202,13 @@ var aEvent string = `
 {
   "kind": "Event",
   "apiVersion": "v1beta1",
+  "namespace": "default",
   "id": "a",
   "involvedObject": {
-    {
-      "kind": "Minion",
-      "name": "a",
-      "apiVersion": "v1beta1",
-    }
+    "kind": "Minion",
+    "name": "a",
+    "namespace": "default",
+    "apiVersion": "v1beta1",
   }
 }
 `
