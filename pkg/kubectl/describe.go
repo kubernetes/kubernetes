@@ -38,29 +38,13 @@ type Describer interface {
 func DescriberFor(kind string, c *client.Client) (Describer, bool) {
 	switch kind {
 	case "Pod":
-		return &PodDescriber{
-			PodClient: func(namespace string) (client.PodInterface, error) {
-				return c.Pods(namespace), nil
-			},
-			ReplicationControllerClient: func(namespace string) (client.ReplicationControllerInterface, error) {
-				return c.ReplicationControllers(namespace), nil
-			},
-		}, true
+		return &PodDescriber{c}, true
 	case "ReplicationController":
-		return &ReplicationControllerDescriber{
-			PodClient: func(namespace string) (client.PodInterface, error) {
-				return c.Pods(namespace), nil
-			},
-			ReplicationControllerClient: func(namespace string) (client.ReplicationControllerInterface, error) {
-				return c.ReplicationControllers(namespace), nil
-			},
-		}, true
+		return &ReplicationControllerDescriber{c}, true
 	case "Service":
-		return &ServiceDescriber{
-			ServiceClient: func(namespace string) (client.ServiceInterface, error) {
-				return c.Services(namespace), nil
-			},
-		}, true
+		return &ServiceDescriber{c}, true
+	case "Minion", "Node":
+		return &MinionDescriber{c}, true
 	}
 	return nil, false
 }
@@ -68,19 +52,12 @@ func DescriberFor(kind string, c *client.Client) (Describer, bool) {
 // PodDescriber generates information about a pod and the replication controllers that
 // create it.
 type PodDescriber struct {
-	PodClient                   func(namespace string) (client.PodInterface, error)
-	ReplicationControllerClient func(namespace string) (client.ReplicationControllerInterface, error)
+	client.Interface
 }
 
 func (d *PodDescriber) Describe(namespace, name string) (string, error) {
-	rc, err := d.ReplicationControllerClient(namespace)
-	if err != nil {
-		return "", err
-	}
-	pc, err := d.PodClient(namespace)
-	if err != nil {
-		return "", err
-	}
+	rc := d.ReplicationControllers(namespace)
+	pc := d.Pods(namespace)
 
 	pod, err := pc.Get(name)
 	if err != nil {
@@ -107,19 +84,12 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 // ReplicationControllerDescriber generates information about a replication controller
 // and the pods it has created.
 type ReplicationControllerDescriber struct {
-	ReplicationControllerClient func(namespace string) (client.ReplicationControllerInterface, error)
-	PodClient                   func(namespace string) (client.PodInterface, error)
+	client.Interface
 }
 
 func (d *ReplicationControllerDescriber) Describe(namespace, name string) (string, error) {
-	rc, err := d.ReplicationControllerClient(namespace)
-	if err != nil {
-		return "", err
-	}
-	pc, err := d.PodClient(namespace)
-	if err != nil {
-		return "", err
-	}
+	rc := d.ReplicationControllers(namespace)
+	pc := d.Pods(namespace)
 
 	controller, err := rc.Get(name)
 	if err != nil {
@@ -144,14 +114,11 @@ func (d *ReplicationControllerDescriber) Describe(namespace, name string) (strin
 
 // ServiceDescriber generates information about a service.
 type ServiceDescriber struct {
-	ServiceClient func(namespace string) (client.ServiceInterface, error)
+	client.Interface
 }
 
 func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
-	c, err := d.ServiceClient(namespace)
-	if err != nil {
-		return "", err
-	}
+	c := d.Services(namespace)
 
 	service, err := c.Get(name)
 	if err != nil {
@@ -169,14 +136,11 @@ func (d *ServiceDescriber) Describe(namespace, name string) (string, error) {
 
 // MinionDescriber generates information about a minion.
 type MinionDescriber struct {
-	MinionClient func() (client.MinionInterface, error)
+	client.Interface
 }
 
 func (d *MinionDescriber) Describe(namespace, name string) (string, error) {
-	mc, err := d.MinionClient()
-	if err != nil {
-		return "", err
-	}
+	mc := d.Minions()
 	minion, err := mc.Get(name)
 	if err != nil {
 		return "", err

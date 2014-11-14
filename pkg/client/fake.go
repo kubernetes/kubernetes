@@ -49,7 +49,7 @@ func (c *Fake) Minions() MinionInterface {
 	return &FakeMinions{Fake: c}
 }
 
-func (c *Fake) Events() EventInterface {
+func (c *Fake) Events(namespace string) EventInterface {
 	return &FakeEvents{Fake: c}
 }
 

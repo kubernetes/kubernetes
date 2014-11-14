@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
@@ -45,7 +47,14 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-
+	if api.Namespace(ctx) != "" {
+		if !api.ValidNamespace(ctx, &event.ObjectMeta) {
+			return nil, errors.NewConflict("event", event.Namespace, fmt.Errorf("event.namespace does not match the provided context"))
+		}
+	}
+	if errs := validation.ValidateEvent(event); len(errs) > 0 {
+		return nil, errors.NewInvalid("event", event.Name, errs)
+	}
 	api.FillObjectMetaSystemFields(ctx, &event.ObjectMeta)
 
 	return apiserver.MakeAsync(func() (runtime.Object, error) {

@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -121,6 +122,7 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 
 	requestBody := body(c.Request.Body, c.Request.RawBody)
 	actualQuery := c.handler.RequestReceived.URL.Query()
+	t.Logf("got query: %v", actualQuery)
 	// We check the query manually, so blank it out so that FakeHandler.ValidateRequest
 	// won't check it.
 	c.handler.RequestReceived.URL.RawQuery = ""
@@ -128,11 +130,17 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 	for key, values := range c.Request.Query {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
-			validator = func(a, b string) bool { return a == b }
+			switch key {
+			case "labels", "fields":
+				validator = validateLabels
+			default:
+				validator = func(a, b string) bool { return a == b }
+			}
 		}
 		observed := actualQuery.Get(key)
-		if !validator(values[0], observed) {
-			t.Errorf("Unexpected query arg for key: %s.  Expected %s, Received %s", key, values[0], observed)
+		wanted := strings.Join(values, "")
+		if !validator(wanted, observed) {
+			t.Errorf("Unexpected query arg for key: %s.  Expected %s, Received %s", key, wanted, observed)
 		}
 	}
 	if c.Request.Header != "" {

@@ -19,6 +19,7 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
@@ -50,4 +51,10 @@ func (c *FakeEvents) Get(id string) (*api.Event, error) {
 func (c *FakeEvents) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-events", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
+}
+
+// Search returns a list of events matching the specified object.
+func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "search-events"})
+	return &c.Fake.EventsList, nil
 }
