@@ -714,11 +714,13 @@ func (kl *Kubelet) syncPod(pod *api.BoundPod, dockerContainers dockertools.Docke
 		glog.V(3).Infof("Container with name %s--%s--%s doesn't exist, creating %#v", podFullName, uuid, container.Name, container)
 		if !api.IsPullNever(container.ImagePullPolicy) {
 			present, err := kl.dockerPuller.IsImagePresent(container.Image)
+			latest := dockertools.RequireLatestImage(container.Image)
 			if err != nil {
 				glog.Errorf("Failed to inspect image: %s: %#v skipping pod %s container %s", container.Image, err, podFullName, container.Name)
 				continue
 			}
-			if api.IsPullAlways(container.ImagePullPolicy) || !present {
+			if api.IsPullAlways(container.ImagePullPolicy) ||
+				(api.IsPullIfNotPresent(container.ImagePullPolicy) && (!present || latest)) {
 				if err := kl.dockerPuller.Pull(container.Image); err != nil {
 					glog.Errorf("Failed to pull image %s: %v skipping pod %s container %s.", container.Image, err, podFullName, container.Name)
 					continue

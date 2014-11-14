@@ -247,6 +247,16 @@ func (p dockerPuller) IsImagePresent(name string) (bool, error) {
 	return false, err
 }
 
+// RequireLatestImage returns if the user wants the latest image
+func RequireLatestImage(name string) bool {
+	_, tag := parseImageName(name)
+
+	if tag == "latest" {
+		return true
+	}
+	return false
+}
+
 func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 	return p.puller.IsImagePresent(name)
 }
