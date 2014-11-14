@@ -612,8 +612,11 @@ function setup-monitoring {
 	if "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" &> /dev/null \
 	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
 	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/heapster-pod.json" &> /dev/null; then
-	    dashboardIP="http://$KUBE_USER:$KUBE_PASSWORD@`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
-	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online. Use the master user name and password for the dashboard."
+	    dashboardIP="http://`${kubectl} get -o json pod influx-grafana | grep hostIP | awk '{print $2}' | sed 's/[,|\"]//g'`"
+	    echo 
+	    echo "Grafana dashboard will be available at $dashboardIP. Wait for the monitoring dashboard to be online."
+	    echo "Use the master user name and password for the dashboard."
+	    echo
 	else
 	    echo "Failed to Setup Monitoring"
 	    teardown-monitoring
