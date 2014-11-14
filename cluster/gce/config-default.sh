@@ -36,6 +36,9 @@ MINION_SCOPES=("storage-ro" "compute-rw")
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true
+
 # Optional: When set to true, heapster will be setup as part of the cluster bring up.
 ENABLE_CLUSTER_MONITORING=true
 
@@ -46,5 +49,6 @@ if [[ "${FLUENTD_GCP-}" != "true" ]]; then
     FLUENTD_ELASTICSEARCH="true"
   fi
 fi
+
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true

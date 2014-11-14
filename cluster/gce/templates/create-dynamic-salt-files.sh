@@ -24,6 +24,7 @@ node_instance_prefix: $NODE_INSTANCE_PREFIX
 portal_net: $PORTAL_NET
 use-fluentd-es: $FLUENTD_ELASTICSEARCH
 use-fluentd-gcp: $FLUENTD_GCP
+enable_node_monitoring: $ENABLE_NODE_MONITORING
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

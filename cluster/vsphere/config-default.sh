@@ -32,3 +32,6 @@ MINION_MEMORY_MB=2048
 MINION_CPU=1
 
 PORTAL_NET="10.244.240.0/20"
+
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true

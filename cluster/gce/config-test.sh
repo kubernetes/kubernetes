@@ -39,4 +39,6 @@ PORTAL_NET="10.0.0.0/16"
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true
 
+ENABLE_NODE_MONITORING=true
+
 ENABLE_CLUSTER_MONITORING=false

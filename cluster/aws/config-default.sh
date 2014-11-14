@@ -35,3 +35,6 @@ MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
 MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
+
+# Optional: Install node monitoring.
+ENABLE_NODE_MONITORING=true

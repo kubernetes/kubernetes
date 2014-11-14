@@ -8,7 +8,9 @@ base:
     - docker
     - kubelet
     - kube-proxy
+{% if pillar['enable_node_monitoring'] is defined and pillar['enable_node_monitoring'] %}
     - cadvisor
+{% endif %}
 {% if pillar['use-fluentd-es'] is defined and pillar['use-fluentd-es'] %}
     - fluentd-es
 {% endif %}

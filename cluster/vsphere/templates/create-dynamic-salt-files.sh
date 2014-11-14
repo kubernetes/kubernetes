@@ -22,6 +22,7 @@ mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 node_instance_prefix: $NODE_INSTANCE_PREFIX
 portal_net: $PORTAL_NET
+enable_node_monitoring: $ENABLE_NODE_MONITORING
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

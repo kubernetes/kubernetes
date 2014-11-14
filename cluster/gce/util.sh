@@ -285,6 +285,7 @@ function kube-up {
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly FLUENTD_ELASTICSEARCH='${FLUENTD_ELASTICSEARCH:-false}'"
     echo "readonly FLUENTD_GCP='${FLUENTD_GCP:-false}'"
+    echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/common.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/gce/templates/download-release.sh"
