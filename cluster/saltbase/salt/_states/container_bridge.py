@@ -34,11 +34,22 @@ def ensure(name, cidr, mtu=1460):
     '''
     ret = {'name': name, 'changes': {}, 'result': False, 'comment': ''}
 
-    iptables_rule = {
-        'table': 'nat',
-        'chain': 'POSTROUTING',
-        'rule': '-o eth0 -j MASQUERADE \! -d 10.0.0.0/8'
-    }
+    # This is a little hacky.  I should probably import a real library for this
+    # but this'll work for now.
+    try:
+        cidr_network = ipaddr.IPNetwork(cidr, strict=True)
+    except Exception:
+        raise salt.exceptions.SaltInvocationError(
+            'Invalid CIDR \'{0}\''.format(cidr))
+
+    if cidr_network.version == 4:
+        iptables_rule = {
+            'table': 'nat',
+            'chain': 'POSTROUTING',
+            'rule': '-o eth0 -j MASQUERADE \! -d 10.0.0.0/8'
+        }
+    else:
+        iptables_rule = None
 
     def bridge_exists(name):
         'Determine if a bridge exists already.'
@@ -90,20 +101,15 @@ def ensure(name, cidr, mtu=1460):
             ret['details'] = {}
         # This module function is strange and returns True if the rule exists.
         # If not, it returns a string with the error from the call to iptables.
-        ret['iptables_rule_exists'] = \
-          __salt__['iptables.check'](**iptables_rule) == True
+        if iptables_rule:
+            ret['iptables_rule_exists'] = \
+              __salt__['iptables.check'](**iptables_rule) == True
+        else:
+            ret['iptables_rule_exists'] = True
         return ret
 
-    # This is a little hacky.  I should probably import a real library for this
-    # but this'll work for now.
-    try:
-        cidr_network = ipaddr.IPv4Network(cidr, strict=True)
-    except Exception:
-        raise salt.exceptions.SaltInvocationError(
-            'Invalid CIDR \'{0}\''.format(cidr))
-
     desired_network = '{0}/{1}'.format(
-        str(ipaddr.IPv4Address(cidr_network._ip + 1)),
+        str(ipaddr.IPAddress(cidr_network._ip + 1)),
         str(cidr_network.prefixlen))
 
     current_state = get_current_state()
@@ -147,7 +153,7 @@ def ensure(name, cidr, mtu=1460):
         __salt__['cmd.run'](
             'ip link set dev {0} up'.format(name))
     new_state = get_current_state()
-    if not new_state['iptables_rule_exists']:
+    if iptables_rule and not new_state['iptables_rule_exists']:
         __salt__['iptables.append'](**iptables_rule)
     new_state = get_current_state()
 

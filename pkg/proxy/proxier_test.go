@@ -94,6 +94,10 @@ func (fake *fakeIptables) DeleteRule(table iptables.Table, chain iptables.Chain,
 	return nil
 }
 
+func (fake *fakeIptables) IsIpv6() bool {
+	return false
+}
+
 var tcpServerPort string
 var udpServerPort string
 

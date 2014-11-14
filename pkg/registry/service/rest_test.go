@@ -44,6 +44,8 @@ func TestServiceRegistryCreate(t *testing.T) {
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	storage := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	storage.portalMgr.randomAttempts = 0
+
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -455,6 +457,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	rest := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest.portalMgr.randomAttempts = 0
 
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -513,6 +516,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	rest := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest.portalMgr.randomAttempts = 0
 
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -559,6 +563,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	rest := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -613,6 +618,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	rest := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -642,6 +648,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	rest1 := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest1.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -665,6 +672,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 
 	// This will reload from storage, finding the previous 2
 	rest2 := NewREST(registry, fakeCloud, registrytest.NewMinionRegistry(machines, api.NodeResources{}), makeIPNet(t))
+	rest2.portalMgr.randomAttempts = 0
 
 	svc = &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},

@@ -532,8 +532,11 @@ func iptablesFlush(ipt iptables.Interface) error {
 }
 
 // Used below.
-var zeroIP = net.ParseIP("0.0.0.0")
-var localhostIP = net.ParseIP("127.0.0.1")
+var zeroIPv4 = net.ParseIP("0.0.0.0")
+var localhostIPv4 = net.ParseIP("127.0.0.1")
+
+var zeroIPv6 = net.ParseIP("::0")
+var localhostIPv6 = net.ParseIP("::1")
 
 // Build a slice of iptables args for a portal rule.
 func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
@@ -561,10 +564,13 @@ func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, prox
 	// Unfortunately, I don't know of any way to listen on some (N > 1)
 	// interfaces but not ALL interfaces, short of doing it manually, and
 	// this is simpler than that.
-	if proxyIP.Equal(zeroIP) || proxyIP.Equal(localhostIP) {
+	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) ||
+		proxyIP.Equal(localhostIPv4) || proxyIP.Equal(localhostIPv6) {
+		// TODO: Can we REDIRECT with IPv6?
 		args = append(args, "-j", "REDIRECT", "--to-ports", fmt.Sprintf("%d", proxyPort))
 	} else {
-		args = append(args, "-j", "DNAT", "--to-destination", fmt.Sprintf("%s:%d", proxyIP.String(), proxyPort))
+		// TODO: Can we DNAT with IPv6?
+		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	}
 	return args
 }

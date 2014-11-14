@@ -1,1 +1,6 @@
-DOCKER_OPTS="--bridge cbr0 --iptables=false --ip-masq=false -r=false"
+{% if grains.docker_opts is defined %}
+  {% set docker_opts = grains.docker_opts %}
+{% else %}
+  {% set docker_opts = "" %}
+{% endif %}
+DOCKER_OPTS="{{docker_opts}} --bridge cbr0 --iptables=false --ip-masq=false -r=false"
