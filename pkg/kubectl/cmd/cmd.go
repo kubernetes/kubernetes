@@ -170,7 +170,7 @@ func GetKubeConfig(cmd *cobra.Command) *client.Config {
 	}
 	config.Host = host
 
-	if client.IsConfigTransportSecure(config) {
+	if client.IsConfigTransportTLS(config) {
 		// Get the values from the file on disk (or from the user at the
 		// command line). Override them with the command line parameters, if
 		// provided.

@@ -47,40 +47,47 @@ func TestTransportFor(t *testing.T) {
 	}
 }
 
-func TestIsConfigTransportSecure(t *testing.T) {
+func TestIsConfigTransportTLS(t *testing.T) {
 	testCases := []struct {
-		Config *Config
-		Secure bool
+		Config       *Config
+		TransportTLS bool
 	}{
 		{
-			Config: &Config{},
-			Secure: false,
+			Config:       &Config{},
+			TransportTLS: false,
 		},
 		{
 			Config: &Config{
 				Host: "https://localhost",
 			},
-			Secure: true,
+			TransportTLS: true,
 		},
 		{
 			Config: &Config{
 				Host:     "localhost",
 				CertFile: "foo",
 			},
-			Secure: true,
+			TransportTLS: true,
 		},
 		{
 			Config: &Config{
 				Host:     "///:://localhost",
 				CertFile: "foo",
 			},
-			Secure: false,
+			TransportTLS: false,
+		},
+		{
+			Config: &Config{
+				Host:     "1.2.3.4:567",
+				Insecure: true,
+			},
+			TransportTLS: true,
 		},
 	}
 	for _, testCase := range testCases {
-		secure := IsConfigTransportSecure(testCase.Config)
-		if testCase.Secure != secure {
-			t.Errorf("expected %v for %#v", testCase.Secure, testCase.Config)
+		useTLS := IsConfigTransportTLS(testCase.Config)
+		if testCase.TransportTLS != useTLS {
+			t.Errorf("expected %v for %#v", testCase.TransportTLS, testCase.Config)
 		}
 	}
 }
