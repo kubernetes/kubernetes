@@ -39,6 +39,12 @@ logger-up:
 logger-down:
 	-${KUBECTL} delete pods synthetic-logger-0.25lps-pod
 
+logger10-up:
+	-${KUBECTL} create -f synthetic_10lps.yml
+
+logger10-down:
+	-${KUBECTL} delete pods synthetic-logger-10lps-pod
+
 get:	
 	${KUBECTL} get pods
 	${KUBECTL} get services
