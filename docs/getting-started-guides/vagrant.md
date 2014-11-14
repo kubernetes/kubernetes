@@ -184,11 +184,10 @@ ID                                     Image(s)            Host                 
 78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Waiting
 ```
 
-You need to wait for the provisioning to complete, you can monitor the minions by doing
+You need to wait for the provisioning to complete, you can monitor the minions by doing:
 
 ```
-$ vagrant ssh minion-1
-$ sudo docker images
+$ sudo salt '*minion-1' cmd.run 'docker images'
 REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
 <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
 google/cadvisor     latest              e0575e677c50        13 days ago         12.64 MB
