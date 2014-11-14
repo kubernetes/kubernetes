@@ -6,7 +6,7 @@
     {% set cert_ip='_use_aws_external_ip_' %}
   {% endif %}
   {% if grains.cloud == 'vagrant' %}
-    {% set cert_ip=grains.fqdn_ip4 %}
+    {% set cert_ip=grains.ip_interfaces.eth1[0] %}
   {% endif %}
   {% if grains.cloud == 'vsphere' %}
     {% set cert_ip=grains.ip_interfaces.eth0[0] %}
@@ -22,6 +22,10 @@
 {% if cert_ip is defined %}
   {% set certgen="make-ca-cert.sh" %}
 {% endif %}
+
+kube-cert:
+  group.present:
+    - system: True
 
 kubernetes-cert:
   cmd.script:

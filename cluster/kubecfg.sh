@@ -83,16 +83,9 @@ fi
 
 # When we are using vagrant it has hard coded auth.  We repeat that here so that
 # we don't clobber auth that might be used for a publicly facing cluster.
-if [ "$KUBERNETES_PROVIDER" == "vagrant" ]; then
-  cat >~/.kubernetes_vagrant_auth <<EOF
-{
-  "User": "vagrant",
-  "Password": "vagrant"
-}
-EOF
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
   auth_config=(
     "-auth" "$HOME/.kubernetes_vagrant_auth"
-    "-insecure_skip_tls_verify"
   )
 else
   auth_config=()

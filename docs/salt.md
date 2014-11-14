@@ -52,7 +52,7 @@ The following enumerates the set of defined key/value pairs that are supported t
 Key | Value
 ------------- | -------------
 `cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
-`cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*
+`cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*, *aws*, *vagrant*
 `cloud_provider` | (Optional) The cloud_provider used by apiserver: *gce*, *azure*, *vagrant*
 `etcd_servers` | (Optional) Comma-delimited list of IP addresses the apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role.
 `hostnamef` | (Optional) The full host name of the machine, i.e. hostname -f

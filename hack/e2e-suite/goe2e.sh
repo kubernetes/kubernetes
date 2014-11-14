@@ -63,5 +63,14 @@ locations=(
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
+# When we are using vagrant it has hard coded auth.  We repeat that here so that
+# we don't clobber auth that might be used for a publicly facing cluster.
+if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  auth_config=(
+    "--auth_config=$HOME/.kubernetes_vagrant_auth"
+  )
+else
+  auth_config=()
+fi
 
-"${e2e}" -host="https://${KUBE_MASTER_IP-}"
+"${e2e}" "${auth_config[@]:+${auth_config[@]}}" -host="https://${KUBE_MASTER_IP-}"
