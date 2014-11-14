@@ -112,6 +112,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
+		// TODO: Get rid of ProxyPort.
 		service.Spec.ProxyPort = 0
 		if service.Spec.CreateExternalLoadBalancer {
 			if rs.cloud == nil {

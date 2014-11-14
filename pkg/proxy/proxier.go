@@ -40,7 +40,8 @@ type serviceInfo struct {
 	timeout    time.Duration
 	mu         sync.Mutex // protects active
 	active     bool
-	publicIP   []string
+	// TODO: make this an net.IP address
+	publicIP []string
 }
 
 func (si *serviceInfo) isActive() bool {
@@ -506,7 +507,6 @@ func (proxier *Proxier) openPortal(service string, info *serviceInfo) error {
 
 func (proxier *Proxier) openExternalPortal(service string, info *serviceInfo) error {
 	for _, publicIP := range info.publicIP {
-		proxier.iptables.EnsureRule(iptables.TableNAT, iptables.ChainPostrouting, iptablesRoutingArgs(publicIP)...)
 		args := iptablesPortalArgs(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 		existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesProxyChain, args...)
 		if err != nil {
@@ -535,7 +535,6 @@ func (proxier *Proxier) closePortal(service string, info *serviceInfo) error {
 
 func (proxier *Proxier) closeExternalPortal(service string, info *serviceInfo) error {
 	for _, publicIP := range info.publicIP {
-		proxier.iptables.DeleteRule(iptables.TableNAT, iptables.ChainPostrouting, iptablesRoutingArgs(publicIP)...)
 		args := iptablesPortalArgs(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenAddress, info.proxyPort, service)
 		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesProxyChain, args...); err != nil {
 			glog.Errorf("Failed to delete external iptables %s rule for service %q", iptablesProxyChain, service)
@@ -576,16 +575,6 @@ var localhostIPv4 = net.ParseIP("127.0.0.1")
 
 var zeroIPv6 = net.ParseIP("::0")
 var localhostIPv6 = net.ParseIP("::1")
-
-// Build an iptables args to route in a specific external ip
-func iptablesRoutingArgs(destIP string) []string {
-	return []string{
-		"!",
-		"-d", destIP + "/32",
-		"-o", "eth0",
-		"-j", "MASQUERADE",
-	}
-}
 
 // Build a slice of iptables args for a portal rule.
 func iptablesPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service string) []string {
