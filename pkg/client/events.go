@@ -17,14 +17,17 @@ limitations under the License.
 package client
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// Events has methods to work with Event resources
-type EventsInterface interface {
-	Events() EventInterface
+// EventNamespacer can return an EventInterface for the given namespace.
+type EventNamespacer interface {
+	Events(namespace string) EventInterface
 }
 
 // EventInterface has methods to work with Event resources
@@ -33,32 +36,48 @@ type EventInterface interface {
 	List(label, field labels.Selector) (*api.EventList, error)
 	Get(id string) (*api.Event, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	// Search finds events about the specified object
+	Search(objOrRef runtime.Object) (*api.EventList, error)
 }
 
 // events implements Events interface
 type events struct {
-	r *Client
+	client    *Client
+	namespace string
 }
 
-// newEvents returns a events
-func newEvents(c *Client) *events {
+// newEvents returns a new events object.
+func newEvents(c *Client, ns string) *events {
 	return &events{
-		r: c,
+		client:    c,
+		namespace: ns,
 	}
 }
 
-// Create makes a new event. Returns the copy of the event the server returns, or an error.
-func (c *events) Create(event *api.Event) (*api.Event, error) {
+// Create makes a new event. Returns the copy of the event the server returns,
+// or an error. The namespace to create the event within is deduced from the
+// event; it must either match this event client's namespace, or this event
+// client must have been created with the "" namespace.
+func (e *events) Create(event *api.Event) (*api.Event, error) {
+	if e.namespace != "" && event.Namespace != e.namespace {
+		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, e.namespace)
+	}
 	result := &api.Event{}
-	err := c.r.Post().Path("events").Namespace(event.Namespace).Body(event).Do().Into(result)
+	err := e.client.Post().
+		Path("events").
+		Namespace(event.Namespace).
+		Body(event).
+		Do().
+		Into(result)
 	return result, err
 }
 
 // List returns a list of events matching the selectors.
-func (c *events) List(label, field labels.Selector) (*api.EventList, error) {
+func (e *events) List(label, field labels.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
-	err := c.r.Get().
+	err := e.client.Get().
 		Path("events").
+		Namespace(e.namespace).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Do().
@@ -67,19 +86,45 @@ func (c *events) List(label, field labels.Selector) (*api.EventList, error) {
 }
 
 // Get returns the given event, or an error.
-func (c *events) Get(id string) (*api.Event, error) {
+func (e *events) Get(id string) (*api.Event, error) {
 	result := &api.Event{}
-	err := c.r.Get().Path("events").Path(id).Do().Into(result)
+	err := e.client.Get().
+		Path("events").
+		Path(id).
+		Namespace(e.namespace).
+		Do().
+		Into(result)
 	return result, err
 }
 
 // Watch starts watching for events matching the given selectors.
-func (c *events) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	return c.r.Get().
+func (e *events) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return e.client.Get().
 		Path("watch").
 		Path("events").
 		Param("resourceVersion", resourceVersion).
+		Namespace(e.namespace).
 		SelectorParam("labels", label).
 		SelectorParam("fields", field).
 		Watch()
+}
+
+// Search finds events about the specified object. The namespace of the
+// object must match this event's client namespace unless the event client
+// was made with the "" namespace.
+func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
+	ref, err := api.GetReference(objOrRef)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: search by UID if it's set
+	fields := labels.Set{
+		"involvedObject.kind":      ref.Kind,
+		"involvedObject.namespace": ref.Namespace,
+		"involvedObject.name":      ref.Name,
+	}.AsSelector()
+	if e.namespace != "" && ref.Namespace != e.namespace {
+		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.namespace)
+	}
+	return e.List(labels.Everything(), fields)
 }

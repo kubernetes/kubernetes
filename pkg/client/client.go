@@ -33,7 +33,7 @@ type Interface interface {
 	EndpointsNamespacer
 	VersionInterface
 	MinionsInterface
-	EventsInterface
+	EventNamespacer
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -44,8 +44,8 @@ func (c *Client) Minions() MinionInterface {
 	return newMinions(c)
 }
 
-func (c *Client) Events() EventInterface {
-	return newEvents(c)
+func (c *Client) Events(namespace string) EventInterface {
+	return newEvents(c, namespace)
 }
 
 func (c *Client) Endpoints(namespace string) EndpointsInterface {
