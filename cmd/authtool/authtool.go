@@ -25,7 +25,7 @@ limitations under the License.
 // since not all distributions have python or the like (coreOS doesn't).
 //
 // TODO: will need auto-edit mode, to update existing policies if, upon
-// a kubernetes upgrade::
+// a kubernetes upgrade:
 //   - new object types were added that users need access too.
 //   - new privileges are required for a system user, such as kubelet.
 
