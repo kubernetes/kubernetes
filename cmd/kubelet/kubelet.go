@@ -110,6 +110,27 @@ func getHostname() string {
 	return strings.TrimSpace(string(hostname))
 }
 
+func getApiserverClient() (*client.Client, error) {
+	authInfo, err := clientauth.LoadFromFile(*authPath)
+	if err != nil {
+		return nil, err
+	}
+	clientConfig, err := authInfo.MergeWithConfig(client.Config{})
+	if err != nil {
+		return nil, err
+	}
+	// TODO: adapt Kube client to support LB over several servers
+	if len(apiServerList) > 1 {
+		glog.Infof("Mulitple api servers specified.  Picking first one")
+	}
+	clientConfig.Host = apiServerList[0]
+	if c, err := client.New(&clientConfig); err != nil {
+		return nil, err
+	} else {
+		return c, nil
+	}
+}
+
 func main() {
 	flag.Parse()
 	util.InitLogs()
@@ -132,36 +153,16 @@ func main() {
 	etcd.SetLogger(util.NewLogger("etcd "))
 
 	// Make an API client if possible.
-	var apiClient *client.Client = nil
 	if len(apiServerList) < 1 {
 		glog.Info("No api servers specified.")
 	} else {
-		authInfo, err := clientauth.LoadFromFile(*authPath)
-		if err != nil {
-			glog.Warningf("Not able to load auth config file: %v", err)
+		if apiClient, err := getApiserverClient(); err != nil {
+			glog.Errorf("Unable to make apiserver client: %v", err)
 		} else {
-			clientConfig, err := authInfo.MergeWithConfig(client.Config{})
-			if err != nil {
-				glog.Warningf("Not able to make client config: %v", err)
-			} else {
-				// TODO: adapt Kube client to support LB over several servers.
-				if len(apiServerList) > 1 {
-					glog.Infof("Mulitple api servers specified.  Picking first one")
-				}
-				clientConfig.Host = apiServerList[0]
-				if c, err := client.New(&clientConfig); err != nil {
-					glog.Warningf("No API client configured: %v", err)
-				} else {
-					apiClient = c
-					glog.Infof("API Client created.")
-				}
-			}
+			// Send events to APIserver if there is a client.
+			glog.Infof("Sending events to APIserver.")
+			record.StartRecording(apiClient.Events(""), "kubelet")
 		}
-	}
-	// Send events to APIserver if there is a client.
-	if apiClient != nil {
-		glog.Infof("Sending events to APIserver.")
-		record.StartRecording(apiClient.Events(""), "kubelet")
 	}
 
 	// Log the events locally too.
