@@ -134,6 +134,7 @@ func tryUp() bool {
 }
 
 func Test() (failed, passed []string) {
+	defer runBashUntil("watchEvents", "$KUBECTL --watch-only get events")()
 	// run tests!
 	dir, err := os.Open(filepath.Join(*root, "hack", "e2e-suite"))
 	if err != nil {
@@ -173,6 +174,24 @@ func runBash(stepName, bashFragment string) bool {
 	cmd := exec.Command("bash", "-s")
 	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
 	return finishRunning(stepName, cmd)
+}
+
+// call the returned anonymous function to stop.
+func runBashUntil(stepName, bashFragment string) func() {
+	cmd := exec.Command("bash", "-s")
+	cmd.Stdin = strings.NewReader(bashWrap(bashFragment))
+	log.Printf("Running in background: %v", stepName)
+	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	if err := cmd.Start(); err != nil {
+		log.Printf("Unable to start '%v': '%v'", stepName, err)
+		return func() {}
+	}
+	return func() {
+		cmd.Process.Signal(os.Interrupt)
+		fmt.Printf("%v stdout:\n------\n%v\n------\n", stepName, string(stdout.Bytes()))
+		fmt.Printf("%v stderr:\n------\n%v\n------\n", stepName, string(stderr.Bytes()))
+	}
 }
 
 func run(stepName, cmdPath string) bool {
