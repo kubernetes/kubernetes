@@ -584,9 +584,9 @@ function setup-monitoring {
 
     cp "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" "${KUBE_TEMP}/influx-grafana-pod.0.json"
     sed "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" \
-      "${KUBE_TEMP}/influx-grafana-pod.0.json" > "${KUBE_TEMP}/influx-grafana-pod.1.json"
+        "${KUBE_TEMP}/influx-grafana-pod.0.json" > "${KUBE_TEMP}/influx-grafana-pod.1.json"
     sed "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" \
-      "${KUBE_TEMP}/influx-grafana-pod.1.json" > "${KUBE_TEMP}/influx-grafana-pod.2.json"
+        "${KUBE_TEMP}/influx-grafana-pod.1.json" > "${KUBE_TEMP}/influx-grafana-pod.2.json"
     local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
     if "${kubectl}" create -f "${KUBE_TEMP}/influx-grafana-pod.2.json" &> /dev/null \
         && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
@@ -613,9 +613,9 @@ function teardown-monitoring {
     "${kubectl}" delete services influx-master &> /dev/null || true
     if gcloud compute firewall-rules describe monitoring-heapster &> /dev/null; then
       gcloud compute firewall-rules delete \
-        --project "${PROJECT}" \
-        --quiet \
-        monitoring-heapster &> /dev/null || true
+          --project "${PROJECT}" \
+          --quiet \
+          monitoring-heapster &> /dev/null || true
     fi
   fi
 }
