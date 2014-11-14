@@ -184,26 +184,27 @@ ID                                     Image(s)            Host                 
 78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Waiting
 ```
 
-You need to wait for the provisioning to complete, you can monitor the minions by doing
+You need to wait for the provisioning to complete, you can monitor the minions by doing:
 
 ```
-$ vagrant ssh minion-1
-$ sudo docker images
-REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
-<none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
-google/cadvisor     latest              e0575e677c50        13 days ago         12.64 MB
-kubernetes/pause    latest              6c4579af347b        8 weeks ago         239.8 kB
+$ sudo salt '*minion-1' cmd.run 'docker images'
+kubernetes-minion-1:
+    REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
+    <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
+    google/cadvisor     latest              e0575e677c50        13 days ago         12.64 MB
+    kubernetes/pause    latest              6c4579af347b        8 weeks ago         239.8 kB
 ```
 
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
 ```
-$ sudo docker ps
-CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
-dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
-fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
-aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
-65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561
+$ sudo salt '*minion-1' cmd.run 'docker ps'
+kubernetes-minion-1:
+    CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
+    dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
+    fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
+    aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
+    65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561
 ```
 
 Going back to listing the pods, services and replicationControllers, you now have:
