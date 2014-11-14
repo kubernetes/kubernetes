@@ -322,8 +322,6 @@ type ContainerStatus struct {
 	PodIP string `json:"podIP,omitempty" yaml:"podIP,omitempty"`
 	// TODO(dchen1107): Need to decide how to reprensent this in v1beta3
 	Image string `yaml:"image" json:"image"`
-	// TODO(dchen1107): Once we have done with integration with cadvisor, resource
-	// usage should be included.
 }
 
 // PodInfo contains one entry for every container with available info.
