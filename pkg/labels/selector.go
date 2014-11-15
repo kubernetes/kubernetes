@@ -29,7 +29,7 @@ import (
 // Selector represents a label selector.
 type Selector interface {
 	// Matches returns true if this selector matches the given set of labels.
-	Matches(Labels) bool
+	Matches(labels Labels) bool
 
 	// Empty returns true if this selector does not restrict the selection space.
 	Empty() bool

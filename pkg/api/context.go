@@ -69,7 +69,8 @@ func Namespace(ctx Context) string {
 	return namespace
 }
 
-// ValidNamespace returns false if the namespace on the context differs from the resource.  If the resource has no namespace, it is set to the value in the context.
+// ValidNamespace returns false if the namespace on the context differs from the resource.
+// If the resource has no namespace, it is set to the value in the context.
 func ValidNamespace(ctx Context, resource *ObjectMeta) bool {
 	ns, ok := NamespaceFrom(ctx)
 	if len(resource.Namespace) == 0 {
@@ -78,7 +79,8 @@ func ValidNamespace(ctx Context, resource *ObjectMeta) bool {
 	return ns == resource.Namespace && ok
 }
 
-// WithNamespaceDefaultIfNone returns a context whose namespace is the default if and only if the parent context has no namespace value
+// WithNamespaceDefaultIfNone returns a context whose namespace is the default if and only
+// if the parent context has no namespace value
 func WithNamespaceDefaultIfNone(parent Context) Context {
 	namespace, ok := NamespaceFrom(parent)
 	if !ok || len(namespace) == 0 {
