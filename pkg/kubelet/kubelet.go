@@ -268,11 +268,6 @@ func (self *podWorkers) Run(podFullName string, action func()) {
 	}()
 }
 
-// LogEvent reports an event.
-func (kl *Kubelet) LogEvent(event *api.Event) error {
-	return nil
-}
-
 func makeEnvironmentVariables(container *api.Container) []string {
 	var result []string
 	for _, value := range container.Env {
@@ -404,6 +399,9 @@ func fieldPath(pod *api.BoundPod, container *api.Container) (string, error) {
 // containerRef returns an *api.ObjectReference which references the given container within the
 // given pod. Returns an error if the reference can't be constructed or the container doesn't
 // actually belong to the pod.
+// TODO: Pods that came to us by static config or over HTTP have no selfLink set, which makes
+// this fail and log an error. Figure out how we want to identify these pods to the rest of the
+// system.
 func containerRef(pod *api.BoundPod, container *api.Container) (*api.ObjectReference, error) {
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {
