@@ -432,7 +432,7 @@ func ValidateService(service *api.Service, lister ServiceLister, ctx api.Context
 		} else {
 			for i := range services.Items {
 				if services.Items[i].Spec.CreateExternalLoadBalancer && services.Items[i].Spec.Port == service.Spec.Port {
-					allErrs = append(allErrs, errs.NewConflict("service", service.Namespace, fmt.Errorf("Port: %d is already in use", service.Spec.Port)))
+					allErrs = append(allErrs, errs.NewConflict("service", service.Name, fmt.Errorf("Port: %d is already in use", service.Spec.Port)))
 					break
 				}
 			}
