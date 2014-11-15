@@ -258,7 +258,8 @@ stop_service "${svc1_name}"
 wait_for_service_down "${svc1_name}" "${svc1_ip}" "${svc1_port}"
 
 #
-# Test 4: Bring up another service, make sure it re-uses Portal IPs.
+# Test 4: Bring up another service.
+# TODO: Actually add a test to force re-use.
 #
 svc3_name="service3"
 svc3_port=80
@@ -274,9 +275,6 @@ svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 # Get the portal IP.
 svc3_ip=$(${KUBECFG} -template '{{.portalIP}}' get "services/${svc3_name}")
 test -n "${svc3_ip}" || error "Service3 IP is blank"
-if [[ "${svc3_ip}" != "${svc1_ip}" ]]; then
-  error "Portal IPs not resued: ${svc3_ip} != ${svc1_ip}"
-fi
 
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
