@@ -8,9 +8,21 @@ Manifests can then be edited by a human to match deployment needs.
 
 ## Usage
 ```
-$ docker pull google/nodejs-hello
-$ podex -yaml google/nodejs-hello > pod.yaml
-$ podex -json google/nodejs-hello > pod.json
+$ podex [-json|-yaml] [-id PODNAME] IMAGES...
+
+$ podex -json [-id PODNAME] IMAGES... > pod.json
+$ podex -yaml [-id PODNAME] IMAGES... > pod.yaml
+```
+
+### Options
+- `id`: set the pod name (required with multiple images, optional with single image: default to image base name)
+- `json`: puts the container manifest into JSON format
+- `yaml`: puts the container manifest into YAML format
+
+### Examples
+```
+$ podex -json google/nodejs-hello > pod.yaml
+$ podex -yaml -id nodejs-nginx google/nodejs-hello nginx > pod.yaml
 ```
 
 ## TODOs

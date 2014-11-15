@@ -40,7 +40,7 @@ import (
 	"gopkg.in/v1/yaml"
 )
 
-const usage = "usage: podex [-json|-yaml] -id=ID username/image1 ... username/imageN"
+const usage = "usage: podex [-json|-yaml] [-id PODNAME] IMAGES"
 
 var generateJSON = flag.Bool("json", false, "generate json manifest")
 var generateYAML = flag.Bool("yaml", false, "generate yaml manifest")
