@@ -18,7 +18,10 @@
            }]
          }
        },
-       "labels": {"name": "redisslave"}
+       "labels": {
+         "name": "redisslave",
+         "uses": "redis-master",
+       }
       }},
   "labels": {"name": "redisslave"}
 }
