@@ -127,12 +127,16 @@ func formatLabels(labelMap map[string]string) string {
 	return l
 }
 
-func makeImageList(spec *api.PodSpec) string {
+func listOfImages(spec *api.PodSpec) []string {
 	var images []string
 	for _, container := range spec.Containers {
 		images = append(images, container.Image)
 	}
-	return strings.Join(images, ",")
+	return images
+}
+
+func makeImageList(spec *api.PodSpec) string {
+	return strings.Join(listOfImages(spec), ",")
 }
 
 // ExpandResourceShortcut will return the expanded version of resource

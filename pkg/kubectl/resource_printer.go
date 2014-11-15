@@ -260,12 +260,27 @@ func printPod(pod *api.Pod, w io.Writer) error {
 	if err := api.Scheme.Convert(&pod.DesiredState.Manifest, spec); err != nil {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
-
+	il := listOfImages(spec)
+	// Be paranoid about the case where there is no image.
+	var firstImage string
+	if len(il) > 0 {
+		firstImage, il = il[0], il[1:]
+	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-		pod.Name, makeImageList(spec),
+		pod.Name, firstImage,
 		podHostString(pod.CurrentState.Host, pod.CurrentState.HostIP),
 		labels.Set(pod.Labels), pod.CurrentState.Status)
-	return err
+	if err != nil {
+		return err
+	}
+	// Lay out all the other images on separate lines.
+	for _, image := range il {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", "", image, "", "", "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func printPodList(podList *api.PodList, w io.Writer) error {
