@@ -646,6 +646,7 @@ func ServeCachedManifestFile() (servingAddress string) {
 const (
 	// This is copied from, and should be kept in sync with:
 	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
+	// Note that kubelet complains about these containers not having a self link.
 	testManifestFile = `version: v1beta2
 id: container-vm-guestbook
 containers:
