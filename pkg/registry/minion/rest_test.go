@@ -17,6 +17,7 @@ limitations under the License.
 package minion
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -117,6 +118,49 @@ func contains(nodes *api.MinionList, nodeID string) bool {
 		}
 	}
 	return false
+}
+
+func TestMinionRegistryUpdate(t *testing.T) {
+	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
+	ms := NewREST(minionRegistry)
+
+	ctx := api.NewContext()
+
+	expected_labels := map[string]string{"foo": "bar"}
+	c, err := ms.Create(ctx, &api.Minion{
+		ObjectMeta: api.ObjectMeta{Name: "m1"},
+		Labels:     expected_labels,
+	})
+	if err != nil {
+		t.Errorf("insert failed")
+	}
+	result := <-c
+
+	created, ok := result.Object.(*api.Minion)
+	if !ok || created.Name != "m1" {
+		t.Errorf("insert return value was weird: %#v", result)
+	}
+	if !reflect.DeepEqual(expected_labels, created.Labels) {
+		t.Errorf("unexpected labels: %#v", created.Labels)
+	}
+
+	update := new(api.Minion)
+	*update = *created
+	update_labels := map[string]string{"bar": "foo"}
+	update.Labels = update_labels
+
+	c, err = ms.Update(ctx, update)
+	if err != nil {
+		t.Errorf("update failed")
+	}
+	result = <-c
+	updated, ok := result.Object.(*api.Minion)
+	if !ok || updated.Name != "m1" {
+		t.Errorf("update return value was weird: %#v", result)
+	}
+	if !reflect.DeepEqual(update_labels, updated.Labels) {
+		t.Errorf("unexpected labels: %#v", updated.Labels)
+	}
 }
 
 func TestMinionStorageValidatesCreate(t *testing.T) {

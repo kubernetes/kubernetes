@@ -581,6 +581,12 @@ func (r *Registry) CreateMinion(ctx api.Context, minion *api.Minion) error {
 	return etcderr.InterpretCreateError(err, "minion", minion.Name)
 }
 
+func (r *Registry) UpdateMinion(ctx api.Context, minion *api.Minion) error {
+	// TODO: Add some validations.
+	err := r.SetObj(makeMinionKey(minion.Name), minion)
+	return etcderr.InterpretUpdateError(err, "minion", minion.Name)
+}
+
 func (r *Registry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
 	var minion api.Minion
 	key := makeMinionKey(minionID)
