@@ -14,20 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockertools
+package credentialprovider
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
-
-	"github.com/fsouza/go-dockerclient"
 )
 
 func TestDockerConfigJSONDecode(t *testing.T) {
 	input := []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`)
 
-	expect := dockerConfig(map[string]dockerConfigEntry{
+	expect := DockerConfig(map[string]DockerConfigEntry{
 		"http://foo.example.com": {
 			Username: "foo",
 			Password: "bar",
@@ -40,7 +38,7 @@ func TestDockerConfigJSONDecode(t *testing.T) {
 		},
 	})
 
-	var output dockerConfig
+	var output DockerConfig
 	err := json.Unmarshal(input, &output)
 	if err != nil {
 		t.Errorf("Received unexpected error: %v", err)
@@ -54,13 +52,13 @@ func TestDockerConfigJSONDecode(t *testing.T) {
 func TestDockerConfigEntryJSONDecode(t *testing.T) {
 	tests := []struct {
 		input  []byte
-		expect dockerConfigEntry
+		expect DockerConfigEntry
 		fail   bool
 	}{
 		// simple case, just decode the fields
 		{
 			input: []byte(`{"username": "foo", "password": "bar", "email": "foo@example.com"}`),
-			expect: dockerConfigEntry{
+			expect: DockerConfigEntry{
 				Username: "foo",
 				Password: "bar",
 				Email:    "foo@example.com",
@@ -71,7 +69,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 		// auth field decodes to username & password
 		{
 			input: []byte(`{"auth": "Zm9vOmJhcg==", "email": "foo@example.com"}`),
-			expect: dockerConfigEntry{
+			expect: DockerConfigEntry{
 				Username: "foo",
 				Password: "bar",
 				Email:    "foo@example.com",
@@ -82,7 +80,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 		// auth field overrides username & password
 		{
 			input: []byte(`{"username": "foo", "password": "bar", "auth": "cGluZzpwb25n", "email": "foo@example.com"}`),
-			expect: dockerConfigEntry{
+			expect: DockerConfigEntry{
 				Username: "ping",
 				Password: "pong",
 				Email:    "foo@example.com",
@@ -93,7 +91,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 		// poorly-formatted auth causes failure
 		{
 			input: []byte(`{"auth": "pants", "email": "foo@example.com"}`),
-			expect: dockerConfigEntry{
+			expect: DockerConfigEntry{
 				Username: "",
 				Password: "",
 				Email:    "foo@example.com",
@@ -104,7 +102,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 		// invalid JSON causes failure
 		{
 			input: []byte(`{"email": false}`),
-			expect: dockerConfigEntry{
+			expect: DockerConfigEntry{
 				Username: "",
 				Password: "",
 				Email:    "",
@@ -114,7 +112,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		var output dockerConfigEntry
+		var output DockerConfigEntry
 		err := json.Unmarshal(tt.input, &output)
 		if (err != nil) != tt.fail {
 			t.Errorf("case %d: expected fail=%t, got err=%v", i, tt.fail, err)
@@ -166,43 +164,5 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 		if tt.password != password {
 			t.Errorf("case %d: expected password %q, got %q", i, tt.password, password)
 		}
-	}
-}
-
-func TestDockerKeyringFromConfig(t *testing.T) {
-	cfg := dockerConfig(map[string]dockerConfigEntry{
-		"http://foo.example.com": {
-			Username: "foo",
-			Password: "bar",
-			Email:    "foo@example.com",
-		},
-		"https://bar.example.com": {
-			Username: "bar",
-			Password: "baz",
-			Email:    "bar@example.com",
-		},
-	})
-
-	dk := newDockerKeyring()
-	cfg.addToKeyring(dk)
-
-	expect := newDockerKeyring()
-	expect.add("foo.example.com",
-		docker.AuthConfiguration{
-			Username: "foo",
-			Password: "bar",
-			Email:    "foo@example.com",
-		},
-	)
-	expect.add("bar.example.com",
-		docker.AuthConfiguration{
-			Username: "bar",
-			Password: "baz",
-			Email:    "bar@example.com",
-		},
-	)
-
-	if !reflect.DeepEqual(expect, dk) {
-		t.Errorf("Received unexpected output. Expected %#v, got %#v", expect, dk)
 	}
 }
