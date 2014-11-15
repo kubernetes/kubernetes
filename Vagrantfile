@@ -28,19 +28,19 @@ $kube_box = {
 }
 
 # This stuff is cargo-culted from http://www.stefanwrobel.com/how-to-make-vagrant-performance-not-suck
-# Give access to all cpu cores on the host
+# Give access to half of all cpu cores on the host. We divide by 2 as we assume
+# that users are running with hyperthreads.
 host = RbConfig::CONFIG['host_os']
 if host =~ /darwin/
-  $vm_cpus = `sysctl -n hw.ncpu`.to_i
+  $vm_cpus = (`sysctl -n hw.ncpu`.to_i/2.0).ceil
 elsif host =~ /linux/
-  $vm_cpus = `nproc`.to_i
+  $vm_cpus = (`nproc`.to_i/2.0).ceil
 else # sorry Windows folks, I can't help you
   $vm_cpus = 2
 end
 
 # Give VM 512MB of RAM
 $vm_mem = 512
-
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def customize_vm(config)

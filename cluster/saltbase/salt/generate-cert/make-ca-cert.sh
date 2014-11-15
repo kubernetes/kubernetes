@@ -20,7 +20,7 @@ set -o pipefail
 
 cert_ip=$1
 cert_dir=/srv/kubernetes
-cert_file_owner=apiserver.apiserver
+cert_group=kube-cert
 
 mkdir -p "$cert_dir"
 
@@ -63,4 +63,5 @@ cp -p pki/ca.crt "${cert_dir}/ca.crt"
 cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
 cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
 # Make server certs accessible to apiserver.
-chown $cert_file_owner "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.cert"
+chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"
+chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"

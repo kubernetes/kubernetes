@@ -44,6 +44,8 @@ apiserver:
   user.present:
     - system: True
     - gid_from_name: True
+    - groups:
+      - kube-cert
     - shell: /sbin/nologin
     - home: /var/apiserver
     - require:

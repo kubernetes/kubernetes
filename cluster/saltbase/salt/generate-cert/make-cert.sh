@@ -15,11 +15,12 @@
 # limitations under the License.
 
 cert_dir=/srv/kubernetes
-cert_file_owner=apiserver.apiserver
+cert_group=kube-cert
 
 mkdir -p "$cert_dir"
 
 openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
   -subj "/CN=kubernetes.invalid/O=Kubernetes" \
   -keyout "${cert_dir}/server.key" -out "${cert_dir}/server.cert"
-chown $cert_file_owner "${cert_dir}/server.key" "${cert_dir}/server.cert"
+chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert"
+chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert"

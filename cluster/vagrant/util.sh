@@ -43,6 +43,29 @@ function kube-up {
   get-password
   vagrant up
 
+  local kube_cert=".kubecfg.vagrant.crt"
+  local kube_key=".kubecfg.vagrant.key"
+  local ca_cert=".kubernetes.vagrant.ca.crt"
+
+  (umask 077
+   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+
+   cat << EOF > ~/.kubernetes_vagrant_auth
+{
+  "User": "$KUBE_USER",
+  "Password": "$KUBE_PASSWORD",
+  "CAFile": "$HOME/$ca_cert",
+  "CertFile": "$HOME/$kube_cert",
+  "KeyFile": "$HOME/$kube_key"
+}
+EOF
+
+   chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
+     "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+  )
+
   echo "Each machine instance has been created."
   echo "  Now waiting for the Salt provisioning process to complete on each machine."
   echo "  This can take some time based on your network, disk, and cpu speed."
@@ -108,7 +131,7 @@ function kube-up {
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
   echo
 }
 

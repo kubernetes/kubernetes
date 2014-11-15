@@ -1,14 +1,6 @@
 nginx:
   pkg:
     - installed
-  service:
-    - running
-    - watch:
-      - pkg: nginx
-      - file: /etc/nginx/nginx.conf
-      - file: /etc/nginx/sites-enabled/default
-      - file: /usr/share/nginx/htpasswd
-      - cmd: kubernetes-cert
 
 /etc/nginx/nginx.conf:
   file:
@@ -36,3 +28,13 @@ nginx:
     - group: root
     - mode: 644
 
+nginx-service:
+  service:
+    - running
+    - name: nginx
+    - watch:
+      - pkg: nginx
+      - file: /etc/nginx/nginx.conf
+      - file: /etc/nginx/sites-enabled/default
+      - file: /usr/share/nginx/htpasswd
+      - cmd: kubernetes-cert
