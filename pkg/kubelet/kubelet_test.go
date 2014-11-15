@@ -1529,3 +1529,44 @@ func TestPurgeOldest(t *testing.T) {
 		}
 	}
 }
+
+func TestSyncPodsWithPullPolicy(t *testing.T) {
+	kubelet, _, fakeDocker := newTestKubelet(t)
+	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
+	puller.HasImages = []string{"existing_one", "want:latest"}
+	kubelet.networkContainerImage = "custom_image_name"
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	err := kubelet.SyncPods([]api.BoundPod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar", Image: "pull_always_image", ImagePullPolicy: api.PullAlways},
+					{Name: "bar1", Image: "pull_never_image", ImagePullPolicy: api.PullNever},
+					{Name: "bar2", Image: "pull_if_not_present_image", ImagePullPolicy: api.PullIfNotPresent},
+					{Name: "bar3", Image: "existing_one", ImagePullPolicy: api.PullIfNotPresent},
+					{Name: "bar4", Image: "want:latest", ImagePullPolicy: api.PullIfNotPresent},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	kubelet.drainWorkers()
+
+	fakeDocker.Lock()
+
+	if !reflect.DeepEqual(puller.ImagesPulled, []string{"custom_image_name", "pull_always_image", "pull_if_not_present_image", "want:latest"}) {
+		t.Errorf("Unexpected pulled containers: %v", puller.ImagesPulled)
+	}
+
+	if len(fakeDocker.Created) != 6 {
+		t.Errorf("Unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+}
