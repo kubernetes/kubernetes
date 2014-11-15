@@ -638,7 +638,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
-	if created_service.Spec.ProxyPort != 6502 {
+	if created_service.Spec.ProxyPort != 0 {
 		t.Errorf("Unexpected ProxyPort: %d", created_service.Spec.ProxyPort)
 	}
 }

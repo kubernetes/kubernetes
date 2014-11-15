@@ -112,6 +112,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	return apiserver.MakeAsync(func() (runtime.Object, error) {
 		// TODO: Consider moving this to a rectification loop, so that we make/remove external load balancers
 		// correctly no matter what http operations happen.
+		// TODO: Get rid of ProxyPort.
 		service.Spec.ProxyPort = 0
 		if service.Spec.CreateExternalLoadBalancer {
 			if rs.cloud == nil {
@@ -133,13 +134,21 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 			if err != nil {
 				return nil, err
 			}
-			err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, service.Spec.Port, hostsFromMinionList(hosts))
+			var ip net.IP
+			if len(service.Spec.PublicIPs) > 0 {
+				for _, publicIP := range service.Spec.PublicIPs {
+					ip, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, net.ParseIP(publicIP), service.Spec.Port, hostsFromMinionList(hosts))
+					if err != nil {
+						break
+					}
+				}
+			} else {
+				ip, err = balancer.CreateTCPLoadBalancer(service.Name, zone.Region, nil, service.Spec.Port, hostsFromMinionList(hosts))
+			}
 			if err != nil {
 				return nil, err
 			}
-			// External load-balancers require a known port for the service proxy.
-			// TODO: If we end up brokering HostPorts between Pods and Services, this can be any port.
-			service.Spec.ProxyPort = service.Spec.Port
+			service.Spec.PublicIPs = []string{ip.String()}
 		}
 		err := rs.registry.CreateService(ctx, service)
 		if err != nil {

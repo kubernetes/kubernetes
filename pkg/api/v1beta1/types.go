@@ -467,6 +467,8 @@ type Service struct {
 	// This service will route traffic to pods having labels matching this selector.
 	Selector                   map[string]string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	CreateExternalLoadBalancer bool              `json:"createExternalLoadBalancer,omitempty" yaml:"createExternalLoadBalancer,omitempty"`
+	// PublicIPs are used by external load balancers.
+	PublicIPs []string `json:"publicIPs,omitempty" yaml:"publicIPs,omitempty"`
 
 	// ContainerPort is the name of the port on the container to direct traffic to.
 	// Optional, if unspecified use the first port on the container.
