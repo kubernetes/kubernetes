@@ -100,8 +100,17 @@ func (rs *REST) New() runtime.Object {
 	return &api.Minion{}
 }
 
-func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan apiserver.RESTResult, error) {
-	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+	minion, ok := obj.(*api.Minion)
+	if !ok {
+		return nil, fmt.Errorf("not a minion: %#v", obj)
+	}
+
+	oldMinion, err := rs.registry.GetMinion(ctx, minion.Name)
+
+	if errs := validation.ValidateMinionUpdate(minion); len(errs) > 0 {
+		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
+	}
 }
 
 func (rs *REST) toApiMinion(name string) *api.Minion {
