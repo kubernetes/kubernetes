@@ -27,10 +27,11 @@ This will build and start a lightweight local cluster, consisting of a master
 and a single minion. Type Control-C to shut it down.
 
 You can use the cluster/kubecfg.sh script to interact with the local cluster.
-You must set the KUBERNETES_MASTER environment variable to let other programs
+You must set the KUBERNETES_PROVIDER and KUBERNETES_MASTER environment variables to let other programs
 know how to reach your master.
 
 ```
+export KUBERNETES_PROVIDER=local
 export KUBERNETES_MASTER=http://localhost:8080
 ```
 
