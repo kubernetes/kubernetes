@@ -606,8 +606,8 @@ function setup-monitoring {
 
 	# Re-use master auth for Grafana
 	get-password
-	sed -i "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
-	sed -i "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
+	sed -i '' "s/HTTP_USER, \"value\": \"[^\"]*\"/HTTP_USER, \"value\": \"$KUBE_USER\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
+	sed -i '' "s/HTTP_PASS, \"value\": \"[^\"]*\"/HTTP_PASS, \"value\": \"$KUBE_PASSWORD\"/g" "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json"
         local kubectl=${KUBE_ROOT}/cluster/kubectl.sh
 	if "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-pod.json" &> /dev/null \
 	    && "${kubectl}" create -f "${KUBE_ROOT}/examples/monitoring/influx-grafana-service.json" &> /dev/null \
