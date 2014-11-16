@@ -939,6 +939,28 @@ type EventList struct {
 	Items []Event `yaml:"items" json:"items"`
 }
 
+// MasterFlagsSpec specifies configuration of a kubernetes master component.
+type MasterFlagsSpec struct {
+	// The command line flags as key-value pairs.
+	CmdLineArg map[string]string `json:"cmdlinearg" yaml:"cmdlinearg"`
+}
+
+// MasterFlags represents the configuration of a kubernetes master component.
+type MasterFlags struct {
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	Spec MasterFlagsSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// MasterFlagsList is a list of MasterFlagss
+type MasterFlagsList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	Items []MasterFlags `json:"items" yaml:"items"`
+}
+
 // ContainerManifest corresponds to the Container Manifest format, documented at:
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
 // This is used as the representation of Kubernetes workloads.

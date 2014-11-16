@@ -48,6 +48,10 @@ func (c *Client) Events(namespace string) EventInterface {
 	return newEvents(c, namespace)
 }
 
+func (c *Client) MasterFlags(namespace string) MasterFlagsInterface {
+	return newMasterFlags(c, namespace)
+}
+
 func (c *Client) Endpoints(namespace string) EndpointsInterface {
 	return newEndpoints(c, namespace)
 }

@@ -541,6 +541,16 @@ func ValidateMinion(minion *api.Minion) errs.ValidationErrorList {
 	return allErrs
 }
 
+// ValidateMasterFlags tests if required fields in the MasterFlags are set.
+func ValidateMasterFlags(flags *api.MasterFlags) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if len(flags.Name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("name", flags.Name))
+	}
+	allErrs = append(allErrs, validateLabels(flags.Labels)...)
+	return allErrs
+}
+
 // ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
 func ValidateMinionUpdate(oldMinion *api.Minion, minion *api.Minion) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}

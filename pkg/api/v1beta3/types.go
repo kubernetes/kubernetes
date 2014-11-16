@@ -944,3 +944,25 @@ type EventList struct {
 
 	Items []Event `json:"items" yaml:"items"`
 }
+
+// MasterFlagsSpec specifies configuration of a kubernetes master component.
+type MasterFlagsSpec struct {
+	// The command line flags as key-value pairs.
+	CmdLineArg map[string]string `json:"cmdlinearg" yaml:"cmdlinearg"`
+}
+
+// MasterFlags represents the configuration of a kubernetes master component.
+type MasterFlags struct {
+	TypeMeta   `json:",inline" yaml:",inline"`
+	ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	Spec MasterFlagsSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
+}
+
+// MasterFlagsList is a list of MasterFlagss
+type MasterFlagsList struct {
+	TypeMeta `json:",inline" yaml:",inline"`
+	ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+
+	Items []MasterFlags `json:"items" yaml:"items"`
+}

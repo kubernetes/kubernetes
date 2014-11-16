@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -244,4 +245,23 @@ func main() {
 	}
 	glog.Infof("Serving insecurely on %s", rwLocation)
 	glog.Fatal(s.ListenAndServe())
+
+	// Fetch additional flags from the API server
+	//
+	// Note: It would probably be better to do this by calling
+	// storage.Get(...) as in pkg/apiserver/resthandler.go.
+	// But we'd need a RESTStorage (the "storage" variable)
+	// and it doesn't seem we have that in this function?
+	flagsClient := client.MasterFlags(api.NamespaceDefault)
+	flags, err := flagsClient.Get("apiserver")
+	if err != nil {
+		glog.Fatalf("Could not read flags from api server: %v", err)
+	}
+	for k, v := range flags.Spec.CmdLineArg {
+		f := flag.Lookup(k)
+		if (f == nil) {
+			glog.Fatalf("Could not find flag %s", k)
+		}
+		f.Value.Set(v);
+	}
 }

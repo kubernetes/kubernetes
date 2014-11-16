@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/binding"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/masterflags"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
@@ -99,6 +100,7 @@ type Master struct {
 	minionRegistry        minion.Registry
 	bindingRegistry       binding.Registry
 	eventRegistry         generic.Registry
+	masterFlagsRegistry   generic.Registry
 	storage               map[string]apiserver.RESTStorage
 	client                *client.Client
 	portalNet             *net.IPNet
@@ -230,6 +232,7 @@ func New(c *Config) *Master {
 		endpointRegistry:      etcd.NewRegistry(c.EtcdHelper, nil),
 		bindingRegistry:       etcd.NewRegistry(c.EtcdHelper, boundPodFactory),
 		eventRegistry:         event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds())),
+		masterFlagsRegistry:   masterflags.NewEtcdRegistry(c.EtcdHelper),
 		minionRegistry:        minionRegistry,
 		client:                c.Client,
 		portalNet:             c.PortalNet,
@@ -323,6 +326,7 @@ func (m *Master) init(c *Config) {
 		"endpoints":              endpoint.NewREST(m.endpointRegistry),
 		"minions":                minion.NewREST(m.minionRegistry),
 		"events":                 event.NewREST(m.eventRegistry),
+		"masterFlags":            masterflags.NewREST(m.masterFlagsRegistry),
 
 		// TODO: should appear only in scheduler API group.
 		"bindings": binding.NewREST(m.bindingRegistry),

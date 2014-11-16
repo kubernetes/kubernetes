@@ -46,6 +46,8 @@ func init() {
 		&ContainerManifestList{},
 		&BoundPod{},
 		&BoundPods{},
+		&MasterFlags{},
+		&MasterFlagsList{},
 	)
 }
 
@@ -69,3 +71,5 @@ func (*ContainerManifest) IsAnAPIObject()         {}
 func (*ContainerManifestList) IsAnAPIObject()     {}
 func (*BoundPod) IsAnAPIObject()                  {}
 func (*BoundPods) IsAnAPIObject()                 {}
+func (*MasterFlags) IsAnAPIObject()               {}
+func (*MasterFlagsList) IsAnAPIObject()           {}
