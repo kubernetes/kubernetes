@@ -26,14 +26,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
+type RESTClientPoster interface {
+	Post() *client.Request
+}
+
 // ClientFunc returns the RESTClient defined for given resource
-type ClientFunc func(mapping *meta.RESTMapping) (*client.RESTClient, error)
+type ClientPosterFunc func(mapping *meta.RESTMapping) (RESTClientPoster, error)
 
 // CreateObjects creates bulk of resources provided by items list. Each item must
 // be valid API type. It requires ObjectTyper to parse the Version and Kind and
 // RESTMapper to get the resource URI and REST client that knows how to create
 // given type
-func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientFunc, objects []runtime.Object) util.ErrorList {
+func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientPosterFunc, objects []runtime.Object) util.ErrorList {
 	allErrors := util.ErrorList{}
 	for i, obj := range objects {
 		version, kind, err := typer.ObjectVersionAndKind(obj)
@@ -65,7 +69,7 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 // CreateObject creates the obj using the provided clients and the resource URI
 // mapping. It reports ValidationError when the object is missing the Metadata
 // or the Name and it will report any error occured during create REST call
-func CreateObject(client *client.RESTClient, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
+func CreateObject(client RESTClientPoster, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
 	name, err := mapping.MetadataAccessor.Name(obj)
 	if err != nil || name == "" {
 		return errs.NewFieldRequired("name", err)

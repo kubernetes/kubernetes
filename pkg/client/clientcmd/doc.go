@@ -14,16 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+/*
+Package cmd provides one stop shopping for a command line executable to bind the correct flags,
+build the client config, and create a working client. The code for usage looks like this:
 
-import (
-	"os"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
-)
-
-func main() {
-	clientBuilder := clientcmd.NewBuilder(clientcmd.NewPromptingAuthLoader(os.Stdin))
-	cmd.NewFactory(clientBuilder).Run(os.Stdout)
-}
+    clientBuilder := clientcmd.NewBuilder(clientcmd.NewDefaultAuthLoader())
+    clientBuilder.BindFlags(cmds.PersistentFlags())
+    apiClient, err := clientBuilder.Client()
+*/
+package clientcmd

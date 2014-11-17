@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdVersion(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version of client and server",
@@ -31,7 +31,10 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 			if GetFlagBool(cmd, "client") {
 				kubectl.GetClientVersion(out)
 			} else {
-				kubectl.GetVersion(out, getKubeClient(cmd))
+				client, err := f.ClientBuilder.Client()
+				checkErr(err)
+
+				kubectl.GetVersion(out, client)
 			}
 		},
 	}

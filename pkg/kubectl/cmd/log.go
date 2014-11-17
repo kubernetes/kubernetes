@@ -21,7 +21,7 @@ import (
 	"io"
 )
 
-func NewCmdLog(out io.Writer) *cobra.Command {
+func (f *Factory) NewCmdLog(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "log <pod> <container>",
 		Short: "Print the logs for a container in a pod",
@@ -32,7 +32,8 @@ func NewCmdLog(out io.Writer) *cobra.Command {
 
 			namespace := getKubeNamespace(cmd)
 
-			client := getKubeClient(cmd)
+			client, err := f.ClientBuilder.Client()
+			checkErr(err)
 			pod, err := client.Pods(namespace).Get(args[0])
 			checkErr(err)
 

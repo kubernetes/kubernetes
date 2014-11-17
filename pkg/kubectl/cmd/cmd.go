@@ -24,9 +24,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -34,23 +35,29 @@ import (
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
 type Factory struct {
-	Mapper    meta.RESTMapper
-	Typer     runtime.ObjectTyper
-	Client    func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error)
-	Describer func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error)
-	Printer   func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
+	ClientBuilder clientcmd.Builder
+	Mapper        meta.RESTMapper
+	Typer         runtime.ObjectTyper
+	Client        func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error)
+	Describer     func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error)
+	Printer       func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
-func NewFactory() *Factory {
+func NewFactory(clientBuilder clientcmd.Builder) *Factory {
 	return &Factory{
-		Mapper: latest.RESTMapper,
-		Typer:  api.Scheme,
+		ClientBuilder: clientBuilder,
+		Mapper:        latest.RESTMapper,
+		Typer:         api.Scheme,
 		Client: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.RESTClient, error) {
-			return getKubeClient(cmd), nil
+			return clientBuilder.Client()
 		},
 		Describer: func(cmd *cobra.Command, mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			describer, ok := kubectl.DescriberFor(mapping.Kind, getKubeClient(cmd))
+			client, err := clientBuilder.Client()
+			if err != nil {
+				return nil, err
+			}
+			describer, ok := kubectl.DescriberFor(mapping.Kind, client)
 			if !ok {
 				return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
 			}
@@ -73,23 +80,17 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 		Run: runHelp,
 	}
 
+	f.ClientBuilder.BindFlags(cmds.PersistentFlags())
+
 	// Globally persistent flags across all subcommands.
 	// TODO Change flag names to consts to allow safer lookup from subcommands.
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
-	cmds.PersistentFlags().StringP("server", "s", "", "Kubernetes apiserver to connect to")
-	cmds.PersistentFlags().StringP("auth-path", "a", os.Getenv("HOME")+"/.kubernetes_auth", "Path to the auth info file. If missing, prompt the user. Only used if using https.")
-	cmds.PersistentFlags().Bool("match-server-version", false, "Require server version to match client version")
-	cmds.PersistentFlags().String("api-version", latest.Version, "The version of the API to use against the server")
-	cmds.PersistentFlags().String("certificate-authority", "", "Path to a certificate file for the certificate authority")
-	cmds.PersistentFlags().String("client-certificate", "", "Path to a client certificate for TLS.")
-	cmds.PersistentFlags().String("client-key", "", "Path to a client key file for TLS.")
-	cmds.PersistentFlags().Bool("insecure-skip-tls-verify", false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
 	cmds.PersistentFlags().String("ns-path", os.Getenv("HOME")+"/.kubernetes_ns", "Path to the namespace info file that holds the namespace context to use for CLI requests.")
 	cmds.PersistentFlags().StringP("namespace", "n", "", "If present, the namespace scope for this CLI request.")
 
-	cmds.AddCommand(NewCmdVersion(out))
-	cmds.AddCommand(NewCmdProxy(out))
+	cmds.AddCommand(f.NewCmdVersion(out))
+	cmds.AddCommand(f.NewCmdProxy(out))
 
 	cmds.AddCommand(f.NewCmdGet(out))
 	cmds.AddCommand(f.NewCmdDescribe(out))
@@ -99,7 +100,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdDelete(out))
 
 	cmds.AddCommand(NewCmdNamespace(out))
-	cmds.AddCommand(NewCmdLog(out))
+	cmds.AddCommand(f.NewCmdLog(out))
 
 	if err := cmds.Execute(); err != nil {
 		os.Exit(1)
@@ -149,70 +150,4 @@ func getExplicitKubeNamespace(cmd *cobra.Command) (string, bool) {
 	// TODO: determine when --ns-path is set but equal to the default
 	// value and return its value and true.
 	return "", false
-}
-
-// GetKubeConfig returns a config used for the Kubernetes client with CLI
-// options parsed.
-func GetKubeConfig(cmd *cobra.Command) *client.Config {
-	config := &client.Config{}
-
-	var host string
-	if hostFlag := GetFlagString(cmd, "server"); len(hostFlag) > 0 {
-		host = hostFlag
-		glog.V(2).Infof("Using server from -s flag: %s", host)
-	} else if len(os.Getenv("KUBERNETES_MASTER")) > 0 {
-		host = os.Getenv("KUBERNETES_MASTER")
-		glog.V(2).Infof("Using server from env var KUBERNETES_MASTER: %s", host)
-	} else {
-		// TODO: eventually apiserver should start on 443 and be secure by default
-		host = "http://localhost:8080"
-		glog.V(2).Infof("No server found in flag or env var, using default: %s", host)
-	}
-	config.Host = host
-
-	if client.IsConfigTransportTLS(config) {
-		// Get the values from the file on disk (or from the user at the
-		// command line). Override them with the command line parameters, if
-		// provided.
-		authPath := GetFlagString(cmd, "auth-path")
-		authInfo, err := kubectl.LoadClientAuthInfoOrPrompt(authPath, os.Stdin)
-		// TODO: handle the case where the file could not be written but
-		// we still got a user/pass from prompting.
-		if err != nil {
-			glog.Fatalf("Error loading auth: %v", err)
-		}
-
-		config.Username = authInfo.User
-		config.Password = authInfo.Password
-		// First priority is flag, then file.
-		config.CAFile = FirstNonEmptyString(GetFlagString(cmd, "certificate-authority"), authInfo.CAFile)
-		config.CertFile = FirstNonEmptyString(GetFlagString(cmd, "client-certificate"), authInfo.CertFile)
-		config.KeyFile = FirstNonEmptyString(GetFlagString(cmd, "client-key"), authInfo.KeyFile)
-		config.BearerToken = authInfo.BearerToken
-		// For config.Insecure, the command line ALWAYS overrides the authInfo
-		// file, regardless of its setting.
-		if insecureFlag := GetFlagBoolPtr(cmd, "insecure-skip-tls-verify"); insecureFlag != nil {
-			config.Insecure = *insecureFlag
-		} else if authInfo.Insecure != nil {
-			config.Insecure = *authInfo.Insecure
-		}
-	}
-
-	// The API version (e.g. v1beta1), not the binary version.
-	config.Version = GetFlagString(cmd, "api-version")
-
-	return config
-}
-
-func getKubeClient(cmd *cobra.Command) *client.Client {
-	config := GetKubeConfig(cmd)
-
-	// The binary version.
-	matchVersion := GetFlagBool(cmd, "match-server-version")
-
-	c, err := kubectl.GetKubeClient(config, matchVersion)
-	if err != nil {
-		glog.Fatalf("Error creating kubernetes client: %v", err)
-	}
-	return c
 }

@@ -21,7 +21,6 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -80,8 +79,10 @@ Examples:
   $ cat config.json | kubectl apply -f -
   <creates all resources listed in config.json>`,
 		Run: func(cmd *cobra.Command, args []string) {
-			clientFunc := func(*meta.RESTMapping) (*client.RESTClient, error) {
-				return getKubeClient(cmd).RESTClient, nil
+			clientFunc := func(mapper *meta.RESTMapping) (config.RESTClientPoster, error) {
+				client, err := f.Client(cmd, mapper)
+				checkErr(err)
+				return client, nil
 			}
 
 			filename := GetFlagString(cmd, "filename")

@@ -20,7 +20,6 @@ package kubectl
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -28,7 +27,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
@@ -88,34 +86,6 @@ func SaveNamespaceInfo(path string, ns *NamespaceInfo) error {
 	data, err := json.Marshal(ns)
 	err = ioutil.WriteFile(path, data, 0600)
 	return err
-}
-
-// LoadClientAuthInfoOrPrompt parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
-func LoadClientAuthInfoOrPrompt(path string, r io.Reader) (*clientauth.Info, error) {
-	var auth clientauth.Info
-	// Prompt for user/pass and write a file if none exists.
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		auth.User = promptForString("Username", r)
-		auth.Password = promptForString("Password", r)
-		data, err := json.Marshal(auth)
-		if err != nil {
-			return &auth, err
-		}
-		err = ioutil.WriteFile(path, data, 0600)
-		return &auth, err
-	}
-	authPtr, err := clientauth.LoadFromFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return authPtr, nil
-}
-
-func promptForString(field string, r io.Reader) string {
-	fmt.Printf("Please enter %s: ", field)
-	var result string
-	fmt.Fscan(r, &result)
-	return result
 }
 
 // TODO Move to labels package.
