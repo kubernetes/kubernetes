@@ -31,26 +31,26 @@ containers:
         hostPort: 4001
         containerPort: 4001
         protocol: TCP
-  - name: apiserver
+  - name: kube-apiserver
     image: kubernetes
     imagePullPolicy: never
     ports:
-      - name: apiserver-port
+      - name: kube-apiserver-port
         hostPort: 8080
         containerPort: 8080
         protocol: TCP
-    command: ["/kubernetes/apiserver", "-v=5", "-address=0.0.0.0", "-etcd_servers=http://127.0.0.1:4001"]
+    command: ["/kubernetes/kube-apiserver", "-v=5", "-address=0.0.0.0", "-etcd_servers=http://127.0.0.1:4001"]
   - name: controller-manager
     image: kubernetes
     imagePullPolicy: never
-    command: ["/kubernetes/controller-manager", "-v=5", "-master=127.0.0.1:8080", "-machines=${KUBELET_IP}"]
+    command: ["/kubernetes/kube-controller-manager", "-v=5", "-master=127.0.0.1:8080", "-machines=${KUBELET_IP}"]
   - name: proxy
     image: kubernetes
     imagePullPolicy: never
-    command: ["/kubernetes/proxy", "-v=5", "-etcd_servers=http://127.0.0.1:4001"]
+    command: ["/kubernetes/kube-proxy", "-v=5", "-etcd_servers=http://127.0.0.1:4001"]
   - name: scheduler
     image: kubernetes
     imagePullPolicy: never
-    command: ["/kubernetes/scheduler", "-v=5", "-master=127.0.0.1:8080"]
+    command: ["/kubernetes/kube-scheduler", "-v=5", "-master=127.0.0.1:8080"]
 EOF
 ./kubelet -v=5 -address=0.0.0.0 -hostname_override=${KUBELET_IP} -etcd_servers=http://${HOST_IP}:4001 -config pod.yaml

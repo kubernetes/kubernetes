@@ -6,7 +6,7 @@
 
 /usr/local/bin/kube-proxy:
   file.managed:
-    - source: salt://kube-bins/proxy
+    - source: salt://kube-bins/kube-proxy
     - user: root
     - group: root
     - mode: 755

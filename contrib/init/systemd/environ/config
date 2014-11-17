@@ -4,11 +4,11 @@
 # The following values are used to configure various aspects of all
 # kubernetes services, including
 #
-#   kubernetes-apiserver.service
-#   kubernetes-controller-manager.service
-#   kubernetes-scheduler.service
+#   kube-apiserver.service
+#   kube-controller-manager.service
+#   kube-scheduler.service
 #   kubelet.service
-#   kubernetes-proxy.service
+#   kube-proxy.service
 
 # Comma seperated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"

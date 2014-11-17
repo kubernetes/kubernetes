@@ -1,12 +1,12 @@
 [Unit]
-After=apiserver.service
-ConditionFileIsExecutable=/opt/bin/scheduler
+After=kube-apiserver.service
+ConditionFileIsExecutable=/opt/bin/kube-scheduler
 Description=Kubernetes Scheduler
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-Wants=apiserver.service
+Wants=kube-apiserver.service
 
 [Service]
-ExecStart=/opt/bin/scheduler \
+ExecStart=/opt/bin/kube-scheduler \
 --logtostderr=true \
 --master=127.0.0.1:8080
 Restart=always

@@ -84,8 +84,8 @@ esac
 
 GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 
-APISERVER_LOG=/tmp/apiserver.log
-"${GO_OUT}/apiserver" \
+APISERVER_LOG=/tmp/kube-apiserver.log
+"${GO_OUT}/kube-apiserver" \
   -v=${LOG_LEVEL} \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
@@ -94,11 +94,11 @@ APISERVER_LOG=/tmp/apiserver.log
   --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
 APISERVER_PID=$!
 
-# Wait for apiserver to come up before launching the rest of the components.
+# Wait for kube-apiserver to come up before launching the rest of the components.
 kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: "
 
-CTLRMGR_LOG=/tmp/controller-manager.log
-"${GO_OUT}/controller-manager" \
+CTLRMGR_LOG=/tmp/kube-controller-manager.log
+"${GO_OUT}/kube-controller-manager" \
   -v=${LOG_LEVEL} \
   --machines="127.0.0.1" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
@@ -114,13 +114,13 @@ KUBELET_LOG=/tmp/kubelet.log
 KUBELET_PID=$!
 
 PROXY_LOG=/tmp/kube-proxy.log
-"${GO_OUT}/proxy" \
+"${GO_OUT}/kube-proxy" \
   -v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 
-SCHEDULER_LOG=/tmp/k8s-scheduler.log
-"${GO_OUT}/scheduler" \
+SCHEDULER_LOG=/tmp/kube-scheduler.log
+"${GO_OUT}/kube-scheduler" \
   -v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!

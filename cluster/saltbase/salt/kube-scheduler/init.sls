@@ -1,60 +1,60 @@
 {% if grains['os_family'] == 'RedHat' %}
-{% set environment_file = '/etc/sysconfig/apiserver' %}
+{% set environment_file = '/etc/sysconfig/kube-scheduler' %}
 {% else %}
-{% set environment_file = '/etc/default/apiserver' %}
+{% set environment_file = '/etc/default/kube-scheduler' %}
 {% endif %}
 
 {{ environment_file }}:
   file.managed:
-    - source: salt://apiserver/default
+    - source: salt://kube-scheduler/default
     - template: jinja
     - user: root
     - group: root
     - mode: 644
 
-/usr/local/bin/apiserver:
+/usr/local/bin/kube-scheduler:
   file.managed:
-    - source: salt://kube-bins/apiserver
+    - source: salt://kube-bins/kube-scheduler
     - user: root
     - group: root
     - mode: 755
 
 {% if grains['os_family'] == 'RedHat' %}
 
-/usr/lib/systemd/system/apiserver.service:
+/usr/lib/systemd/system/kube-scheduler.service:
   file.managed:
-    - source: salt://apiserver/apiserver.service
+    - source: salt://kube-scheduler/kube-scheduler.service
     - user: root
     - group: root
 
 {% else %}
 
-/etc/init.d/apiserver:
+/etc/init.d/kube-scheduler:
   file.managed:
-    - source: salt://apiserver/initd
+    - source: salt://kube-scheduler/initd
     - user: root
     - group: root
     - mode: 755
 
 {% endif %}
 
-apiserver:
+kube-scheduler:
   group.present:
     - system: True
   user.present:
     - system: True
     - gid_from_name: True
-    - groups:
-      - kube-cert
     - shell: /sbin/nologin
-    - home: /var/apiserver
+    - home: /var/kube-scheduler
     - require:
-      - group: apiserver
+      - group: kube-scheduler
   service.running:
     - enable: True
     - watch:
+      - file: /usr/local/bin/kube-scheduler
       - file: {{ environment_file }}
-      - file: /usr/local/bin/apiserver
 {% if grains['os_family'] != 'RedHat' %}
-      - file: /etc/init.d/apiserver
+      - file: /etc/init.d/kube-scheduler
 {% endif %}
+
+

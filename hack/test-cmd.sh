@@ -63,9 +63,9 @@ KUBELET_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
 
-# Start apiserver
-kube::log::status "Starting apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/apiserver" \
+# Start kube-apiserver
+kube::log::status "Starting kube-apiserver"
+"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --address="127.0.0.1" \
   --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
@@ -88,7 +88,7 @@ kube_flags=(
 
 # Start controller manager
 kube::log::status "Starting CONTROLLER-MANAGER"
-"${KUBE_OUTPUT_HOSTBIN}/controller-manager" \
+"${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
   --machines="127.0.0.1" \
   --master="127.0.0.1:${API_PORT}" 1>&2 &
 CTLRMGR_PID=$!
@@ -130,6 +130,6 @@ kube::log::status "TEST PASSED"
 
 # Start proxy
 #PROXY_LOG=/tmp/kube-proxy.log
-#${KUBE_OUTPUT_HOSTBIN}/proxy \
+#${KUBE_OUTPUT_HOSTBIN}/kube-proxy \
 #  --etcd_servers="http://127.0.0.1:${ETCD_PORT}" 1>&2 &
 #PROXY_PID=$!

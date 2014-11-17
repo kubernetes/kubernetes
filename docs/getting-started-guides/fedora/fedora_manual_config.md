@@ -10,7 +10,7 @@ The guide is broken into 3 sections:
 2. Configuring the two hosts, a master and a minion.
 3. Basic functionality test.
 
-The kubernetes package provides a few services: apiserver, scheduler, controller, kubelet, proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, fed-master, will be the kubernetes master.  This host will run the apiserver, controller, and scheduler.  In addition, the master will also run _etcd_.  The remaining host, fed-minion will be the minion and run kubelet, proxy, cadvisor and docker.
+The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes. We will break the services up between the hosts.  The first host, fed-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_.  The remaining host, fed-minion will be the minion and run kubelet, proxy, cadvisor and docker.
 
 **System Information:**
 
@@ -54,11 +54,11 @@ echo "192.168.121.9	fed-master
 # The following values are used to configure various aspects of all
 # kubernetes services, including
 #
-#   kubernetes-apiserver.service
-#   kubernetes-controller-manager.service
-#   kubernetes-scheduler.service
+#   kube-apiserver.service
+#   kube-controller-manager.service
+#   kube-scheduler.service
 #   kubelet.service
-#   kubernetes-proxy.service
+#   kube-proxy.service
 
 # Comma seperated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
@@ -82,7 +82,7 @@ systemctl stop iptables-services firewalld
 
 **Configure the kubernetes services on the master.**
 
-***For this you need to configure the apiserver. The apiserver, controller-manager, and scheduler along with the etcd, will need to be started***
+***For this you need to configure the kube-apiserver. The kube-apiserver, kube-controller-manager, and kube-scheduler along with the etcd, will need to be started***
 
 * Edit /etc/kubernetes/apiserver to appear as such:
 
@@ -90,7 +90,7 @@ systemctl stop iptables-services firewalld
 ###
 # kubernetes system config
 #
-# The following values are used to configure the kubernetes-apiserver
+# The following values are used to configure the kube-apiserver
 #
 
 # The address on the local server to listen to.
@@ -99,7 +99,7 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 # The port on the local server to listen on.
 KUBE_API_PORT="--port=8080"
 
-# How the replication controller and scheduler find the apiserver
+# How the replication controller and scheduler find the kube-apiserver
 KUBE_MASTER="--master=fed-master:8080"
 
 # Port minions listen on
@@ -117,7 +117,7 @@ KUBE_API_ARGS=""
 ###
 # kubernetes system config
 #
-# The following values are used to configure the kubernetes-controller-manager
+# The following values are used to configure the kube-controller-manager
 #
 
 # Comma seperated list of minions
@@ -149,7 +149,7 @@ curl -s -L http://fed-master:4001/v2/keys/mykey | python -mjson.tool
 curl -s -L http://fed-master:4001/v2/keys/mykey -XDELETE | python -mjson.tool
 ```       
 
-* Poke the apiserver just a bit
+* Poke the kube-apiserver just a bit
 ```
 curl -s -L http://fed-master:8080/version | python -mjson.tool
 curl -s -L http://fed-master:8080/api/v1beta1/pods | python -mjson.tool

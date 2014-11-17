@@ -28,9 +28,9 @@ base:
     - match: grain
     - generate-cert
     - etcd
-    - apiserver
-    - controller-manager
-    - scheduler
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
     - nginx
     - kube-client-tools
     - logrotate
