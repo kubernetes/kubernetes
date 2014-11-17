@@ -51,10 +51,10 @@ func GenerateRandomStats(numStats, numCores int, duration time.Duration) []*info
 	return ret
 }
 
-func GenerateRandomContainerSpec(numCores int) *info.ContainerSpec {
-	ret := &info.ContainerSpec{
-		Cpu:    &info.CpuSpec{},
-		Memory: &info.MemorySpec{},
+func GenerateRandomContainerSpec(numCores int) info.ContainerSpec {
+	ret := info.ContainerSpec{
+		Cpu:    info.CpuSpec{},
+		Memory: info.MemorySpec{},
 	}
 	ret.Cpu.Limit = uint64(1000 + rand.Int63n(2000))
 	ret.Cpu.MaxLimit = uint64(1000 + rand.Int63n(2000))

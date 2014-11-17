@@ -40,8 +40,15 @@ type MemorySpec struct {
 }
 
 type ContainerSpec struct {
-	Cpu    *CpuSpec    `json:"cpu,omitempty"`
-	Memory *MemorySpec `json:"memory,omitempty"`
+	HasCpu bool    `json:"has_cpu"`
+	Cpu    CpuSpec `json:"cpu,omitempty"`
+
+	HasMemory bool       `json:"has_memory"`
+	Memory    MemorySpec `json:"memory,omitempty"`
+
+	HasNetwork bool `json:"has_network"`
+
+	HasFilesystem bool `json:"has_filesystem"`
 }
 
 // Container reference contains enough information to uniquely identify a container
@@ -66,7 +73,7 @@ type ContainerInfo struct {
 	Subcontainers []ContainerReference `json:"subcontainers,omitempty"`
 
 	// The isolation used in the container.
-	Spec *ContainerSpec `json:"spec,omitempty"`
+	Spec ContainerSpec `json:"spec,omitempty"`
 
 	// Historical statistics gathered from the container.
 	Stats []*ContainerStats `json:"stats,omitempty"`
@@ -166,6 +173,19 @@ type CpuStats struct {
 	Load int32 `json:"load"`
 }
 
+type PerDiskStats struct {
+	Major uint64            `json:"major"`
+	Minor uint64            `json:"minor"`
+	Stats map[string]uint64 `json:"stats"`
+}
+
+type DiskIoStats struct {
+	IoServiceBytes []PerDiskStats `json:"io_service_bytes,omitempty"`
+	IoServiced     []PerDiskStats `json:"io_serviced,omitempty"`
+	IoQueued       []PerDiskStats `json:"io_queued,omitempty"`
+	Sectors        []PerDiskStats `json:"sectors,omitempty"`
+}
+
 type MemoryStats struct {
 	// Memory limit, equivalent to "limit" in MemorySpec.
 	// Units: Bytes.
@@ -211,12 +231,26 @@ type NetworkStats struct {
 	TxDropped uint64 `json:"tx_dropped"`
 }
 
+type FsStats struct {
+	// The block device name associated with the filesystem.
+	Device string `json:"device,omitempty"`
+
+	// Number of bytes that can be consumed by the container on this filesystem.
+	Limit uint64 `json:"capacity"`
+
+	// Number of bytes that is consumed by the container on this filesystem.
+	Usage uint64 `json:"usage"`
+}
+
 type ContainerStats struct {
 	// The time of this stat point.
 	Timestamp time.Time     `json:"timestamp"`
 	Cpu       *CpuStats     `json:"cpu,omitempty"`
+	DiskIo    DiskIoStats   `json:"diskio,omitempty"`
 	Memory    *MemoryStats  `json:"memory,omitempty"`
 	Network   *NetworkStats `json:"network,omitempty"`
+	// Filesystem statistics
+	Filesystem []FsStats `json:"filesystem,omitempty"`
 }
 
 // Makes a deep copy of the ContainerStats and returns a pointer to the new

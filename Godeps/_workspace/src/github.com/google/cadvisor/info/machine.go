@@ -14,12 +14,23 @@
 
 package info
 
+type FsInfo struct {
+	// Block device associated with the filesystem.
+	Device string `json:"device"`
+
+	// Total number of bytes available on the filesystem.
+	Capacity uint64 `json:"capacity"`
+}
+
 type MachineInfo struct {
 	// The number of cores in this machine.
 	NumCores int `json:"num_cores"`
 
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity int64 `json:"memory_capacity"`
+
+	// Filesystems on this machine.
+	Filesystems []FsInfo `json:"filesystems"`
 }
 
 type VersionInfo struct {
