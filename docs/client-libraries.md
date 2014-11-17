@@ -8,4 +8,5 @@
 
    * [Java](https://github.com/nirmal070125/KubernetesAPIJavaClient)
    * [Ruby](https://github.com/Ch00k/kuber)
+   * [PHP](https://github.com/devstub/kubernetes-api-php-client)
 
