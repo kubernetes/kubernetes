@@ -48,6 +48,11 @@ def ensure(name, cidr, mtu=1460):
             'chain': 'POSTROUTING',
             'rule': '-o eth0 -j MASQUERADE \! -d 10.0.0.0/8'
         }
+        iptables_rule_2 = {
+            'table': 'nat',
+            'chain': 'POSTROUTING',
+            'rule': '-o eth0 -j MASQUERADE -s %s' % cidr
+        }
     else:
         iptables_rule = None
 
@@ -103,7 +108,8 @@ def ensure(name, cidr, mtu=1460):
         # If not, it returns a string with the error from the call to iptables.
         if iptables_rule:
             ret['iptables_rule_exists'] = \
-              __salt__['iptables.check'](**iptables_rule) == True
+              (__salt__['iptables.check'](**iptables_rule) == True) and \
+              (__salt__['iptables.check'](**iptables_rule_2) == True)
         else:
             ret['iptables_rule_exists'] = True
         return ret
@@ -155,6 +161,7 @@ def ensure(name, cidr, mtu=1460):
     new_state = get_current_state()
     if iptables_rule and not new_state['iptables_rule_exists']:
         __salt__['iptables.append'](**iptables_rule)
+        __salt__['iptables.append'](**iptables_rule_2)
     new_state = get_current_state()
 
     ret['comment'] = 'The state of "{0}" was changed!'.format(name)
