@@ -110,10 +110,12 @@ cd kubernetes
 hack/e2e-test.sh
 ```
 
-Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with the magical incantation:
+Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with this command:
 ```
-hack/e2e-test.sh 1 1 1
+go run e2e.go --down
 ```
+
+See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster.
 
 ## Testing out flaky tests
 [Instructions here](docs/devel/flaky-tests.md)
