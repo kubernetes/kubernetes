@@ -641,6 +641,14 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	if created_service.Spec.ProxyPort != 0 {
 		t.Errorf("Unexpected ProxyPort: %d", created_service.Spec.ProxyPort)
 	}
+
+	update := new(api.Service)
+	*update = *created_service
+
+	_, err := rest.Update(ctx, update)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
 }
 
 func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
