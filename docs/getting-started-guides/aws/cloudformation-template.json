@@ -91,7 +91,19 @@
           "Fn::GetAtt" : [ "KubernetesSecurityGroup", "GroupId" ] 
         }
       }
-    }, 
+    },
+    "KubernetesIngressUDP": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupName": {"Ref": "KubernetesSecurityGroup"},
+        "IpProtocol": "udp",
+        "FromPort": "1",
+        "ToPort": "65535",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt" : [ "KubernetesSecurityGroup", "GroupId" ]
+        }
+      }
+    },
     "KubernetesMasterInstance": {
       "Type": "AWS::EC2::Instance",
       "Properties": {
