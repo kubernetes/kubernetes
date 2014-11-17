@@ -38,15 +38,26 @@ __has_resource()
 }
 
 # call kubectl get $1,
-# exclude blank lines
-# skip the header stuff kubectl prints on the first 2 lines
-# append $1/ to the first column and use that in compgen
+# use the first column in compgen
+# we could use templates, but then would need a template per resource
 __kubectl_parse_get()
 {
     local kubectl_output out
     if kubectl_output=$(kubectl get --no-headers "$1" 2>/dev/null); then
         out=($(echo "${kubectl_output}" | awk '{print $1}'))
         COMPREPLY=( $( compgen -W "${out[*]}" -- "$cur" ) )
+    fi
+}
+
+# $1 is the name of the pod we want to get the list of containers inside
+__kubectl_get_containers()
+{
+    local template
+    template="{{ range .DesiredState.Manifest.Containers  }}{{ .Name }} {{ end }}"
+
+    local kubectl_out
+    if kubectl_out=$(kubectl get -o template --template="${template}" pods "$1" 2>/dev/null); then
+        COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
 
@@ -61,6 +72,9 @@ __kubectl_pre_command()
             --client-key=
             --insecure-skip-tls-verify=
             --match-server-version=
+            -n
+            --namespace=
+            --ns-path=
             -s
             --server=
     )
@@ -71,7 +85,7 @@ __kubectl_pre_command()
             COMPREPLY=( $(compgen -W "${api_versions[*]}" -- "$cur") )
             return 0
             ;;
-        -a | --auth-path | --certificate-authority | --client-certificate | --client-key)
+        -a | --auth-path | --certificate-authority | --client-certificate | --client-key | --ns-path)
             _filedir
             return 0
             ;;
@@ -79,7 +93,7 @@ __kubectl_pre_command()
             COMPREPLY=( $(compgen -W "true false" -- "$cur") )
             return 0
             ;;
-        -s | --server)
+        -n | --namespace | -s | --server)
             return 0
             ;;
         *)
@@ -120,20 +134,23 @@ __kubectl_require_file()
 __kubectl_handle_flags_resources()
 {
     case $prev in
-        pod | pods)
+        po | pod | pods)
             __kubectl_parse_get pods
             return 0
             ;;
-        replicationController | replicationControllers)
+        rc | replicationController | replicationControllers)
             __kubectl_parse_get replicationControllers
             return 0
             ;;
-        service | services)
+        se | service | services)
             __kubectl_parse_get services
             return 0
             ;;
-        minion | minions)
+        me | minion | minions)
             __kubectl_parse_get minions
+            return 0
+            ;;
+        ev | event | events)
             return 0
             ;;
     esac
@@ -184,7 +201,7 @@ __kubectl_get()
 
     case $prev in
         -o | --output)
-            COMPREPLY=( $(compgen -W "table json yaml template" -- "$cur") )
+            COMPREPLY=( $(compgen -W "json yaml template templatefile" -- "$cur") )
             return 0
             ;;
         -t | --template)
@@ -193,6 +210,22 @@ __kubectl_get()
             ;;
     esac
     __kubectl_handle_flags_resources
+}
+
+# Require both a pod and a container to be specified
+__kubectl_require_pod_and_container()
+{
+    # check is cword-1 is $command
+    if [[ $prev == $command ]]; then
+        __kubectl_parse_get pods
+        return 0
+    fi;
+
+    # this is safe, we know $command is back there somewhere and we know cword-1
+    if [[ ${words[cword-2]} == $command ]]; then
+        __kubectl_get_containers $prev
+        return 0
+    fi
 }
 
 __kubectl_describe()
@@ -243,7 +276,7 @@ __kubectl_delete()
 __kubectl_post_command()
 {
     case $command in
-        create | update)
+        apply | create | update)
             __kubectl_require_file
             return 0
             ;;
@@ -259,6 +292,10 @@ __kubectl_post_command()
             __kubectl_delete
             return 0
             ;;
+        log)
+            __kubectl_require_pod_and_container
+            return 0
+            ;;
         *)
             ;;
     esac
@@ -272,10 +309,11 @@ _kubectl()
     _expand || return 0
     COMPREPLY=()
 
-    local commands=(version proxy get describe create update delete help)
+    local commands=(version proxy get describe create update delete namespace log apply help)
     local two_word_flags=(
             -a
             -s
+            -n
     )
 
     # figure out which command they are running, remembering that arguments to
