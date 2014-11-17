@@ -23,7 +23,7 @@ Kubernetes documentation is organized into several categories.
     - in [examples](../examples)
     - Hands on introduction and example config files
   - **API documentation**
-    - in [api](../api)
-    - automatically generated REST API documentation
+    - in [the API conventions doc](api-conventions.md)
+    - and automatically generated API documentation served by the master
   - **Wiki**
     - in [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
