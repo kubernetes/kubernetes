@@ -630,6 +630,8 @@ function setup-monitoring {
 
 function teardown-monitoring {
   if [[ "${MONITORING}" == "true" ]]; then
+    detect-project
+
     local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
     "${kubectl}" delete pods heapster &> /dev/null || true
     "${kubectl}" delete pods influx-grafana &> /dev/null || true
