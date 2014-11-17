@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -90,6 +91,21 @@ func FirstNonEmptyString(args ...string) string {
 		}
 	}
 	return ""
+}
+
+// Return a list of file names of a certain type within a given directory.
+func GetFilesFromDir(directory string, fileType string) []string {
+	files := []string{}
+
+	err := filepath.Walk(directory, func(path string, f os.FileInfo, err error) error {
+		if filepath.Ext(path) == fileType {
+			files = append(files, path)
+		}
+		return err
+	})
+
+	checkErr(err)
+	return files
 }
 
 // ReadConfigData reads the bytes from the specified filesytem or network
