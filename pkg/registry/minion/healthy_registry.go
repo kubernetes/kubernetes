@@ -62,6 +62,10 @@ func (r *HealthyRegistry) CreateMinion(ctx api.Context, minion *api.Minion) erro
 	return r.delegate.CreateMinion(ctx, minion)
 }
 
+func (r *HealthyRegistry) UpdateMinion(ctx api.Context, minion *api.Minion) error {
+	return r.delegate.UpdateMinion(ctx, minion)
+}
+
 func (r *HealthyRegistry) ListMinions(ctx api.Context) (currentMinions *api.MinionList, err error) {
 	result := &api.MinionList{}
 	list, err := r.delegate.ListMinions(ctx)

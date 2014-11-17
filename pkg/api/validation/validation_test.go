@@ -1065,3 +1065,62 @@ func TestValidateMinion(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateMinionUpdate(t *testing.T) {
+	tests := []struct {
+		oldMinion api.Minion
+		minion    api.Minion
+		valid     bool
+	}{
+		{api.Minion{}, api.Minion{}, true},
+		{api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo"}},
+			api.Minion{
+				ObjectMeta: api.ObjectMeta{
+					Name: "bar"},
+			}, false},
+		{api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "bar"},
+			},
+		}, api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, true},
+		{api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+		}, api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, true},
+		{api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"bar": "foo"},
+			},
+		}, api.Minion{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, true},
+	}
+	for _, test := range tests {
+		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("Unexpected error: %v", errs)
+			t.Logf("%#v vs %#v", test.oldMinion.ObjectMeta, test.minion.ObjectMeta)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("Unexpected non-error")
+		}
+	}
+}

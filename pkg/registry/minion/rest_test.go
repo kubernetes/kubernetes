@@ -87,7 +87,7 @@ func TestMinionREST(t *testing.T) {
 	}
 }
 
-func TestMinionRESTWithHealthCheck(t *testing.T) {
+func TestMinionStorageWithHealthCheck(t *testing.T) {
 	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
 	minionHealthRegistry := HealthyRegistry{
 		delegate: minionRegistry,
@@ -117,6 +117,43 @@ func contains(nodes *api.MinionList, nodeID string) bool {
 		}
 	}
 	return false
+}
+
+func TestMinionStorageInvalidUpdate(t *testing.T) {
+	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	minion, ok := obj.(*api.Minion)
+	if !ok {
+		t.Fatalf("Object is not a minion: %#v", obj)
+	}
+	minion.HostIP = "1.2.3.4"
+	if _, err = storage.Update(ctx, minion); err == nil {
+		t.Error("Unexpected non-error.")
+	}
+}
+
+func TestMinionStorageValidUpdate(t *testing.T) {
+	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	minion, ok := obj.(*api.Minion)
+	if !ok {
+		t.Fatalf("Object is not a minion: %#v", obj)
+	}
+	minion.Labels = map[string]string{
+		"foo": "bar",
+		"baz": "home",
+	}
+	if _, err = storage.Update(ctx, minion); err != nil {
+		t.Error("Unexpected error: %v", err)
+	}
 }
 
 func TestMinionStorageValidatesCreate(t *testing.T) {

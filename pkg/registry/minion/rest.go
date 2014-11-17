@@ -100,8 +100,29 @@ func (rs *REST) New() runtime.Object {
 	return &api.Minion{}
 }
 
-func (rs *REST) Update(ctx api.Context, minion runtime.Object) (<-chan apiserver.RESTResult, error) {
-	return nil, fmt.Errorf("Minions can only be created (inserted) and deleted.")
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+	minion, ok := obj.(*api.Minion)
+	if !ok {
+		return nil, fmt.Errorf("not a minion: %#v", obj)
+	}
+
+	// TODO: GetMinion will health check the minion, but we shouldn't require the minion to be
+	// running for updating labels.
+	oldMinion, err := rs.registry.GetMinion(ctx, minion.Name)
+	if err != nil {
+		return nil, err
+	}
+	if errs := validation.ValidateMinionUpdate(oldMinion, minion); len(errs) > 0 {
+		return nil, kerrors.NewInvalid("minion", minion.Name, errs)
+	}
+
+	return apiserver.MakeAsync(func() (runtime.Object, error) {
+		err := rs.registry.UpdateMinion(ctx, minion)
+		if err != nil {
+			return nil, err
+		}
+		return rs.registry.GetMinion(ctx, minion.Name)
+	}), nil
 }
 
 func (rs *REST) toApiMinion(name string) *api.Minion {
