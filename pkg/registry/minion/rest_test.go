@@ -17,7 +17,6 @@ limitations under the License.
 package minion
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -88,7 +87,7 @@ func TestMinionREST(t *testing.T) {
 	}
 }
 
-func TestMinionRESTWithHealthCheck(t *testing.T) {
+func TestMinionStorageWithHealthCheck(t *testing.T) {
 	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
 	minionHealthRegistry := HealthyRegistry{
 		delegate: minionRegistry,
@@ -120,46 +119,40 @@ func contains(nodes *api.MinionList, nodeID string) bool {
 	return false
 }
 
-func TestMinionRegistryUpdate(t *testing.T) {
-	minionRegistry := registrytest.NewMinionRegistry([]string{}, api.NodeResources{})
-	ms := NewREST(minionRegistry)
-
+func TestMinionStorageInvalidUpdate(t *testing.T) {
+	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
 	ctx := api.NewContext()
-
-	expected_labels := map[string]string{"foo": "bar"}
-	c, err := ms.Create(ctx, &api.Minion{
-		ObjectMeta: api.ObjectMeta{Name: "m1"},
-		Labels:     expected_labels,
-	})
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
-		t.Errorf("insert failed")
+		t.Errorf("Unexpected error: %v", err)
 	}
-	result := <-c
-
-	created, ok := result.Object.(*api.Minion)
-	if !ok || created.Name != "m1" {
-		t.Errorf("insert return value was weird: %#v", result)
+	minion, ok := obj.(*api.Minion)
+	if !ok {
+		t.Fatalf("Object is not a minion: %#v", obj)
 	}
-	if !reflect.DeepEqual(expected_labels, created.Labels) {
-		t.Errorf("unexpected labels: %#v", created.Labels)
+	minion.HostIP = "1.2.3.4"
+	if _, err = storage.Update(ctx, minion); err == nil {
+		t.Error("Unexpected non-error.")
 	}
+}
 
-	update := new(api.Minion)
-	*update = *created
-	update_labels := map[string]string{"bar": "foo"}
-	update.Labels = update_labels
-
-	c, err = ms.Update(ctx, update)
+func TestMinionStorageValidUpdate(t *testing.T) {
+	storage := NewREST(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	ctx := api.NewContext()
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
-		t.Errorf("update failed")
+		t.Errorf("Unexpected error: %v", err)
 	}
-	result = <-c
-	updated, ok := result.Object.(*api.Minion)
-	if !ok || updated.Name != "m1" {
-		t.Errorf("update return value was weird: %#v", result)
+	minion, ok := obj.(*api.Minion)
+	if !ok {
+		t.Fatalf("Object is not a minion: %#v", obj)
 	}
-	if !reflect.DeepEqual(update_labels, updated.Labels) {
-		t.Errorf("unexpected labels: %#v", updated.Labels)
+	minion.Labels = map[string]string{
+		"foo": "bar",
+		"baz": "home",
+	}
+	if _, err = storage.Update(ctx, minion); err != nil {
+		t.Error("Unexpected error: %v", err)
 	}
 }
 

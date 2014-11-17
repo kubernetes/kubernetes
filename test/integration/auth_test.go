@@ -306,7 +306,7 @@ func getTestRequests() []struct {
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200},
 		{"POST", "/api/v1beta1/minions" + syncFlags, aMinion, code200},
-		{"PUT", "/api/v1beta1/minions/a" + syncFlags, aMinion, code409}, // See #2115 about why 409
+		{"PUT", "/api/v1beta1/minions/a" + syncFlags, aMinion, code422}, // TODO: GET and put back server-provided fields to avoid a 422
 		{"GET", "/api/v1beta1/minions", "", code200},
 		{"GET", "/api/v1beta1/minions/a", "", code200},
 		{"DELETE", "/api/v1beta1/minions/a" + syncFlags, "", code200},
